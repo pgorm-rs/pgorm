@@ -44,6 +44,7 @@ uuid = { version = "1", default-features = false, optional = true }
 ouroboros = { version = "0.17", default-features = false }
 url = { version = "2.2", default-features = false }
 thiserror = { version = "1", default-features = false }
+deadpool = { version = "0.12.1", optional = true }
 
 [dev-dependencies]
 smol = { version = "1.2" }
@@ -72,6 +73,8 @@ default = [
     "with-bigdecimal",
     "with-uuid",
     "with-time",
+
+    "sqlx-deadpool-postgres"
 ]
 macros = ["sea-orm-macros/derive"]
 mock = []
@@ -90,6 +93,7 @@ sqlx-all = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite"]
 sqlx-mysql = ["sqlx-dep", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
 sqlx-postgres = ["sqlx-dep", "sea-query-binder/sqlx-postgres", "sqlx/postgres", "postgres-array"]
 sqlx-sqlite = ["sqlx-dep", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
+sqlx-deadpool-postgres = ["sqlx-postgres", "deadpool"]
 sqlite-use-returning-for-3_35 = []
 runtime-async-std = ["sqlx?/runtime-async-std"]
 runtime-async-std-native-tls = ["sqlx?/runtime-async-std-native-tls", "runtime-async-std"]

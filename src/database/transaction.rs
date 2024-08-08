@@ -325,7 +325,7 @@ impl ConnectionTrait for DatabaseTransaction {
             #[cfg(feature = "sqlx-postgres")]
             InnerConnection::Postgres(conn) => {
                 let query = crate::driver::sqlx_postgres::sqlx_query(&stmt);
-                let conn: &mut sqlx::PgConnection = &mut *conn;
+                let conn = &mut ***conn;
                 crate::metric::metric!(self.metric_callback, &stmt, {
                     crate::sqlx_map_err_ignore_not_found(
                         query.fetch_one(conn).await.map(|row| Some(row.into())),

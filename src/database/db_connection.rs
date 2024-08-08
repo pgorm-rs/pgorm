@@ -1,6 +1,5 @@
 use crate::{
-    error::*, AccessMode, ConnectionTrait, DatabaseTransaction, ExecResult, IsolationLevel,
-    QueryResult, Statement, StatementBuilder, StreamTrait, TransactionError, TransactionTrait,
+    error::*, AccessMode, ConnectionTrait, DatabaseTransaction, ExecResult, IsolationLevel, PgConnection, PgPool, QueryResult, Statement, StatementBuilder, StreamTrait, TransactionError, TransactionTrait
 };
 use sea_query::{MysqlQueryBuilder, PostgresQueryBuilder, QueryBuilder, SqliteQueryBuilder};
 use std::{future::Future, pin::Pin};
@@ -71,7 +70,7 @@ pub(crate) enum InnerConnection {
     #[cfg(feature = "sqlx-mysql")]
     MySql(PoolConnection<sqlx::MySql>),
     #[cfg(feature = "sqlx-postgres")]
-    Postgres(PoolConnection<sqlx::Postgres>),
+    Postgres(PgConnection),
     #[cfg(feature = "sqlx-sqlite")]
     Sqlite(PoolConnection<sqlx::Sqlite>),
     #[cfg(feature = "mock")]
@@ -519,7 +518,7 @@ impl DatabaseConnection {
     ///
     /// Panics if [DbConn] is not a Postgres connection.
     #[cfg(feature = "sqlx-postgres")]
-    pub fn get_postgres_connection_pool(&self) -> &sqlx::PgPool {
+    pub fn get_postgres_connection_pool(&self) -> &crate::PgPoolWrapper {
         match self {
             DatabaseConnection::SqlxPostgresPoolConnection(conn) => &conn.pool,
             _ => panic!("Not Postgres Connection"),

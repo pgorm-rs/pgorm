@@ -1,12 +1,11 @@
+use deadpool::managed::{Manager, Metrics, Object, RecycleResult};
 use futures::lock::Mutex;
 use log::LevelFilter;
 use sea_query::Values;
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, ops::{Deref, DerefMut}, pin::Pin, sync::Arc};
 
 use sqlx::{
-    pool::PoolConnection,
-    postgres::{PgConnectOptions, PgQueryResult, PgRow},
-    Connection, Executor, PgPool, Postgres,
+    postgres::{PgConnectOptions, PgQueryResult, PgRow}, Connection, Executor, Postgres
 };
 
 use sea_query_binder::SqlxValues;
@@ -26,8 +25,56 @@ pub struct SqlxPostgresConnector;
 /// Defines a sqlx PostgreSQL pool
 #[derive(Clone)]
 pub struct SqlxPostgresPoolConnection {
-    pub(crate) pool: PgPool,
+    pub(crate) pool: PgPoolWrapper,
     metric_callback: Option<crate::metric::Callback>,
+}
+
+#[derive(Debug)]
+pub struct PgPool {
+    url: String,
+}
+
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct PooledPgConnection(sqlx::PgConnection);
+
+pub type PgConnection = Object<PgPool>;
+pub type PgPoolWrapper = deadpool::managed::Pool<PgPool>;
+
+impl Deref for PooledPgConnection {
+    type Target = sqlx::PgConnection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PooledPgConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+
+impl Manager for PgPool {
+    type Type = PooledPgConnection;
+    type Error = SqlxError;
+
+     fn create(&self) -> impl Future<Output = Result<Self::Type, Self::Error>> + Send {
+        async move {
+            Ok(PooledPgConnection(sqlx::PgConnection::connect(&self.url).await?))
+        }
+     }
+
+     fn recycle(
+         &self,
+         obj: &mut Self::Type,
+         _metrics: &Metrics,
+     ) -> impl Future<Output = RecycleResult<Self::Error>> + Send {
+        async move {
+            Ok(obj.0.ping().await?)
+        }
+     }
 }
 
 impl std::fmt::Debug for SqlxPostgresPoolConnection {
@@ -65,7 +112,8 @@ impl SqlxPostgresConnector {
             .schema_search_path
             .as_ref()
             .map(|schema| format!("SET search_path = {schema}"));
-        let mut pool_options = options.sqlx_pool_options();
+        let options0 = options.clone();
+        let mut pool_options = options.sqlx_pool_options::<Postgres>();
         if let Some(sql) = set_search_path_sql {
             pool_options = pool_options.after_connect(move |conn, _| {
                 let sql = sql.clone();
@@ -76,21 +124,30 @@ impl SqlxPostgresConnector {
                 })
             });
         }
-        match pool_options.connect_with(opt).await {
-            Ok(pool) => Ok(DatabaseConnection::SqlxPostgresPoolConnection(
-                SqlxPostgresPoolConnection {
-                    pool,
-                    metric_callback: None,
-                },
-            )),
-            Err(e) => Err(sqlx_error_to_conn_err(e)),
-        }
+
+        let manager = PgPool { url: options0.url };
+        let pool = PgPoolWrapper::builder(manager).build().unwrap();
+
+        Ok(DatabaseConnection::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
+            pool,
+            metric_callback: None,
+        }))
+
+        // match pool_options.connect_with(opt).await {
+        //     Ok(pool) => Ok(DatabaseConnection::SqlxPostgresPoolConnection(
+        //         SqlxPostgresPoolConnection {
+        //             pool,
+        //             metric_callback: None,
+        //         },
+        //     )),
+        //     Err(e) => Err(sqlx_error_to_conn_err(e)),
+        // }
     }
 }
 
 impl SqlxPostgresConnector {
     /// Instantiate a sqlx pool connection to a [DatabaseConnection]
-    pub fn from_sqlx_postgres_pool(pool: PgPool) -> DatabaseConnection {
+    pub fn from_sqlx_postgres_pool(pool: PgPoolWrapper) -> DatabaseConnection {
         DatabaseConnection::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
             pool,
             metric_callback: None,
@@ -105,9 +162,9 @@ impl SqlxPostgresPoolConnection {
         debug_print!("{}", stmt);
 
         let query = sqlx_query(&stmt);
-        let mut conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let mut conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         crate::metric::metric!(self.metric_callback, &stmt, {
-            match query.execute(&mut *conn).await {
+            match query.execute(&mut **conn).await {
                 Ok(res) => Ok(res.into()),
                 Err(err) => Err(sqlx_error_to_exec_err(err)),
             }
@@ -119,7 +176,7 @@ impl SqlxPostgresPoolConnection {
     pub async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
         debug_print!("{}", sql);
 
-        let conn = &mut self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let conn = &mut self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         match conn.execute(sql).await {
             Ok(res) => Ok(res.into()),
             Err(err) => Err(sqlx_error_to_exec_err(err)),
@@ -132,9 +189,9 @@ impl SqlxPostgresPoolConnection {
         debug_print!("{}", stmt);
 
         let query = sqlx_query(&stmt);
-        let mut conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let mut conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         crate::metric::metric!(self.metric_callback, &stmt, {
-            match query.fetch_one(&mut *conn).await {
+            match query.fetch_one(&mut **conn).await {
                 Ok(row) => Ok(Some(row.into())),
                 Err(err) => match err {
                     sqlx::Error::RowNotFound => Ok(None),
@@ -150,9 +207,9 @@ impl SqlxPostgresPoolConnection {
         debug_print!("{}", stmt);
 
         let query = sqlx_query(&stmt);
-        let mut conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let mut conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         crate::metric::metric!(self.metric_callback, &stmt, {
-            match query.fetch_all(&mut *conn).await {
+            match query.fetch_all(&mut **conn).await {
                 Ok(rows) => Ok(rows.into_iter().map(|r| r.into()).collect()),
                 Err(err) => Err(sqlx_error_to_query_err(err)),
             }
@@ -164,7 +221,7 @@ impl SqlxPostgresPoolConnection {
     pub async fn stream(&self, stmt: Statement) -> Result<QueryStream, DbErr> {
         debug_print!("{}", stmt);
 
-        let conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         Ok(QueryStream::from((
             conn,
             stmt,
@@ -179,7 +236,7 @@ impl SqlxPostgresPoolConnection {
         isolation_level: Option<IsolationLevel>,
         access_mode: Option<AccessMode>,
     ) -> Result<DatabaseTransaction, DbErr> {
-        let conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let conn = self.pool.get().await.unwrap(); //.map_err(sqlx_conn_acquire_err)?;
         DatabaseTransaction::new_postgres(
             conn,
             self.metric_callback.clone(),
@@ -205,7 +262,7 @@ impl SqlxPostgresPoolConnection {
         T: Send,
         E: std::error::Error + Send,
     {
-        let conn = self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         let transaction = DatabaseTransaction::new_postgres(
             conn,
             self.metric_callback.clone(),
@@ -226,7 +283,7 @@ impl SqlxPostgresPoolConnection {
 
     /// Checks if a connection to the database is still valid.
     pub async fn ping(&self) -> Result<(), DbErr> {
-        let conn = &mut self.pool.acquire().await.map_err(sqlx_conn_acquire_err)?;
+        let conn = &mut self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
         match conn.ping().await {
             Ok(_) => Ok(()),
             Err(err) => Err(sqlx_error_to_conn_err(err)),
@@ -235,7 +292,7 @@ impl SqlxPostgresPoolConnection {
 
     /// Explicitly close the Postgres connection
     pub async fn close(self) -> Result<(), DbErr> {
-        self.pool.close().await;
+        self.pool.close();
         Ok(())
     }
 }
@@ -265,7 +322,7 @@ pub(crate) fn sqlx_query(stmt: &Statement) -> sqlx::query::Query<'_, Postgres, S
 }
 
 pub(crate) async fn set_transaction_config(
-    conn: &mut PoolConnection<Postgres>,
+    conn: &mut PgConnection,
     isolation_level: Option<IsolationLevel>,
     access_mode: Option<AccessMode>,
 ) -> Result<(), DbErr> {
@@ -292,14 +349,14 @@ pub(crate) async fn set_transaction_config(
 
 impl
     From<(
-        PoolConnection<sqlx::Postgres>,
+        PgConnection,
         Statement,
         Option<crate::metric::Callback>,
     )> for crate::QueryStream
 {
     fn from(
         (conn, stmt, metric_callback): (
-            PoolConnection<sqlx::Postgres>,
+            PgConnection,
             Statement,
             Option<crate::metric::Callback>,
         ),
@@ -314,7 +371,7 @@ impl
 
 impl crate::DatabaseTransaction {
     pub(crate) async fn new_postgres(
-        inner: PoolConnection<sqlx::Postgres>,
+        inner: PgConnection, // PoolConnection<sqlx::Postgres>,
         metric_callback: Option<crate::metric::Callback>,
         isolation_level: Option<IsolationLevel>,
         access_mode: Option<AccessMode>,
