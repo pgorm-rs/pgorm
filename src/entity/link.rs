@@ -3,9 +3,6 @@ use crate::{
 };
 use sea_query::{Alias, Condition, IntoIden, JoinType, SeaRc};
 
-/// Same as [RelationDef]
-pub type LinkDef = RelationDef;
-
 /// A Trait for links between Entities
 pub trait Linked {
     #[allow(missing_docs)]
@@ -15,7 +12,7 @@ pub trait Linked {
     type ToEntity: EntityTrait;
 
     /// Link for an Entity
-    fn link(&self) -> Vec<LinkDef>;
+    fn link(&self) -> Vec<RelationDef>;
 
     /// Find all the Entities that are linked to the Entity
     fn find_linked(&self) -> Select<Self::ToEntity> {

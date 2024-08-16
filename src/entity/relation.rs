@@ -17,7 +17,7 @@ pub enum RelationType {
 
 /// Action to perform on a foreign key whenever there are changes
 /// to an ActiveModel
-pub type ForeignKeyAction = sea_query::ForeignKeyAction;
+pub(crate) type ForeignKeyAction = sea_query::ForeignKeyAction;
 
 /// Defines the relations of an Entity
 pub trait RelationTrait: Iterable + Debug + 'static {

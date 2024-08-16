@@ -20,9 +20,6 @@ pub enum DatabaseConnection {
     Disconnected,
 }
 
-/// The same as a [DatabaseConnection]
-pub type DbConn = DatabaseConnection;
-
 impl Default for DatabaseConnection {
     fn default() -> Self {
         Self::Disconnected
