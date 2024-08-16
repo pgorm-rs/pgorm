@@ -93,9 +93,6 @@ pub(crate) fn create_enum_from_active_enum<A>(backend: DbBackend) -> TypeCreateS
 where
     A: ActiveEnum,
 {
-    if matches!(backend, DbBackend::MySql | DbBackend::Sqlite) {
-        panic!("TypeCreateStatement is not supported in MySQL & SQLite");
-    }
     let col_def = A::db_type();
     let col_type = col_def.get_column_type();
     create_enum_from_column_type(col_type)
@@ -114,9 +111,6 @@ pub(crate) fn create_enum_from_entity<E>(_: E, backend: DbBackend) -> Vec<TypeCr
 where
     E: EntityTrait,
 {
-    if matches!(backend, DbBackend::MySql | DbBackend::Sqlite) {
-        return Vec::new();
-    }
     let mut vec = Vec::new();
     for col in E::Column::iter() {
         let col_def = col.def();
@@ -201,12 +195,7 @@ where
             ref name,
             ref variants,
         } => match backend {
-            DbBackend::MySql => {
-                let variants: Vec<String> = variants.iter().map(|v| v.to_string()).collect();
-                ColumnType::custom(format!("ENUM('{}')", variants.join("', '")).as_str())
-            }
             DbBackend::Postgres => ColumnType::Custom(SeaRc::clone(name)),
-            DbBackend::Sqlite => orm_column_def.col_type,
         },
         _ => orm_column_def.col_type,
     };
@@ -243,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_create_table_from_entity_table_ref() {
-        for builder in [DbBackend::MySql, DbBackend::Postgres, DbBackend::Sqlite] {
+        for builder in [DbBackend::Postgres] {
             let schema = Schema::new(builder);
             assert_eq!(
                 builder.build(&schema.create_table_from_entity(CakeFillingPrice)),
@@ -295,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_create_index_from_entity_table_ref() {
-        for builder in [DbBackend::MySql, DbBackend::Postgres, DbBackend::Sqlite] {
+        for builder in [DbBackend::Postgres] {
             let schema = Schema::new(builder);
 
             assert_eq!(

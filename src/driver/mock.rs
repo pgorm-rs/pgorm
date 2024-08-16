@@ -1,5 +1,5 @@
 use crate::{
-    debug_print, error::*, DatabaseConnection, DbBackend, ExecResult, MockDatabase, QueryResult,
+    debug_print, error::*, DatabaseConnection, DbBackend, ExecResult, QueryResult,
     Statement, Transaction,
 };
 use futures::Stream;
@@ -56,16 +56,8 @@ impl MockDatabaseConnector {
     /// Check if the database URI given and the [DatabaseBackend](crate::DatabaseBackend) selected are the same
     #[allow(unused_variables)]
     pub fn accepts(string: &str) -> bool {
-        #[cfg(feature = "sqlx-mysql")]
-        if DbBackend::MySql.is_prefix_of(string) {
-            return true;
-        }
         #[cfg(feature = "sqlx-postgres")]
         if DbBackend::Postgres.is_prefix_of(string) {
-            return true;
-        }
-        #[cfg(feature = "sqlx-sqlite")]
-        if DbBackend::Sqlite.is_prefix_of(string) {
             return true;
         }
         false
@@ -83,18 +75,11 @@ impl MockDatabaseConnector {
             };
         }
 
-        #[cfg(feature = "sqlx-mysql")]
-        if crate::SqlxMySqlConnector::accepts(string) {
-            return connect_mock_db!(DbBackend::MySql);
-        }
         #[cfg(feature = "sqlx-postgres")]
         if crate::SqlxPostgresConnector::accepts(string) {
             return connect_mock_db!(DbBackend::Postgres);
         }
-        #[cfg(feature = "sqlx-sqlite")]
-        if crate::SqlxSqliteConnector::accepts(string) {
-            return connect_mock_db!(DbBackend::Sqlite);
-        }
+        
         connect_mock_db!(DbBackend::Postgres)
     }
 }

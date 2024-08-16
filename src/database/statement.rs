@@ -1,5 +1,5 @@
 use crate::DbBackend;
-use sea_query::{inject_parameters, MysqlQueryBuilder, PostgresQueryBuilder, SqliteQueryBuilder};
+use sea_query::{inject_parameters, PostgresQueryBuilder};
 pub use sea_query::{Value, Values};
 use std::fmt;
 
@@ -77,9 +77,7 @@ impl fmt::Display for Statement {
 macro_rules! build_any_stmt {
     ($stmt: expr, $db_backend: expr) => {
         match $db_backend {
-            DbBackend::MySql => $stmt.build(MysqlQueryBuilder),
             DbBackend::Postgres => $stmt.build(PostgresQueryBuilder),
-            DbBackend::Sqlite => $stmt.build(SqliteQueryBuilder),
         }
     };
 }
@@ -88,7 +86,6 @@ macro_rules! build_postgres_stmt {
     ($stmt: expr, $db_backend: expr) => {
         match $db_backend {
             DbBackend::Postgres => $stmt.to_string(PostgresQueryBuilder),
-            DbBackend::MySql | DbBackend::Sqlite => unimplemented!(),
         }
     };
 }

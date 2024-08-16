@@ -2,24 +2,12 @@ use std::time::Duration;
 
 mod connection;
 mod db_connection;
-#[cfg(feature = "mock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "mock")))]
-mod mock;
-#[cfg(feature = "proxy")]
-#[cfg_attr(docsrs, doc(cfg(feature = "proxy")))]
-mod proxy;
 mod statement;
 mod stream;
 mod transaction;
 
 pub use connection::*;
 pub use db_connection::*;
-#[cfg(feature = "mock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "mock")))]
-pub use mock::*;
-#[cfg(feature = "proxy")]
-#[cfg_attr(docsrs, doc(cfg(feature = "proxy")))]
-pub use proxy::*;
 pub use statement::*;
 use std::borrow::Cow;
 pub use stream::*;
@@ -74,56 +62,15 @@ impl Database {
     {
         let opt: ConnectOptions = opt.into();
 
-        #[cfg(feature = "sqlx-mysql")]
-        if DbBackend::MySql.is_prefix_of(&opt.url) {
-            return crate::SqlxMySqlConnector::connect(opt).await;
-        }
         #[cfg(feature = "sqlx-postgres")]
         if DbBackend::Postgres.is_prefix_of(&opt.url) {
             return crate::SqlxPostgresConnector::connect(opt).await;
-        }
-        #[cfg(feature = "sqlx-sqlite")]
-        if DbBackend::Sqlite.is_prefix_of(&opt.url) {
-            return crate::SqlxSqliteConnector::connect(opt).await;
-        }
-        #[cfg(feature = "mock")]
-        if crate::MockDatabaseConnector::accepts(&opt.url) {
-            return crate::MockDatabaseConnector::connect(&opt.url).await;
         }
 
         Err(conn_err(format!(
             "The connection string '{}' has no supporting driver.",
             opt.url
         )))
-    }
-
-    /// Method to create a [DatabaseConnection] on a proxy database
-    #[cfg(feature = "proxy")]
-    #[instrument(level = "trace", skip(proxy_func_arc))]
-    pub async fn connect_proxy(
-        db_type: DbBackend,
-        proxy_func_arc: std::sync::Arc<std::sync::Mutex<Box<dyn ProxyDatabaseTrait>>>,
-    ) -> Result<DatabaseConnection, DbErr> {
-        match db_type {
-            DbBackend::MySql => {
-                return crate::ProxyDatabaseConnector::connect(
-                    DbBackend::MySql,
-                    proxy_func_arc.to_owned(),
-                );
-            }
-            DbBackend::Postgres => {
-                return crate::ProxyDatabaseConnector::connect(
-                    DbBackend::Postgres,
-                    proxy_func_arc.to_owned(),
-                );
-            }
-            DbBackend::Sqlite => {
-                return crate::ProxyDatabaseConnector::connect(
-                    DbBackend::Sqlite,
-                    proxy_func_arc.to_owned(),
-                );
-            }
-        }
     }
 }
 
