@@ -46,8 +46,7 @@ impl<'a> TransactionStream<'a> {
             conn,
             metric_callback,
             stream_builder: |conn, stmt, _metric_callback| match conn.deref_mut() {
-                #[cfg(feature = "sqlx-postgres")]
-                InnerConnection::Postgres(c) => {
+                InnerConnection(c) => {
                     let query = crate::driver::sqlx_postgres::sqlx_query(stmt);
                     let _start = _metric_callback.is_some().then(std::time::SystemTime::now);
                     let stream = c

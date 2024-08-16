@@ -133,12 +133,10 @@ impl SqlxPostgresConnector {
         let manager = PgPool { url: options0.url };
         let pool = PgPoolWrapper::builder(manager).build().unwrap();
 
-        Ok(DatabaseConnection::SqlxPostgresPoolConnection(
-            SqlxPostgresPoolConnection {
-                pool,
-                metric_callback: None,
-            },
-        ))
+        Ok(DatabaseConnection(Some(SqlxPostgresPoolConnection {
+            pool,
+            metric_callback: None,
+        })))
 
         // match pool_options.connect_with(opt).await {
         //     Ok(pool) => Ok(DatabaseConnection::SqlxPostgresPoolConnection(
@@ -155,10 +153,10 @@ impl SqlxPostgresConnector {
 impl SqlxPostgresConnector {
     /// Instantiate a sqlx pool connection to a [DatabaseConnection]
     pub fn from_sqlx_postgres_pool(pool: PgPoolWrapper) -> DatabaseConnection {
-        DatabaseConnection::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
+        DatabaseConnection(Some(SqlxPostgresPoolConnection {
             pool,
             metric_callback: None,
-        })
+        }))
     }
 }
 
@@ -244,7 +242,7 @@ impl SqlxPostgresPoolConnection {
         access_mode: Option<AccessMode>,
     ) -> Result<DatabaseTransaction, DbErr> {
         let conn = self.pool.get().await.unwrap(); //.map_err(sqlx_conn_acquire_err)?;
-        DatabaseTransaction::new_postgres(
+        DatabaseTransaction::new(
             conn,
             self.metric_callback.clone(),
             isolation_level,
@@ -270,7 +268,7 @@ impl SqlxPostgresPoolConnection {
         E: std::error::Error + Send,
     {
         let conn = self.pool.get().await.unwrap(); // .map_err(sqlx_conn_acquire_err)?;
-        let transaction = DatabaseTransaction::new_postgres(
+        let transaction = DatabaseTransaction::new(
             conn,
             self.metric_callback.clone(),
             isolation_level,
@@ -356,23 +354,19 @@ impl From<(PgConnection, Statement, Option<crate::metric::Callback>)> for crate:
     fn from(
         (conn, stmt, metric_callback): (PgConnection, Statement, Option<crate::metric::Callback>),
     ) -> Self {
-        crate::QueryStream::build(
-            stmt,
-            crate::InnerConnection::Postgres(conn),
-            metric_callback,
-        )
+        crate::QueryStream::build(stmt, crate::InnerConnection(conn), metric_callback)
     }
 }
 
 impl crate::DatabaseTransaction {
-    pub(crate) async fn new_postgres(
-        inner: PgConnection, // PoolConnection<sqlx::Postgres>,
+    pub(crate) async fn new(
+        inner: PgConnection,
         metric_callback: Option<crate::metric::Callback>,
         isolation_level: Option<IsolationLevel>,
         access_mode: Option<AccessMode>,
     ) -> Result<crate::DatabaseTransaction, DbErr> {
         Self::begin(
-            Arc::new(Mutex::new(crate::InnerConnection::Postgres(inner))),
+            Arc::new(Mutex::new(crate::InnerConnection(inner))),
             metric_callback,
             isolation_level,
             access_mode,

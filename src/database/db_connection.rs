@@ -11,36 +11,26 @@ use url::Url;
 /// Handle a database connection depending on the backend enabled by the feature
 /// flags. This creates a database pool.
 #[derive(Clone)]
-pub enum DatabaseConnection {
-    /// Create a PostgreSQL database connection and pool
-    #[cfg(feature = "sqlx-postgres")]
-    SqlxPostgresPoolConnection(crate::SqlxPostgresPoolConnection),
-
-    /// The connection to the database has been severed
-    Disconnected,
-}
+#[repr(transparent)]
+pub struct DatabaseConnection(pub Option<crate::SqlxPostgresPoolConnection>);
 
 impl Default for DatabaseConnection {
     fn default() -> Self {
-        Self::Disconnected
+        Self(None)
     }
 }
 
 #[derive(Debug)]
-pub(crate) enum InnerConnection {
-    #[cfg(feature = "sqlx-postgres")]
-    Postgres(PgConnection),
-}
+pub(crate) struct InnerConnection(pub(crate) PgConnection);
 
 impl std::fmt::Debug for DatabaseConnection {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "{}",
-            match self {
-                #[cfg(feature = "sqlx-postgres")]
-                Self::SqlxPostgresPoolConnection(_) => "SqlxPostgresPoolConnection",
-                Self::Disconnected => "Disconnected",
+            match self.0.as_ref() {
+                Some(_) => "SqlxPostgresPoolConnection",
+                None => "Disconnected",
             }
         )
     }
@@ -51,42 +41,38 @@ impl ConnectionTrait for DatabaseConnection {
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn execute(&self, stmt: Statement) -> Result<ExecResult, DbErr> {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.execute(stmt).await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+        match self.0.as_ref() {
+            Some(conn) => conn.execute(stmt).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.execute_unprepared(sql).await
-            }
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+        match self.0.as_ref() {
+            Some(conn) => conn.execute_unprepared(sql).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn query_one(&self, stmt: Statement) -> Result<Option<QueryResult>, DbErr> {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.query_one(stmt).await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+            Some(conn) => conn.query_one(stmt).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn query_all(&self, stmt: Statement) -> Result<Vec<QueryResult>, DbErr> {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.query_all(stmt).await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+            Some(conn) => conn.query_all(stmt).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 }
@@ -102,10 +88,10 @@ impl StreamTrait for DatabaseConnection {
         stmt: Statement,
     ) -> Pin<Box<dyn Future<Output = Result<Self::Stream<'a>, DbErr>> + 'a + Send>> {
         Box::pin(async move {
-            match self {
+            match self.0.as_ref() {
                 #[cfg(feature = "sqlx-postgres")]
-                DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.stream(stmt).await,
-                DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+                Some(conn) => conn.stream(stmt).await,
+                None => Err(conn_err("Disconnected")),
             }
         })
     }
@@ -115,10 +101,10 @@ impl StreamTrait for DatabaseConnection {
 impl TransactionTrait for DatabaseConnection {
     #[instrument(level = "trace")]
     async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.begin(None, None).await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+            Some(conn) => conn.begin(None, None).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
@@ -128,12 +114,10 @@ impl TransactionTrait for DatabaseConnection {
         isolation_level: Option<IsolationLevel>,
         access_mode: Option<AccessMode>,
     ) -> Result<DatabaseTransaction, DbErr> {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.begin(isolation_level, access_mode).await
-            }
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+            Some(conn) => conn.begin(isolation_level, access_mode).await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
@@ -149,13 +133,11 @@ impl TransactionTrait for DatabaseConnection {
         T: Send,
         E: std::error::Error + Send,
     {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.transaction(callback, None, None).await
-            }
+            Some(conn) => conn.transaction(callback, None, None).await,
 
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected").into()),
+            None => Err(conn_err("Disconnected").into()),
         }
     }
 
@@ -176,13 +158,13 @@ impl TransactionTrait for DatabaseConnection {
         T: Send,
         E: std::error::Error + Send,
     {
-        match self {
+        match self.0.as_ref() {
             #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
+            Some(conn) => {
                 conn.transaction(callback, isolation_level, access_mode)
                     .await
             }
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected").into()),
+            None => Err(conn_err("Disconnected").into()),
         }
     }
 }
@@ -193,45 +175,25 @@ impl DatabaseConnection {
     where
         F: Fn(&crate::metric::Info<'_>) + Send + Sync + 'static,
     {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.set_metric_callback(_callback)
-            }
+        match self.0.as_mut() {
+            Some(conn) => conn.set_metric_callback(_callback),
             _ => {}
         }
     }
 
     /// Checks if a connection to the database is still valid.
     pub async fn ping(&self) -> Result<(), DbErr> {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.ping().await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
+        match self.0.as_ref() {
+            Some(conn) => conn.ping().await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 
     /// Explicitly close the database connection
-    pub async fn close(self) -> Result<(), DbErr> {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => conn.close().await,
-            DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
-        }
-    }
-}
-
-impl DatabaseConnection {
-    /// Get [sqlx::PgPool]
-    ///
-    /// # Panics
-    ///
-    /// Panics if [DbConn] is not a Postgres connection.
-    #[cfg(feature = "sqlx-postgres")]
-    pub fn get_postgres_connection_pool(&self) -> &crate::PgPoolWrapper {
-        match self {
-            DatabaseConnection::SqlxPostgresPoolConnection(conn) => &conn.pool,
-            _ => panic!("Not Postgres Connection"),
+    pub async fn close(mut self) -> Result<(), DbErr> {
+        match self.0.take() {
+            Some(conn) => conn.close().await,
+            None => Err(conn_err("Disconnected")),
         }
     }
 }

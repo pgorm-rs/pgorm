@@ -39,8 +39,7 @@ impl DatabaseTransaction {
             metric_callback,
         };
         match *res.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(ref mut c) => {
+            InnerConnection(ref mut c) => {
                 <sqlx::Postgres as sqlx::Database>::TransactionManager::begin(c)
                     .await
                     .map_err(sqlx_error_to_query_err)?;
@@ -86,8 +85,7 @@ impl DatabaseTransaction {
     #[allow(unreachable_code, unused_mut)]
     pub async fn commit(mut self) -> Result<(), DbErr> {
         match *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(ref mut c) => {
+            InnerConnection(ref mut c) => {
                 <sqlx::Postgres as sqlx::Database>::TransactionManager::commit(c)
                     .await
                     .map_err(sqlx_error_to_query_err)
@@ -104,8 +102,7 @@ impl DatabaseTransaction {
     #[allow(unreachable_code, unused_mut)]
     pub async fn rollback(mut self) -> Result<(), DbErr> {
         match *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(ref mut c) => {
+            InnerConnection(ref mut c) => {
                 <sqlx::Postgres as sqlx::Database>::TransactionManager::rollback(c)
                     .await
                     .map_err(sqlx_error_to_query_err)
@@ -123,8 +120,7 @@ impl DatabaseTransaction {
         if self.open {
             if let Some(mut conn) = self.conn.try_lock() {
                 match &mut *conn {
-                    #[cfg(feature = "sqlx-postgres")]
-                    InnerConnection::Postgres(c) => {
+                    InnerConnection(c) => {
                         <sqlx::Postgres as sqlx::Database>::TransactionManager::start_rollback(c);
                     }
                     #[allow(unreachable_patterns)]
@@ -153,8 +149,7 @@ impl ConnectionTrait for DatabaseTransaction {
         debug_print!("{}", stmt);
 
         match &mut *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(conn) => {
+            InnerConnection(conn) => {
                 let query = crate::driver::sqlx_postgres::sqlx_query(&stmt);
                 let conn: &mut sqlx::PgConnection = &mut *conn;
                 crate::metric::metric!(self.metric_callback, &stmt, {
@@ -173,8 +168,7 @@ impl ConnectionTrait for DatabaseTransaction {
         debug_print!("{}", sql);
 
         match &mut *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(conn) => {
+            InnerConnection(conn) => {
                 let conn: &mut sqlx::PgConnection = &mut *conn;
                 sqlx::Executor::execute(conn, sql)
                     .await
@@ -192,8 +186,7 @@ impl ConnectionTrait for DatabaseTransaction {
         debug_print!("{}", stmt);
 
         match &mut *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(conn) => {
+            InnerConnection(conn) => {
                 let query = crate::driver::sqlx_postgres::sqlx_query(&stmt);
                 let conn = &mut ***conn;
                 crate::metric::metric!(self.metric_callback, &stmt, {
@@ -202,7 +195,6 @@ impl ConnectionTrait for DatabaseTransaction {
                     )
                 })
             }
-            #[allow(unreachable_patterns)]
             _ => Err(conn_err("Disconnected")),
         }
     }
@@ -213,8 +205,7 @@ impl ConnectionTrait for DatabaseTransaction {
         debug_print!("{}", stmt);
 
         match &mut *self.conn.lock().await {
-            #[cfg(feature = "sqlx-postgres")]
-            InnerConnection::Postgres(conn) => {
+            InnerConnection(conn) => {
                 let query = crate::driver::sqlx_postgres::sqlx_query(&stmt);
                 let conn: &mut sqlx::PgConnection = &mut *conn;
                 crate::metric::metric!(self.metric_callback, &stmt, {
@@ -225,7 +216,6 @@ impl ConnectionTrait for DatabaseTransaction {
                         .map_err(sqlx_error_to_query_err)
                 })
             }
-            #[allow(unreachable_patterns)]
             _ => Err(conn_err("Disconnected")),
         }
     }
