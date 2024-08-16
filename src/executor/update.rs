@@ -1,8 +1,8 @@
 use crate::{
     error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne,
+    Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, Statement, UpdateMany, UpdateOne,
 };
-use sea_query::{FromValueTuple, Query, UpdateStatement};
+use sea_query::{FromValueTuple, PostgresQueryBuilder, Query, UpdateStatement};
 
 /// Defines an update operation
 #[derive(Clone, Debug)]
@@ -84,8 +84,7 @@ impl Updater {
         if self.is_noop() {
             return Ok(UpdateResult::default());
         }
-        let builder = db.get_database_backend();
-        let statement = builder.build(&self.query);
+        let statement = Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder));
         let result = db.execute(statement).await?;
         if self.check_record_exists && result.rows_affected() == 0 {
             return Err(DbErr::RecordNotUpdated);
@@ -112,29 +111,19 @@ impl Updater {
             return find_updated_model_by_id(model, db).await;
         }
 
-        match db.support_returning() {
-            true => {
-                let db_backend = db.get_database_backend();
-                let returning = Query::returning().exprs(
-                    Column::<A>::iter().map(|c| c.select_as(c.into_returning_expr(db_backend))),
-                );
-                self.query.returning(returning);
-                let found: Option<Model<A>> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(
-                    db_backend.build(&self.query),
-                )
-                .one(db)
-                .await?;
-                // If we got `None` then we are updating a row that does not exist.
-                match found {
-                    Some(model) => Ok(model),
-                    None => Err(DbErr::RecordNotUpdated),
-                }
-            }
-            false => {
-                // If we updating a row that does not exist then an error will be thrown here.
-                self.check_record_exists().exec(db).await?;
-                find_updated_model_by_id(model, db).await
-            }
+        let returning = Query::returning()
+            .exprs(Column::<A>::iter().map(|c| c.select_as(c.into_returning_expr())));
+        self.query.returning(returning);
+        let found: Option<Model<A>> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(
+            Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder)),
+        )
+        .one(db)
+        .await?;
+
+        // If we got `None` then we are updating a row that does not exist.
+        match found {
+            Some(model) => Ok(model),
+            None => Err(DbErr::RecordNotUpdated),
         }
     }
 
@@ -147,22 +136,17 @@ impl Updater {
             return Ok(vec![]);
         }
 
-        match db.support_returning() {
-            true => {
-                let db_backend = db.get_database_backend();
-                let returning = Query::returning().exprs(
-                    E::Column::iter().map(|c| c.select_as(c.into_returning_expr(db_backend))),
-                );
-                self.query.returning(returning);
-                let models: Vec<E::Model> = SelectorRaw::<SelectModel<E::Model>>::from_statement(
-                    db_backend.build(&self.query),
-                )
-                .all(db)
-                .await?;
-                Ok(models)
-            }
-            false => unimplemented!("Database backend doesn't support RETURNING"),
-        }
+        let returning = Query::returning()
+            .exprs(E::Column::iter().map(|c| c.select_as(c.into_returning_expr())));
+
+        self.query.returning(returning);
+        let models: Vec<E::Model> = SelectorRaw::<SelectModel<E::Model>>::from_statement(
+            Statement::from_string_values_tuple(self.query.build(sea_query::PostgresQueryBuilder)),
+        )
+        .all(db)
+        .await?;
+
+        Ok(models)
     }
 
     fn is_noop(&self) -> bool {

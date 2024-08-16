@@ -1,11 +1,11 @@
 use crate::{
     ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoIdentity,
     PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select, SelectModel, SelectTwo,
-    SelectTwoModel, SelectorTrait,
+    SelectTwoModel, SelectorTrait, Statement,
 };
 use sea_query::{
-    Condition, DynIden, Expr, IntoValueTuple, Order, SeaRc, SelectStatement, SimpleExpr, Value,
-    ValueTuple,
+    Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc, SelectStatement,
+    SimpleExpr, Value, ValueTuple,
 };
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
@@ -283,7 +283,7 @@ where
         self.apply_order_by();
         self.apply_filters();
 
-        let stmt = db.get_database_backend().build(&self.query);
+        let stmt = Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder));
         let rows = db.query_all(stmt).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {

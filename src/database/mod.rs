@@ -62,15 +62,7 @@ impl Database {
     {
         let opt: ConnectOptions = opt.into();
 
-        #[cfg(feature = "sqlx-postgres")]
-        if DbBackend::Postgres.is_prefix_of(&opt.url) {
-            return crate::SqlxPostgresConnector::connect(opt).await;
-        }
-
-        Err(conn_err(format!(
-            "The connection string '{}' has no supporting driver.",
-            opt.url
-        )))
+        return crate::SqlxPostgresConnector::connect(opt).await;
     }
 }
 

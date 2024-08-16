@@ -1,5 +1,7 @@
 use crate::{
-    error::*, AccessMode, ConnectionTrait, DatabaseTransaction, ExecResult, IsolationLevel, PgConnection, QueryResult, Statement, StatementBuilder, StreamTrait, TransactionError, TransactionTrait
+    error::*, AccessMode, ConnectionTrait, DatabaseTransaction, ExecResult, IsolationLevel,
+    PgConnection, QueryResult, Statement, StatementBuilder, StreamTrait, TransactionError,
+    TransactionTrait,
 };
 use sea_query::{PostgresQueryBuilder, QueryBuilder};
 use std::{future::Future, pin::Pin};
@@ -7,9 +9,8 @@ use tracing::instrument;
 use url::Url;
 
 /// Handle a database connection depending on the backend enabled by the feature
-/// flags. This creates a database pool. This will be `Clone` unless the feature
-/// flag `mock` is enabled.
-#[cfg_attr(not(feature = "mock"), derive(Clone))]
+/// flags. This creates a database pool.
+#[derive(Clone)]
 pub enum DatabaseConnection {
     /// Create a PostgreSQL database connection and pool
     #[cfg(feature = "sqlx-postgres")]
@@ -27,17 +28,6 @@ impl Default for DatabaseConnection {
         Self::Disconnected
     }
 }
-
-/// The type of database backend for real world databases.
-/// This is enabled by feature flags as specified in the crate documentation
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum DatabaseBackend {
-    /// A PostgreSQL backend
-    Postgres,
-}
-
-/// The same as [DatabaseBackend] just shorter :)
-pub type DbBackend = DatabaseBackend;
 
 #[derive(Debug)]
 pub(crate) enum InnerConnection {
@@ -61,14 +51,6 @@ impl std::fmt::Debug for DatabaseConnection {
 
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
-    fn get_database_backend(&self) -> DbBackend {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            DatabaseConnection::SqlxPostgresPoolConnection(_) => DbBackend::Postgres,
-            DatabaseConnection::Disconnected => panic!("Disconnected"),
-        }
-    }
-
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn execute(&self, stmt: Statement) -> Result<ExecResult, DbErr> {
@@ -110,11 +92,6 @@ impl ConnectionTrait for DatabaseConnection {
             DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
         }
     }
-
-    #[cfg(feature = "mock")]
-    fn is_mock_connection(&self) -> bool {
-        false
-    }
 }
 
 #[async_trait::async_trait]
@@ -151,13 +128,13 @@ impl TransactionTrait for DatabaseConnection {
     #[instrument(level = "trace")]
     async fn begin_with_config(
         &self,
-        _isolation_level: Option<IsolationLevel>,
-        _access_mode: Option<AccessMode>,
+        isolation_level: Option<IsolationLevel>,
+        access_mode: Option<AccessMode>,
     ) -> Result<DatabaseTransaction, DbErr> {
         match self {
             #[cfg(feature = "sqlx-postgres")]
             DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.begin(_isolation_level, _access_mode).await
+                conn.begin(isolation_level, access_mode).await
             }
             DatabaseConnection::Disconnected => Err(conn_err("Disconnected")),
         }
@@ -165,8 +142,8 @@ impl TransactionTrait for DatabaseConnection {
 
     /// Execute the function inside a transaction.
     /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    #[instrument(level = "trace", skip(_callback))]
-    async fn transaction<F, T, E>(&self, _callback: F) -> Result<T, TransactionError<E>>
+    #[instrument(level = "trace", skip(callback))]
+    async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
     where
         F: for<'c> FnOnce(
                 &'c DatabaseTransaction,
@@ -178,21 +155,21 @@ impl TransactionTrait for DatabaseConnection {
         match self {
             #[cfg(feature = "sqlx-postgres")]
             DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.transaction(_callback, None, None).await
+                conn.transaction(callback, None, None).await
             }
-            
+
             DatabaseConnection::Disconnected => Err(conn_err("Disconnected").into()),
         }
     }
 
     /// Execute the function inside a transaction.
     /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    #[instrument(level = "trace", skip(_callback))]
+    #[instrument(level = "trace", skip(callback))]
     async fn transaction_with_config<F, T, E>(
         &self,
-        _callback: F,
-        _isolation_level: Option<IsolationLevel>,
-        _access_mode: Option<AccessMode>,
+        callback: F,
+        isolation_level: Option<IsolationLevel>,
+        access_mode: Option<AccessMode>,
     ) -> Result<T, TransactionError<E>>
     where
         F: for<'c> FnOnce(
@@ -203,10 +180,9 @@ impl TransactionTrait for DatabaseConnection {
         E: std::error::Error + Send,
     {
         match self {
-            
             #[cfg(feature = "sqlx-postgres")]
             DatabaseConnection::SqlxPostgresPoolConnection(conn) => {
-                conn.transaction(_callback, _isolation_level, _access_mode)
+                conn.transaction(callback, isolation_level, access_mode)
                     .await
             }
             DatabaseConnection::Disconnected => Err(conn_err("Disconnected").into()),
@@ -259,45 +235,6 @@ impl DatabaseConnection {
         match self {
             DatabaseConnection::SqlxPostgresPoolConnection(conn) => &conn.pool,
             _ => panic!("Not Postgres Connection"),
-        }
-    }
-}
-
-impl DbBackend {
-    /// Check if the URI is the same as the specified database backend.
-    /// Returns true if they match.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `base_url` cannot be parsed as `Url`.
-    pub fn is_prefix_of(self, base_url: &str) -> bool {
-        let base_url_parsed = Url::parse(base_url).expect("Fail to parse database URL");
-        match self {
-            Self::Postgres => {
-                base_url_parsed.scheme() == "postgres" || base_url_parsed.scheme() == "postgresql"
-            }
-        }
-    }
-
-    /// Build an SQL [Statement]
-    pub fn build<S>(&self, statement: &S) -> Statement
-    where
-        S: StatementBuilder,
-    {
-        statement.build(self)
-    }
-
-    /// A helper for building SQL queries
-    pub fn get_query_builder(&self) -> Box<dyn QueryBuilder> {
-        match self {
-            Self::Postgres => Box::new(PostgresQueryBuilder),
-        }
-    }
-
-    /// Check if the database supports `RETURNING` syntax on insert and update
-    pub fn support_returning(&self) -> bool {
-        match self {
-            Self::Postgres => true,
         }
     }
 }

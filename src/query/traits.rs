@@ -1,5 +1,5 @@
-use crate::{ColumnTrait, DbBackend, IntoIdentity, IntoSimpleExpr, QuerySelect, Statement};
-use sea_query::QueryStatementBuilder;
+use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect, Statement};
+use sea_query::{PostgresQueryBuilder, QueryStatementBuilder};
 
 /// A Trait for any type performing queries on a Model or ActiveModel
 pub trait QueryTrait {
@@ -16,11 +16,9 @@ pub trait QueryTrait {
     fn into_query(self) -> Self::QueryStatement;
 
     /// Build the query as [`Statement`]
-    fn build(&self, db_backend: DbBackend) -> Statement {
-        let query_builder = db_backend.get_query_builder();
+    fn build(&self) -> Statement {
         Statement::from_string_values_tuple(
-            db_backend,
-            self.as_query().build_any(query_builder.as_ref()),
+            self.as_query().build_any(&sea_query::PostgresQueryBuilder),
         )
     }
 

@@ -1,11 +1,11 @@
 use crate::{
-    error::*, ConnectionTrait, DbBackend, EntityTrait, FromQueryResult, IdenStatic, Iterable,
-    ModelTrait, PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait,
-    QueryResult, QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, Statement,
-    StreamTrait, TryGetableMany,
+    error::*, ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
+    PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
+    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, Statement, StreamTrait,
+    TryGetableMany,
 };
 use futures::{Stream, TryStreamExt};
-use sea_query::{SelectStatement, Value};
+use sea_query::{PostgresQueryBuilder, SelectStatement, Value};
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
@@ -649,12 +649,8 @@ where
         }
     }
 
-    fn into_selector_raw<C>(self, db: &C) -> SelectorRaw<S>
-    where
-        C: ConnectionTrait,
-    {
-        let builder = db.get_database_backend();
-        let stmt = builder.build(&self.query);
+    fn into_selector_raw(self) -> SelectorRaw<S> {
+        let stmt = Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder));
         SelectorRaw {
             stmt,
             selector: self.selector,
@@ -662,8 +658,8 @@ where
     }
 
     /// Get the SQL statement
-    pub fn into_statement(self, builder: DbBackend) -> Statement {
-        builder.build(&self.query)
+    pub fn into_statement(self) -> Statement {
+        Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder))
     }
 
     /// Get an item from the Select query
@@ -672,7 +668,7 @@ where
         C: ConnectionTrait,
     {
         self.query.limit(1);
-        self.into_selector_raw(db).one(db).await
+        self.into_selector_raw().one(db).await
     }
 
     /// Get all items from the Select query
@@ -680,7 +676,7 @@ where
     where
         C: ConnectionTrait,
     {
-        self.into_selector_raw(db).all(db).await
+        self.into_selector_raw().all(db).await
     }
 
     /// Stream the results of the Select operation
@@ -693,7 +689,7 @@ where
         S: 'b,
         S::Item: Send,
     {
-        self.into_selector_raw(db).stream(db).await
+        self.into_selector_raw().stream(db).await
     }
 }
 

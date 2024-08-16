@@ -1,5 +1,5 @@
 use crate::{
-    ActiveEnum, ColumnTrait, ColumnType, DbBackend, EntityTrait, Iterable, PrimaryKeyArity,
+    ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Iterable, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use sea_query::{
@@ -13,7 +13,7 @@ impl Schema {
     where
         A: ActiveEnum,
     {
-        create_enum_from_active_enum::<A>(self.backend)
+        create_enum_from_active_enum::<A>()
     }
 
     /// Creates Postgres enums from an Entity. See [TypeCreateStatement] for more details
@@ -21,7 +21,7 @@ impl Schema {
     where
         E: EntityTrait,
     {
-        create_enum_from_entity(entity, self.backend)
+        create_enum_from_entity(entity)
     }
 
     /// Creates a table from an Entity. See [TableCreateStatement] for more details.
@@ -29,7 +29,7 @@ impl Schema {
     where
         E: EntityTrait,
     {
-        create_table_from_entity(entity, self.backend)
+        create_table_from_entity(entity)
     }
 
     /// Creates the indexes from an Entity, returning an empty Vec if there are none
@@ -38,7 +38,7 @@ impl Schema {
     where
         E: EntityTrait,
     {
-        create_index_from_entity(entity, self.backend)
+        create_index_from_entity(entity)
     }
 
     /// Creates a column definition for example to update a table.
@@ -85,11 +85,11 @@ impl Schema {
     where
         E: EntityTrait,
     {
-        column_def_from_entity_column::<E>(column, self.backend)
+        column_def_from_entity_column::<E>(column)
     }
 }
 
-pub(crate) fn create_enum_from_active_enum<A>(backend: DbBackend) -> TypeCreateStatement
+pub(crate) fn create_enum_from_active_enum<A>() -> TypeCreateStatement
 where
     A: ActiveEnum,
 {
@@ -107,7 +107,7 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> TypeCreateS
 }
 
 #[allow(clippy::needless_borrow)]
-pub(crate) fn create_enum_from_entity<E>(_: E, backend: DbBackend) -> Vec<TypeCreateStatement>
+pub(crate) fn create_enum_from_entity<E>(_: E) -> Vec<TypeCreateStatement>
 where
     E: EntityTrait,
 {
@@ -124,10 +124,7 @@ where
     vec
 }
 
-pub(crate) fn create_index_from_entity<E>(
-    entity: E,
-    _backend: DbBackend,
-) -> Vec<IndexCreateStatement>
+pub(crate) fn create_index_from_entity<E>(entity: E) -> Vec<IndexCreateStatement>
 where
     E: EntityTrait,
 {
@@ -151,7 +148,7 @@ where
     vec
 }
 
-pub(crate) fn create_table_from_entity<E>(entity: E, backend: DbBackend) -> TableCreateStatement
+pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
 {
@@ -162,7 +159,7 @@ where
     }
 
     for column in E::Column::iter() {
-        let mut column_def = column_def_from_entity_column::<E>(column, backend);
+        let mut column_def = column_def_from_entity_column::<E>(column);
         stmt.col(&mut column_def);
     }
 
@@ -185,7 +182,7 @@ where
     stmt.table(entity.table_ref()).take()
 }
 
-fn column_def_from_entity_column<E>(column: E::Column, backend: DbBackend) -> ColumnDef
+fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
 {
@@ -194,9 +191,7 @@ where
         ColumnType::Enum {
             ref name,
             ref variants,
-        } => match backend {
-            DbBackend::Postgres => ColumnType::Custom(SeaRc::clone(name)),
-        },
+        } => ColumnType::Custom(SeaRc::clone(name)),
         _ => orm_column_def.col_type,
     };
     let mut column_def = ColumnDef::new_with_type(column, types);
@@ -227,7 +222,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{sea_query::*, tests_cfg::*, DbBackend, EntityName, Schema};
+    use crate::{sea_query::*, tests_cfg::*, EntityName, Schema};
     use pretty_assertions::assert_eq;
 
     #[test]

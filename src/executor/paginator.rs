@@ -1,10 +1,10 @@
 use crate::{
-    error::*, ConnectionTrait, DbBackend, EntityTrait, FromQueryResult, Select, SelectModel,
-    SelectTwo, SelectTwoModel, Selector, SelectorRaw, SelectorTrait,
+    error::*, ConnectionTrait, EntityTrait, FromQueryResult, Select, SelectModel, SelectTwo,
+    SelectTwoModel, Selector, SelectorRaw, SelectorTrait, Statement,
 };
 use async_stream::stream;
 use futures::Stream;
-use sea_query::{Alias, Expr, SelectStatement};
+use sea_query::{Alias, Expr, PostgresQueryBuilder, SelectStatement};
 use std::{marker::PhantomData, pin::Pin};
 
 /// Pin a Model so that stream operations can be performed on the model
@@ -48,8 +48,7 @@ where
             .limit(self.page_size)
             .offset(self.page_size * page)
             .to_owned();
-        let builder = self.db.get_database_backend();
-        let stmt = builder.build(&query);
+        let stmt = Statement::from_string_values_tuple(query.build(PostgresQueryBuilder));
         let rows = self.db.query_all(stmt).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {
@@ -66,7 +65,6 @@ where
 
     /// Get the total number of items
     pub async fn num_items(&self) -> Result<u64, DbErr> {
-        let builder = self.db.get_database_backend();
         let stmt = SelectStatement::new()
             .expr(Expr::cust("COUNT(*) AS num_items"))
             .from_subquery(
@@ -79,15 +77,12 @@ where
                 Alias::new("sub_query"),
             )
             .to_owned();
-        let stmt = builder.build(&stmt);
+        let stmt = Statement::from_string_values_tuple(stmt.build(PostgresQueryBuilder));
         let result = match self.db.query_one(stmt).await? {
             Some(res) => res,
             None => return Ok(0),
         };
-        let num_items = match builder {
-            DbBackend::Postgres => result.try_get::<i64>("", "num_items")? as u64,
-            _ => result.try_get::<i32>("", "num_items")? as u64,
-        };
+        let num_items = result.try_get::<i64>("", "num_items")? as u64;
         Ok(num_items)
     }
 

@@ -2,10 +2,16 @@ use deadpool::managed::{Manager, Metrics, Object, RecycleResult};
 use futures::lock::Mutex;
 use log::LevelFilter;
 use sea_query::Values;
-use std::{future::Future, ops::{Deref, DerefMut}, pin::Pin, sync::Arc};
+use std::{
+    future::Future,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    sync::Arc,
+};
 
 use sqlx::{
-    postgres::{PgConnectOptions, PgQueryResult, PgRow}, Connection, Executor, Postgres
+    postgres::{PgConnectOptions, PgQueryResult, PgRow},
+    Connection, Executor, Postgres,
 };
 
 use sea_query_binder::SqlxValues;
@@ -13,7 +19,7 @@ use tracing::instrument;
 
 use crate::{
     debug_print, error::*, executor::*, AccessMode, ConnectOptions, DatabaseConnection,
-    DatabaseTransaction, DbBackend, IsolationLevel, QueryStream, Statement, TransactionError,
+    DatabaseTransaction, IsolationLevel, QueryStream, Statement, TransactionError,
 };
 
 use super::sqlx_common::*;
@@ -55,26 +61,25 @@ impl DerefMut for PooledPgConnection {
     }
 }
 
-
 impl Manager for PgPool {
     type Type = PooledPgConnection;
     type Error = SqlxError;
 
-     fn create(&self) -> impl Future<Output = Result<Self::Type, Self::Error>> + Send {
+    fn create(&self) -> impl Future<Output = Result<Self::Type, Self::Error>> + Send {
         async move {
-            Ok(PooledPgConnection(sqlx::PgConnection::connect(&self.url).await?))
+            Ok(PooledPgConnection(
+                sqlx::PgConnection::connect(&self.url).await?,
+            ))
         }
-     }
+    }
 
-     fn recycle(
-         &self,
-         obj: &mut Self::Type,
-         _metrics: &Metrics,
-     ) -> impl Future<Output = RecycleResult<Self::Error>> + Send {
-        async move {
-            Ok(obj.0.ping().await?)
-        }
-     }
+    fn recycle(
+        &self,
+        obj: &mut Self::Type,
+        _metrics: &Metrics,
+    ) -> impl Future<Output = RecycleResult<Self::Error>> + Send {
+        async move { Ok(obj.0.ping().await?) }
+    }
 }
 
 impl std::fmt::Debug for SqlxPostgresPoolConnection {
@@ -128,10 +133,12 @@ impl SqlxPostgresConnector {
         let manager = PgPool { url: options0.url };
         let pool = PgPoolWrapper::builder(manager).build().unwrap();
 
-        Ok(DatabaseConnection::SqlxPostgresPoolConnection(SqlxPostgresPoolConnection {
-            pool,
-            metric_callback: None,
-        }))
+        Ok(DatabaseConnection::SqlxPostgresPoolConnection(
+            SqlxPostgresPoolConnection {
+                pool,
+                metric_callback: None,
+            },
+        ))
 
         // match pool_options.connect_with(opt).await {
         //     Ok(pool) => Ok(DatabaseConnection::SqlxPostgresPoolConnection(
@@ -330,7 +337,6 @@ pub(crate) async fn set_transaction_config(
         let stmt = Statement {
             sql: format!("SET TRANSACTION ISOLATION LEVEL {isolation_level}"),
             values: None,
-            db_backend: DbBackend::Postgres,
         };
         let query = sqlx_query(&stmt);
         conn.execute(query).await.map_err(sqlx_error_to_exec_err)?;
@@ -339,7 +345,6 @@ pub(crate) async fn set_transaction_config(
         let stmt = Statement {
             sql: format!("SET TRANSACTION {access_mode}"),
             values: None,
-            db_backend: DbBackend::Postgres,
         };
         let query = sqlx_query(&stmt);
         conn.execute(query).await.map_err(sqlx_error_to_exec_err)?;
@@ -347,19 +352,9 @@ pub(crate) async fn set_transaction_config(
     Ok(())
 }
 
-impl
-    From<(
-        PgConnection,
-        Statement,
-        Option<crate::metric::Callback>,
-    )> for crate::QueryStream
-{
+impl From<(PgConnection, Statement, Option<crate::metric::Callback>)> for crate::QueryStream {
     fn from(
-        (conn, stmt, metric_callback): (
-            PgConnection,
-            Statement,
-            Option<crate::metric::Callback>,
-        ),
+        (conn, stmt, metric_callback): (PgConnection, Statement, Option<crate::metric::Callback>),
     ) -> Self {
         crate::QueryStream::build(
             stmt,
@@ -378,7 +373,6 @@ impl crate::DatabaseTransaction {
     ) -> Result<crate::DatabaseTransaction, DbErr> {
         Self::begin(
             Arc::new(Mutex::new(crate::InnerConnection::Postgres(inner))),
-            crate::DbBackend::Postgres,
             metric_callback,
             isolation_level,
             access_mode,

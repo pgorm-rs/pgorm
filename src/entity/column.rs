@@ -1,4 +1,4 @@
-use crate::{DbBackend, EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
+use crate::{EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
 use sea_query::{
     Alias, BinOper, DynIden, Expr, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
 };
@@ -249,10 +249,8 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
 
     /// Construct a returning [`Expr`].
     #[allow(clippy::match_single_binding)]
-    fn into_returning_expr(self, db_backend: DbBackend) -> Expr {
-        match db_backend {
-            _ => Expr::col(self),
-        }
+    fn into_returning_expr(self) -> Expr {
+        Expr::col(self)
     }
 
     /// Cast column expression used in select statement.

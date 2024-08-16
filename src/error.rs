@@ -173,7 +173,7 @@ impl DbErr {
             {
                 let error_code = e.code().unwrap_or_default();
                 let _error_code_expanded = error_code.deref();
-                
+
                 #[cfg(feature = "sqlx-postgres")]
                 if e.try_downcast_ref::<sqlx::postgres::PgDatabaseError>()
                     .is_some()

@@ -1,4 +1,3 @@
-use crate::DbBackend;
 use sea_query::{inject_parameters, PostgresQueryBuilder};
 pub use sea_query::{Value, Values};
 use std::fmt;
@@ -10,48 +9,43 @@ pub struct Statement {
     pub sql: String,
     /// The values for the SQL statement's parameters
     pub values: Option<Values>,
-    /// The database backend this statement is constructed for.
-    /// The SQL dialect and values should be valid for the DbBackend.
-    pub db_backend: DbBackend,
 }
 
 /// Any type that can build a [Statement]
 pub trait StatementBuilder {
     /// Method to call in order to build a [Statement]
-    fn build(&self, db_backend: &DbBackend) -> Statement;
+    fn build(&self) -> Statement;
 }
 
 impl Statement {
     /// Create a [Statement] from a [crate::DatabaseBackend] and a raw SQL statement
-    pub fn from_string<T>(db_backend: DbBackend, stmt: T) -> Statement
+    pub fn from_string<T>(stmt: T) -> Statement
     where
         T: Into<String>,
     {
         Statement {
             sql: stmt.into(),
             values: None,
-            db_backend,
         }
     }
 
     /// Create a SQL statement from a [crate::DatabaseBackend], a
     /// raw SQL statement and param values
-    pub fn from_sql_and_values<I, T>(db_backend: DbBackend, sql: T, values: I) -> Self
+    pub fn from_sql_and_values<I, T>(sql: T, values: I) -> Self
     where
         I: IntoIterator<Item = Value>,
         T: Into<String>,
     {
-        Self::from_string_values_tuple(db_backend, (sql, Values(values.into_iter().collect())))
+        Self::from_string_values_tuple((sql, Values(values.into_iter().collect())))
     }
 
-    pub(crate) fn from_string_values_tuple<T>(db_backend: DbBackend, stmt: (T, Values)) -> Statement
+    pub(crate) fn from_string_values_tuple<T>(stmt: (T, Values)) -> Statement
     where
         T: Into<String>,
     {
         Statement {
             sql: stmt.0.into(),
             values: Some(stmt.1),
-            db_backend,
         }
     }
 }
@@ -63,7 +57,7 @@ impl fmt::Display for Statement {
                 let string = inject_parameters(
                     &self.sql,
                     values.0.clone(),
-                    self.db_backend.get_query_builder().as_ref(),
+                    &sea_query::PostgresQueryBuilder,
                 );
                 write!(f, "{}", &string)
             }
@@ -75,27 +69,23 @@ impl fmt::Display for Statement {
 }
 
 macro_rules! build_any_stmt {
-    ($stmt: expr, $db_backend: expr) => {
-        match $db_backend {
-            DbBackend::Postgres => $stmt.build(PostgresQueryBuilder),
-        }
+    ($stmt: expr) => {
+        $stmt.build(sea_query::PostgresQueryBuilder)
     };
 }
 
 macro_rules! build_postgres_stmt {
-    ($stmt: expr, $db_backend: expr) => {
-        match $db_backend {
-            DbBackend::Postgres => $stmt.to_string(PostgresQueryBuilder),
-        }
+    ($stmt: expr) => {
+        $stmt.to_string(sea_query::PostgresQueryBuilder)
     };
 }
 
 macro_rules! build_query_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
-            fn build(&self, db_backend: &DbBackend) -> Statement {
-                let stmt = build_any_stmt!(self, db_backend);
-                Statement::from_string_values_tuple(*db_backend, stmt)
+            fn build(&self) -> Statement {
+                let stmt = self.build(sea_query::PostgresQueryBuilder);
+                Statement::from_string_values_tuple(stmt)
             }
         }
     };
@@ -110,9 +100,9 @@ build_query_stmt!(sea_query::WithQuery);
 macro_rules! build_schema_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
-            fn build(&self, db_backend: &DbBackend) -> Statement {
-                let stmt = build_any_stmt!(self, db_backend);
-                Statement::from_string(*db_backend, stmt)
+            fn build(&self) -> Statement {
+                let stmt = build_any_stmt!(self);
+                Statement::from_string(stmt)
             }
         }
     };
@@ -131,9 +121,9 @@ build_schema_stmt!(sea_query::ForeignKeyDropStatement);
 macro_rules! build_type_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
-            fn build(&self, db_backend: &DbBackend) -> Statement {
-                let stmt = build_postgres_stmt!(self, db_backend);
-                Statement::from_string(*db_backend, stmt)
+            fn build(&self) -> Statement {
+                let stmt = build_postgres_stmt!(self);
+                Statement::from_string(stmt)
             }
         }
     };

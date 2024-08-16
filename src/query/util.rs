@@ -18,23 +18,23 @@ macro_rules! debug_query_build {
             /// This macro builds a [Statement] when invoked
             pub fn build(&self) -> Statement {
                 let func = $db_expr;
-                let db_backend = func(self);
-                self.query.build(db_backend)
+                // let db_backend = func(self);
+                self.query.build()
             }
         }
     };
 }
 
-debug_query_build!(DbBackend, |x: &DebugQuery<_, DbBackend>| x.value);
-debug_query_build!(&DbBackend, |x: &DebugQuery<_, &DbBackend>| *x.value);
-debug_query_build!(DatabaseConnection, |x: &DebugQuery<
-    _,
-    DatabaseConnection,
->| x.value.get_database_backend());
-debug_query_build!(&DatabaseConnection, |x: &DebugQuery<
-    _,
-    &DatabaseConnection,
->| x.value.get_database_backend());
+// debug_query_build!(DbBackend, |x: &DebugQuery<_>| x.value);
+// debug_query_build!(&DbBackend, |x: &DebugQuery<_>| *x.value);
+// debug_query_build!(DatabaseConnection, |x: &DebugQuery<
+//     _,
+//     DatabaseConnection,
+// >| x.value.get_database_backend());
+// debug_query_build!(&DatabaseConnection, |x: &DebugQuery<
+//     _,
+//     &DatabaseConnection,
+// >| x.value.get_database_backend());
 
 /// Helper to get a `Statement` from an object that impl `QueryTrait`.
 ///

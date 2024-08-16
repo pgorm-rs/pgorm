@@ -752,7 +752,7 @@ where
                 .try_get::<Option<sqlx::types::Json<Self>>, _>(idx.as_sqlx_postgres_index())
                 .map_err(|e| sqlx_error_to_query_err(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)).map(|json| json.0)),
-           
+
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
         }

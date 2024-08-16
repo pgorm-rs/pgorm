@@ -1,7 +1,6 @@
 use crate::{
-    debug_print, error::*, AccessMode, ConnectionTrait, DbBackend, DbErr, ExecResult,
-    InnerConnection, IsolationLevel, QueryResult, Statement, StreamTrait, TransactionStream,
-    TransactionTrait,
+    debug_print, error::*, AccessMode, ConnectionTrait, DbErr, ExecResult, InnerConnection,
+    IsolationLevel, QueryResult, Statement, StreamTrait, TransactionStream, TransactionTrait,
 };
 #[cfg(feature = "sqlx-dep")]
 use crate::{sqlx_error_to_exec_err, sqlx_error_to_query_err};
@@ -16,7 +15,6 @@ use tracing::instrument;
 /// backend to use
 pub struct DatabaseTransaction {
     conn: Arc<Mutex<InnerConnection>>,
-    backend: DbBackend,
     open: bool,
     metric_callback: Option<crate::metric::Callback>,
 }
@@ -31,14 +29,12 @@ impl DatabaseTransaction {
     #[instrument(level = "trace", skip(metric_callback))]
     pub(crate) async fn begin(
         conn: Arc<Mutex<InnerConnection>>,
-        backend: DbBackend,
         metric_callback: Option<crate::metric::Callback>,
         isolation_level: Option<IsolationLevel>,
         access_mode: Option<AccessMode>,
     ) -> Result<DatabaseTransaction, DbErr> {
         let res = DatabaseTransaction {
             conn,
-            backend,
             open: true,
             metric_callback,
         };
@@ -151,11 +147,6 @@ impl Drop for DatabaseTransaction {
 
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseTransaction {
-    fn get_database_backend(&self) -> DbBackend {
-        // this way we don't need to lock
-        self.backend
-    }
-
     #[instrument(level = "trace")]
     #[allow(unused_variables)]
     async fn execute(&self, stmt: Statement) -> Result<ExecResult, DbErr> {
@@ -265,7 +256,6 @@ impl TransactionTrait for DatabaseTransaction {
     async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
         DatabaseTransaction::begin(
             Arc::clone(&self.conn),
-            self.backend,
             self.metric_callback.clone(),
             None,
             None,
@@ -281,7 +271,6 @@ impl TransactionTrait for DatabaseTransaction {
     ) -> Result<DatabaseTransaction, DbErr> {
         DatabaseTransaction::begin(
             Arc::clone(&self.conn),
-            self.backend,
             self.metric_callback.clone(),
             isolation_level,
             access_mode,

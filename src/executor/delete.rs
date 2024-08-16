@@ -1,5 +1,7 @@
-use crate::{error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait};
-use sea_query::DeleteStatement;
+use crate::{
+    error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait, Statement,
+};
+use sea_query::{DeleteStatement, PostgresQueryBuilder};
 use std::future::Future;
 
 /// Handles DELETE operations in a ActiveModel using [DeleteStatement]
@@ -69,8 +71,7 @@ async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, 
 where
     C: ConnectionTrait,
 {
-    let builder = db.get_database_backend();
-    let statement = builder.build(&query);
+    let statement = Statement::from_string_values_tuple(query.build(PostgresQueryBuilder));
 
     let result = db.execute(statement).await?;
     Ok(DeleteResult {

@@ -1,6 +1,4 @@
-use crate::{
-    DatabaseTransaction, DbBackend, DbErr, ExecResult, QueryResult, Statement, TransactionError,
-};
+use crate::{DatabaseTransaction, DbErr, ExecResult, QueryResult, Statement, TransactionError};
 use futures::Stream;
 use std::{future::Future, pin::Pin};
 
@@ -8,10 +6,6 @@ use std::{future::Future, pin::Pin};
 /// It abstracts database connection and transaction
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
-    /// Fetch the database backend as specified in [DbBackend].
-    /// This depends on feature flags enabled.
-    fn get_database_backend(&self) -> DbBackend;
-
     /// Execute a [Statement]
     async fn execute(&self, stmt: Statement) -> Result<ExecResult, DbErr>;
 
@@ -23,17 +17,6 @@ pub trait ConnectionTrait: Sync {
 
     /// Execute a [Statement] and return a collection Vec<[QueryResult]> on success
     async fn query_all(&self, stmt: Statement) -> Result<Vec<QueryResult>, DbErr>;
-
-    /// Check if the connection supports `RETURNING` syntax on insert and update
-    fn support_returning(&self) -> bool {
-        let db_backend = self.get_database_backend();
-        db_backend.support_returning()
-    }
-
-    /// Check if the connection is a test connection for the Mock database
-    fn is_mock_connection(&self) -> bool {
-        false
-    }
 }
 
 /// Stream query results

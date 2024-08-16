@@ -1,9 +1,9 @@
 use crate::{
-    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, DbBackend, EntityTrait, Insert,
-    IntoActiveModel, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, SelectModel, SelectorRaw,
-    TryFromU64, TryInsert,
+    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel,
+    Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, SelectModel, SelectorRaw, Statement, TryFromU64,
+    TryInsert,
 };
-use sea_query::{FromValueTuple, Iden, InsertStatement, Query, ValueTuple};
+use sea_query::{FromValueTuple, Iden, InsertStatement, PostgresQueryBuilder, Query, ValueTuple};
 use std::{future::Future, marker::PhantomData};
 
 /// Defines a structure to perform INSERT operations in an ActiveModel
@@ -117,15 +117,12 @@ where
     {
         // so that self is dropped before entering await
         let mut query = self.query;
-        if db.support_returning() {
-            let db_backend = db.get_database_backend();
-            let returning =
-                Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
-                    c.into_column()
-                        .select_as(c.into_column().into_returning_expr(db_backend))
-                }));
-            query.returning(returning);
-        }
+        let returning =
+            Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
+                c.into_column()
+                    .select_as(c.into_column().into_returning_expr())
+            }));
+        query.returning(returning);
         Inserter::<A>::new(self.primary_key, query).exec(db)
     }
 
@@ -214,13 +211,12 @@ where
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
-    let db_backend = db.get_database_backend();
-    let statement = db_backend.build(&statement);
+    let statement = Statement::from_string_values_tuple(statement.build(PostgresQueryBuilder));
 
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
     type ValueTypeOf<A> = <PrimaryKey<A> as PrimaryKeyTrait>::ValueType;
 
-    let last_insert_id = match (primary_key, db.support_returning()) {
+    let last_insert_id = match (primary_key, true) {
         (Some(value_tuple), _) => {
             let res = db.execute(statement).await?;
             if res.rows_affected() == 0 {
@@ -268,8 +264,8 @@ async fn exec_insert_without_returning<C>(
 where
     C: ConnectionTrait,
 {
-    let db_backend = db.get_database_backend();
-    let insert_statement = db_backend.build(&insert_statement);
+    let insert_statement =
+        Statement::from_string_values_tuple(insert_statement.build(PostgresQueryBuilder));
     let exec_result = db.execute(insert_statement).await?;
     Ok(exec_result.rows_affected())
 }
@@ -284,28 +280,17 @@ where
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
-    let db_backend = db.get_database_backend();
-    let found = match db.support_returning() {
-        true => {
-            let returning = Query::returning().exprs(
-                <A::Entity as EntityTrait>::Column::iter()
-                    .map(|c| c.select_as(c.into_returning_expr(db_backend))),
-            );
-            insert_statement.returning(returning);
-            let insert_statement = db_backend.build(&insert_statement);
-            SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(
-                insert_statement,
-            )
-            .one(db)
-            .await?
-        }
-        false => {
-            let insert_res = exec_insert::<A, _>(primary_key, insert_statement, db).await?;
-            <A::Entity as EntityTrait>::find_by_id(insert_res.last_insert_id)
-                .one(db)
-                .await?
-        }
-    };
+    let returning = Query::returning().exprs(
+        <A::Entity as EntityTrait>::Column::iter().map(|c| c.select_as(c.into_returning_expr())),
+    );
+    insert_statement.returning(returning);
+    let insert_statement =
+        Statement::from_string_values_tuple(insert_statement.build(PostgresQueryBuilder));
+    let found = SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(
+        insert_statement,
+    )
+    .one(db)
+    .await?;
     match found {
         Some(model) => Ok(model),
         None => Err(DbErr::RecordNotFound(
