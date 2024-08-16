@@ -1,4 +1,4 @@
-use crate::{error::*, FromQueryResult, QueryResult};
+use crate::{error::*, FromQueryResult, QueryResult, QueryResultRow};
 use serde_json::Map;
 pub use serde_json::Value as JsonValue;
 
@@ -16,8 +16,7 @@ impl FromQueryResult for JsonValue {
             };
         }
         match &res.row {
-            #[cfg(feature = "sqlx-postgres")]
-            crate::QueryResultRow::SqlxPostgres(row) => {
+            QueryResultRow(row) => {
                 use serde_json::json;
                 use sqlx::{postgres::types::Oid, Column, Postgres, Row, Type};
 

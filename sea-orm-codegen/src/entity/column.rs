@@ -77,7 +77,6 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type, date_time_crate))
                 }
-                _ => unimplemented!(),
             }
         }
         let ident: TokenStream = write_rs_type(&self.col_type, date_time_crate)

@@ -16,10 +16,7 @@ pub struct QueryResult {
 }
 
 #[allow(clippy::enum_variant_names)]
-pub(crate) enum QueryResultRow {
-    #[cfg(feature = "sqlx-postgres")]
-    SqlxPostgres(sqlx::postgres::PgRow),
-}
+pub(crate) struct QueryResultRow(pub(crate) sqlx::postgres::PgRow);
 
 /// An interface to get a value from the query result
 pub trait TryGetable: Sized {
@@ -113,27 +110,20 @@ impl QueryResult {
 
     /// Retrieves the names of the columns in the result set
     pub fn column_names(&self) -> Vec<String> {
-        #[cfg(feature = "sqlx-dep")]
         use sqlx::Column;
-
-        match &self.row {
-            #[cfg(feature = "sqlx-postgres")]
-            QueryResultRow::SqlxPostgres(row) => {
-                row.columns().iter().map(|c| c.name().to_string()).collect()
-            }
-        }
+        self.row
+            .0
+            .columns()
+            .iter()
+            .map(|c| c.name().to_string())
+            .collect()
     }
 }
 
 #[allow(unused_variables)]
 impl fmt::Debug for QueryResultRow {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            #[cfg(feature = "sqlx-postgres")]
-            Self::SqlxPostgres(_) => write!(f, "QueryResultRow::SqlxPostgres cannot be inspected"),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
-        }
+        write!(f, "QueryResultRow")
     }
 }
 
@@ -215,8 +205,7 @@ macro_rules! try_getable_all {
             #[allow(unused_variables)]
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
-                    #[cfg(feature = "sqlx-postgres")]
-                    QueryResultRow::SqlxPostgres(row) => row
+                    QueryResultRow(row) => row
                         .try_get::<Option<$type>, _>(idx.as_sqlx_postgres_index())
                         .map_err(|e| sqlx_error_to_query_err(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -234,8 +223,7 @@ macro_rules! try_getable_unsigned {
             #[allow(unused_variables)]
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
-                    #[cfg(feature = "sqlx-postgres")]
-                    QueryResultRow::SqlxPostgres(_) => Err(type_err(format!(
+                    QueryResultRow(_) => Err(type_err(format!(
                         "{} unsupported by sqlx-postgres",
                         stringify!($type)
                     ))
@@ -254,8 +242,7 @@ macro_rules! try_getable_mysql {
             #[allow(unused_variables)]
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
-                    #[cfg(feature = "sqlx-postgres")]
-                    QueryResultRow::SqlxPostgres(_) => Err(type_err(format!(
+                    QueryResultRow(_) => Err(type_err(format!(
                         "{} unsupported by sqlx-postgres",
                         stringify!($type)
                     ))
@@ -275,8 +262,7 @@ macro_rules! try_getable_date_time {
             #[allow(unused_variables)]
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
-                    #[cfg(feature = "sqlx-postgres")]
-                    QueryResultRow::SqlxPostgres(row) => row
+                    QueryResultRow(row) => row
                         .try_get::<Option<$type>, _>(idx.as_sqlx_postgres_index())
                         .map_err(|e| sqlx_error_to_query_err(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -342,8 +328,7 @@ impl TryGetable for Decimal {
     #[allow(unused_variables)]
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
-            #[cfg(feature = "sqlx-postgres")]
-            QueryResultRow::SqlxPostgres(row) => row
+            QueryResultRow(row) => row
                 .try_get::<Option<Decimal>, _>(idx.as_sqlx_postgres_index())
                 .map_err(|e| sqlx_error_to_query_err(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -361,8 +346,7 @@ impl TryGetable for BigDecimal {
     #[allow(unused_variables)]
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
-            #[cfg(feature = "sqlx-postgres")]
-            QueryResultRow::SqlxPostgres(row) => row
+            QueryResultRow(row) => row
                 .try_get::<Option<BigDecimal>, _>(idx.as_sqlx_postgres_index())
                 .map_err(|e| sqlx_error_to_query_err(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -379,8 +363,7 @@ macro_rules! try_getable_uuid {
         impl TryGetable for $type {
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let res: Result<uuid::Uuid, TryGetError> = match &res.row {
-                    #[cfg(feature = "sqlx-postgres")]
-                    QueryResultRow::SqlxPostgres(row) => row
+                    QueryResultRow(row) => row
                         .try_get::<Option<uuid::Uuid>, _>(idx.as_sqlx_postgres_index())
                         .map_err(|e| sqlx_error_to_query_err(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -412,8 +395,7 @@ impl TryGetable for u32 {
     #[allow(unused_variables)]
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
-            #[cfg(feature = "sqlx-postgres")]
-            QueryResultRow::SqlxPostgres(row) => {
+            QueryResultRow(row) => {
                 use sqlx::postgres::types::Oid;
                 // Since 0.6.0, SQLx has dropped direct mapping from PostgreSQL's OID to Rust's `u32`;
                 // Instead, `u32` was wrapped by a `sqlx::Oid`.
@@ -444,8 +426,7 @@ mod postgres_array {
             impl TryGetable for Vec<$type> {
                 fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     match &res.row {
-                        #[cfg(feature = "sqlx-postgres")]
-                        QueryResultRow::SqlxPostgres(row) => row
+                        QueryResultRow(row) => row
                             .try_get::<Option<Vec<$type>>, _>(idx.as_sqlx_postgres_index())
                             .map_err(|e| sqlx_error_to_query_err(e).into())
                             .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -512,8 +493,7 @@ mod postgres_array {
             impl TryGetable for Vec<$type> {
                 fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     let res: Result<Vec<uuid::Uuid>, TryGetError> = match &res.row {
-                        #[cfg(feature = "sqlx-postgres")]
-                        QueryResultRow::SqlxPostgres(row) => row
+                        QueryResultRow(row) => row
                             .try_get::<Option<Vec<uuid::Uuid>>, _>(idx.as_sqlx_postgres_index())
                             .map_err(|e| sqlx_error_to_query_err(e).into())
                             .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
@@ -545,8 +525,7 @@ mod postgres_array {
         #[allow(unused_variables)]
         fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
             match &res.row {
-                #[cfg(feature = "sqlx-postgres")]
-                QueryResultRow::SqlxPostgres(row) => {
+                QueryResultRow(row) => {
                     use sqlx::postgres::types::Oid;
                     // Since 0.6.0, SQLx has dropped direct mapping from PostgreSQL's OID to Rust's `u32`;
                     // Instead, `u32` was wrapped by a `sqlx::Oid`.
@@ -747,12 +726,10 @@ where
     #[allow(unused_variables, unreachable_code)]
     fn try_get_from_json<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
-            #[cfg(feature = "sqlx-postgres")]
-            QueryResultRow::SqlxPostgres(row) => row
+            QueryResultRow(row) => row
                 .try_get::<Option<sqlx::types::Json<Self>>, _>(idx.as_sqlx_postgres_index())
                 .map_err(|e| sqlx_error_to_query_err(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)).map(|json| json.0)),
-
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
         }

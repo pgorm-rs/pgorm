@@ -216,15 +216,15 @@ where
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
     type ValueTypeOf<A> = <PrimaryKey<A> as PrimaryKeyTrait>::ValueType;
 
-    let last_insert_id = match (primary_key, true) {
-        (Some(value_tuple), _) => {
+    let last_insert_id = match primary_key {
+        Some(value_tuple) => {
             let res = db.execute(statement).await?;
             if res.rows_affected() == 0 {
                 return Err(DbErr::RecordNotInserted);
             }
             FromValueTuple::from_value_tuple(value_tuple)
         }
-        (None, true) => {
+        None => {
             let mut rows = db.query_all(statement).await?;
             let row = match rows.pop() {
                 Some(row) => row,
@@ -235,22 +235,6 @@ where
                 .collect::<Vec<_>>();
             row.try_get_many("", cols.as_ref())
                 .map_err(|_| DbErr::UnpackInsertId)?
-        }
-        (None, false) => {
-            let res = db.execute(statement).await?;
-            if res.rows_affected() == 0 {
-                return Err(DbErr::RecordNotInserted);
-            }
-            let last_insert_id = res.last_insert_id();
-            // // For MySQL, the affected-rows number:
-            // //   - The affected-rows value per row is `1` if the row is inserted as a new row,
-            // //   - `2` if an existing row is updated,
-            // //   - and `0` if an existing row is set to its current values.
-            // // Reference: https://dev.mysql.com/doc/refman/8.4/en/insert-on-duplicate.html
-            // if db_backend == DbBackend::MySql && last_insert_id == 0 {
-            //     return Err(DbErr::RecordNotInserted);
-            // }
-            ValueTypeOf::<A>::try_from_u64(last_insert_id).map_err(|_| DbErr::UnpackInsertId)?
         }
     };
 

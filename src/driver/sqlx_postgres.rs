@@ -305,7 +305,7 @@ impl SqlxPostgresPoolConnection {
 impl From<PgRow> for QueryResult {
     fn from(row: PgRow) -> QueryResult {
         QueryResult {
-            row: QueryResultRow::SqlxPostgres(row),
+            row: QueryResultRow(row),
         }
     }
 }
@@ -313,7 +313,7 @@ impl From<PgRow> for QueryResult {
 impl From<PgQueryResult> for ExecResult {
     fn from(result: PgQueryResult) -> ExecResult {
         ExecResult {
-            result: ExecResultHolder::SqlxPostgres(result),
+            result: ExecResultHolder(result),
         }
     }
 }
