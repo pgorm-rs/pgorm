@@ -10,71 +10,35 @@ use sea_query::{
 };
 
 pub async fn setup(base_url: &str, db_name: &str) -> DatabaseConnection {
-    if cfg!(feature = "sqlx-mysql") {
-        let url = format!("{base_url}/mysql");
-        let db = Database::connect(&url).await.unwrap();
-        let _drop_db_result = db
-            .execute(Statement::from_string(
-                DatabaseBackend::MySql,
-                format!("DROP DATABASE IF EXISTS `{db_name}`;"),
-            ))
-            .await;
+    let url = format!("{base_url}/postgres");
+    let db = Database::connect(&url).await.unwrap();
+    let _drop_db_result = db
+        .execute(Statement::from_string(
+            DatabaseBackend::Postgres,
+            format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
+        ))
+        .await;
 
-        let _create_db_result = db
-            .execute(Statement::from_string(
-                DatabaseBackend::MySql,
-                format!("CREATE DATABASE `{db_name}`;"),
-            ))
-            .await;
+    let _create_db_result = db
+        .execute(Statement::from_string(
+            DatabaseBackend::Postgres,
+            format!("CREATE DATABASE \"{db_name}\";"),
+        ))
+        .await;
 
-        let url = format!("{base_url}/{db_name}");
-        Database::connect(&url).await.unwrap()
-    } else if cfg!(feature = "sqlx-postgres") {
-        let url = format!("{base_url}/postgres");
-        let db = Database::connect(&url).await.unwrap();
-        let _drop_db_result = db
-            .execute(Statement::from_string(
-                DatabaseBackend::Postgres,
-                format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
-            ))
-            .await;
-
-        let _create_db_result = db
-            .execute(Statement::from_string(
-                DatabaseBackend::Postgres,
-                format!("CREATE DATABASE \"{db_name}\";"),
-            ))
-            .await;
-
-        let url = format!("{base_url}/{db_name}");
-        Database::connect(&url).await.unwrap()
-    } else {
-        let mut options: ConnectOptions = base_url.into();
-        options.sqlx_logging(false);
-        Database::connect(options).await.unwrap()
-    }
+    let url = format!("{base_url}/{db_name}");
+    Database::connect(&url).await.unwrap()
 }
 
 pub async fn tear_down(base_url: &str, db_name: &str) {
-    if cfg!(feature = "sqlx-mysql") {
-        let url = format!("{base_url}/mysql");
-        let db = Database::connect(&url).await.unwrap();
-        let _ = db
-            .execute(Statement::from_string(
-                DatabaseBackend::MySql,
-                format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
-            ))
-            .await;
-    } else if cfg!(feature = "sqlx-postgres") {
-        let url = format!("{base_url}/postgres");
-        let db = Database::connect(&url).await.unwrap();
-        let _ = db
-            .execute(Statement::from_string(
-                DatabaseBackend::Postgres,
-                format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
-            ))
-            .await;
-    };
+    let url = format!("{base_url}/postgres");
+    let db = Database::connect(&url).await.unwrap();
+    let _ = db
+        .execute(Statement::from_string(
+            DatabaseBackend::Postgres,
+            format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
+        ))
+        .await;
 }
 
 pub async fn create_enum<E>(
@@ -98,7 +62,7 @@ where
                 _ => unreachable!(),
             };
             let drop_type_stmt = Type::drop()
-                .name(SeaRc::clone(name))
+                .name(SeaRc::clone(&name))
                 .if_exists()
                 .cascade()
                 .to_owned();
@@ -147,15 +111,6 @@ pub async fn create_table_without_asserts(
     create: &TableCreateStatement,
 ) -> Result<ExecResult, DbErr> {
     let builder = db.get_database_backend();
-    if builder != DbBackend::Sqlite {
-        let stmt = builder.build(
-            Table::drop()
-                .table(create.get_table_name().unwrap().clone())
-                .if_exists()
-                .cascade(),
-        );
-        db.execute(stmt).await?;
-    }
     db.execute(builder.build(create)).await
 }
 

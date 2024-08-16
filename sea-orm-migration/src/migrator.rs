@@ -264,10 +264,6 @@ where
             f(&manager).await?;
             transaction.commit().await
         }
-        DbBackend::MySql | DbBackend::Sqlite => {
-            let manager = SchemaManager::new(db);
-            f(&manager).await
-        }
     }
 }
 
@@ -279,38 +275,6 @@ where
 
     M::install(db).await?;
     let db_backend = db.get_database_backend();
-
-    // Temporarily disable the foreign key check
-    if db_backend == DbBackend::Sqlite {
-        info!("Disabling foreign key check");
-        db.execute(Statement::from_string(
-            db_backend,
-            "PRAGMA foreign_keys = OFF".to_owned(),
-        ))
-        .await?;
-        info!("Foreign key check disabled");
-    }
-
-    // Drop all foreign keys
-    if db_backend == DbBackend::MySql {
-        info!("Dropping all foreign keys");
-        let stmt = query_mysql_foreign_keys(db);
-        let rows = db.query_all(db_backend.build(&stmt)).await?;
-        for row in rows.into_iter() {
-            let constraint_name: String = row.try_get("", "CONSTRAINT_NAME")?;
-            let table_name: String = row.try_get("", "TABLE_NAME")?;
-            info!(
-                "Dropping foreign key '{}' from table '{}'",
-                constraint_name, table_name
-            );
-            let mut stmt = ForeignKey::drop();
-            stmt.table(Alias::new(table_name.as_str()))
-                .name(constraint_name.as_str());
-            db.execute(db_backend.build(&stmt)).await?;
-            info!("Foreign key '{}' has been dropped", constraint_name);
-        }
-        info!("All foreign keys dropped");
-    }
 
     // Drop all tables
     let stmt = query_tables(db).await;
@@ -442,9 +406,7 @@ where
     C: ConnectionTrait,
 {
     match db.get_database_backend() {
-        DbBackend::MySql => MySql.query_tables(),
         DbBackend::Postgres => Postgres.query_tables(),
-        DbBackend::Sqlite => Sqlite.query_tables(),
     }
 }
 
@@ -453,9 +415,7 @@ where
     C: ConnectionTrait,
 {
     match db.get_database_backend() {
-        DbBackend::MySql => MySql::get_current_schema(),
         DbBackend::Postgres => Postgres::get_current_schema(),
-        DbBackend::Sqlite => unimplemented!(),
     }
 }
 
