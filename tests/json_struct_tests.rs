@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 use serde_json::json;
 
 #[sea_orm_macros::test]
@@ -18,7 +18,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_1(db: &DatabasePool) -> Result<(), DbErr> {
     use json_struct::*;
 
     let model = Model {
@@ -58,7 +58,7 @@ pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> 
     Ok(())
 }
 
-pub async fn insert_json_struct_2(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_2(db: &DatabasePool) -> Result<(), DbErr> {
     use json_struct::*;
 
     let model = Model {

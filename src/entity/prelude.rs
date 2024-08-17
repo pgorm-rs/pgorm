@@ -2,7 +2,7 @@ pub use crate::{
     error::*,
     sea_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ColumnDef, ColumnTrait, ColumnType,
-    ColumnTypeTrait, ConnectionTrait, CursorTrait, DatabaseConnection, EntityName, EntityTrait,
+    ColumnTypeTrait, ConnectionTrait, CursorTrait, DatabasePool, EntityName, EntityTrait,
     EnumIter, Iden, IdenStatic, Linked, LoaderTrait, ModelTrait, PaginatorTrait, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryResult, Related, RelationDef,
     RelationTrait, Select, Value,

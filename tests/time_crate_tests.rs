@@ -3,7 +3,7 @@
 pub mod common;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, DatabaseConnection, IntoActiveModel};
+use sea_orm::{entity::prelude::*, DatabasePool, IntoActiveModel};
 use serde_json::json;
 use time::macros::{date, time};
 
@@ -16,7 +16,7 @@ async fn main() {
     ctx.delete().await;
 }
 
-pub async fn create_transaction_log(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_transaction_log(db: &DatabasePool) -> Result<(), DbErr> {
     let transaction_log = transaction_log::Model {
         id: 1,
         date: date!(2022 - 03 - 13),

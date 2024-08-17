@@ -13,13 +13,13 @@ use sqlx::Executor;
 use super::metric::MetricStream;
 #[cfg(feature = "sqlx-dep")]
 use crate::driver::*;
-use crate::{DbErr, InnerConnection, QueryResult, Statement};
+use crate::{DbErr, DatabaseConnection, QueryResult, Statement};
 
 /// Creates a stream from a [QueryResult]
 #[ouroboros::self_referencing]
 pub struct QueryStream {
     stmt: Statement,
-    conn: InnerConnection,
+    conn: DatabaseConnection,
     metric_callback: Option<crate::metric::Callback>,
     #[borrows(mut conn, stmt, metric_callback)]
     #[not_covariant]
@@ -36,7 +36,7 @@ impl QueryStream {
     #[instrument(level = "trace", skip(metric_callback))]
     pub(crate) fn build(
         stmt: Statement,
-        conn: InnerConnection,
+        conn: DatabaseConnection,
         metric_callback: Option<crate::metric::Callback>,
     ) -> QueryStream {
         QueryStreamBuilder {
@@ -44,7 +44,7 @@ impl QueryStream {
             conn,
             metric_callback,
             stream_builder: |conn, stmt, _metric_callback| match conn {
-                InnerConnection(c) => {
+                DatabaseConnection(c) => {
                     let query = crate::driver::sqlx_postgres::sqlx_query(stmt);
                     let _start = _metric_callback.is_some().then(std::time::SystemTime::now);
                     let stream = c

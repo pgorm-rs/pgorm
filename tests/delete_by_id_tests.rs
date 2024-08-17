@@ -2,7 +2,7 @@
 
 pub mod common;
 pub use common::{features::*, setup::*, TestContext};
-use sea_orm::{entity::prelude::*, DatabaseConnection, IntoActiveModel};
+use sea_orm::{entity::prelude::*, DatabasePool, IntoActiveModel};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -15,7 +15,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_delete_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_delete_applog(db: &DatabasePool) -> Result<(), DbErr> {
     let log1 = applog::Model {
         id: 1,
         action: "Testing".to_owned(),

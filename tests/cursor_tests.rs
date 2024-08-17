@@ -21,7 +21,7 @@ async fn cursor_tests() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
     use insert_default::*;
 
     for _ in 0..10 {
@@ -51,7 +51,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
     Ok(())
 }
 
-pub async fn cursor_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
     use insert_default::*;
 
     // Before 5, i.e. id < 5
@@ -549,7 +549,7 @@ fn cakebaker(cake: char, baker: char) -> CakeBakerlite {
     }
 }
 
-pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_baker_cake(db: &DatabasePool) -> Result<(), DbErr> {
     let mut bakeries: Vec<bakery::ActiveModel> = vec![];
     // bakeries named from 1 to 10
     for i in 1..=10 {
@@ -607,7 +607,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn cursor_related_pagination(db: &DatabasePool) -> Result<(), DbErr> {
     use common::bakery_chain::*;
 
     assert_eq!(

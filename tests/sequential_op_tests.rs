@@ -5,7 +5,7 @@ pub mod common;
 use chrono::offset::Utc;
 use common::{bakery_chain::*, setup::*, TestContext};
 use rust_decimal::prelude::*;
-use sea_orm::{entity::*, query::*, DatabaseConnection, FromQueryResult};
+use sea_orm::{entity::*, query::*, DatabasePool, FromQueryResult};
 use uuid::Uuid;
 
 // Run the test locally:
@@ -29,7 +29,7 @@ pub async fn test_multiple_operations() {
     ctx.delete().await;
 }
 
-async fn seed_data(db: &DatabaseConnection) {
+async fn seed_data(db: &DatabasePool) {
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -130,7 +130,7 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert order");
 }
 
-async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model> {
+async fn find_baker_least_sales(db: &DatabasePool) -> Option<baker::Model> {
     #[cfg(any(feature = "sqlx-postgres"))]
     type Type = i64;
     #[cfg(not(any(feature = "sqlx-postgres")))]
@@ -192,7 +192,7 @@ async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model>
         .unwrap()
 }
 
-async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cake::Model> {
+async fn create_cake(db: &DatabasePool, baker: baker::Model) -> Option<cake::Model> {
     let new_cake = cake::ActiveModel {
         name: Set("New Cake".to_owned()),
         price: Set(rust_dec(8.00)),
@@ -227,7 +227,7 @@ async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cak
         .unwrap()
 }
 
-async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
+async fn create_order(db: &DatabasePool, cake: cake::Model) {
     let another_customer = customer::ActiveModel {
         name: Set("John".to_owned()),
         ..Default::default()
@@ -260,7 +260,7 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
     .expect("could not insert order");
 }
 
-pub async fn test_delete_bakery(db: &DatabaseConnection) {
+pub async fn test_delete_bakery(db: &DatabasePool) {
     let initial_bakeries = Bakery::find().all(db).await.unwrap().len();
 
     let bakery = bakery::ActiveModel {

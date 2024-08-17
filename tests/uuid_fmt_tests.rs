@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -16,7 +16,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_uuid_fmt(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_uuid_fmt(db: &DatabasePool) -> Result<(), DbErr> {
     let uuid = Uuid::new_v4();
 
     let uuid_fmt = uuid_fmt::Model {

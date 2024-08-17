@@ -1,7 +1,7 @@
 use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
 use sea_orm::{
-    error::*, sea_query, ConnectionTrait, DatabaseConnection, DbBackend, DbConn, EntityName,
+    error::*, sea_query, ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName,
     ExecResult, Schema,
 };
 use sea_query::{
@@ -9,7 +9,7 @@ use sea_query::{
     StringLen,
 };
 
-pub async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     let db_backend = db.get_database_backend();
 
     create_log_table(db).await?;

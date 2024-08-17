@@ -301,7 +301,7 @@ mod tests {
     use super::*;
     use crate::entity::prelude::*;
     use crate::{tests_cfg::*, ConnectionTrait, Statement};
-    use crate::{DatabaseConnection, DbBackend, MockDatabase, Transaction};
+    use crate::{DatabasePool, DbBackend, MockDatabase, Transaction};
     use futures::TryStreamExt;
     use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
@@ -315,7 +315,7 @@ mod tests {
         )
     });
 
-    fn setup() -> (DatabaseConnection, Vec<Vec<fruit::Model>>) {
+    fn setup() -> (DatabasePool, Vec<Vec<fruit::Model>>) {
         let page1 = vec![
             fruit::Model {
                 id: 1,
@@ -344,7 +344,7 @@ mod tests {
         (db, vec![page1, page2, page3])
     }
 
-    fn setup_num_items() -> (DatabaseConnection, i64) {
+    fn setup_num_items() -> (DatabasePool, i64) {
         let num_items = 3;
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[maplit::btreemap! {

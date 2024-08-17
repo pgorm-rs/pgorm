@@ -3,7 +3,7 @@
 pub mod common;
 pub use common::{bakery_chain::*, setup::*, TestContext};
 pub use sea_orm::{
-    entity::*, error::DbErr, error::SqlErr, tests_cfg, ConnectionTrait, DatabaseConnection,
+    entity::*, error::DbErr, error::SqlErr, tests_cfg, ConnectionTrait, DatabasePool,
     DbBackend, EntityName, ExecResult,
 };
 use uuid::Uuid;
@@ -16,7 +16,7 @@ async fn main() {
     ctx.delete().await;
 }
 
-pub async fn test_error(db: &DatabaseConnection) {
+pub async fn test_error(db: &DatabasePool) {
     let mud_cake = cake::ActiveModel {
         name: Set("Moldy Cake".to_owned()),
         price: Set(rust_dec(10.25)),

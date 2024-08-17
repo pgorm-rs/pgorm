@@ -4,7 +4,7 @@ pub mod common;
 
 use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 use std::str::FromStr;
 
 #[sea_orm_macros::test]
@@ -17,7 +17,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_update_pi(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_pi(db: &DatabasePool) -> Result<(), DbErr> {
     let pi = pi::Model {
         id: 1,
         decimal: rust_dec(3.1415926536),

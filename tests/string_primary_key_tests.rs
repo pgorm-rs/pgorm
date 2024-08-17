@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 use serde_json::json;
 
 #[sea_orm_macros::test]
@@ -18,7 +18,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_and_delete_repository(db: &DatabasePool) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-001".to_owned(),
         owner: "GC".to_owned(),
@@ -103,7 +103,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_repository(db: &DatabasePool) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-002".to_owned(),
         owner: "GC".to_owned(),

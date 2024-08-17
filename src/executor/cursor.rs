@@ -1,12 +1,16 @@
 use crate::{
     ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoIdentity,
     PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select, SelectModel, SelectTwo,
-    SelectTwoModel, SelectorTrait, Statement,
+    SelectTwoModel, SelectorTrait,
 };
+use bigdecimal::BigDecimal;
+use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use rust_decimal::Decimal;
 use sea_query::{
-    Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc, SelectStatement,
-    SimpleExpr, Value, ValueTuple,
+    ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc, SelectStatement, SimpleExpr, Value, ValueTuple
 };
+use tokio_postgres::{types::{Json, ToSql}, Statement};
+use uuid::Uuid;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
 
@@ -283,8 +287,11 @@ where
         self.apply_order_by();
         self.apply_filters();
 
-        let stmt = Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder));
-        let rows = db.query_all(stmt).await?;
+        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+
+        let rows = db.query_all(&stmt, &values).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {
             buffer.push(S::from_raw_query_result(row)?);
@@ -2380,5 +2387,133 @@ mod tests {
         );
 
         Ok(())
+    }
+}
+
+
+#[derive(Debug)]
+pub struct ValueHolder(Value);
+
+use bytes::BytesMut;
+
+#[inline(always)]
+fn accepts<T: ToSql>(input: T, ty: &tokio_postgres::types::Type) -> bool {
+    T::accepts(ty)
+}
+
+impl ToSql for ValueHolder {
+    fn to_sql(&self, ty: &tokio_postgres::types::Type, out: &mut BytesMut) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+    where
+        Self: Sized {
+        match self.0 {
+            Value::Bool(x) => x.to_sql(ty, out),
+            Value::TinyInt(x) => x.to_sql(ty, out),
+            Value::SmallInt(x) => x.to_sql(ty, out),
+            Value::Int(x) => x.to_sql(ty, out),
+            Value::BigInt(x) => x.to_sql(ty, out),
+            Value::TinyUnsigned(x) => x.map(|x| x as _).to_sql(ty, out),
+            Value::SmallUnsigned(x) => x.map(|x| x as _).to_sql(ty, out),
+            Value::Unsigned(x) => x.to_sql(ty, out),
+            Value::BigUnsigned(x) => x.map(|x| x as _).to_sql(ty, out),
+            Value::Float(x) => x.to_sql(ty, out),
+            Value::Double(x) => x.to_sql(ty, out),
+            Value::String(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::Char(x) => x.map(|x| x.to_string()).to_sql(ty, out),
+            Value::Bytes(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::Json(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoDate(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoTime(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoDateTime(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoDateTimeUtc(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoDateTimeLocal(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::ChronoDateTimeWithTimeZone(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::TimeDate(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::TimeTime(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::TimeDateTime(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::TimeDateTimeWithTimeZone(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::Uuid(x) => x.map(|x| &*x).to_sql(ty, out),
+            Value::Decimal(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::BigDecimal(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::Array(ty, x) => todo!(),
+        }
+    }
+
+    fn accepts(ty: &tokio_postgres::types::Type) -> bool
+    where
+        Self: Sized {
+            // TODO
+            true
+    }
+
+    fn to_sql_checked(
+        &self,
+        ty: &tokio_postgres::types::Type,
+        out: &mut BytesMut,
+    ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
+        match self.0 {
+            Value::Bool(x) => x.to_sql_checked(ty, out),
+            Value::TinyInt(x) => x.to_sql_checked(ty, out),
+            Value::SmallInt(x) => x.to_sql_checked(ty, out),
+            Value::Int(x) => x.to_sql_checked(ty, out),
+            Value::BigInt(x) => x.to_sql_checked(ty, out),
+            Value::TinyUnsigned(x) => x.map(|x| x as _).to_sql_checked(ty, out),
+            Value::SmallUnsigned(x) => x.map(|x| x as _).to_sql_checked(ty, out),
+            Value::Unsigned(x) => x.to_sql_checked(ty, out),
+            Value::BigUnsigned(x) => x.map(|x| x as _).to_sql_checked(ty, out),
+            Value::Float(x) => x.to_sql_checked(ty, out),
+            Value::Double(x) => x.to_sql_checked(ty, out),
+            Value::String(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::Char(x) => x.map(|x| x.to_string()).to_sql_checked(ty, out),
+            Value::Bytes(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::Json(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoDate(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoTime(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoDateTime(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoDateTimeUtc(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoDateTimeLocal(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::ChronoDateTimeWithTimeZone(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::TimeDate(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::TimeTime(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::TimeDateTime(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::TimeDateTimeWithTimeZone(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::Uuid(x) => x.map(|x| &*x).to_sql_checked(ty, out),
+            Value::Decimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::BigDecimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
+            Value::Array(ty, x) => todo!(),
+        }
+    }
+    
+    fn encode_format(&self, ty: &tokio_postgres::types::Type) -> tokio_postgres::types::Format {
+        match self.0 {
+            Value::Bool(x) => x.encode_format(ty),
+            Value::TinyInt(x) => x.encode_format(ty),
+            Value::SmallInt(x) => x.encode_format(ty),
+            Value::Int(x) => x.encode_format(ty),
+            Value::BigInt(x) => x.encode_format(ty),
+            Value::TinyUnsigned(x) => x.map(|x| x as _).encode_format(ty),
+            Value::SmallUnsigned(x) => x.map(|x| x as _).encode_format(ty),
+            Value::Unsigned(x) => x.encode_format(ty),
+            Value::BigUnsigned(x) => x.map(|x| x as _).encode_format(ty),
+            Value::Float(x) => x.encode_format(ty),
+            Value::Double(x) => x.encode_format(ty),
+            Value::String(x) => x.map(|x| &**x).encode_format(ty),
+            Value::Char(x) => x.map(|x| x.to_string()).encode_format(ty),
+            Value::Bytes(x) => x.map(|x| &*x).encode_format(ty),
+            Value::Json(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoDate(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoTime(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoDateTime(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoDateTimeUtc(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoDateTimeLocal(x) => x.map(|x| &*x).encode_format(ty),
+            Value::ChronoDateTimeWithTimeZone(x) => x.map(|x| &*x).encode_format(ty),
+            Value::TimeDate(x) => x.map(|x| &**x).encode_format(ty),
+            Value::TimeTime(x) => x.map(|x| &**x).encode_format(ty),
+            Value::TimeDateTime(x) => x.map(|x| &**x).encode_format(ty),
+            Value::TimeDateTimeWithTimeZone(x) => x.map(|x| &**x).encode_format(ty),
+            Value::Uuid(x) => x.map(|x| &*x).encode_format(ty),
+            Value::Decimal(x) => x.map(|x| &**x).encode_format(ty),
+            Value::BigDecimal(x) => x.map(|x| &**x).encode_format(ty),
+            Value::Array(ty, x) => todo!(),
+        }
     }
 }

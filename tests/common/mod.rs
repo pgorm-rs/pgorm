@@ -3,12 +3,12 @@ pub mod features;
 pub mod runtime;
 pub mod setup;
 
-use sea_orm::DatabaseConnection;
+use sea_orm::DatabasePool;
 
 pub struct TestContext {
     base_url: String,
     db_name: String,
-    pub db: DatabaseConnection,
+    pub db: DatabasePool,
 }
 
 impl TestContext {
@@ -18,7 +18,7 @@ impl TestContext {
 
         let base_url =
             std::env::var("DATABASE_URL").expect("Enviroment variable 'DATABASE_URL' not set");
-        let db: DatabaseConnection = setup::setup(&base_url, test_name).await;
+        let db: DatabasePool = setup::setup(&base_url, test_name).await;
 
         Self {
             base_url,

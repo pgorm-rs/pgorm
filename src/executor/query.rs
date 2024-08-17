@@ -16,7 +16,7 @@ pub struct QueryResult {
 }
 
 #[allow(clippy::enum_variant_names)]
-pub(crate) struct QueryResultRow(pub(crate) sqlx::postgres::PgRow);
+pub(crate) struct QueryResultRow(pub(crate) Row);
 
 /// An interface to get a value from the query result
 pub trait TryGetable: Sized {
@@ -110,7 +110,6 @@ impl QueryResult {
 
     /// Retrieves the names of the columns in the result set
     pub fn column_names(&self) -> Vec<String> {
-        use sqlx::Column;
         self.row
             .0
             .columns()
@@ -145,14 +144,6 @@ impl<T: TryGetable> TryGetable for Option<T> {
 
 /// Column Index, used by [`TryGetable`]. Implemented for `&str` and `usize`
 pub trait ColIdx: std::fmt::Debug + Copy {
-    #[cfg(feature = "sqlx-postgres")]
-    /// Type surrogate
-    type SqlxPostgresIndex: sqlx::ColumnIndex<sqlx::postgres::PgRow>;
-
-    #[cfg(feature = "sqlx-postgres")]
-    /// Basically a no-op; only to satisfy trait bounds
-    fn as_sqlx_postgres_index(&self) -> Self::SqlxPostgresIndex;
-
     /// Self must be `&str`, return `None` otherwise
     fn as_str(&self) -> Option<&str>;
     /// Self must be `usize`, return `None` otherwise
@@ -180,15 +171,6 @@ impl ColIdx for &str {
 }
 
 impl ColIdx for usize {
-    #[cfg(feature = "sqlx-postgres")]
-    type SqlxPostgresIndex = Self;
-
-    #[cfg(feature = "sqlx-postgres")]
-    #[inline]
-    fn as_sqlx_postgres_index(&self) -> Self::SqlxPostgresIndex {
-        *self
-    }
-
     #[inline]
     fn as_str(&self) -> Option<&str> {
         None
@@ -206,8 +188,8 @@ macro_rules! try_getable_all {
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
                     QueryResultRow(row) => row
-                        .try_get::<Option<$type>, _>(idx.as_sqlx_postgres_index())
-                        .map_err(|e| sqlx_error_to_query_err(e).into())
+                        .try_get::<Option<$type>, _>(idx)
+                        .map_err(|e| DbErr::Postgres(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
                     #[allow(unreachable_patterns)]
                     _ => unreachable!(),
@@ -263,8 +245,8 @@ macro_rules! try_getable_date_time {
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 match &res.row {
                     QueryResultRow(row) => row
-                        .try_get::<Option<$type>, _>(idx.as_sqlx_postgres_index())
-                        .map_err(|e| sqlx_error_to_query_err(e).into())
+                        .try_get::<Option<$type>, _>(idx)
+                        .map_err(|e| DbErr::Postgres(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
                     #[allow(unreachable_patterns)]
                     _ => unreachable!(),
@@ -329,8 +311,8 @@ impl TryGetable for Decimal {
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
             QueryResultRow(row) => row
-                .try_get::<Option<Decimal>, _>(idx.as_sqlx_postgres_index())
-                .map_err(|e| sqlx_error_to_query_err(e).into())
+                .try_get::<Option<Decimal>, _>(idx)
+                .map_err(|e| DbErr::Postgres(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
@@ -340,6 +322,7 @@ impl TryGetable for Decimal {
 
 #[cfg(feature = "with-bigdecimal")]
 use bigdecimal::BigDecimal;
+use tokio_postgres::{types::{Json, Oid}, Row};
 
 #[cfg(feature = "with-bigdecimal")]
 impl TryGetable for BigDecimal {
@@ -347,8 +330,8 @@ impl TryGetable for BigDecimal {
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
             QueryResultRow(row) => row
-                .try_get::<Option<BigDecimal>, _>(idx.as_sqlx_postgres_index())
-                .map_err(|e| sqlx_error_to_query_err(e).into())
+                .try_get::<Option<BigDecimal>, _>(idx)
+                .map_err(|e| DbErr::Postgres(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
@@ -364,8 +347,8 @@ macro_rules! try_getable_uuid {
             fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let res: Result<uuid::Uuid, TryGetError> = match &res.row {
                     QueryResultRow(row) => row
-                        .try_get::<Option<uuid::Uuid>, _>(idx.as_sqlx_postgres_index())
-                        .map_err(|e| sqlx_error_to_query_err(e).into())
+                        .try_get::<Option<uuid::Uuid>, _>(idx)
+                        .map_err(|e| DbErr::Postgres(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
                     #[allow(unreachable_patterns)]
                     _ => unreachable!(),
@@ -396,11 +379,8 @@ impl TryGetable for u32 {
     fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
             QueryResultRow(row) => {
-                use sqlx::postgres::types::Oid;
-                // Since 0.6.0, SQLx has dropped direct mapping from PostgreSQL's OID to Rust's `u32`;
-                // Instead, `u32` was wrapped by a `sqlx::Oid`.
-                row.try_get::<Option<Oid>, _>(idx.as_sqlx_postgres_index())
-                    .map_err(|e| sqlx_error_to_query_err(e).into())
+                row.try_get::<Option<Oid>, _>(idx)
+                    .map_err(|e| DbErr::Postgres(e).into())
                     .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
                     .map(|oid| oid.0)
             }
@@ -427,8 +407,8 @@ mod postgres_array {
                 fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     match &res.row {
                         QueryResultRow(row) => row
-                            .try_get::<Option<Vec<$type>>, _>(idx.as_sqlx_postgres_index())
-                            .map_err(|e| sqlx_error_to_query_err(e).into())
+                            .try_get::<Option<Vec<$type>>, _>(idx)
+                            .map_err(|e| DbErr::Postgres(e).into())
                             .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
                         #[allow(unreachable_patterns)]
                         _ => unreachable!(),
@@ -494,8 +474,8 @@ mod postgres_array {
                 fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     let res: Result<Vec<uuid::Uuid>, TryGetError> = match &res.row {
                         QueryResultRow(row) => row
-                            .try_get::<Option<Vec<uuid::Uuid>>, _>(idx.as_sqlx_postgres_index())
-                            .map_err(|e| sqlx_error_to_query_err(e).into())
+                            .try_get::<Option<Vec<uuid::Uuid>>, _>(idx)
+                            .map_err(|e| DbErr::Postgres(e).into())
                             .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
                         #[allow(unreachable_patterns)]
                         _ => unreachable!(),
@@ -526,11 +506,10 @@ mod postgres_array {
         fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
             match &res.row {
                 QueryResultRow(row) => {
-                    use sqlx::postgres::types::Oid;
                     // Since 0.6.0, SQLx has dropped direct mapping from PostgreSQL's OID to Rust's `u32`;
                     // Instead, `u32` was wrapped by a `sqlx::Oid`.
-                    row.try_get::<Option<Vec<Oid>>, _>(idx.as_sqlx_postgres_index())
-                        .map_err(|e| sqlx_error_to_query_err(e).into())
+                    row.try_get::<Option<Vec<Oid>>, _>(idx)
+                        .map_err(|e| DbErr::Postgres(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
                         .map(|oids| oids.into_iter().map(|oid| oid.0).collect())
                 }
@@ -727,8 +706,8 @@ where
     fn try_get_from_json<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         match &res.row {
             QueryResultRow(row) => row
-                .try_get::<Option<sqlx::types::Json<Self>>, _>(idx.as_sqlx_postgres_index())
-                .map_err(|e| sqlx_error_to_query_err(e).into())
+                .try_get::<Option<Json<Self>>, _>(idx)
+                .map_err(|e| DbErr::Postgres(e).into())
                 .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)).map(|json| json.0)),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),

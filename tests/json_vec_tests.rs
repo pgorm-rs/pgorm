@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -19,7 +19,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_vec(db: &DatabasePool) -> Result<(), DbErr> {
     let json_vec = json_vec::Model {
         id: 1,
         str_vec: Some(json_vec::StringVec(vec![
@@ -43,7 +43,7 @@ pub async fn insert_json_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_string_vec_derive(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_string_vec_derive(db: &DatabasePool) -> Result<(), DbErr> {
     let json_vec = json_vec_derive::json_string_vec::Model {
         id: 1,
         str_vec: Some(json_vec_derive::json_string_vec::StringVec(vec![
@@ -72,7 +72,7 @@ pub async fn insert_json_string_vec_derive(db: &DatabaseConnection) -> Result<()
     Ok(())
 }
 
-pub async fn insert_json_struct_vec_derive(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_vec_derive(db: &DatabasePool) -> Result<(), DbErr> {
     let json_vec = json_vec_derive::json_struct_vec::Model {
         id: 2,
         struct_vec: vec![

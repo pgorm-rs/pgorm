@@ -6,6 +6,7 @@ use crate::{
 };
 use futures::{Stream, TryStreamExt};
 use sea_query::{PostgresQueryBuilder, SelectStatement, Value};
+use tokio_postgres::Row;
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
@@ -39,7 +40,7 @@ pub trait SelectorTrait {
     type Item: Sized;
 
     /// The method to perform a query on a Model
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr>;
+    fn from_raw_query_result(res: Row) -> Result<Self::Item, DbErr>;
 }
 
 /// Get tuple from query result based on a list of column identifiers

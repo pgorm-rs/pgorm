@@ -1,7 +1,7 @@
 use pretty_assertions::assert_eq;
 use sea_orm::{
     ColumnTrait, ColumnType, ConnectOptions, ConnectionTrait, Database, DatabaseBackend,
-    DatabaseConnection, DbBackend, DbConn, DbErr, EntityTrait, ExecResult, Iterable, Schema,
+    DatabasePool, DbBackend, DbConn, DbErr, EntityTrait, ExecResult, Iterable, Schema,
     Statement,
 };
 use sea_query::{
@@ -9,7 +9,7 @@ use sea_query::{
     SeaRc, Table, TableCreateStatement,
 };
 
-pub async fn setup(base_url: &str, db_name: &str) -> DatabaseConnection {
+pub async fn setup(base_url: &str, db_name: &str) -> DatabasePool {
     let url = format!("{base_url}/postgres");
     let db = Database::connect(&url).await.unwrap();
     let _drop_db_result = db

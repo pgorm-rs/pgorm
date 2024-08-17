@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
 use sea_orm::{
-    entity::prelude::*, entity::*, DatabaseConnection, DerivePartialModel, FromQueryResult,
+    entity::prelude::*, entity::*, DatabasePool, DerivePartialModel, FromQueryResult,
 };
 use serde_json::json;
 
@@ -22,7 +22,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_collection(db: &DatabasePool) -> Result<(), DbErr> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
@@ -168,7 +168,7 @@ pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn update_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn update_collection(db: &DatabasePool) -> Result<(), DbErr> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
@@ -204,7 +204,7 @@ pub async fn update_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn select_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn select_collection(db: &DatabasePool) -> Result<(), DbErr> {
     use collection::*;
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq)]

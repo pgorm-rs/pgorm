@@ -3,7 +3,7 @@
 pub mod common;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, DatabaseConnection, IntoActiveModel};
+use sea_orm::{entity::prelude::*, DatabasePool, IntoActiveModel};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -17,7 +17,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_applog(db: &DatabasePool) -> Result<(), DbErr> {
     let log = applog::Model {
         id: 1,
         action: "Testing".to_owned(),
@@ -66,7 +66,7 @@ pub async fn create_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_satellites_log(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_satellites_log(db: &DatabasePool) -> Result<(), DbErr> {
     let archive = satellite::Model {
         id: 1,
         satellite_name: "Sea-00001-2022".to_owned(),

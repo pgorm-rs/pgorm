@@ -1,10 +1,14 @@
 use crate::{
-    error::*, AccessMode, ConnectionTrait, DatabaseTransaction, ExecResult, IsolationLevel,
-    PgConnection, QueryResult, Statement, StatementBuilder, StreamTrait, TransactionError,
+    error::*, ConnectionTrait, ExecResult, 
+    QueryResult,
     TransactionTrait,
 };
+use deadpool_postgres::{Manager, Object, Pool, Transaction};
 use sea_query::{PostgresQueryBuilder, QueryBuilder};
-use std::{future::Future, pin::Pin};
+use std::{future::Future, ops::Deref, pin::Pin};
+use tokio_postgres::{
+    types::{BorrowToSql, ToSql}, RowStream, ToStatement
+};
 use tracing::instrument;
 use url::Url;
 
@@ -12,200 +16,321 @@ use url::Url;
 /// flags. This creates a database pool.
 #[derive(Clone)]
 #[repr(transparent)]
-pub struct DatabaseConnection(pub Option<crate::SqlxPostgresPoolConnection>);
+pub struct DatabasePool(pub(crate) Pool);
 
-impl Default for DatabaseConnection {
-    fn default() -> Self {
-        Self(None)
+impl Deref for DatabasePool {
+    type Target = Pool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct InnerConnection(pub(crate) PgConnection);
+pub(crate) struct DatabaseConnection(pub(crate) Object);
 
-impl std::fmt::Debug for DatabaseConnection {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self.0.as_ref() {
-                Some(_) => "SqlxPostgresPoolConnection",
-                None => "Disconnected",
-            }
-        )
+// #[async_trait::async_trait]
+impl ConnectionTrait for DatabasePool {
+    // #[instrument(level = "trace")]
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.execute(statement, params).await?)
+    }
+
+    // #[instrument(level = "trace")]
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.execute_raw(statement, params).await?)
+    }
+
+    async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<tokio_postgres::Row, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.query_one(statement, params).await?)
+    }
+
+    async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.query_opt(statement, params).await?)
+    }
+
+    async fn query_all<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.query(statement, params).await?)
+    }
+
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator
+    {
+        let conn = self.0.get().await?;
+        Ok(conn.query_raw(statement, params).await?)
     }
 }
 
-#[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
-    #[instrument(level = "trace")]
-    #[allow(unused_variables)]
-    async fn execute(&self, stmt: Statement) -> Result<ExecResult, DbErr> {
-        match self.0.as_ref() {
-            Some(conn) => conn.execute(stmt).await,
-            None => Err(conn_err("Disconnected")),
-        }
+    // #[instrument(level = "trace")]
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.0.execute(statement, params).await?)
     }
 
-    #[instrument(level = "trace")]
-    #[allow(unused_variables)]
-    async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
-        match self.0.as_ref() {
-            Some(conn) => conn.execute_unprepared(sql).await,
-            None => Err(conn_err("Disconnected")),
-        }
+    // #[instrument(level = "trace")]
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self.0.execute_raw(statement, params).await?)
     }
 
-    #[instrument(level = "trace")]
-    #[allow(unused_variables)]
-    async fn query_one(&self, stmt: Statement) -> Result<Option<QueryResult>, DbErr> {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => conn.query_one(stmt).await,
-            None => Err(conn_err("Disconnected")),
-        }
+    async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<tokio_postgres::Row, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.0.query_one(statement, params).await?)
     }
 
-    #[instrument(level = "trace")]
-    #[allow(unused_variables)]
-    async fn query_all(&self, stmt: Statement) -> Result<Vec<QueryResult>, DbErr> {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => conn.query_all(stmt).await,
-            None => Err(conn_err("Disconnected")),
-        }
+    async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.0.query_opt(statement, params).await?)
+    }
+
+    async fn query_all<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.0.query(statement, params).await?)
+    }
+
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator
+    {
+        Ok(self.0.query_raw(statement, params).await?)
     }
 }
 
-#[async_trait::async_trait]
-impl StreamTrait for DatabaseConnection {
-    type Stream<'a> = crate::QueryStream;
 
-    #[instrument(level = "trace")]
-    #[allow(unused_variables)]
-    fn stream<'a>(
-        &'a self,
-        stmt: Statement,
-    ) -> Pin<Box<dyn Future<Output = Result<Self::Stream<'a>, DbErr>> + 'a + Send>> {
-        Box::pin(async move {
-            match self.0.as_ref() {
-                #[cfg(feature = "sqlx-postgres")]
-                Some(conn) => conn.stream(stmt).await,
-                None => Err(conn_err("Disconnected")),
-            }
-        })
+impl ConnectionTrait for Transaction<'_> {
+    // #[instrument(level = "trace")]
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.execute(statement, params).await?)
+    }
+
+    // #[instrument(level = "trace")]
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self.execute_raw(statement, params).await?)
+    }
+
+    async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<tokio_postgres::Row, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.query_one(statement, params).await?)
+    }
+
+    async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.query_opt(statement, params).await?)
+    }
+
+    async fn query_all<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement,
+    {
+        Ok(self.query(statement, params).await?)
+    }
+
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator
+    {
+        Ok(self.query_raw(statement, params).await?)
     }
 }
 
-#[async_trait::async_trait]
+
+// #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
-    #[instrument(level = "trace")]
-    async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => conn.begin(None, None).await,
-            None => Err(conn_err("Disconnected")),
-        }
+    async fn begin(&mut self) -> Result<Transaction<'_>, DbErr> {
+        Ok(self.0.transaction().await?)
     }
-
-    #[instrument(level = "trace")]
+    
     async fn begin_with_config(
-        &self,
-        isolation_level: Option<IsolationLevel>,
-        access_mode: Option<AccessMode>,
-    ) -> Result<DatabaseTransaction, DbErr> {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => conn.begin(isolation_level, access_mode).await,
-            None => Err(conn_err("Disconnected")),
+        &mut self,
+        read_only: bool,
+        isolation_level: Option<tokio_postgres::IsolationLevel>,
+    ) -> Result<Transaction<'_>, DbErr> {
+        let mut t = self.0.build_transaction();
+        
+        if let Some(l) = isolation_level {
+            t = t.isolation_level(l);
         }
-    }
 
-    /// Execute the function inside a transaction.
-    /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    #[instrument(level = "trace", skip(callback))]
-    async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
-    where
-        F: for<'c> FnOnce(
-                &'c DatabaseTransaction,
-            ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-            + Send,
-        T: Send,
-        E: std::error::Error + Send,
-    {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => conn.transaction(callback, None, None).await,
-
-            None => Err(conn_err("Disconnected").into()),
+        if read_only {
+            t = t.read_only(true);
         }
-    }
 
-    /// Execute the function inside a transaction.
-    /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    #[instrument(level = "trace", skip(callback))]
-    async fn transaction_with_config<F, T, E>(
-        &self,
-        callback: F,
-        isolation_level: Option<IsolationLevel>,
-        access_mode: Option<AccessMode>,
-    ) -> Result<T, TransactionError<E>>
-    where
-        F: for<'c> FnOnce(
-                &'c DatabaseTransaction,
-            ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-            + Send,
-        T: Send,
-        E: std::error::Error + Send,
-    {
-        match self.0.as_ref() {
-            #[cfg(feature = "sqlx-postgres")]
-            Some(conn) => {
-                conn.transaction(callback, isolation_level, access_mode)
-                    .await
-            }
-            None => Err(conn_err("Disconnected").into()),
-        }
+        Ok(t.start().await?)
     }
+    // #[instrument(level = "trace")]
+    // async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
+    //     let conn = self.0.get().await?;
+    //     conn.transaction()
+    //     match self.0.as_ref() {
+    //         #[cfg(feature = "sqlx-postgres")]
+    //         Some(conn) => conn.begin(None, None).await,
+    //         None => Err(conn_err("Disconnected")),
+    //     }
+    // }
+
+    // #[instrument(level = "trace")]
+    // async fn begin_with_config(
+    //     &self,
+    //     isolation_level: Option<IsolationLevel>,
+    //     access_mode: Option<AccessMode>,
+    // ) -> Result<DatabaseTransaction, DbErr> {
+    //     match self.0.as_ref() {
+    //         #[cfg(feature = "sqlx-postgres")]
+    //         Some(conn) => conn.begin(isolation_level, access_mode).await,
+    //         None => Err(conn_err("Disconnected")),
+    //     }
+    // }
+
+    // /// Execute the function inside a transaction.
+    // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
+    // #[instrument(level = "trace", skip(callback))]
+    // async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
+    // where
+    //     F: for<'c> FnOnce(
+    //             &'c DatabaseTransaction,
+    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
+    //         + Send,
+    //     T: Send,
+    //     E: std::error::Error + Send,
+    // {
+    //     match self.0.as_ref() {
+    //         #[cfg(feature = "sqlx-postgres")]
+    //         Some(conn) => conn.transaction(callback, None, None).await,
+
+    //         None => Err(conn_err("Disconnected").into()),
+    //     }
+    // }
+
+    // /// Execute the function inside a transaction.
+    // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
+    // #[instrument(level = "trace", skip(callback))]
+    // async fn transaction_with_config<F, T, E>(
+    //     &self,
+    //     callback: F,
+    //     isolation_level: Option<IsolationLevel>,
+    //     access_mode: Option<AccessMode>,
+    // ) -> Result<T, TransactionError<E>>
+    // where
+    //     F: for<'c> FnOnce(
+    //             &'c DatabaseTransaction,
+    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
+    //         + Send,
+    //     T: Send,
+    //     E: std::error::Error + Send,
+    // {
+    //     match self.0.as_ref() {
+    //         #[cfg(feature = "sqlx-postgres")]
+    //         Some(conn) => {
+    //             conn.transaction(callback, isolation_level, access_mode)
+    //                 .await
+    //         }
+    //         None => Err(conn_err("Disconnected").into()),
+    //     }
+    // }
 }
-
-impl DatabaseConnection {
-    /// Sets a callback to metric this connection
-    pub fn set_metric_callback<F>(&mut self, _callback: F)
-    where
-        F: Fn(&crate::metric::Info<'_>) + Send + Sync + 'static,
-    {
-        match self.0.as_mut() {
-            Some(conn) => conn.set_metric_callback(_callback),
-            _ => {}
-        }
-    }
-
-    /// Checks if a connection to the database is still valid.
-    pub async fn ping(&self) -> Result<(), DbErr> {
-        match self.0.as_ref() {
-            Some(conn) => conn.ping().await,
-            None => Err(conn_err("Disconnected")),
-        }
-    }
-
-    /// Explicitly close the database connection
-    pub async fn close(mut self) -> Result<(), DbErr> {
-        match self.0.take() {
-            Some(conn) => conn.close().await,
-            None => Err(conn_err("Disconnected")),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::DatabaseConnection;
+    use crate::DatabasePool;
 
     #[test]
     fn assert_database_connection_traits() {
         fn assert_send_sync<T: Send + Sync>() {}
 
-        assert_send_sync::<DatabaseConnection>();
+        assert_send_sync::<DatabasePool>();
     }
 }

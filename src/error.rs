@@ -1,14 +1,14 @@
-#[cfg(feature = "sqlx-dep")]
-pub use sqlx::error::Error as SqlxError;
-
-#[cfg(feature = "sqlx-postgres")]
-pub use sqlx::postgres::PgDatabaseError as SqlxPostgresError;
-
 use thiserror::Error;
 
 /// An error from unsuccessful database operations
 #[derive(Error, Debug)]
 pub enum DbErr {
+    /// Postgres error
+    #[error("Postgres Error: {0}")]
+    Postgres(#[from] tokio_postgres::Error),
+    /// Pool error
+    #[error("Pool Error: {0}")]
+    Pool(#[from] deadpool_postgres::PoolError),
     /// This error can happen when the connection pool is fully-utilized
     #[error("Failed to acquire connection from pool: {0}")]
     ConnectionAcquire(#[source] ConnAcquireErr),

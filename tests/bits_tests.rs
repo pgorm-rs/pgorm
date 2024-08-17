@@ -4,7 +4,7 @@ pub mod common;
 
 use common::features::*;
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 
 #[sea_orm_macros::test]
 #[cfg(feature = "sqlx-postgres")]
@@ -17,7 +17,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
     let bits = bits::Model {
         id: 1,
         bit0: 0,

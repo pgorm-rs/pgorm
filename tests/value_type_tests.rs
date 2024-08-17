@@ -14,7 +14,7 @@ pub use common::{
     TestContext,
 };
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 use sea_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
 
 #[sea_orm_macros::test]
@@ -37,7 +37,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_value(db: &DatabasePool) -> Result<(), DbErr> {
     let model = value_type_general::Model {
         id: 1,
         number: 48.into(),
@@ -48,7 +48,7 @@ pub async fn insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn postgres_insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn postgres_insert_value(db: &DatabasePool) -> Result<(), DbErr> {
     let model = value_type_pg::Model {
         id: 1,
         number: 48.into(),

@@ -8,7 +8,7 @@ use sea_orm::{
     entity::prelude::*,
     entity::*,
     sea_query::{BinOper, Expr},
-    ActiveEnum as ActiveEnumTrait, DatabaseConnection,
+    ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
 
 #[sea_orm_macros::test]
@@ -21,7 +21,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
     use teas::*;
 
     let model = Model {

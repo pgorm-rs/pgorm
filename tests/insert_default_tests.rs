@@ -16,7 +16,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
     use insert_default::*;
 
     let active_model = ActiveModel {

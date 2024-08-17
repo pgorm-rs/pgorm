@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
 use sea_orm::{
-    entity::prelude::*, DatabaseConnection, Delete, IntoActiveModel, Iterable, QueryTrait, Set,
+    entity::prelude::*, DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set,
     Update,
 };
 use sea_query::{Expr, Query};
@@ -20,7 +20,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn dyn_table_name_lazy_static(db: &DatabasePool) -> Result<(), DbErr> {
     use dyn_table_name_lazy_static::*;
 
     for i in 1..=2 {

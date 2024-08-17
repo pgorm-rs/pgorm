@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, DatabaseConnection, IntoActiveModel, Set};
+use sea_orm::{entity::prelude::*, DatabasePool, IntoActiveModel, Set};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -16,7 +16,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn crud_in_parallel(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn crud_in_parallel(db: &DatabasePool) -> Result<(), DbErr> {
     let metadata = [
         metadata::Model {
             uuid: Uuid::new_v4(),

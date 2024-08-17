@@ -5,7 +5,7 @@ mod crud;
 
 pub use common::{bakery_chain::*, setup::*, TestContext};
 pub use crud::*;
-use sea_orm::DatabaseConnection;
+use sea_orm::DatabasePool;
 
 // Run the test locally:
 // DATABASE_URL="sqlite::memory:" cargo test --features sqlx-sqlite,runtime-async-std-native-tls --test crud_tests
@@ -19,7 +19,7 @@ async fn main() {
     ctx.delete().await;
 }
 
-pub async fn create_entities(db: &DatabaseConnection) {
+pub async fn create_entities(db: &DatabasePool) {
     test_create_bakery(db).await;
     test_create_baker(db).await;
     test_create_customer(db).await;

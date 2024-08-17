@@ -44,7 +44,11 @@ uuid = { version = "1", default-features = false, optional = true }
 ouroboros = { version = "0.17", default-features = false }
 url = { version = "2.2", default-features = false }
 thiserror = { version = "1", default-features = false }
-deadpool = { version = "0.12.1", optional = true }
+# deadpool = { version = "0.12.1" }
+tokio = { version = "1.6", features = ["full"] }
+tokio-postgres = { version = "0.7.11", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1", "array-impls"] }
+deadpool-postgres = "0.14.0"
+bytes = "1.7.1"
 
 [dev-dependencies]
 smol = { version = "1.2" }
@@ -74,7 +78,7 @@ default = [
     "with-uuid",
     "with-time",
 
-    "sqlx-deadpool-postgres",
+    # "sqlx-deadpool-postgres",
     "sqlx?/runtime-tokio-rustls",
     "runtime-tokio"
 ]
@@ -94,9 +98,9 @@ sqlx-dep = []
 runtime-tokio = []
 # sqlx-all = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite"]
 # sqlx-mysql = ["sqlx-dep", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
-sqlx-postgres = ["sqlx-dep", "sea-query-binder/sqlx-postgres", "sqlx/postgres", "postgres-array"]
+# sqlx-postgres = ["sqlx-dep", "sea-query-binder/sqlx-postgres", "sqlx/postgres", "postgres-array"]
 # sqlx-sqlite = ["sqlx-dep", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
-sqlx-deadpool-postgres = ["sqlx-postgres", "deadpool"]
+# sqlx-deadpool-postgres = ["sqlx-postgres", "deadpool"]
 # sqlite-use-returning-for-3_35 = []
 tests-cfg = ["serde/derive"]
 seaography = ["sea-orm-macros/seaography"]

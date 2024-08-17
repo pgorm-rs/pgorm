@@ -37,13 +37,13 @@ pub async fn connection_ping_closed_mysql() {
 
     let db = sea_orm::Database::connect(opt).await.unwrap();
 
-    async fn transaction_blocked(db: &DatabaseConnection) {
+    async fn transaction_blocked(db: &DatabasePool) {
         let _txn = sea_orm::TransactionTrait::begin(db).await.unwrap();
         // Occupy the only connection, thus forcing others fail to acquire connection
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
 
-    async fn transaction(db: &DatabaseConnection) {
+    async fn transaction(db: &DatabasePool) {
         // Should fail to acquire
         let txn = sea_orm::TransactionTrait::begin(db).await;
         assert_eq!(
@@ -79,13 +79,13 @@ pub async fn connection_ping_closed_sqlite() {
 
     let db = sea_orm::Database::connect(opt).await.unwrap();
 
-    async fn transaction_blocked(db: &DatabaseConnection) {
+    async fn transaction_blocked(db: &DatabasePool) {
         let _txn = sea_orm::TransactionTrait::begin(db).await.unwrap();
         // Occupy the only connection, thus forcing others fail to acquire connection
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
 
-    async fn transaction(db: &DatabaseConnection) {
+    async fn transaction(db: &DatabasePool) {
         // Should fail to acquire
         let txn = sea_orm::TransactionTrait::begin(db).await;
         assert_eq!(
@@ -121,13 +121,13 @@ pub async fn connection_ping_closed_postgres() {
 
     let db = sea_orm::Database::connect(opt).await.unwrap();
 
-    async fn transaction_blocked(db: &DatabaseConnection) {
+    async fn transaction_blocked(db: &DatabasePool) {
         let _txn = sea_orm::TransactionTrait::begin(db).await.unwrap();
         // Occupy the only connection, thus forcing others fail to acquire connection
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
 
-    async fn transaction(db: &DatabaseConnection) {
+    async fn transaction(db: &DatabasePool) {
         // Should fail to acquire
         let txn = sea_orm::TransactionTrait::begin(db).await;
         assert_eq!(

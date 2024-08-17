@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabaseConnection};
+use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
 use serde_json::json;
 
 #[sea_orm_macros::test]
@@ -18,7 +18,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_metadata(db: &DatabasePool) -> Result<(), DbErr> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),
@@ -55,7 +55,7 @@ pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_metadata(db: &DatabasePool) -> Result<(), DbErr> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),

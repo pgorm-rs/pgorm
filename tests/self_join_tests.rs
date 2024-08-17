@@ -18,7 +18,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_metadata(db: &DatabasePool) -> Result<(), DbErr> {
     let model = self_join::Model {
         uuid: Uuid::new_v4(),
         uuid_ref: None,

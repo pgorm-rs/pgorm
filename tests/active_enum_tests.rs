@@ -11,7 +11,7 @@ use sea_orm::{
     entity::prelude::*,
     entity::*,
     sea_query::{BinOper, Expr},
-    ActiveEnum as ActiveEnumTrait, DatabaseConnection,
+    ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
 
 #[sea_orm_macros::test]
@@ -32,7 +32,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     use active_enum::*;
 
     let model = Model {
@@ -223,7 +223,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
     use active_enum_child::*;
 
     active_enum::ActiveModel {
@@ -303,7 +303,7 @@ pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbE
     Ok(())
 }
 
-pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
     use categories::*;
 
     let model = Model {
@@ -369,7 +369,7 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn find_related_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     assert_eq!(
         active_enum::Model {
             id: 2,
@@ -495,7 +495,7 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), DbE
     Ok(())
 }
 
-pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn find_linked_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     assert_eq!(
         active_enum::Model {
             id: 2,

@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, ConnectionTrait, DatabaseConnection};
+use sea_orm::{entity::prelude::*, ConnectionTrait, DatabasePool};
 
 #[sea_orm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -16,7 +16,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn execute_unprepared(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn execute_unprepared(db: &DatabasePool) -> Result<(), DbErr> {
     use insert_default::*;
 
     db.execute_unprepared(
