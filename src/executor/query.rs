@@ -129,7 +129,7 @@ macro_rules! try_getable_all {
             #[allow(unused_variables)]
             fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let result: Result<$type, _> = res.row
-                        .try_get::<$type, _>(idx);
+                        .try_get(idx);
                 result.map_err(|e| DbErr::Postgres(e).into())
             }
         }
@@ -142,10 +142,10 @@ macro_rules! try_getable_date_time {
         impl TryGetable for $type {
             #[allow(unused_variables)]
             fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                res.row
-                        .try_get::<Option<$type>, _>(idx)
-                        .map_err(|e| DbErr::Postgres(e).into())
-                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
+                let result: $type = res.row
+                        .try_get(idx)
+                        .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                Ok(result)
             }
         }
     };
@@ -201,10 +201,10 @@ use rust_decimal::Decimal;
 impl TryGetable for Decimal {
     #[allow(unused_variables)]
     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        let result: Result<Decimal, _> = res.row
-                .try_get(idx);
-        result
-            .map_err(|e| DbErr::Postgres(e).into())
+        let result: Decimal = res.row
+                .try_get(idx)
+                .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+        Ok(result)
     }
 }
 
@@ -259,7 +259,6 @@ impl TryGetable for u32 {
        let result: Result<Oid, _> = res.row.try_get(idx);
        result
                     .map_err(|e| DbErr::Postgres(e).into())
-                    .map(|oid| oid.0)
     }
 }
 
@@ -278,10 +277,10 @@ mod postgres_array {
             #[allow(unused_variables)]
             impl TryGetable for Vec<$type> {
                 fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    res.row
-                            .try_get::<Option<Vec<$type>>, _>(idx)
-                            .map_err(|e| DbErr::Postgres(e).into())
-                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
+                    let result: Vec<$type> = res.row
+                            .try_get(idx)
+                            .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                    Ok(result)
                 }
             }
         };
@@ -341,11 +340,10 @@ mod postgres_array {
             #[allow(unused_variables, unreachable_code)]
             impl TryGetable for Vec<$type> {
                 fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    let res: Result<Vec<uuid::Uuid>, TryGetError> = res.row
-                            .try_get::<Option<Vec<uuid::Uuid>>, _>(idx)
-                            .map_err(|e| DbErr::Postgres(e).into())
-                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)));
-                    res.map(|vec| vec.into_iter().map($conversion_fn).collect())
+                    let res: Vec<uuid::Uuid> = res.row
+                            .try_get(idx)
+                            .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                    Ok(res.into_iter().map($conversion_fn).collect())
                 }
             }
         };
@@ -369,10 +367,9 @@ mod postgres_array {
     impl TryGetable for Vec<u32> {
         #[allow(unused_variables)]
         fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-            res.try_get::<Option<Vec<Oid>>, _>(idx)
-                        .map_err(|e| DbErr::Postgres(e).into())
-                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
-                        .map(|oids| oids.into_iter().map(|oid| oid.0).collect())
+            let result: Vec<Oid> = res.row.try_get(idx)
+                        .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+            Ok(result)
         }
     }
 }

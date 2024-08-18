@@ -13,14 +13,14 @@ pub trait ConnectionTrait: Sync {
     /// Execute a [Statement]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement;
+        T: ?Sized + ToStatement + Send + Sync;
 
     /// Execute a unprepared [Statement]
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement,
+        T: ?Sized + ToStatement + Send + Sync,
         P: BorrowToSql,
-        I: IntoIterator<Item = P>,
+        I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator;
 
     async fn query_one<T>(
@@ -29,7 +29,7 @@ pub trait ConnectionTrait: Sync {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, DbErr>
     where
-        T: ?Sized + ToStatement;
+        T: ?Sized + ToStatement + Send + Sync;
 
     async fn query_opt<T>(
         &self,
@@ -37,7 +37,7 @@ pub trait ConnectionTrait: Sync {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, DbErr>
     where
-        T: ?Sized + ToStatement;
+        T: ?Sized + ToStatement + Send + Sync;
 
     async fn query_all<T>(
         &self,
@@ -45,14 +45,14 @@ pub trait ConnectionTrait: Sync {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, DbErr>
     where
-        T: ?Sized + ToStatement;
+        T: ?Sized + ToStatement+ Send + Sync;
 
-    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
-    where
-        T: ?Sized + ToStatement,
-        P: BorrowToSql,
-        I: IntoIterator<Item = P>,
-        I::IntoIter: ExactSizeIterator;
+    // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    // where
+    //     T: ?Sized + ToStatement,
+    //     P: BorrowToSql,
+    //     I: IntoIterator<Item = P>,
+    //     I::IntoIter: ExactSizeIterator;
 }
 
 /// Spawn database transaction

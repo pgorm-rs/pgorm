@@ -1,5 +1,5 @@
-use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect, Statement};
-use sea_query::{PostgresQueryBuilder, QueryStatementBuilder};
+use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect};
+use sea_query::{PostgresQueryBuilder, QueryStatementBuilder, Values};
 
 /// A Trait for any type performing queries on a Model or ActiveModel
 pub trait QueryTrait {
@@ -16,10 +16,8 @@ pub trait QueryTrait {
     fn into_query(self) -> Self::QueryStatement;
 
     /// Build the query as [`Statement`]
-    fn build(&self) -> Statement {
-        Statement::from_string_values_tuple(
-            self.as_query().build_any(&sea_query::PostgresQueryBuilder),
-        )
+    fn build(&self) -> (String, Values) {
+        self.as_query().build_any(&sea_query::PostgresQueryBuilder)
     }
 
     /// Apply an operation on the [QueryTrait::QueryStatement] if the given `Option<T>` is `Some(_)`

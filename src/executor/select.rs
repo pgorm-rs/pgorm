@@ -692,18 +692,18 @@ where
         self.into_selector_raw().all(db).await
     }
 
-    /// Stream the results of the Select operation
-    pub async fn stream<'a: 'b, 'b, C>(
-        self,
-        db: &'a C,
-    ) -> Result<RowStream, DbErr>
-    where
-        C: ConnectionTrait + Send,
-        S: 'b,
-        S::Item: Send,
-    {
-        self.into_selector_raw().stream(db).await
-    }
+    // /// Stream the results of the Select operation
+    // pub async fn stream<'a: 'b, 'b, C>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<RowStream, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    //     S: 'b,
+    //     S::Item: Send,
+    // {
+    //     self.into_selector_raw().stream(db).await
+    // }
 }
 
 impl<S> SelectorRaw<S>
@@ -987,17 +987,17 @@ where
         Ok(models)
     }
 
-    /// Stream the results of the Select operation
-    pub async fn stream<'a, C>(
-        self,
-        db: &'a C,
-    ) -> Result<RowStream, DbErr>
-    where
-        C: ConnectionTrait + Send,
-    {
-        let stream = db.query_raw::<_, _, Vec<&(dyn ToSql + Sync)>>(&self.stmt, vec![]).await?;
-        Ok(stream)
-    }
+    // /// Stream the results of the Select operation
+    // pub async fn stream<'a, C>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<RowStream, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    // {
+    //     let stream = db.query_raw::<_, _, Vec<&(dyn ToSql + Sync)>>(&self.stmt, vec![]).await?;
+    //     Ok(stream)
+    // }
 }
 
 #[allow(clippy::unwrap_used)]

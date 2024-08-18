@@ -3,7 +3,7 @@ pub use crate::{
     sea_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ColumnDef, ColumnTrait, ColumnType,
     ColumnTypeTrait, ConnectionTrait, CursorTrait, DatabasePool, EntityName, EntityTrait,
-    EnumIter, Iden, IdenStatic, Linked, LoaderTrait, ModelTrait, PaginatorTrait, PrimaryKeyArity,
+    EnumIter, Iden, IdenStatic, Linked, LoaderTrait, ModelTrait, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryResult, Related, RelationDef,
     RelationTrait, Select, Value,
 };

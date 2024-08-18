@@ -274,9 +274,6 @@ where
     );
     insert_statement.returning(returning);
     let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
-    let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-    let values = values.into_iter().map(|x| Box::new(x) as _).collect::<Vec<Box<(dyn ToSql + Sync)>>>();
-    let values = values.into_boxed_slice();
 
     let found = SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(
         stmt, values

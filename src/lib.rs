@@ -7,6 +7,7 @@
     clippy::print_stderr,
     clippy::print_stdout
 )]
+#![allow(warnings)]
 
 //! <div align="center">
 //!
@@ -338,15 +339,15 @@ pub mod entity;
 pub mod error;
 /// This module performs execution of queries on a Model or ActiveModel
 mod executor;
-/// Holds types and methods to perform metric collection
-pub mod metric;
+// /// Holds types and methods to perform metric collection
+// pub mod metric;
 /// Holds types and methods to perform queries
 pub mod query;
 /// Holds types that defines the schemas of an Entity
 pub mod schema;
 #[doc(hidden)]
-#[cfg(all(feature = "macros", feature = "tests-cfg"))]
-pub mod tests_cfg;
+// #[cfg(all(feature = "macros", feature = "tests-cfg"))]
+// pub mod tests_cfg;
 mod util;
 
 pub use database::*;

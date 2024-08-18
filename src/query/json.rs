@@ -5,7 +5,10 @@ pub use serde_json::Value as JsonValue;
 impl FromQueryResult for JsonValue {
     #[allow(unused_variables, unused_mut)]
     fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, DbErr> {
+        // Wow, this is weird.
+        
         todo!()
+        // serde_json::to_value(res.row)
         // let mut map = Map::new();
         // #[allow(unused_macros)]
         // macro_rules! try_get_type {

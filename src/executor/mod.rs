@@ -11,7 +11,7 @@ pub use cursor::*;
 pub use delete::*;
 pub use execute::*;
 pub use insert::*;
-pub use paginator::*;
+// pub use paginator::*;
 pub use query::*;
 pub use select::*;
 pub use update::*;

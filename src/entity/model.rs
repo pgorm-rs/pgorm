@@ -4,6 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 pub use sea_query::Value;
+use sea_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
@@ -110,8 +111,8 @@ pub trait FromQueryResult: Sized {
     /// # Ok(())
     /// # }
     /// ```
-    fn find_by_statement(stmt: Statement) -> SelectorRaw<SelectModel<Self>> {
-        SelectorRaw::<SelectModel<Self>>::from_statement(stmt)
+    fn find_by_statement(stmt: String, values: Values) -> SelectorRaw<SelectModel<Self>> {
+        SelectorRaw::<SelectModel<Self>>::from_statement(stmt, values)
     }
 }
 

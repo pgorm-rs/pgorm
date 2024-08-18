@@ -1,6 +1,6 @@
 use crate::{
     error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, Statement, UpdateMany, UpdateOne,
+    Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne,
 };
 use sea_query::{FromValueTuple, PostgresQueryBuilder, Query, UpdateStatement};
 use tokio_postgres::types::ToSql;
@@ -122,9 +122,6 @@ impl Updater {
         self.query.returning(returning);
 
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
-        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values.into_iter().map(|x| Box::new(x) as _).collect::<Vec<Box<(dyn ToSql + Sync)>>>();
-        let values = values.into_boxed_slice();
 
         let found: Option<Model<A>> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(
             stmt, values
@@ -154,9 +151,6 @@ impl Updater {
         self.query.returning(returning);
 
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
-        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values.into_iter().map(|x| Box::new(x) as _).collect::<Vec<Box<(dyn ToSql + Sync)>>>();
-        let values = values.into_boxed_slice();
         
         let models: Vec<E::Model> = SelectorRaw::<SelectModel<E::Model>>::from_statement(
             stmt, values
