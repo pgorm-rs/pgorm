@@ -108,7 +108,7 @@ impl DeriveValueType {
 
             #[automatically_derived]
             impl sea_orm::TryGetable for #name {
-                fn try_get_by<I: sea_orm::ColIdx>(res: &sea_orm::QueryResult, idx: I)
+                fn try_get_by<I: sea_orm::RowIndex>(res: &sea_orm::QueryResult, idx: I)
                     -> std::result::Result<Self, sea_orm::TryGetError> {
                     <#field_type as sea_orm::TryGetable>::try_get_by(res, idx).map(|v| #name(v))
                 }

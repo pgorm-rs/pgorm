@@ -294,7 +294,7 @@ where
         let rows = db.query_all(&stmt, &values).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {
-            buffer.push(S::from_raw_query_result(row)?);
+            buffer.push(S::from_raw_query_result(QueryResult { row })?);
         }
         if self.is_result_reversed {
             buffer.reverse()
@@ -2392,9 +2392,11 @@ mod tests {
 
 
 #[derive(Debug)]
-pub struct ValueHolder(Value);
+pub struct ValueHolder(pub Value);
 
 use bytes::BytesMut;
+
+use super::QueryResult;
 
 #[inline(always)]
 fn accepts<T: ToSql>(input: T, ty: &tokio_postgres::types::Type) -> bool {

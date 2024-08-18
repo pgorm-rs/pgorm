@@ -1,8 +1,11 @@
 use crate::{
-    error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait, Statement,
+    error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait,
 };
 use sea_query::{DeleteStatement, PostgresQueryBuilder};
+use tokio_postgres::types::ToSql;
 use std::future::Future;
+
+use super::ValueHolder;
 
 /// Handles DELETE operations in a ActiveModel using [DeleteStatement]
 #[derive(Clone, Debug)]
@@ -71,10 +74,13 @@ async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, 
 where
     C: ConnectionTrait,
 {
-    let statement = Statement::from_string_values_tuple(query.build(PostgresQueryBuilder));
 
-    let result = db.execute(statement).await?;
+    let (stmt, values) = query.build(PostgresQueryBuilder);
+    let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+
+    let result = db.execute(&stmt, &values).await?;
     Ok(DeleteResult {
-        rows_affected: result.rows_affected(),
+        rows_affected: result,
     })
 }

@@ -316,7 +316,7 @@ impl ActiveEnum {
             quote!(
                 #[automatically_derived]
                 impl sea_orm::TryGetableArray for #ident {
-                    fn try_get_by<I: sea_orm::ColIdx>(res: &sea_orm::QueryResult, index: I) -> std::result::Result<Vec<Self>, sea_orm::TryGetError> {
+                    fn try_get_by<I: sea_orm::RowIndex>(res: &sea_orm::QueryResult, index: I) -> std::result::Result<Vec<Self>, sea_orm::TryGetError> {
                         <<Self as sea_orm::ActiveEnum>::Value as sea_orm::ActiveEnumValue>::try_get_vec_by(res, index)?
                             .into_iter()
                             .map(|value| <Self as sea_orm::ActiveEnum>::try_from_value(&value).map_err(Into::into))
@@ -387,7 +387,7 @@ impl ActiveEnum {
 
             #[automatically_derived]
             impl sea_orm::TryGetable for #ident {
-                fn try_get_by<I: sea_orm::ColIdx>(res: &sea_orm::QueryResult, idx: I) -> std::result::Result<Self, sea_orm::TryGetError> {
+                fn try_get_by<I: sea_orm::RowIndex>(res: &sea_orm::QueryResult, idx: I) -> std::result::Result<Self, sea_orm::TryGetError> {
                     let value = <<Self as sea_orm::ActiveEnum>::Value as sea_orm::TryGetable>::try_get_by(res, idx)?;
                     <Self as sea_orm::ActiveEnum>::try_from_value(&value).map_err(sea_orm::TryGetError::DbErr)
                 }

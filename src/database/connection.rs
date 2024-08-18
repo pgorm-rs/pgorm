@@ -8,7 +8,7 @@ use tokio_postgres::{
 
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
-// #[async_trait::async_trait]
+#[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a [Statement]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -56,7 +56,7 @@ pub trait ConnectionTrait: Sync {
 }
 
 /// Spawn database transaction
-// #[async_trait::async_trait]
+#[async_trait::async_trait]
 pub trait TransactionTrait {
     /// Execute SQL `BEGIN` transaction.
     /// Returns a Transaction that can be committed or rolled back

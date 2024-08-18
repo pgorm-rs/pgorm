@@ -1,7 +1,6 @@
 use crate::{
     ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, DbErr, DeleteResult, EntityTrait,
     IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select, SelectModel, SelectorRaw,
-    Statement,
 };
 use async_trait::async_trait;
 pub use sea_query::Value;

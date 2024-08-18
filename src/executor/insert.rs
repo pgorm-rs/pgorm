@@ -1,10 +1,11 @@
 use crate::{
-    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel,
-    Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, SelectModel, SelectorRaw, Statement, TryFromU64,
-    TryInsert,
+    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert
 };
 use sea_query::{FromValueTuple, Iden, InsertStatement, PostgresQueryBuilder, Query, ValueTuple};
+use tokio_postgres::types::ToSql;
 use std::{future::Future, marker::PhantomData};
+
+use super::ValueHolder;
 
 /// Defines a structure to perform INSERT operations in an ActiveModel
 #[derive(Debug)]
@@ -211,23 +212,25 @@ where
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
-    let statement = Statement::from_string_values_tuple(statement.build(PostgresQueryBuilder));
+    let (stmt, values) = statement.build(PostgresQueryBuilder);
+    let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
 
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
     type ValueTypeOf<A> = <PrimaryKey<A> as PrimaryKeyTrait>::ValueType;
 
     let last_insert_id = match primary_key {
         Some(value_tuple) => {
-            let res = db.execute(statement).await?;
-            if res.rows_affected() == 0 {
+            let res = db.execute(&stmt, &values).await?;
+            if res == 0 {
                 return Err(DbErr::RecordNotInserted);
             }
             FromValueTuple::from_value_tuple(value_tuple)
         }
         None => {
-            let mut rows = db.query_all(statement).await?;
+            let mut rows = db.query_all(&stmt, &values).await?;
             let row = match rows.pop() {
-                Some(row) => row,
+                Some(row) => QueryResult { row },
                 None => return Err(DbErr::RecordNotInserted),
             };
             let cols = PrimaryKey::<A>::iter()
@@ -248,10 +251,12 @@ async fn exec_insert_without_returning<C>(
 where
     C: ConnectionTrait,
 {
-    let insert_statement =
-        Statement::from_string_values_tuple(insert_statement.build(PostgresQueryBuilder));
-    let exec_result = db.execute(insert_statement).await?;
-    Ok(exec_result.rows_affected())
+    let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
+    let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+
+    let exec_result = db.execute(&stmt, &values).await?;
+    Ok(exec_result)
 }
 
 async fn exec_insert_with_returning<A, C>(
@@ -268,10 +273,13 @@ where
         <A::Entity as EntityTrait>::Column::iter().map(|c| c.select_as(c.into_returning_expr())),
     );
     insert_statement.returning(returning);
-    let insert_statement =
-        Statement::from_string_values_tuple(insert_statement.build(PostgresQueryBuilder));
+    let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
+    let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+    let values = values.into_iter().map(|x| Box::new(x) as _).collect::<Vec<Box<(dyn ToSql + Sync)>>>();
+    let values = values.into_boxed_slice();
+
     let found = SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(
-        insert_statement,
+        stmt, values
     )
     .one(db)
     .await?;

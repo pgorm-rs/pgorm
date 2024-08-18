@@ -10,13 +10,13 @@ pub struct ExecResult {
 /// Holds the result of executing an operation on a PostgreSQL database
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct ExecResultHolder(pub(crate) sqlx::postgres::PgQueryResult);
+pub(crate) struct ExecResultHolder(pub(crate) u64);
 
 // ExecResult //
 
 impl ExecResult {
     /// Get the number of rows affected by the operation
     pub fn rows_affected(&self) -> u64 {
-        self.result.0.rows_affected()
+        self.result.0
     }
 }

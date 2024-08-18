@@ -1,17 +1,21 @@
 use crate::{
     error::*, ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
     PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
-    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, Statement, StreamTrait,
+    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany,
     TryGetableMany,
 };
 use futures::{Stream, TryStreamExt};
-use sea_query::{PostgresQueryBuilder, SelectStatement, Value};
-use tokio_postgres::Row;
+use sea_query::{PostgresQueryBuilder, SelectStatement, Value, Values};
+use tokio_postgres::types::ToSql;
+use tokio_postgres::{Row, RowStream, Statement, ToStatement};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
 #[cfg(feature = "with-json")]
 use crate::JsonValue;
+
+use super::ValueHolder;
 
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
 #[derive(Clone, Debug)]
@@ -29,7 +33,8 @@ pub struct SelectorRaw<S>
 where
     S: SelectorTrait,
 {
-    pub(crate) stmt: Statement,
+    pub(crate) stmt: String,
+    pub(crate) values: Values,
     #[allow(dead_code)]
     selector: S,
 }
@@ -40,7 +45,7 @@ pub trait SelectorTrait {
     type Item: Sized;
 
     /// The method to perform a query on a Model
-    fn from_raw_query_result(res: Row) -> Result<Self::Item, DbErr>;
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr>;
 }
 
 /// Get tuple from query result based on a list of column identifiers
@@ -138,9 +143,10 @@ where
 {
     /// Perform a Select operation on a Model using a [Statement]
     #[allow(clippy::wrong_self_convention)]
-    pub fn from_raw_sql(self, stmt: Statement) -> SelectorRaw<SelectModel<E::Model>> {
+    pub fn from_raw_sql<'a>(self, stmt: String, values: Values) -> SelectorRaw<SelectModel<E::Model>> {
         SelectorRaw {
             stmt,
+            values,
             selector: SelectModel { model: PhantomData },
         }
     }
@@ -428,28 +434,30 @@ where
         self.into_model().all(db).await
     }
 
-    /// Stream the results of a SELECT operation on a Model
-    pub async fn stream<'a: 'b, 'b, C>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<E::Model, DbErr>> + 'b + Send, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-    {
-        self.into_model().stream(db).await
-    }
+    // /// Stream the results of a SELECT operation on a Model
+    // pub async fn stream<'a: 'b, 'b, C>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<impl Stream<Item = Result<E::Model, DbErr>> + 'b + Send, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    // {
+    //     // self.into_model().stream(db).await
+    //     todo!()
+    // }
 
-    /// Stream the result of the operation with PartialModel
-    pub async fn stream_partial_model<'a: 'b, 'b, C, M>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<M, DbErr>> + 'b + Send, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-        M: PartialModelTrait + Send + 'b,
-    {
-        self.into_partial_model().stream(db).await
-    }
+    // /// Stream the result of the operation with PartialModel
+    // pub async fn stream_partial_model<'a: 'b, 'b, C, M>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<impl Stream<Item = Result<M, DbErr>> + 'b + Send, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    //     M: PartialModelTrait + Send + 'b,
+    // {
+    //     // self.into_partial_model().stream(db).await
+    //     todo!()
+    // }
 }
 
 impl<E, F> SelectTwo<E, F>
@@ -506,29 +514,29 @@ where
         self.into_model().all(db).await
     }
 
-    /// Stream the results of a Select operation on a Model
-    pub async fn stream<'a: 'b, 'b, C>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<(E::Model, Option<F::Model>), DbErr>> + 'b, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-    {
-        self.into_model().stream(db).await
-    }
+    // /// Stream the results of a Select operation on a Model
+    // pub async fn stream<'a: 'b, 'b, C>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<impl Stream<Item = Result<(E::Model, Option<F::Model>), DbErr>> + 'b, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    // {
+    //     self.into_model().stream(db).await
+    // }
 
-    /// Stream the result of the operation with PartialModel
-    pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<(M, Option<N>), DbErr>> + 'b + Send, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-        M: PartialModelTrait + Send + 'b,
-        N: PartialModelTrait + Send + 'b,
-    {
-        self.into_partial_model().stream(db).await
-    }
+    // /// Stream the result of the operation with PartialModel
+    // pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<impl Stream<Item = Result<(M, Option<N>), DbErr>> + 'b + Send, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    //     M: PartialModelTrait + Send + 'b,
+    //     N: PartialModelTrait + Send + 'b,
+    // {
+    //     self.into_partial_model().stream(db).await
+    // }
 }
 
 impl<E, F> SelectTwoMany<E, F>
@@ -569,29 +577,29 @@ where
         }
     }
 
-    /// Stream the result of the operation
-    pub async fn stream<'a: 'b, 'b, C>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<(E::Model, Option<F::Model>), DbErr>> + 'b + Send, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-    {
-        self.into_model().stream(db).await
-    }
+    // /// Stream the result of the operation
+    // pub async fn stream<'a: 'b, 'b, C>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<RowStream, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    // {
+    //     self.into_model().stream(db).await
+    // }
 
-    /// Stream the result of the operation with PartialModel
-    pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
-        self,
-        db: &'a C,
-    ) -> Result<impl Stream<Item = Result<(M, Option<N>), DbErr>> + 'b + Send, DbErr>
-    where
-        C: ConnectionTrait + StreamTrait + Send,
-        M: PartialModelTrait + Send + 'b,
-        N: PartialModelTrait + Send + 'b,
-    {
-        self.into_partial_model().stream(db).await
-    }
+    // /// Stream the result of the operation with PartialModel
+    // pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
+    //     self,
+    //     db: &'a C,
+    // ) -> Result<RowStream, DbErr>
+    // where
+    //     C: ConnectionTrait + Send,
+    //     M: PartialModelTrait + Send + 'b,
+    //     N: PartialModelTrait + Send + 'b,
+    // {
+    //     self.into_partial_model().stream(db).await
+    // }
 
     /// Get all Models from the select operation
     ///
@@ -651,17 +659,21 @@ where
     }
 
     fn into_selector_raw(self) -> SelectorRaw<S> {
-        let stmt = Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder));
+        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        
         SelectorRaw {
             stmt,
+            values,
             selector: self.selector,
         }
     }
 
     /// Get the SQL statement
-    pub fn into_statement(self) -> Statement {
-        Statement::from_string_values_tuple(self.query.build(PostgresQueryBuilder))
-    }
+    // pub fn into_statement(self) -> Statement {
+    //     // This is probably wrong <_<
+    //     let (stmt, _) = self.query.build(PostgresQueryBuilder);
+    //     stmt
+    // }
 
     /// Get an item from the Select query
     pub async fn one<'a, C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
@@ -684,9 +696,9 @@ where
     pub async fn stream<'a: 'b, 'b, C>(
         self,
         db: &'a C,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<S::Item, DbErr>> + 'b + Send>>, DbErr>
+    ) -> Result<RowStream, DbErr>
     where
-        C: ConnectionTrait + StreamTrait + Send,
+        C: ConnectionTrait + Send,
         S: 'b,
         S::Item: Send,
     {
@@ -699,25 +711,27 @@ where
     S: SelectorTrait,
 {
     /// Select a custom Model from a raw SQL [Statement].
-    pub fn from_statement<M>(stmt: Statement) -> SelectorRaw<SelectModel<M>>
+    pub fn from_statement<M>(stmt: String, values: Values) -> SelectorRaw<SelectModel<M>>
     where
         M: FromQueryResult,
     {
         SelectorRaw {
             stmt,
+            values,
             selector: SelectModel { model: PhantomData },
         }
     }
 
     /// Create `SelectorRaw` from Statement and columns. Executing this `SelectorRaw` will
     /// return a type `T` which implement `TryGetableMany`.
-    pub fn with_columns<T, C>(stmt: Statement) -> SelectorRaw<SelectGetableValue<T, C>>
+    pub fn with_columns<T, C>(stmt: String, values: Values) -> SelectorRaw<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
         C: strum::IntoEnumIterator + sea_query::Iden,
     {
         SelectorRaw {
             stmt,
+            values,
             selector: SelectGetableValue {
                 columns: PhantomData,
                 model: PhantomData,
@@ -795,6 +809,7 @@ where
     {
         SelectorRaw {
             stmt: self.stmt,
+            values: self.values,
             selector: SelectModel { model: PhantomData },
         }
     }
@@ -859,14 +874,15 @@ where
     pub fn into_json(self) -> SelectorRaw<SelectModel<JsonValue>> {
         SelectorRaw {
             stmt: self.stmt,
+            values: self.values,
             selector: SelectModel { model: PhantomData },
         }
     }
 
     /// Get the SQL statement
-    pub fn into_statement(self) -> Statement {
-        self.stmt
-    }
+    // pub fn into_statement(self) -> Statement {
+    //     self.stmt
+    // }
 
     /// Get an item from the Select query
     /// ```
@@ -912,9 +928,9 @@ where
     where
         C: ConnectionTrait,
     {
-        let row = db.query_one(self.stmt).await?;
+        let row = db.query_opt(&self.stmt, &[]).await?;
         match row {
-            Some(row) => Ok(Some(S::from_raw_query_result(row)?)),
+            Some(row) => Ok(Some(S::from_raw_query_result(QueryResult { row })?)),
             None => Ok(None),
         }
     }
@@ -963,28 +979,24 @@ where
     where
         C: ConnectionTrait,
     {
-        let rows = db.query_all(self.stmt).await?;
+        let rows = db.query_all(&self.stmt, &[]).await?;
         let mut models = Vec::new();
         for row in rows.into_iter() {
-            models.push(S::from_raw_query_result(row)?);
+            models.push(S::from_raw_query_result(QueryResult { row })?);
         }
         Ok(models)
     }
 
     /// Stream the results of the Select operation
-    pub async fn stream<'a: 'b, 'b, C>(
+    pub async fn stream<'a, C>(
         self,
         db: &'a C,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<S::Item, DbErr>> + 'b + Send>>, DbErr>
+    ) -> Result<RowStream, DbErr>
     where
-        C: ConnectionTrait + StreamTrait + Send,
-        S: 'b,
-        S::Item: Send,
+        C: ConnectionTrait + Send,
     {
-        let stream = db.stream(self.stmt).await?;
-        Ok(Box::pin(stream.and_then(|row| {
-            futures::future::ready(S::from_raw_query_result(row))
-        })))
+        let stream = db.query_raw::<_, _, Vec<&(dyn ToSql + Sync)>>(&self.stmt, vec![]).await?;
+        Ok(stream)
     }
 }
 

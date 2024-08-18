@@ -1,27 +1,20 @@
-use crate::{error::*, SelectGetableValue, SelectorRaw, Statement};
+use crate::{error::*, SelectGetableValue, SelectorRaw};
 use std::fmt;
 
 #[cfg(any(feature = "mock", feature = "proxy"))]
 use crate::debug_print;
 
-#[cfg(feature = "sqlx-dep")]
-use crate::driver::*;
-#[cfg(feature = "sqlx-dep")]
-use sqlx::Row;
-
 /// Defines the result of a query operation on a Model
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct QueryResult {
-    pub(crate) row: QueryResultRow,
+    pub(crate) row: Row,
 }
-
-#[allow(clippy::enum_variant_names)]
-pub(crate) struct QueryResultRow(pub(crate) Row);
 
 /// An interface to get a value from the query result
 pub trait TryGetable: Sized {
-    /// Get a value from the query result with an ColIdx
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError>;
+    /// Get a value from the query result with an RowIndex
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError>;
 
     /// Get a value from the query result with prefixed column name
     fn try_get(res: &QueryResult, pre: &str, col: &str) -> Result<Self, TryGetError> {
@@ -67,11 +60,11 @@ impl From<DbErr> for TryGetError {
 // QueryResult //
 
 impl QueryResult {
-    /// Get a value from the query result with an ColIdx
+    /// Get a value from the query result with an RowIndex
     pub fn try_get_by<T, I>(&self, index: I) -> Result<T, DbErr>
     where
         T: TryGetable,
-        I: ColIdx,
+        I: RowIndex + std::fmt::Display,
     {
         Ok(T::try_get_by(self, index)?)
     }
@@ -111,7 +104,6 @@ impl QueryResult {
     /// Retrieves the names of the columns in the result set
     pub fn column_names(&self) -> Vec<String> {
         self.row
-            .0
             .columns()
             .iter()
             .map(|c| c.name().to_string())
@@ -119,65 +111,15 @@ impl QueryResult {
     }
 }
 
-#[allow(unused_variables)]
-impl fmt::Debug for QueryResultRow {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "QueryResultRow")
-    }
-}
-
 // TryGetable //
 
 impl<T: TryGetable> TryGetable for Option<T> {
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
         match T::try_get_by(res, index) {
             Ok(v) => Ok(Some(v)),
             Err(TryGetError::Null(_)) => Ok(None),
-            #[cfg(feature = "sqlx-dep")]
-            Err(TryGetError::DbErr(DbErr::Query(RuntimeErr::SqlxError(
-                sqlx::Error::ColumnNotFound(_),
-            )))) => Ok(None),
             Err(e) => Err(e),
         }
-    }
-}
-
-/// Column Index, used by [`TryGetable`]. Implemented for `&str` and `usize`
-pub trait ColIdx: std::fmt::Debug + Copy {
-    /// Self must be `&str`, return `None` otherwise
-    fn as_str(&self) -> Option<&str>;
-    /// Self must be `usize`, return `None` otherwise
-    fn as_usize(&self) -> Option<&usize>;
-}
-
-impl ColIdx for &str {
-    #[cfg(feature = "sqlx-postgres")]
-    type SqlxPostgresIndex = Self;
-
-    #[cfg(feature = "sqlx-postgres")]
-    #[inline]
-    fn as_sqlx_postgres_index(&self) -> Self::SqlxPostgresIndex {
-        self
-    }
-
-    #[inline]
-    fn as_str(&self) -> Option<&str> {
-        Some(self)
-    }
-    #[inline]
-    fn as_usize(&self) -> Option<&usize> {
-        None
-    }
-}
-
-impl ColIdx for usize {
-    #[inline]
-    fn as_str(&self) -> Option<&str> {
-        None
-    }
-    #[inline]
-    fn as_usize(&self) -> Option<&usize> {
-        Some(self)
     }
 }
 
@@ -185,53 +127,10 @@ macro_rules! try_getable_all {
     ( $type: ty ) => {
         impl TryGetable for $type {
             #[allow(unused_variables)]
-            fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                match &res.row {
-                    QueryResultRow(row) => row
-                        .try_get::<Option<$type>, _>(idx)
-                        .map_err(|e| DbErr::Postgres(e).into())
-                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-                    #[allow(unreachable_patterns)]
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! try_getable_unsigned {
-    ( $type: ty ) => {
-        impl TryGetable for $type {
-            #[allow(unused_variables)]
-            fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                match &res.row {
-                    QueryResultRow(_) => Err(type_err(format!(
-                        "{} unsupported by sqlx-postgres",
-                        stringify!($type)
-                    ))
-                    .into()),
-                    #[allow(unreachable_patterns)]
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! try_getable_mysql {
-    ( $type: ty ) => {
-        impl TryGetable for $type {
-            #[allow(unused_variables)]
-            fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                match &res.row {
-                    QueryResultRow(_) => Err(type_err(format!(
-                        "{} unsupported by sqlx-postgres",
-                        stringify!($type)
-                    ))
-                    .into()),
-                    #[allow(unreachable_patterns)]
-                    _ => unreachable!(),
-                }
+            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+                let result: Result<$type, _> = res.row
+                        .try_get::<$type, _>(idx);
+                result.map_err(|e| DbErr::Postgres(e).into())
             }
         }
     };
@@ -242,15 +141,11 @@ macro_rules! try_getable_date_time {
     ( $type: ty ) => {
         impl TryGetable for $type {
             #[allow(unused_variables)]
-            fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                match &res.row {
-                    QueryResultRow(row) => row
+            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+                res.row
                         .try_get::<Option<$type>, _>(idx)
                         .map_err(|e| DbErr::Postgres(e).into())
-                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-                    #[allow(unreachable_patterns)]
-                    _ => unreachable!(),
-                }
+                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
             }
         }
     };
@@ -261,9 +156,6 @@ try_getable_all!(i8);
 try_getable_all!(i16);
 try_getable_all!(i32);
 try_getable_all!(i64);
-try_getable_unsigned!(u8);
-try_getable_unsigned!(u16);
-try_getable_mysql!(u64);
 try_getable_all!(f32);
 try_getable_all!(f64);
 try_getable_all!(String);
@@ -308,34 +200,26 @@ use rust_decimal::Decimal;
 #[cfg(feature = "with-rust_decimal")]
 impl TryGetable for Decimal {
     #[allow(unused_variables)]
-    fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        match &res.row {
-            QueryResultRow(row) => row
-                .try_get::<Option<Decimal>, _>(idx)
-                .map_err(|e| DbErr::Postgres(e).into())
-                .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
-        }
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+        let result: Result<Decimal, _> = res.row
+                .try_get(idx);
+        result
+            .map_err(|e| DbErr::Postgres(e).into())
     }
 }
 
 #[cfg(feature = "with-bigdecimal")]
 use bigdecimal::BigDecimal;
-use tokio_postgres::{types::{Json, Oid}, Row};
+use sea_query::Values;
+use tokio_postgres::{row::RowIndex, types::{Json, Oid}, Row, Statement};
 
 #[cfg(feature = "with-bigdecimal")]
 impl TryGetable for BigDecimal {
     #[allow(unused_variables)]
-    fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        match &res.row {
-            QueryResultRow(row) => row
-                .try_get::<Option<BigDecimal>, _>(idx)
-                .map_err(|e| DbErr::Postgres(e).into())
-                .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
-        }
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+         let result: Result<BigDecimal, _> = res.row
+                .try_get(idx);
+         result.map_err(|e| DbErr::Postgres(e).into())
     }
 }
 
@@ -344,15 +228,10 @@ macro_rules! try_getable_uuid {
     ( $type: ty, $conversion_fn: expr ) => {
         #[allow(unused_variables, unreachable_code)]
         impl TryGetable for $type {
-            fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                let res: Result<uuid::Uuid, TryGetError> = match &res.row {
-                    QueryResultRow(row) => row
-                        .try_get::<Option<uuid::Uuid>, _>(idx)
-                        .map_err(|e| DbErr::Postgres(e).into())
-                        .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-                    #[allow(unreachable_patterns)]
-                    _ => unreachable!(),
-                };
+            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+                let res: Result<uuid::Uuid, TryGetError> = res.row
+                        .try_get(idx)
+                        .map_err(|e| DbErr::Postgres(e).into());
                 res.map($conversion_fn)
             }
         }
@@ -376,23 +255,17 @@ try_getable_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 
 impl TryGetable for u32 {
     #[allow(unused_variables)]
-    fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        match &res.row {
-            QueryResultRow(row) => {
-                row.try_get::<Option<Oid>, _>(idx)
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+       let result: Result<Oid, _> = res.row.try_get(idx);
+       result
                     .map_err(|e| DbErr::Postgres(e).into())
-                    .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
                     .map(|oid| oid.0)
-            }
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
-        }
     }
 }
 
 #[allow(dead_code)]
-fn err_null_idx_col<I: ColIdx>(idx: I) -> TryGetError {
-    TryGetError::Null(format!("{idx:?}"))
+fn err_null_idx_col<I: RowIndex + std::fmt::Display>(idx: I) -> TryGetError {
+    TryGetError::Null("TODO".into()) //format!("{idx:?}"))
 }
 
 #[cfg(feature = "postgres-array")]
@@ -404,15 +277,11 @@ mod postgres_array {
         ( $type: ty ) => {
             #[allow(unused_variables)]
             impl TryGetable for Vec<$type> {
-                fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    match &res.row {
-                        QueryResultRow(row) => row
+                fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+                    res.row
                             .try_get::<Option<Vec<$type>>, _>(idx)
                             .map_err(|e| DbErr::Postgres(e).into())
-                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-                        #[allow(unreachable_patterns)]
-                        _ => unreachable!(),
-                    }
+                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
                 }
             }
         };
@@ -471,15 +340,11 @@ mod postgres_array {
         ( $type: ty, $conversion_fn: expr ) => {
             #[allow(unused_variables, unreachable_code)]
             impl TryGetable for Vec<$type> {
-                fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    let res: Result<Vec<uuid::Uuid>, TryGetError> = match &res.row {
-                        QueryResultRow(row) => row
+                fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+                    let res: Result<Vec<uuid::Uuid>, TryGetError> = res.row
                             .try_get::<Option<Vec<uuid::Uuid>>, _>(idx)
                             .map_err(|e| DbErr::Postgres(e).into())
-                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx))),
-                        #[allow(unreachable_patterns)]
-                        _ => unreachable!(),
-                    };
+                            .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)));
                     res.map(|vec| vec.into_iter().map($conversion_fn).collect())
                 }
             }
@@ -503,22 +368,20 @@ mod postgres_array {
 
     impl TryGetable for Vec<u32> {
         #[allow(unused_variables)]
-        fn try_get_by<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-            match &res.row {
-                QueryResultRow(row) => {
-                    // Since 0.6.0, SQLx has dropped direct mapping from PostgreSQL's OID to Rust's `u32`;
-                    // Instead, `u32` was wrapped by a `sqlx::Oid`.
-                    row.try_get::<Option<Vec<Oid>>, _>(idx)
+        fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+            res.try_get::<Option<Vec<Oid>>, _>(idx)
                         .map_err(|e| DbErr::Postgres(e).into())
                         .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)))
                         .map(|oids| oids.into_iter().map(|oid| oid.0).collect())
-                }
-                #[allow(unreachable_patterns)]
-                _ => unreachable!(),
-            }
         }
     }
 }
+
+// impl TryGetable for Row {
+//     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+//         res.row.try_get(index).map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))
+//     }
+// }
 
 // TryGetableMany //
 
@@ -587,11 +450,11 @@ pub trait TryGetableMany: Sized {
     /// # Ok(())
     /// # }
     /// ```
-    fn find_by_statement<C>(stmt: Statement) -> SelectorRaw<SelectGetableValue<Self, C>>
+    fn find_by_statement<C>(stmt: String, values: Values) -> SelectorRaw<SelectGetableValue<Self, C>>
     where
         C: strum::IntoEnumIterator + sea_query::Iden,
     {
-        SelectorRaw::<SelectGetableValue<Self, C>>::with_columns(stmt)
+        SelectorRaw::<SelectGetableValue<Self, C>>::with_columns(stmt, values)
     }
 }
 
@@ -681,14 +544,14 @@ fn try_get_many_with_slice_len_of(len: usize, cols: &[String]) -> Result<(), Try
 /// touch this trait.
 pub trait TryGetableArray: Sized {
     /// Just a delegate
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
 }
 
 impl<T> TryGetable for Vec<T>
 where
     T: TryGetableArray,
 {
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
         T::try_get_by(res, index)
     }
 }
@@ -703,15 +566,11 @@ where
 {
     /// Get a JSON from the query result with prefixed column name
     #[allow(unused_variables, unreachable_code)]
-    fn try_get_from_json<I: ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        match &res.row {
-            QueryResultRow(row) => row
-                .try_get::<Option<Json<Self>>, _>(idx)
-                .map_err(|e| DbErr::Postgres(e).into())
-                .and_then(|opt| opt.ok_or_else(|| err_null_idx_col(idx)).map(|json| json.0)),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
-        }
+    fn try_get_from_json<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+        let result: Result<Json<Self>, _> = res.row.try_get(idx);
+        result
+                .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))
+                .map(|x| x.0)
     }
 
     /// Get a Vec<Self> from an Array of Json
@@ -736,7 +595,7 @@ impl<T> TryGetable for T
 where
     T: TryGetableFromJson,
 {
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
         T::try_get_from_json(res, index)
     }
 }
@@ -746,7 +605,7 @@ impl<T> TryGetableArray for T
 where
     T: TryGetableFromJson,
 {
-    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Vec<T>, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<T>, TryGetError> {
         T::from_json_vec(serde_json::Value::try_get_by(res, index)?)
     }
 }

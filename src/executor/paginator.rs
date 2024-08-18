@@ -1,11 +1,14 @@
 use crate::{
     error::*, ConnectionTrait, EntityTrait, FromQueryResult, Select, SelectModel, SelectTwo,
-    SelectTwoModel, Selector, SelectorRaw, SelectorTrait, Statement,
+    SelectTwoModel, Selector, SelectorRaw, SelectorTrait,
 };
 use async_stream::stream;
 use futures::Stream;
 use sea_query::{Alias, Expr, PostgresQueryBuilder, SelectStatement};
+use tokio_postgres::types::ToSql;
 use std::{marker::PhantomData, pin::Pin};
+
+use super::{QueryResult, ValueHolder};
 
 /// Pin a Model so that stream operations can be performed on the model
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
@@ -48,12 +51,14 @@ where
             .limit(self.page_size)
             .offset(self.page_size * page)
             .to_owned();
-        let stmt = Statement::from_string_values_tuple(query.build(PostgresQueryBuilder));
-        let rows = self.db.query_all(stmt).await?;
+        let (stmt, values) = query.build(PostgresQueryBuilder);
+        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+        let rows = self.db.query_all(&stmt, &values).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {
             // TODO: Error handling
-            buffer.push(S::from_raw_query_result(row)?);
+            buffer.push(S::from_raw_query_result(QueryResult { row })?);
         }
         Ok(buffer)
     }
@@ -77,11 +82,14 @@ where
                 Alias::new("sub_query"),
             )
             .to_owned();
-        let stmt = Statement::from_string_values_tuple(stmt.build(PostgresQueryBuilder));
-        let result = match self.db.query_one(stmt).await? {
+        let (stmt, values) = stmt.build(PostgresQueryBuilder);
+        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+        let result = match self.db.query_opt(&stmt, &values).await? {
             Some(res) => res,
             None => return Ok(0),
         };
+        let result = QueryResult { row: result };
         let num_items = result.try_get::<i64>("", "num_items")? as u64;
         Ok(num_items)
     }

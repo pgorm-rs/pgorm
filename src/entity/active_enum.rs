@@ -1,5 +1,6 @@
-use crate::{ColIdx, ColumnDef, DbErr, Iterable, QueryResult, TryFromU64, TryGetError, TryGetable};
+use crate::{RowIndex, ColumnDef, DbErr, Iterable, QueryResult, TryFromU64, TryGetError, TryGetable};
 use sea_query::{DynIden, Expr, Nullable, SimpleExpr, Value, ValueType};
+use tokio_postgres::row::RowIndex;
 
 /// A Rust representation of enum defined in database.
 ///
@@ -147,13 +148,13 @@ pub trait ActiveEnum: Sized + Iterable {
 /// The Rust Value backing ActiveEnums
 pub trait ActiveEnumValue: Into<Value> + ValueType + Nullable + TryGetable {
     /// For getting an array of enum. Postgres only
-    fn try_get_vec_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
+    fn try_get_vec_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
 }
 
 macro_rules! impl_active_enum_value {
     ($type:ident) => {
         impl ActiveEnumValue for $type {
-            fn try_get_vec_by<I: ColIdx>(
+            fn try_get_vec_by<I: RowIndex + std::fmt::Display>(
                 _res: &QueryResult,
                 _index: I,
             ) -> Result<Vec<Self>, TryGetError> {
@@ -166,7 +167,7 @@ macro_rules! impl_active_enum_value {
 macro_rules! impl_active_enum_value_with_pg_array {
     ($type:ident) => {
         impl ActiveEnumValue for $type {
-            fn try_get_vec_by<I: ColIdx>(
+            fn try_get_vec_by<I: RowIndex + std::fmt::Display>(
                 _res: &QueryResult,
                 _index: I,
             ) -> Result<Vec<Self>, TryGetError> {
@@ -181,10 +182,10 @@ macro_rules! impl_active_enum_value_with_pg_array {
     };
 }
 
-impl_active_enum_value!(u8);
-impl_active_enum_value!(u16);
+// impl_active_enum_value!(u8);
+// impl_active_enum_value!(u16);
 impl_active_enum_value!(u32);
-impl_active_enum_value!(u64);
+// impl_active_enum_value!(u64);
 impl_active_enum_value_with_pg_array!(String);
 impl_active_enum_value_with_pg_array!(i8);
 impl_active_enum_value_with_pg_array!(i16);

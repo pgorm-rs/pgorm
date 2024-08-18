@@ -28,7 +28,7 @@ impl Deref for DatabasePool {
 
 pub(crate) struct DatabaseConnection(pub(crate) Object);
 
-// #[async_trait::async_trait]
+#[async_trait::async_trait]
 impl ConnectionTrait for DatabasePool {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -99,6 +99,7 @@ impl ConnectionTrait for DatabasePool {
     }
 }
 
+#[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -163,7 +164,7 @@ impl ConnectionTrait for DatabaseConnection {
     }
 }
 
-
+#[async_trait::async_trait]
 impl ConnectionTrait for Transaction<'_> {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -228,8 +229,7 @@ impl ConnectionTrait for Transaction<'_> {
     }
 }
 
-
-// #[async_trait::async_trait]
+#[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<Transaction<'_>, DbErr> {
         Ok(self.0.transaction().await?)
