@@ -83,10 +83,6 @@ pub enum ConnAcquireErr {
 /// Runtime error
 #[derive(Error, Debug)]
 pub enum RuntimeErr {
-    /// SQLx Error
-    #[cfg(feature = "sqlx-dep")]
-    #[error("{0}")]
-    SqlxError(#[source] sqlx::error::Error),
     /// Error generated from within SeaORM
     #[error("{0}")]
     Internal(String),

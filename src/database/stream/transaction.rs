@@ -3,16 +3,9 @@
 use std::{ops::DerefMut, pin::Pin, task::Poll};
 use tracing::instrument;
 
-#[cfg(feature = "sqlx-dep")]
-use futures::TryStreamExt;
 use futures::{lock::MutexGuard, Stream};
 
-#[cfg(feature = "sqlx-dep")]
-use sqlx::Executor;
-
 use super::metric::MetricStream;
-#[cfg(feature = "sqlx-dep")]
-use crate::driver::*;
 use crate::{DbErr, DatabaseConnection, QueryResult, Statement};
 
 /// `TransactionStream` cannot be used in a `transaction` closure as it does not impl `Send`.

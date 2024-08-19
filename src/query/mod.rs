@@ -3,8 +3,6 @@ mod delete;
 mod helper;
 mod insert;
 mod join;
-#[cfg(feature = "with-json")]
-mod json;
 mod loader;
 mod select;
 mod traits;
@@ -15,8 +13,6 @@ pub use combine::{SelectA, SelectB};
 pub use delete::*;
 pub use helper::*;
 pub use insert::*;
-#[cfg(feature = "with-json")]
-pub use json::*;
 pub use loader::*;
 pub use select::*;
 pub use traits::*;

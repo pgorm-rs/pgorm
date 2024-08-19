@@ -4,15 +4,7 @@ use futures::Stream;
 use std::{pin::Pin, task::Poll};
 use tracing::instrument;
 
-#[cfg(feature = "sqlx-dep")]
-use futures::TryStreamExt;
-
-#[cfg(feature = "sqlx-dep")]
-use sqlx::Executor;
-
 use super::metric::MetricStream;
-#[cfg(feature = "sqlx-dep")]
-use crate::driver::*;
 use crate::{DbErr, DatabaseConnection, QueryResult, Statement};
 
 /// Creates a stream from a [QueryResult]

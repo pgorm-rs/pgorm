@@ -1,5 +1,5 @@
 use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect};
-use sea_query::{PostgresQueryBuilder, QueryStatementBuilder, Values};
+use sea_query::{QueryStatementBuilder, Values};
 
 /// A Trait for any type performing queries on a Model or ActiveModel
 pub trait QueryTrait {

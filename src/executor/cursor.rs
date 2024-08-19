@@ -2406,8 +2406,8 @@ impl ToSql for ValueHolder {
             Value::SmallInt(x) => x.to_sql(ty, out),
             Value::Int(x) => x.to_sql(ty, out),
             Value::BigInt(x) => x.to_sql(ty, out),
-            Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), //x.as_ref().map(|x| (*x).to_sql(ty, out))
-            Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql(ty, out),
+            Value::TinyUnsigned(_x) => unimplemented!("u8 not supported"), //x.as_ref().map(|x| (*x).to_sql(ty, out))
+            Value::SmallUnsigned(_x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql(ty, out),
             Value::Unsigned(x) => x.to_sql(ty, out),
             Value::BigUnsigned(x) => {
                 //unimplemented!("ToSql: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).to_sql(ty, out),
@@ -2500,7 +2500,7 @@ impl ToSql for ValueHolder {
         }
     }
 
-    fn accepts(ty: &Type) -> bool
+    fn accepts(_ty: &Type) -> bool
     where
         Self: Sized,
     {

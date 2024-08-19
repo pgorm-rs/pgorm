@@ -35,34 +35,3 @@ macro_rules! it_impl_traits {
         it_impl_try_from_u64::<$ty>();
     };
 }
-
-#[sea_orm_macros::test]
-#[cfg(feature = "sqlx-dep")]
-fn main() {
-    it_impl_traits!(i8);
-    it_impl_traits!(i16);
-    it_impl_traits!(i32);
-    it_impl_traits!(i64);
-    it_impl_traits!(u8);
-    it_impl_traits!(u16);
-    it_impl_traits!(u32);
-    it_impl_traits!(u64);
-    it_impl_traits!(bool);
-    it_impl_traits!(f32);
-    it_impl_traits!(f64);
-    it_impl_traits!(Vec<u8>);
-    it_impl_traits!(String);
-    it_impl_traits!(serde_json::Value);
-    it_impl_traits!(chrono::NaiveDate);
-    it_impl_traits!(chrono::NaiveTime);
-    it_impl_traits!(chrono::NaiveDateTime);
-    it_impl_traits!(chrono::DateTime<chrono::FixedOffset>);
-    it_impl_traits!(chrono::DateTime<chrono::Utc>);
-    it_impl_traits!(chrono::DateTime<chrono::Local>);
-    it_impl_traits!(time::Date);
-    it_impl_traits!(time::Time);
-    it_impl_traits!(time::PrimitiveDateTime);
-    it_impl_traits!(time::OffsetDateTime);
-    it_impl_traits!(rust_decimal::Decimal);
-    it_impl_traits!(uuid::Uuid);
-}

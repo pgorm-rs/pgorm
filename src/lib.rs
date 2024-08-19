@@ -331,7 +331,6 @@
 
 mod database;
 mod docs;
-mod driver;
 /// Module for the Entity type and operations
 pub mod entity;
 /// Error types for all database operations
@@ -350,8 +349,6 @@ pub mod schema;
 mod util;
 
 pub use database::*;
-#[allow(unused_imports)]
-pub use driver::*;
 pub use entity::*;
 pub use error::*;
 pub use executor::*;
