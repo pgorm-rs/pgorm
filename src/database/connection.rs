@@ -6,6 +6,8 @@ use tokio_postgres::{
     types::{BorrowToSql, ToSql}, Row, RowStream, ToStatement
 };
 
+use super::DatabaseTransaction;
+
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
 #[async_trait::async_trait]
@@ -60,7 +62,7 @@ pub trait ConnectionTrait: Sync {
 pub trait TransactionTrait {
     /// Execute SQL `BEGIN` transaction.
     /// Returns a Transaction that can be committed or rolled back
-    async fn begin(&mut self) -> Result<Transaction<'_>, DbErr>;
+    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr>;
 
     /// Execute SQL `BEGIN` transaction with isolation level and/or access mode.
     /// Returns a Transaction that can be committed or rolled back
@@ -68,7 +70,7 @@ pub trait TransactionTrait {
         &mut self,
         read_only: bool,
         isolation_level: Option<tokio_postgres::IsolationLevel>,
-    ) -> Result<Transaction<'_>, DbErr>;
+    ) -> Result<DatabaseTransaction<'_>, DbErr>;
 
     // Execute the function inside a transaction.
     // If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.

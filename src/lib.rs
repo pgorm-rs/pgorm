@@ -366,6 +366,8 @@ pub use sea_orm_macros::{
     DeriveIntoActiveModel, DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey,
     DeriveRelatedEntity, DeriveRelation, DeriveValueType, FromJsonQueryResult, FromQueryResult,
 };
+#[cfg(feature = "macros")]
+pub use tokio_postgres::row::RowIndex;
 
 pub use sea_query;
 pub use sea_query::Iden;

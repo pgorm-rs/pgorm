@@ -23,7 +23,7 @@ use crate::error::*;
 pub struct Database;
 
 impl Database {
-    /// Method to create a [DatabaseConnection] on a database
+    /// Method to create a [DatabasePool] on a database
     // #[instrument(level = "trace", skip(config))]
     pub fn connect(config: tokio_postgres::Config) -> Result<DatabasePool, DbErr> {
         let mgr_config = ManagerConfig {
