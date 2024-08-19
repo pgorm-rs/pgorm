@@ -10,7 +10,7 @@ use sea_query::{
     ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc,
     SelectStatement, SimpleExpr, Value, ValueTuple,
 };
-use tokio_postgres::types::{IsNull, ToSql, Type};
+use tokio_postgres::types::{to_sql_checked, IsNull, ToSql, Type};
 // use uuid::Uuid;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
@@ -2459,41 +2459,10 @@ impl ToSql for ValueHolder {
                 .unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
             // Value::Decimal(x) => x.map(|x| &**x).to_sql(ty, out),
             // Value::BigDecimal(x) => x.map(|x| &**x).to_sql(ty, out),
-            Value::Array(ty, x) => {
-                if let Some(x) = x {
-                    let v = x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>();
-                    v.to_sql(
-                        &match ty {
-                            ArrayType::Bool => Type::BOOL_ARRAY,
-                            ArrayType::TinyInt => Type::ANYARRAY,
-                            ArrayType::SmallInt => Type::INT2_ARRAY,
-                            ArrayType::Int => Type::INT4_ARRAY,
-                            ArrayType::BigInt => Type::INT8_ARRAY,
-                            ArrayType::TinyUnsigned => Type::ANYARRAY,
-                            ArrayType::SmallUnsigned => Type::ANYARRAY,
-                            ArrayType::Unsigned => Type::OID_ARRAY,
-                            ArrayType::BigUnsigned => Type::ANYARRAY,
-                            ArrayType::Float => Type::FLOAT4_ARRAY,
-                            ArrayType::Double => Type::FLOAT8_ARRAY,
-                            ArrayType::String => Type::TEXT_ARRAY,
-                            ArrayType::Char => Type::CHAR_ARRAY,
-                            ArrayType::Bytes => Type::BYTEA_ARRAY,
-                            ArrayType::Json => Type::JSONB_ARRAY,
-                            ArrayType::ChronoDate => Type::DATE_ARRAY,
-                            ArrayType::ChronoTime => Type::TIME_ARRAY,
-                            ArrayType::ChronoDateTime => Type::TIMESTAMP_ARRAY,
-                            ArrayType::ChronoDateTimeUtc => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::ChronoDateTimeLocal => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::ChronoDateTimeWithTimeZone => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::Uuid => Type::UUID_ARRAY,
-                        },
-                        out,
-                    )?;
-                    Ok(IsNull::No)
-                } else {
-                    Ok(IsNull::Yes)
-                }
+            Value::Array(_, Some(x)) => {
+                x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>().to_sql(ty, out)
             }
+            Value::Array(_, None) => Ok(IsNull::Yes)
         }
     }
 
@@ -2501,181 +2470,8 @@ impl ToSql for ValueHolder {
     where
         Self: Sized,
     {
-        // tracing::debug!("Accepting value: {ty:?}");
         true
     }
 
-    fn to_sql_checked(
-        &self,
-        ty: &Type,
-        out: &mut BytesMut,
-    ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
-        match &self.0 {
-            Value::Bool(x) => x.to_sql_checked(ty, out),
-            Value::TinyInt(x) => x.to_sql_checked(ty, out),
-            Value::SmallInt(x) => x.to_sql_checked(ty, out),
-            Value::Int(x) => x.to_sql_checked(ty, out),
-            Value::BigInt(x) => x.to_sql_checked(ty, out),
-            Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
-            Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
-            Value::Unsigned(x) => x.to_sql_checked(ty, out),
-            Value::BigUnsigned(x) => {
-                // unimplemented!("ToSqlChecked: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
-                x.map(|x| x as i64).to_sql_checked(ty, out)
-            }
-            Value::Float(x) => x.to_sql_checked(ty, out),
-            Value::Double(x) => x.to_sql_checked(ty, out),
-            Value::String(x) => match x.as_ref() {
-                Some(x) => x.to_sql_checked(ty, out),
-                None => Ok(IsNull::Yes),
-            },
-            Value::Char(x) => x.map(|x| x.to_string()).to_sql_checked(ty, out),
-            Value::Bytes(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::Json(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoDate(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoTime(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoDateTime(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoDateTimeUtc(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoDateTimeLocal(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            Value::ChronoDateTimeWithTimeZone(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            // Value::TimeDate(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            // Value::TimeTime(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            // Value::TimeDateTime(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            // Value::TimeDateTimeWithTimeZone(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            Value::Uuid(x) => x
-                .as_ref()
-                .map(|x| x.to_sql_checked(ty, out))
-                .unwrap_or(Ok(IsNull::Yes)),
-            // Value::Decimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            // Value::BigDecimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            Value::Array(ty, x) => {
-                if let Some(x) = x {
-                    let v = x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>();
-                    v.to_sql_checked(
-                        &match ty {
-                            ArrayType::Bool => Type::BOOL_ARRAY,
-                            ArrayType::TinyInt => Type::ANYARRAY,
-                            ArrayType::SmallInt => Type::INT2_ARRAY,
-                            ArrayType::Int => Type::INT4_ARRAY,
-                            ArrayType::BigInt => Type::INT8_ARRAY,
-                            ArrayType::TinyUnsigned => Type::ANYARRAY,
-                            ArrayType::SmallUnsigned => Type::ANYARRAY,
-                            ArrayType::Unsigned => Type::OID_ARRAY,
-                            ArrayType::BigUnsigned => Type::ANYARRAY,
-                            ArrayType::Float => Type::FLOAT4_ARRAY,
-                            ArrayType::Double => Type::FLOAT8_ARRAY,
-                            ArrayType::String => Type::TEXT_ARRAY,
-                            ArrayType::Char => Type::CHAR_ARRAY,
-                            ArrayType::Bytes => Type::BYTEA_ARRAY,
-                            ArrayType::Json => Type::JSONB_ARRAY,
-                            ArrayType::ChronoDate => Type::DATE_ARRAY,
-                            ArrayType::ChronoTime => Type::TIME_ARRAY,
-                            ArrayType::ChronoDateTime => Type::TIMESTAMP_ARRAY,
-                            ArrayType::ChronoDateTimeUtc => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::ChronoDateTimeLocal => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::ChronoDateTimeWithTimeZone => Type::TIMESTAMPTZ_ARRAY,
-                            ArrayType::Uuid => Type::UUID_ARRAY,
-                        },
-                        out,
-                    )?;
-                    Ok(IsNull::No)
-                } else {
-                    Ok(IsNull::Yes)
-                }
-            }
-        }
-    }
-
-    fn encode_format(&self, ty: &Type) -> tokio_postgres::types::Format {
-        match &self.0 {
-            Value::Bool(x) => x.encode_format(ty),
-            Value::TinyInt(x) => x.encode_format(ty),
-            Value::SmallInt(x) => x.encode_format(ty),
-            Value::Int(x) => x.encode_format(ty),
-            Value::BigInt(x) => x.encode_format(ty),
-            Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), // x.map(|x| x as _).encode_format(ty),
-            Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).encode_format(ty),
-            Value::Unsigned(x) => x.encode_format(ty),
-            Value::BigUnsigned(x) => {
-                // unimplemented!("EncodeFormat: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).encode_format(ty),
-                // TODO: workaround until fork sea-orm
-                tokio_postgres::types::Format::Binary
-            }
-            Value::Float(x) => x.encode_format(ty),
-            Value::Double(x) => x.encode_format(ty),
-            Value::String(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::Char(x) => tokio_postgres::types::Format::Binary,
-            Value::Bytes(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::Json(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoDate(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoTime(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoDateTime(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoDateTimeUtc(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoDateTimeLocal(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            Value::ChronoDateTimeWithTimeZone(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            // Value::TimeDate(x) => x.map(|x| &**x).encode_format(ty),
-            // Value::TimeTime(x) => x.map(|x| &**x).encode_format(ty),
-            // Value::TimeDateTime(x) => x.map(|x| &**x).encode_format(ty),
-            // Value::TimeDateTimeWithTimeZone(x) => x.map(|x| &**x).encode_format(ty),
-            Value::Uuid(x) => x
-                .as_ref()
-                .map(|x| x.encode_format(ty))
-                .unwrap_or(tokio_postgres::types::Format::Binary),
-            // Value::Decimal(x) => x.map(|x| &**x).encode_format(ty),
-            // Value::BigDecimal(x) => x.map(|x| &**x).encode_format(ty),
-            Value::Array(ty, x) => tokio_postgres::types::Format::Binary,
-        }
-        // todo!()
-    }
+    to_sql_checked!();
 }
