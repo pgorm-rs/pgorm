@@ -5,18 +5,11 @@ use std::pin::Pin;
 use std::time::SystemTime;
 use tracing::info;
 
-use sea_orm::sea_query::{
-    self, extension::postgres::Type, Alias, Expr, ForeignKey, IntoIden, JoinType, Order, Query,
-    SelectStatement, SimpleExpr, Table,
-};
+use super::{seaql_migrations, MigrationTrait};
+use sea_orm::sea_query::{self, IntoIden, Order, PostgresQueryBuilder, Query, SelectStatement};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, Condition, ConnectionTrait, DbBackend, DbErr, DeriveIden,
-    DynIden, EntityTrait, FromQueryResult, Iterable, QueryFilter, Schema, Statement,
-    TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr, DynIden, EntityTrait, FromQueryResult, Iterable, Schema, TransactionTrait
 };
-use sea_schema::{mysql::MySql, postgres::Postgres, probe::SchemaProbe, sqlite::Sqlite};
-
-use super::{seaql_migrations, IntoSchemaManagerConnection, MigrationTrait, SchemaManager};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 /// Status of migration
@@ -77,27 +70,23 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of applied migrations from database
-    async fn get_migration_models<C>(db: &C) -> Result<Vec<seaql_migrations::Model>, DbErr>
-    where
-        C: ConnectionTrait,
-    {
+    async fn get_migration_models(
+        db: &(impl ConnectionTrait),
+    ) -> Result<Vec<seaql_migrations::Model>, DbErr> {
         Self::install(db).await?;
         let stmt = Query::select()
             .table_name(Self::migration_table_name())
             .columns(seaql_migrations::Column::iter().map(IntoIden::into_iden))
             .order_by(seaql_migrations::Column::Version, Order::Asc)
             .to_owned();
-        let builder = db.get_database_backend();
-        seaql_migrations::Model::find_by_statement(builder.build(&stmt))
+        let (stmt, values) = stmt.build(PostgresQueryBuilder);
+        seaql_migrations::Model::find_by_statement(stmt, values.0)
             .all(db)
             .await
     }
 
     /// Get list of migrations with status
-    async fn get_migration_with_status<C>(db: &C) -> Result<Vec<Migration>, DbErr>
-    where
-        C: ConnectionTrait,
-    {
+    async fn get_migration_with_status(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
         Self::install(db).await?;
         let mut migration_files = Self::get_migration_files();
         let migration_models = Self::get_migration_models(db).await?;
@@ -133,10 +122,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of pending migrations
-    async fn get_pending_migrations<C>(db: &C) -> Result<Vec<Migration>, DbErr>
-    where
-        C: ConnectionTrait,
-    {
+    async fn get_pending_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
         Self::install(db).await?;
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -146,10 +132,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of applied migrations
-    async fn get_applied_migrations<C>(db: &C) -> Result<Vec<Migration>, DbErr>
-    where
-        C: ConnectionTrait,
-    {
+    async fn get_applied_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
         Self::install(db).await?;
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -159,25 +142,14 @@ pub trait MigratorTrait: Send {
     }
 
     /// Create migration table `seaql_migrations` in the database
-    async fn install<C>(db: &C) -> Result<(), DbErr>
-    where
-        C: ConnectionTrait,
-    {
-        let builder = db.get_database_backend();
-        let table_name = Self::migration_table_name();
-        let schema = Schema::new(builder);
-        let mut stmt = schema
-            .create_table_from_entity(seaql_migrations::Entity)
-            .table_name(table_name);
-        stmt.if_not_exists();
-        db.execute(builder.build(&stmt)).await.map(|_| ())
+    async fn install(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
+        db.execute("CREATE TABLE IF NOT EXISTS seaql_migrations (version TEXT NOT NULL, applied_at BIGINT NOT NULL)", &[]).await?;
+        tracing::debug!("Installed");
+        Ok(())
     }
 
     /// Check the status of all migrations
-    async fn status<C>(db: &C) -> Result<(), DbErr>
-    where
-        C: ConnectionTrait,
-    {
+    async fn status(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
         Self::install(db).await?;
 
         info!("Checking migration status");
@@ -189,143 +161,33 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
-    /// Drop all tables from the database, then reapply all migrations
-    async fn fresh<'c, C>(db: C) -> Result<(), DbErr>
-    where
-        C: IntoSchemaManagerConnection<'c>,
-    {
-        exec_with_connection::<'_, _, _>(db, move |manager| {
-            Box::pin(async move { exec_fresh::<Self>(manager).await })
-        })
-        .await
-    }
-
-    /// Rollback all applied migrations, then reapply all migrations
-    async fn refresh<'c, C>(db: C) -> Result<(), DbErr>
-    where
-        C: IntoSchemaManagerConnection<'c>,
-    {
-        exec_with_connection::<'_, _, _>(db, move |manager| {
-            Box::pin(async move {
-                exec_down::<Self>(manager, None).await?;
-                exec_up::<Self>(manager, None).await
-            })
-        })
-        .await
-    }
-
-    /// Rollback all applied migrations
-    async fn reset<'c, C>(db: C) -> Result<(), DbErr>
-    where
-        C: IntoSchemaManagerConnection<'c>,
-    {
-        exec_with_connection::<'_, _, _>(db, move |manager| {
-            Box::pin(async move { exec_down::<Self>(manager, None).await })
-        })
-        .await
-    }
-
     /// Apply pending migrations
-    async fn up<'c, C>(db: C, steps: Option<u32>) -> Result<(), DbErr>
-    where
-        C: IntoSchemaManagerConnection<'c>,
-    {
-        exec_with_connection::<'_, _, _>(db, move |manager| {
+    async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), DbErr> {
+        tracing::debug!("Applying migrations");
+        exec_with_connection::<'_, _>(db, move |manager| {
+            tracing::debug!("Exec up");
             Box::pin(async move { exec_up::<Self>(manager, steps).await })
         })
         .await
     }
-
-    /// Rollback applied migrations
-    async fn down<'c, C>(db: C, steps: Option<u32>) -> Result<(), DbErr>
-    where
-        C: IntoSchemaManagerConnection<'c>,
-    {
-        exec_with_connection::<'_, _, _>(db, move |manager| {
-            Box::pin(async move { exec_down::<Self>(manager, steps).await })
-        })
-        .await
-    }
 }
 
-async fn exec_with_connection<'c, C, F>(db: C, f: F) -> Result<(), DbErr>
+async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), DbErr>
 where
-    C: IntoSchemaManagerConnection<'c>,
     F: for<'b> Fn(
-        &'b SchemaManager<'_>,
+        &'b DatabaseTransaction<'_>,
     ) -> Pin<Box<dyn Future<Output = Result<(), DbErr>> + Send + 'b>>,
 {
-    let db = db.into_schema_manager_connection();
-
-    match db.get_database_backend() {
-        DbBackend::Postgres => {
-            let transaction = db.begin().await?;
-            let manager = SchemaManager::new(&transaction);
-            f(&manager).await?;
-            transaction.commit().await
-        }
-    }
+    let mut conn = db.get().await?;
+    let transaction = conn.begin().await?;
+    f(&transaction).await?;
+    transaction.commit().await
 }
 
-async fn exec_fresh<M>(manager: &SchemaManager<'_>) -> Result<(), DbErr>
+async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
 where
     M: MigratorTrait + ?Sized,
 {
-    let db = manager.get_connection();
-
-    M::install(db).await?;
-    let db_backend = db.get_database_backend();
-
-    // Drop all tables
-    let stmt = query_tables(db).await;
-    let rows = db.query_all(db_backend.build(&stmt)).await?;
-    for row in rows.into_iter() {
-        let table_name: String = row.try_get("", "table_name")?;
-        info!("Dropping table '{}'", table_name);
-        let mut stmt = Table::drop();
-        stmt.table(Alias::new(table_name.as_str()))
-            .if_exists()
-            .cascade();
-        db.execute(db_backend.build(&stmt)).await?;
-        info!("Table '{}' has been dropped", table_name);
-    }
-
-    // Drop all types
-    if db_backend == DbBackend::Postgres {
-        info!("Dropping all types");
-        let stmt = query_pg_types(db);
-        let rows = db.query_all(db_backend.build(&stmt)).await?;
-        for row in rows {
-            let type_name: String = row.try_get("", "typname")?;
-            info!("Dropping type '{}'", type_name);
-            let mut stmt = Type::drop();
-            stmt.name(Alias::new(&type_name));
-            db.execute(db_backend.build(&stmt)).await?;
-            info!("Type '{}' has been dropped", type_name);
-        }
-    }
-
-    // Restore the foreign key check
-    if db_backend == DbBackend::Sqlite {
-        info!("Restoring foreign key check");
-        db.execute(Statement::from_string(
-            db_backend,
-            "PRAGMA foreign_keys = ON".to_owned(),
-        ))
-        .await?;
-        info!("Foreign key check restored");
-    }
-
-    // Reapply all migrations
-    exec_up::<M>(manager, None).await
-}
-
-async fn exec_up<M>(manager: &SchemaManager<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
-where
-    M: MigratorTrait + ?Sized,
-{
-    let db = manager.get_connection();
-
     M::install(db).await?;
 
     if let Some(steps) = steps {
@@ -346,7 +208,7 @@ where
             *steps -= 1;
         }
         info!("Applying migration '{}'", migration.name());
-        migration.up(manager).await?;
+        migration.up(db, &crate::SchemaManager(&())).await?;
         info!("Migration '{}' has been applied", migration.name());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -361,144 +223,6 @@ where
     }
 
     Ok(())
-}
-
-async fn exec_down<M>(manager: &SchemaManager<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
-where
-    M: MigratorTrait + ?Sized,
-{
-    let db = manager.get_connection();
-
-    M::install(db).await?;
-
-    if let Some(steps) = steps {
-        info!("Rolling back {} applied migrations", steps);
-    } else {
-        info!("Rolling back all applied migrations");
-    }
-
-    let migrations = M::get_applied_migrations(db).await?.into_iter().rev();
-    if migrations.len() == 0 {
-        info!("No applied migrations");
-    }
-    for Migration { migration, .. } in migrations {
-        if let Some(steps) = steps.as_mut() {
-            if steps == &0 {
-                break;
-            }
-            *steps -= 1;
-        }
-        info!("Rolling back migration '{}'", migration.name());
-        migration.down(manager).await?;
-        info!("Migration '{}' has been rollbacked", migration.name());
-        seaql_migrations::Entity::delete_many()
-            .filter(Expr::col(seaql_migrations::Column::Version).eq(migration.name()))
-            .table_name(M::migration_table_name())
-            .exec(db)
-            .await?;
-    }
-
-    Ok(())
-}
-
-async fn query_tables<C>(db: &C) -> SelectStatement
-where
-    C: ConnectionTrait,
-{
-    match db.get_database_backend() {
-        DbBackend::Postgres => Postgres.query_tables(),
-    }
-}
-
-fn get_current_schema<C>(db: &C) -> SimpleExpr
-where
-    C: ConnectionTrait,
-{
-    match db.get_database_backend() {
-        DbBackend::Postgres => Postgres::get_current_schema(),
-    }
-}
-
-#[derive(DeriveIden)]
-enum InformationSchema {
-    #[sea_orm(iden = "information_schema")]
-    Schema,
-    #[sea_orm(iden = "TABLE_NAME")]
-    TableName,
-    #[sea_orm(iden = "CONSTRAINT_NAME")]
-    ConstraintName,
-    TableConstraints,
-    TableSchema,
-    ConstraintType,
-}
-
-fn query_mysql_foreign_keys<C>(db: &C) -> SelectStatement
-where
-    C: ConnectionTrait,
-{
-    let mut stmt = Query::select();
-    stmt.columns([
-        InformationSchema::TableName,
-        InformationSchema::ConstraintName,
-    ])
-    .from((
-        InformationSchema::Schema,
-        InformationSchema::TableConstraints,
-    ))
-    .cond_where(
-        Condition::all()
-            .add(Expr::expr(get_current_schema(db)).equals((
-                InformationSchema::TableConstraints,
-                InformationSchema::TableSchema,
-            )))
-            .add(
-                Expr::col((
-                    InformationSchema::TableConstraints,
-                    InformationSchema::ConstraintType,
-                ))
-                .eq("FOREIGN KEY"),
-            ),
-    );
-    stmt
-}
-
-#[derive(DeriveIden)]
-enum PgType {
-    Table,
-    Typname,
-    Typnamespace,
-    Typelem,
-}
-
-#[derive(DeriveIden)]
-enum PgNamespace {
-    Table,
-    Oid,
-    Nspname,
-}
-
-fn query_pg_types<C>(db: &C) -> SelectStatement
-where
-    C: ConnectionTrait,
-{
-    let mut stmt = Query::select();
-    stmt.column(PgType::Typname)
-        .from(PgType::Table)
-        .join(
-            JoinType::LeftJoin,
-            PgNamespace::Table,
-            Expr::col((PgNamespace::Table, PgNamespace::Oid))
-                .equals((PgType::Table, PgType::Typnamespace)),
-        )
-        .cond_where(
-            Condition::all()
-                .add(
-                    Expr::expr(get_current_schema(db))
-                        .equals((PgNamespace::Table, PgNamespace::Nspname)),
-                )
-                .add(Expr::col((PgType::Table, PgType::Typelem)).eq(0)),
-        );
-    stmt
 }
 
 trait QueryTable {

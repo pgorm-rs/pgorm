@@ -74,11 +74,11 @@ pub fn pk_auto<T: IntoIden>(name: T) -> ColumnDef {
 }
 
 pub fn char_len<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).char_len(length).not_null().take()
+    char_len_null(col, length).not_null().take()
 }
 
 pub fn char_len_null<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).char_len(length).null().take()
+    ColumnDef::new(col).char_len(length).take()
 }
 
 pub fn char_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
@@ -86,11 +86,11 @@ pub fn char_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
 }
 
 pub fn char<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).char().not_null().take()
+    char_null(col).not_null().take()
 }
 
 pub fn char_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).char().null().take()
+    ColumnDef::new(col).char().take()
 }
 
 pub fn char_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -98,11 +98,11 @@ pub fn char_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn string_len<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).string_len(length).not_null().take()
+    string_len_null(col, length).not_null().take()
 }
 
 pub fn string_len_null<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).string_len(length).null().take()
+    ColumnDef::new(col).string_len(length).take()
 }
 
 pub fn string_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
@@ -110,11 +110,11 @@ pub fn string_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
 }
 
 pub fn string<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).string().not_null().take()
+    string_null(col).not_null().take()
 }
 
 pub fn string_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).string().null().take()
+    ColumnDef::new(col).string().take()
 }
 
 pub fn string_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -122,11 +122,11 @@ pub fn string_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn text<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).text().not_null().take()
+    text_null(col).not_null().take()
 }
 
 pub fn text_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).text().null().take()
+    ColumnDef::new(col).text().take()
 }
 
 pub fn text_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -134,11 +134,11 @@ pub fn text_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn tiny_integer<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).tiny_integer().not_null().take()
+    tiny_integer_null(col).not_null().take()
 }
 
 pub fn tiny_integer_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).tiny_integer().null().take()
+    ColumnDef::new(col).tiny_integer().take()
 }
 
 pub fn tiny_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -146,11 +146,11 @@ pub fn tiny_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn small_integer<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).small_integer().not_null().take()
+    small_integer_null(col).not_null().take()
 }
 
 pub fn small_integer_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).small_integer().null().take()
+    ColumnDef::new(col).small_integer().take()
 }
 
 pub fn small_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -158,11 +158,11 @@ pub fn small_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn integer<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).integer().not_null().take()
+    integer_null(col).not_null().take()
 }
 
 pub fn integer_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).integer().null().take()
+    ColumnDef::new(col).integer().take()
 }
 
 pub fn integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -170,11 +170,11 @@ pub fn integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn big_integer<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).big_integer().not_null().take()
+    big_integer_null(col).not_null().take()
 }
 
 pub fn big_integer_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).big_integer().null().take()
+    ColumnDef::new(col).big_integer().take()
 }
 
 pub fn big_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -182,11 +182,11 @@ pub fn big_integer_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn tiny_unsigned<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).tiny_unsigned().not_null().take()
+    tiny_unsigned_null(col).not_null().take()
 }
 
 pub fn tiny_unsigned_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).tiny_unsigned().null().take()
+    ColumnDef::new(col).tiny_unsigned().take()
 }
 
 pub fn tiny_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -194,11 +194,11 @@ pub fn tiny_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn small_unsigned<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).small_unsigned().not_null().take()
+    small_unsigned_null(col).not_null().take()
 }
 
 pub fn small_unsigned_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).small_unsigned().null().take()
+    ColumnDef::new(col).small_unsigned().take()
 }
 
 pub fn small_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -206,11 +206,11 @@ pub fn small_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn unsigned<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).unsigned().not_null().take()
+    unsigned_null(col).not_null().take()
 }
 
 pub fn unsigned_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).unsigned().null().take()
+    ColumnDef::new(col).unsigned().take()
 }
 
 pub fn unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -218,11 +218,11 @@ pub fn unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn big_unsigned<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).big_unsigned().not_null().take()
+    big_unsigned_null(col).not_null().take()
 }
 
 pub fn big_unsigned_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).big_unsigned().null().take()
+    ColumnDef::new(col).big_unsigned().take()
 }
 
 pub fn big_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -230,11 +230,11 @@ pub fn big_unsigned_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn float<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).float().not_null().take()
+    float_null(col).not_null().take()
 }
 
 pub fn float_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).float().null().take()
+    ColumnDef::new(col).float().take()
 }
 
 pub fn float_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -242,11 +242,11 @@ pub fn float_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn double<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).double().not_null().take()
+    double_null(col).not_null().take()
 }
 
 pub fn double_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).double().null().take()
+    ColumnDef::new(col).double().take()
 }
 
 pub fn double_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -254,17 +254,11 @@ pub fn double_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn decimal_len<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
-    ColumnDef::new(col)
-        .decimal_len(precision, scale)
-        .not_null()
-        .take()
+    decimal_len_null(col, precision, scale).not_null().take()
 }
 
 pub fn decimal_len_null<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
-    ColumnDef::new(col)
-        .decimal_len(precision, scale)
-        .null()
-        .take()
+    ColumnDef::new(col).decimal_len(precision, scale).take()
 }
 
 pub fn decimal_len_uniq<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
@@ -272,11 +266,11 @@ pub fn decimal_len_uniq<T: IntoIden>(col: T, precision: u32, scale: u32) -> Colu
 }
 
 pub fn decimal<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).decimal().not_null().take()
+    decimal_null(col).not_null().take()
 }
 
 pub fn decimal_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).decimal().null().take()
+    ColumnDef::new(col).decimal().take()
 }
 
 pub fn decimal_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -284,11 +278,11 @@ pub fn decimal_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn date_time<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).date_time().not_null().take()
+    date_time_null(col).not_null().take()
 }
 
 pub fn date_time_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).date_time().null().take()
+    ColumnDef::new(col).date_time().take()
 }
 
 pub fn date_time_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -300,10 +294,7 @@ pub fn interval<T: IntoIden>(
     fields: Option<PgInterval>,
     precision: Option<u32>,
 ) -> ColumnDef {
-    ColumnDef::new(col)
-        .interval(fields, precision)
-        .not_null()
-        .take()
+    interval_null(col, fields, precision).not_null().take()
 }
 
 pub fn interval_null<T: IntoIden>(
@@ -311,10 +302,7 @@ pub fn interval_null<T: IntoIden>(
     fields: Option<PgInterval>,
     precision: Option<u32>,
 ) -> ColumnDef {
-    ColumnDef::new(col)
-        .interval(fields, precision)
-        .null()
-        .take()
+    ColumnDef::new(col).interval(fields, precision).take()
 }
 
 pub fn interval_uniq<T: IntoIden>(
@@ -326,11 +314,11 @@ pub fn interval_uniq<T: IntoIden>(
 }
 
 pub fn timestamp<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).timestamp().not_null().take()
+    timestamp_null(col).not_null().take()
 }
 
 pub fn timestamp_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).timestamp().null().take()
+    ColumnDef::new(col).timestamp().take()
 }
 
 pub fn timestamp_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -338,14 +326,11 @@ pub fn timestamp_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn timestamp_with_time_zone<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col)
-        .timestamp_with_time_zone()
-        .not_null()
-        .take()
+    timestamp_with_time_zone_null(col).not_null().take()
 }
 
 pub fn timestamp_with_time_zone_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).timestamp_with_time_zone().null().take()
+    ColumnDef::new(col).timestamp_with_time_zone().take()
 }
 
 pub fn timestamp_with_time_zone_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -353,11 +338,11 @@ pub fn timestamp_with_time_zone_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn time<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).time().not_null().take()
+    time_null(col).not_null().take()
 }
 
 pub fn time_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).time().null().take()
+    ColumnDef::new(col).time().take()
 }
 
 pub fn time_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -365,11 +350,11 @@ pub fn time_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn date<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).date().not_null().take()
+    date_null(col).not_null().take()
 }
 
 pub fn date_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).date().null().take()
+    ColumnDef::new(col).date().take()
 }
 
 pub fn date_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -377,11 +362,11 @@ pub fn date_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn year<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).year().not_null().take()
+    year_null(col).not_null().take()
 }
 
 pub fn year_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).year().null().take()
+    ColumnDef::new(col).year().take()
 }
 
 pub fn year_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -389,11 +374,11 @@ pub fn year_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn binary_len<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).binary_len(length).not_null().take()
+    binary_len_null(col, length).not_null().take()
 }
 
 pub fn binary_len_null<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).binary_len(length).null().take()
+    ColumnDef::new(col).binary_len(length).take()
 }
 
 pub fn binary_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
@@ -401,11 +386,11 @@ pub fn binary_len_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
 }
 
 pub fn binary<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).binary().not_null().take()
+    binary_null(col).not_null().take()
 }
 
 pub fn binary_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).binary().null().take()
+    ColumnDef::new(col).binary().take()
 }
 
 pub fn binary_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -413,11 +398,11 @@ pub fn binary_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn var_binary<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).var_binary(length).not_null().take()
+    var_binary_null(col, length).not_null().take()
 }
 
 pub fn var_binary_null<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).var_binary(length).null().take()
+    ColumnDef::new(col).var_binary(length).take()
 }
 
 pub fn var_binary_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
@@ -425,11 +410,11 @@ pub fn var_binary_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
 }
 
 pub fn bit<T: IntoIden>(col: T, length: Option<u32>) -> ColumnDef {
-    ColumnDef::new(col).bit(length).not_null().take()
+    bit_null(col, length).not_null().take()
 }
 
 pub fn bit_null<T: IntoIden>(col: T, length: Option<u32>) -> ColumnDef {
-    ColumnDef::new(col).bit(length).null().take()
+    ColumnDef::new(col).bit(length).take()
 }
 
 pub fn bit_uniq<T: IntoIden>(col: T, length: Option<u32>) -> ColumnDef {
@@ -437,11 +422,11 @@ pub fn bit_uniq<T: IntoIden>(col: T, length: Option<u32>) -> ColumnDef {
 }
 
 pub fn varbit<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).varbit(length).not_null().take()
+    varbit_null(col, length).not_null().take()
 }
 
 pub fn varbit_null<T: IntoIden>(col: T, length: u32) -> ColumnDef {
-    ColumnDef::new(col).varbit(length).null().take()
+    ColumnDef::new(col).varbit(length).take()
 }
 
 pub fn varbit_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
@@ -449,11 +434,11 @@ pub fn varbit_uniq<T: IntoIden>(col: T, length: u32) -> ColumnDef {
 }
 
 pub fn blob<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).blob().not_null().take()
+    blob_null(col).not_null().take()
 }
 
 pub fn blob_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).blob().null().take()
+    ColumnDef::new(col).blob().take()
 }
 
 pub fn blob_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -461,11 +446,11 @@ pub fn blob_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn boolean<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).boolean().not_null().take()
+    boolean_null(col).not_null().take()
 }
 
 pub fn boolean_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).boolean().null().take()
+    ColumnDef::new(col).boolean().take()
 }
 
 pub fn boolean_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -473,17 +458,11 @@ pub fn boolean_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn money_len<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
-    ColumnDef::new(col)
-        .money_len(precision, scale)
-        .not_null()
-        .take()
+    money_len_null(col, precision, scale).not_null().take()
 }
 
 pub fn money_len_null<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
-    ColumnDef::new(col)
-        .money_len(precision, scale)
-        .null()
-        .take()
+    ColumnDef::new(col).money_len(precision, scale).take()
 }
 
 pub fn money_len_uniq<T: IntoIden>(col: T, precision: u32, scale: u32) -> ColumnDef {
@@ -491,11 +470,11 @@ pub fn money_len_uniq<T: IntoIden>(col: T, precision: u32, scale: u32) -> Column
 }
 
 pub fn money<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).money().not_null().take()
+    money_null(col).not_null().take()
 }
 
 pub fn money_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).money().null().take()
+    ColumnDef::new(col).money().take()
 }
 
 pub fn money_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -503,11 +482,11 @@ pub fn money_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn json<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).json().not_null().take()
+    json_null(col).not_null().take()
 }
 
 pub fn json_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).json().null().take()
+    ColumnDef::new(col).json().take()
 }
 
 pub fn json_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -515,11 +494,11 @@ pub fn json_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn json_binary<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).json_binary().not_null().take()
+    json_binary_null(col).not_null().take()
 }
 
 pub fn json_binary_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).json_binary().null().take()
+    ColumnDef::new(col).json_binary().take()
 }
 
 pub fn json_binary_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -527,11 +506,11 @@ pub fn json_binary_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn uuid<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).uuid().not_null().take()
+    uuid_null(col).not_null().take()
 }
 
 pub fn uuid_null<T: IntoIden>(col: T) -> ColumnDef {
-    ColumnDef::new(col).uuid().null().take()
+    ColumnDef::new(col).uuid().take()
 }
 
 pub fn uuid_uniq<T: IntoIden>(col: T) -> ColumnDef {
@@ -539,11 +518,11 @@ pub fn uuid_uniq<T: IntoIden>(col: T) -> ColumnDef {
 }
 
 pub fn custom<T: IntoIden>(col: T, name: T) -> ColumnDef {
-    ColumnDef::new(col).custom(name).not_null().take()
+    custom_null(col, name).not_null().take()
 }
 
 pub fn custom_null<T: IntoIden>(col: T, name: T) -> ColumnDef {
-    ColumnDef::new(col).custom(name).null().take()
+    ColumnDef::new(col).custom(name).take()
 }
 
 pub fn enumeration<T, N, S, V>(col: T, name: N, variants: V) -> ColumnDef
@@ -553,10 +532,7 @@ where
     S: IntoIden,
     V: IntoIterator<Item = S>,
 {
-    ColumnDef::new(col)
-        .enumeration(name, variants)
-        .not_null()
-        .take()
+    enumeration_null(col, name, variants).not_null().take()
 }
 
 pub fn enumeration_null<T, N, S, V>(col: T, name: N, variants: V) -> ColumnDef
@@ -566,10 +542,7 @@ where
     S: IntoIden,
     V: IntoIterator<Item = S>,
 {
-    ColumnDef::new(col)
-        .enumeration(name, variants)
-        .null()
-        .take()
+    ColumnDef::new(col).enumeration(name, variants).take()
 }
 
 pub fn enumeration_uniq<T, N, S, V>(col: T, name: N, variants: V) -> ColumnDef
@@ -583,11 +556,11 @@ where
 }
 
 pub fn array<T: IntoIden>(col: T, elem_type: ColumnType) -> ColumnDef {
-    ColumnDef::new(col).array(elem_type).not_null().take()
+    array_null(col, elem_type).not_null().take()
 }
 
 pub fn array_null<T: IntoIden>(col: T, elem_type: ColumnType) -> ColumnDef {
-    ColumnDef::new(col).array(elem_type).null().take()
+    ColumnDef::new(col).array(elem_type).take()
 }
 
 pub fn array_uniq<T: IntoIden>(col: T, elem_type: ColumnType) -> ColumnDef {
