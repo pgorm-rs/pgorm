@@ -1,10 +1,7 @@
-use crate::{DbErr, ExecResult, QueryResult};
-use deadpool_postgres::Transaction;
-use futures::Stream;
-use std::{future::Future, pin::Pin};
+use crate::DbErr;
 use tokio_postgres::{
     types::{BorrowToSql, ToSql},
-    Row, RowStream, ToStatement,
+    Row, ToStatement,
 };
 
 use super::DatabaseTransaction;

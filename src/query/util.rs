@@ -1,4 +1,4 @@
-use crate::{database::*, QueryTrait};
+use crate::QueryTrait;
 
 /// This structure provides debug capabilities
 #[derive(Debug)]

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 mod connection;
 mod db_connection;
 // mod statement;
@@ -12,13 +10,9 @@ pub use tokio_postgres::Config;
 
 use deadpool_postgres::{Manager, ManagerConfig, Pool, PoolBuilder, RecyclingMethod};
 // pub use statement::*;
-use std::borrow::Cow;
 // pub use stream::*;
 use tokio_postgres::NoTls;
-use tracing::instrument;
 // pub use transaction::*;
-
-use crate::error::*;
 
 /// Defines a database
 #[derive(Debug, Default)]

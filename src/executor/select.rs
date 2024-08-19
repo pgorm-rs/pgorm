@@ -6,10 +6,9 @@ use crate::{
 use futures::{Stream, TryStreamExt};
 use sea_query::{PostgresQueryBuilder, SelectStatement, Value, Values};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::{hash::Hash, marker::PhantomData, pin::Pin};
+use std::{hash::Hash, marker::PhantomData};
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{Row, RowStream, Statement, ToStatement};
+use tokio_postgres::ToStatement;
 
 use super::ValueHolder;
 

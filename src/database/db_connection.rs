@@ -1,13 +1,9 @@
-use crate::{error::*, ConnectionTrait, ExecResult, QueryResult, TransactionTrait};
-use deadpool_postgres::{Manager, Object, Pool, Transaction};
-use sea_query::{PostgresQueryBuilder, QueryBuilder};
-use std::{future::Future, ops::Deref, pin::Pin};
+use crate::{error::*, ConnectionTrait, TransactionTrait};
+use deadpool_postgres::{Object, Pool, Transaction};
 use tokio_postgres::{
     types::{BorrowToSql, ToSql},
-    RowStream, ToStatement,
+    ToStatement,
 };
-use tracing::instrument;
-use url::Url;
 
 /// Handle a database connection depending on the backend enabled by the feature
 /// flags. This creates a database pool.

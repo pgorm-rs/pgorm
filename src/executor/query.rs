@@ -1,5 +1,5 @@
 use crate::{error::*, SelectGetableValue, SelectorRaw};
-use std::{error::Error, fmt};
+use std::error::Error;
 
 #[cfg(any(feature = "mock", feature = "proxy"))]
 use crate::debug_print;
@@ -239,7 +239,7 @@ use sea_query::Values;
 use tokio_postgres::{
     row::RowIndex,
     types::{Json, Oid, WasNull},
-    Row, Statement,
+    Row,
 };
 
 #[cfg(feature = "with-bigdecimal")]

@@ -10,10 +10,7 @@ use sea_query::{
     ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc,
     SelectStatement, SimpleExpr, Value, ValueTuple,
 };
-use tokio_postgres::{
-    types::{IsNull, Json, ToSql, Type},
-    Statement,
-};
+use tokio_postgres::types::{IsNull, ToSql, Type};
 // use uuid::Uuid;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
