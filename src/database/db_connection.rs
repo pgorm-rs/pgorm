@@ -1,13 +1,10 @@
-use crate::{
-    error::*, ConnectionTrait, ExecResult, 
-    QueryResult,
-    TransactionTrait,
-};
+use crate::{error::*, ConnectionTrait, ExecResult, QueryResult, TransactionTrait};
 use deadpool_postgres::{Manager, Object, Pool, Transaction};
 use sea_query::{PostgresQueryBuilder, QueryBuilder};
 use std::{future::Future, ops::Deref, pin::Pin};
 use tokio_postgres::{
-    types::{BorrowToSql, ToSql}, RowStream, ToStatement
+    types::{BorrowToSql, ToSql},
+    RowStream, ToStatement,
 };
 use tracing::instrument;
 use url::Url;
@@ -43,7 +40,7 @@ impl DatabaseConnection {
         isolation_level: Option<tokio_postgres::IsolationLevel>,
     ) -> Result<DatabaseTransaction<'_>, DbErr> {
         let mut t = self.0.build_transaction();
-        
+
         if let Some(l) = isolation_level {
             t = t.isolation_level(l);
         }

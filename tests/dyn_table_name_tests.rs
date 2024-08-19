@@ -5,8 +5,7 @@ pub mod common;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
 use sea_orm::{
-    entity::prelude::*, DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set,
-    Update,
+    entity::prelude::*, DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set, Update,
 };
 use sea_query::{Expr, Query};
 

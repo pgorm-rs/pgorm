@@ -3,7 +3,8 @@ use deadpool_postgres::Transaction;
 use futures::Stream;
 use std::{future::Future, pin::Pin};
 use tokio_postgres::{
-    types::{BorrowToSql, ToSql}, Row, RowStream, ToStatement
+    types::{BorrowToSql, ToSql},
+    Row, RowStream, ToStatement,
 };
 
 use super::DatabaseTransaction;
@@ -47,7 +48,7 @@ pub trait ConnectionTrait: Sync {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, DbErr>
     where
-        T: ?Sized + ToStatement+ Send + Sync;
+        T: ?Sized + ToStatement + Send + Sync;
 
     // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
     // where

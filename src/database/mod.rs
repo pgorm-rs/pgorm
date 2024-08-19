@@ -37,7 +37,10 @@ impl Database {
         DatabasePool(pool)
     }
 
-    pub fn with_builder(config: Config, build: impl Fn(PoolBuilder) -> PoolBuilder) -> DatabasePool {
+    pub fn with_builder(
+        config: Config,
+        build: impl Fn(PoolBuilder) -> PoolBuilder,
+    ) -> DatabasePool {
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Fast,
         };

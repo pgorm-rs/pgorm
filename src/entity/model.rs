@@ -111,7 +111,10 @@ pub trait FromQueryResult: Sized {
     /// # Ok(())
     /// # }
     /// ```
-    fn find_by_statement(stmt: impl Into<String>, values: Vec<Value>) -> SelectorRaw<SelectModel<Self>> {
+    fn find_by_statement(
+        stmt: impl Into<String>,
+        values: Vec<Value>,
+    ) -> SelectorRaw<SelectModel<Self>> {
         SelectorRaw::<SelectModel<Self>>::from_statement(stmt.into(), Values(values))
     }
 }

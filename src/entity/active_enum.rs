@@ -148,7 +148,10 @@ pub trait ActiveEnum: Sized + Iterable {
 /// The Rust Value backing ActiveEnums
 pub trait ActiveEnumValue: Into<Value> + ValueType + Nullable + TryGetable {
     /// For getting an array of enum. Postgres only
-    fn try_get_vec_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
+    fn try_get_vec_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Vec<Self>, TryGetError>;
 }
 
 macro_rules! impl_active_enum_value {

@@ -14,7 +14,10 @@ pub struct QueryResult {
 /// An interface to get a value from the query result
 pub trait TryGetable: Sized {
     /// Get a value from the query result with an RowIndex
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError>;
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Self, TryGetError>;
 
     /// Get a value from the query result with prefixed column name
     fn try_get(res: &QueryResult, pre: &str, col: &str) -> Result<Self, TryGetError> {
@@ -129,7 +132,10 @@ impl QueryResult {
 // TryGetable //
 
 impl<T: TryGetable> TryGetable for Option<T> {
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Self, TryGetError> {
         match T::try_get_by(res, index) {
             Ok(v) => Ok(Some(v)),
             Err(TryGetError::Null(_)) => Ok(None),
@@ -142,9 +148,11 @@ macro_rules! try_getable_all {
     ( $type: ty ) => {
         impl TryGetable for $type {
             #[allow(unused_variables)]
-            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                let result: Result<$type, _> = res.row
-                        .try_get(idx);
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: Result<$type, _> = res.row.try_get(idx);
                 result.map_err(|e| TryGetError::postgres(e))
             }
         }
@@ -156,10 +164,11 @@ macro_rules! try_getable_date_time {
     ( $type: ty ) => {
         impl TryGetable for $type {
             #[allow(unused_variables)]
-            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                let result: $type = res.row
-                        .try_get(idx)
-                        .map_err(|e| TryGetError::postgres(e))?;
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: $type = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
                 Ok(result)
             }
         }
@@ -215,10 +224,11 @@ use rust_decimal::Decimal;
 #[cfg(feature = "with-rust_decimal")]
 impl TryGetable for Decimal {
     #[allow(unused_variables)]
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-        let result: Decimal = res.row
-                .try_get(idx)
-                .map_err(|e| TryGetError::postgres(e))?;
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        let result: Decimal = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
         Ok(result)
     }
 }
@@ -226,15 +236,21 @@ impl TryGetable for Decimal {
 #[cfg(feature = "with-bigdecimal")]
 use bigdecimal::BigDecimal;
 use sea_query::Values;
-use tokio_postgres::{row::RowIndex, types::{Json, Oid, WasNull}, Row, Statement};
+use tokio_postgres::{
+    row::RowIndex,
+    types::{Json, Oid, WasNull},
+    Row, Statement,
+};
 
 #[cfg(feature = "with-bigdecimal")]
 impl TryGetable for BigDecimal {
     #[allow(unused_variables)]
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-         let result: Result<BigDecimal, _> = res.row
-                .try_get(idx);
-         result.map_err(|e| TryGetError::postgres(e).into())
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        let result: Result<BigDecimal, _> = res.row.try_get(idx);
+        result.map_err(|e| TryGetError::postgres(e).into())
     }
 }
 
@@ -243,10 +259,14 @@ macro_rules! try_getable_uuid {
     ( $type: ty, $conversion_fn: expr ) => {
         #[allow(unused_variables, unreachable_code)]
         impl TryGetable for $type {
-            fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                let res: Result<uuid::Uuid, TryGetError> = res.row
-                        .try_get(idx)
-                        .map_err(|e| TryGetError::postgres(e).into());
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let res: Result<uuid::Uuid, TryGetError> = res
+                    .row
+                    .try_get(idx)
+                    .map_err(|e| TryGetError::postgres(e).into());
                 res.map($conversion_fn)
             }
         }
@@ -270,10 +290,12 @@ try_getable_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 
 impl TryGetable for u32 {
     #[allow(unused_variables)]
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-       let result: Result<Oid, _> = res.row.try_get(idx);
-       result
-                    .map_err(|e| TryGetError::postgres(e).into())
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        let result: Result<Oid, _> = res.row.try_get(idx);
+        result.map_err(|e| TryGetError::postgres(e).into())
     }
 }
 
@@ -291,10 +313,12 @@ mod postgres_array {
         ( $type: ty ) => {
             #[allow(unused_variables)]
             impl TryGetable for Vec<$type> {
-                fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    let result: Vec<$type> = res.row
-                            .try_get(idx)
-                            .map_err(|e| TryGetError::postgres(e))?;
+                fn try_get_by<I: RowIndex + std::fmt::Display>(
+                    res: &QueryResult,
+                    idx: I,
+                ) -> Result<Self, TryGetError> {
+                    let result: Vec<$type> =
+                        res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
                     Ok(result)
                 }
             }
@@ -354,10 +378,12 @@ mod postgres_array {
         ( $type: ty, $conversion_fn: expr ) => {
             #[allow(unused_variables, unreachable_code)]
             impl TryGetable for Vec<$type> {
-                fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-                    let res: Vec<uuid::Uuid> = res.row
-                            .try_get(idx)
-                            .map_err(|e| TryGetError::postgres(e))?;
+                fn try_get_by<I: RowIndex + std::fmt::Display>(
+                    res: &QueryResult,
+                    idx: I,
+                ) -> Result<Self, TryGetError> {
+                    let res: Vec<uuid::Uuid> =
+                        res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
                     Ok(res.into_iter().map($conversion_fn).collect())
                 }
             }
@@ -381,9 +407,11 @@ mod postgres_array {
 
     impl TryGetable for Vec<u32> {
         #[allow(unused_variables)]
-        fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
-            let result: Vec<Oid> = res.row.try_get(idx)
-                        .map_err(|e| TryGetError::postgres(e))?;
+        fn try_get_by<I: RowIndex + std::fmt::Display>(
+            res: &QueryResult,
+            idx: I,
+        ) -> Result<Self, TryGetError> {
+            let result: Vec<Oid> = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
             Ok(result)
         }
     }
@@ -462,7 +490,10 @@ pub trait TryGetableMany: Sized {
     /// # Ok(())
     /// # }
     /// ```
-    fn find_by_statement<C>(stmt: String, values: Values) -> SelectorRaw<SelectGetableValue<Self, C>>
+    fn find_by_statement<C>(
+        stmt: String,
+        values: Values,
+    ) -> SelectorRaw<SelectGetableValue<Self, C>>
     where
         C: strum::IntoEnumIterator + sea_query::Iden,
     {
@@ -556,14 +587,20 @@ fn try_get_many_with_slice_len_of(len: usize, cols: &[String]) -> Result<(), Try
 /// touch this trait.
 pub trait TryGetableArray: Sized {
     /// Just a delegate
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<Self>, TryGetError>;
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Vec<Self>, TryGetError>;
 }
 
 impl<T> TryGetable for Vec<T>
 where
     T: TryGetableArray,
 {
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Self, TryGetError> {
         T::try_get_by(res, index)
     }
 }
@@ -578,11 +615,12 @@ where
 {
     /// Get a JSON from the query result with prefixed column name
     #[allow(unused_variables, unreachable_code)]
-    fn try_get_from_json<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+    fn try_get_from_json<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
         let result: Result<Json<Self>, _> = res.row.try_get(idx);
-        result
-                .map_err(|e| TryGetError::postgres(e))
-                .map(|x| x.0)
+        result.map_err(|e| TryGetError::postgres(e)).map(|x| x.0)
     }
 
     /// Get a Vec<Self> from an Array of Json
@@ -607,7 +645,10 @@ impl<T> TryGetable for T
 where
     T: TryGetableFromJson,
 {
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Self, TryGetError> {
         T::try_get_from_json(res, index)
     }
 }
@@ -617,7 +658,10 @@ impl<T> TryGetableArray for T
 where
     T: TryGetableFromJson,
 {
-    fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Vec<T>, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        index: I,
+    ) -> Result<Vec<T>, TryGetError> {
         T::from_json_vec(serde_json::Value::try_get_by(res, index)?)
     }
 }

@@ -5,8 +5,8 @@ use crate::{
 use async_stream::stream;
 use futures::Stream;
 use sea_query::{Alias, Expr, PostgresQueryBuilder, SelectStatement};
-use tokio_postgres::types::ToSql;
 use std::{marker::PhantomData, pin::Pin};
+use tokio_postgres::types::ToSql;
 
 use super::{QueryResult, ValueHolder};
 
@@ -53,7 +53,10 @@ where
             .to_owned();
         let (stmt, values) = query.build(PostgresQueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+        let values = values
+            .iter()
+            .map(|x| &*x as _)
+            .collect::<Vec<&(dyn ToSql + Sync)>>();
         let rows = self.db.query_all(&stmt, &values).await?;
         let mut buffer = Vec::with_capacity(rows.len());
         for row in rows.into_iter() {
@@ -84,7 +87,10 @@ where
             .to_owned();
         let (stmt, values) = stmt.build(PostgresQueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+        let values = values
+            .iter()
+            .map(|x| &*x as _)
+            .collect::<Vec<&(dyn ToSql + Sync)>>();
         let result = match self.db.query_opt(&stmt, &values).await? {
             Some(res) => res,
             None => return Ok(0),

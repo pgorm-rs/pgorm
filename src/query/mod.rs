@@ -24,6 +24,5 @@ pub use update::*;
 pub use util::*;
 
 pub use crate::{
-    ConnectionTrait, CursorTrait, InsertResult,
-    TransactionTrait, UpdateResult, Value,
+    ConnectionTrait, CursorTrait, InsertResult, TransactionTrait, UpdateResult, Value,
 };

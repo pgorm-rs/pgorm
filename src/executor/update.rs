@@ -89,8 +89,11 @@ impl Updater {
         }
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
-        
+        let values = values
+            .iter()
+            .map(|x| &*x as _)
+            .collect::<Vec<&(dyn ToSql + Sync)>>();
+
         let result = db.execute(&stmt, &values).await?;
         if self.check_record_exists && result == 0 {
             return Err(DbErr::RecordNotUpdated);
@@ -123,11 +126,10 @@ impl Updater {
 
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
 
-        let found: Option<Model<A>> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(
-            stmt, values
-        )
-        .one(db)
-        .await?;
+        let found: Option<Model<A>> =
+            SelectorRaw::<SelectModel<Model<A>>>::from_statement(stmt, values)
+                .one(db)
+                .await?;
 
         // If we got `None` then we are updating a row that does not exist.
         match found {
@@ -151,12 +153,11 @@ impl Updater {
         self.query.returning(returning);
 
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
-        
-        let models: Vec<E::Model> = SelectorRaw::<SelectModel<E::Model>>::from_statement(
-            stmt, values
-        )
-        .all(db)
-        .await?;
+
+        let models: Vec<E::Model> =
+            SelectorRaw::<SelectModel<E::Model>>::from_statement(stmt, values)
+                .all(db)
+                .await?;
 
         Ok(models)
     }

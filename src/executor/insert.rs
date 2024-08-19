@@ -1,9 +1,11 @@
 use crate::{
-    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert
+    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel,
+    Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw,
+    TryInsert,
 };
 use sea_query::{FromValueTuple, Iden, InsertStatement, PostgresQueryBuilder, Query, ValueTuple};
-use tokio_postgres::types::ToSql;
 use std::{future::Future, marker::PhantomData};
+use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
 
@@ -214,7 +216,10 @@ where
 {
     let (stmt, values) = statement.build(PostgresQueryBuilder);
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+    let values = values
+        .iter()
+        .map(|x| &*x as _)
+        .collect::<Vec<&(dyn ToSql + Sync)>>();
 
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
     type ValueTypeOf<A> = <PrimaryKey<A> as PrimaryKeyTrait>::ValueType;
@@ -253,7 +258,10 @@ where
 {
     let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+    let values = values
+        .iter()
+        .map(|x| &*x as _)
+        .collect::<Vec<&(dyn ToSql + Sync)>>();
 
     let exec_result = db.execute(&stmt, &values).await?;
     Ok(exec_result)
@@ -275,11 +283,10 @@ where
     insert_statement.returning(returning);
     let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
 
-    let found = SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(
-        stmt, values
-    )
-    .one(db)
-    .await?;
+    let found =
+        SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)
+            .one(db)
+            .await?;
 
     tracing::debug!("Nice");
     match found {

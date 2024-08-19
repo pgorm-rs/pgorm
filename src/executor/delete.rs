@@ -1,9 +1,7 @@
-use crate::{
-    error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait,
-};
+use crate::{error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait};
 use sea_query::{DeleteStatement, PostgresQueryBuilder};
-use tokio_postgres::types::ToSql;
 use std::future::Future;
+use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
 
@@ -74,10 +72,12 @@ async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, 
 where
     C: ConnectionTrait,
 {
-
     let (stmt, values) = query.build(PostgresQueryBuilder);
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-    let values = values.iter().map(|x| &*x as _).collect::<Vec<&(dyn ToSql + Sync)>>();
+    let values = values
+        .iter()
+        .map(|x| &*x as _)
+        .collect::<Vec<&(dyn ToSql + Sync)>>();
 
     let result = db.execute(&stmt, &values).await?;
     Ok(DeleteResult {

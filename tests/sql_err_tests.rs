@@ -3,8 +3,8 @@
 pub mod common;
 pub use common::{bakery_chain::*, setup::*, TestContext};
 pub use sea_orm::{
-    entity::*, error::DbErr, error::SqlErr, tests_cfg, ConnectionTrait, DatabasePool,
-    DbBackend, EntityName, ExecResult,
+    entity::*, error::DbErr, error::SqlErr, tests_cfg, ConnectionTrait, DatabasePool, DbBackend,
+    EntityName, ExecResult,
 };
 use uuid::Uuid;
 

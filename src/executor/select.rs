@@ -1,16 +1,15 @@
 use crate::{
     error::*, ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
     PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
-    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany,
-    TryGetableMany,
+    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany,
 };
 use futures::{Stream, TryStreamExt};
 use sea_query::{PostgresQueryBuilder, SelectStatement, Value, Values};
-use tokio_postgres::types::ToSql;
-use tokio_postgres::{Row, RowStream, Statement, ToStatement};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
+use tokio_postgres::types::ToSql;
+use tokio_postgres::{Row, RowStream, Statement, ToStatement};
 
 use super::ValueHolder;
 
@@ -141,7 +140,11 @@ where
 {
     /// Perform a Select operation on a Model using a [Statement]
     #[allow(clippy::wrong_self_convention)]
-    pub fn from_raw_sql<'a>(self, stmt: String, values: Values) -> SelectorRaw<SelectModel<E::Model>> {
+    pub fn from_raw_sql<'a>(
+        self,
+        stmt: String,
+        values: Values,
+    ) -> SelectorRaw<SelectModel<E::Model>> {
         SelectorRaw {
             stmt,
             values,
@@ -631,7 +634,7 @@ where
 
     fn into_selector_raw(self) -> SelectorRaw<S> {
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
-        
+
         SelectorRaw {
             stmt,
             values,
@@ -829,7 +832,12 @@ where
     where
         C: ConnectionTrait,
     {
-        let values = self.values.0.into_iter().map(|x| ValueHolder(x)).collect::<Vec<_>>();
+        let values = self
+            .values
+            .0
+            .into_iter()
+            .map(|x| ValueHolder(x))
+            .collect::<Vec<_>>();
         let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
         let row = db.query_opt(&self.stmt, &values).await?;
         match row {
@@ -883,7 +891,12 @@ where
         C: ConnectionTrait,
     {
         // tracing::warn!("Querying all");
-        let values = self.values.0.into_iter().map(|x| ValueHolder(x)).collect::<Vec<_>>();
+        let values = self
+            .values
+            .0
+            .into_iter()
+            .map(|x| ValueHolder(x))
+            .collect::<Vec<_>>();
         let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
         let rows = db.query_all(&self.stmt, &values).await?;
         // tracing::warn!("Got rows!");
