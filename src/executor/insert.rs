@@ -280,6 +280,8 @@ where
     )
     .one(db)
     .await?;
+
+    tracing::debug!("Nice");
     match found {
         Some(model) => Ok(model),
         None => Err(DbErr::RecordNotFound(

@@ -36,6 +36,26 @@ impl DatabasePool {
 #[derive(Debug)]
 pub struct DatabaseConnection(pub(crate) Object);
 
+impl DatabaseConnection {
+    async fn begin_with_config(
+        &mut self,
+        read_only: bool,
+        isolation_level: Option<tokio_postgres::IsolationLevel>,
+    ) -> Result<DatabaseTransaction<'_>, DbErr> {
+        let mut t = self.0.build_transaction();
+        
+        if let Some(l) = isolation_level {
+            t = t.isolation_level(l);
+        }
+
+        if read_only {
+            t = t.read_only(true);
+        }
+
+        Ok(DatabaseTransaction(t.start().await?))
+    }
+}
+
 #[derive(Debug)]
 pub struct DatabaseTransaction<'a>(pub(crate) Transaction<'a>);
 
@@ -188,7 +208,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.execute(statement, params).await?)
+        Ok(self.0.execute(statement, params).await?)
     }
 
     // #[instrument(level = "trace")]
@@ -199,7 +219,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        Ok(self.execute_raw(statement, params).await?)
+        Ok(self.0.execute_raw(statement, params).await?)
     }
 
     async fn query_one<T>(
@@ -210,7 +230,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.query_one(statement, params).await?)
+        Ok(self.0.query_one(statement, params).await?)
     }
 
     async fn query_opt<T>(
@@ -221,7 +241,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.query_opt(statement, params).await?)
+        Ok(self.0.query_opt(statement, params).await?)
     }
 
     async fn query_all<T>(
@@ -245,30 +265,18 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     //     Ok(self.query_raw(statement, params).await?)
     // }
 }
+#[async_trait::async_trait]
+impl TransactionTrait for DatabaseTransaction<'_> {
+    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
+        Ok(DatabaseTransaction(self.0.transaction().await?))
+    }
+}
 
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
         let tx = self.0.transaction().await?;
         Ok(DatabaseTransaction(tx))
-    }
-    
-    async fn begin_with_config(
-        &mut self,
-        read_only: bool,
-        isolation_level: Option<tokio_postgres::IsolationLevel>,
-    ) -> Result<DatabaseTransaction<'_>, DbErr> {
-        let mut t = self.0.build_transaction();
-        
-        if let Some(l) = isolation_level {
-            t = t.isolation_level(l);
-        }
-
-        if read_only {
-            t = t.read_only(true);
-        }
-
-        Ok(DatabaseTransaction(t.start().await?))
     }
     // #[instrument(level = "trace")]
     // async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {

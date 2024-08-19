@@ -64,13 +64,13 @@ pub trait TransactionTrait {
     /// Returns a Transaction that can be committed or rolled back
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr>;
 
-    /// Execute SQL `BEGIN` transaction with isolation level and/or access mode.
-    /// Returns a Transaction that can be committed or rolled back
-    async fn begin_with_config(
-        &mut self,
-        read_only: bool,
-        isolation_level: Option<tokio_postgres::IsolationLevel>,
-    ) -> Result<DatabaseTransaction<'_>, DbErr>;
+    // /// Execute SQL `BEGIN` transaction with isolation level and/or access mode.
+    // /// Returns a Transaction that can be committed or rolled back
+    // async fn begin_with_config(
+    //     &mut self,
+    //     read_only: bool,
+    //     isolation_level: Option<tokio_postgres::IsolationLevel>,
+    // ) -> Result<DatabaseTransaction<'_>, DbErr>;
 
     // Execute the function inside a transaction.
     // If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.

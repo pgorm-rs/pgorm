@@ -118,10 +118,13 @@ impl DeriveModel {
             })
             .collect();
 
+        let foo = ident.to_string();
+
         quote!(
             #[automatically_derived]
             impl sea_orm::FromQueryResult for #ident {
                 fn from_query_result(row: &sea_orm::QueryResult, pre: &str) -> std::result::Result<Self, sea_orm::DbErr> {
+                    // tracing::debug!("from_query_result: {}", #foo);
                     Ok(Self {
                         #(#field_idents: #field_values),*
                     })

@@ -279,10 +279,13 @@ pub trait ActiveModelTrait: Clone + Debug {
         Self: ActiveModelBehavior + 'a,
         C: ConnectionTrait,
     {
+        // tracing::debug!("Insert ActiveModel: {:?}", self);
         let am = ActiveModelBehavior::before_save(self, db, true).await?;
+        // tracing::debug!("before save");
         let model = <Self::Entity as EntityTrait>::insert(am)
             .exec_with_returning(db)
             .await?;
+        // tracing::debug!("before save");
         Self::after_save(model, db, true).await
     }
 

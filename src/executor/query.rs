@@ -1,5 +1,5 @@
 use crate::{error::*, SelectGetableValue, SelectorRaw};
-use std::fmt;
+use std::{error::Error, fmt};
 
 #[cfg(any(feature = "mock", feature = "proxy"))]
 use crate::debug_print;
@@ -18,6 +18,7 @@ pub trait TryGetable: Sized {
 
     /// Get a value from the query result with prefixed column name
     fn try_get(res: &QueryResult, pre: &str, col: &str) -> Result<Self, TryGetError> {
+        // tracing::debug!("try_get: pre={}, col={}", pre, col);
         if pre.is_empty() {
             Self::try_get_by(res, col)
         } else {
@@ -38,6 +39,20 @@ pub enum TryGetError {
     DbErr(DbErr),
     /// A null value was encountered
     Null(String),
+}
+
+impl TryGetError {
+    fn postgres(value: tokio_postgres::Error) -> Self {
+        let Some(source) = value.source() else {
+            return TryGetError::DbErr(DbErr::Postgres(value));
+        };
+
+        if let Some(WasNull) = source.downcast_ref() {
+            return TryGetError::Null(format!("{}", value));
+        }
+
+        TryGetError::DbErr(DbErr::Postgres(value))
+    }
 }
 
 impl From<TryGetError> for DbErr {
@@ -130,7 +145,7 @@ macro_rules! try_getable_all {
             fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let result: Result<$type, _> = res.row
                         .try_get(idx);
-                result.map_err(|e| DbErr::Postgres(e).into())
+                result.map_err(|e| TryGetError::postgres(e))
             }
         }
     };
@@ -144,7 +159,7 @@ macro_rules! try_getable_date_time {
             fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let result: $type = res.row
                         .try_get(idx)
-                        .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                        .map_err(|e| TryGetError::postgres(e))?;
                 Ok(result)
             }
         }
@@ -203,7 +218,7 @@ impl TryGetable for Decimal {
     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         let result: Decimal = res.row
                 .try_get(idx)
-                .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                .map_err(|e| TryGetError::postgres(e))?;
         Ok(result)
     }
 }
@@ -211,7 +226,7 @@ impl TryGetable for Decimal {
 #[cfg(feature = "with-bigdecimal")]
 use bigdecimal::BigDecimal;
 use sea_query::Values;
-use tokio_postgres::{row::RowIndex, types::{Json, Oid}, Row, Statement};
+use tokio_postgres::{row::RowIndex, types::{Json, Oid, WasNull}, Row, Statement};
 
 #[cfg(feature = "with-bigdecimal")]
 impl TryGetable for BigDecimal {
@@ -219,7 +234,7 @@ impl TryGetable for BigDecimal {
     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
          let result: Result<BigDecimal, _> = res.row
                 .try_get(idx);
-         result.map_err(|e| DbErr::Postgres(e).into())
+         result.map_err(|e| TryGetError::postgres(e).into())
     }
 }
 
@@ -231,7 +246,7 @@ macro_rules! try_getable_uuid {
             fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                 let res: Result<uuid::Uuid, TryGetError> = res.row
                         .try_get(idx)
-                        .map_err(|e| DbErr::Postgres(e).into());
+                        .map_err(|e| TryGetError::postgres(e).into());
                 res.map($conversion_fn)
             }
         }
@@ -258,7 +273,7 @@ impl TryGetable for u32 {
     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
        let result: Result<Oid, _> = res.row.try_get(idx);
        result
-                    .map_err(|e| DbErr::Postgres(e).into())
+                    .map_err(|e| TryGetError::postgres(e).into())
     }
 }
 
@@ -279,7 +294,7 @@ mod postgres_array {
                 fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     let result: Vec<$type> = res.row
                             .try_get(idx)
-                            .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                            .map_err(|e| TryGetError::postgres(e))?;
                     Ok(result)
                 }
             }
@@ -342,7 +357,7 @@ mod postgres_array {
                 fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
                     let res: Vec<uuid::Uuid> = res.row
                             .try_get(idx)
-                            .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                            .map_err(|e| TryGetError::postgres(e))?;
                     Ok(res.into_iter().map($conversion_fn).collect())
                 }
             }
@@ -368,7 +383,7 @@ mod postgres_array {
         #[allow(unused_variables)]
         fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
             let result: Vec<Oid> = res.row.try_get(idx)
-                        .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))?;
+                        .map_err(|e| TryGetError::postgres(e))?;
             Ok(result)
         }
     }
@@ -376,7 +391,7 @@ mod postgres_array {
 
 // impl TryGetable for Row {
 //     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
-//         res.row.try_get(index).map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))
+//         res.row.try_get(index).map_err(|e| TryGetError::postgres(e))
 //     }
 // }
 
@@ -566,7 +581,7 @@ where
     fn try_get_from_json<I: RowIndex + std::fmt::Display>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         let result: Result<Json<Self>, _> = res.row.try_get(idx);
         result
-                .map_err(|e| TryGetError::DbErr(DbErr::Postgres(e)))
+                .map_err(|e| TryGetError::postgres(e))
                 .map(|x| x.0)
     }
 

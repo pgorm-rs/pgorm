@@ -9,13 +9,13 @@ use crate::{
 use sea_query::{
     ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc, SelectStatement, SimpleExpr, Value, ValueTuple
 };
-use tokio_postgres::{types::{IsNull, Json, ToSql}, Statement};
+use tokio_postgres::{types::{IsNull, Json, ToSql, Type}, Statement};
 // use uuid::Uuid;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
 
-#[cfg(feature = "with-json")]
-use crate::JsonValue;
+// #[cfg(feature = "with-json")]
+// use crate::JsonValue;
 
 /// Cursor pagination
 #[derive(Debug, Clone)]
@@ -328,24 +328,6 @@ where
         M: PartialModelTrait,
     {
         M::select_cols(QuerySelect::select_only(self)).into_model::<M>()
-    }
-
-    /// Construct a [Cursor] that fetch JSON value
-    #[cfg(feature = "with-json")]
-    pub fn into_json(self) -> Cursor<SelectModel<JsonValue>> {
-        Cursor {
-            query: self.query,
-            table: self.table,
-            order_columns: self.order_columns,
-            last: self.last,
-            first: self.first,
-            after: self.after,
-            before: self.before,
-            sort_asc: self.sort_asc,
-            is_result_reversed: self.is_result_reversed,
-            phantom: PhantomData,
-            secondary_order_by: self.secondary_order_by,
-        }
     }
 
     /// Set the cursor ordering for another table when dealing with SelectTwo
@@ -2399,12 +2381,12 @@ use bytes::BytesMut;
 use super::QueryResult;
 
 #[inline(always)]
-fn accepts<T: ToSql>(input: T, ty: &tokio_postgres::types::Type) -> bool {
+fn accepts<T: ToSql>(input: T, ty: &Type) -> bool {
     T::accepts(ty)
 }
 
 impl ToSql for ValueHolder {
-    fn to_sql(&self, ty: &tokio_postgres::types::Type, out: &mut BytesMut) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>>
+    fn to_sql(&self, ty: &Type, out: &mut BytesMut) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>>
     where
         Self: Sized {
         match &self.0 {
@@ -2416,10 +2398,16 @@ impl ToSql for ValueHolder {
             Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), //x.as_ref().map(|x| (*x).to_sql(ty, out))
             Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql(ty, out),
             Value::Unsigned(x) => x.to_sql(ty, out),
-            Value::BigUnsigned(x) => unimplemented!("u64 not supported"), // x.map(|x| x as _).to_sql(ty, out),
+            Value::BigUnsigned(x) => {
+                //unimplemented!("ToSql: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).to_sql(ty, out),
+                x.map(|x| x as i64).to_sql(ty, out)
+            }
             Value::Float(x) => x.to_sql(ty, out),
             Value::Double(x) => x.to_sql(ty, out),
-            Value::String(x) => x.as_ref().map(|x| x.to_sql(ty, out)).unwrap_or(Ok(IsNull::Yes)), // x.to_sql(ty, out),
+            Value::String(x) => match x.as_ref() {
+                Some(x) => x.to_sql(ty, out),
+                None => Ok(IsNull::Yes),
+            },
             Value::Char(x) => x.map(|x| x.to_string()).to_sql(ty, out),
             Value::Bytes(x) => x.as_ref().map(|x| x.to_sql(ty, out)).unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
             Value::Json(x) => x.as_ref().map(|x| x.to_sql(ty, out)).unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
@@ -2436,20 +2424,49 @@ impl ToSql for ValueHolder {
             Value::Uuid(x) => x.as_ref().map(|x| x.to_sql(ty, out)).unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
             // Value::Decimal(x) => x.map(|x| &**x).to_sql(ty, out),
             // Value::BigDecimal(x) => x.map(|x| &**x).to_sql(ty, out),
-            Value::Array(ty, x) => todo!(),
+            Value::Array(ty, x) => if let Some(x) = x {
+                let v = x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>();
+                v.to_sql(&match ty {
+                    ArrayType::Bool => Type::BOOL_ARRAY,
+                    ArrayType::TinyInt => Type::ANYARRAY,
+                    ArrayType::SmallInt => Type::INT2_ARRAY,
+                    ArrayType::Int => Type::INT4_ARRAY,
+                    ArrayType::BigInt => Type::INT8_ARRAY,
+                    ArrayType::TinyUnsigned => Type::ANYARRAY,
+                    ArrayType::SmallUnsigned => Type::ANYARRAY,
+                    ArrayType::Unsigned => Type::OID_ARRAY,
+                    ArrayType::BigUnsigned => Type::ANYARRAY,
+                    ArrayType::Float => Type::FLOAT4_ARRAY,
+                    ArrayType::Double => Type::FLOAT8_ARRAY,
+                    ArrayType::String => Type::TEXT_ARRAY,
+                    ArrayType::Char => Type::CHAR_ARRAY,
+                    ArrayType::Bytes => Type::BYTEA_ARRAY,
+                    ArrayType::Json => Type::JSONB_ARRAY,
+                    ArrayType::ChronoDate => Type::DATE_ARRAY,
+                    ArrayType::ChronoTime => Type::TIME_ARRAY,
+                    ArrayType::ChronoDateTime => Type::TIMESTAMP_ARRAY,
+                    ArrayType::ChronoDateTimeUtc => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::ChronoDateTimeLocal => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::ChronoDateTimeWithTimeZone => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::Uuid => Type::UUID_ARRAY,
+                }, out)?;
+                Ok(IsNull::No)
+            } else {
+                Ok(IsNull::Yes)
+            },
         }
     }
 
-    fn accepts(ty: &tokio_postgres::types::Type) -> bool
+    fn accepts(ty: &Type) -> bool
     where
         Self: Sized {
-            // TODO
+            // tracing::debug!("Accepting value: {ty:?}");
             true
     }
 
     fn to_sql_checked(
         &self,
-        ty: &tokio_postgres::types::Type,
+        ty: &Type,
         out: &mut BytesMut,
     ) -> Result<tokio_postgres::types::IsNull, Box<dyn std::error::Error + Sync + Send>> {
         match &self.0 {
@@ -2461,10 +2478,16 @@ impl ToSql for ValueHolder {
             Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
             Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
             Value::Unsigned(x) => x.to_sql_checked(ty, out),
-            Value::BigUnsigned(x) => unimplemented!("u64 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
+            Value::BigUnsigned(x) => {
+                // unimplemented!("ToSqlChecked: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).to_sql_checked(ty, out),
+                x.map(|x| x as i64).to_sql_checked(ty, out)
+            }
             Value::Float(x) => x.to_sql_checked(ty, out),
             Value::Double(x) => x.to_sql_checked(ty, out),
-            Value::String(x) => x.as_ref().map(|x| x.to_sql_checked(ty, out)).unwrap_or(Ok(IsNull::Yes)),
+            Value::String(x) => match x.as_ref() {
+                Some(x) => x.to_sql_checked(ty, out),
+                None => Ok(IsNull::Yes),
+            },
             Value::Char(x) => x.map(|x| x.to_string()).to_sql_checked(ty, out),
             Value::Bytes(x) => x.as_ref().map(|x| x.to_sql_checked(ty, out)).unwrap_or(Ok(IsNull::Yes)),
             Value::Json(x) => x.as_ref().map(|x| x.to_sql_checked(ty, out)).unwrap_or(Ok(IsNull::Yes)),
@@ -2481,11 +2504,40 @@ impl ToSql for ValueHolder {
             Value::Uuid(x) => x.as_ref().map(|x| x.to_sql_checked(ty, out)).unwrap_or(Ok(IsNull::Yes)),
             // Value::Decimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
             // Value::BigDecimal(x) => x.map(|x| &**x).to_sql_checked(ty, out),
-            Value::Array(ty, x) => todo!(),
+            Value::Array(ty, x) => if let Some(x) = x {
+                let v = x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>();
+                v.to_sql_checked(&match ty {
+                    ArrayType::Bool => Type::BOOL_ARRAY,
+                    ArrayType::TinyInt => Type::ANYARRAY,
+                    ArrayType::SmallInt => Type::INT2_ARRAY,
+                    ArrayType::Int => Type::INT4_ARRAY,
+                    ArrayType::BigInt => Type::INT8_ARRAY,
+                    ArrayType::TinyUnsigned => Type::ANYARRAY,
+                    ArrayType::SmallUnsigned => Type::ANYARRAY,
+                    ArrayType::Unsigned => Type::OID_ARRAY,
+                    ArrayType::BigUnsigned => Type::ANYARRAY,
+                    ArrayType::Float => Type::FLOAT4_ARRAY,
+                    ArrayType::Double => Type::FLOAT8_ARRAY,
+                    ArrayType::String => Type::TEXT_ARRAY,
+                    ArrayType::Char => Type::CHAR_ARRAY,
+                    ArrayType::Bytes => Type::BYTEA_ARRAY,
+                    ArrayType::Json => Type::JSONB_ARRAY,
+                    ArrayType::ChronoDate => Type::DATE_ARRAY,
+                    ArrayType::ChronoTime => Type::TIME_ARRAY,
+                    ArrayType::ChronoDateTime => Type::TIMESTAMP_ARRAY,
+                    ArrayType::ChronoDateTimeUtc => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::ChronoDateTimeLocal => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::ChronoDateTimeWithTimeZone => Type::TIMESTAMPTZ_ARRAY,
+                    ArrayType::Uuid => Type::UUID_ARRAY,
+                }, out)?;
+                Ok(IsNull::No)
+            } else {
+                Ok(IsNull::Yes)
+            },
         }
     }
     
-    fn encode_format(&self, ty: &tokio_postgres::types::Type) -> tokio_postgres::types::Format {
+    fn encode_format(&self, ty: &Type) -> tokio_postgres::types::Format {
         match &self.0 {
             Value::Bool(x) => x.encode_format(ty),
             Value::TinyInt(x) => x.encode_format(ty),
@@ -2495,7 +2547,11 @@ impl ToSql for ValueHolder {
             Value::TinyUnsigned(x) => unimplemented!("u8 not supported"), // x.map(|x| x as _).encode_format(ty),
             Value::SmallUnsigned(x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).encode_format(ty),
             Value::Unsigned(x) => x.encode_format(ty),
-            Value::BigUnsigned(x) => unimplemented!("u64 not supported"), // x.map(|x| x as _).encode_format(ty),
+            Value::BigUnsigned(x) => {
+                // unimplemented!("EncodeFormat: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).encode_format(ty),
+                // TODO: workaround until fork sea-orm
+                tokio_postgres::types::Format::Binary
+            },
             Value::Float(x) => x.encode_format(ty),
             Value::Double(x) => x.encode_format(ty),
             Value::String(x) => x.as_ref().map(|x| x.encode_format(ty)).unwrap_or(tokio_postgres::types::Format::Binary),
@@ -2515,7 +2571,7 @@ impl ToSql for ValueHolder {
             Value::Uuid(x) => x.as_ref().map(|x| x.encode_format(ty)).unwrap_or(tokio_postgres::types::Format::Binary),
             // Value::Decimal(x) => x.map(|x| &**x).encode_format(ty),
             // Value::BigDecimal(x) => x.map(|x| &**x).encode_format(ty),
-            Value::Array(ty, x) => todo!(),
+            Value::Array(ty, x) => tokio_postgres::types::Format::Binary,
         }
         // todo!()
     }

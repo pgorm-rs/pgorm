@@ -12,9 +12,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
-#[cfg(feature = "with-json")]
-use crate::JsonValue;
-
 use super::ValueHolder;
 
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
@@ -118,6 +115,7 @@ where
     type Item = M;
 
     fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr> {
+        // tracing::debug!("Got raw query result: {:?}", res);
         M::from_query_result(&res, "")
     }
 }
@@ -199,15 +197,6 @@ where
         M: PartialModelTrait,
     {
         M::select_cols(QuerySelect::select_only(self)).into_model::<M>()
-    }
-
-    /// Get a selectable Model as a [JsonValue] for SQL JSON operations
-    #[cfg(feature = "with-json")]
-    pub fn into_json(self) -> Selector<SelectModel<JsonValue>> {
-        Selector {
-            query: self.query,
-            selector: SelectModel { model: PhantomData },
-        }
     }
 
     /// ```
@@ -489,15 +478,6 @@ where
         select.into_model::<M, N>()
     }
 
-    /// Convert the Models into JsonValue
-    #[cfg(feature = "with-json")]
-    pub fn into_json(self) -> Selector<SelectTwoModel<JsonValue, JsonValue>> {
-        Selector {
-            query: self.query,
-            selector: SelectTwoModel { model: PhantomData },
-        }
-    }
-
     /// Get one Model from the Select query
     pub async fn one<'a, C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
     where
@@ -566,15 +546,6 @@ where
         let select = M::select_cols(select);
         let select = N::select_cols(select);
         select.into_model()
-    }
-
-    /// Convert the results to JSON
-    #[cfg(feature = "with-json")]
-    pub fn into_json(self) -> Selector<SelectTwoModel<JsonValue, JsonValue>> {
-        Selector {
-            query: self.query,
-            selector: SelectTwoModel { model: PhantomData },
-        }
     }
 
     // /// Stream the result of the operation
@@ -814,76 +785,6 @@ where
         }
     }
 
-    /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("New York Cheese"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
-    ///
-    /// let res: Vec<serde_json::Value> = cake::Entity::find().from_raw_sql(
-    ///     Statement::from_sql_and_values(
-    ///         DbBackend::Postgres, r#"SELECT "cake"."id", "cake"."name" FROM "cake""#, []
-    ///     )
-    /// )
-    /// .into_json()
-    /// .all(&db)
-    /// .await?;
-    ///
-    /// assert_eq!(
-    ///     res,
-    ///     [
-    ///         serde_json::json!({
-    ///             "name": "Chocolate Forest",
-    ///             "num_of_cakes": 1,
-    ///         }),
-    ///         serde_json::json!({
-    ///             "name": "New York Cheese",
-    ///             "num_of_cakes": 1,
-    ///         }),
-    ///     ]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [
-    ///     Transaction::from_sql_and_values(
-    ///             DbBackend::Postgres, r#"SELECT "cake"."id", "cake"."name" FROM "cake""#, []
-    ///     ),
-    /// ]);
-    /// #
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[cfg(feature = "with-json")]
-    pub fn into_json(self) -> SelectorRaw<SelectModel<JsonValue>> {
-        SelectorRaw {
-            stmt: self.stmt,
-            values: self.values,
-            selector: SelectModel { model: PhantomData },
-        }
-    }
-
-    /// Get the SQL statement
-    // pub fn into_statement(self) -> Statement {
-    //     self.stmt
-    // }
-
     /// Get an item from the Select query
     /// ```
     /// # use sea_orm::{error::*, tests_cfg::*, *};
@@ -928,7 +829,9 @@ where
     where
         C: ConnectionTrait,
     {
-        let row = db.query_opt(&self.stmt, &[]).await?;
+        let values = self.values.0.into_iter().map(|x| ValueHolder(x)).collect::<Vec<_>>();
+        let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
+        let row = db.query_opt(&self.stmt, &values).await?;
         match row {
             Some(row) => Ok(Some(S::from_raw_query_result(QueryResult { row })?)),
             None => Ok(None),
@@ -979,11 +882,16 @@ where
     where
         C: ConnectionTrait,
     {
-        let rows = db.query_all(&self.stmt, &[]).await?;
+        // tracing::warn!("Querying all");
+        let values = self.values.0.into_iter().map(|x| ValueHolder(x)).collect::<Vec<_>>();
+        let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
+        let rows = db.query_all(&self.stmt, &values).await?;
+        // tracing::warn!("Got rows!");
         let mut models = Vec::new();
         for row in rows.into_iter() {
             models.push(S::from_raw_query_result(QueryResult { row })?);
         }
+        // tracing::warn!("Got models!");
         Ok(models)
     }
 

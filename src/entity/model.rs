@@ -66,7 +66,7 @@ pub trait FromQueryResult: Sized {
     /// # #[cfg(feature = "mock")]
     /// # pub async fn main() -> Result<(), DbErr> {
     /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
+    /// # let mut db = MockDatabase::new(DbBackend::Postgres)
     /// #     .append_query_results([[
     /// #         maplit::btreemap! {
     /// #             "name" => Into::<Value>::into("Chocolate Forest"),
@@ -111,8 +111,8 @@ pub trait FromQueryResult: Sized {
     /// # Ok(())
     /// # }
     /// ```
-    fn find_by_statement(stmt: String, values: Values) -> SelectorRaw<SelectModel<Self>> {
-        SelectorRaw::<SelectModel<Self>>::from_statement(stmt, values)
+    fn find_by_statement(stmt: impl Into<String>, values: Vec<Value>) -> SelectorRaw<SelectModel<Self>> {
+        SelectorRaw::<SelectModel<Self>>::from_statement(stmt.into(), Values(values))
     }
 }
 
