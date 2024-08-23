@@ -568,12 +568,12 @@ pub fn array_uniq<T: IntoIden>(col: T, elem_type: ColumnType) -> ColumnDef {
 }
 
 /// Add timestamp columns (`CreatedAt` and `UpdatedAt`) to an existing table.
-pub fn timestamps(t: TableCreateStatement) -> TableCreateStatement {
-    let mut t = t;
-    t.col(timestamp(GeneralIds::CreatedAt).default(Expr::current_timestamp()))
-        .col(timestamp(GeneralIds::UpdatedAt).default(Expr::current_timestamp()))
-        .take()
-}
+// pub fn timestamps(t: TableCreateStatement) -> TableCreateStatement {
+//     let mut t = t;
+//     t.col(timestamp(GeneralIds::CreatedAt).default(Expr::current_timestamp()))
+//         .col(timestamp(GeneralIds::UpdatedAt).default(Expr::current_timestamp()))
+//         .take()
+// }
 
 /// Create an Alias.
 pub fn name<T: Into<String>>(name: T) -> Alias {
