@@ -2376,8 +2376,13 @@ mod tests {
     }
 }
 
-#[derive(Debug)]
 pub struct ValueHolder(pub Value);
+
+impl std::fmt::Debug for ValueHolder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 use bytes::BytesMut;
 
