@@ -285,14 +285,11 @@ where
 
     let found =
         SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)
-            .one(db)
+            .one_opt(db)
             .await?;
 
-    tracing::debug!("Nice");
     match found {
         Some(model) => Ok(model),
-        None => Err(DbErr::RecordNotFound(
-            "Failed to find inserted item".to_owned(),
-        )),
+        None => Err(DbErr::RecordNotFound),
     }
 }

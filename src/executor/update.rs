@@ -126,16 +126,11 @@ impl Updater {
 
         let (stmt, values) = self.query.build(PostgresQueryBuilder);
 
-        let found: Option<Model<A>> =
-            SelectorRaw::<SelectModel<Model<A>>>::from_statement(stmt, values)
-                .one(db)
-                .await?;
+        let found: Model<A> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(stmt, values)
+            .one(db)
+            .await?;
 
-        // If we got `None` then we are updating a row that does not exist.
-        match found {
-            Some(model) => Ok(model),
-            None => Err(DbErr::RecordNotUpdated),
-        }
+        Ok(found)
     }
 
     async fn exec_update_with_returning<E, C>(mut self, db: &C) -> Result<Vec<E::Model>, DbErr>
@@ -183,13 +178,8 @@ where
         None => return Err(DbErr::UpdateGetPrimaryKey),
     };
     let found = Entity::<A>::find_by_id(primary_key_value).one(db).await?;
-    // If we cannot select the updated row from db by the cached primary key
-    match found {
-        Some(model) => Ok(model),
-        None => Err(DbErr::RecordNotFound(
-            "Failed to find updated item".to_owned(),
-        )),
-    }
+
+    Ok(found)
 }
 
 #[cfg(test)]

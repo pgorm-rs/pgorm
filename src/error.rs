@@ -41,24 +41,18 @@ pub enum DbErr {
     /// if the record has been correctly updated, otherwise this error will occur
     #[error("Failed to get primary key from model")]
     UpdateGetPrimaryKey,
-    /// The record was not found in the database
-    #[error("RecordNotFound Error: {0}")]
-    RecordNotFound(String),
     /// Thrown by `TryFrom<ActiveModel>`, which assumes all attributes are set/unchanged
     #[error("Attribute {0} is NotSet")]
     AttrNotSet(String),
-    /// A custom error
-    #[error("Custom Error: {0}")]
-    Custom(String),
     /// Error occurred while parsing value as target type
     #[error("Type Error: {0}")]
     Type(String),
     /// Error occurred while parsing json value as target type
     #[error("Json Error: {0}")]
     Json(String),
-    /// A migration error
-    #[error("Migration Error: {0}")]
-    Migration(String),
+    /// The record was not found in the database
+    #[error("No records were returned for the given query")]
+    RecordNotFound,
     /// None of the records are inserted,
     /// that probably means all of them conflict with existing records in the table
     #[error("None of the records are inserted")]
@@ -67,6 +61,9 @@ pub enum DbErr {
     /// May be the table is empty or the record does not exist
     #[error("None of the records are updated")]
     RecordNotUpdated,
+    /// A custom error
+    #[error("Custom Error: {0}")]
+    Custom(String),
 }
 
 /// Connection Acquire error

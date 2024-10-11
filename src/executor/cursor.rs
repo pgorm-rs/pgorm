@@ -2464,10 +2464,12 @@ impl ToSql for ValueHolder {
                 .unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
             // Value::Decimal(x) => x.map(|x| &**x).to_sql(ty, out),
             // Value::BigDecimal(x) => x.map(|x| &**x).to_sql(ty, out),
-            Value::Array(_, Some(x)) => {
-                x.iter().map(|x| ValueHolder(x.clone())).collect::<Vec<_>>().to_sql(ty, out)
-            }
-            Value::Array(_, None) => Ok(IsNull::Yes)
+            Value::Array(_, Some(x)) => x
+                .iter()
+                .map(|x| ValueHolder(x.clone()))
+                .collect::<Vec<_>>()
+                .to_sql(ty, out),
+            Value::Array(_, None) => Ok(IsNull::Yes),
         }
     }
 

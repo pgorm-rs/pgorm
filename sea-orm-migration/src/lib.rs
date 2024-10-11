@@ -20,11 +20,9 @@ pub trait MigrationName {
     fn name(&self) -> &str;
 }
 
-pub struct SchemaManager<'a>(&'a ());
-
 /// The migration definition
 #[async_trait::async_trait]
 pub trait MigrationTrait: MigrationName + Send + Sync {
     /// Define actions to perform when applying the migration
-    async fn up(&self, tx: &DatabaseTransaction<'_>, manager: &SchemaManager<'_>) -> Result<(), DbErr>;
+    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr>;
 }

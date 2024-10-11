@@ -8,7 +8,8 @@ use tracing::info;
 use super::{seaql_migrations, MigrationTrait};
 use sea_orm::sea_query::{self, IntoIden, Order, PostgresQueryBuilder, Query, SelectStatement};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr, DynIden, EntityTrait, FromQueryResult, Iterable, Schema, TransactionTrait
+    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,
+    DynIden, EntityTrait, FromQueryResult, Iterable, Schema, TransactionTrait,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -86,7 +87,9 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of migrations with status
-    async fn get_migration_with_status(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
+    async fn get_migration_with_status(
+        db: &(impl ConnectionTrait),
+    ) -> Result<Vec<Migration>, DbErr> {
         Self::install(db).await?;
         let mut migration_files = Self::get_migration_files();
         let migration_models = Self::get_migration_models(db).await?;
@@ -200,6 +203,7 @@ where
     if migrations.len() == 0 {
         info!("No pending migrations");
     }
+
     for Migration { migration, .. } in migrations {
         if let Some(steps) = steps.as_mut() {
             if steps == &0 {
@@ -208,7 +212,7 @@ where
             *steps -= 1;
         }
         info!("Applying migration '{}'", migration.name());
-        migration.up(db, &crate::SchemaManager(&())).await?;
+        migration.up(db).await?;
         info!("Migration '{}' has been applied", migration.name());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)

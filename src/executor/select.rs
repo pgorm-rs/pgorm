@@ -410,11 +410,19 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
+    pub async fn one<'a, C>(self, db: &C) -> Result<E::Model, DbErr>
     where
         C: ConnectionTrait,
     {
         self.into_model().one(db).await
+    }
+
+    /// Get one Model from the SELECT query
+    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        self.into_model().one_opt(db).await
     }
 
     /// Get all Models from the SELECT query
@@ -481,11 +489,19 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn one<'a, C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), DbErr>
     where
         C: ConnectionTrait,
     {
         self.into_model().one(db).await
+    }
+
+    /// Get one Model from the Select query
+    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        self.into_model().one_opt(db).await
     }
 
     /// Get all Models from the Select query
@@ -649,12 +665,21 @@ where
     // }
 
     /// Get an item from the Select query
-    pub async fn one<'a, C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one<'a, C>(mut self, db: &C) -> Result<S::Item, DbErr>
     where
         C: ConnectionTrait,
     {
         self.query.limit(1);
         self.into_selector_raw().one(db).await
+    }
+
+    /// Get an item from the Select query
+    pub async fn one_opt<'a, C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        self.query.limit(1);
+        self.into_selector_raw().one_opt(db).await
     }
 
     /// Get all items from the Select query
@@ -827,7 +852,65 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn one<'a, C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one<'a, C>(self, db: &C) -> Result<S::Item, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        let values = self
+            .values
+            .0
+            .into_iter()
+            .map(|x| ValueHolder(x))
+            .collect::<Vec<_>>();
+        let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
+        let row = db.query_opt(&self.stmt, &values).await?;
+        match row {
+            Some(row) => Ok(S::from_raw_query_result(QueryResult { row })?),
+            None => Err(DbErr::RecordNotFound),
+        }
+    }
+
+    /// Get an item from the Select query
+    /// ```
+    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// #
+    /// # #[smol_potat::main]
+    /// # #[cfg(feature = "mock")]
+    /// # pub async fn main() -> Result<(), DbErr> {
+    /// #
+    /// # let db = MockDatabase::new(DbBackend::Postgres)
+    /// #     .append_query_results([
+    /// #         [cake::Model {
+    /// #             id: 1,
+    /// #             name: "Cake".to_owned(),
+    /// #         }],
+    /// #     ])
+    /// #     .into_connection();
+    /// #
+    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// let _: Option<cake::Model> = cake::Entity::find()
+    ///     .from_raw_sql(Statement::from_sql_and_values(
+    ///         DbBackend::Postgres,
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
+    ///         [1.into()],
+    ///     ))
+    ///     .one(&db)
+    ///     .await?;
+    ///
+    /// assert_eq!(
+    ///     db.into_transaction_log(),
+    ///     [Transaction::from_sql_and_values(
+    ///         DbBackend::Postgres,
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
+    ///         [1.into()]
+    ///     ),]
+    /// );
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
