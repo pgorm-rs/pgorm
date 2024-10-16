@@ -2462,7 +2462,7 @@ impl ToSql for ValueHolder {
                 .as_ref()
                 .map(|x| x.to_sql(ty, out))
                 .unwrap_or(Ok(IsNull::Yes)), // x.map(|x| &*x).to_sql(ty, out),
-            // Value::Decimal(x) => x.map(|x| &**x).to_sql(ty, out),
+            Value::Decimal(x) => x.as_ref().map(|x| &**x).to_sql(ty, out),
             // Value::BigDecimal(x) => x.map(|x| &**x).to_sql(ty, out),
             Value::Array(_, Some(x)) => x
                 .iter()
