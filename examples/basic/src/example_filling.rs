@@ -1,6 +1,6 @@
 //! The `filling` entity.
 
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 /// Filling entity
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]

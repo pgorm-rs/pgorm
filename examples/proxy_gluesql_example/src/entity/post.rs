@@ -1,10 +1,10 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Deserialize, Serialize)]
-#[sea_orm(table_name = "posts")]
+#[pgorm(table_name = "posts")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i64,
 
     pub title: String,

@@ -16,8 +16,8 @@
 //!
 //!   <h3>🐚 An async & dynamic ORM for Rust</h3>
 //!
-//!   [![crate](https://img.shields.io/crates/v/sea-orm.svg)](https://crates.io/crates/sea-orm)
-//!   [![docs](https://docs.rs/sea-orm/badge.svg)](https://docs.rs/sea-orm)
+//!   [![crate](https://img.shields.io/crates/v/pgorm.svg)](https://crates.io/crates/pgorm)
+//!   [![docs](https://docs.rs/pgorm/badge.svg)](https://docs.rs/pgorm)
 //!   [![build status](https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml/badge.svg)](https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml)
 //!
 //! </div>
@@ -26,7 +26,7 @@
 //!
 //! #### SeaORM is a relational ORM to help you build web services in Rust with the familiarity of dynamic languages.
 //!
-//! [![GitHub stars](https://img.shields.io/github/stars/SeaQL/sea-orm.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/)
+//! [![GitHub stars](https://img.shields.io/github/stars/SeaQL/pgorm.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/)
 //! If you like what we do, consider starring, sharing and contributing!
 //!
 //! Please help us with maintaining SeaORM by completing the [SeaQL Community Survey 2024](https://sea-ql.org/community-survey)!
@@ -37,8 +37,8 @@
 //! ## Getting Started
 //!
 //! + [Documentation](https://www.sea-ql.org/SeaORM)
-//! + [Tutorial](https://www.sea-ql.org/sea-orm-tutorial)
-//! + [Cookbook](https://www.sea-ql.org/sea-orm-cookbook)
+//! + [Tutorial](https://www.sea-ql.org/pgorm-tutorial)
+//! + [Cookbook](https://www.sea-ql.org/pgorm-cookbook)
 //!
 //! Integration examples:
 //!
@@ -78,18 +78,18 @@
 //! # #[cfg(feature = "macros")]
 //! # mod entities {
 //! # mod fruit {
-//! # use sea_orm::entity::prelude::*;
+//! # use pgorm::entity::prelude::*;
 //! # #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-//! # #[sea_orm(table_name = "fruit")]
+//! # #[pgorm(table_name = "fruit")]
 //! # pub struct Model {
-//! #     #[sea_orm(primary_key)]
+//! #     #[pgorm(primary_key)]
 //! #     pub id: i32,
 //! #     pub name: String,
 //! #     pub cake_id: Option<i32>,
 //! # }
 //! # #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 //! # pub enum Relation {
-//! #     #[sea_orm(
+//! #     #[pgorm(
 //! #         belongs_to = "super::cake::Entity",
 //! #         from = "Column::CakeId",
 //! #         to = "super::cake::Column::Id"
@@ -104,19 +104,19 @@
 //! # impl ActiveModelBehavior for ActiveModel {}
 //! # }
 //! # mod cake {
-//! use sea_orm::entity::prelude::*;
+//! use pgorm::entity::prelude::*;
 //!
 //! #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-//! #[sea_orm(table_name = "cake")]
+//! #[pgorm(table_name = "cake")]
 //! pub struct Model {
-//!     #[sea_orm(primary_key)]
+//!     #[pgorm(primary_key)]
 //!     pub id: i32,
 //!     pub name: String,
 //! }
 //!
 //! #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 //! pub enum Relation {
-//!     #[sea_orm(has_many = "super::fruit::Entity")]
+//!     #[pgorm(has_many = "super::fruit::Entity")]
 //!     Fruit,
 //! }
 //!
@@ -132,7 +132,7 @@
 //!
 //! ### Select
 //! ```
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
 //! # async fn function(db: &DbConn) -> Result<(), DbErr> {
 //! // find all models
 //! let cakes: Vec<cake::Model> = Cake::find().all(db).await?;
@@ -159,7 +159,7 @@
 //! ```
 //! ### Insert
 //! ```
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
 //! # async fn function(db: &DbConn) -> Result<(), DbErr> {
 //! let apple = fruit::ActiveModel {
 //!     name: Set("Apple".to_owned()),
@@ -192,8 +192,8 @@
 //! ```
 //! ### Update
 //! ```
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
-//! use sea_orm::sea_query::{Expr, Value};
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! use pgorm::pgorm_query::{Expr, Value};
 //!
 //! # async fn function(db: &DbConn) -> Result<(), DbErr> {
 //! let pear: Option<fruit::Model> = Fruit::find_by_id(1).one(db).await?;
@@ -216,7 +216,7 @@
 //! ```
 //! ### Save
 //! ```
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
 //! # async fn function(db: &DbConn) -> Result<(), DbErr> {
 //! let banana = fruit::ActiveModel {
 //!     id: NotSet,
@@ -237,7 +237,7 @@
 //! ```
 //! ### Delete
 //! ```
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
 //! # async fn function(db: &DbConn) -> Result<(), DbErr> {
 //! // delete one
 //! let orange: Option<fruit::Model> = Fruit::find_by_id(1).one(db).await?;
@@ -265,7 +265,7 @@
 //!
 //! [Seaography](https://github.com/SeaQL/seaography) is a GraphQL framework built on top of SeaORM. Seaography allows you to build GraphQL resolvers quickly. With just a few commands, you can launch a GraphQL server from SeaORM entities!
 //!
-//! Starting `0.12`, `seaography` integration is built into `sea-orm`. While Seaography development is still in an early stage, it is especially useful in prototyping and building internal-use admin panels.
+//! Starting `0.12`, `seaography` integration is built into `pgorm`. While Seaography development is still in an early stage, it is especially useful in prototyping and building internal-use admin panels.
 //!
 //! <img src="https://raw.githubusercontent.com/SeaQL/sea-orm/master/examples/seaography_example/Seaography%20example.png"/>
 //!
@@ -303,7 +303,7 @@
 //!
 //! A big shout out to our contributors!
 //!
-//! [![Contributors](https://opencollective.com/sea-orm/contributors.svg?width=1000&button=false)](https://github.com/SeaQL/sea-orm/graphs/contributors)
+//! [![Contributors](https://opencollective.com/pgorm/contributors.svg?width=1000&button=false)](https://github.com/SeaQL/sea-orm/graphs/contributors)
 //!
 //! ## Sponsorship
 //!
@@ -356,7 +356,7 @@ pub use query::*;
 pub use schema::*;
 
 #[cfg(feature = "macros")]
-pub use sea_orm_macros::{
+pub use pgorm_macros::{
     DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
     DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIden,
     DeriveIntoActiveModel, DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey,
@@ -365,10 +365,10 @@ pub use sea_orm_macros::{
 #[cfg(feature = "macros")]
 pub use tokio_postgres::row::RowIndex;
 
-pub use sea_query;
-pub use sea_query::Iden;
+pub use pgorm_query;
+pub use pgorm_query::Iden;
 
-pub use sea_orm_macros::EnumIter;
+pub use pgorm_macros::EnumIter;
 pub use strum;
 
 pub use tokio_postgres::types;

@@ -3,7 +3,7 @@ use crate::{
     FromQueryResult, Insert, ModelTrait, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related,
     RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany, UpdateOne,
 };
-use sea_query::{Alias, Iden, IntoIden, IntoTableRef, IntoValueTuple, TableRef};
+use pgorm_query::{Alias, Iden, IntoIden, IntoTableRef, IntoValueTuple, TableRef};
 use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
@@ -103,7 +103,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -130,7 +130,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find().one(&db).await?,
@@ -182,7 +182,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -199,7 +199,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find_by_id(11).all(&db).await?,
@@ -223,7 +223,7 @@ pub trait EntityTrait: EntityName {
     /// ```
     /// Find by composite key
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -240,7 +240,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake_filling};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake_filling};
     ///
     /// assert_eq!(
     ///     cake_filling::Entity::find_by_id((2, 3)).all(&db).await?,
@@ -293,7 +293,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (Postgres)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -305,7 +305,7 @@ pub trait EntityTrait: EntityName {
     /// #     }]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -332,7 +332,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (MySQL)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -347,7 +347,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -382,7 +382,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (Postgres)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -394,7 +394,7 @@ pub trait EntityTrait: EntityName {
     /// #     }]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -425,7 +425,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (MySQL)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -440,7 +440,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -482,7 +482,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (Postgres)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -498,7 +498,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(1),
@@ -533,7 +533,7 @@ pub trait EntityTrait: EntityName {
     /// # Example (MySQL)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -555,7 +555,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(1),
@@ -606,7 +606,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -621,10 +621,10 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{
+    /// use pgorm::{
     ///     entity::*,
     ///     query::*,
-    ///     sea_query::{Expr, Value},
+    ///     pgorm_query::{Expr, Value},
     ///     tests_cfg::fruit,
     /// };
     ///
@@ -659,7 +659,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -674,7 +674,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(3),
@@ -711,7 +711,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -732,7 +732,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let delete_result = fruit::Entity::delete_many()
     ///     .filter(fruit::Column::Name.contains("Apple"))
@@ -762,7 +762,7 @@ pub trait EntityTrait: EntityName {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -777,7 +777,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let delete_result = fruit::Entity::delete_by_id(1).exec(&db).await?;
     ///
@@ -797,7 +797,7 @@ pub trait EntityTrait: EntityName {
     /// ```
     /// Delete by composite key
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -812,7 +812,7 @@ pub trait EntityTrait: EntityName {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake_filling};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake_filling};
     ///
     /// let delete_result = cake_filling::Entity::delete_by_id((2, 3)).exec(&db).await?;
     ///
@@ -887,13 +887,13 @@ mod tests {
         use crate::entity::*;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
             }
 
@@ -913,13 +913,13 @@ mod tests {
         use crate::entity::*;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello", schema_name = "world")]
+            #[pgorm(table_name = "hello", schema_name = "world")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
             }
 
@@ -940,13 +940,13 @@ mod tests {
         use std::borrow::Cow;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello", schema_name = "world")]
+            #[pgorm(table_name = "hello", schema_name = "world")]
             pub struct Model {
-                #[sea_orm(primary_key, auto_increment = false)]
+                #[pgorm(primary_key, auto_increment = false)]
                 pub id: String,
             }
 

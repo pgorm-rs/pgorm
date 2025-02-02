@@ -1,24 +1,24 @@
 #!/bin/bash
 set -e
 
-# publish `sea-orm-codegen`
-cd sea-orm-codegen
+# publish `pgorm-codegen`
+cd pgorm-codegen
 cargo publish
 cd ..
 
-# publish `sea-orm-cli`
-cd sea-orm-cli
+# publish `pgorm-cli`
+cd pgorm-cli
 cargo publish
 cd ..
 
-# publish `sea-orm-macros`
-cd sea-orm-macros
+# publish `pgorm-macros`
+cd pgorm-macros
 cargo publish
 cd ..
 
-# publish `sea-orm`
+# publish `pgorm`
 cargo publish
 
-# publish `sea-orm-migration`
-cd sea-orm-migration
+# publish `pgorm-migration`
+cd pgorm-migration
 cargo publish

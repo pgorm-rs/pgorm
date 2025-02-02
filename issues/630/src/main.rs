@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-// use sea_orm::sea_query::tests_cfg::json;
-use sea_orm::{ConnectOptions, Database, EntityTrait};
+// use pgorm::pgorm_query::tests_cfg::json;
+use pgorm::{ConnectOptions, Database, EntityTrait};
 
 mod entity;
 use entity::{underscores, underscores_workaround};

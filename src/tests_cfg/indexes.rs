@@ -1,5 +1,5 @@
 //! An entity definition for testing table index creation.
-use crate as sea_orm;
+use crate as pgorm;
 use crate::entity::prelude::*;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]

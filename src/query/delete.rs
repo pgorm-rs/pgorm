@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
-use sea_query::DeleteStatement;
+use pgorm_query::DeleteStatement;
 
 /// Defines the structure for a delete operation
 #[derive(Clone, Debug)]
@@ -34,7 +34,7 @@ impl Delete {
     ///
     /// Model
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::Model {
@@ -48,7 +48,7 @@ impl Delete {
     /// ```
     /// ActiveModel
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
@@ -78,7 +78,7 @@ impl Delete {
     /// Delete many ActiveModel
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit, DbBackend};
     ///
     /// assert_eq!(
     ///     Delete::many(fruit::Entity)

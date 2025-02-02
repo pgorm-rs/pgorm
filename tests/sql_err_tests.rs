@@ -2,13 +2,13 @@
 
 pub mod common;
 pub use common::{bakery_chain::*, setup::*, TestContext};
-pub use sea_orm::{
+pub use pgorm::{
     entity::*, error::DbErr, error::SqlErr, tests_cfg, ConnectionTrait, DatabasePool, DbBackend,
     EntityName, ExecResult,
 };
 use uuid::Uuid;
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() {
     let ctx = TestContext::new("bakery_chain_sql_err_tests").await;
     create_tables(&ctx.db).await.unwrap();

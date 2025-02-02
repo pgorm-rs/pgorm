@@ -1,5 +1,5 @@
 use ::entity::note;
-use sea_orm::*;
+use pgorm::*;
 
 #[cfg(feature = "mock")]
 pub fn prepare_mock_db() -> DatabaseConnection {

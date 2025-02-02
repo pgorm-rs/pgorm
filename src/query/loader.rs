@@ -3,7 +3,7 @@ use crate::{
     Related, RelationType, Select,
 };
 use async_trait::async_trait;
-use sea_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
+use pgorm_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
 use std::{collections::HashMap, str::FromStr};
 
 /// Entity, or a Select<Entity>; to be used as parameters in [`LoaderTrait`]
@@ -440,7 +440,7 @@ fn table_column(tbl: &TableRef, col: &DynIden) -> ColumnRef {
 
 #[cfg(test)]
 mod tests {
-    fn cake_model(id: i32) -> sea_orm::tests_cfg::cake::Model {
+    fn cake_model(id: i32) -> pgorm::tests_cfg::cake::Model {
         let name = match id {
             1 => "apple cake",
             2 => "orange cake",
@@ -449,10 +449,10 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::cake::Model { id, name }
+        pgorm::tests_cfg::cake::Model { id, name }
     }
 
-    fn fruit_model(id: i32, cake_id: Option<i32>) -> sea_orm::tests_cfg::fruit::Model {
+    fn fruit_model(id: i32, cake_id: Option<i32>) -> pgorm::tests_cfg::fruit::Model {
         let name = match id {
             1 => "apple",
             2 => "orange",
@@ -461,10 +461,10 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::fruit::Model { id, name, cake_id }
+        pgorm::tests_cfg::fruit::Model { id, name, cake_id }
     }
 
-    fn filling_model(id: i32) -> sea_orm::tests_cfg::filling::Model {
+    fn filling_model(id: i32) -> pgorm::tests_cfg::filling::Model {
         let name = match id {
             1 => "apple juice",
             2 => "orange jam",
@@ -473,7 +473,7 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::filling::Model {
+        pgorm::tests_cfg::filling::Model {
             id,
             name,
             vendor_id: Some(1),
@@ -481,11 +481,8 @@ mod tests {
         }
     }
 
-    fn cake_filling_model(
-        cake_id: i32,
-        filling_id: i32,
-    ) -> sea_orm::tests_cfg::cake_filling::Model {
-        sea_orm::tests_cfg::cake_filling::Model {
+    fn cake_filling_model(cake_id: i32, filling_id: i32) -> pgorm::tests_cfg::cake_filling::Model {
+        pgorm::tests_cfg::cake_filling::Model {
             cake_id,
             filling_id,
         }
@@ -493,7 +490,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -511,7 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one_same_cake() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -529,7 +526,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one_empty() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -547,7 +544,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[fruit_model(1, Some(1))]])
@@ -565,7 +562,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_same_fruit() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[fruit_model(1, Some(1)), fruit_model(2, Some(1))]])
@@ -589,7 +586,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_empty() {
-        use sea_orm::{entity::prelude::*, tests_cfg::*, DbBackend, MockDatabase};
+        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres).into_connection();
 
@@ -607,7 +604,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_base() {
-        use sea_orm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -628,7 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_complex() {
-        use sea_orm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -668,7 +665,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_empty() {
-        use sea_orm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([

@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, Value,
 };
 use async_trait::async_trait;
-use sea_query::{Nullable, ValueTuple};
+use pgorm_query::{Nullable, ValueTuple};
 use std::fmt::Debug;
 
 pub use ActiveValue::NotSet;
@@ -21,8 +21,8 @@ pub use ActiveValue::NotSet;
 /// # Examples
 ///
 /// ```
-/// use sea_orm::tests_cfg::{cake, fruit};
-/// use sea_orm::{entity::*, query::*, DbBackend};
+/// use pgorm::tests_cfg::{cake, fruit};
+/// use pgorm::{entity::*, query::*, DbBackend};
 ///
 /// // The code snipped below does an UPDATE operation on a `ActiveValue`
 /// assert_eq!(
@@ -172,7 +172,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Example (Postgres)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -187,7 +187,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -218,7 +218,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Example (MySQL)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -239,7 +239,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
     ///     name: Set("Apple Pie".to_owned()),
@@ -294,7 +294,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Example (Postgres)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -310,7 +310,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(1),
@@ -342,7 +342,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Example (MySQL)
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -364,7 +364,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(1),
@@ -438,7 +438,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Example
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -453,7 +453,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
     ///     id: Set(3),
@@ -567,7 +567,7 @@ pub trait ActiveModelTrait: Clone + Debug {
 ///
 /// ### Example
 /// ```ignore
-/// use sea_orm::entity::prelude::*;
+/// use pgorm::entity::prelude::*;
 ///
 ///  // Use [DeriveEntity] to derive the EntityTrait automatically
 /// #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -868,7 +868,7 @@ where
     /// ## Examples
     ///
     /// ```
-    /// # use sea_orm::ActiveValue;
+    /// # use pgorm::ActiveValue;
     /// #
     /// let mut value = ActiveValue::Unchanged("old");
     ///
@@ -898,7 +898,7 @@ where
     /// ## Examples
     ///
     /// ```
-    /// # use sea_orm::ActiveValue;
+    /// # use pgorm::ActiveValue;
     /// #
     /// assert_eq!(ActiveValue::Unchanged(42).try_as_ref(), Some(&42));
     /// assert_eq!(ActiveValue::Set(42).try_as_ref(), Some(&42));
@@ -969,7 +969,7 @@ mod tests {
     fn test_derive_into_active_model_1() {
         mod my_fruit {
             pub use super::fruit::*;
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(DeriveIntoActiveModel)]
@@ -1000,7 +1000,7 @@ mod tests {
     fn test_derive_into_active_model_2() {
         mod my_fruit {
             pub use super::fruit::*;
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(DeriveIntoActiveModel)]
@@ -1047,13 +1047,13 @@ mod tests {
     #[cfg(feature = "macros")]
     fn test_derive_try_into_model_1() {
         mod my_fruit {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-            #[sea_orm(table_name = "fruit")]
+            #[pgorm(table_name = "fruit")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
                 pub name: String,
                 pub cake_id: Option<i32>,
@@ -1119,16 +1119,16 @@ mod tests {
     #[cfg(feature = "macros")]
     fn test_derive_try_into_model_2() {
         mod my_fruit {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-            #[sea_orm(table_name = "fruit")]
+            #[pgorm(table_name = "fruit")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
                 pub name: String,
-                #[sea_orm(ignore)]
+                #[pgorm(ignore)]
                 pub cake_id: Option<i32>,
             }
 
@@ -1156,15 +1156,15 @@ mod tests {
     #[cfg(feature = "macros")]
     fn test_derive_try_into_model_3() {
         mod my_fruit {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-            #[sea_orm(table_name = "fruit")]
+            #[pgorm(table_name = "fruit")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(ignore)]
+                #[pgorm(ignore)]
                 pub name: String,
                 pub cake_id: Option<i32>,
             }

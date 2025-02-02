@@ -1,24 +1,24 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "cake")]
+#[pgorm(table_name = "cake")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
-    #[sea_orm(column_name = "name", enum_name = "Name")]
+    #[pgorm(column_name = "name", enum_name = "Name")]
     pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::fruit::Entity")]
+    #[pgorm(has_many = "super::fruit::Entity")]
     Fruit,
-    #[sea_orm(
+    #[pgorm(
         has_many = "super::fruit::Entity",
         on_condition = r#"super::fruit::Column::Name.like("%tropical%")"#
     )]
     TropicalFruit,
-    #[sea_orm(
+    #[pgorm(
         has_many = "super::fruit::Entity",
         condition_type = "any",
         on_condition = r#"super::fruit::Column::Name.like("%tropical%")"#
@@ -44,13 +44,13 @@ impl Related<super::filling::Entity> for Entity {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
 pub enum RelatedEntity {
-    #[sea_orm(entity = "super::fruit::Entity")]
+    #[pgorm(entity = "super::fruit::Entity")]
     Fruit,
-    #[sea_orm(entity = "super::filling::Entity")]
+    #[pgorm(entity = "super::filling::Entity")]
     Filling,
-    #[sea_orm(entity = "super::fruit::Entity", def = "Relation::TropicalFruit.def()")]
+    #[pgorm(entity = "super::fruit::Entity", def = "Relation::TropicalFruit.def()")]
     TropicalFruit,
-    #[sea_orm(
+    #[pgorm(
         entity = "super::fruit::Entity",
         def = "Relation::OrTropicalFruit.def()"
     )]

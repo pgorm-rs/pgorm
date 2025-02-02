@@ -3,7 +3,7 @@
 //!     Relying on [SQLx](https://github.com/launchbadge/sqlx), SeaORM is a new library with async support from day 1.
 //!
 //! ```
-//! # use sea_orm::{error::*, tests_cfg::*, *};
+//! # use pgorm::{error::*, tests_cfg::*, *};
 //! #
 //! # #[smol_potat::main]
 //! # #[cfg(feature = "mock")]
@@ -66,8 +66,8 @@
 //!     Built upon [SeaQuery](https://github.com/SeaQL/sea-query), SeaORM allows you to build complex queries without 'fighting the ORM'.
 //!
 //! ```
-//! # use sea_query::Query;
-//! # use sea_orm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
+//! # use pgorm_query::Query;
+//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
 //! # async fn function(db: DbConn) -> Result<(), DbErr> {
 //! // build subquery with ease
 //! let cakes_with_filling: Vec<cake::Model> = cake::Entity::find()
@@ -93,7 +93,7 @@
 //!     Use mock connections to write unit tests for your logic.
 //!
 //! ```
-//! # use sea_orm::{error::*, entity::*, query::*, tests_cfg::*, DbConn, MockDatabase, Transaction, DbBackend};
+//! # use pgorm::{error::*, entity::*, query::*, tests_cfg::*, DbConn, MockDatabase, Transaction, DbBackend};
 //! # async fn function(db: DbConn) -> Result<(), DbErr> {
 //! // Setup mock connection
 //! let db = MockDatabase::new(DbBackend::Postgres)

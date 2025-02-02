@@ -1,12 +1,12 @@
 //! The `cake` entity.
 
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 /// Cake entity
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "cake")]
+#[pgorm(table_name = "cake")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     /// id field
     pub id: i32,
     /// name field

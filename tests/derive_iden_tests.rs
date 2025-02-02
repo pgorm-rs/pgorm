@@ -2,7 +2,7 @@
 
 pub mod common;
 pub use common::{features::*, setup::*, TestContext};
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(DeriveIden)]
 pub enum ClassName {
@@ -14,14 +14,14 @@ pub enum ClassName {
 
 #[derive(DeriveIden)]
 pub enum Book {
-    #[sea_orm(iden = "book_table")]
+    #[pgorm(iden = "book_table")]
     Table,
     Id,
-    #[sea_orm(iden = "turtle")]
+    #[pgorm(iden = "turtle")]
     Title,
-    #[sea_orm(iden = "TeXt")]
+    #[pgorm(iden = "TeXt")]
     Text,
-    #[sea_orm(iden = "ty_pe")]
+    #[pgorm(iden = "ty_pe")]
     Type,
 }
 
@@ -29,7 +29,7 @@ pub enum Book {
 struct GlyphToken;
 
 #[derive(DeriveIden)]
-#[sea_orm(iden = "weRd")]
+#[pgorm(iden = "weRd")]
 struct Word;
 
 #[test]

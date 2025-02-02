@@ -8,7 +8,7 @@ use axum::{
     Router,
 };
 use axum_example_service::{
-    sea_orm::{Database, DatabaseConnection},
+    pgorm::{Database, DatabaseConnection},
     Mutation as MutationCore, Query as QueryCore,
 };
 use entity::post;

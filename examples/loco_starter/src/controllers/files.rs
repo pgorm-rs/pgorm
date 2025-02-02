@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use axum::{body::Body, debug_handler, extract::Multipart};
 use loco_rs::prelude::*;
-use sea_orm::QueryOrder;
+use pgorm::QueryOrder;
 use tokio::{fs, io::AsyncWriteExt};
 use tokio_util::io::ReaderStream;
 

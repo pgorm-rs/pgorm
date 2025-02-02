@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "model", table_iden)]
+#[pgorm(table_name = "model", table_iden)]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub owner: String,
     pub name: String,
@@ -18,7 +18,7 @@ impl ActiveModelBehavior for ActiveModel {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::*;
+    use pgorm::*;
 
     #[test]
     fn test_columns_1() {

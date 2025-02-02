@@ -1,7 +1,7 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
-#[sea_orm(table_name = "filling")]
+#[pgorm(table_name = "filling")]
 pub struct Entity;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub name: String,
     pub vendor_id: Option<i32>,
-    #[sea_orm(ignore)]
+    #[pgorm(ignore)]
     pub ignored_attr: i32,
 }
 

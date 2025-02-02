@@ -12,6 +12,6 @@ path = "src/lib.rs"
 serde = { version = "1", features = ["derive"] }
 salvo = { version = "0.50" }
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../../" # remove this line in your own project
-version = "~1.0.0" # sea-orm version
+version = "~1.0.0" # pgorm version

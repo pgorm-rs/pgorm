@@ -1,13 +1,13 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::{
-    sea_query::{ArrayType, ColumnType, ValueType},
+use pgorm::entity::prelude::*;
+use pgorm::{
+    pgorm_query::{ArrayType, ColumnType, ValueType},
     TryGetError, TryGetable,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "event_trigger")]
+#[pgorm(table_name = "event_trigger")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub events: Events,
 }
@@ -39,14 +39,14 @@ impl From<Events> for Value {
 }
 
 impl TryGetable for Events {
-    fn try_get_by<I: sea_orm::ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: pgorm::ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
         let vec: Vec<String> = res.try_get_by(idx).map_err(TryGetError::DbErr)?;
         Ok(Events(vec.into_iter().map(Event).collect()))
     }
 }
 
 impl ValueType for Events {
-    fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
+    fn try_from(v: Value) -> Result<Self, pgorm_query::ValueTypeErr> {
         let value: Option<Vec<String>> =
             v.expect("This Value::Array should consist of Value::String");
         let vec = match value {

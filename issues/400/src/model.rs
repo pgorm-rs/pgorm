@@ -1,10 +1,10 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "model")]
+#[pgorm(table_name = "model")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: AccountId<String>,
     pub name: String,
 }
@@ -29,40 +29,40 @@ impl<T> From<AccountId<T>> for Uuid {
     }
 }
 
-impl<T> sea_orm::TryFromU64 for AccountId<T> {
-    fn try_from_u64(_n: u64) -> Result<Self, sea_orm::DbErr> {
-        Err(sea_orm::DbErr::ConvertFromU64(stringify!(AccountId<T>)))
+impl<T> pgorm::TryFromU64 for AccountId<T> {
+    fn try_from_u64(_n: u64) -> Result<Self, pgorm::DbErr> {
+        Err(pgorm::DbErr::ConvertFromU64(stringify!(AccountId<T>)))
     }
 }
 
-impl<T> From<AccountId<T>> for sea_orm::Value {
+impl<T> From<AccountId<T>> for pgorm::Value {
     fn from(source: AccountId<T>) -> Self {
-        sea_orm::Value::Uuid(Some(Box::new(source.into())))
+        pgorm::Value::Uuid(Some(Box::new(source.into())))
     }
 }
 
-impl<T> sea_orm::TryGetable for AccountId<T> {
+impl<T> pgorm::TryGetable for AccountId<T> {
     fn try_get(
-        res: &sea_orm::QueryResult,
+        res: &pgorm::QueryResult,
         pre: &str,
         col: &str,
-    ) -> Result<Self, sea_orm::TryGetError> {
-        let val: Uuid = res.try_get(pre, col).map_err(sea_orm::TryGetError::DbErr)?;
+    ) -> Result<Self, pgorm::TryGetError> {
+        let val: Uuid = res.try_get(pre, col).map_err(pgorm::TryGetError::DbErr)?;
         Ok(AccountId::<T>::new(val))
     }
 }
 
-impl<T> sea_orm::sea_query::Nullable for AccountId<T> {
-    fn null() -> sea_orm::Value {
-        sea_orm::Value::Uuid(None)
+impl<T> pgorm::pgorm_query::Nullable for AccountId<T> {
+    fn null() -> pgorm::Value {
+        pgorm::Value::Uuid(None)
     }
 }
 
-impl<T> sea_orm::sea_query::ValueType for AccountId<T> {
-    fn try_from(v: sea_orm::Value) -> Result<Self, sea_orm::sea_query::ValueTypeErr> {
+impl<T> pgorm::pgorm_query::ValueType for AccountId<T> {
+    fn try_from(v: pgorm::Value) -> Result<Self, pgorm::pgorm_query::ValueTypeErr> {
         match v {
-            sea_orm::Value::Uuid(Some(x)) => Ok(AccountId::<T>::new(*x)),
-            _ => Err(sea_orm::sea_query::ValueTypeErr),
+            pgorm::Value::Uuid(Some(x)) => Ok(AccountId::<T>::new(*x)),
+            _ => Err(pgorm::pgorm_query::ValueTypeErr),
         }
     }
 
@@ -70,11 +70,11 @@ impl<T> sea_orm::sea_query::ValueType for AccountId<T> {
         stringify!(AccountId).to_owned()
     }
 
-    fn array_type() -> sea_orm::sea_query::ArrayType {
-        sea_orm::sea_query::ArrayType::Uuid
+    fn array_type() -> pgorm::pgorm_query::ArrayType {
+        pgorm::pgorm_query::ArrayType::Uuid
     }
 
-    fn column_type() -> sea_orm::sea_query::ColumnType {
-        sea_orm::sea_query::ColumnType::Uuid
+    fn column_type() -> pgorm::pgorm_query::ColumnType {
+        pgorm::pgorm_query::ColumnType::Uuid
     }
 }

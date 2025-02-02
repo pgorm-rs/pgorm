@@ -35,9 +35,9 @@ async fn main() {
         assert_eq!(
             post,
             post::ActiveModel {
-                id: sea_orm::ActiveValue::Unchanged(6),
-                title: sea_orm::ActiveValue::Unchanged("Title D".to_owned()),
-                text: sea_orm::ActiveValue::Unchanged("Text D".to_owned())
+                id: pgorm::ActiveValue::Unchanged(6),
+                title: pgorm::ActiveValue::Unchanged("Title D".to_owned()),
+                text: pgorm::ActiveValue::Unchanged("Text D".to_owned())
             }
         );
     }

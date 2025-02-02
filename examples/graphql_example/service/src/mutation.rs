@@ -1,5 +1,5 @@
 use ::entity::{note, note::Entity as Note};
-use sea_orm::*;
+use pgorm::*;
 
 pub struct Mutation;
 

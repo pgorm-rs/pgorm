@@ -1,28 +1,28 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(1))")]
+#[pgorm(rs_type = "String", db_type = "String(StringLen::N(1))")]
 pub enum Category {
-    #[sea_orm(string_value = "B")]
+    #[pgorm(string_value = "B")]
     Big,
-    #[sea_orm(string_value = "S")]
+    #[pgorm(string_value = "S")]
     Small,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
+#[pgorm(rs_type = "i32", db_type = "Integer")]
 pub enum Color {
-    #[sea_orm(num_value = 0)]
+    #[pgorm(num_value = 0)]
     Black,
-    #[sea_orm(num_value = 1)]
+    #[pgorm(num_value = 1)]
     White,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "tea")]
+#[pgorm(rs_type = "String", db_type = "Enum", enum_name = "tea")]
 pub enum Tea {
-    #[sea_orm(string_value = "EverydayTea")]
+    #[pgorm(string_value = "EverydayTea")]
     EverydayTea,
-    #[sea_orm(string_value = "BreakfastTea")]
+    #[pgorm(string_value = "BreakfastTea")]
     BreakfastTea,
 }

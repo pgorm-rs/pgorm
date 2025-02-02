@@ -12,7 +12,7 @@ use rocket_example_service::{Mutation, Query};
 use serde_json::json;
 
 use migration::MigratorTrait;
-use sea_orm_rocket::{Connection, Database};
+use pgorm_rocket::{Connection, Database};
 
 mod pool;
 use pool::Db;

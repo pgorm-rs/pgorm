@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyTrait, QueryTrait,
 };
 use core::marker::PhantomData;
-use sea_query::{Expr, InsertStatement, OnConflict, ValueTuple};
+use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
 
 /// Performs INSERT operations on a ActiveModel
 #[derive(Debug)]
@@ -46,7 +46,7 @@ where
     ///
     /// Model
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::Model {
@@ -60,7 +60,7 @@ where
     /// ```
     /// ActiveModel
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::ActiveModel {
@@ -82,7 +82,7 @@ where
     /// Insert many Model or ActiveModel
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Insert::many([
@@ -165,7 +165,7 @@ where
     ///
     /// on conflict do nothing
     /// ```
-    /// use sea_orm::{entity::*, query::*, sea_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -186,7 +186,7 @@ where
     ///
     /// on conflict do update
     /// ```
-    /// use sea_orm::{entity::*, query::*, sea_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -229,7 +229,7 @@ where
     /// Set ON CONFLICT on primary key do nothing, but with MySQL specific polyfill.
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, sea_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -391,7 +391,7 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use sea_query::OnConflict;
+    use pgorm_query::OnConflict;
 
     use crate::tests_cfg::cake::{self};
     use crate::{ActiveValue, DbBackend, DbErr, EntityTrait, Insert, IntoActiveModel, QueryTrait};
@@ -523,13 +523,13 @@ mod tests {
         use crate::{DbBackend, MockDatabase, Statement, Transaction};
 
         mod post {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "posts")]
+            #[pgorm(table_name = "posts")]
             pub struct Model {
-                #[sea_orm(primary_key, select_as = "INTEGER", save_as = "TEXT")]
+                #[pgorm(primary_key, select_as = "INTEGER", save_as = "TEXT")]
                 pub id: i32,
                 pub title: String,
                 pub text: String,
@@ -576,20 +576,20 @@ mod tests {
         use crate::{DbBackend, MockDatabase, MockExecResult, Statement, Transaction};
 
         mod post {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "posts")]
+            #[pgorm(table_name = "posts")]
             pub struct Model {
-                #[sea_orm(
+                #[pgorm(
                     primary_key,
                     auto_increment = false,
                     select_as = "INTEGER",
                     save_as = "TEXT"
                 )]
                 pub id_primary: i32,
-                #[sea_orm(
+                #[pgorm(
                     primary_key,
                     auto_increment = false,
                     select_as = "INTEGER",

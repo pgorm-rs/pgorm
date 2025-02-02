@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sea_orm::{ConnectionTrait, Database, EntityTrait, IntoActiveModel, Schema};
+use pgorm::{ConnectionTrait, Database, EntityTrait, IntoActiveModel, Schema};
 
 mod entity;
 

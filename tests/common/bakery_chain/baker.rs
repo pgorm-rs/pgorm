@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "baker")]
+#[pgorm(table_name = "baker")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub name: String,
     pub contact_details: Json,
@@ -12,7 +12,7 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
+    #[pgorm(
         belongs_to = "super::bakery::Entity",
         from = "Column::BakeryId",
         to = "super::bakery::Column::Id",

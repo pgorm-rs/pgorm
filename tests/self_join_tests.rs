@@ -4,9 +4,9 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, query::*, DbBackend, IntoActiveModel, QueryOrder};
+use pgorm::{entity::prelude::*, query::*, DbBackend, IntoActiveModel, QueryOrder};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("self_join_tests").await;
     create_tables(&ctx.db).await?;

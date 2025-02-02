@@ -3,8 +3,8 @@ use crate::{
     IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select, SelectModel, SelectorRaw,
 };
 use async_trait::async_trait;
-pub use sea_query::Value;
-use sea_query::Values;
+pub use pgorm_query::Value;
+use pgorm_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
@@ -60,7 +60,7 @@ pub trait FromQueryResult: Sized {
     }
 
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -75,7 +75,7 @@ pub trait FromQueryResult: Sized {
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{query::*, FromQueryResult};
+    /// use pgorm::{query::*, FromQueryResult};
     ///
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {

@@ -32,8 +32,8 @@ cargo install seaography-cli@^1.0.0-rc.3
 
 ```sh
 rm -rf graphql # this entire folder is generated
-sea-orm-cli generate entity --output-dir graphql/src/entities --seaography
-seaography-cli graphql graphql/src/entities $DATABASE_URL sea-orm-seaography-example
+pgorm-cli generate entity --output-dir graphql/src/entities --seaography
+seaography-cli graphql graphql/src/entities $DATABASE_URL pgorm-seaography-example
 ```
 
 ## Running the project

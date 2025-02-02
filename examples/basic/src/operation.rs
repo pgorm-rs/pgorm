@@ -1,5 +1,5 @@
 use super::*;
-use sea_orm::{entity::*, error::*, DbConn};
+use pgorm::{entity::*, error::*, DbConn};
 
 pub async fn all_about_operation(db: &DbConn) -> Result<(), DbErr> {
     insert_and_update(db).await?;
@@ -66,7 +66,7 @@ pub async fn save_active_model(db: &DbConn) -> Result<(), DbErr> {
 
 mod form {
     use super::fruit::*;
-    use sea_orm::entity::prelude::*;
+    use pgorm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, DeriveIntoActiveModel)]
     pub struct InputModel {

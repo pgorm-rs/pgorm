@@ -1,6 +1,6 @@
 use crate::{unpack_table_ref, EntityTrait, Identity, IdentityOf, Iterable, QuerySelect, Select};
 use core::marker::PhantomData;
-use sea_query::{
+use pgorm_query::{
     Alias, Condition, ConditionType, DynIden, ForeignKeyCreateStatement, IntoIden, JoinType, SeaRc,
     TableForeignKey, TableRef,
 };
@@ -17,7 +17,7 @@ pub enum RelationType {
 
 /// Action to perform on a foreign key whenever there are changes
 /// to an ActiveModel
-pub(crate) type ForeignKeyAction = sea_query::ForeignKeyAction;
+pub(crate) type ForeignKeyAction = pgorm_query::ForeignKeyAction;
 
 /// Defines the relations of an Entity
 pub trait RelationTrait: Iterable + Debug + 'static {
@@ -178,13 +178,13 @@ impl RelationDef {
     /// e.g. https://github.com/SeaQL/sea-orm/discussions/2133
     ///
     /// ```
-    /// use sea_orm::{
+    /// use pgorm::{
     ///     entity::*,
     ///     query::*,
     ///     tests_cfg::{cake, cake_filling},
     ///     DbBackend,
     /// };
-    /// use sea_query::Alias;
+    /// use pgorm_query::Alias;
     ///
     /// let cf = Alias::new("cf");
     ///
@@ -227,8 +227,8 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
-    /// use sea_query::{Expr, IntoCondition};
+    /// use pgorm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
+    /// use pgorm_query::{Expr, IntoCondition};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -265,8 +265,8 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
-    /// use sea_query::{Expr, IntoCondition, ConditionType};
+    /// use pgorm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
+    /// use pgorm_query::{Expr, IntoCondition, ConditionType};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -456,8 +456,8 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use sea_query::{Alias, IntoIden, MysqlQueryBuilder, TableAlterStatement, TableRef, ConditionType};
-/// use sea_orm::{EnumIter, Iden, Identity, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
+/// use pgorm_query::{Alias, IntoIden, MysqlQueryBuilder, TableAlterStatement, TableRef, ConditionType};
+/// use pgorm::{EnumIter, Iden, Identity, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
 ///     rel_type: RelationType::HasOne,

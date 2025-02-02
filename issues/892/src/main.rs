@@ -1,5 +1,5 @@
-use sea_orm::tests_cfg::{cake, cake_filling};
-use sea_orm::{Database, DbErr, EntityTrait, JoinType, QuerySelect, RelationTrait};
+use pgorm::tests_cfg::{cake, cake_filling};
+use pgorm::{Database, DbErr, EntityTrait, JoinType, QuerySelect, RelationTrait};
 
 #[tokio::main]
 async fn main() -> Result<(), DbErr> {

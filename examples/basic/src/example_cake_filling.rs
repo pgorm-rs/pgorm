@@ -1,6 +1,6 @@
 //! The `cake_filling` entity.
 
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 /// CakeFilling entity
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]

@@ -3,7 +3,7 @@ mod content;
 
 use container::prelude::*;
 use content::prelude::*;
-use sea_orm::{DbBackend, EntityTrait, QueryTrait};
+use pgorm::{DbBackend, EntityTrait, QueryTrait};
 
 fn main() {
     assert_eq!(

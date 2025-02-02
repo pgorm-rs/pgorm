@@ -2,7 +2,7 @@ use crate::{
     ColumnTrait, EntityTrait, IdenStatic, Iterable, QueryTrait, Select, SelectTwo, SelectTwoMany,
 };
 use core::marker::PhantomData;
-use sea_query::{Alias, ColumnRef, Iden, Order, SeaRc, SelectExpr, SelectStatement, SimpleExpr};
+use pgorm_query::{Alias, ColumnRef, Iden, Order, SeaRc, SelectExpr, SelectStatement, SimpleExpr};
 
 macro_rules! select_def {
     ( $ident: ident, $str: expr ) => {

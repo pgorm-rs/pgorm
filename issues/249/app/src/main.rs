@@ -1,6 +1,6 @@
 use service::clone_a_model;
 
-use sea_orm::tests_cfg::cake;
+use pgorm::tests_cfg::cake;
 
 fn main() {
 	let c1 = cake::Model {

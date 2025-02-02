@@ -4,7 +4,7 @@ use crate::{
 };
 use async_stream::stream;
 use futures::Stream;
-use sea_query::{Alias, Expr, PostgresQueryBuilder, SelectStatement};
+use pgorm_query::{Alias, Expr, QueryBuilder, SelectStatement};
 use std::{marker::PhantomData, pin::Pin};
 use tokio_postgres::types::ToSql;
 
@@ -51,7 +51,7 @@ where
             .limit(self.page_size)
             .offset(self.page_size * page)
             .to_owned();
-        let (stmt, values) = query.build(PostgresQueryBuilder);
+        let (stmt, values) = query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -85,7 +85,7 @@ where
                 Alias::new("sub_query"),
             )
             .to_owned();
-        let (stmt, values) = stmt.build(PostgresQueryBuilder);
+        let (stmt, values) = stmt.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -136,7 +136,7 @@ where
     /// Fetch one page and increment the page counter
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -153,7 +153,7 @@ where
     /// #     .into_connection();
     /// # let db = &owned_db;
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// let mut cake_pages = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
     ///     .paginate(db, 50);
@@ -175,7 +175,7 @@ where
     /// Convert self into an async stream
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -193,7 +193,7 @@ where
     /// # let db = &owned_db;
     /// #
     /// use futures::TryStreamExt;
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// let mut cake_stream = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
     ///     .paginate(db, 50)
@@ -318,8 +318,8 @@ mod tests {
     use crate::{DatabasePool, DbBackend, MockDatabase, Transaction};
     use futures::TryStreamExt;
     use once_cell::sync::Lazy;
+    use pgorm_query::{Alias, Expr, SelectStatement, Value};
     use pretty_assertions::assert_eq;
-    use sea_query::{Alias, Expr, SelectStatement, Value};
 
     static RAW_STMT: Lazy<Statement> = Lazy::new(|| {
         Statement::from_sql_and_values(

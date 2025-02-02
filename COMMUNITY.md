@@ -93,8 +93,8 @@ If you have built an app using SeaORM and want to showcase it, feel free to open
 
 ### Programming Libraries
 
-- [logic-lock](https://github.com/nappa85/logic-lock) | MySQL logic locks implemented over sea-orm | DB: MySQL
-- [sea-orm-adapter](https://github.com/ZihanType/sea-orm-adapter) | Sea ORM adapter for casbin-rs | DB: MySQL, Postgres, SQLite
+- [logic-lock](https://github.com/nappa85/logic-lock) | MySQL logic locks implemented over pgorm | DB: MySQL
+- [pgorm-adapter](https://github.com/ZihanType/pgorm-adapter) | Sea ORM adapter for casbin-rs | DB: MySQL, Postgres, SQLite
 - [symbols](https://github.com/nappa85/symbols) | A proc-macro utility to populates enum variants with primary keys values
 
 ### Frameworks

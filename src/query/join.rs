@@ -2,8 +2,8 @@ use crate::{
     join_tbl_on_condition, unpack_table_ref, ColumnTrait, EntityTrait, IdenStatic, Iterable,
     Linked, QuerySelect, Related, Select, SelectA, SelectB, SelectTwo, SelectTwoMany,
 };
-pub use sea_query::JoinType;
-use sea_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
+pub use pgorm_query::JoinType;
+use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
 
 impl<E> Select<E>
 where
@@ -162,8 +162,8 @@ mod tests {
         ColumnTrait, DbBackend, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait,
         RelationTrait,
     };
+    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType};
     use pretty_assertions::assert_eq;
-    use sea_query::{Alias, ConditionType, Expr, IntoCondition, JoinType};
 
     #[test]
     fn join_1() {

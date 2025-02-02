@@ -1,5 +1,5 @@
 mod material;
-use sea_orm::*;
+use pgorm::*;
 
 #[async_std::main]
 pub async fn main() {

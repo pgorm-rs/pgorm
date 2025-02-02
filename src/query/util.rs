@@ -42,12 +42,12 @@ macro_rules! debug_query_build {
 ///
 /// ```
 /// # #[cfg(feature = "mock")]
-/// # use sea_orm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
+/// # use pgorm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
 /// #
 /// # let conn = MockDatabase::new(DbBackend::Postgres)
 /// #     .into_connection();
 /// #
-/// use sea_orm::{debug_query_stmt, entity::*, query::*, tests_cfg::cake};
+/// use pgorm::{debug_query_stmt, entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
 ///     id: ActiveValue::set(1),
@@ -95,12 +95,12 @@ macro_rules! debug_query_stmt {
 ///
 /// ```
 /// # #[cfg(feature = "mock")]
-/// # use sea_orm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
+/// # use pgorm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
 /// #
 /// # let conn = MockDatabase::new(DbBackend::Postgres)
 /// #     .into_connection();
 /// #
-/// use sea_orm::{debug_query, entity::*, query::*, tests_cfg::cake};
+/// use pgorm::{debug_query, entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
 ///     id: ActiveValue::set(1),

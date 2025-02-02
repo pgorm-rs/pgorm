@@ -26,9 +26,9 @@ include_dir = "0.7"
 uuid = { version = "1.6.0", features = ["v4"] }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "json"] }
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../" # remove this line in your own project
-version = "~1.0.0" # sea-orm version
+version = "~1.0.0" # pgorm version
 features = [
   "sqlx-sqlite",
   "sqlx-postgres",
@@ -48,5 +48,5 @@ loco-rs = { version = "0.4.0", features = ["testing"] }
 insta = { version = "1.34.0", features = ["redactions", "yaml", "filters"] }
 
 [patch.crates-io]
-sea-orm = { path = "../../" }
-sea-orm-migration = { path = "../../sea-orm-migration" }
+pgorm = { path = "../../" }
+pgorm-migration = { path = "../../pgorm-migration" }

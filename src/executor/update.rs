@@ -2,7 +2,7 @@ use crate::{
     error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
     Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne,
 };
-use sea_query::{FromValueTuple, PostgresQueryBuilder, Query, UpdateStatement};
+use pgorm_query::{FromValueTuple, Query, QueryBuilder, UpdateStatement};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
@@ -87,7 +87,7 @@ impl Updater {
         if self.is_noop() {
             return Ok(UpdateResult::default());
         }
-        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let (stmt, values) = self.query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -124,7 +124,7 @@ impl Updater {
             .exprs(Column::<A>::iter().map(|c| c.select_as(c.into_returning_expr())));
         self.query.returning(returning);
 
-        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let (stmt, values) = self.query.build(QueryBuilder);
 
         let found: Model<A> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(stmt, values)
             .one(db)
@@ -147,7 +147,7 @@ impl Updater {
 
         self.query.returning(returning);
 
-        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let (stmt, values) = self.query.build(QueryBuilder);
 
         let models: Vec<E::Model> =
             SelectorRaw::<SelectModel<E::Model>>::from_statement(stmt, values)
@@ -185,8 +185,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{entity::prelude::*, tests_cfg::*, *};
+    use pgorm_query::Expr;
     use pretty_assertions::assert_eq;
-    use sea_query::Expr;
 
     #[smol_potat::test]
     async fn update_record_not_found_1() -> Result<(), DbErr> {

@@ -1,7 +1,7 @@
 use super::*;
 use crate::common::setup::create_table;
-use sea_orm::{error::*, sea_query, DatabasePool, DbConn, ExecResult};
-use sea_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Table};
+use pgorm::{error::*, pgorm_query, DatabasePool, DbConn, ExecResult};
+use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Table};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     create_bakery_table(db).await?;

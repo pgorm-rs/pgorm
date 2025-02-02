@@ -6,18 +6,18 @@ pub mod prelude {
 }
 
 pub mod model {
-    use sea_orm::entity::prelude::*;
+    use pgorm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    #[sea_orm(table_name = "container")]
+    #[pgorm(table_name = "container")]
     pub struct Model {
-        #[sea_orm(primary_key, column_name = "db_id")]
+        #[pgorm(primary_key, column_name = "db_id")]
         pub rust_id: i32,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        #[sea_orm(has_many = "crate::Content")]
+        #[pgorm(has_many = "crate::Content")]
         Content, // 1(Container) ⇆ n(Content)
     }
 

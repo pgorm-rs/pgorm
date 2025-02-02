@@ -13,13 +13,13 @@ path = "src/lib.rs"
 [dependencies]
 async-std = { version = "1", features = ["attributes", "tokio1"] }
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../../" # remove this line in your own project
-version = "~1.0.0" # sea-orm version
+version = "~1.0.0" # pgorm version
 
-[dependencies.sea-orm-migration]
-path = "../../../sea-orm-migration" # remove this line in your own project
-version = "~1.0.0" # sea-orm-migration version
+[dependencies.pgorm-migration]
+path = "../../../pgorm-migration" # remove this line in your own project
+version = "~1.0.0" # pgorm-migration version
 features = [
   "runtime-async-std-native-tls",
   "sqlx-mysql",

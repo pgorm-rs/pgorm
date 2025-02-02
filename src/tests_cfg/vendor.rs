@@ -1,10 +1,10 @@
-use crate as sea_orm;
+use crate as pgorm;
 use crate::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "vendor")]
+#[pgorm(table_name = "vendor")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub name: String,
 }

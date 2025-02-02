@@ -1,4 +1,4 @@
-use crate as sea_orm;
+use crate as pgorm;
 use crate::entity::prelude::*;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -20,7 +20,7 @@ pub struct Model {
     pub filling_id: i32,
     #[cfg(feature = "with-decimal")]
     pub price: Decimal,
-    #[sea_orm(ignore)]
+    #[pgorm(ignore)]
     pub ignored_attr: i32,
 }
 

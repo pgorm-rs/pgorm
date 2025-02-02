@@ -2,12 +2,12 @@
 
 pub mod common;
 
-pub use sea_orm::{entity::*, error::*, query::*, sea_query, tests_cfg::*, Database, DbConn};
+pub use pgorm::{entity::*, error::*, query::*, pgorm_query, tests_cfg::*, Database, DbConn};
 
 // cargo test --features sqlx-sqlite,runtime-async-std-native-tls --test basic
 // export DATABASE_URL=mysql://root:root@localhost:3306
 // export DATABASE_URL=sqlite::memory:
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg(feature = "sqlx-sqlite")]
 async fn main() -> Result<(), DbErr> {
     dotenv::from_filename(".env.local").ok();
@@ -24,9 +24,9 @@ async fn main() -> Result<(), DbErr> {
 
 #[cfg(feature = "sqlx-sqlite")]
 async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
-    use sea_query::*;
+    use pgorm_query::*;
 
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(cake::Entity)
         .col(
             ColumnDef::new(cake::Column::Id)

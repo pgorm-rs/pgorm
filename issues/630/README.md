@@ -1,4 +1,4 @@
-# sea_orm_underscore_fields
+# pgorm_underscore_fields
 A minimal repository showing an issue with SeaORM.
 
 Connects to the database with `env!()`, so make sure to set `DATABASE_URL` when compiling.

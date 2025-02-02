@@ -3,11 +3,11 @@ set -e
 if [ -d ./build-tools ]; then
     targets=(
         "Cargo.toml"
-        "sea-orm-cli/Cargo.toml"
-        "sea-orm-codegen/Cargo.toml"
-        "sea-orm-macros/Cargo.toml"
-        "sea-orm-migration/Cargo.toml"
-        "sea-orm-rocket/Cargo.toml"
+        "pgorm-cli/Cargo.toml"
+        "pgorm-codegen/Cargo.toml"
+        "pgorm-macros/Cargo.toml"
+        "pgorm-migration/Cargo.toml"
+        "pgorm-rocket/Cargo.toml"
     )
 
     for target in "${targets[@]}"; do

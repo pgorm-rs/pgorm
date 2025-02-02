@@ -1,17 +1,17 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "model")]
+#[pgorm(table_name = "model")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id_1: i32,
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id_2: String,
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id_3: f64,
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id_4: Uuid,
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id_5: DateTime,
     pub owner: String,
     pub name: String,

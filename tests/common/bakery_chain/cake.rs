@@ -1,13 +1,13 @@
 use crate::common::setup::rust_dec;
-use sea_orm::{entity::prelude::*, ConnectionTrait};
+use pgorm::{entity::prelude::*, ConnectionTrait};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "cake")]
+#[pgorm(table_name = "cake")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub name: String,
-    #[sea_orm(column_type = "Decimal(Some((16, 4)))")]
+    #[pgorm(column_type = "Decimal(Some((16, 4)))")]
     pub price: Decimal,
     pub bakery_id: Option<i32>,
     pub gluten_free: bool,
@@ -16,7 +16,7 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
+    #[pgorm(
         belongs_to = "super::bakery::Entity",
         from = "Column::BakeryId",
         to = "super::bakery::Column::Id",
@@ -24,7 +24,7 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     Bakery,
-    #[sea_orm(has_many = "super::lineitem::Entity")]
+    #[pgorm(has_many = "super::lineitem::Entity")]
     Lineitem,
 }
 
@@ -53,7 +53,7 @@ impl Related<super::lineitem::Entity> for Entity {
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
-        use sea_orm::Set;
+        use pgorm::Set;
         Self {
             serial: Set(Uuid::new_v4()),
             ..ActiveModelTrait::default()

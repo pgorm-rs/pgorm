@@ -4,7 +4,7 @@ use crate::{
     QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany,
 };
 use futures::{Stream, TryStreamExt};
-use sea_query::{PostgresQueryBuilder, SelectStatement, Value, Values};
+use pgorm_query::{QueryBuilder, SelectStatement, Value, Values};
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData};
 use tokio_postgres::types::ToSql;
@@ -48,7 +48,7 @@ pub trait SelectorTrait {
 pub struct SelectGetableValue<T, C>
 where
     T: TryGetableMany,
-    C: strum::IntoEnumIterator + sea_query::Iden,
+    C: strum::IntoEnumIterator + pgorm_query::Iden,
 {
     columns: PhantomData<C>,
     model: PhantomData<T>,
@@ -85,7 +85,7 @@ where
 impl<T, C> SelectorTrait for SelectGetableValue<T, C>
 where
     T: TryGetableMany,
-    C: strum::IntoEnumIterator + sea_query::Iden,
+    C: strum::IntoEnumIterator + pgorm_query::Iden,
 {
     type Item = T;
 
@@ -167,19 +167,19 @@ where
     /// ```
     /// # #[cfg(feature = "macros")]
     /// # {
-    /// use sea_orm::{
+    /// use pgorm::{
     ///     entity::*,
     ///     query::*,
     ///     tests_cfg::cake::{self, Entity as Cake},
     ///     DbBackend, DerivePartialModel, FromQueryResult,
     /// };
-    /// use sea_query::{Expr, Func, SimpleExpr};
+    /// use pgorm_query::{Expr, Func, SimpleExpr};
     ///
     /// #[derive(DerivePartialModel, FromQueryResult)]
-    /// #[sea_orm(entity = "Cake")]
+    /// #[pgorm(entity = "Cake")]
     /// struct PartialCake {
     ///     name: String,
-    ///     #[sea_orm(
+    ///     #[pgorm(
     ///         from_expr = r#"SimpleExpr::FunctionCall(Func::upper(Expr::col((Cake, cake::Column::Name))))"#
     ///     )]
     ///     name_upper: String,
@@ -202,7 +202,7 @@ where
     }
 
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(all(feature = "mock", feature = "macros"))]
@@ -219,7 +219,7 @@ where
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
     ///
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
@@ -252,7 +252,7 @@ where
     /// ```
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(all(feature = "mock", feature = "macros"))]
@@ -267,7 +267,7 @@ where
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
     ///
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
@@ -306,13 +306,13 @@ where
     pub fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + sea_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::Iden,
     {
         Selector::<SelectGetableValue<T, C>>::with_columns(self.query)
     }
 
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(all(feature = "mock", feature = "macros"))]
@@ -329,7 +329,7 @@ where
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let res: Vec<String> = cake::Entity::find()
     ///     .select_only()
@@ -357,7 +357,7 @@ where
     /// ```
     ///
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(all(feature = "mock", feature = "macros"))]
@@ -372,7 +372,7 @@ where
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let res: Vec<(String, i64)> = cake::Entity::find()
     ///     .select_only()
@@ -625,7 +625,7 @@ where
     pub fn with_columns<T, C>(query: SelectStatement) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + sea_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::Iden,
     {
         Selector {
             query,
@@ -648,7 +648,7 @@ where
     }
 
     fn into_selector_raw(self) -> SelectorRaw<S> {
-        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let (stmt, values) = self.query.build(QueryBuilder);
 
         SelectorRaw {
             stmt,
@@ -660,7 +660,7 @@ where
     /// Get the SQL statement
     // pub fn into_statement(self) -> Statement {
     //     // This is probably wrong <_<
-    //     let (stmt, _) = self.query.build(PostgresQueryBuilder);
+    //     let (stmt, _) = self.query.build(QueryBuilder);
     //     stmt
     // }
 
@@ -725,7 +725,7 @@ where
     pub fn with_columns<T, C>(stmt: String, values: Values) -> SelectorRaw<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + sea_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::Iden,
     {
         SelectorRaw {
             stmt,
@@ -738,7 +738,7 @@ where
     }
 
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -757,7 +757,7 @@ where
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, FromQueryResult};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, FromQueryResult};
     ///
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {
@@ -814,7 +814,7 @@ where
 
     /// Get an item from the Select query
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -829,7 +829,7 @@ where
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let _: Option<cake::Model> = cake::Entity::find()
     ///     .from_raw_sql(Statement::from_sql_and_values(
@@ -872,7 +872,7 @@ where
 
     /// Get an item from the Select query
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -887,7 +887,7 @@ where
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let _: Option<cake::Model> = cake::Entity::find()
     ///     .from_raw_sql(Statement::from_sql_and_values(
@@ -930,7 +930,7 @@ where
 
     /// Get all items from the Select query
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(feature = "mock")]
@@ -945,7 +945,7 @@ where
     /// #     ])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let _: Vec<cake::Model> = cake::Entity::find()
     ///     .from_raw_sql(Statement::from_sql_and_values(
@@ -1149,13 +1149,13 @@ mod tests {
         cake_id: i32,
         fruit_id: i32,
     ) -> (
-        sea_orm::tests_cfg::cake::Model,
-        sea_orm::tests_cfg::fruit::Model,
+        pgorm::tests_cfg::cake::Model,
+        pgorm::tests_cfg::fruit::Model,
     ) {
         (cake_model(cake_id), fruit_model(fruit_id, Some(cake_id)))
     }
 
-    fn cake_model(id: i32) -> sea_orm::tests_cfg::cake::Model {
+    fn cake_model(id: i32) -> pgorm::tests_cfg::cake::Model {
         let name = match id {
             1 => "apple cake",
             2 => "orange cake",
@@ -1164,10 +1164,10 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::cake::Model { id, name }
+        pgorm::tests_cfg::cake::Model { id, name }
     }
 
-    fn filling_model(id: i32) -> sea_orm::tests_cfg::filling::Model {
+    fn filling_model(id: i32) -> pgorm::tests_cfg::filling::Model {
         let name = match id {
             1 => "apple juice",
             2 => "orange jam",
@@ -1176,7 +1176,7 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::filling::Model {
+        pgorm::tests_cfg::filling::Model {
             id,
             name,
             vendor_id: Some(1),
@@ -1188,13 +1188,13 @@ mod tests {
         cake_id: i32,
         filling_id: i32,
     ) -> (
-        sea_orm::tests_cfg::cake::Model,
-        sea_orm::tests_cfg::filling::Model,
+        pgorm::tests_cfg::cake::Model,
+        pgorm::tests_cfg::filling::Model,
     ) {
         (cake_model(cake_id), filling_model(filling_id))
     }
 
-    fn fruit_model(id: i32, cake_id: Option<i32>) -> sea_orm::tests_cfg::fruit::Model {
+    fn fruit_model(id: i32, cake_id: Option<i32>) -> pgorm::tests_cfg::fruit::Model {
         let name = match id {
             1 => "apple",
             2 => "orange",
@@ -1203,20 +1203,20 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::fruit::Model { id, name, cake_id }
+        pgorm::tests_cfg::fruit::Model { id, name, cake_id }
     }
 
     fn cake_vendor_link(
         cake_id: i32,
         vendor_id: i32,
     ) -> (
-        sea_orm::tests_cfg::cake::Model,
-        sea_orm::tests_cfg::vendor::Model,
+        pgorm::tests_cfg::cake::Model,
+        pgorm::tests_cfg::vendor::Model,
     ) {
         (cake_model(cake_id), vendor_model(vendor_id))
     }
 
-    fn vendor_model(id: i32) -> sea_orm::tests_cfg::vendor::Model {
+    fn vendor_model(id: i32) -> pgorm::tests_cfg::vendor::Model {
         let name = match id {
             1 => "Apollo",
             2 => "Benny",
@@ -1225,13 +1225,13 @@ mod tests {
             _ => "",
         }
         .to_string();
-        sea_orm::tests_cfg::vendor::Model { id, name }
+        pgorm::tests_cfg::vendor::Model { id, name }
     }
 
     #[smol_potat::test]
-    pub async fn also_related() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
+    pub async fn also_related() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_fruit_model(1, 1)]])
@@ -1262,9 +1262,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_related_2() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase};
+    pub async fn also_related_2() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_fruit_model(1, 1), cake_fruit_model(1, 2)]])
@@ -1282,9 +1282,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_related_3() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase};
+    pub async fn also_related_3() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1307,9 +1307,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_related_4() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_related_4() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1334,9 +1334,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_related_many_to_many() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_related_many_to_many() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1359,9 +1359,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_related_many_to_many_2() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_related_many_to_many_2() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1386,9 +1386,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_related() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
+    pub async fn with_related() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1430,9 +1430,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_related_2() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_related_2() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1462,9 +1462,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_related_empty() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_related_empty() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1496,9 +1496,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_related_many_to_many() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_related_many_to_many() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1520,9 +1520,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_related_many_to_many_2() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_related_many_to_many_2() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1546,9 +1546,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_linked_base() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
+    pub async fn also_linked_base() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_vendor_link(1, 1)]])
@@ -1584,9 +1584,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_linked_same_cake() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase};
+    pub async fn also_linked_same_cake() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1612,9 +1612,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_linked_same_vendor() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_linked_same_vendor() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1640,9 +1640,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_linked_many_to_many() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_linked_many_to_many() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1672,9 +1672,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn also_linked_empty() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn also_linked_empty() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1702,9 +1702,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_linked_base() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
+    pub async fn with_linked_base() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1746,9 +1746,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_linked_same_vendor() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_linked_same_vendor() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1774,9 +1774,9 @@ mod tests {
     }
 
     #[smol_potat::test]
-    pub async fn with_linked_empty() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_linked_empty() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[
@@ -1804,9 +1804,9 @@ mod tests {
 
     // normally would not happen
     #[smol_potat::test]
-    pub async fn with_linked_repeated() -> Result<(), sea_orm::DbErr> {
-        use sea_orm::tests_cfg::*;
-        use sea_orm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
+    pub async fn with_linked_repeated() -> Result<(), pgorm::DbErr> {
+        use pgorm::tests_cfg::*;
+        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[

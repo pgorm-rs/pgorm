@@ -1,6 +1,6 @@
 use crate::entity::{prelude::*, *};
-use sea_orm::entity::*;
-use sea_orm_migration::prelude::*;
+use pgorm::entity::*;
+use pgorm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

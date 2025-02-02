@@ -1,8 +1,8 @@
-//! Basic sea-orm example.
+//! Basic pgorm example.
 
 #![deny(missing_docs)]
 
-use sea_orm::Database;
+use pgorm::Database;
 
 mod entities;
 pub mod example_cake;
@@ -10,7 +10,7 @@ pub mod example_cake_filling;
 pub mod example_filling;
 pub mod example_fruit;
 mod operation;
-pub mod sea_orm_active_enums;
+pub mod pgorm_active_enums;
 mod select;
 
 use entities::*;

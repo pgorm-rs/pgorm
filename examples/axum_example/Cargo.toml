@@ -1,5 +1,5 @@
 [package]
-name = "sea-orm-axum-example"
+name = "pgorm-axum-example"
 version = "0.1.0"
 authors = ["Yoshiera Huang <huangjasper@126.com>"]
 edition = "2021"

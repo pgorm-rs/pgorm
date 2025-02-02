@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "pool")]
+#[pgorm(table_name = "pool")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id: i64,
     pub name: String,
 }

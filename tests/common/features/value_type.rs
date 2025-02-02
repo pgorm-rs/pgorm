@@ -1,11 +1,11 @@
 pub mod value_type_general {
     use super::*;
-    use sea_orm::entity::prelude::*;
+    use pgorm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "value_type")]
+    #[pgorm(table_name = "value_type")]
     pub struct Model {
-        #[sea_orm(primary_key)]
+        #[pgorm(primary_key)]
         pub id: i32,
         pub number: Integer,
     }
@@ -18,12 +18,12 @@ pub mod value_type_general {
 
 pub mod value_type_pg {
     use super::*;
-    use sea_orm::entity::prelude::*;
+    use pgorm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "value_type_postgres")]
+    #[pgorm(table_name = "value_type_postgres")]
     pub struct Model {
-        #[sea_orm(primary_key)]
+        #[pgorm(primary_key)]
         pub id: i32,
         pub number: Integer,
         pub str_vec: StringVec,
@@ -35,10 +35,10 @@ pub mod value_type_pg {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveValueType)]
-#[sea_orm(array_type = "Int")]
+#[pgorm(array_type = "Int")]
 pub struct Integer(i32);
 
 impl<T> From<T> for Integer
@@ -51,7 +51,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveValueType)]
-#[sea_orm(column_type = "Boolean", array_type = "Bool")]
+#[pgorm(column_type = "Boolean", array_type = "Bool")]
 pub struct Boolbean(pub String);
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveValueType)]

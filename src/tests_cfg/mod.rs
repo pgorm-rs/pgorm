@@ -13,7 +13,7 @@ pub mod indexes;
 pub mod lunch_set;
 pub mod lunch_set_expanded;
 pub mod rust_keyword;
-pub mod sea_orm_active_enums;
+pub mod pgorm_active_enums;
 pub mod vendor;
 
 pub use cake::Entity as Cake;

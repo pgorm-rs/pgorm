@@ -1,6 +1,6 @@
 #![allow(elided_lifetimes_in_paths)]
 #![allow(clippy::wildcard_imports)]
-pub use sea_orm_migration::prelude::*;
+pub use pgorm_migration::prelude::*;
 
 mod m20220101_000001_users;
 mod m20231103_114510_notes;

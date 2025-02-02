@@ -6,8 +6,8 @@ use crate::{
 // use bigdecimal::BigDecimal;
 // use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 // use rust_decimal::Decimal;
-use sea_query::{
-    ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, PostgresQueryBuilder, SeaRc,
+use pgorm_query::{
+    ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, QueryBuilder, SeaRc,
     SelectStatement, SimpleExpr, Value, ValueTuple,
 };
 use tokio_postgres::types::{to_sql_checked, IsNull, ToSql, Type};
@@ -288,7 +288,7 @@ where
         self.apply_order_by();
         self.apply_filters();
 
-        let (stmt, values) = self.query.build(PostgresQueryBuilder);
+        let (stmt, values) = self.query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -1255,15 +1255,15 @@ mod tests {
     }
 
     mod test_entity {
-        use crate as sea_orm;
+        use crate as pgorm;
         use crate::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-        #[sea_orm(table_name = "example")]
+        #[pgorm(table_name = "example")]
         pub struct Model {
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub id: i32,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub category: String,
         }
 
@@ -1274,17 +1274,17 @@ mod tests {
     }
 
     mod xyz_entity {
-        use crate as sea_orm;
+        use crate as pgorm;
         use crate::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-        #[sea_orm(table_name = "m")]
+        #[pgorm(table_name = "m")]
         pub struct Model {
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub x: i32,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub y: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub z: i64,
         }
 
@@ -1730,35 +1730,35 @@ mod tests {
     }
 
     mod composite_entity {
-        use crate as sea_orm;
+        use crate as pgorm;
         use crate::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-        #[sea_orm(table_name = "t")]
+        #[pgorm(table_name = "t")]
         pub struct Model {
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_1: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_2: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_3: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_4: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_5: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_6: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_7: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_8: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_9: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_10: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_11: String,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub col_12: String,
         }
 
@@ -2013,21 +2013,21 @@ mod tests {
     }
 
     mod test_base_entity {
-        use crate as sea_orm;
+        use crate as pgorm;
         use crate::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-        #[sea_orm(table_name = "base")]
+        #[pgorm(table_name = "base")]
         pub struct Model {
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub id: i32,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub name: String,
         }
 
         #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
         pub enum Relation {
-            #[sea_orm(has_many = "super::test_related_entity::Entity")]
+            #[pgorm(has_many = "super::test_related_entity::Entity")]
             TestRelatedEntity,
         }
 
@@ -2042,22 +2042,22 @@ mod tests {
 
     mod test_related_entity {
         use super::test_base_entity;
-        use crate as sea_orm;
+        use crate as pgorm;
         use crate::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-        #[sea_orm(table_name = "related")]
+        #[pgorm(table_name = "related")]
         pub struct Model {
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub id: i32,
-            #[sea_orm(primary_key)]
+            #[pgorm(primary_key)]
             pub name: String,
             pub test_id: i32,
         }
 
         #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
         pub enum Relation {
-            #[sea_orm(
+            #[pgorm(
                 belongs_to = "test_base_entity::Entity",
                 from = "Column::TestId",
                 to = "super::test_base_entity::Column::Id"
@@ -2470,6 +2470,9 @@ impl ToSql for ValueHolder {
                 .collect::<Vec<_>>()
                 .to_sql(ty, out),
             Value::Array(_, None) => Ok(IsNull::Yes),
+            Value::Vector(vector) => todo!(),
+            Value::IpNetwork(ip_network) => todo!(),
+            Value::MacAddress(mac_address) => todo!(),
         }
     }
 

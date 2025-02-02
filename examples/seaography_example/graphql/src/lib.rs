@@ -1,4 +1,4 @@
-use sea_orm::prelude::*;
+use pgorm::prelude::*;
 
 pub mod entities;
 pub mod query_root;

@@ -6,13 +6,13 @@ pub use chrono::offset::Utc;
 pub use common::{bakery_chain::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
 pub use rust_decimal::prelude::*;
-use sea_orm::{entity::*, query::*, DbErr, DerivePartialModel, FromQueryResult};
-use sea_query::{Expr, Func, SimpleExpr};
+use pgorm::{entity::*, query::*, DbErr, DerivePartialModel, FromQueryResult};
+use pgorm_query::{Expr, Func, SimpleExpr};
 pub use uuid::Uuid;
 
 // Run the test locally:
 // DATABASE_URL="mysql://root:@localhost" cargo test --features sqlx-mysql,runtime-async-std-native-tls --test relational_tests
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn left_join() {
     let ctx = TestContext::new("test_left_join").await;
     create_tables(&ctx.db).await.unwrap();
@@ -74,12 +74,12 @@ pub async fn left_join() {
     assert_eq!(result.bakery_name, Some("SeaSide Bakery".to_string()));
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq)]
-    #[sea_orm(entity = "Baker")]
+    #[pgorm(entity = "Baker")]
     struct PartialSelectResult {
         name: String,
-        #[sea_orm(from_expr = "Expr::col((bakery::Entity, bakery::Column::Name))")]
+        #[pgorm(from_expr = "Expr::col((bakery::Entity, bakery::Column::Name))")]
         bakery_name: Option<String>,
-        #[sea_orm(
+        #[pgorm(
             from_expr = r#"SimpleExpr::FunctionCall(Func::upper(Expr::col((bakery::Entity, bakery::Column::Name))))"#
         )]
         bakery_name_upper: Option<String>,
@@ -113,7 +113,7 @@ pub async fn left_join() {
     ctx.delete().await;
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-postgres"))]
 pub async fn right_join() {
     let ctx = TestContext::new("test_right_join").await;
@@ -196,7 +196,7 @@ pub async fn right_join() {
     ctx.delete().await;
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn inner_join() {
     let ctx = TestContext::new("test_inner_join").await;
     create_tables(&ctx.db).await.unwrap();
@@ -281,7 +281,7 @@ pub async fn inner_join() {
     ctx.delete().await;
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn group_by() {
     let ctx = TestContext::new("test_group_by").await;
     create_tables(&ctx.db).await.unwrap();
@@ -375,7 +375,7 @@ pub async fn group_by() {
     ctx.delete().await;
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn having() {
     // customers with orders with total equal to $90
     let ctx = TestContext::new("test_having").await;
@@ -480,9 +480,9 @@ pub async fn having() {
     ctx.delete().await;
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn related() -> Result<(), DbErr> {
-    use sea_orm::{SelectA, SelectB};
+    use pgorm::{SelectA, SelectB};
 
     let ctx = TestContext::new("test_related").await;
     create_tables(&ctx.db).await?;
@@ -644,7 +644,7 @@ pub async fn related() -> Result<(), DbErr> {
 
     assert_eq!(
         select_bakery_with_baker
-            .build(sea_orm::DatabaseBackend::MySql)
+            .build(pgorm::DatabaseBackend::MySql)
             .to_string(),
         [
             "SELECT `bakery`.`id` AS `A_id`,",
@@ -724,11 +724,11 @@ pub async fn related() -> Result<(), DbErr> {
     Ok(())
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn linked() -> Result<(), DbErr> {
     use common::bakery_chain::Order;
-    use sea_orm::{SelectA, SelectB};
-    use sea_query::{Alias, Expr};
+    use pgorm::{SelectA, SelectB};
+    use pgorm_query::::::{Alias, Expr};
 
     let ctx = TestContext::new("test_linked").await;
     create_tables(&ctx.db).await?;
@@ -1000,7 +1000,7 @@ pub async fn linked() -> Result<(), DbErr> {
 
     assert_eq!(
         select_baker_with_customer
-            .build(sea_orm::DatabaseBackend::MySql)
+            .build(pgorm::DatabaseBackend::MySql)
             .to_string(),
         [
             "SELECT `baker`.`id` AS `A_id`,",

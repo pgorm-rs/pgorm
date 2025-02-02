@@ -1,5 +1,5 @@
 use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect};
-use sea_query::{QueryStatementBuilder, Values};
+use pgorm_query::{QueryStatementBuilder, Values};
 
 /// A Trait for any type performing queries on a Model or ActiveModel
 pub trait QueryTrait {
@@ -17,7 +17,7 @@ pub trait QueryTrait {
 
     /// Build the query as [`Statement`]
     fn build(&self) -> (String, Values) {
-        self.as_query().build_any(&sea_query::PostgresQueryBuilder)
+        self.as_query().build_any(&pgorm_query::QueryBuilder)
     }
 
     /// Apply an operation on the [QueryTrait::QueryStatement] if the given `Option<T>` is `Some(_)`
@@ -25,7 +25,7 @@ pub trait QueryTrait {
     /// # Example
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()

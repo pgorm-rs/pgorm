@@ -6,7 +6,7 @@ use async_graphql_poem::GraphQL;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use poem::{get, handler, listener::TcpListener, web::Html, IntoResponse, Route, Server};
-use sea_orm::{prelude::*, Database};
+use pgorm::{prelude::*, Database};
 use std::env;
 
 pub mod query_root;

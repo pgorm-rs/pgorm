@@ -1,24 +1,24 @@
-use rocket_okapi_example_service::sea_orm;
+use rocket_okapi_example_service::pgorm;
 
 use async_trait::async_trait;
-use sea_orm::ConnectOptions;
-use sea_orm_rocket::{rocket::figment::Figment, Config, Database};
+use pgorm::ConnectOptions;
+use pgorm_rocket::{rocket::figment::Figment, Config, Database};
 use std::time::Duration;
 
 #[derive(Database, Debug)]
-#[database("sea_orm")]
+#[database("pgorm")]
 pub struct Db(SeaOrmPool);
 
 #[derive(Debug, Clone)]
 pub struct SeaOrmPool {
-    pub conn: sea_orm::DatabaseConnection,
+    pub conn: pgorm::DatabaseConnection,
 }
 
 #[async_trait]
-impl sea_orm_rocket::Pool for SeaOrmPool {
-    type Error = sea_orm::DbErr;
+impl pgorm_rocket::Pool for SeaOrmPool {
+    type Error = pgorm::DbErr;
 
-    type Connection = sea_orm::DatabaseConnection;
+    type Connection = pgorm::DatabaseConnection;
 
     async fn init(figment: &Figment) -> Result<Self, Self::Error> {
         let config = figment.extract::<Config>().unwrap();
@@ -30,7 +30,7 @@ impl sea_orm_rocket::Pool for SeaOrmPool {
         if let Some(idle_timeout) = config.idle_timeout {
             options.idle_timeout(Duration::from_secs(idle_timeout));
         }
-        let conn = sea_orm::Database::connect(options).await?;
+        let conn = pgorm::Database::connect(options).await?;
 
         Ok(SeaOrmPool { conn })
     }

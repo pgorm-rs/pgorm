@@ -1,19 +1,19 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "users")]
+#[pgorm(table_name = "users")]
 pub struct Model {
     pub created_at: DateTime,
     pub updated_at: DateTime,
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
-    #[sea_orm(unique)]
+    #[pgorm(unique)]
     pub pid: Uuid,
-    #[sea_orm(unique)]
+    #[pgorm(unique)]
     pub email: String,
     pub password: String,
-    #[sea_orm(unique)]
+    #[pgorm(unique)]
     pub api_key: String,
     pub name: String,
     pub reset_token: Option<String>,

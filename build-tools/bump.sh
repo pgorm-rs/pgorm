@@ -1,38 +1,38 @@
 #!/bin/bash
 set -e
 
-# Bump `sea-orm-codegen` version
-cd sea-orm-codegen
+# Bump `pgorm-codegen` version
+cd pgorm-codegen
 sed -i 's/^version.*$/version = "'$1'"/' Cargo.toml
 cd ..
 
-# Bump `sea-orm-cli` version
-cd sea-orm-cli
+# Bump `pgorm-cli` version
+cd pgorm-cli
 sed -i 's/^version.*$/version = "'$1'"/' Cargo.toml
-sed -i 's/^sea-orm-codegen [^,]*,/sea-orm-codegen = { version = "\='$1'",/' Cargo.toml
+sed -i 's/^pgorm-codegen [^,]*,/pgorm-codegen = { version = "\='$1'",/' Cargo.toml
 cd ..
 
-# Bump `sea-orm-macros` version
-cd sea-orm-macros
+# Bump `pgorm-macros` version
+cd pgorm-macros
 sed -i 's/^version.*$/version = "'$1'"/' Cargo.toml
 cd ..
 
-# Bump `sea-orm` version
+# Bump `pgorm` version
 sed -i 's/^version.*$/version = "'$1'"/' Cargo.toml
-sed -i 's/^sea-orm-macros [^,]*,/sea-orm-macros = { version = "'~$1'",/' Cargo.toml
+sed -i 's/^pgorm-macros [^,]*,/pgorm-macros = { version = "'~$1'",/' Cargo.toml
 
-# Bump `sea-orm-migration` version
-cd sea-orm-migration
+# Bump `pgorm-migration` version
+cd pgorm-migration
 sed -i 's/^version.*$/version = "'$1'"/' Cargo.toml
-sed -i 's/^sea-orm-cli [^,]*,/sea-orm-cli = { version = "'~$1'",/' Cargo.toml
-sed -i 's/^sea-orm [^,]*,/sea-orm = { version = "'~$1'",/' Cargo.toml
+sed -i 's/^pgorm-cli [^,]*,/pgorm-cli = { version = "'~$1'",/' Cargo.toml
+sed -i 's/^pgorm [^,]*,/pgorm = { version = "'~$1'",/' Cargo.toml
 cd ..
 
 git commit -am "$1"
 
 # Bump examples' dependency version
 cd examples
-find . -depth -type f -name '*.toml' -exec sed -i 's/^version = ".*" # sea-orm version$/version = "'~$1'" # sea-orm version/' {} \;
-find . -depth -type f -name '*.toml' -exec sed -i 's/^version = ".*" # sea-orm-migration version$/version = "'~$1'" # sea-orm-migration version/' {} \;
+find . -depth -type f -name '*.toml' -exec sed -i 's/^version = ".*" # pgorm version$/version = "'~$1'" # pgorm version/' {} \;
+find . -depth -type f -name '*.toml' -exec sed -i 's/^version = ".*" # pgorm-migration version$/version = "'~$1'" # pgorm-migration version/' {} \;
 git add .
 git commit -m "update examples"

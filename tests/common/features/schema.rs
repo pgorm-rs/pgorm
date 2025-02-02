@@ -1,10 +1,10 @@
 use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
-use sea_orm::{
-    error::*, sea_query, ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName, ExecResult,
+use pgorm::{
+    error::*, pgorm_query, ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName, ExecResult,
     Schema,
 };
-use sea_query::{
+use pgorm_query::{
     extension::postgres::Type, Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden,
     StringLen,
 };
@@ -67,7 +67,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
 }
 
 pub async fn create_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(applog::Entity)
         .comment("app logs")
         .col(
@@ -102,7 +102,7 @@ pub async fn create_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_metadata_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(metadata::Entity)
         .col(
             ColumnDef::new(metadata::Column::Uuid)
@@ -128,7 +128,7 @@ pub async fn create_metadata_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_repository_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(repository::Entity)
         .col(
             ColumnDef::new(repository::Column::Id)
@@ -149,7 +149,7 @@ pub async fn create_repository_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_self_join_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(self_join::Entity)
         .col(
             ColumnDef::new(self_join::Column::Uuid)
@@ -179,7 +179,7 @@ pub async fn create_byte_primary_key_table(db: &DbConn) -> Result<ExecResult, Db
         DbBackend::Sqlite | DbBackend::Postgres => primary_key_col.binary(),
     };
 
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(byte_primary_key::Entity)
         .col(primary_key_col.not_null().primary_key())
         .col(
@@ -193,7 +193,7 @@ pub async fn create_byte_primary_key_table(db: &DbConn) -> Result<ExecResult, Db
 }
 
 pub async fn create_active_enum_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(active_enum::Entity.table_ref())
         .col(
             ColumnDef::new(active_enum::Column::Id)
@@ -214,7 +214,7 @@ pub async fn create_active_enum_table(db: &DbConn) -> Result<ExecResult, DbErr> 
 }
 
 pub async fn create_active_enum_child_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(active_enum_child::Entity.table_ref())
         .col(
             ColumnDef::new(active_enum_child::Column::Id)
@@ -248,7 +248,7 @@ pub async fn create_active_enum_child_table(db: &DbConn) -> Result<ExecResult, D
 }
 
 pub async fn create_satellites_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(satellite::Entity)
         .col(
             ColumnDef::new(satellite::Column::Id)
@@ -280,7 +280,7 @@ pub async fn create_satellites_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_transaction_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(transaction_log::Entity)
         .col(
             ColumnDef::new(transaction_log::Column::Id)
@@ -315,7 +315,7 @@ pub async fn create_transaction_log_table(db: &DbConn) -> Result<ExecResult, DbE
 }
 
 pub async fn create_insert_default_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(insert_default::Entity.table_ref())
         .col(
             ColumnDef::new(insert_default::Column::Id)
@@ -330,7 +330,7 @@ pub async fn create_insert_default_table(db: &DbConn) -> Result<ExecResult, DbEr
 }
 
 pub async fn create_json_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(json_vec::Entity.table_ref())
         .col(
             ColumnDef::new(json_vec::Column::Id)
@@ -346,7 +346,7 @@ pub async fn create_json_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_json_struct_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(json_struct::Entity)
         .col(
             ColumnDef::new(json_struct::Column::Id)
@@ -368,7 +368,7 @@ pub async fn create_json_struct_table(db: &DbConn) -> Result<ExecResult, DbErr> 
 }
 
 pub async fn create_json_string_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(JsonStringVec.table_ref())
         .col(
             ColumnDef::new(json_vec_derive::json_string_vec::Column::Id)
@@ -384,7 +384,7 @@ pub async fn create_json_string_vec_table(db: &DbConn) -> Result<ExecResult, DbE
 }
 
 pub async fn create_json_struct_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(JsonStructVec.table_ref())
         .col(
             ColumnDef::new(json_vec_derive::json_struct_vec::Column::Id)
@@ -404,13 +404,13 @@ pub async fn create_json_struct_vec_table(db: &DbConn) -> Result<ExecResult, DbE
 }
 
 pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    db.execute(sea_orm::Statement::from_string(
+    db.execute(pgorm::Statement::from_string(
         db.get_database_backend(),
         "CREATE EXTENSION IF NOT EXISTS citext",
     ))
     .await?;
 
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(collection::Entity)
         .col(
             ColumnDef::new(collection::Column::Id)
@@ -426,13 +426,13 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
         )
         .col(
             ColumnDef::new(collection::Column::Integers)
-                .array(sea_query::ColumnType::Integer)
+                .array(pgorm_query::ColumnType::Integer)
                 .not_null(),
         )
-        .col(ColumnDef::new(collection::Column::IntegersOpt).array(sea_query::ColumnType::Integer))
+        .col(ColumnDef::new(collection::Column::IntegersOpt).array(pgorm_query::ColumnType::Integer))
         .col(
             ColumnDef::new(collection::Column::Teas)
-                .array(sea_query::ColumnType::Enum {
+                .array(pgorm_query::ColumnType::Enum {
                     name: TeaEnum.into_iden(),
                     variants: vec![
                         TeaVariant::EverydayTea.into_iden(),
@@ -442,7 +442,7 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(collection::Column::TeasOpt).array(sea_query::ColumnType::Enum {
+            ColumnDef::new(collection::Column::TeasOpt).array(pgorm_query::ColumnType::Enum {
                 name: TeaEnum.into_iden(),
                 variants: vec![
                     TeaVariant::EverydayTea.into_iden(),
@@ -452,18 +452,18 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
         )
         .col(
             ColumnDef::new(collection::Column::Colors)
-                .array(sea_query::ColumnType::Integer)
+                .array(pgorm_query::ColumnType::Integer)
                 .not_null(),
         )
-        .col(ColumnDef::new(collection::Column::ColorsOpt).array(sea_query::ColumnType::Integer))
+        .col(ColumnDef::new(collection::Column::ColorsOpt).array(pgorm_query::ColumnType::Integer))
         .col(
             ColumnDef::new(collection::Column::Uuid)
-                .array(sea_query::ColumnType::Uuid)
+                .array(pgorm_query::ColumnType::Uuid)
                 .not_null(),
         )
         .col(
             ColumnDef::new(collection::Column::UuidHyphenated)
-                .array(sea_query::ColumnType::Uuid)
+                .array(pgorm_query::ColumnType::Uuid)
                 .not_null(),
         )
         .to_owned();
@@ -472,7 +472,7 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_pi_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(pi::Entity)
         .col(
             ColumnDef::new(pi::Column::Id)
@@ -499,7 +499,7 @@ pub async fn create_pi_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_event_trigger_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(event_trigger::Entity)
         .col(
             ColumnDef::new(event_trigger::Column::Id)
@@ -510,7 +510,7 @@ pub async fn create_event_trigger_table(db: &DbConn) -> Result<ExecResult, DbErr
         )
         .col(
             ColumnDef::new(event_trigger::Column::Events)
-                .array(sea_query::ColumnType::String(StringLen::None))
+                .array(pgorm_query::ColumnType::String(StringLen::None))
                 .not_null(),
         )
         .to_owned();
@@ -519,7 +519,7 @@ pub async fn create_event_trigger_table(db: &DbConn) -> Result<ExecResult, DbErr
 }
 
 pub async fn create_uuid_fmt_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(uuid_fmt::Entity)
         .col(
             ColumnDef::new(uuid_fmt::Column::Id)
@@ -551,7 +551,7 @@ pub async fn create_uuid_fmt_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_edit_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(edit_log::Entity)
         .col(
             ColumnDef::new(edit_log::Column::Id)
@@ -568,7 +568,7 @@ pub async fn create_edit_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_teas_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(teas::Entity.table_ref())
         .col(
             ColumnDef::new(teas::Column::Id)
@@ -584,7 +584,7 @@ pub async fn create_teas_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_categories_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(categories::Entity.table_ref())
         .col(
             ColumnDef::new(categories::Column::Id)
@@ -602,7 +602,7 @@ pub async fn create_categories_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_binary_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(binary::Entity.table_ref())
         .col(
             ColumnDef::new(binary::Column::Id)
@@ -628,7 +628,7 @@ pub async fn create_binary_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 }
 
 pub async fn create_bits_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let create_table_stmt = sea_query::Table::create()
+    let create_table_stmt = pgorm_query::Table::create()
         .table(bits::Entity.table_ref())
         .col(
             ColumnDef::new(bits::Column::Id)
@@ -684,7 +684,7 @@ pub async fn create_dyn_table_name_lazy_static_table(db: &DbConn) -> Result<(), 
         },
     ];
     for entity in entities {
-        let create_table_stmt = sea_query::Table::create()
+        let create_table_stmt = pgorm_query::Table::create()
             .table(entity.table_ref())
             .col(
                 ColumnDef::new(Column::Id)
@@ -703,7 +703,7 @@ pub async fn create_dyn_table_name_lazy_static_table(db: &DbConn) -> Result<(), 
 }
 
 pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let general_stmt = sea_query::Table::create()
+    let general_stmt = pgorm_query::Table::create()
         .table(value_type::value_type_general::Entity)
         .col(
             ColumnDef::new(value_type::value_type_general::Column::Id)
@@ -722,7 +722,7 @@ pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &general_stmt, value_type::value_type_general::Entity).await
 }
 pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let postgres_stmt = sea_query::Table::create()
+    let postgres_stmt = pgorm_query::Table::create()
         .table(value_type::value_type_pg::Entity)
         .col(
             ColumnDef::new(value_type::value_type_pg::Column::Id)
@@ -738,7 +738,7 @@ pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult,
         )
         .col(
             ColumnDef::new(json_vec::Column::StrVec)
-                .array(sea_query::ColumnType::String(StringLen::None))
+                .array(pgorm_query::ColumnType::String(StringLen::None))
                 .not_null(),
         )
         .to_owned();

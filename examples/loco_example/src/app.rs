@@ -12,7 +12,7 @@ use loco_rs::{
     Result,
 };
 use migration::Migrator;
-use sea_orm::DatabaseConnection;
+use pgorm::DatabaseConnection;
 
 use crate::{controllers, models::_entities::notes};
 

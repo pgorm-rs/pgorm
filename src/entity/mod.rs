@@ -16,15 +16,15 @@
 /// #### Example for creating an Entity, Model and ActiveModel
 /// ```
 /// #[cfg(feature = "macros")]
-/// # use sea_orm::entity::prelude::*;
-/// use sea_orm::ActiveModelBehavior;
-/// use sea_orm::ColumnDef;
-/// use sea_orm::ColumnTrait;
-/// use sea_orm::ColumnType;
-/// use sea_orm::EntityName;
-/// use sea_orm::PrimaryKeyTrait;
-/// use sea_orm::RelationDef;
-/// use sea_orm::RelationTrait;
+/// # use pgorm::entity::prelude::*;
+/// use pgorm::ActiveModelBehavior;
+/// use pgorm::ColumnDef;
+/// use pgorm::ColumnTrait;
+/// use pgorm::ColumnType;
+/// use pgorm::EntityName;
+/// use pgorm::PrimaryKeyTrait;
+/// use pgorm::RelationDef;
+/// use pgorm::RelationTrait;
 ///
 /// // Use [DeriveEntity] to derive the EntityTrait automatically
 /// #[derive(Copy, Clone, Default, Debug, DeriveEntity)]

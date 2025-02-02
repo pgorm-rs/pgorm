@@ -40,8 +40,8 @@ $ cargo loco start
     Finished dev [unoptimized + debuginfo] target(s) in 0.53s
      Running `target/debug/todolist-cli start`
 2024-02-01T08:49:41.070430Z  INFO loco_rs::db: auto migrating
-2024-02-01T08:49:41.073698Z  INFO sea_orm_migration::migrator: Applying all pending migrations
-2024-02-01T08:49:41.078191Z  INFO sea_orm_migration::migrator: No pending migrations
+2024-02-01T08:49:41.073698Z  INFO pgorm_migration::migrator: Applying all pending migrations
+2024-02-01T08:49:41.078191Z  INFO pgorm_migration::migrator: No pending migrations
 2024-02-01T08:49:41.100557Z  INFO loco_rs::controller::app_routes: [GET] /api/_ping
 2024-02-01T08:49:41.100617Z  INFO loco_rs::controller::app_routes: [GET] /api/_health
 2024-02-01T08:49:41.100667Z  INFO loco_rs::controller::app_routes: [GET] /api/notes

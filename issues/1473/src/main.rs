@@ -1,4 +1,4 @@
-use sea_orm::{DeriveIden, Iden};
+use pgorm::{DeriveIden, Iden};
 
 #[derive(DeriveIden)]
 enum Character {

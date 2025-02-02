@@ -1,5 +1,5 @@
-use sea_orm::sea_query::{ColumnDef, TableCreateStatement};
-use sea_orm::{error::*, sea_query, ConnectionTrait, DbConn, ExecResult};
+use pgorm::pgorm_query::{ColumnDef, TableCreateStatement};
+use pgorm::{error::*, pgorm_query, ConnectionTrait, DbConn, ExecResult};
 
 async fn create_table(db: &DbConn, stmt: &TableCreateStatement) -> Result<ExecResult, DbErr> {
     let builder = db.get_database_backend();
@@ -7,7 +7,7 @@ async fn create_table(db: &DbConn, stmt: &TableCreateStatement) -> Result<ExecRe
 }
 
 pub async fn create_post_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = sea_query::Table::create()
+    let stmt = pgorm_query::Table::create()
         .table(super::post::Entity)
         .if_not_exists()
         .col(

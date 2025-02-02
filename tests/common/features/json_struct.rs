@@ -1,11 +1,11 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::FromJsonQueryResult;
+use pgorm::entity::prelude::*;
+use pgorm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "json_struct")]
+#[pgorm(table_name = "json_struct")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub json: Json,
     pub json_value: KeyValue,

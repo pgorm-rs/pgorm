@@ -2,7 +2,7 @@ use dto::dto;
 use rocket::serde::json::Json;
 use rocket_okapi_example_service::{Mutation, Query};
 
-use sea_orm_rocket::Connection;
+use pgorm_rocket::Connection;
 
 use rocket_okapi::okapi::openapi3::OpenApi;
 

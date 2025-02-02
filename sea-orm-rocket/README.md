@@ -1,1 +1,0 @@
-# SeaORM Rocket support crate.

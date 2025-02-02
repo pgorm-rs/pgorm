@@ -2,7 +2,7 @@
 
 pub mod common;
 
-use sea_orm::{IntoActiveValue, TryFromU64, TryGetable, Value};
+use pgorm::{IntoActiveValue, TryFromU64, TryGetable, Value};
 
 /*
 

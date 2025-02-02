@@ -2,7 +2,7 @@
 # A separate workspace
 
 [package]
-name = "sea-orm-issues-319"
+name = "pgorm-issues-319"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 async-std = { version = "1", features = ["attributes", "tokio1"] }
 serde = { version = "1", features = ["derive"] }
-sea-orm = { path = "../../", features = [
+pgorm = { path = "../../", features = [
     "sqlx-mysql",
     "runtime-async-std-native-tls",
     "with-json",

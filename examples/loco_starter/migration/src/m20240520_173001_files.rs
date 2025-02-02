@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, schema::*};
+use pgorm_migration::{prelude::*, schema::*};
 
 use super::m20231103_114510_notes::Notes;
 

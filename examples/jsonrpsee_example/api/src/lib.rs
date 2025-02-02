@@ -5,7 +5,7 @@ use jsonrpsee::core::{async_trait, RpcResult};
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::ServerBuilder;
 use jsonrpsee::types::error::ErrorObjectOwned;
-use jsonrpsee_example_service::sea_orm::{Database, DatabaseConnection};
+use jsonrpsee_example_service::pgorm::{Database, DatabaseConnection};
 use jsonrpsee_example_service::{Mutation, Query};
 use log::info;
 use migration::{Migrator, MigratorTrait};

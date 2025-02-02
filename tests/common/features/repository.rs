@@ -1,11 +1,11 @@
 use super::edit_log;
-use sea_orm::{entity::prelude::*, ConnectionTrait, Set, TryIntoModel};
+use pgorm::{entity::prelude::*, ConnectionTrait, Set, TryIntoModel};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize)]
-#[sea_orm(table_name = "repository")]
+#[pgorm(table_name = "repository")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id: String,
     pub owner: String,
     pub name: String,

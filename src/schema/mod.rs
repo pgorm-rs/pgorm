@@ -1,7 +1,7 @@
 mod entity;
 
 /// This is a helper struct to convert [`EntityTrait`](crate::EntityTrait)
-/// into different [`sea_query`](crate::sea_query) statements.
+/// into different [`pgorm_query`](crate::pgorm_query) statements.
 #[derive(Debug)]
 pub struct Schema {}
 

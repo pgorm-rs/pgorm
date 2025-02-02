@@ -1,6 +1,6 @@
 //! The `fruit` entity.
 
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 /// Fruit entity
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]

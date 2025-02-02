@@ -10,7 +10,7 @@ use std::{
 };
 
 use gluesql::{memory_storage::MemoryStorage, prelude::Glue};
-use sea_orm::{
+use pgorm::{
     ActiveValue::Set, Database, DbBackend, DbErr, EntityTrait, ProxyDatabaseTrait, ProxyExecResult,
     ProxyRow, Statement,
 };
@@ -44,10 +44,10 @@ impl ProxyDatabaseTrait for ProxyDb {
                                     label.to_owned(),
                                     match column {
                                         gluesql::prelude::Value::I64(val) => {
-                                            sea_orm::Value::BigInt(Some(*val))
+                                            pgorm::Value::BigInt(Some(*val))
                                         }
                                         gluesql::prelude::Value::Str(val) => {
-                                            sea_orm::Value::String(Some(Box::new(val.to_owned())))
+                                            pgorm::Value::String(Some(Box::new(val.to_owned())))
                                         }
                                         _ => unreachable!("Unsupported value: {:?}", column),
                                     },
@@ -88,13 +88,13 @@ impl ProxyDatabaseTrait for ProxyDb {
                                     match &mut item {
                                         Expr::Value(item) => {
                                             *item = match val {
-                                                sea_orm::Value::String(val) => {
+                                                pgorm::Value::String(val) => {
                                                     Value::SingleQuotedString(match val {
                                                         Some(val) => val.to_string(),
                                                         None => "".to_string(),
                                                     })
                                                 }
-                                                sea_orm::Value::BigInt(val) => Value::Number(
+                                                pgorm::Value::BigInt(val) => Value::Number(
                                                     val.unwrap_or(0).to_string(),
                                                     false,
                                                 ),

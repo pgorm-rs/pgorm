@@ -1,10 +1,10 @@
-use super::sea_orm_active_enums::*;
-use sea_orm::entity::prelude::*;
+use super::pgorm_active_enums::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "categories")]
+#[pgorm(table_name = "categories")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub id: i32,
     pub categories: Option<Vec<Category>>,
 }

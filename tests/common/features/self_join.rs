@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "self_join")]
+#[pgorm(table_name = "self_join")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[pgorm(primary_key, auto_increment = false)]
     pub uuid: Uuid,
     pub uuid_ref: Option<Uuid>,
     pub time: Option<Time>,
@@ -11,7 +11,7 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "Entity", from = "Column::UuidRef", to = "Column::Uuid")]
+    #[pgorm(belongs_to = "Entity", from = "Column::UuidRef", to = "Column::Uuid")]
     SelfReferencing,
 }
 

@@ -1,10 +1,10 @@
-use crate as sea_orm;
+use crate as pgorm;
 use crate::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "rust_keyword")]
+#[pgorm(table_name = "rust_keyword")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub testing: i32,
     pub rust: i32,
@@ -70,7 +70,7 @@ impl ActiveModelBehavior for ActiveModel {}
 #[cfg(test)]
 mod tests {
     use crate::tests_cfg::rust_keyword::*;
-    use sea_query::Iden;
+    use pgorm_query::Iden;
 
     #[test]
     fn test_columns() {

@@ -6,15 +6,15 @@ use active_enum::Entity as ActiveEnumEntity;
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
 #[cfg(feature = "sqlx-postgres")]
-use sea_orm::QueryTrait;
-use sea_orm::{
+use pgorm::QueryTrait;
+use pgorm::{
     entity::prelude::*,
     entity::*,
-    sea_query::{BinOper, Expr},
+    pgorm_query::{BinOper, Expr},
     ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("active_enum_tests").await;
     create_tables(&ctx.db).await?;
@@ -114,7 +114,7 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     #[cfg(feature = "sqlx-postgres")]
     assert_eq!(
         select_with_tea_in
-            .build(sea_orm::DatabaseBackend::Postgres)
+            .build(pgorm::DatabaseBackend::Postgres)
             .to_string(),
         [
             r#"SELECT "active_enum"."id","#,
@@ -148,7 +148,7 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     #[cfg(feature = "sqlx-postgres")]
     assert_eq!(
         select_with_tea_not_in
-            .build(sea_orm::DatabaseBackend::Postgres)
+            .build(pgorm::DatabaseBackend::Postgres)
             .to_string(),
         [
             r#"SELECT "active_enum"."id","#,
@@ -625,7 +625,7 @@ pub async fn find_linked_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
 mod tests {
     use super::*;
     pub use pretty_assertions::assert_eq;
-    pub use sea_orm::{DbBackend, QueryTrait};
+    pub use pgorm::{DbBackend, QueryTrait};
 
     #[test]
     fn active_enum_find_related() {
@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn create_enum_from() {
-        use sea_orm::{Schema, Statement};
+        use pgorm::{Schema, Statement};
 
         let db_postgres = DbBackend::Postgres;
         let schema = Schema::new(db_postgres);

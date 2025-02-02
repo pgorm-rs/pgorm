@@ -4,9 +4,9 @@ pub mod common;
 
 use common::features::*;
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
+use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg(feature = "sqlx-postgres")]
 async fn main() -> Result<(), DbErr> {
     let ctx = common::TestContext::new("bits_tests").await;

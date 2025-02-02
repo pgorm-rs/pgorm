@@ -1,4 +1,4 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 use super::_entities::notes::ActiveModel;
 

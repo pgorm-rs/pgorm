@@ -1,7 +1,7 @@
 [default]
 template_dir = "api/templates/"
 
-[default.databases.sea_orm]
+[default.databases.pgorm]
 # Mysql
 # make sure to enable "sqlx-mysql" feature in Cargo.toml, i.e default = ["sqlx-mysql"]
 # url = "mysql://root:@localhost/rocket_example"

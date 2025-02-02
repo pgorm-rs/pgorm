@@ -36,17 +36,17 @@ Thanks for the time and effort to compose a PR! You are always welcomed to conta
 
 Without involving a live database, you can run unit tests on your machine with the command below:
 
-- Unit testing `sea-orm`, `sea-orm-macros`, `sea-orm-codegen`
+- Unit testing `pgorm`, `pgorm-macros`, `pgorm-codegen`
     ```sh
     cargo test --workspace
     ```
-- Unit testing `sea-orm-cli`
+- Unit testing `pgorm-cli`
     ```sh
-    cargo test --manifest-path sea-orm-cli/Cargo.toml
+    cargo test --manifest-path pgorm-cli/Cargo.toml
     ```
-- Unit testing `sea-orm-rocket`
+- Unit testing `pgorm-rocket`
     ```sh
-    cargo test --manifest-path sea-orm-rocket/Cargo.toml
+    cargo test --manifest-path pgorm-rocket/Cargo.toml
     ```
 
 ### Integration Test
@@ -67,40 +67,40 @@ Running integration tests on a live database:
     DATABASE_URL="postgres://root:root@localhost" cargo test --all --features default,sqlx-postgres,runtime-async-std-native-tls
     ```
 
-### Running `sea-orm-cli` from source code
+### Running `pgorm-cli` from source code
 
 You can either run the follow command at root:
 
 ```sh
-cargo run --manifest-path sea-orm-cli/Cargo.toml -- <command & arguments for sea-orm-cli>
+cargo run --manifest-path pgorm-cli/Cargo.toml -- <command & arguments for pgorm-cli>
 # E.g.
-cargo run --manifest-path sea-orm-cli/Cargo.toml -- migrate init
+cargo run --manifest-path pgorm-cli/Cargo.toml -- migrate init
 ```
 
-Or, you `cd` into `sea-orm-cli` directory and simply execute:
+Or, you `cd` into `pgorm-cli` directory and simply execute:
 
 ```sh
-cargo run -- <command & arguments for sea-orm-cli>
+cargo run -- <command & arguments for pgorm-cli>
 # E.g.
 cargo run -- migrate init
 ```
 
-### Installing `sea-orm-cli` from source code
+### Installing `pgorm-cli` from source code
 
 You can either run the follow command at root:
 
 ```sh
-cargo install --force --path sea-orm-cli
+cargo install --force --path pgorm-cli
 ```
 
-Or, you `cd` into `sea-orm-cli` directory and simply execute:
+Or, you `cd` into `pgorm-cli` directory and simply execute:
 
 ```sh
 cargo install --force --path .
 ```
 
-Or, you install `sea-orm-cli` from GitHub:
+Or, you install `pgorm-cli` from GitHub:
 
 ```sh
-cargo install sea-orm-cli --force --git https://github.com/SeaQL/sea-orm --branch <GIT_BRANCH>
+cargo install pgorm-cli --force --git https://github.com/SeaQL/pgorm --branch <GIT_BRANCH>
 ```

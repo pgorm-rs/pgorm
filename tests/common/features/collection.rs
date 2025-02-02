@@ -1,12 +1,12 @@
-use super::sea_orm_active_enums::*;
-use sea_orm::entity::prelude::*;
+use super::pgorm_active_enums::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "collection")]
+#[pgorm(table_name = "collection")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
-    #[sea_orm(
+    #[pgorm(
         column_type = r#"custom("citext")"#,
         select_as = "text",
         save_as = "citext"

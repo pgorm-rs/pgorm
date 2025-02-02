@@ -1,4 +1,4 @@
-pub use sea_orm_migration::prelude::*;
+pub use pgorm_migration::prelude::*;
 
 mod m20220120_000001_create_post_table;
 

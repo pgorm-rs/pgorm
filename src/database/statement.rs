@@ -1,5 +1,5 @@
-use sea_query::{inject_parameters, PostgresQueryBuilder};
-pub use sea_query::{Value, Values};
+use pgorm_query::{inject_parameters, QueryBuilder};
+pub use pgorm_query::{Value, Values};
 use std::fmt;
 
 /// Defines an SQL statement
@@ -57,7 +57,7 @@ impl fmt::Display for Statement {
                 let string = inject_parameters(
                     &self.sql,
                     values.0.clone(),
-                    &sea_query::PostgresQueryBuilder,
+                    &pgorm_query::QueryBuilder,
                 );
                 write!(f, "{}", &string)
             }
@@ -70,13 +70,13 @@ impl fmt::Display for Statement {
 
 macro_rules! build_any_stmt {
     ($stmt: expr) => {
-        $stmt.build(sea_query::PostgresQueryBuilder)
+        $stmt.build(pgorm_query::QueryBuilder)
     };
 }
 
 macro_rules! build_postgres_stmt {
     ($stmt: expr) => {
-        $stmt.to_string(sea_query::PostgresQueryBuilder)
+        $stmt.to_string(pgorm_query::QueryBuilder)
     };
 }
 
@@ -84,18 +84,18 @@ macro_rules! build_query_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
             fn build(&self) -> Statement {
-                let stmt = self.build(sea_query::PostgresQueryBuilder);
+                let stmt = self.build(pgorm_query::QueryBuilder);
                 Statement::from_string_values_tuple(stmt)
             }
         }
     };
 }
 
-build_query_stmt!(sea_query::InsertStatement);
-build_query_stmt!(sea_query::SelectStatement);
-build_query_stmt!(sea_query::UpdateStatement);
-build_query_stmt!(sea_query::DeleteStatement);
-build_query_stmt!(sea_query::WithQuery);
+build_query_stmt!(pgorm_query::InsertStatement);
+build_query_stmt!(pgorm_query::SelectStatement);
+build_query_stmt!(pgorm_query::UpdateStatement);
+build_query_stmt!(pgorm_query::DeleteStatement);
+build_query_stmt!(pgorm_query::WithQuery);
 
 macro_rules! build_schema_stmt {
     ($stmt: ty) => {
@@ -108,15 +108,15 @@ macro_rules! build_schema_stmt {
     };
 }
 
-build_schema_stmt!(sea_query::TableCreateStatement);
-build_schema_stmt!(sea_query::TableDropStatement);
-build_schema_stmt!(sea_query::TableAlterStatement);
-build_schema_stmt!(sea_query::TableRenameStatement);
-build_schema_stmt!(sea_query::TableTruncateStatement);
-build_schema_stmt!(sea_query::IndexCreateStatement);
-build_schema_stmt!(sea_query::IndexDropStatement);
-build_schema_stmt!(sea_query::ForeignKeyCreateStatement);
-build_schema_stmt!(sea_query::ForeignKeyDropStatement);
+build_schema_stmt!(pgorm_query::TableCreateStatement);
+build_schema_stmt!(pgorm_query::TableDropStatement);
+build_schema_stmt!(pgorm_query::TableAlterStatement);
+build_schema_stmt!(pgorm_query::TableRenameStatement);
+build_schema_stmt!(pgorm_query::TableTruncateStatement);
+build_schema_stmt!(pgorm_query::IndexCreateStatement);
+build_schema_stmt!(pgorm_query::IndexDropStatement);
+build_schema_stmt!(pgorm_query::ForeignKeyCreateStatement);
+build_schema_stmt!(pgorm_query::ForeignKeyDropStatement);
 
 macro_rules! build_type_stmt {
     ($stmt: ty) => {
@@ -129,6 +129,6 @@ macro_rules! build_type_stmt {
     };
 }
 
-build_type_stmt!(sea_query::extension::postgres::TypeAlterStatement);
-build_type_stmt!(sea_query::extension::postgres::TypeCreateStatement);
-build_type_stmt!(sea_query::extension::postgres::TypeDropStatement);
+build_type_stmt!(pgorm_query::extension::postgres::TypeAlterStatement);
+build_type_stmt!(pgorm_query::extension::postgres::TypeCreateStatement);
+build_type_stmt!(pgorm_query::extension::postgres::TypeDropStatement);

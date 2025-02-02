@@ -1,12 +1,12 @@
 use async_graphql::*;
-use sea_orm::{entity::prelude::*, DeleteMany};
+use pgorm::{entity::prelude::*, DeleteMany};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize, SimpleObject)]
-#[sea_orm(table_name = "notes")]
+#[pgorm(table_name = "notes")]
 #[graphql(concrete(name = "Note", params()))]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
     pub title: String,

@@ -2,7 +2,7 @@
 # A separate workspace
 
 [package]
-name = "sea-orm-issues-1143"
+name = "pgorm-issues-1143"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -11,7 +11,7 @@ publish = false
 serde = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../"
 default-features = false
 features = ["macros", "runtime-tokio-native-tls"]

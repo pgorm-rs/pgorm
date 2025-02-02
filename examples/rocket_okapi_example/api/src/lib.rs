@@ -5,7 +5,7 @@ use rocket::fairing::{self, AdHoc};
 use rocket::{Build, Rocket};
 
 use migration::MigratorTrait;
-use sea_orm_rocket::Database;
+use pgorm_rocket::Database;
 
 use rocket_okapi::mount_endpoints_and_merged_docs;
 use rocket_okapi::okapi::openapi3::OpenApi;
@@ -96,10 +96,10 @@ fn custom_openapi_spec() -> OpenApi {
         info: Info {
             title: "SeaOrm-Rocket-Okapi Example".to_owned(),
             description: Some("API Docs for Rocket/SeaOrm example".to_owned()),
-            terms_of_service: Some("https://github.com/SeaQL/sea-orm#license".to_owned()),
+            terms_of_service: Some("https://github.com/SeaQL/pgorm#license".to_owned()),
             contact: Some(Contact {
                 name: Some("SeaOrm".to_owned()),
-                url: Some("https://github.com/SeaQL/sea-orm".to_owned()),
+                url: Some("https://github.com/SeaQL/pgorm".to_owned()),
                 email: None,
                 ..Default::default()
             }),

@@ -8,9 +8,9 @@ edition = "2021"
 [dependencies]
 entity = { path = "../entity" }
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../../" # remove this line in your own project
-version = "~1.0.0" # sea-orm version
+version = "~1.0.0" # pgorm version
 features = [
     "runtime-tokio-native-tls",
 #    "sqlx-postgres",
@@ -22,7 +22,7 @@ features = [
 tokio = "1.20.0"
 
 [features]
-mock = ["sea-orm/mock"]
+mock = ["pgorm/mock"]
 
 [[test]]
 name = "mock"

@@ -6,8 +6,8 @@
 
   <h3>🐚 An async & dynamic ORM for Rust</h3>
 
-  [![crate](https://img.shields.io/crates/v/sea-orm.svg)](https://crates.io/crates/sea-orm)
-  [![docs](https://docs.rs/sea-orm/badge.svg)](https://docs.rs/sea-orm)
+  [![crate](https://img.shields.io/crates/v/pgorm.svg)](https://crates.io/crates/pgorm)
+  [![docs](https://docs.rs/pgorm/badge.svg)](https://docs.rs/pgorm)
   [![build status](https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml/badge.svg)](https://github.com/SeaQL/sea-orm/actions/workflows/rust.yml)
 
 </div>
@@ -16,7 +16,7 @@
 
 #### SeaORM is a relational ORM to help you build web services in Rust with the familiarity of dynamic languages.
 
-[![GitHub stars](https://img.shields.io/github/stars/SeaQL/sea-orm.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/)
+[![GitHub stars](https://img.shields.io/github/stars/SeaQL/pgorm.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/)
 If you like what we do, consider starring, sharing and contributing!
 
 Please help us with maintaining SeaORM by completing the [SeaQL Community Survey 2024](https://sea-ql.org/community-survey)!
@@ -27,8 +27,8 @@ Join our Discord server to chat with other members of the SeaQL community!
 ## Getting Started
 
 + [Documentation](https://www.sea-ql.org/SeaORM)
-+ [Tutorial](https://www.sea-ql.org/sea-orm-tutorial)
-+ [Cookbook](https://www.sea-ql.org/sea-orm-cookbook)
++ [Tutorial](https://www.sea-ql.org/pgorm-tutorial)
++ [Cookbook](https://www.sea-ql.org/pgorm-cookbook)
 
 Integration examples:
 
@@ -65,19 +65,19 @@ Integration examples:
 
 ### Entity
 ```rust
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "cake")]
+#[pgorm(table_name = "cake")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::fruit::Entity")]
+    #[pgorm(has_many = "super::fruit::Entity")]
     Fruit,
 }
 
@@ -131,7 +131,7 @@ Fruit::insert_many([apple, pear]).exec(db).await?;
 ```
 ### Update
 ```rust
-use sea_orm::sea_query::{Expr, Value};
+use pgorm::pgorm_query::{Expr, Value};
 
 let pear: Option<fruit::Model> = Fruit::find_by_id(1).one(db).await?;
 let mut pear: fruit::ActiveModel = pear.unwrap().into();
@@ -192,7 +192,7 @@ fruit::Entity::delete_many()
 
 [Seaography](https://github.com/SeaQL/seaography) is a GraphQL framework built on top of SeaORM. Seaography allows you to build GraphQL resolvers quickly. With just a few commands, you can launch a GraphQL server from SeaORM entities!
 
-Starting `0.12`, `seaography` integration is built into `sea-orm`. While Seaography development is still in an early stage, it is especially useful in prototyping and building internal-use admin panels.
+Starting `0.12`, `seaography` integration is built into `pgorm`. While Seaography development is still in an early stage, it is especially useful in prototyping and building internal-use admin panels.
 
 <img src="https://raw.githubusercontent.com/SeaQL/sea-orm/master/examples/seaography_example/Seaography%20example.png"/>
 
@@ -230,7 +230,7 @@ SeaORM is a community driven project. We welcome you to participate, contribute 
 
 A big shout out to our contributors!
 
-[![Contributors](https://opencollective.com/sea-orm/contributors.svg?width=1000&button=false)](https://github.com/SeaQL/sea-orm/graphs/contributors)
+[![Contributors](https://opencollective.com/pgorm/contributors.svg?width=1000&button=false)](https://github.com/SeaQL/sea-orm/graphs/contributors)
 
 ## Sponsorship
 

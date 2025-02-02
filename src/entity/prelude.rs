@@ -1,6 +1,6 @@
 pub use crate::{
     error::*,
-    sea_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
+    pgorm_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ColumnDef, ColumnTrait, ColumnType,
     ColumnTypeTrait, ConnectionTrait, CursorTrait, DatabasePool, EntityName, EntityTrait, EnumIter,
     Iden, IdenStatic, Linked, LoaderTrait, ModelTrait, PrimaryKeyArity, PrimaryKeyToColumn,

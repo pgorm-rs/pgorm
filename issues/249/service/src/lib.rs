@@ -1,4 +1,4 @@
-pub use sea_orm::entity::*;
+pub use pgorm::entity::*;
 
 pub fn clone_a_model<M>(model: &M) -> M
 where

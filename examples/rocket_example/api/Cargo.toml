@@ -18,6 +18,6 @@ entity = { path = "../entity" }
 migration = { path = "../migration" }
 tokio = "1.29.0"
 
-[dependencies.sea-orm-rocket]
-path = "../../../sea-orm-rocket/lib" # remove this line in your own project and uncomment the following line
+[dependencies.pgorm-rocket]
+path = "../../../pgorm-rocket/lib" # remove this line in your own project and uncomment the following line
 # version = "0.5"

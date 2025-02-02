@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "model")]
+#[pgorm(table_name = "model")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: AccountId,
     pub name: String,
 }
@@ -24,44 +24,44 @@ impl From<AccountId> for Uuid {
 
 macro_rules! impl_try_from_u64_err {
     ($newtype: ident) => {
-        impl sea_orm::TryFromU64 for $newtype {
-            fn try_from_u64(_n: u64) -> Result<Self, sea_orm::DbErr> {
-                Err(sea_orm::DbErr::ConvertFromU64(stringify!($newtype)))
+        impl pgorm::TryFromU64 for $newtype {
+            fn try_from_u64(_n: u64) -> Result<Self, pgorm::DbErr> {
+                Err(pgorm::DbErr::ConvertFromU64(stringify!($newtype)))
             }
         }
     };
 }
 
-macro_rules! into_sea_query_value {
+macro_rules! into_pgorm_query_value {
     ($newtype: ident: Box($name: ident)) => {
-        impl From<$newtype> for sea_orm::Value {
+        impl From<$newtype> for pgorm::Value {
             fn from(source: $newtype) -> Self {
-                sea_orm::Value::$name(Some(Box::new(source.into())))
+                pgorm::Value::$name(Some(Box::new(source.into())))
             }
         }
 
-        impl sea_orm::TryGetable for $newtype {
+        impl pgorm::TryGetable for $newtype {
             fn try_get(
-                res: &sea_orm::QueryResult,
+                res: &pgorm::QueryResult,
                 pre: &str,
                 col: &str,
-            ) -> Result<Self, sea_orm::TryGetError> {
-                let val: $name = res.try_get(pre, col).map_err(sea_orm::TryGetError::DbErr)?;
+            ) -> Result<Self, pgorm::TryGetError> {
+                let val: $name = res.try_get(pre, col).map_err(pgorm::TryGetError::DbErr)?;
                 Ok($newtype(val))
             }
         }
 
-        impl sea_orm::sea_query::Nullable for $newtype {
-            fn null() -> sea_orm::Value {
-                sea_orm::Value::$name(None)
+        impl pgorm::pgorm_query::Nullable for $newtype {
+            fn null() -> pgorm::Value {
+                pgorm::Value::$name(None)
             }
         }
 
-        impl sea_orm::sea_query::ValueType for $newtype {
-            fn try_from(v: sea_orm::Value) -> Result<Self, sea_orm::sea_query::ValueTypeErr> {
+        impl pgorm::pgorm_query::ValueType for $newtype {
+            fn try_from(v: pgorm::Value) -> Result<Self, pgorm::pgorm_query::ValueTypeErr> {
                 match v {
-                    sea_orm::Value::$name(Some(x)) => Ok($newtype(*x)),
-                    _ => Err(sea_orm::sea_query::ValueTypeErr),
+                    pgorm::Value::$name(Some(x)) => Ok($newtype(*x)),
+                    _ => Err(pgorm::pgorm_query::ValueTypeErr),
                 }
             }
 
@@ -69,16 +69,16 @@ macro_rules! into_sea_query_value {
                 stringify!($newtype).to_owned()
             }
 
-            fn array_type() -> sea_orm::sea_query::ArrayType {
-                sea_orm::sea_query::ArrayType::$name
+            fn array_type() -> pgorm::pgorm_query::ArrayType {
+                pgorm::pgorm_query::ArrayType::$name
             }
 
-            fn column_type() -> sea_orm::sea_query::ColumnType {
-                sea_orm::sea_query::ColumnType::$name
+            fn column_type() -> pgorm::pgorm_query::ColumnType {
+                pgorm::pgorm_query::ColumnType::$name
             }
         }
     };
 }
 
-into_sea_query_value!(AccountId: Box(Uuid));
+into_pgorm_query_value!(AccountId: Box(Uuid));
 impl_try_from_u64_err!(AccountId);

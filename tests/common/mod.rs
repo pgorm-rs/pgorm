@@ -3,7 +3,7 @@ pub mod features;
 pub mod runtime;
 pub mod setup;
 
-use sea_orm::DatabasePool;
+use pgorm::DatabasePool;
 
 pub struct TestContext {
     base_url: String,

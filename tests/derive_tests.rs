@@ -1,4 +1,4 @@
-use sea_orm::{FromQueryResult, TryGetable};
+use pgorm::{FromQueryResult, TryGetable};
 
 #[derive(FromQueryResult)]
 struct SimpleTest {
@@ -59,7 +59,7 @@ where
 
 #[derive(FromQueryResult)]
 struct FromQueryAttributeTests {
-    #[sea_orm(skip)]
+    #[pgorm(skip)]
     _foo: i32,
     _bar: String,
 }

@@ -4,10 +4,10 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, DerivePartialModel, FromQueryResult, QuerySelect, Set};
+use pgorm::{entity::prelude::*, DerivePartialModel, FromQueryResult, QuerySelect, Set};
 use serde_json::json;
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn cursor_tests() -> Result<(), DbErr> {
     let ctx = TestContext::new("cursor_tests").await;
     create_tables(&ctx.db).await?;
@@ -422,11 +422,11 @@ pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
     );
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq, Clone)]
-    #[sea_orm(entity = "Entity")]
+    #[pgorm(entity = "Entity")]
     struct PartialRow {
-        #[sea_orm(from_col = "id")]
+        #[pgorm(from_col = "id")]
         id: i32,
-        #[sea_orm(from_expr = "sea_query::Expr::col(Column::Id).add(1000)")]
+        #[pgorm(from_expr = "pgorm_query::Expr::col(Column::Id).add(1000)")]
         id_shifted: i32,
     }
 

@@ -1,15 +1,15 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "applog", comment = "app logs")]
+#[pgorm(table_name = "applog", comment = "app logs")]
 pub struct Model {
-    #[sea_orm(primary_key, comment = "ID")]
+    #[pgorm(primary_key, comment = "ID")]
     pub id: i32,
-    #[sea_orm(comment = "action")]
+    #[pgorm(comment = "action")]
     pub action: String,
-    #[sea_orm(comment = "action data")]
+    #[pgorm(comment = "action data")]
     pub json: Json,
-    #[sea_orm(comment = "create time")]
+    #[pgorm(comment = "create time")]
     pub created_at: DateTimeWithTimeZone,
 }
 

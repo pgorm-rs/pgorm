@@ -3,7 +3,7 @@ use crate::{
     QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
-use sea_query::{Expr, IntoIden, SimpleExpr, UpdateStatement};
+use pgorm_query::{Expr, IntoIden, SimpleExpr, UpdateStatement};
 
 /// Defines a structure to perform UPDATE query operations on a ActiveModel
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ impl Update {
     /// Update one ActiveModel
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
@@ -63,7 +63,7 @@ impl Update {
     /// Update many ActiveModel
     ///
     /// ```
-    /// use sea_orm::{entity::*, query::*, sea_query::Expr, tests_cfg::fruit, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::Expr, tests_cfg::fruit, DbBackend};
     ///
     /// assert_eq!(
     ///     Update::many(fruit::Entity)
@@ -212,9 +212,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::tests_cfg::{cake, fruit, lunch_set, sea_orm_active_enums::Tea};
+    use crate::tests_cfg::{cake, fruit, lunch_set, pgorm_active_enums::Tea};
     use crate::{entity::*, query::*, DbBackend};
-    use sea_query::{Expr, Value};
+    use pgorm_query::{Expr, Value};
 
     #[test]
     fn update_1() {

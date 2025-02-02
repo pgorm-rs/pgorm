@@ -1,5 +1,5 @@
 use arraystring::{typenum::U32, ArrayString};
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 pub type TableName = ArrayString<U32>;
 

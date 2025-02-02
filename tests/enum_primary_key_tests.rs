@@ -4,14 +4,14 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{
+use pgorm::{
     entity::prelude::*,
     entity::*,
-    sea_query::{BinOper, Expr},
+    pgorm_query::{BinOper, Expr},
     ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("enum_primary_key_tests").await;
     create_tables(&ctx.db).await?;

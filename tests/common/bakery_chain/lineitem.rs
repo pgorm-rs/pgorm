@@ -1,11 +1,11 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "lineitem")]
+#[pgorm(table_name = "lineitem")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
-    #[sea_orm(column_type = "Decimal(Some((16, 4)))")]
+    #[pgorm(column_type = "Decimal(Some((16, 4)))")]
     pub price: Decimal,
     pub quantity: i32,
     pub order_id: i32,
@@ -14,7 +14,7 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
+    #[pgorm(
         belongs_to = "super::order::Entity",
         from = "Column::OrderId",
         to = "super::order::Column::Id",
@@ -22,7 +22,7 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Order,
-    #[sea_orm(
+    #[pgorm(
         belongs_to = "super::cake::Entity",
         from = "Column::CakeId",
         to = "super::cake::Column::Id"

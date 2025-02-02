@@ -1,12 +1,12 @@
 use crate::{EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
-use sea_query::{
+use pgorm_query::{
     Alias, BinOper, DynIden, Expr, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
 };
 use std::str::FromStr;
 
-// The original `sea_orm::ColumnType` enum was dropped since 0.11.0
-// It was replaced by `sea_query::ColumnType`, we reexport it here to keep the `ColumnType` symbol
-pub use sea_query::ColumnType;
+// The original `pgorm::ColumnType` enum was dropped since 0.11.0
+// It was replaced by `pgorm_query::ColumnType`, we reexport it here to keep the `ColumnType` symbol
+pub use pgorm_query::ColumnType;
 
 /// Defines a Column for an Entity
 #[derive(Debug, Clone, PartialEq)]
@@ -67,7 +67,7 @@ macro_rules! bind_subquery_func {
 }
 
 // LINT: when the operand value does not match column type
-/// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`sea_query::Expr`]
+/// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
 pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -93,7 +93,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     bind_oper!(lte, SmallerThanOrEqual);
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -111,7 +111,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -129,7 +129,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -147,7 +147,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -165,7 +165,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -184,7 +184,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -203,7 +203,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -419,7 +419,7 @@ where
     match col_type {
         #[cfg(all(feature = "with-json", feature = "postgres-array"))]
         ColumnType::Json | ColumnType::JsonBinary => {
-            use sea_query::ArrayType;
+            use pgorm_query::ArrayType;
             use serde_json::Value as Json;
 
             #[allow(clippy::boxed_local)]
@@ -458,7 +458,7 @@ mod tests {
     use crate::{
         tests_cfg::*, ColumnTrait, Condition, DbBackend, EntityTrait, QueryFilter, QueryTrait,
     };
-    use sea_query::Query;
+    use pgorm_query::Query;
 
     #[test]
     fn test_in_subquery_1() {
@@ -540,38 +540,38 @@ mod tests {
         use crate::prelude::*;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
                 pub one: i32,
-                #[sea_orm(unique)]
+                #[pgorm(unique)]
                 pub two: i8,
-                #[sea_orm(indexed)]
+                #[pgorm(indexed)]
                 pub three: i16,
-                #[sea_orm(nullable)]
+                #[pgorm(nullable)]
                 pub four: i32,
-                #[sea_orm(unique, indexed, nullable)]
+                #[pgorm(unique, indexed, nullable)]
                 pub five: i64,
-                #[sea_orm(unique)]
+                #[pgorm(unique)]
                 pub six: u8,
-                #[sea_orm(indexed)]
+                #[pgorm(indexed)]
                 pub seven: u16,
-                #[sea_orm(nullable)]
+                #[pgorm(nullable)]
                 pub eight: u32,
-                #[sea_orm(unique, indexed, nullable)]
+                #[pgorm(unique, indexed, nullable)]
                 pub nine: u64,
-                #[sea_orm(default_expr = "Expr::current_timestamp()")]
+                #[pgorm(default_expr = "Expr::current_timestamp()")]
                 pub ten: DateTimeUtc,
-                #[sea_orm(default_value = 7)]
+                #[pgorm(default_value = 7)]
                 pub eleven: u8,
-                #[sea_orm(default_value = "twelve_value")]
+                #[pgorm(default_value = "twelve_value")]
                 pub twelve: String,
-                #[sea_orm(default_expr = "\"twelve_value\"")]
+                #[pgorm(default_expr = "\"twelve_value\"")]
                 pub twelve_two: String,
             }
 
@@ -641,21 +641,21 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_1() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(column_name = "ONE")]
+                #[pgorm(column_name = "ONE")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(column_name = "3")]
+                #[pgorm(column_name = "3")]
                 pub three: i32,
             }
 
@@ -673,10 +673,10 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_2() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -699,10 +699,10 @@ mod tests {
             #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
             pub enum Column {
                 Id,
-                #[sea_orm(column_name = "ONE")]
+                #[pgorm(column_name = "ONE")]
                 One,
                 Two,
-                #[sea_orm(column_name = "3")]
+                #[pgorm(column_name = "3")]
                 Three,
             }
 
@@ -746,21 +746,21 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn enum_name_1() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -778,10 +778,10 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn enum_name_2() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -796,10 +796,10 @@ mod tests {
             #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
             pub struct Model {
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -851,22 +851,22 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_1() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         #[allow(clippy::enum_variant_names)]
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key, column_name = "ID", enum_name = "IdentityColumn")]
+                #[pgorm(primary_key, column_name = "ID", enum_name = "IdentityColumn")]
                 pub id: i32,
-                #[sea_orm(column_name = "ONE", enum_name = "One1")]
+                #[pgorm(column_name = "ONE", enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(column_name = "THREE", enum_name = "Three3")]
+                #[pgorm(column_name = "THREE", enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -885,10 +885,10 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_2() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod hello {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -902,23 +902,23 @@ mod tests {
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
             pub struct Model {
-                #[sea_orm(enum_name = "IdentityCol")]
+                #[pgorm(enum_name = "IdentityCol")]
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
             #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
             pub enum Column {
-                #[sea_orm(column_name = "ID")]
+                #[pgorm(column_name = "ID")]
                 IdentityCol,
-                #[sea_orm(column_name = "ONE")]
+                #[pgorm(column_name = "ONE")]
                 One1,
                 Two,
-                #[sea_orm(column_name = "THREE")]
+                #[pgorm(column_name = "THREE")]
                 Three3,
             }
 
@@ -963,18 +963,18 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_3() {
-        use sea_query::Iden;
+        use pgorm_query::Iden;
 
         mod my_entity {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "my_entity")]
+            #[pgorm(table_name = "my_entity")]
             pub struct Model {
-                #[sea_orm(primary_key, enum_name = "IdentityColumn", column_name = "id")]
+                #[pgorm(primary_key, enum_name = "IdentityColumn", column_name = "id")]
                 pub id: i32,
-                #[sea_orm(column_name = "type")]
+                #[pgorm(column_name = "type")]
                 pub type_: String,
             }
 
@@ -994,9 +994,9 @@ mod tests {
         use crate::{ActiveModelTrait, ActiveValue, Update};
 
         mod hello_expanded {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1010,10 +1010,10 @@ mod tests {
             #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
             pub struct Model {
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -1066,19 +1066,19 @@ mod tests {
 
         #[allow(clippy::enum_variant_names)]
         mod hello_compact {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
-                #[sea_orm(select_as = "integer")]
+                #[pgorm(select_as = "integer")]
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -1125,9 +1125,9 @@ mod tests {
         use crate::{ActiveModelTrait, ActiveValue, Update};
 
         mod hello_expanded {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1141,10 +1141,10 @@ mod tests {
             #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
             pub struct Model {
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -1197,19 +1197,19 @@ mod tests {
 
         #[allow(clippy::enum_variant_names)]
         mod hello_compact {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
-                #[sea_orm(save_as = "text")]
+                #[pgorm(save_as = "text")]
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -1256,9 +1256,9 @@ mod tests {
         use crate::{ActiveModelTrait, ActiveValue, Update};
 
         mod hello_expanded {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::sea_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1272,10 +1272,10 @@ mod tests {
             #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
             pub struct Model {
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 
@@ -1335,19 +1335,19 @@ mod tests {
 
         #[allow(clippy::enum_variant_names)]
         mod hello_compact {
-            use crate as sea_orm;
+            use crate as pgorm;
             use crate::entity::prelude::*;
 
             #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-            #[sea_orm(table_name = "hello")]
+            #[pgorm(table_name = "hello")]
             pub struct Model {
-                #[sea_orm(primary_key)]
+                #[pgorm(primary_key)]
                 pub id: i32,
-                #[sea_orm(enum_name = "One1")]
+                #[pgorm(enum_name = "One1")]
                 pub one: i32,
-                #[sea_orm(select_as = "integer", save_as = "text")]
+                #[pgorm(select_as = "integer", save_as = "text")]
                 pub two: i32,
-                #[sea_orm(enum_name = "Three3")]
+                #[pgorm(enum_name = "Three3")]
                 pub three: i32,
             }
 

@@ -3,7 +3,7 @@ use crate::{
     Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw,
     TryInsert,
 };
-use sea_query::{FromValueTuple, Iden, InsertStatement, PostgresQueryBuilder, Query, ValueTuple};
+use pgorm_query::{FromValueTuple, Iden, InsertStatement, Query, QueryBuilder, ValueTuple};
 use std::{future::Future, marker::PhantomData};
 use tokio_postgres::types::ToSql;
 
@@ -214,7 +214,7 @@ where
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
-    let (stmt, values) = statement.build(PostgresQueryBuilder);
+    let (stmt, values) = statement.build(QueryBuilder);
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
         .iter()
@@ -256,7 +256,7 @@ async fn exec_insert_without_returning<C>(
 where
     C: ConnectionTrait,
 {
-    let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
+    let (stmt, values) = insert_statement.build(QueryBuilder);
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
         .iter()
@@ -281,7 +281,7 @@ where
         <A::Entity as EntityTrait>::Column::iter().map(|c| c.select_as(c.into_returning_expr())),
     );
     insert_statement.returning(returning);
-    let (stmt, values) = insert_statement.build(PostgresQueryBuilder);
+    let (stmt, values) = insert_statement.build(QueryBuilder);
 
     let found =
         SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)

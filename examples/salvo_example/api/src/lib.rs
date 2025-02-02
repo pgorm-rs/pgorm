@@ -5,7 +5,7 @@ use migration::{Migrator, MigratorTrait};
 use salvo::affix;
 use salvo::prelude::*;
 use salvo_example_service::{
-    sea_orm::{Database, DatabaseConnection},
+    pgorm::{Database, DatabaseConnection},
     Mutation, Query,
 };
 use tera::Tera;

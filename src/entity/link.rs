@@ -1,7 +1,7 @@
 use crate::{
     join_tbl_on_condition, unpack_table_ref, EntityTrait, QuerySelect, RelationDef, Select,
 };
-use sea_query::{Alias, Condition, IntoIden, JoinType, SeaRc};
+use pgorm_query::{Alias, Condition, IntoIden, JoinType, SeaRc};
 
 /// A Trait for links between Entities
 pub trait Linked {

@@ -1,7 +1,7 @@
 use crate::OrmDataloader;
 use async_graphql::{dataloader::DataLoader, dynamic::*};
 use entity::*;
-use sea_orm::DatabaseConnection;
+use pgorm::DatabaseConnection;
 use seaography::{Builder, BuilderContext};
 
 lazy_static::lazy_static! { static ref CONTEXT : BuilderContext = BuilderContext :: default () ; }

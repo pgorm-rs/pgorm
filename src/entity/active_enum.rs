@@ -1,33 +1,33 @@
 use crate::{ColumnDef, DbErr, Iterable, QueryResult, TryFromU64, TryGetError, TryGetable};
-use sea_query::{DynIden, Expr, Nullable, SimpleExpr, Value, ValueType};
+use pgorm_query::{DynIden, Expr, Nullable, SimpleExpr, Value, ValueType};
 use tokio_postgres::row::RowIndex;
 
 /// A Rust representation of enum defined in database.
 ///
 /// # Implementations
 ///
-/// You can implement [ActiveEnum] manually by hand or use the derive macro [DeriveActiveEnum](sea_orm_macros::DeriveActiveEnum).
+/// You can implement [ActiveEnum] manually by hand or use the derive macro [DeriveActiveEnum](pgorm_macros::DeriveActiveEnum).
 ///
 /// # Examples
 ///
-/// Implementing it manually versus using the derive macro [DeriveActiveEnum](sea_orm_macros::DeriveActiveEnum).
+/// Implementing it manually versus using the derive macro [DeriveActiveEnum](pgorm_macros::DeriveActiveEnum).
 ///
-/// > See [DeriveActiveEnum](sea_orm_macros::DeriveActiveEnum) for the full specification of macro attributes.
+/// > See [DeriveActiveEnum](pgorm_macros::DeriveActiveEnum) for the full specification of macro attributes.
 ///
 /// ```rust
-/// use sea_orm::entity::prelude::*;
+/// use pgorm::entity::prelude::*;
 ///
 /// // Using the derive macro
 /// #[derive(Debug, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-/// #[sea_orm(
+/// #[pgorm(
 ///     rs_type = "String",
 ///     db_type = "String(StringLen::N(1))",
 ///     enum_name = "category"
 /// )]
 /// pub enum DeriveCategory {
-///     #[sea_orm(string_value = "B")]
+///     #[pgorm(string_value = "B")]
 ///     Big,
-///     #[sea_orm(string_value = "S")]
+///     #[pgorm(string_value = "S")]
 ///     Small,
 /// }
 ///
@@ -83,22 +83,22 @@ use tokio_postgres::row::RowIndex;
 /// Using [ActiveEnum] on Model.
 ///
 /// ```
-/// use sea_orm::entity::prelude::*;
+/// use pgorm::entity::prelude::*;
 ///
 /// // Define the `Category` active enum
 /// #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-/// #[sea_orm(rs_type = "String", db_type = "String(StringLen::N(1))")]
+/// #[pgorm(rs_type = "String", db_type = "String(StringLen::N(1))")]
 /// pub enum Category {
-///     #[sea_orm(string_value = "B")]
+///     #[pgorm(string_value = "B")]
 ///     Big,
-///     #[sea_orm(string_value = "S")]
+///     #[pgorm(string_value = "S")]
 ///     Small,
 /// }
 ///
 /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-/// #[sea_orm(table_name = "active_enum")]
+/// #[pgorm(table_name = "active_enum")]
 /// pub struct Model {
-///     #[sea_orm(primary_key)]
+///     #[pgorm(primary_key)]
 ///     pub id: i32,
 ///     // Represents a db column using `Category` active enum
 ///     pub category: Category,
@@ -208,10 +208,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate as sea_orm;
+    use crate as pgorm;
     use crate::{
         error::*,
-        sea_query::{SeaRc, StringLen},
+        pgorm_query::{SeaRc, StringLen},
         *,
     };
     use pretty_assertions::assert_eq;
@@ -225,7 +225,7 @@ mod tests {
         }
 
         #[derive(Debug, DeriveIden)]
-        #[sea_orm(iden = "category")]
+        #[pgorm(iden = "category")]
         pub struct CategoryEnum;
 
         impl ActiveEnum for Category {
@@ -259,15 +259,15 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-        #[sea_orm(
+        #[pgorm(
             rs_type = "String",
             db_type = "String(StringLen::N(1))",
             enum_name = "category"
         )]
         pub enum DeriveCategory {
-            #[sea_orm(string_value = "B")]
+            #[pgorm(string_value = "B")]
             Big,
-            #[sea_orm(string_value = "S")]
+            #[pgorm(string_value = "S")]
             Small,
         }
 
@@ -325,13 +325,13 @@ mod tests {
         macro_rules! test_num_value_int {
             ($ident: ident, $rs_type: expr, $db_type: expr, $col_def: ident) => {
                 #[derive(Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-                #[sea_orm(rs_type = $rs_type, db_type = $db_type)]
+                #[pgorm(rs_type = $rs_type, db_type = $db_type)]
                 pub enum $ident {
-                    #[sea_orm(num_value = -10)]
+                    #[pgorm(num_value = -10)]
                     Negative,
-                    #[sea_orm(num_value = 1)]
+                    #[pgorm(num_value = 1)]
                     Big,
-                    #[sea_orm(num_value = 0)]
+                    #[pgorm(num_value = 0)]
                     Small,
                 }
 
@@ -342,7 +342,7 @@ mod tests {
         macro_rules! test_fallback_int {
             ($ident: ident, $fallback_type: ident, $rs_type: expr, $db_type: expr, $col_def: ident) => {
                 #[derive(Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-                #[sea_orm(rs_type = $rs_type, db_type = $db_type)]
+                #[pgorm(rs_type = $rs_type, db_type = $db_type)]
                 #[repr(i32)]
                 pub enum $ident {
                     Big = 1,
@@ -395,11 +395,11 @@ mod tests {
         macro_rules! test_num_value_uint {
             ($ident: ident, $rs_type: expr, $db_type: expr, $col_def: ident) => {
                 #[derive(Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-                #[sea_orm(rs_type = $rs_type, db_type = $db_type)]
+                #[pgorm(rs_type = $rs_type, db_type = $db_type)]
                 pub enum $ident {
-                    #[sea_orm(num_value = 1)]
+                    #[pgorm(num_value = 1)]
                     Big,
-                    #[sea_orm(num_value = 0)]
+                    #[pgorm(num_value = 0)]
                     Small,
                 }
 
@@ -410,7 +410,7 @@ mod tests {
         macro_rules! test_fallback_uint {
             ($ident: ident, $fallback_type: ident, $rs_type: expr, $db_type: expr, $col_def: ident) => {
                 #[derive(Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-                #[sea_orm(rs_type = $rs_type, db_type = $db_type)]
+                #[pgorm(rs_type = $rs_type, db_type = $db_type)]
                 #[repr($fallback_type)]
                 pub enum $ident {
                     Big = 1,
@@ -457,35 +457,35 @@ mod tests {
     #[test]
     fn escaped_non_uax31() {
         #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy)]
-        #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "pop_os_names_typos")]
+        #[pgorm(rs_type = "String", db_type = "Enum", enum_name = "pop_os_names_typos")]
         pub enum PopOSTypos {
-            #[sea_orm(string_value = "Pop!_OS")]
+            #[pgorm(string_value = "Pop!_OS")]
             PopOSCorrect,
-            #[sea_orm(string_value = "Pop\u{2757}_OS")]
+            #[pgorm(string_value = "Pop\u{2757}_OS")]
             PopOSEmoji,
-            #[sea_orm(string_value = "Pop!_操作系统")]
+            #[pgorm(string_value = "Pop!_操作系统")]
             PopOSChinese,
-            #[sea_orm(string_value = "PopOS")]
+            #[pgorm(string_value = "PopOS")]
             PopOSASCIIOnly,
-            #[sea_orm(string_value = "Pop OS")]
+            #[pgorm(string_value = "Pop OS")]
             PopOSASCIIOnlyWithSpace,
-            #[sea_orm(string_value = "Pop!OS")]
+            #[pgorm(string_value = "Pop!OS")]
             PopOSNoUnderscore,
-            #[sea_orm(string_value = "Pop_OS")]
+            #[pgorm(string_value = "Pop_OS")]
             PopOSNoExclaimation,
-            #[sea_orm(string_value = "!PopOS_")]
+            #[pgorm(string_value = "!PopOS_")]
             PopOSAllOverThePlace,
-            #[sea_orm(string_value = "Pop!_OS22.04LTS")]
+            #[pgorm(string_value = "Pop!_OS22.04LTS")]
             PopOSWithVersion,
-            #[sea_orm(string_value = "22.04LTSPop!_OS")]
+            #[pgorm(string_value = "22.04LTSPop!_OS")]
             PopOSWithVersionPrefix,
-            #[sea_orm(string_value = "!_")]
+            #[pgorm(string_value = "!_")]
             PopOSJustTheSymbols,
-            #[sea_orm(string_value = "")]
+            #[pgorm(string_value = "")]
             Nothing,
             // This WILL fail:
             // Both PopOs and PopOS will create identifier "Popos"
-            // #[sea_orm(string_value = "PopOs")]
+            // #[pgorm(string_value = "PopOs")]
             // PopOSLowerCase,
         }
         let values = [
@@ -508,25 +508,25 @@ mod tests {
         }
 
         #[derive(Clone, Debug, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
-        #[sea_orm(
+        #[pgorm(
             rs_type = "String",
             db_type = "String(StringLen::None)",
             enum_name = "conflicting_string_values"
         )]
         pub enum ConflictingStringValues {
-            #[sea_orm(string_value = "")]
+            #[pgorm(string_value = "")]
             Member1,
-            #[sea_orm(string_value = "$")]
+            #[pgorm(string_value = "$")]
             Member2,
-            #[sea_orm(string_value = "$$")]
+            #[pgorm(string_value = "$$")]
             Member3,
-            #[sea_orm(string_value = "AB")]
+            #[pgorm(string_value = "AB")]
             Member4,
-            #[sea_orm(string_value = "A_B")]
+            #[pgorm(string_value = "A_B")]
             Member5,
-            #[sea_orm(string_value = "A$B")]
+            #[pgorm(string_value = "A$B")]
             Member6,
-            #[sea_orm(string_value = "0 123")]
+            #[pgorm(string_value = "0 123")]
             Member7,
         }
         type EnumVariant = ConflictingStringValuesVariant;
@@ -546,7 +546,7 @@ mod tests {
         #[derive(DeriveDisplay)]
         enum DisplayTea {
             EverydayTea,
-            #[sea_orm(display_value = "Breakfast Tea")]
+            #[pgorm(display_value = "Breakfast Tea")]
             BreakfastTea,
         }
         assert_eq!(format!("{}", DisplayTea::EverydayTea), "EverydayTea");

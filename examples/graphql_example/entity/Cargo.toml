@@ -14,6 +14,6 @@ serde = { version = "1", features = ["derive"] }
 [dependencies.async-graphql]
 version = "5.0.10"
 
-[dependencies.sea-orm]
+[dependencies.pgorm]
 path = "../../../" # remove this line in your own project
-version = "~1.0.0" # sea-orm version
+version = "~1.0.0" # pgorm version

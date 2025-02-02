@@ -3,11 +3,11 @@
 pub mod common;
 
 pub use common::{bakery_chain::*, setup::*, TestContext};
-use sea_orm::{entity::prelude::*, IntoActiveModel, Set};
-pub use sea_query::{Expr, Query};
+use pgorm::{entity::prelude::*, IntoActiveModel, Set};
+pub use pgorm_query::{Expr, Query};
 use serde_json::json;
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     use bakery::*;
 
@@ -67,7 +67,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg_attr(
     any(
         feature = "sqlx-mysql",

@@ -235,7 +235,7 @@ impl TryGetable for Decimal {
 
 #[cfg(feature = "with-bigdecimal")]
 use bigdecimal::BigDecimal;
-use sea_query::Values;
+use pgorm_query::Values;
 use tokio_postgres::{
     row::RowIndex,
     types::{Json, Oid, WasNull},
@@ -434,7 +434,7 @@ pub trait TryGetableMany: Sized {
     fn try_get_many_by_index(res: &QueryResult) -> Result<Self, TryGetError>;
 
     /// ```
-    /// # use sea_orm::{error::*, tests_cfg::*, *};
+    /// # use pgorm::{error::*, tests_cfg::*, *};
     /// #
     /// # #[smol_potat::main]
     /// # #[cfg(all(feature = "mock", feature = "macros"))]
@@ -453,7 +453,7 @@ pub trait TryGetableMany: Sized {
     /// #     ]])
     /// #     .into_connection();
     /// #
-    /// use sea_orm::{entity::*, query::*, tests_cfg::cake, DeriveIden, EnumIter, TryGetableMany};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveIden, EnumIter, TryGetableMany};
     ///
     /// #[derive(EnumIter, DeriveIden)]
     /// enum ResultCol {
@@ -495,7 +495,7 @@ pub trait TryGetableMany: Sized {
         values: Values,
     ) -> SelectorRaw<SelectGetableValue<Self, C>>
     where
-        C: strum::IntoEnumIterator + sea_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::Iden,
     {
         SelectorRaw::<SelectGetableValue<Self, C>>::with_columns(stmt, values)
     }
@@ -795,7 +795,7 @@ try_from_u64_err!(uuid::Uuid);
 mod tests {
     use std::collections::BTreeMap;
 
-    use sea_query::Value;
+    use pgorm_query::Value;
 
     use super::*;
 
@@ -818,8 +818,8 @@ mod tests {
 
     #[test]
     fn build_with_query() {
-        use sea_orm::{DbBackend, Statement};
-        use sea_query::*;
+        use pgorm::{DbBackend, Statement};
+        use pgorm_query::*;
 
         let base_query = SelectStatement::new()
             .column(Alias::new("id"))

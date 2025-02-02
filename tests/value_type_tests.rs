@@ -14,10 +14,10 @@ pub use common::{
     TestContext,
 };
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
-use sea_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
+use pgorm::{entity::prelude::*, entity::*, DatabasePool};
+use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("value_type_tests").await;
     create_tables(&ctx.db).await?;

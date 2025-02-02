@@ -1,5 +1,5 @@
 use actix_example_service::{
-    sea_orm::{Database, DatabaseConnection},
+    pgorm::{Database, DatabaseConnection},
     Mutation, Query,
 };
 use actix_files::Files as Fs;

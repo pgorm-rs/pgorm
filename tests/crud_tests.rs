@@ -5,13 +5,13 @@ mod crud;
 
 pub use common::{bakery_chain::*, setup::*, TestContext};
 pub use crud::*;
-use sea_orm::DatabasePool;
+use pgorm::DatabasePool;
 
 // Run the test locally:
 // DATABASE_URL="sqlite::memory:" cargo test --features sqlx-sqlite,runtime-async-std-native-tls --test crud_tests
 // DATABASE_URL="mysql://root:root@localhost" cargo test --features sqlx-mysql,runtime-async-std-native-tls --test crud_tests
 // DATABASE_URL="postgres://root:root@localhost" cargo test --features sqlx-postgres,runtime-async-std-native-tls --test crud_tests
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() {
     let ctx = TestContext::new("bakery_chain_schema_crud_tests").await;
     create_tables(&ctx.db).await.unwrap();

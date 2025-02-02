@@ -1,5 +1,5 @@
 mod cake;
-use sea_orm::*;
+use pgorm::*;
 
 #[tokio::main]
 pub async fn main() {

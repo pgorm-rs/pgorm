@@ -1,5 +1,5 @@
 use crate::{ColumnTrait, EntityTrait, IdenStatic};
-use sea_query::{Alias, DynIden, Iden, IntoIden, SeaRc};
+use pgorm_query::{Alias, DynIden, Iden, IntoIden, SeaRc};
 use std::fmt;
 
 /// List of column identifier

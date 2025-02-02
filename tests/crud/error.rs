@@ -1,5 +1,5 @@
 pub use super::*;
-use sea_orm::error::*;
+use pgorm::error::*;
 #[cfg(any(
     feature = "sqlx-mysql",
     feature = "sqlx-sqlite",

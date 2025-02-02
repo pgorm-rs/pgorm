@@ -1,5 +1,5 @@
-use super::sea_orm_active_enums::*;
-use crate as sea_orm;
+use super::pgorm_active_enums::*;
+use crate as pgorm;
 use crate::entity::prelude::*;
 
 #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
@@ -12,9 +12,9 @@ impl EntityName for Entity {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
-#[sea_orm(table_name = "lunch_set")]
+#[pgorm(table_name = "lunch_set")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub name: String,
     pub tea: Tea,

@@ -1,11 +1,11 @@
-use sea_orm::entity::prelude::*;
-use sea_orm::TryGetableFromJson;
+use pgorm::entity::prelude::*;
+use pgorm::TryGetableFromJson;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "json_vec")]
+#[pgorm(table_name = "json_vec")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub str_vec: Option<StringVec>,
 }
@@ -22,17 +22,17 @@ impl TryGetableFromJson for StringVec {}
 
 impl From<StringVec> for Value {
     fn from(source: StringVec) -> Self {
-        sea_orm::Value::Json(serde_json::to_value(source).ok().map(std::boxed::Box::new))
+        pgorm::Value::Json(serde_json::to_value(source).ok().map(std::boxed::Box::new))
     }
 }
 
-impl sea_query::ValueType for StringVec {
-    fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
+impl pgorm_query::ValueType for StringVec {
+    fn try_from(v: Value) -> Result<Self, pgorm_query::ValueTypeErr> {
         match v {
-            sea_orm::Value::Json(Some(json)) => {
-                Ok(serde_json::from_value(*json).map_err(|_| sea_orm::sea_query::ValueTypeErr)?)
+            pgorm::Value::Json(Some(json)) => {
+                Ok(serde_json::from_value(*json).map_err(|_| pgorm::pgorm_query::ValueTypeErr)?)
             }
-            _ => Err(sea_orm::sea_query::ValueTypeErr),
+            _ => Err(pgorm::pgorm_query::ValueTypeErr),
         }
     }
 
@@ -40,17 +40,17 @@ impl sea_query::ValueType for StringVec {
         stringify!(StringVec).to_owned()
     }
 
-    fn array_type() -> sea_orm::sea_query::ArrayType {
-        sea_orm::sea_query::ArrayType::Json
+    fn array_type() -> pgorm::pgorm_query::ArrayType {
+        pgorm::pgorm_query::ArrayType::Json
     }
 
-    fn column_type() -> sea_query::ColumnType {
-        sea_query::ColumnType::Json
+    fn column_type() -> pgorm_query::ColumnType {
+        pgorm_query::ColumnType::Json
     }
 }
 
-impl sea_orm::sea_query::Nullable for StringVec {
-    fn null() -> sea_orm::Value {
-        sea_orm::Value::Json(None)
+impl pgorm::pgorm_query::Nullable for StringVec {
+    fn null() -> pgorm::Value {
+        pgorm::Value::Json(None)
     }
 }

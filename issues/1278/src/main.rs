@@ -1,4 +1,4 @@
-use sea_orm::{
+use pgorm::{
     Database, DeriveColumn, EntityTrait, EnumIter, FromQueryResult, QuerySelect,
 };
 

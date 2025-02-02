@@ -9,7 +9,7 @@ export DATABASE_URL=mysql://sea:sea@localhost/bakery
 # Re-generate entities
 
 ```sh
-sea-orm-cli generate entity --output-dir src/entity
+pgorm-cli generate entity --output-dir src/entity
 ```
 
 # Running Migrator CLI

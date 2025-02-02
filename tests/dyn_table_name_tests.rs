@@ -4,12 +4,12 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{
+use pgorm::{
     entity::prelude::*, DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set, Update,
 };
-use sea_query::{Expr, Query};
+use pgorm_query::{Expr, Query};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("dyn_table_name_tests").await;
     create_tables(&ctx.db).await?;

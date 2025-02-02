@@ -4,11 +4,11 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::entity::prelude::*;
-use sea_orm::TryInsertResult;
-use sea_orm::{sea_query::OnConflict, Set};
+use pgorm::entity::prelude::*;
+use pgorm::TryInsertResult;
+use pgorm::{pgorm_query::OnConflict, Set};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("upsert_tests").await;
     create_tables(&ctx.db).await?;

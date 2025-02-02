@@ -5,12 +5,12 @@ pub mod common;
 use chrono::offset::Utc;
 use common::{bakery_chain::*, setup::*, TestContext};
 use rust_decimal::prelude::*;
-use sea_orm::{entity::*, query::*, DatabasePool, FromQueryResult};
+use pgorm::{entity::*, query::*, DatabasePool, FromQueryResult};
 use uuid::Uuid;
 
 // Run the test locally:
 // DATABASE_URL="mysql://root:@localhost" cargo test --features sqlx-mysql,runtime-async-std --test sequential_op_tests
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-postgres"))]
 pub async fn test_multiple_operations() {
     let ctx = TestContext::new("multiple_sequential_operations").await;

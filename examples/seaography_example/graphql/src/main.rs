@@ -6,8 +6,8 @@ use async_graphql_poem::GraphQL;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use poem::{get, handler, listener::TcpListener, web::Html, IntoResponse, Route, Server};
-use sea_orm::Database;
-use sea_orm_seaography_example::*;
+use pgorm::Database;
+use pgorm_seaography_example::*;
 use std::env;
 
 lazy_static! {
@@ -45,7 +45,7 @@ async fn main() {
         },
         tokio::spawn,
     );
-    let schema = sea_orm_seaography_example::query_root::schema(
+    let schema = pgorm_seaography_example::query_root::schema(
         database,
         orm_dataloader,
         *DEPTH_LIMIT,

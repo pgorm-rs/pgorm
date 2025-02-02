@@ -2202,8 +2202,8 @@ dependencies = [
  "requestty",
  "rrgen",
  "rusty-sidekiq",
- "sea-orm",
- "sea-orm-migration",
+ "pgorm",
+ "pgorm-migration",
  "serde",
  "serde_json",
  "serde_variant",
@@ -2232,7 +2232,7 @@ dependencies = [
  "loco-rs",
  "migration",
  "rstest",
- "sea-orm",
+ "pgorm",
  "serde",
  "serde_json",
  "serial_test",
@@ -2290,7 +2290,7 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "loco-rs",
- "sea-orm-migration",
+ "pgorm-migration",
 ]
 
 [[package]]
@@ -3418,7 +3418,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sea-orm"
+name = "pgorm"
 version = "1.0.0-rc.4"
 dependencies = [
  "async-stream",
@@ -3429,7 +3429,7 @@ dependencies = [
  "log",
  "ouroboros",
  "rust_decimal",
- "sea-orm-macros",
+ "pgorm-macros",
  "sea-query",
  "sea-query-binder",
  "serde",
@@ -3444,7 +3444,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sea-orm-cli"
+name = "pgorm-cli"
 version = "1.0.0-rc.4"
 dependencies = [
  "chrono",
@@ -3459,7 +3459,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sea-orm-macros"
+name = "pgorm-macros"
 version = "1.0.0-rc.4"
 dependencies = [
  "heck 0.4.1",
@@ -3471,15 +3471,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "sea-orm-migration"
+name = "pgorm-migration"
 version = "1.0.0-rc.4"
 dependencies = [
  "async-trait",
  "clap",
  "dotenvy",
  "futures",
- "sea-orm",
- "sea-orm-cli",
+ "pgorm",
+ "pgorm-cli",
  "sea-schema",
  "tracing",
  "tracing-subscriber",

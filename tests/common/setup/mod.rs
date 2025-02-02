@@ -1,9 +1,9 @@
 use pretty_assertions::assert_eq;
-use sea_orm::{
+use pgorm::{
     ColumnTrait, ColumnType, ConnectOptions, ConnectionTrait, Database, DatabaseBackend,
     DatabasePool, DbBackend, DbConn, DbErr, EntityTrait, ExecResult, Iterable, Schema, Statement,
 };
-use sea_query::{
+use pgorm_query::{
     extension::postgres::{Type, TypeCreateStatement},
     SeaRc, Table, TableCreateStatement,
 };

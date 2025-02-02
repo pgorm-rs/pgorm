@@ -9,9 +9,9 @@ name = "entity"
 path = "src/lib.rs"
 
 [dependencies]
-sea-orm = { path = "../../../" }
+pgorm = { path = "../../../" }
 seaography = { path = "../../../../seaography", optional = true }
 async-graphql = { version = "5", optional = true  }
 
 [features]
-seaography = ["dep:seaography", "async-graphql", "sea-orm/seaography"]
+seaography = ["dep:seaography", "async-graphql", "pgorm/seaography"]

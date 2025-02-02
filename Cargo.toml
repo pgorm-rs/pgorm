@@ -1,26 +1,25 @@
 [workspace]
-members = [".", "sea-orm-macros", "sea-orm-codegen", "sea-orm-migration"]
+members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration"]
 
 [package]
-name = "sea-orm"
-version = "1.0.0"
-authors = ["Chris Tsang <chris.2y3@outlook.com>"]
+name = "pgorm"
+version = "0.1.0"
+authors = []
 edition = "2021"
 description = "🐚 An async & dynamic ORM for Rust"
 license = "MIT OR Apache-2.0"
-homepage = "https://www.sea-ql.org/SeaORM"
-documentation = "https://docs.rs/sea-orm"
-repository = "https://github.com/SeaQL/sea-orm"
+documentation = "https://docs.rs/pgorm"
+# repository = "https://github.com/-/pgorm"
 categories = ["database"]
 keywords = ["async", "orm", "mysql", "postgres", "sqlite"]
 rust-version = "1.65"
 
 [package.metadata.docs.rs]
-features = ["default", "sqlx-all", "mock", "proxy", "runtime-async-std-native-tls", "postgres-array", "sea-orm-internal"]
+features = ["default", "sqlx-all", "mock", "proxy", "runtime-async-std-native-tls", "postgres-array", "pgorm-internal"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
-name = "sea_orm"
+name = "pgorm"
 path = "src/lib.rs"
 
 [dependencies]
@@ -33,8 +32,8 @@ log = { version = "0.4", default-features = false }
 tracing = { version = "0.1", default-features = false, features = ["attributes", "log"] }
 rust_decimal = { version = "1", features = ["db-tokio-postgres"], default-features = false, optional = true }
 bigdecimal = { version = "0.3", default-features = false, optional = true }
-sea-orm-macros = { version = "~1.0.0", path = "sea-orm-macros", default-features = false, features = ["strum"] }
-sea-query = { git = "ssh://git@github.com/meelahealth/sea-query", default-features = false, features = ["derive", "thread-safe", "hashable-value", "backend-mysql", "backend-postgres", "backend-sqlite"] }
+pgorm-macros = { version = "~1.0.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
+pgorm-query = { path = "../pgorm-query", default-features = false, features = ["derive"] }
 sea-query-binder = { version = "0.6.0", default-features = false, optional = true }
 strum = { version = "0.26", default-features = false }
 serde = { version = "1.0", default-features = false }
@@ -59,7 +58,7 @@ tokio = { version = "1.6", features = ["full"] }
 actix-rt = { version = "2.2.0" }
 maplit = { version = "1" }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-sea-orm = { path = ".", features = ["debug-print", "tests-cfg", "postgres-array", "sea-orm-internal"] }
+pgorm = { path = ".", features = ["debug-print", "tests-cfg", "postgres-array", "pgorm-internal"] }
 pretty_assertions = { version = "0.7" }
 time = { version = "0.3.36", features = ["macros"] }
 uuid = { version = "1", features = ["v4"] }
@@ -79,18 +78,18 @@ default = [
     "runtime-tokio",
     "macros"
 ]
-macros = ["sea-orm-macros/derive"]
+macros = ["pgorm-macros/derive"]
 proxy = ["serde_json", "serde/derive"]
-with-json = ["serde_json", "sea-query/with-json", "chrono?/serde", "time?/serde", "uuid?/serde", "sea-query-binder?/with-json"]
-with-chrono = ["chrono", "sea-query/with-chrono", "sea-query-binder?/with-chrono"]
-with-rust_decimal = ["rust_decimal", "sea-query/with-rust_decimal", "sea-query-binder?/with-rust_decimal"]
-with-uuid = ["uuid", "sea-query/with-uuid", "sea-query-binder?/with-uuid"]
-postgres-array = ["sea-query/postgres-array", "sea-query-binder?/postgres-array", "sea-orm-macros/postgres-array"]
-json-array = ["postgres-array"]
-sea-orm-internal = []
+with-json = ["serde_json", "chrono?/serde", "time?/serde", "uuid?/serde"]
+with-chrono = ["chrono"]
+with-rust_decimal = ["rust_decimal"]
+with-uuid = ["uuid"]
+postgres-array = []
+json-array = []
+pgorm-internal = []
 runtime-tokio = []
 tests-cfg = []
 
 # This allows us to develop using a local version of sea-query
 # [patch.crates-io]
-# sea-query = { path = "../sea-query" }
+# pgorm-query = { path = "../sea-query" }

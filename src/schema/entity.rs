@@ -2,8 +2,8 @@ use crate::{
     ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Iterable, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
-use sea_query::{
-    extension::postgres::{Type, TypeCreateStatement},
+use pgorm_query::{
+    extension::{Type, TypeCreateStatement},
     ColumnDef, Iden, Index, IndexCreateStatement, SeaRc, TableCreateStatement,
 };
 
@@ -44,18 +44,18 @@ impl Schema {
     /// Creates a column definition for example to update a table.
     ///
     /// ```
-    /// use crate::sea_orm::IdenStatic;
-    /// use sea_orm::{
+    /// use crate::pgorm::IdenStatic;
+    /// use pgorm::{
     ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, DbBackend, EntityName,
     ///     EntityTrait, EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
     /// };
-    /// use sea_orm_macros::{DeriveEntityModel, DerivePrimaryKey};
-    /// use sea_query::{MysqlQueryBuilder, TableAlterStatement};
+    /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
+    /// use pgorm_query::{MysqlQueryBuilder, TableAlterStatement};
     ///
     /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    /// #[sea_orm(table_name = "posts")]
+    /// #[pgorm(table_name = "posts")]
     /// pub struct Model {
-    ///     #[sea_orm(primary_key)]
+    ///     #[pgorm(primary_key)]
     ///     pub id: u32,
     ///     pub title: String,
     /// }
@@ -222,7 +222,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{sea_query::*, tests_cfg::*, EntityName, Schema};
+    use crate::{pgorm_query::*, tests_cfg::*, EntityName, Schema};
     use pretty_assertions::assert_eq;
 
     #[test]

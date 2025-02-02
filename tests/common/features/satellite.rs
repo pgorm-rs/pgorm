@@ -1,14 +1,14 @@
-use sea_orm::entity::prelude::*;
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "satellite")]
+#[pgorm(table_name = "satellite")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[pgorm(primary_key)]
     pub id: i32,
     pub satellite_name: String,
-    #[sea_orm(default_value = "2022-01-26 16:24:00")]
+    #[pgorm(default_value = "2022-01-26 16:24:00")]
     pub launch_date: DateTimeUtc,
-    #[sea_orm(default_value = "2022-01-26 16:24:00")]
+    #[pgorm(default_value = "2022-01-26 16:24:00")]
     pub deployment_date: DateTimeLocal,
 }
 

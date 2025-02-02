@@ -4,10 +4,10 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabasePool, DerivePartialModel, FromQueryResult};
+use pgorm::{entity::prelude::*, entity::*, DatabasePool, DerivePartialModel, FromQueryResult};
 use serde_json::json;
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 #[cfg(all(feature = "sqlx-postgres", feature = "postgres-array"))]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("collection_tests").await;
@@ -206,7 +206,7 @@ pub async fn select_collection(db: &DatabasePool) -> Result<(), DbErr> {
     use collection::*;
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq)]
-    #[sea_orm(entity = "Entity")]
+    #[pgorm(entity = "Entity")]
     struct PartialSelectResult {
         name: String,
     }

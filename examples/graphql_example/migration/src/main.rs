@@ -1,4 +1,4 @@
-use sea_orm_migration::prelude::*;
+use pgorm_migration::prelude::*;
 
 #[cfg(debug_assertions)]
 use dotenvy::dotenv;

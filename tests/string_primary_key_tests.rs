@@ -4,10 +4,10 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
+use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 use serde_json::json;
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("features_schema_string_primary_key_tests").await;
     create_tables(&ctx.db).await?;
@@ -41,7 +41,7 @@ pub async fn insert_and_delete_repository(db: &DatabasePool) -> Result<(), DbErr
 
     #[cfg(any(feature = "sqlx-sqlite", feature = "sqlx-postgres"))]
     {
-        use sea_orm::sea_query::OnConflict;
+        use pgorm::pgorm_query::OnConflict;
 
         let err = Repository::insert(repository)
             // MySQL does not support DO NOTHING, we might workaround that later

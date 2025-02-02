@@ -3,10 +3,10 @@
 pub mod common;
 
 pub use common::{bakery_chain::*, setup::*, TestContext};
-pub use sea_orm::entity::*;
-pub use sea_orm::{ConnectionTrait, DbErr, QueryFilter};
+pub use pgorm::entity::*;
+pub use pgorm::{ConnectionTrait, DbErr, QueryFilter};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 pub async fn stream() -> Result<(), DbErr> {
     use futures::StreamExt;
 

@@ -3,7 +3,7 @@ mod setup;
 
 use futures_util::StreamExt;
 use post::Entity as Post;
-use sea_orm::{prelude::*, Database};
+use pgorm::{prelude::*, Database};
 use std::env;
 
 #[tokio::main]

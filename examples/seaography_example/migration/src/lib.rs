@@ -1,4 +1,4 @@
-pub use sea_orm_migration::prelude::*;
+pub use pgorm_migration::prelude::*;
 
 mod entity;
 mod m20230101_000001_create_bakery_table;

@@ -4,9 +4,9 @@ pub mod common;
 
 pub use common::{features::*, setup::*, TestContext};
 use pretty_assertions::assert_eq;
-use sea_orm::{entity::prelude::*, entity::*, DatabasePool};
+use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 
-#[sea_orm_macros::test]
+#[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("uuid_fmt_tests").await;
     create_tables(&ctx.db).await?;
