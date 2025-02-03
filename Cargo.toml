@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration"]
+members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool"]
 
 [package]
 name = "pgorm"
@@ -22,31 +22,39 @@ rustdoc-args = ["--cfg", "docsrs"]
 name = "pgorm"
 path = "src/lib.rs"
 
-[dependencies]
-async-stream = { version = "0.3", default-features = false }
+[workspace.dependencies]
 async-trait = { version = "0.1", default-features = false }
+deadpool = { version = "0.12.2", features = ["serde", "rt_tokio_1"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "rc"] }
+tokio = { version = "1.6", features = ["full"] }
+tracing = { version = "0.1", default-features = false, features = ["attributes", "log"] }
+tokio-postgres = { version = "0.7.11", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1", "array-impls"] }
+
+[dependencies]
+pgorm-pool = { path = "./pgorm-pool" }
+async-stream = { version = "0.3", default-features = false }
+async-trait.workspace = true
+deadpool.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tokio-postgres.workspace = true
 chrono = { version = "0.4.30", default-features = false, optional = true }
 time = { version = "0.3.36", default-features = false, optional = true }
 futures = { version = "0.3", default-features = false, features = ["std"] }
 log = { version = "0.4", default-features = false }
-tracing = { version = "0.1", default-features = false, features = ["attributes", "log"] }
 rust_decimal = { version = "1", features = ["db-tokio-postgres"], default-features = false, optional = true }
 bigdecimal = { version = "0.3", default-features = false, optional = true }
 pgorm-macros = { version = "~1.0.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
 pgorm-query = { path = "../pgorm-query", default-features = false, features = ["derive"] }
 sea-query-binder = { version = "0.6.0", default-features = false, optional = true }
 strum = { version = "0.26", default-features = false }
-serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, optional = true }
 # sqlx = { version = "0.7", default-features = false, optional = true }
 uuid = { version = "1", default-features = false, optional = true }
 # ouroboros = { version = "0.17", default-features = false }
 url = { version = "2.2", default-features = false }
 thiserror = { version = "1", default-features = false }
-# deadpool = { version = "0.12.1" }
-tokio = { version = "1.6", features = ["full"] }
-tokio-postgres = { version = "0.7.11", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1", "array-impls"] }
-deadpool-postgres = "0.14.0"
 bytes = "1.7.1"
 
 [dev-dependencies]

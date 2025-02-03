@@ -31,7 +31,7 @@ impl DeriveModel {
             _ => return Err(Error::InputNotStruct),
         };
 
-        let sea_attr = derive_attr::SeaOrm::try_from_attributes(&input.attrs)
+        let sea_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 

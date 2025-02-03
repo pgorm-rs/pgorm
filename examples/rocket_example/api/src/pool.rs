@@ -10,7 +10,7 @@ use std::time::Duration;
 pub struct Db(SeaOrmPool);
 
 #[derive(Debug, Clone)]
-pub struct SeaOrmPool {
+pub struct PgormPool {
     pub conn: pgorm::DatabaseConnection,
 }
 

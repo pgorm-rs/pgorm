@@ -18,7 +18,7 @@ struct DeriveRelatedEntity {
 
 impl DeriveRelatedEntity {
     fn new(input: syn::DeriveInput) -> Result<Self, Error> {
-        let sea_attr = related_attr::SeaOrm::try_from_attributes(&input.attrs)
+        let sea_attr = related_attr::Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 
@@ -48,7 +48,7 @@ impl DeriveRelatedEntity {
             .variants
             .iter()
             .map(|variant| {
-                let attr = related_attr::SeaOrm::from_attributes(&variant.attrs)?;
+                let attr = related_attr::Pgorm::from_attributes(&variant.attrs)?;
 
                 let enum_name = &variant.ident;
 

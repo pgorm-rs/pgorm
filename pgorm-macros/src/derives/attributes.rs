@@ -4,7 +4,7 @@ pub mod derive_attr {
     /// Attributes for Models and ActiveModels
     #[derive(Default, FromAttributes)]
     #[allow(dead_code)]
-    pub struct SeaOrm {
+    pub struct Pgorm {
         pub column: Option<syn::Ident>,
         pub entity: Option<syn::Ident>,
         pub model: Option<syn::Ident>,
@@ -24,7 +24,7 @@ pub mod field_attr {
 
     /// Operations for Models and ActiveModels
     #[derive(Default, FromAttributes)]
-    pub struct SeaOrm {
+    pub struct Pgorm {
         pub belongs_to: Option<syn::Lit>,
         pub has_one: Option<syn::Lit>,
         pub has_many: Option<syn::Lit>,
@@ -43,7 +43,7 @@ pub mod related_attr {
 
     /// Operations for RelatedEntity enumeration
     #[derive(Default, FromAttributes)]
-    pub struct SeaOrm {
+    pub struct Pgorm {
         ///
         /// Allows to modify target entity
         ///

@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned};
 
 /// Attributes to derive an ActiveModel
 #[derive(Default, FromAttributes)]
-pub struct SeaOrm {
+pub struct Pgorm {
     pub active_model: Option<syn::Ident>,
 }
 
@@ -14,7 +14,7 @@ enum Error {
 }
 
 struct IntoActiveModel {
-    attrs: SeaOrm,
+    attrs: Pgorm,
     fields: syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
     field_idents: Vec<syn::Ident>,
     ident: syn::Ident,
@@ -30,7 +30,7 @@ impl IntoActiveModel {
             _ => return Err(Error::InputNotStruct),
         };
 
-        let attrs = SeaOrm::try_from_attributes(&input.attrs)
+        let attrs = Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 

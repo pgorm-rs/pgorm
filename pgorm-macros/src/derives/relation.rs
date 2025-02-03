@@ -21,7 +21,7 @@ impl DeriveRelation {
             _ => return Err(Error::InputNotEnum),
         };
 
-        let sea_attr = derive_attr::SeaOrm::try_from_attributes(&input.attrs)
+        let sea_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 
@@ -51,7 +51,7 @@ impl DeriveRelation {
             .iter()
             .map(|variant| {
                 let variant_ident = &variant.ident;
-                let attr = field_attr::SeaOrm::from_attributes(&variant.attrs)?;
+                let attr = field_attr::Pgorm::from_attributes(&variant.attrs)?;
                 let mut relation_type = quote! { error };
                 let related_to = if attr.belongs_to.is_some() {
                     relation_type = quote! { belongs_to };

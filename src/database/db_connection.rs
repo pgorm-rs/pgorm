@@ -1,5 +1,8 @@
+use std::{collections::BTreeMap, sync::Arc};
+
 use crate::{error::*, ConnectionTrait, TransactionTrait};
-use deadpool_postgres::{Object, Pool, Transaction};
+use deadpool::Status;
+use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
     types::{BorrowToSql, ToSql},
     ToStatement,
@@ -10,6 +13,23 @@ use tokio_postgres::{
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabasePool(pub(crate) Pool);
+
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct DatabaseMultiPool(pub(crate) BTreeMap<Arc<String>, DatabasePool>);
+
+impl DatabaseMultiPool {
+    pub fn get(&self, key: Arc<String>) -> Option<DatabasePool> {
+        self.0.get(&key).cloned()
+    }
+
+    pub fn status(&self) -> BTreeMap<Arc<String>, Status> {
+        self.0
+            .iter()
+            .map(|(k, v)| (k.clone(), v.status()))
+            .collect()
+    }
+}
 
 // impl Deref for DatabasePool {
 //     type Target = Pool;
@@ -23,6 +43,14 @@ impl DatabasePool {
     pub async fn get(&self) -> Result<DatabaseConnection, DbErr> {
         let conn = Pool::get(&self.0).await?;
         Ok(DatabaseConnection(conn))
+    }
+
+    pub fn tag(&self) -> Arc<String> {
+        self.0.manager().tag()
+    }
+
+    pub fn status(&self) -> Status {
+        self.0.status()
     }
 }
 
