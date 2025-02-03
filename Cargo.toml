@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool"]
+members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool", "pgorm-query", "pgorm-query/pgorm-query-attr", "pgorm-query/pgorm-query-derive"]
 
 [package]
 name = "pgorm"
@@ -29,6 +29,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "rc"]
 tokio = { version = "1.6", features = ["full"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes", "log"] }
 tokio-postgres = { version = "0.7.11", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1", "array-impls"] }
+pgorm-query = { path = "./pgorm-query", default-features = false, features = ["derive"] }
 
 [dependencies]
 pgorm-pool = { path = "./pgorm-pool" }
@@ -46,7 +47,7 @@ log = { version = "0.4", default-features = false }
 rust_decimal = { version = "1", features = ["db-tokio-postgres"], default-features = false, optional = true }
 bigdecimal = { version = "0.3", default-features = false, optional = true }
 pgorm-macros = { version = "~1.0.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
-pgorm-query = { path = "../pgorm-query", default-features = false, features = ["derive"] }
+pgorm-query.workspace = true
 sea-query-binder = { version = "0.6.0", default-features = false, optional = true }
 strum = { version = "0.26", default-features = false }
 serde_json = { version = "1.0", default-features = false, optional = true }

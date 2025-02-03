@@ -1,0 +1,30 @@
+[package]
+name = "pgorm-query-derive"
+version = "0.4.1"
+authors = [ "Follpvosten <wolfi@karpador.xyz>", "Rene Leveille <rene@nestingsafe.com>" ]
+edition = "2021"
+description = "Derive macro for pgorm-query's Iden trait"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/pgorm-query"
+repository = "https://github.com/SeaQL/sea-query"
+categories = [ "database" ]
+keywords = [ "database", "sql", "mysql", "postgres", "sqlite" ]
+rust-version = "1.60"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "derive", "printing"] }
+quote = { version = "1", default-features = false }
+heck = { version = "0.5", default-features = false }
+proc-macro2 = { version = "1", default-features = false }
+thiserror = { version = "1.0", default-features = false }
+
+[dev-dependencies]
+trybuild = "1.0"
+pgorm-query.workspace = true
+strum = { version = "0.26", features = ["derive"] }
+
+[features]
+sea-orm = []
