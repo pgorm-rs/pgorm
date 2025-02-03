@@ -73,16 +73,28 @@ impl DatabaseConnection {
             t = t.read_only(true);
         }
 
-        Ok(DatabaseTransaction(t.start().await?))
+        Ok(DatabaseTransaction(Some(t.start().await?)))
     }
 }
 
 #[derive(Debug)]
-pub struct DatabaseTransaction<'a>(pub(crate) Transaction<'a>);
+pub struct DatabaseTransaction<'a>(pub(crate) Option<Transaction<'a>>);
 
 impl DatabaseTransaction<'_> {
-    pub async fn commit(self) -> Result<(), DbErr> {
-        self.0.commit().await.map_err(|e| DbErr::Postgres(e))
+    pub async fn commit(mut self) -> Result<(), DbErr> {
+        if let Some(tx) = self.0.take() {
+            tx.commit().await.map_err(|e| DbErr::Postgres(e))
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+impl Drop for DatabaseTransaction<'_> {
+    fn drop(&mut self) {
+        if self.0.is_some() {
+            tracing::warn!("Transaction dropped without committing!");
+        }
     }
 }
 
@@ -229,7 +241,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.execute(statement, params).await?)
+        Ok(self.0.as_ref().unwrap().execute(statement, params).await?)
     }
 
     // #[instrument(level = "trace")]
@@ -240,7 +252,12 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        Ok(self.0.execute_raw(statement, params).await?)
+        Ok(self
+            .0
+            .as_ref()
+            .unwrap()
+            .execute_raw(statement, params)
+            .await?)
     }
 
     async fn query_one<T>(
@@ -251,7 +268,12 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.query_one(statement, params).await?)
+        Ok(self
+            .0
+            .as_ref()
+            .unwrap()
+            .query_one(statement, params)
+            .await?)
     }
 
     async fn query_opt<T>(
@@ -262,7 +284,12 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.query_opt(statement, params).await?)
+        Ok(self
+            .0
+            .as_ref()
+            .unwrap()
+            .query_opt(statement, params)
+            .await?)
     }
 
     async fn query_all<T>(
@@ -273,7 +300,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.query(statement, params).await?)
+        Ok(self.0.as_ref().unwrap().query(statement, params).await?)
     }
 
     // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
@@ -289,7 +316,9 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseTransaction<'_> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
-        Ok(DatabaseTransaction(self.0.transaction().await?))
+        Ok(DatabaseTransaction(Some(
+            self.0.as_mut().unwrap().transaction().await?,
+        )))
     }
 }
 
@@ -297,7 +326,7 @@ impl TransactionTrait for DatabaseTransaction<'_> {
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
         let tx = self.0.transaction().await?;
-        Ok(DatabaseTransaction(tx))
+        Ok(DatabaseTransaction(Some(tx)))
     }
     // #[instrument(level = "trace")]
     // async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
