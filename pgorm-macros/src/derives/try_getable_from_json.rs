@@ -2,14 +2,10 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 pub fn expand_derive_from_json_query_result(ident: Ident) -> syn::Result<TokenStream> {
-    let impl_not_u8 = if cfg!(feature = "postgres-array") {
-        quote!(
-            #[automatically_derived]
-            impl pgorm::pgorm_query::value::with_array::NotU8 for #ident {}
-        )
-    } else {
-        quote!()
-    };
+    let impl_not_u8 = quote!(
+        #[automatically_derived]
+        impl pgorm::pgorm_query::value::with_array::NotU8 for #ident {}
+    );
 
     Ok(quote!(
         #[automatically_derived]
