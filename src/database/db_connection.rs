@@ -170,6 +170,62 @@ impl ConnectionTrait for DatabasePool {
 }
 
 #[async_trait::async_trait]
+impl ConnectionTrait for &DatabaseConnection {
+    // #[instrument(level = "trace")]
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+    {
+        Ok(self.0.execute(statement, params).await?)
+    }
+
+    // #[instrument(level = "trace")]
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self.0.execute_raw(statement, params).await?)
+    }
+
+    async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<tokio_postgres::Row, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+    {
+        Ok(self.0.query_one(statement, params).await?)
+    }
+
+    async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+    {
+        Ok(self.0.query_opt(statement, params).await?)
+    }
+
+    async fn query_all<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+    {
+        Ok(self.0.query(statement, params).await?)
+    }
+}
+
+
+#[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>

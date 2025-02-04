@@ -49,35 +49,10 @@ where
     NotSet,
 }
 
-/// Defines a set operation on an [ActiveValue]
-#[allow(non_snake_case)]
-pub fn Set<V>(v: V) -> ActiveValue<V>
-where
-    V: Into<Value>,
-{
-    ActiveValue::set(v)
-}
-
-/// Defines an not set operation on an [ActiveValue]
-#[deprecated(
-    since = "0.5.0",
-    note = "Please use [`ActiveValue::NotSet`] or [`NotSet`]"
-)]
-#[allow(non_snake_case)]
-pub fn Unset<V>(_: Option<bool>) -> ActiveValue<V>
-where
-    V: Into<Value>,
-{
-    ActiveValue::not_set()
-}
-
-/// Defines an unchanged operation on an [ActiveValue]
-#[allow(non_snake_case)]
-pub fn Unchanged<V>(value: V) -> ActiveValue<V>
-where
-    V: Into<Value>,
-{
-    ActiveValue::unchanged(value)
+impl<V: Into<Value>> From<V> for ActiveValue<V> {
+    fn from(value: V) -> Self {
+        ActiveValue::Set(value)
+    }
 }
 
 /// A Trait for ActiveModel to perform Create, Update or Delete operation.
@@ -668,7 +643,7 @@ where
 {
     fn into_active_value(self) -> ActiveValue<Option<V>> {
         match self {
-            Some(value) => Set(Some(value)),
+            Some(value) => ActiveValue::Set(Some(value)),
             None => NotSet,
         }
     }
@@ -680,7 +655,7 @@ where
 {
     fn into_active_value(self) -> ActiveValue<Option<V>> {
         match self {
-            Some(value) => Set(value),
+            Some(value) => ActiveValue::Set(value),
             None => NotSet,
         }
     }
@@ -690,7 +665,7 @@ macro_rules! impl_into_active_value {
     ($ty: ty) => {
         impl IntoActiveValue<$ty> for $ty {
             fn into_active_value(self) -> ActiveValue<$ty> {
-                Set(self)
+                ActiveValue::Set(self)
             }
         }
     };

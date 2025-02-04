@@ -100,11 +100,6 @@ impl Expr {
         }
     }
 
-    #[deprecated(since = "0.29.0", note = "Please use the [`Asterisk`]")]
-    pub fn asterisk() -> Self {
-        Self::col(Asterisk)
-    }
-
     /// Express the target column without table prefix.
     ///
     /// # Examples
@@ -172,14 +167,6 @@ impl Expr {
         Expr::expr(SimpleExpr::Tuple(
             n.into_iter().collect::<Vec<SimpleExpr>>(),
         ))
-    }
-
-    #[deprecated(since = "0.29.0", note = "Please use the [`Asterisk`]")]
-    pub fn table_asterisk<T>(t: T) -> Self
-    where
-        T: IntoIden,
-    {
-        Self::col((t.into_iden(), Asterisk))
     }
 
     /// Express a [`Value`], returning a [`Expr`].

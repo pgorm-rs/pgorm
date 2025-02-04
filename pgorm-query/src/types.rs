@@ -570,17 +570,6 @@ impl LikeExpr {
         }
     }
 
-    #[deprecated(since = "0.29.0", note = "Please use the [`LikeExpr::new`] method")]
-    pub fn str<T>(pattern: T) -> Self
-    where
-        T: Into<String>,
-    {
-        Self {
-            pattern: pattern.into(),
-            escape: None,
-        }
-    }
-
     pub fn escape(self, c: char) -> Self {
         Self {
             pattern: self.pattern,
