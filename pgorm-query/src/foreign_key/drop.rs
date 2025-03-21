@@ -1,6 +1,6 @@
 use inherent::inherent;
 
-use crate::{types::*, QueryBuilder, SchemaStatementBuilder, TableForeignKey};
+use crate::{QueryBuilder, SchemaStatementBuilder, TableForeignKey, types::*};
 
 /// Drop a foreign key constraint for an existing table
 ///

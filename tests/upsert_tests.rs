@@ -2,11 +2,11 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
-use pgorm::entity::prelude::*;
+pub use common::{TestContext, features::*, setup::*};
 use pgorm::TryInsertResult;
-use pgorm::{pgorm_query::OnConflict, Set};
+use pgorm::entity::prelude::*;
+use pgorm::{Set, pgorm_query::OnConflict};
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

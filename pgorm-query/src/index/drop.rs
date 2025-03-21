@@ -1,6 +1,6 @@
 use inherent::inherent;
 
-use crate::{types::*, QueryBuilder, SchemaStatementBuilder, TableIndex};
+use crate::{QueryBuilder, SchemaStatementBuilder, TableIndex, types::*};
 
 /// Drop an index for an existing table
 ///

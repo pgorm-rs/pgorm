@@ -2,9 +2,9 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
+pub use common::{TestContext, features::*, setup::*};
+use pgorm::{DbBackend, IntoActiveModel, QueryOrder, entity::prelude::*, query::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, query::*, DbBackend, IntoActiveModel, QueryOrder};
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

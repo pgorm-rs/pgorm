@@ -1,5 +1,5 @@
 pub use super::*;
-use pgorm::{query::*, DbErr};
+use pgorm::{DbErr, query::*};
 use uuid::Uuid;
 
 pub async fn test_update_cake(db: &DbConn) {

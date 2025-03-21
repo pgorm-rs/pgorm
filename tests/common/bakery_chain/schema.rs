@@ -1,6 +1,6 @@
 use super::*;
 use crate::common::setup::create_table;
-use pgorm::{error::*, pgorm_query, DatabasePool, DbConn, ExecResult};
+use pgorm::{DatabasePool, DbConn, ExecResult, error::*, pgorm_query};
 use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Table};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {

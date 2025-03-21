@@ -4,10 +4,10 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 use quote::quote_spanned;
+use syn::Expr;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::Expr;
 
 use syn::Meta;
 
@@ -228,7 +228,7 @@ mod util {
 #[cfg(test)]
 mod test {
     use quote::format_ident;
-    use syn::{parse_str, DeriveInput, Type};
+    use syn::{DeriveInput, Type, parse_str};
 
     use crate::derives::partial_model::ColumnAs;
 

@@ -3,9 +3,9 @@
 pub mod common;
 
 use chrono::offset::Utc;
-use common::{bakery_chain::*, setup::*, TestContext};
+use common::{TestContext, bakery_chain::*, setup::*};
+use pgorm::{DatabasePool, FromQueryResult, entity::*, query::*};
 use rust_decimal::prelude::*;
-use pgorm::{entity::*, query::*, DatabasePool, FromQueryResult};
 use uuid::Uuid;
 
 // Run the test locally:

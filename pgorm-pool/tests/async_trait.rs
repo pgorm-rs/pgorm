@@ -2,7 +2,7 @@
 // See: https://github.com/bikeshedder/deadpool/issues/323
 
 use futures_util::{Stream, StreamExt};
-use pgorm_pool::{tokio_postgres::Row, GenericClient};
+use pgorm_pool::{GenericClient, tokio_postgres::Row};
 use std::future::Future;
 use tokio_postgres::types::ToSql;
 

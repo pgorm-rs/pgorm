@@ -2,12 +2,12 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
+pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    entity::prelude::*, DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set, Update,
+    DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set, Update, entity::prelude::*,
 };
 use pgorm_query::{Expr, Query};
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

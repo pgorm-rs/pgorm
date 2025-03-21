@@ -1,7 +1,7 @@
 use crate::DbErr;
 use tokio_postgres::{
-    types::{BorrowToSql, ToSql},
     Row, ToStatement,
+    types::{BorrowToSql, ToSql},
 };
 
 use super::DatabaseTransaction;

@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{error::*, ConnectionTrait, TransactionTrait};
+use crate::{ConnectionTrait, TransactionTrait, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
-    types::{BorrowToSql, ToSql},
     ToStatement,
+    types::{BorrowToSql, ToSql},
 };
 
 /// Handle a database connection depending on the backend enabled by the feature

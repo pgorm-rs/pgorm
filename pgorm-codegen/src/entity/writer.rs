@@ -1,4 +1,4 @@
-use crate::{util::escape_rust_keyword, ActiveEnum, Entity};
+use crate::{ActiveEnum, Entity, util::escape_rust_keyword};
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -126,7 +126,7 @@ impl FromStr for WithSerde {
             v => {
                 return Err(crate::Error::TransformError(format!(
                     "Unsupported enum variant '{v}'"
-                )))
+                )));
             }
         })
     }
@@ -827,9 +827,9 @@ impl EntityWriter {
 #[cfg(test)]
 mod tests {
     use crate::{
-        entity::writer::{bonus_attributes, bonus_derive},
         Column, ConjunctRelation, DateTimeCrate, Entity, EntityWriter, PrimaryKey, Relation,
         RelationType, WithSerde,
+        entity::writer::{bonus_attributes, bonus_derive},
     };
     use pgorm_query::{Alias, ColumnType, ForeignKeyAction, RcOrArc, SeaRc, StringLen};
     use pretty_assertions::assert_eq;

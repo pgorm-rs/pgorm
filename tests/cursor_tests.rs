@@ -2,9 +2,9 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
+pub use common::{TestContext, features::*, setup::*};
+use pgorm::{DerivePartialModel, FromQueryResult, QuerySelect, Set, entity::prelude::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, DerivePartialModel, FromQueryResult, QuerySelect, Set};
 use serde_json::json;
 
 #[pgorm_macros::test]
@@ -512,8 +512,8 @@ pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
 }
 
 use common::bakery_chain::{
-    baker, bakery, cake, cakes_bakers, schema as bakery_chain_schema, Baker, Bakery, Cake,
-    CakesBakers,
+    Baker, Bakery, Cake, CakesBakers, baker, bakery, cake, cakes_bakers,
+    schema as bakery_chain_schema,
 };
 
 fn bakery(i: i32) -> bakery::Model {

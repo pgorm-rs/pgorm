@@ -3,16 +3,16 @@
 pub mod common;
 
 use active_enum::Entity as ActiveEnumEntity;
-pub use common::{features::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
+pub use common::{TestContext, features::*, setup::*};
 #[cfg(feature = "sqlx-postgres")]
 use pgorm::QueryTrait;
 use pgorm::{
+    ActiveEnum as ActiveEnumTrait, DatabasePool,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
-    ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -624,8 +624,8 @@ pub async fn find_linked_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use pretty_assertions::assert_eq;
     pub use pgorm::{DbBackend, QueryTrait};
+    pub use pretty_assertions::assert_eq;
 
     #[test]
     fn active_enum_find_related() {

@@ -1,5 +1,5 @@
-use pgorm::entity::prelude::*;
 use pgorm::FromJsonQueryResult;
+use pgorm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]

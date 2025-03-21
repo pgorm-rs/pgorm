@@ -2,8 +2,8 @@
 
 pub mod common;
 
-pub use common::{bakery_chain::*, setup::*, TestContext};
-use pgorm::{entity::prelude::*, IntoActiveModel, Set};
+pub use common::{TestContext, bakery_chain::*, setup::*};
+use pgorm::{IntoActiveModel, Set, entity::prelude::*};
 pub use pgorm_query::{Expr, Query};
 use serde_json::json;
 
@@ -79,7 +79,7 @@ async fn main() -> Result<(), DbErr> {
     should_panic(expected = "Database backend doesn't support RETURNING")
 )]
 async fn update_many() {
-    pub use common::{features::*, TestContext};
+    pub use common::{TestContext, features::*};
     use edit_log::*;
 
     let run = || async {

@@ -2,9 +2,9 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
+pub use common::{TestContext, features::*, setup::*};
+use pgorm::{DatabasePool, DerivePartialModel, FromQueryResult, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, entity::*, DatabasePool, DerivePartialModel, FromQueryResult};
 use serde_json::json;
 
 #[pgorm_macros::test]

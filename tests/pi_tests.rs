@@ -2,9 +2,9 @@
 
 pub mod common;
 
-use common::{features::*, setup::*, TestContext};
+use common::{TestContext, features::*, setup::*};
+use pgorm::{DatabasePool, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 use std::str::FromStr;
 
 #[pgorm_macros::test]

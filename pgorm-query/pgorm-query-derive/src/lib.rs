@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use heck::ToSnakeCase;
 use proc_macro::{self, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, Attribute, DataEnum, DataStruct, DeriveInput, Fields, Variant};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Fields, Variant, parse_macro_input};
 
 mod error;
 mod iden_attr;

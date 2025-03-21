@@ -3,8 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    extension::{Type, TypeCreateStatement},
     ColumnDef, Iden, Index, IndexCreateStatement, SeaRc, TableCreateStatement,
+    extension::{Type, TypeCreateStatement},
 };
 
 impl Schema {
@@ -222,7 +222,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{pgorm_query::*, tests_cfg::*, EntityName, Schema};
+    use crate::{EntityName, Schema, pgorm_query::*, tests_cfg::*};
     use pretty_assertions::assert_eq;
 
     #[test]

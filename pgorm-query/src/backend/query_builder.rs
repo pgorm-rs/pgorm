@@ -2013,12 +2013,12 @@ impl QueryBuilder {
     /// Translate the generated column into SQL statement
     pub(crate) fn prepare_generated_column(
         &self,
-        gen: &SimpleExpr,
+        gen_: &SimpleExpr,
         stored: bool,
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
-        QueryBuilder::prepare_simple_expr(self, gen, sql);
+        QueryBuilder::prepare_simple_expr(self, gen_, sql);
         write!(sql, ")").unwrap();
         if stored {
             write!(sql, " STORED").unwrap();

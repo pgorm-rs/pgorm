@@ -1,12 +1,12 @@
-use pretty_assertions::assert_eq;
 use pgorm::{
     ColumnTrait, ColumnType, ConnectOptions, ConnectionTrait, Database, DatabaseBackend,
     DatabasePool, DbBackend, DbConn, DbErr, EntityTrait, ExecResult, Iterable, Schema, Statement,
 };
 use pgorm_query::{
-    extension::postgres::{Type, TypeCreateStatement},
     SeaRc, Table, TableCreateStatement,
+    extension::postgres::{Type, TypeCreateStatement},
 };
+use pretty_assertions::assert_eq;
 
 pub async fn setup(base_url: &str, db_name: &str) -> DatabasePool {
     let url = format!("{base_url}/postgres");

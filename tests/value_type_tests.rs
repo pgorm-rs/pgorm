@@ -6,16 +6,16 @@ use std::sync::Arc;
 use std::vec;
 
 pub use common::{
+    TestContext,
     features::{
-        value_type::{value_type_general, value_type_pg, Boolbean, Integer, StringVec},
+        value_type::{Boolbean, Integer, StringVec, value_type_general, value_type_pg},
         *,
     },
     setup::*,
-    TestContext,
 };
-use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, entity::*, DatabasePool};
+use pgorm::{DatabasePool, entity::prelude::*, entity::*};
 use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

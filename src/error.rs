@@ -173,10 +173,10 @@ impl DbErr {
                 {
                     match _error_code_expanded {
                         "23505" => {
-                            return Some(SqlErr::UniqueConstraintViolation(e.message().into()))
+                            return Some(SqlErr::UniqueConstraintViolation(e.message().into()));
                         }
                         "23503" => {
-                            return Some(SqlErr::ForeignKeyConstraintViolation(e.message().into()))
+                            return Some(SqlErr::ForeignKeyConstraintViolation(e.message().into()));
                         }
                         _ => return None,
                     }

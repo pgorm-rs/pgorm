@@ -3,11 +3,11 @@
 pub mod common;
 
 pub use chrono::offset::Utc;
-pub use common::{bakery_chain::*, setup::*, TestContext};
+pub use common::{TestContext, bakery_chain::*, setup::*};
+use pgorm::{DbErr, DerivePartialModel, FromQueryResult, entity::*, query::*};
+use pgorm_query::{Expr, Func, SimpleExpr};
 use pretty_assertions::assert_eq;
 pub use rust_decimal::prelude::*;
-use pgorm::{entity::*, query::*, DbErr, DerivePartialModel, FromQueryResult};
-use pgorm_query::{Expr, Func, SimpleExpr};
 pub use uuid::Uuid;
 
 // Run the test locally:
@@ -269,14 +269,18 @@ pub async fn inner_join() {
         .unwrap();
 
     assert_eq!(results.len(), 2);
-    assert!(results
-        .iter()
-        .any(|result| result.name == customer_kate.name.clone()
-            && result.order_total == Some(kate_order_1.total)));
-    assert!(results
-        .iter()
-        .any(|result| result.name == customer_kate.name.clone()
-            && result.order_total == Some(kate_order_2.total)));
+    assert!(
+        results
+            .iter()
+            .any(|result| result.name == customer_kate.name.clone()
+                && result.order_total == Some(kate_order_1.total))
+    );
+    assert!(
+        results
+            .iter()
+            .any(|result| result.name == customer_kate.name.clone()
+                && result.order_total == Some(kate_order_2.total))
+    );
 
     ctx.delete().await;
 }
@@ -728,7 +732,7 @@ pub async fn related() -> Result<(), DbErr> {
 pub async fn linked() -> Result<(), DbErr> {
     use common::bakery_chain::Order;
     use pgorm::{SelectA, SelectB};
-    use pgorm_query::::::{Alias, Expr};
+    use pgorm_query::backend::{Alias, Expr};
 
     let ctx = TestContext::new("test_linked").await;
     create_tables(&ctx.db).await?;

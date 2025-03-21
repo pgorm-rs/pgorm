@@ -1,6 +1,6 @@
 pub mod json_string_vec {
-    use pgorm::entity::prelude::*;
     use pgorm::FromJsonQueryResult;
+    use pgorm::entity::prelude::*;
     use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]

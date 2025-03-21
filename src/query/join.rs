@@ -1,6 +1,6 @@
 use crate::{
-    join_tbl_on_condition, unpack_table_ref, ColumnTrait, EntityTrait, IdenStatic, Iterable,
-    Linked, QuerySelect, Related, Select, SelectA, SelectB, SelectTwo, SelectTwoMany,
+    ColumnTrait, EntityTrait, IdenStatic, Iterable, Linked, QuerySelect, Related, Select, SelectA,
+    SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
 };
 pub use pgorm_query::JoinType;
 use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};

@@ -2,9 +2,9 @@
 name = "pgorm-migration"
 version = "0.0.0"
 authors = []
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
-rust-version = "1.65"
+rust-version = "1.85"
 publish = false
 
 [dependencies]

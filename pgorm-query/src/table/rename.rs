@@ -1,6 +1,6 @@
 use inherent::inherent;
 
-use crate::{types::*, QueryBuilder, SchemaStatementBuilder};
+use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 
 /// Rename a table
 ///

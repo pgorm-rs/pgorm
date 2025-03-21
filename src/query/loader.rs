@@ -1,6 +1,6 @@
 use crate::{
-    error::*, Condition, ConnectionTrait, DbErr, EntityTrait, Identity, ModelTrait, QueryFilter,
-    Related, RelationType, Select,
+    Condition, ConnectionTrait, DbErr, EntityTrait, Identity, ModelTrait, QueryFilter, Related,
+    RelationType, Select, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
@@ -490,7 +490,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, LoaderTrait, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -508,7 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one_same_cake() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, LoaderTrait, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -526,7 +526,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_one_empty() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, LoaderTrait, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[cake_model(1), cake_model(2)]])
@@ -544,7 +544,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, LoaderTrait, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[fruit_model(1, Some(1))]])
@@ -562,7 +562,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_same_fruit() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, LoaderTrait, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([[fruit_model(1, Some(1)), fruit_model(2, Some(1))]])
@@ -586,7 +586,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_empty() {
-        use pgorm::{entity::prelude::*, tests_cfg::*, DbBackend, MockDatabase};
+        use pgorm::{DbBackend, MockDatabase, entity::prelude::*, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres).into_connection();
 
@@ -604,7 +604,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_base() {
-        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, IntoMockRow, LoaderTrait, MockDatabase, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -625,7 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_complex() {
-        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, IntoMockRow, LoaderTrait, MockDatabase, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([
@@ -665,7 +665,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_many_to_many_empty() {
-        use pgorm::{tests_cfg::*, DbBackend, IntoMockRow, LoaderTrait, MockDatabase};
+        use pgorm::{DbBackend, IntoMockRow, LoaderTrait, MockDatabase, tests_cfg::*};
 
         let db = MockDatabase::new(DbBackend::Postgres)
             .append_query_results([

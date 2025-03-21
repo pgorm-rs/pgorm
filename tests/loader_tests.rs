@@ -2,8 +2,8 @@
 
 pub mod common;
 
-pub use common::{bakery_chain::*, setup::*, TestContext};
-use pgorm::{entity::*, query::*, DbConn, DbErr, RuntimeErr};
+pub use common::{TestContext, bakery_chain::*, setup::*};
+use pgorm::{DbConn, DbErr, RuntimeErr, entity::*, query::*};
 
 #[pgorm_macros::test]
 async fn loader_load_one() -> Result<(), DbErr> {

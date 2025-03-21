@@ -1,7 +1,7 @@
 use crate::{
-    error::*, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel,
-    Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw,
-    TryInsert,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable,
+    PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert,
+    error::*,
 };
 use pgorm_query::{FromValueTuple, Iden, InsertStatement, Query, QueryBuilder, ValueTuple};
 use std::{future::Future, marker::PhantomData};

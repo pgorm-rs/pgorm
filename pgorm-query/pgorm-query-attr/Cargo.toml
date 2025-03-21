@@ -2,14 +2,14 @@
 name = "pgorm-query-attr"
 version = "0.1.2"
 authors = ["Pedro Henrique <hello@exst.fun>"]
-edition = "2021"
+edition = "2024"
 description = "Proc macros for useful features in Sea Query"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/pgorm-query"
 repository = "https://github.com/SeaQL/sea-query"
 categories = ["database"]
 keywords = ["database", "sql", "postgres"]
-rust-version = "1.60"
+rust-version = "1.85"
 
 [lib]
 proc-macro = true

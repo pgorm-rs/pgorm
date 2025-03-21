@@ -456,7 +456,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        tests_cfg::*, ColumnTrait, Condition, DbBackend, EntityTrait, QueryFilter, QueryTrait,
+        ColumnTrait, Condition, DbBackend, EntityTrait, QueryFilter, QueryTrait, tests_cfg::*,
     };
     use pgorm_query::Query;
 

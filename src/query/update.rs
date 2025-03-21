@@ -213,7 +213,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::tests_cfg::{cake, fruit, lunch_set, pgorm_active_enums::Tea};
-    use crate::{entity::*, query::*, DbBackend};
+    use crate::{DbBackend, entity::*, query::*};
     use pgorm_query::{Expr, Value};
 
     #[test]

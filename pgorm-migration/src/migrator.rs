@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::time::SystemTime;
 use tracing::info;
 
-use super::{seaql_migrations, MigrationTrait};
+use super::{MigrationTrait, seaql_migrations};
 use pgorm::pgorm_query::{self, IntoIden, Order, Query, QueryBuilder, SelectStatement};
 use pgorm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,

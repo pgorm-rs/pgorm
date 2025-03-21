@@ -12,9 +12,9 @@ pub use migrator::*;
 
 pub use async_trait;
 pub use pgorm;
-pub use pgorm::pgorm_query;
 use pgorm::DatabaseTransaction;
 pub use pgorm::DbErr;
+pub use pgorm::pgorm_query;
 
 pub trait MigrationName {
     fn name(&self) -> &str;

@@ -1,6 +1,6 @@
 //! Base types used throughout pgorm-query.
 
-use crate::{expr::*, query::*, FunctionCall, ValueTuple, Values};
+use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*};
 use std::{fmt, mem, ops};
 
 pub use std::sync::Arc as RcOrArc;
@@ -596,8 +596,8 @@ where
 #[cfg(test)]
 mod tests {
     pub use crate::{tests_cfg::*, *};
-    use pretty_assertions::assert_eq;
     pub use Character as CharReexport;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_identifier() {

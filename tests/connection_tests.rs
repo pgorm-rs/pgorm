@@ -2,9 +2,9 @@
 
 pub mod common;
 
-pub use common::{bakery_chain::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
+pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::prelude::*;
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 pub async fn connection_ping() {

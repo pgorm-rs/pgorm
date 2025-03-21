@@ -1,4 +1,4 @@
-use crate::{util::escape_rust_keyword, DateTimeCrate};
+use crate::{DateTimeCrate, util::escape_rust_keyword};
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, StringLen};
 use proc_macro2::{Ident, TokenStream};

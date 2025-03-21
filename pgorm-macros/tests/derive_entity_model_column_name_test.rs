@@ -1,6 +1,6 @@
-use pgorm::prelude::*;
 use pgorm::Iden;
 use pgorm::Iterable;
+use pgorm::prelude::*;
 use pgorm_macros::DeriveEntityModel;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Lit, Type};
+use syn::{Lit, Type, spanned::Spanned};
 
 struct DeriveValueType {
     name: syn::Ident,

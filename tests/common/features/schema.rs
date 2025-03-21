@@ -1,12 +1,12 @@
 use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
 use pgorm::{
-    error::*, pgorm_query, ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName, ExecResult,
-    Schema,
+    ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName, ExecResult, Schema, error::*,
+    pgorm_query,
 };
 use pgorm_query::{
-    extension::postgres::Type, Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden,
-    StringLen,
+    Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, StringLen,
+    extension::postgres::Type,
 };
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
@@ -429,7 +429,9 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
                 .array(pgorm_query::ColumnType::Integer)
                 .not_null(),
         )
-        .col(ColumnDef::new(collection::Column::IntegersOpt).array(pgorm_query::ColumnType::Integer))
+        .col(
+            ColumnDef::new(collection::Column::IntegersOpt).array(pgorm_query::ColumnType::Integer),
+        )
         .col(
             ColumnDef::new(collection::Column::Teas)
                 .array(pgorm_query::ColumnType::Enum {

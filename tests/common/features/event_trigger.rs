@@ -1,7 +1,7 @@
 use pgorm::entity::prelude::*;
 use pgorm::{
-    pgorm_query::{ArrayType, ColumnType, ValueType},
     TryGetError, TryGetable,
+    pgorm_query::{ArrayType, ColumnType, ValueType},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]

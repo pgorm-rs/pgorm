@@ -1,4 +1,4 @@
-use pgorm::{entity::prelude::StringLen, ActiveEnum};
+use pgorm::{ActiveEnum, entity::prelude::StringLen};
 use pgorm_macros::{DeriveActiveEnum, EnumIter};
 
 #[derive(Debug, EnumIter, DeriveActiveEnum, Eq, PartialEq)]

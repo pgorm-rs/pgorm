@@ -1,4 +1,4 @@
-use crate::{unpack_table_ref, EntityTrait, Identity, IdentityOf, Iterable, QuerySelect, Select};
+use crate::{EntityTrait, Identity, IdentityOf, Iterable, QuerySelect, Select, unpack_table_ref};
 use core::marker::PhantomData;
 use pgorm_query::{
     Alias, Condition, ConditionType, DynIden, ForeignKeyCreateStatement, IntoIden, JoinType, SeaRc,
@@ -495,8 +495,8 @@ impl From<RelationDef> for TableForeignKey {
 #[cfg(test)]
 mod tests {
     use crate::{
-        tests_cfg::{cake, fruit},
         RelationBuilder, RelationDef,
+        tests_cfg::{cake, fruit},
     };
 
     #[test]

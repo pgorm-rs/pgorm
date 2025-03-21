@@ -10,7 +10,7 @@ use pgorm_query::{
     ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, QueryBuilder, SeaRc,
     SelectStatement, SimpleExpr, Value, ValueTuple,
 };
-use tokio_postgres::types::{to_sql_checked, IsNull, ToSql, Type};
+use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
 use std::marker::PhantomData;
 use strum::IntoEnumIterator as Iterable;
@@ -83,11 +83,7 @@ where
         if let Some(values) = self.after.clone() {
             let condition = self.apply_filter(values, |c, v| {
                 let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
-                if self.sort_asc {
-                    exp.gt(v)
-                } else {
-                    exp.lt(v)
-                }
+                if self.sort_asc { exp.gt(v) } else { exp.lt(v) }
             });
             self.query.cond_where(condition);
         }
@@ -95,11 +91,7 @@ where
         if let Some(values) = self.before.clone() {
             let condition = self.apply_filter(values, |c, v| {
                 let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
-                if self.sort_asc {
-                    exp.lt(v)
-                } else {
-                    exp.gt(v)
-                }
+                if self.sort_asc { exp.lt(v) } else { exp.gt(v) }
             });
             self.query.cond_where(condition);
         }
@@ -1305,12 +1297,14 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .first(3)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .first(3)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1342,13 +1336,15 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .last(3)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .last(3)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1380,13 +1376,15 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .after(("A".to_owned(), 2))
-            .first(3)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .after(("A".to_owned(), 2))
+                .first(3)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1425,14 +1423,16 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .before(("A".to_owned(), 2))
-            .last(3)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .before(("A".to_owned(), 2))
+                .last(3)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1471,13 +1471,15 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .before(("A".to_owned(), 2))
-            .last(3)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .before(("A".to_owned(), 2))
+                .last(3)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1516,14 +1518,16 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::Category, Column::Id))
-            .after(("A".to_owned(), 2))
-            .first(3)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::Category, Column::Id))
+                .after(("A".to_owned(), 2))
+                .first(3)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1563,12 +1567,14 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::X, Column::Y, Column::Z))
-            .first(4)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::X, Column::Y, Column::Z))
+                .first(4)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1601,13 +1607,15 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::X, Column::Y, Column::Z))
-            .last(4)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::X, Column::Y, Column::Z))
+                .last(4)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1640,13 +1648,15 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::X, Column::Y, Column::Z))
-            .after(('x' as i32, "y".to_owned(), 'z' as i64))
-            .first(4)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::X, Column::Y, Column::Z))
+                .after(('x' as i32, "y".to_owned(), 'z' as i64))
+                .first(4)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -1690,14 +1700,16 @@ mod tests {
             }]])
             .into_connection();
 
-        assert!(!Entity::find()
-            .cursor_by((Column::X, Column::Y, Column::Z))
-            .before(('x' as i32, "y".to_owned(), 'z' as i64))
-            .last(4)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !Entity::find()
+                .cursor_by((Column::X, Column::Y, Column::Z))
+                .before(('x' as i32, "y".to_owned(), 'z' as i64))
+                .last(4)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2090,13 +2102,15 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
-            .first(1)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
+                .first(1)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2134,14 +2148,16 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
-            .last(1)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
+                .last(1)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2179,14 +2195,16 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
-            .after((1, "C".to_string()))
-            .first(2)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
+                .after((1, "C".to_string()))
+                .first(2)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2230,15 +2248,17 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
-            .before((1, "C".to_string()))
-            .last(2)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by((test_base_entity::Column::Id, test_base_entity::Column::Name))
+                .before((1, "C".to_string()))
+                .last(2)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2282,17 +2302,19 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by_other((
-                test_related_entity::Column::Id,
-                test_related_entity::Column::Name
-            ))
-            .after((1, "CAT".to_string()))
-            .first(2)
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by_other((
+                    test_related_entity::Column::Id,
+                    test_related_entity::Column::Name
+                ))
+                .after((1, "CAT".to_string()))
+                .first(2)
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),
@@ -2336,18 +2358,20 @@ mod tests {
             )]])
             .into_connection();
 
-        assert!(!test_base_entity::Entity::find()
-            .find_also_related(test_related_entity::Entity)
-            .cursor_by_other((
-                test_related_entity::Column::Id,
-                test_related_entity::Column::Name
-            ))
-            .before((1, "CAT".to_string()))
-            .last(2)
-            .desc()
-            .all(&db)
-            .await?
-            .is_empty());
+        assert!(
+            !test_base_entity::Entity::find()
+                .find_also_related(test_related_entity::Entity)
+                .cursor_by_other((
+                    test_related_entity::Column::Id,
+                    test_related_entity::Column::Name
+                ))
+                .before((1, "CAT".to_string()))
+                .last(2)
+                .desc()
+                .all(&db)
+                .await?
+                .is_empty()
+        );
 
         assert_eq!(
             db.into_transaction_log(),

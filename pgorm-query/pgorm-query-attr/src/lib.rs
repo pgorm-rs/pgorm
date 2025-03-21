@@ -1,9 +1,9 @@
 #![allow(clippy::manual_unwrap_or_default)]
 
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use heck::{ToPascalCase, ToSnakeCase};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, spanned::Spanned, Data, DataStruct, DeriveInput, Fields, Ident};
+use syn::{Data, DataStruct, DeriveInput, Fields, Ident, parse_macro_input, spanned::Spanned};
 
 struct NamingHolder {
     pub default: Ident,

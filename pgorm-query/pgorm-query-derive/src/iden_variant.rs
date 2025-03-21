@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use heck::ToSnakeCase;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 use syn::{Error, Fields, FieldsNamed, Ident, Variant};
 
 use crate::{error::ErrorMsg, find_attr, iden_attr::IdenAttr, must_be_valid_iden};

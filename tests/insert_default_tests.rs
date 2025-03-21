@@ -2,9 +2,9 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
+pub use common::{TestContext, features::*, setup::*};
 use pgorm::entity::prelude::*;
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

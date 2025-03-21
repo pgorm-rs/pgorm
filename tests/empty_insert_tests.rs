@@ -3,9 +3,9 @@
 pub mod common;
 mod crud;
 
-pub use common::{bakery_chain::*, setup::*, TestContext};
+pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::{
-    entity::*, error::DbErr, tests_cfg, DatabasePool, DbBackend, EntityName, ExecResult,
+    DatabasePool, DbBackend, EntityName, ExecResult, entity::*, error::DbErr, tests_cfg,
 };
 
 pub use crud::*;

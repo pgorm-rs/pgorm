@@ -1,6 +1,6 @@
 use crate::{
-    error::*, ConnectionTrait, DeleteResult, EntityTrait, Iterable, PrimaryKeyArity,
-    PrimaryKeyToColumn, PrimaryKeyTrait, Value,
+    ConnectionTrait, DeleteResult, EntityTrait, Iterable, PrimaryKeyArity, PrimaryKeyToColumn,
+    PrimaryKeyTrait, Value, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{Nullable, ValueTuple};
@@ -933,7 +933,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{entity::*, tests_cfg::*, DbErr};
+    use crate::{DbErr, entity::*, tests_cfg::*};
     use pretty_assertions::assert_eq;
 
     #[cfg(feature = "with-json")]

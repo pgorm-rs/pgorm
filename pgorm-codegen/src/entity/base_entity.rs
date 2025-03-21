@@ -5,7 +5,7 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::{
-    util::escape_rust_keyword, Column, ConjunctRelation, DateTimeCrate, PrimaryKey, Relation,
+    Column, ConjunctRelation, DateTimeCrate, PrimaryKey, Relation, util::escape_rust_keyword,
 };
 
 #[derive(Clone, Debug)]

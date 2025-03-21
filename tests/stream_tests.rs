@@ -2,7 +2,7 @@
 
 pub mod common;
 
-pub use common::{bakery_chain::*, setup::*, TestContext};
+pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::entity::*;
 pub use pgorm::{ConnectionTrait, DbErr, QueryFilter};
 

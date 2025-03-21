@@ -5,7 +5,7 @@
 name = "pgorm-issues-693"
 version = "0.1.0"
 authors = ["bleuse <raphael.bleuse@univ-grenoble-alpes.fr>"]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]

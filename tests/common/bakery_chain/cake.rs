@@ -1,5 +1,5 @@
 use crate::common::setup::rust_dec;
-use pgorm::{entity::prelude::*, ConnectionTrait};
+use pgorm::{ConnectionTrait, entity::prelude::*};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[pgorm(table_name = "cake")]

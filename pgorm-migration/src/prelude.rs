@@ -1,7 +1,6 @@
 pub use crate::{MigrationName, MigrationTrait, MigratorTrait};
 pub use async_trait;
 pub use pgorm::{
-    self,
+    self, ConnectionTrait, DbErr, DeriveIden, DeriveMigrationName,
     pgorm_query::{self, *},
-    ConnectionTrait, DbErr, DeriveIden, DeriveMigrationName,
 };

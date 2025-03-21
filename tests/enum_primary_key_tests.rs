@@ -2,14 +2,14 @@
 
 pub mod common;
 
-pub use common::{features::*, setup::*, TestContext};
-use pretty_assertions::assert_eq;
+pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
+    ActiveEnum as ActiveEnumTrait, DatabasePool,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
-    ActiveEnum as ActiveEnumTrait, DatabasePool,
 };
+use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
@@ -53,24 +53,28 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
     );
 
     // UNIQUE constraint failed
-    assert!(ActiveModel {
-        id: Set(Tea::EverydayTea),
-        category: Set(Some(Category::Big)),
-        color: Set(Some(Color::Black)),
-    }
-    .insert(db)
-    .await
-    .is_err());
+    assert!(
+        ActiveModel {
+            id: Set(Tea::EverydayTea),
+            category: Set(Some(Category::Big)),
+            color: Set(Some(Color::Black)),
+        }
+        .insert(db)
+        .await
+        .is_err()
+    );
 
     // UNIQUE constraint failed
-    assert!(Entity::insert(ActiveModel {
-        id: Set(Tea::EverydayTea),
-        category: Set(Some(Category::Big)),
-        color: Set(Some(Color::Black)),
-    })
-    .exec(db)
-    .await
-    .is_err());
+    assert!(
+        Entity::insert(ActiveModel {
+            id: Set(Tea::EverydayTea),
+            category: Set(Some(Category::Big)),
+            color: Set(Some(Color::Black)),
+        })
+        .exec(db)
+        .await
+        .is_err()
+    );
 
     let _ = ActiveModel {
         category: Set(Some(Category::Big)),

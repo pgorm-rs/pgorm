@@ -3,15 +3,15 @@
 pub mod common;
 
 pub use common::{
+    TestContext,
     features::{
         event_trigger::{Event, Events},
         *,
     },
     setup::*,
-    TestContext,
 };
+use pgorm::{DatabasePool, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 
 #[pgorm_macros::test]
 #[cfg(all(feature = "sqlx-postgres", feature = "postgres-array"))]

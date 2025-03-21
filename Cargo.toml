@@ -5,14 +5,14 @@ members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool"
 name = "pgorm"
 version = "0.1.0"
 authors = []
-edition = "2021"
+edition = "2024"
 description = "🐚 An async & dynamic ORM for Rust"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/pgorm"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["async", "orm", "postgres"]
-rust-version = "1.65"
+rust-version = "1.85"
 
 [package.metadata.docs.rs]
 features = ["default", "sqlx-all", "mock", "proxy", "runtime-async-std-native-tls", "postgres-array", "pgorm-internal"]

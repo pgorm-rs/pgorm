@@ -1,9 +1,9 @@
 #![allow(unused_imports, dead_code)]
 
 pub mod common;
-pub use common::{features::*, setup::*, TestContext};
+pub use common::{TestContext, features::*, setup::*};
+use pgorm::{DatabasePool, IntoActiveModel, entity::prelude::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, DatabasePool, IntoActiveModel};
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {

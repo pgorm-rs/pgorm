@@ -2,7 +2,7 @@
 
 pub mod common;
 
-pub use pgorm::{entity::*, error::*, query::*, pgorm_query, tests_cfg::*, Database, DbConn};
+pub use pgorm::{Database, DbConn, entity::*, error::*, pgorm_query, query::*, tests_cfg::*};
 
 // cargo test --features sqlx-sqlite,runtime-async-std-native-tls --test basic
 // export DATABASE_URL=mysql://root:root@localhost:3306

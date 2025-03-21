@@ -1,4 +1,4 @@
-use crate::{error::*, ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait};
+use crate::{ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait, error::*};
 use pgorm_query::{DeleteStatement, QueryBuilder};
 use std::future::Future;
 use tokio_postgres::types::ToSql;

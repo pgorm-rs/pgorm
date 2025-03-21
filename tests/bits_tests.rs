@@ -3,8 +3,8 @@
 pub mod common;
 
 use common::features::*;
+use pgorm::{DatabasePool, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
-use pgorm::{entity::prelude::*, entity::*, DatabasePool};
 
 #[pgorm_macros::test]
 #[cfg(feature = "sqlx-postgres")]

@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, time::Duration};
 
 use futures::future;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{types::Type, IsolationLevel};
+use tokio_postgres::{IsolationLevel, types::Type};
 
 use pgorm_pool::{ManagerConfig, Pool, RecyclingMethod};
 

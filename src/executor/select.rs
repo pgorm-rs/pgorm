@@ -1,14 +1,14 @@
 use crate::{
-    error::*, ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
+    ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
     PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
-    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany,
+    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany, error::*,
 };
 use futures::{Stream, TryStreamExt};
 use pgorm_query::{QueryBuilder, SelectStatement, Value, Values};
 use std::collections::HashMap;
 use std::{hash::Hash, marker::PhantomData};
-use tokio_postgres::types::ToSql;
 use tokio_postgres::ToStatement;
+use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
 

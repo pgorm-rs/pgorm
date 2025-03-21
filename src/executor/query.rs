@@ -1,4 +1,4 @@
-use crate::{error::*, SelectGetableValue, SelectorRaw};
+use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error;
 
 #[cfg(any(feature = "mock", feature = "proxy"))]
@@ -237,9 +237,9 @@ impl TryGetable for Decimal {
 use bigdecimal::BigDecimal;
 use pgorm_query::Values;
 use tokio_postgres::{
+    Row,
     row::RowIndex,
     types::{Json, Oid, WasNull},
-    Row,
 };
 
 #[cfg(feature = "with-bigdecimal")]
