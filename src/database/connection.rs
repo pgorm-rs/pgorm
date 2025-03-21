@@ -1,3 +1,5 @@
+use std::{future::Future, ops::AsyncFn, pin::Pin};
+
 use crate::DbErr;
 use tokio_postgres::{
     types::{BorrowToSql, ToSql},
@@ -47,6 +49,11 @@ pub trait ConnectionTrait: Sync {
     where
         T: ?Sized + ToStatement + Send + Sync;
 
+    // async fn transaction(
+    //     &self,
+    //     closure: for<'a> fn(&mut DatabaseTransaction<'a>) -> Pin<Box<dyn Future<Output = Result<(), DbErr>> + Send>>,
+    // ) -> Result<(), DbErr>;
+
     // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
     // where
     //     T: ?Sized + ToStatement,
@@ -56,11 +63,18 @@ pub trait ConnectionTrait: Sync {
 }
 
 /// Spawn database transaction
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub trait TransactionTrait {
-    /// Execute SQL `BEGIN` transaction.
-    /// Returns a Transaction that can be committed or rolled back
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr>;
+    // fn transaction(
+    //     &mut self,
+    //     closure: for<'a> fn(
+    //         &mut DatabaseTransaction<'a>,
+    //     ) -> Pin<Box<dyn Future<Output = Result<(), DbErr>> + Send>>,
+    // ) -> impl Future<Output = Result<(), DbErr>>;
+    async fn transaction<T, F: AsyncFn(&mut DatabaseTransaction<'_>) -> Result<T, DbErr>>(
+        &mut self,
+        closure: F,
+    ) -> Result<T, DbErr>;
 
     // /// Execute SQL `BEGIN` transaction with isolation level and/or access mode.
     // /// Returns a Transaction that can be committed or rolled back

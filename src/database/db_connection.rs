@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, future::Future, ops::AsyncFn, pin::Pin, sync::Arc};
 
 use crate::{error::*, ConnectionTrait, TransactionTrait};
 use deadpool::Status;
@@ -31,14 +31,6 @@ impl DatabaseMultiPool {
     }
 }
 
-// impl Deref for DatabasePool {
-//     type Target = Pool;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-
 impl DatabasePool {
     pub async fn get(&self) -> Result<DatabaseConnection, DbErr> {
         let conn = Pool::get(&self.0).await?;
@@ -58,6 +50,7 @@ impl DatabasePool {
 pub struct DatabaseConnection(pub(crate) Object);
 
 impl DatabaseConnection {
+    #[deprecated(note = "Dangerous function. Use .transaction")]
     async fn begin_with_config(
         &mut self,
         read_only: bool,
@@ -88,15 +81,73 @@ impl DatabaseTransaction<'_> {
             unreachable!()
         }
     }
-}
 
-impl Drop for DatabaseTransaction<'_> {
-    fn drop(&mut self) {
-        if self.0.is_some() {
-            tracing::warn!("Transaction dropped without committing!");
+    pub async fn rollback(mut self) -> Result<(), DbErr> {
+        if let Some(tx) = self.0.take() {
+            tx.rollback().await.map_err(|e| DbErr::Postgres(e))
+        } else {
+            unreachable!()
         }
     }
 }
+
+// #[async_trait::async_trait]
+// impl ConnectionTrait for DatabasePool {
+//     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+//     where
+//         T: ?Sized + ToStatement + Send + Sync,
+//     {
+//         let conn = self.0.get().await?;
+//         Ok(conn.execute(statement, params).await?)
+//     }
+
+//     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+//     where
+//         T: ?Sized + ToStatement + Send + Sync,
+//         P: BorrowToSql,
+//         I: IntoIterator<Item = P> + Send,
+//         I::IntoIter: ExactSizeIterator,
+//     {
+//         let conn = self.0.get().await?;
+//         Ok(conn.execute_raw(statement, params).await?)
+//     }
+
+//     async fn query_one<T>(
+//         &self,
+//         statement: &T,
+//         params: &[&(dyn ToSql + Sync)],
+//     ) -> Result<tokio_postgres::Row, DbErr>
+//     where
+//         T: ?Sized + ToStatement + Send + Sync,
+//     {
+//         let conn = self.0.get().await?;
+//         Ok(conn.query_one(statement, params).await?)
+//     }
+
+//     async fn query_opt<T>(
+//         &self,
+//         statement: &T,
+//         params: &[&(dyn ToSql + Sync)],
+//     ) -> Result<Option<tokio_postgres::Row>, DbErr>
+//     where
+//         T: ?Sized + ToStatement + Send + Sync,
+//     {
+//         let conn = self.0.get().await?;
+//         Ok(conn.query_opt(statement, params).await?)
+//     }
+
+//     async fn query_all<T>(
+//         &self,
+//         statement: &T,
+//         params: &[&(dyn ToSql + Sync)],
+//     ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+//     where
+//         T: ?Sized + ToStatement + Send + Sync,
+//     {
+//         let conn = self.0.get().await?;
+//         Ok(conn.query(statement, params).await?)
+//     }
+// }
 
 #[async_trait::async_trait]
 impl ConnectionTrait for &DatabaseConnection {
@@ -152,7 +203,6 @@ impl ConnectionTrait for &DatabaseConnection {
         Ok(self.0.query(statement, params).await?)
     }
 }
-
 
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
@@ -298,92 +348,93 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     //     Ok(self.query_raw(statement, params).await?)
     // }
 }
-#[async_trait::async_trait]
-impl TransactionTrait for DatabaseTransaction<'_> {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
-        Ok(DatabaseTransaction(Some(
-            self.0.as_mut().unwrap().transaction().await?,
-        )))
-    }
-}
 
-#[async_trait::async_trait]
-impl TransactionTrait for DatabaseConnection {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
-        let tx = self.0.transaction().await?;
-        Ok(DatabaseTransaction(Some(tx)))
-    }
-    // #[instrument(level = "trace")]
-    // async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
-    //     let conn = self.0.get().await?;
-    //     conn.transaction()
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.begin(None, None).await,
-    //         None => Err(conn_err("Disconnected")),
-    //     }
-    // }
+impl DatabaseConnection {
+    // fn transaction<'a, F: AsyncFn(&mut DatabaseTransaction<'a>) -> Result<(), DbErr>>(
+    //     &'a mut self,
+    //     closure: F,
+    // ) -> impl Future<Output = Result<(), DbErr>> + use<'a, F> {
+    //     async move {
+    //         let mut transaction =
+    //             DatabaseTransaction(Some(self.0.build_transaction().start().await?));
 
-    // #[instrument(level = "trace")]
-    // async fn begin_with_config(
-    //     &self,
-    //     isolation_level: Option<IsolationLevel>,
-    //     access_mode: Option<AccessMode>,
-    // ) -> Result<DatabaseTransaction, DbErr> {
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.begin(isolation_level, access_mode).await,
-    //         None => Err(conn_err("Disconnected")),
-    //     }
-    // }
-
-    // /// Execute the function inside a transaction.
-    // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    // #[instrument(level = "trace", skip(callback))]
-    // async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
-    // where
-    //     F: for<'c> FnOnce(
-    //             &'c DatabaseTransaction,
-    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-    //         + Send,
-    //     T: Send,
-    //     E: std::error::Error + Send,
-    // {
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.transaction(callback, None, None).await,
-
-    //         None => Err(conn_err("Disconnected").into()),
-    //     }
-    // }
-
-    // /// Execute the function inside a transaction.
-    // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    // #[instrument(level = "trace", skip(callback))]
-    // async fn transaction_with_config<F, T, E>(
-    //     &self,
-    //     callback: F,
-    //     isolation_level: Option<IsolationLevel>,
-    //     access_mode: Option<AccessMode>,
-    // ) -> Result<T, TransactionError<E>>
-    // where
-    //     F: for<'c> FnOnce(
-    //             &'c DatabaseTransaction,
-    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-    //         + Send,
-    //     T: Send,
-    //     E: std::error::Error + Send,
-    // {
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => {
-    //             conn.transaction(callback, isolation_level, access_mode)
-    //                 .await
+    //         match closure(&mut transaction).await {
+    //             Ok(_) => {
+    //                 transaction.commit().await?;
+    //                 Ok(())
+    //             }
+    //             Err(e) => {
+    //                 transaction.rollback().await?;
+    //                 Err(e)
+    //             }
     //         }
-    //         None => Err(conn_err("Disconnected").into()),
+    //     }
+    // }
+    // async fn transaction<F: AsyncFn(&mut DatabaseTransaction<'_>) -> Result<(), DbErr>>(
+    //     &mut self,
+    //     closure: F,
+    // ) -> Result<(), DbErr> {
+    //     let mut transaction =
+    //         DatabaseTransaction(Some(self.0.build_transaction().start().await?));
+
+    //     match closure(&mut transaction).await {
+    //         Ok(_) => {
+    //             transaction.commit().await?;
+    //             Ok(())
+    //         }
+    //         Err(e) => {
+    //             transaction.rollback().await?;
+    //             Err(e)
+    //         }
     //     }
     // }
 }
+
+
+#[async_trait::async_trait(?Send)]
+impl TransactionTrait for DatabaseTransaction<'_> {
+    async fn transaction<T, F: AsyncFn(&mut DatabaseTransaction<'_>) -> Result<T, DbErr>>(
+        &mut self,
+        closure: F,
+    ) -> Result<T, DbErr> {
+        let mut transaction =
+            DatabaseTransaction(Some(self.0.as_mut().unwrap().transaction().await?));
+
+        match closure(&mut transaction).await {
+            Ok(x) => {
+                transaction.commit().await?;
+                Ok(x)
+            }
+            Err(e) => {
+                transaction.rollback().await?;
+                Err(e)
+            }
+        }
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl TransactionTrait for DatabaseConnection {
+    async fn transaction<T, F: AsyncFn(&mut DatabaseTransaction<'_>) -> Result<T, DbErr>>(
+        &mut self,
+        closure: F,
+    ) -> Result<T, DbErr> {
+        let mut transaction =
+            DatabaseTransaction(Some(self.0.build_transaction().start().await?));
+
+        match closure(&mut transaction).await {
+            Ok(x) => {
+                transaction.commit().await?;
+                Ok(x)
+            }
+            Err(e) => {
+                transaction.rollback().await?;
+                Err(e)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::DatabasePool;

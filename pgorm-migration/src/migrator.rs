@@ -49,7 +49,7 @@ impl Migration {
 }
 
 /// Performing migrations on a database
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub trait MigratorTrait: Send {
     /// Vector of migrations in time sequence
     fn migrations() -> Vec<Box<dyn MigrationTrait>>;
@@ -167,24 +167,22 @@ pub trait MigratorTrait: Send {
     /// Apply pending migrations
     async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), DbErr> {
         tracing::debug!("Applying migrations");
-        exec_with_connection::<'_, _>(db, move |manager| {
-            tracing::debug!("Exec up");
-            Box::pin(async move { exec_up::<Self>(manager, steps).await })
-        })
-        .await
-    }
-}
 
-async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), DbErr>
-where
-    F: for<'b> Fn(
-        &'b DatabaseTransaction<'_>,
-    ) -> Pin<Box<dyn Future<Output = Result<(), DbErr>> + Send + 'b>>,
-{
-    let mut conn = db.get().await?;
-    let transaction = conn.begin().await?;
-    f(&transaction).await?;
-    transaction.commit().await
+        let mut conn = db.get().await?;
+        conn.transaction(async |transaction| {
+            exec_up::<Self>(&transaction, steps).await?;
+            Ok(())
+        }).await
+        // let transaction = conn.begin().await?;
+        // // f(&transaction).await?;
+        // exec_up::<Self>(&transaction, steps).await?;
+        // transaction.commit().await
+        // exec_with_connection::<'_, _>(db, move |manager| {
+        //     tracing::debug!("Exec up");
+        //     Box::pin(async move { exec_up::<Self>(manager, steps).await })
+        // })
+        // .await
+    }
 }
 
 async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
