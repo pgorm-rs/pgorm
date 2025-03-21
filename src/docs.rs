@@ -1,6 +1,6 @@
 //! 1. Async
 //!
-//!     Relying on [SQLx](https://github.com/launchbadge/sqlx), SeaORM is a new library with async support from day 1.
+//!     Relying on [SQLx](https://github.com/launchbadge/sqlx), pgorm is a new library with async support from day 1.
 //!
 //! ```
 //! # use pgorm::{error::*, tests_cfg::*, *};
@@ -63,7 +63,7 @@
 //!
 //! 2. Dynamic
 //!
-//!     Built upon [SeaQuery](https://github.com/SeaQL/sea-query), SeaORM allows you to build complex queries without 'fighting the ORM'.
+//!     Built upon [SeaQuery](https://github.com/SeaQL/sea-query), pgorm allows you to build complex queries without 'fighting the ORM'.
 //!
 //! ```
 //! # use pgorm_query::Query;

@@ -115,7 +115,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 ///
 /// Entity should always have a primary key.
 /// Or, it will result in a compile error.
-/// See <https://github.com/SeaQL/sea-orm/issues/485> for details.
+/// See <https://github.com/pgorm-rs/pgorm/issues/485> for details.
 ///
 /// ```compile_fail
 /// use pgorm::entity::prelude::*;

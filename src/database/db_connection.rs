@@ -153,7 +153,6 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 }
 
-
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]

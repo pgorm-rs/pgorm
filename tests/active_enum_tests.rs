@@ -192,7 +192,7 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     // (see https://www.postgresql.org/docs/current/datatype-enum.html#DATATYPE-ENUM-ORDERING).
     // Tea was defined as ('EverydayTea', 'BreakfastTea'), so EverydayTea is considered "smaller" than BreakfastTea.
     //
-    // SQLite doesn't support enum types and SeaORM works around this limitation by storing them as strings.
+    // SQLite doesn't support enum types and pgorm works around this limitation by storing them as strings.
     // When treated as strings, EverydayTea is not "smaller" than BreakfastTea!
     //
     // MySQL should be the same as Postgres (see https://dev.mysql.com/doc/refman/8.0/en/enum.html#enum-sorting),

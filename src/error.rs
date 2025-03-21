@@ -80,7 +80,7 @@ pub enum ConnAcquireErr {
 /// Runtime error
 #[derive(Error, Debug)]
 pub enum RuntimeErr {
-    /// Error generated from within SeaORM
+    /// Error generated from within pgorm
     #[error("{0}")]
     Internal(String),
 }

@@ -30,9 +30,9 @@ AUTHORS:
   ===============================                   \|_/
 
   Getting Started
-    - Documentation: https://www.sea-ql.org/SeaORM
+    - Documentation: https://github.com/pgorm-rs/pgorm
     - Tutorial: https://www.sea-ql.org/pgorm-tutorial
-    - Examples: https://github.com/SeaQL/sea-orm/tree/master/examples
+    - Examples: https://github.com/pgorm-rs/pgorm/tree/master/examples
     - Cookbook: https://www.sea-ql.org/pgorm-cookbook
 
   Join our Discord server to chat with others in the SeaQL community!
@@ -315,7 +315,7 @@ pub enum DateTimeCrate {
 }
 
 /// Use this to build a local, version-controlled `pgorm-cli` in dependent projects
-/// (see [example use case](https://github.com/SeaQL/sea-orm/discussions/1889)).
+/// (see [example use case](https://github.com/pgorm-rs/pgorm/discussions/1889)).
 #[cfg(feature = "codegen")]
 pub async fn main() {
     dotenv().ok();

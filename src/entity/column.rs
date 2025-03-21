@@ -291,7 +291,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 }
 
-/// SeaORM's utility methods that act on [ColumnType]
+/// pgorm's utility methods that act on [ColumnType]
 pub trait ColumnTypeTrait {
     /// Instantiate a new [ColumnDef]
     fn def(self) -> ColumnDef;

@@ -22,7 +22,7 @@ We provide integration for [SQLx](https://crates.io/crates/sqlx),
 [postgres](https://crates.io/crates/postgres) and [rusqlite](https://crates.io/crates/rusqlite).
 See [examples](https://github.com/SeaQL/sea-query/blob/master/examples) for usage.
 
-SeaQuery is the foundation of [SeaORM](https://github.com/SeaQL/sea-orm), an async & dynamic ORM for Rust.
+SeaQuery is the foundation of [pgorm](https://github.com/pgorm-rs/pgorm), an async & dynamic ORM for Rust.
 
 [![GitHub stars](https://img.shields.io/github/stars/SeaQL/sea-query.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-query/stargazers/)
 If you like what we do, consider starring, commenting, sharing and contributing!

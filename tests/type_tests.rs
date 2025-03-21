@@ -6,7 +6,7 @@ use pgorm::{IntoActiveValue, TryFromU64, TryGetable, Value};
 
 /*
 
-When supporting a new type in SeaORM we should implement the following traits for it:
+When supporting a new type in pgorm we should implement the following traits for it:
   - `IntoActiveValue`, given that it implemented `Into<Value>` already
   - `TryGetable`
   - `TryFromU64`

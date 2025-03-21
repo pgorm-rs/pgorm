@@ -597,7 +597,7 @@ where
     /// > You can get `(Entity, Vec<relatedEntity>)` by first querying a single model from Entity,
     /// > then use [`ModelTrait::find_related`] on the model.
     /// >
-    /// > See https://www.sea-ql.org/SeaORM/docs/basic-crud/select#lazy-loading for details.
+    /// > See https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading for details.
     pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,

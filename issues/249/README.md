@@ -1,1 +1,1 @@
-# Demo of a pure logic crate depending on SeaORM with no enabled features
+# Demo of a pure logic crate depending on pgorm with no enabled features

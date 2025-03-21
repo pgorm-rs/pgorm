@@ -9,9 +9,9 @@ edition = "2021"
 description = "🐚 An async & dynamic ORM for Rust"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/pgorm"
-# repository = "https://github.com/-/pgorm"
+repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
-keywords = ["async", "orm", "mysql", "postgres", "sqlite"]
+keywords = ["async", "orm", "postgres"]
 rust-version = "1.65"
 
 [package.metadata.docs.rs]

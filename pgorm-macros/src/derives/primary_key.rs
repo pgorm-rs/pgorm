@@ -16,7 +16,7 @@ pub fn expand_derive_primary_key(ident: Ident, data: Data) -> syn::Result<TokenS
 
     if variants.is_empty() {
         return Ok(quote_spanned! {
-            ident.span() => compile_error!("Entity must have a primary key column. See <https://github.com/SeaQL/sea-orm/issues/485> for details.");
+            ident.span() => compile_error!("Entity must have a primary key column. See <https://github.com/pgorm-rs/pgorm/issues/485> for details.");
         });
     }
 

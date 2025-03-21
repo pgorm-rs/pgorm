@@ -9,11 +9,11 @@ authors = [
     "Billy Chan <ccw.billy.123@gmail.com>",
 ]
 edition = "2021"
-description = "Command line utility for SeaORM"
+description = "Command line utility for pgorm"
 license = "MIT OR Apache-2.0"
-homepage = "https://www.sea-ql.org/SeaORM"
+homepage = "https://github.com/pgorm-rs/pgorm"
 documentation = "https://docs.rs/pgorm"
-repository = "https://github.com/SeaQL/pgorm"
+repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["async", "orm", "mysql", "postgres", "sqlite"]
 default-run = "pgorm-cli"

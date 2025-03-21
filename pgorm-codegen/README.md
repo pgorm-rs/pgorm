@@ -1,1 +1,1 @@
-# SeaORM Codegen
+# pgorm Codegen

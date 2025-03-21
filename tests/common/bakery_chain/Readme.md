@@ -1,4 +1,4 @@
-# Schema for SeaORM test suite
+# Schema for pgorm test suite
 
 ![Entity Relation Diagram](bakery_chain_erd.png)
 

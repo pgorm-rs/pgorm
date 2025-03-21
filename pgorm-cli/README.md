@@ -1,4 +1,4 @@
-# SeaORM CLI
+# pgorm CLI
 
 Install and Usage: 
 
