@@ -1,3 +1,5 @@
+use std::pin::Pin;
+
 use crate::DbErr;
 use tokio_postgres::{
     Row, ToStatement,
@@ -55,12 +57,22 @@ pub trait ConnectionTrait: Sync {
     //     I::IntoIter: ExactSizeIterator;
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TransactionError<E> {
+    #[error("Transaction was rolled back")]
+    Rollback,
+    #[error("Database error: {0}")]
+    Db(#[source] DbErr),
+    #[error("{0}")]
+    Other(#[from] E),
+}
+
 /// Spawn database transaction
 #[async_trait::async_trait]
 pub trait TransactionTrait {
     /// Execute SQL `BEGIN` transaction.
     /// Returns a Transaction that can be committed or rolled back
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr>;
+    // async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr>;
 
     // /// Execute SQL `BEGIN` transaction with isolation level and/or access mode.
     // /// Returns a Transaction that can be committed or rolled back
@@ -70,16 +82,17 @@ pub trait TransactionTrait {
     //     isolation_level: Option<tokio_postgres::IsolationLevel>,
     // ) -> Result<DatabaseTransaction<'_>, DbErr>;
 
-    // Execute the function inside a transaction.
-    // If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
-    // async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
-    // where
-    //     F: for<'c> FnOnce(
-    //             &'c DatabaseTransaction,
-    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-    //         + Send,
-    //     T: Send,
-    //     E: std::error::Error + Send;
+    /// Execute the function inside a transaction.
+    /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
+    async fn transaction<F, T, E>(&mut self, callback: F) -> Result<T, TransactionError<E>>
+    where
+        F: for<'c> FnOnce(
+                &'c mut DatabaseTransaction,
+            ) -> Pin<
+                Box<dyn Future<Output = Result<T, TransactionError<E>>> + Send + 'c>,
+            > + Send,
+        T: Send,
+        E: Send;
 
     // /// Execute the function inside a transaction with isolation level and/or access mode.
     // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.

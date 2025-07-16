@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, pin::Pin, sync::Arc};
 
-use crate::{ConnectionTrait, TransactionTrait, error::*};
+use crate::{ConnectionTrait, TransactionError, TransactionTrait, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
@@ -297,8 +297,8 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     //     Ok(self.query_raw(statement, params).await?)
     // }
 }
-#[async_trait::async_trait]
-impl TransactionTrait for DatabaseTransaction<'_> {
+
+impl DatabaseTransaction<'_> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
         Ok(DatabaseTransaction(Some(
             self.0.as_mut().unwrap().transaction().await?,
@@ -307,54 +307,78 @@ impl TransactionTrait for DatabaseTransaction<'_> {
 }
 
 #[async_trait::async_trait]
-impl TransactionTrait for DatabaseConnection {
+impl TransactionTrait for DatabaseTransaction<'_> {
+    // #[instrument(level = "trace", skip(callback))]
+    async fn transaction<F, T, E>(&mut self, callback: F) -> Result<T, TransactionError<E>>
+    where
+        F: for<'c> FnOnce(
+                &'c mut DatabaseTransaction,
+            ) -> Pin<
+                Box<dyn Future<Output = Result<T, TransactionError<E>>> + Send + 'c>,
+            > + Send,
+        T: Send,
+        E: Send,
+    {
+        let mut tx = self.begin().await.map_err(TransactionError::Db)?;
+        let res = (callback)(&mut tx).await;
+
+        match res {
+            Ok(value) => {
+                tx.commit().await.map_err(TransactionError::Db)?;
+                return Ok(value);
+            }
+            Err(e) => {
+                if let Some(tx) = tx.0.take() {
+                    tx.rollback()
+                        .await
+                        .map_err(|e| TransactionError::Db(DbErr::Postgres(e)))?;
+                }
+                return Err(e);
+            }
+        }
+    }
+}
+
+impl DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
         let tx = self.0.transaction().await?;
         Ok(DatabaseTransaction(Some(tx)))
     }
-    // #[instrument(level = "trace")]
-    // async fn begin(&self) -> Result<DatabaseTransaction, DbErr> {
-    //     let conn = self.0.get().await?;
-    //     conn.transaction()
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.begin(None, None).await,
-    //         None => Err(conn_err("Disconnected")),
-    //     }
-    // }
+}
 
-    // #[instrument(level = "trace")]
-    // async fn begin_with_config(
-    //     &self,
-    //     isolation_level: Option<IsolationLevel>,
-    //     access_mode: Option<AccessMode>,
-    // ) -> Result<DatabaseTransaction, DbErr> {
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.begin(isolation_level, access_mode).await,
-    //         None => Err(conn_err("Disconnected")),
-    //     }
-    // }
-
-    // /// Execute the function inside a transaction.
-    // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
+#[async_trait::async_trait]
+impl TransactionTrait for DatabaseConnection {
+    /// Execute the function inside a transaction.
+    /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
     // #[instrument(level = "trace", skip(callback))]
-    // async fn transaction<F, T, E>(&self, callback: F) -> Result<T, TransactionError<E>>
-    // where
-    //     F: for<'c> FnOnce(
-    //             &'c DatabaseTransaction,
-    //         ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>>
-    //         + Send,
-    //     T: Send,
-    //     E: std::error::Error + Send,
-    // {
-    //     match self.0.as_ref() {
-    //         #[cfg(feature = "sqlx-postgres")]
-    //         Some(conn) => conn.transaction(callback, None, None).await,
+    async fn transaction<F, T, E>(&mut self, callback: F) -> Result<T, TransactionError<E>>
+    where
+        F: for<'c> FnOnce(
+                &'c mut DatabaseTransaction,
+            ) -> Pin<
+                Box<dyn Future<Output = Result<T, TransactionError<E>>> + Send + 'c>,
+            > + Send,
+        T: Send,
+        E: Send,
+    {
+        let mut tx = self.begin().await.map_err(TransactionError::Db)?;
+        let res = (callback)(&mut tx).await;
 
-    //         None => Err(conn_err("Disconnected").into()),
-    //     }
-    // }
+        match res {
+            Ok(value) => {
+                tx.commit().await.map_err(TransactionError::Db)?;
+                return Ok(value);
+            }
+            Err(e) => {
+                if let Some(tx) = tx.0.take() {
+                    tx.rollback()
+                        .await
+                        .map_err(|e| TransactionError::Db(DbErr::Postgres(e)))?;
+                }
+                return Err(e);
+            }
+        }
+    }
 
     // /// Execute the function inside a transaction.
     // /// If the function returns an error, the transaction will be rolled back. If it does not return an error, the transaction will be committed.
