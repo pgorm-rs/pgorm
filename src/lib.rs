@@ -16,8 +16,8 @@ pub mod entity;
 pub mod error;
 /// This module performs execution of queries on a Model or ActiveModel
 mod executor;
-// /// Holds types and methods to perform metric collection
-// pub mod metric;
+/// Holds types and methods to perform metric collection
+pub mod metric;
 /// Holds types and methods to perform queries
 pub mod query;
 /// Holds types that defines the schemas of an Entity

@@ -129,6 +129,7 @@ macro_rules! build_type_stmt {
     };
 }
 
-build_type_stmt!(pgorm_query::extension::postgres::TypeAlterStatement);
-build_type_stmt!(pgorm_query::extension::postgres::TypeCreateStatement);
-build_type_stmt!(pgorm_query::extension::postgres::TypeDropStatement);
+// TODO: Re-enable postgres extensions once available in pgorm_query
+// build_type_stmt!(pgorm_query::extension::postgres::TypeAlterStatement);
+// build_type_stmt!(pgorm_query::extension::postgres::TypeCreateStatement);
+// build_type_stmt!(pgorm_query::extension::postgres::TypeDropStatement);
