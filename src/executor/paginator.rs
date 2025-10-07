@@ -294,6 +294,133 @@ where
     }
 }
 
+pub trait RawPaginatorTrait<'db, C>
+where
+    C: ConnectionTrait,
+{
+    type Selector: SelectorTrait + Send + Sync + 'db;
+    fn paginate_raw(self, db: &'db C, page_size: u64) -> RawPaginator<'db, C, Self::Selector>;
+}
+
+impl<'db, C, M> RawPaginatorTrait<'db, C> for SelectorRaw<SelectModel<M>>
+where
+    C: ConnectionTrait,
+    M: FromQueryResult + Send + Sync + 'db,
+{
+    type Selector = SelectModel<M>;
+
+    fn paginate_raw(self, db: &'db C, page_size: u64) -> RawPaginator<'db, C, Self::Selector> {
+        assert!(page_size != 0, "page_size should not be zero");
+        RawPaginator::new(self.stmt, page_size, db)
+    }
+}
+
+pub struct RawPaginator<'db, C, S>
+where
+    C: ConnectionTrait,
+    S: SelectorTrait + 'db,
+{
+    stmt: String,
+    page: u64,
+    page_size: u64,
+    db: &'db C,
+    selector: PhantomData<S>,
+}
+
+impl<'db, C, S> RawPaginator<'db, C, S>
+where
+    C: ConnectionTrait,
+    S: SelectorTrait + 'db,
+{
+    pub fn new(stmt: String, page_size: u64, db: &'db C) -> Self {
+        Self {
+            stmt,
+            page: 0,
+            page_size,
+            db,
+            selector: PhantomData,
+        }
+    }
+
+    pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
+        let sql = format!(
+            "{} LIMIT {} OFFSET {}",
+            self.stmt,
+            self.page_size,
+            self.page_size * page
+        );
+
+        let rows = self.db.query_all(&sql, &[]).await?;
+        let mut buffer = Vec::with_capacity(rows.len());
+        for row in rows {
+            buffer.push(S::from_raw_query_result(QueryResult { row })?);
+        }
+        Ok(buffer)
+    }
+
+    pub async fn fetch(&self) -> Result<Vec<S::Item>, DbErr> {
+        self.fetch_page(self.page).await
+    }
+
+    pub async fn num_items(&self) -> Result<u64, DbErr> {
+        let sql = format!(
+            "SELECT COUNT(*) AS num_items FROM ({}) AS sub_query",
+            self.stmt
+        );
+
+        let result = match self.db.query_opt(&sql, &[]).await? {
+            Some(res) => res,
+            None => return Ok(0),
+        };
+        let result = QueryResult { row: result };
+        let num_items = result.try_get::<i64>("", "num_items")? as u64;
+        Ok(num_items)
+    }
+
+    pub async fn num_pages(&self) -> Result<u64, DbErr> {
+        let num_items = self.num_items().await?;
+        let num_pages = self.compute_pages_number(num_items);
+        Ok(num_pages)
+    }
+
+    pub async fn num_items_and_pages(&self) -> Result<ItemsAndPagesNumber, DbErr> {
+        let number_of_items = self.num_items().await?;
+        let number_of_pages = self.compute_pages_number(number_of_items);
+        Ok(ItemsAndPagesNumber {
+            number_of_items,
+            number_of_pages,
+        })
+    }
+
+    fn compute_pages_number(&self, num_items: u64) -> u64 {
+        (num_items / self.page_size) + (num_items % self.page_size > 0) as u64
+    }
+
+    pub fn next(&mut self) {
+        self.page += 1;
+    }
+
+    pub fn cur_page(&self) -> u64 {
+        self.page
+    }
+
+    pub async fn fetch_and_next(&mut self) -> Result<Option<Vec<S::Item>>, DbErr> {
+        let vec = self.fetch().await?;
+        self.next();
+        let opt = if !vec.is_empty() { Some(vec) } else { None };
+        Ok(opt)
+    }
+
+    pub fn into_stream(mut self) -> PinBoxStream<'db, Result<Vec<S::Item>, DbErr>> {
+        Box::pin(stream! {
+            while let Some(vec) = self.fetch_and_next().await? {
+                yield Ok(vec);
+            }
+        })
+    }
+}
+
+
 impl<'db, C, M, N, E, F> PaginatorTrait<'db, C> for SelectTwo<E, F>
 where
     C: ConnectionTrait,
