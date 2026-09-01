@@ -164,6 +164,13 @@ children (
                     }
                 )
             }
+
+            {
+                id repair.doctests
+                title "Restore doctests against the current API"
+                kind @docs
+                deps (repair.tests-root)
+            }
         )
     }
 
@@ -440,6 +447,18 @@ children (
                 kind @feat
                 deps (orm.exec repair.tests-root)
             }
+
+            {
+                id orm.binding-types
+                title "Fix ValueHolder type-blind parameter binding (accepts/to_sql ignore inferred types)"
+                kind @fix
+            }
+
+            {
+                id orm.value-decode
+                title "Decode path and re-exports for Vector, IpNetwork and MacAddress"
+                kind @feat
+            }
         )
     }
 
@@ -503,6 +522,85 @@ children (
                 implements {
                     main ([spec:pgorm:def:error.model] [spec:pgorm:def:error.model.runtime] [spec:pgorm:sem:error.model.sql-class])
                 }
+            }
+
+            {
+                id infra.sql-err
+                title "Implement SqlErr classification over DbErr::Postgres SQLSTATEs"
+                kind @feat
+            }
+
+            {
+                id infra.tx-review
+                title "Review the transaction and connection execution API"
+                kind @chore
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T21:25:19.333895Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T21:29:24.461286Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Review conclusions (full report delivered to operator): (1) expose awaitable rollback() — pgorm-pool already has it; commit/rollback both take() the Option so Drop's warn automatically becomes implicit-path-only. (2) Isolation/access config via public inherent DatabaseConnection::begin_with(TransactionOptions{isolation_level, read_only, deferrable}) — NOT on TransactionTrait (savepoints cannot take isolation); delete the dead private begin_with_config. (3) Do NOT revive the closure transaction API — sea-orm's shape relied on an owned Arc<Mutex> handle; over tokio_postgres Transaction<'a> it forces double-lifetime HRTBs; Drop-rollback + explicit API covers it. (4) Add batch_execute as a sixth ConnectionTrait method (simple-query protocol, bypasses statement cache by nature, must be visible to the metric layer). (5) Fire-and-forget Drop rollback is ordered-safe (pipelining + &mut borrow + surviving driver task) — no spawn-await workaround; document the argument in conn.tx.guard. (6) begin(&mut self) is forced by tokio-postgres's borrow and is the anti-interleaving feature; add InstrumentedConnection::begin_instrumented for the metric gap. (7) Pool parallelism is a test-coverage item only — no get_many helper. Decomposed into infra.tx.{rollback,config,batch,metric-tx,tests}."
+                    }
+
+                    {
+                        at 2026-09-01T21:29:29.481195Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id infra.tx
+                title "Transaction API completion (per infra.tx-review)"
+                kind @feat
+                children (
+                    {
+                        id infra.tx.rollback
+                        title "Explicit rollback(); Drop warns only on the implicit path; document queued-rollback ordering"
+                        kind @feat
+                    }
+
+                    {
+                        id infra.tx.config
+                        title "TransactionOptions + DatabaseConnection::begin_with; delete dead begin_with_config and closure-API stubs"
+                        kind @feat
+                    }
+
+                    {
+                        id infra.tx.batch
+                        title "batch_execute on ConnectionTrait (three impls + metric layer)"
+                        kind @feat
+                    }
+
+                    {
+                        id infra.tx.metric-tx
+                        title "begin_instrumented + InstrumentedTransaction rollback metric"
+                        kind @feat
+                        deps (infra.tx.rollback)
+                    }
+
+                    {
+                        id infra.tx.tests
+                        title "Integration tests: rollback, savepoints, isolation, batch, pool parallelism"
+                        kind @test
+                        deps (
+                            infra.tx.rollback
+                            infra.tx.config
+                            infra.tx.batch
+                            infra.tx.metric-tx
+                        )
+                    }
+                )
             }
         )
     }
