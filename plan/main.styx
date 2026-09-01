@@ -556,6 +556,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-09-01T21:35:41.268131Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "Recommendation 3 (do not revive the closure transaction API) was wrong — it was calibrated against the pre-1.85 BoxFuture encoding. Operator challenged it; an empirical spike compiled and ran clean against live Postgres on stable (MSRV 1.85, already this repo's floor). Two things dissolve the double-lifetime objection: (a) AsyncFnOnce natively lets the returned future borrow the &mut txn argument, so the for<'c> rank is carried by the trait machinery with no boxing; (b) the transaction's own lifetime need not be higher-ranked — take &'s mut DatabaseConnection and MOVE that borrow into begin (TransactionTrait::begin(conn), not a reborrow), so the closure sees the concrete DatabaseTransaction<'s>. Working signature: async fn transaction<'s, F, T, E>(conn: &'s mut DatabaseConnection, f: F) -> Result<T, TransactionError<E>> where F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>. Closure API is feasible; adding it is now a pure API-surface judgment (sugar: auto-commit on Ok + TransactionError wrapping; Drop already covers rollback-on-error). It also unlocks a retry-on-40001 serializable-retry helper via AsyncFnMut, which the explicit API cannot express."
+                        after_done true
+                    }
                 )
             }
 
@@ -598,6 +606,22 @@ children (
                             infra.tx.config
                             infra.tx.batch
                             infra.tx.metric-tx
+                            infra.tx.closure
+                        )
+                    }
+
+                    {
+                        id infra.tx.closure
+                        title "Closure transaction API (AsyncFnOnce) + serializable-retry helper"
+                        kind @feat
+                        deps (infra.tx.rollback)
+                        log (
+                            {
+                                at 2026-09-01T21:37:53.590629Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Shape validated by live spike (see infra.tx-review errata): async fn transaction<'s, F, T, E>(conn: &'s mut DatabaseConnection, f: F) -> Result<T, TransactionError<E>> where F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E> — move the &'s mut borrow into begin (no reborrow) so the closure sees the concrete DatabaseTransaction<'s>. Use explicit rollback() internally on the error path (dep: infra.tx.rollback) instead of relying on Drop, so the rollback is awaited and its error surfaces. Retry helper takes AsyncFnMut + TransactionOptions and retries on SQLSTATE 40001."
+                            }
                         )
                     }
                 )
