@@ -62,23 +62,8 @@ pub type ChronoDateTimeUtc = chrono::DateTime<chrono::Utc>;
 #[cfg(feature = "with-chrono")]
 pub type ChronoDateTimeLocal = chrono::DateTime<chrono::Local>;
 
-#[cfg(feature = "with-time")]
-pub use time::Date as TimeDate;
-
-#[cfg(feature = "with-time")]
-pub use time::Time as TimeTime;
-
-#[cfg(feature = "with-time")]
-pub use time::PrimitiveDateTime as TimeDateTime;
-
-#[cfg(feature = "with-time")]
-pub use time::OffsetDateTime as TimeDateTimeWithTimeZone;
-
 #[cfg(feature = "with-rust_decimal")]
 pub use rust_decimal::Decimal;
-
-#[cfg(feature = "with-bigdecimal")]
-pub use bigdecimal::BigDecimal;
 
 #[cfg(feature = "with-uuid")]
 pub use uuid::Uuid;

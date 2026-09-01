@@ -36,17 +36,15 @@ it.
 
 ## SQLSTATE classification
 
-> [spec:pgorm:sem:error.model.sql-class]
+> [spec:pgorm:sem:error.model.sql-class+1]
 > `SqlErr` classifies constraint failures:
 > `UniqueConstraintViolation(String)` for SQLSTATE `23505` and
 > `ForeignKeyConstraintViolation(String)` for SQLSTATE `23503`, each carrying
 > the server message. `DbErr::sql_err()` is the classifier entry point,
 > returning `None` for anything that is not one of these.
 >
-> Known limitation: the classifier body is vestigial sqlx-era code, gated on
-> `sqlx-*` cargo features that no longer exist in this fork (sqlx is not a
-> dependency), so `sql_err()` unconditionally returns `None` in current
-> builds — it does not yet inspect `DbErr::Postgres` /
+> Known limitation: `sql_err()` unconditionally returns `None` — it does
+> not yet inspect `DbErr::Postgres` /
 > `tokio_postgres::error::DbError::code()`. Callers needing SQLSTATE
 > discrimination must match on `DbErr::Postgres` and use
 > `tokio_postgres::Error::as_db_error()` themselves.

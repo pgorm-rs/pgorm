@@ -1,9 +1,6 @@
 use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error;
 
-#[cfg(any(feature = "mock", feature = "proxy"))]
-use crate::debug_print;
-
 /// Defines the result of a query operation on a Model
 // [spec:pgorm:def:exec.decode]
 #[derive(Debug)]
@@ -211,18 +208,6 @@ try_getable_all!(chrono::DateTime<chrono::Utc>);
 #[cfg(feature = "with-chrono")]
 try_getable_all!(chrono::DateTime<chrono::Local>);
 
-#[cfg(feature = "with-time")]
-try_getable_all!(time::Date);
-
-#[cfg(feature = "with-time")]
-try_getable_all!(time::Time);
-
-#[cfg(feature = "with-time")]
-try_getable_all!(time::PrimitiveDateTime);
-
-#[cfg(feature = "with-time")]
-try_getable_all!(time::OffsetDateTime);
-
 #[cfg(feature = "with-rust_decimal")]
 use rust_decimal::Decimal;
 
@@ -238,26 +223,12 @@ impl TryGetable for Decimal {
     }
 }
 
-#[cfg(feature = "with-bigdecimal")]
-use bigdecimal::BigDecimal;
 use pgorm_query::Values;
 use tokio_postgres::{
     Row,
     row::RowIndex,
     types::{Json, Oid, WasNull},
 };
-
-#[cfg(feature = "with-bigdecimal")]
-impl TryGetable for BigDecimal {
-    #[allow(unused_variables)]
-    fn try_get_by<I: RowIndex + std::fmt::Display>(
-        res: &QueryResult,
-        idx: I,
-    ) -> Result<Self, TryGetError> {
-        let result: Result<BigDecimal, _> = res.row.try_get(idx);
-        result.map_err(|e| TryGetError::postgres(e).into())
-    }
-}
 
 #[allow(unused_macros)]
 macro_rules! try_getable_uuid {
@@ -363,23 +334,8 @@ mod postgres_array {
     #[cfg(feature = "with-chrono")]
     try_getable_postgres_array!(chrono::DateTime<chrono::Local>);
 
-    #[cfg(feature = "with-time")]
-    try_getable_postgres_array!(time::Date);
-
-    #[cfg(feature = "with-time")]
-    try_getable_postgres_array!(time::Time);
-
-    #[cfg(feature = "with-time")]
-    try_getable_postgres_array!(time::PrimitiveDateTime);
-
-    #[cfg(feature = "with-time")]
-    try_getable_postgres_array!(time::OffsetDateTime);
-
     #[cfg(feature = "with-rust_decimal")]
     try_getable_postgres_array!(rust_decimal::Decimal);
-
-    #[cfg(feature = "with-bigdecimal")]
-    try_getable_postgres_array!(bigdecimal::BigDecimal);
 
     #[allow(unused_macros)]
     macro_rules! try_getable_postgres_array_uuid {
@@ -787,18 +743,6 @@ try_from_u64_err!(chrono::DateTime<chrono::Utc>);
 
 #[cfg(feature = "with-chrono")]
 try_from_u64_err!(chrono::DateTime<chrono::Local>);
-
-#[cfg(feature = "with-time")]
-try_from_u64_err!(time::Date);
-
-#[cfg(feature = "with-time")]
-try_from_u64_err!(time::Time);
-
-#[cfg(feature = "with-time")]
-try_from_u64_err!(time::PrimitiveDateTime);
-
-#[cfg(feature = "with-time")]
-try_from_u64_err!(time::OffsetDateTime);
 
 #[cfg(feature = "with-rust_decimal")]
 try_from_u64_err!(rust_decimal::Decimal);

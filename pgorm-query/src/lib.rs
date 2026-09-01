@@ -41,18 +41,12 @@
 //! pgorm-query = "0"
 //! ```
 //!
-//! SeaQuery is very lightweight, all dependencies are optional (except `inherent`).
-//!
 //! ### Feature flags
 //!
 //! Macro: `derive` `attr`
 //!
-//! Async support: `thread-safe` (use `Arc` inplace of `Rc`)
-//!
-//! SQL engine: `backend-postgres`
-//!
-//! Type support: `with-chrono`, `with-time`, `with-json`, `with-rust_decimal`, `with-bigdecimal`, `with-uuid`,
-//! `with-ipnetwork`, `with-mac_address`, `postgres-array`, `postgres-interval`
+//! Type support is unconditional: `chrono`, `serde_json`, `rust_decimal`, `uuid`,
+//! `ipnetwork`, `mac_address`, `pgvector`, Postgres arrays and intervals.
 //!
 //! ## Usage
 //!

@@ -1168,20 +1168,6 @@ fn insert_4() {
 }
 
 #[test]
-#[cfg(feature = "with-time")]
-fn insert_9() {
-    use time::macros::{date, time};
-    assert_eq!(
-        Query::insert()
-            .into_table(Glyph::Table)
-            .columns([Glyph::Image])
-            .values_panic([date!(1970 - 01 - 01).with_time(time!(00:00:00)).into()])
-            .to_string(QueryBuilder),
-        "INSERT INTO \"glyph\" (\"image\") VALUES ('1970-01-01 00:00:00.000000')"
-    );
-}
-
-#[test]
 
 fn insert_5() {
     assert_eq!(

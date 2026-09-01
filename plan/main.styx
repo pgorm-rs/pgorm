@@ -102,6 +102,22 @@ children (
                 priority 0
                 kind @chore
                 deps (repair.tests-cfg)
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T20:05:50.783147Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T20:19:18.959205Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

@@ -143,7 +143,7 @@ where
 }
 
 /// An error from unsuccessful SQL query
-// [spec:pgorm:sem:error.model.sql-class]
+// [spec:pgorm:sem:error.model.sql-class+1]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SqlErr {
@@ -157,38 +157,10 @@ pub enum SqlErr {
 
 #[allow(dead_code)]
 impl DbErr {
-    /// Convert generic DbErr by sqlx to SqlErr, return none if the error is not any type of SqlErr
-    // [spec:pgorm:sem:error.model.sql-class]    classifier entry point
+    /// Classify a [`DbErr`] as a [`SqlErr`], returning `None` when the error is
+    /// not a recognised constraint violation.
+    // [spec:pgorm:sem:error.model.sql-class+1]    classifier entry point
     pub fn sql_err(&self) -> Option<SqlErr> {
-        #[cfg(any(
-            feature = "sqlx-mysql",
-            feature = "sqlx-postgres",
-            feature = "sqlx-sqlite"
-        ))]
-        {
-            use std::ops::Deref;
-            if let DbErr::Exec(RuntimeErr::SqlxError(sqlx::Error::Database(e)))
-            | DbErr::Query(RuntimeErr::SqlxError(sqlx::Error::Database(e))) = self
-            {
-                let error_code = e.code().unwrap_or_default();
-                let _error_code_expanded = error_code.deref();
-
-                #[cfg(feature = "sqlx-postgres")]
-                if e.try_downcast_ref::<sqlx::postgres::PgDatabaseError>()
-                    .is_some()
-                {
-                    match _error_code_expanded {
-                        "23505" => {
-                            return Some(SqlErr::UniqueConstraintViolation(e.message().into()));
-                        }
-                        "23503" => {
-                            return Some(SqlErr::ForeignKeyConstraintViolation(e.message().into()));
-                        }
-                        _ => return None,
-                    }
-                }
-            }
-        }
         None
     }
 }
