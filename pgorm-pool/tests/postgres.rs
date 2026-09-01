@@ -222,7 +222,7 @@ impl Env {
     }
     pub fn set(&mut self, name: &str, value: &str) {
         self.backup.insert(name.to_string(), env::var(name).ok());
-        env::set_var(name, value);
+        unsafe { env::set_var(name, value) };
     }
 }
 
@@ -231,14 +231,13 @@ impl Drop for Env {
         for (name, value) in self.backup.iter() {
             println!("setting {} = {:?}", name, value);
             match value {
-                Some(val) => env::set_var(name.as_str(), val),
-                None => env::remove_var(name.as_str()),
+                Some(val) => unsafe { env::set_var(name.as_str(), val) },
+                None => unsafe { env::remove_var(name.as_str()) },
             }
         }
     }
 }
 
-#[cfg(feature = "serde")]
 #[test]
 fn config_from_env() {
     // This test must not use "PG" as prefix as this can cause the other

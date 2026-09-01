@@ -239,6 +239,7 @@ rule_versions (
 
 assertions (
     {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
+    {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
 )
 
 impl_evidence (

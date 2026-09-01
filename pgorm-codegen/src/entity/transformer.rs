@@ -261,7 +261,7 @@ impl EntityTransformer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pgorm::{DbBackend, Schema};
+    use pgorm::Schema;
     use pretty_assertions::assert_eq;
     use proc_macro2::TokenStream;
     use std::{
@@ -272,7 +272,7 @@ mod tests {
     #[test]
     fn duplicated_many_to_many_paths() -> Result<(), Box<dyn Error>> {
         use crate::tests_cfg::duplicated_many_to_many_paths::*;
-        let schema = Schema::new(DbBackend::Postgres);
+        let schema = Schema::new();
 
         validate_compact_entities(
             vec![
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn many_to_many() -> Result<(), Box<dyn Error>> {
         use crate::tests_cfg::many_to_many::*;
-        let schema = Schema::new(DbBackend::Postgres);
+        let schema = Schema::new();
 
         validate_compact_entities(
             vec![
@@ -327,7 +327,7 @@ mod tests {
     #[test]
     fn many_to_many_multiple() -> Result<(), Box<dyn Error>> {
         use crate::tests_cfg::many_to_many_multiple::*;
-        let schema = Schema::new(DbBackend::Postgres);
+        let schema = Schema::new();
 
         validate_compact_entities(
             vec![
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn self_referencing() -> Result<(), Box<dyn Error>> {
         use crate::tests_cfg::self_referencing::*;
-        let schema = Schema::new(DbBackend::Postgres);
+        let schema = Schema::new();
 
         validate_compact_entities(
             vec![

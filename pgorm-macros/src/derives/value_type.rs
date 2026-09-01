@@ -108,7 +108,7 @@ impl DeriveValueType {
 
             #[automatically_derived]
             impl pgorm::TryGetable for #name {
-                fn try_get_by<I: pgorm::RowIndex>(res: &pgorm::QueryResult, idx: I)
+                fn try_get_by<I: pgorm::RowIndex + std::fmt::Display>(res: &pgorm::QueryResult, idx: I)
                     -> std::result::Result<Self, pgorm::TryGetError> {
                     <#field_type as pgorm::TryGetable>::try_get_by(res, idx).map(|v| #name(v))
                 }

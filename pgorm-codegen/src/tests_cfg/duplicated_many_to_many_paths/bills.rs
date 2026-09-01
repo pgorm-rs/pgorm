@@ -5,7 +5,7 @@ use pgorm::entity::prelude::*;
 pub struct Model {
     #[pgorm(primary_key)]
     pub id: i32,
-    pub user_id: Option<i32>,
+    pub user_id: Option<i32> ,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -15,7 +15,7 @@ pub enum Relation {
         from = "Column::UserId",
         to = "super::users::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "NoAction",
     )]
     Users,
     #[pgorm(has_many = "super::users_saved_bills::Entity")]

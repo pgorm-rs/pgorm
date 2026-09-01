@@ -2084,8 +2084,6 @@ mod tests {
         );
         let serde_skip_hidden_column = matches!(entity_serde_variant.1, WithSerde::Serialize);
 
-        reader.read_until(b'\n', &mut Vec::new())?;
-
         let mut line = String::new();
         while reader.read_line(&mut line)? > 0 {
             lines.push(line.to_owned());
@@ -2237,8 +2235,6 @@ mod tests {
     fn comparable_file_string(file: &str) -> io::Result<String> {
         let mut reader = BufReader::new(file.as_bytes());
         let mut lines: Vec<String> = Vec::new();
-
-        reader.read_until(b'\n', &mut Vec::new())?;
 
         let mut line = String::new();
         while reader.read_line(&mut line)? > 0 {

@@ -48,6 +48,36 @@ children (
                 title "Fix pgorm-pool and pgorm-macros test targets"
                 priority 0
                 kind @test
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T19:40:54.065149Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T19:40:56.784229Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope addition: pgorm-codegen's test target is broken in the same API-drift class (transformer.rs cfg(test) imports pgorm::DbBackend and calls the old Schema::new(backend) signature) — folded into this node alongside pgorm-pool and pgorm-macros."
+                    }
+
+                    {
+                        at 2026-09-01T20:00:48.1169Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Two substantive calls made while restoring the targets: (1) DeriveValueType was genuinely regressed — commit 6177d6b5 added a Display bound to TryGetable::try_get_by and missed the derive's emitted impl, so the macro could not compile for any input; fixed the macro (pgorm-macros/src/derives/value_type.rs), not the test. (2) The four transformer golden-fixture tests failed because an inherited upstream commit (27af2c9c) rustfmt-normalized token-level fixture details; restored the fixtures' byte-exact forms in pgorm's own files and put #[rustfmt::skip] on their module decls so the fmt commit-gate cannot re-corrupt them. Also removed pgorm-pool's dead cfg(feature=\"serde\") test gate (serde is unconditional there) and added with-rust_decimal to pgorm-codegen's dev-dep — noting latent rot: cargo check -p pgorm --no-default-features --features macros fails (cursor.rs Decimal ToSql needs with-rust_decimal)."
+                    }
+
+                    {
+                        at 2026-09-01T20:00:52.916149Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

@@ -26,4 +26,4 @@ tracing = { version = "0.1", default-features = false, features = ["log"] }
 
 [dev-dependencies]
 pretty_assertions = { version = "0.7" }
-pgorm = { path = "../", default-features = false, features = ["macros"] }
+pgorm = { path = "../", default-features = false, features = ["macros", "with-rust_decimal"] }
