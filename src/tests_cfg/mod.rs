@@ -6,6 +6,7 @@ pub mod cake;
 pub mod cake_expanded;
 pub mod cake_filling;
 pub mod cake_filling_price;
+pub mod cake_seaography;
 pub mod entity_linked;
 pub mod filling;
 pub mod fruit;
@@ -13,7 +14,7 @@ pub mod indexes;
 pub mod lunch_set;
 pub mod lunch_set_expanded;
 pub mod rust_keyword;
-pub mod pgorm_active_enums;
+pub mod sea_orm_active_enums;
 pub mod vendor;
 
 pub use cake::Entity as Cake;

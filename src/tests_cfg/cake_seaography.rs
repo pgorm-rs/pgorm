@@ -33,6 +33,12 @@ impl Related<super::fruit::Entity> for Entity {
     }
 }
 
+impl Related<Entity> for super::fruit::Entity {
+    fn to() -> RelationDef {
+        super::fruit::Relation::Cake.def()
+    }
+}
+
 impl Related<super::filling::Entity> for Entity {
     fn to() -> RelationDef {
         super::cake_filling::Relation::Filling.def()
@@ -49,10 +55,7 @@ pub enum RelatedEntity {
     Fruit,
     #[pgorm(entity = "super::filling::Entity")]
     Filling,
-    #[pgorm(
-        entity = "super::fruit::Entity",
-        def = "Relation::TropicalFruit.def()"
-    )]
+    #[pgorm(entity = "super::fruit::Entity", def = "Relation::TropicalFruit.def()")]
     TropicalFruit,
     #[pgorm(
         entity = "super::fruit::Entity",

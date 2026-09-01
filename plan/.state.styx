@@ -237,6 +237,10 @@ rule_versions (
     {id sql.value.value-type, version 0}
 )
 
+assertions (
+    {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
+)
+
 impl_evidence (
     {id codegen.generate, covered_rules (
         codegen.entity

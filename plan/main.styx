@@ -17,6 +17,22 @@ children (
                 title "Revive src/tests_cfg and the tests-cfg feature"
                 priority 0
                 kind @test
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T19:25:40.446601Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T19:40:21.226441Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -36,10 +52,18 @@ children (
 
             {
                 id repair.cursor-tosql
-                title "Complete cursor.rs ToSql stubs (Vector/IpNetwork/MacAddress, u8/u16)"
+                title "Remove u8/u16 unsigned types; implement Vector/IpNetwork/MacAddress cursor binding"
                 priority 0
                 kind @fix
                 deps (repair.tests-root)
+                log (
+                    {
+                        at 2026-09-01T19:31:53.79001Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: remove TinyUnsigned (u8) and SmallUnsigned (u16) support end-to-end instead of implementing ToSql widening — Postgres has no unsigned integer types, so the variants are MySQL-era dead vocabulary; deleting them turns the cursor-binding runtime panic into a compile error. Unsigned (u32) stays: it has a real Postgres meaning (oid). BigUnsigned (u64) to be assessed during implementation. Vector/IpNetwork/MacAddress todo!() arms still get real bindings."
+                    }
+                )
             }
 
             {
