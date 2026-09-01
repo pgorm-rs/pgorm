@@ -230,7 +230,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types]
+> [spec:pgorm:sem:codegen.entity.types+1]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -238,7 +238,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 > |---|---|
 > | `Char(_)`, `String(_)`, `Text`, `Custom(_)` | `String` |
 > | `TinyInteger` / `SmallInteger` / `Integer` / `BigInteger` | `i8` / `i16` / `i32` / `i64` |
-> | `TinyUnsigned` / `SmallUnsigned` / `Unsigned` / `BigUnsigned` | `u8` / `u16` / `u32` / `u64` |
+> | `Unsigned` / `BigUnsigned` | `u32` / `u64` |
 > | `Float` / `Double` | `f32` / `f64` |
 > | `Json`, `JsonBinary` | `Json` |
 > | `Decimal(_)`, `Money(_)` | `Decimal` |

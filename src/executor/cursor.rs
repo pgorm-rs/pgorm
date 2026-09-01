@@ -450,7 +450,7 @@ where
     }
 }
 
-// [spec:pgorm:def:exec.cursor.binding]
+// [spec:pgorm:def:exec.cursor.binding+1]
 pub struct ValueHolder(pub Value);
 
 impl std::fmt::Debug for ValueHolder {
@@ -468,9 +468,9 @@ fn accepts<T: ToSql>(input: T, ty: &Type) -> bool {
     T::accepts(ty)
 }
 
-// [spec:pgorm:def:exec.cursor.binding]
+// [spec:pgorm:def:exec.cursor.binding+1]
 impl ToSql for ValueHolder {
-    // [spec:pgorm:req:exec.cursor.binding-gaps]
+    // [spec:pgorm:req:exec.cursor.binding-gaps+1]
     fn to_sql(
         &self,
         ty: &Type,
@@ -485,13 +485,8 @@ impl ToSql for ValueHolder {
             Value::SmallInt(x) => x.to_sql(ty, out),
             Value::Int(x) => x.to_sql(ty, out),
             Value::BigInt(x) => x.to_sql(ty, out),
-            Value::TinyUnsigned(_x) => unimplemented!("u8 not supported"), //x.as_ref().map(|x| (*x).to_sql(ty, out))
-            Value::SmallUnsigned(_x) => unimplemented!("u16 not supported"), // x.map(|x| x as _).to_sql(ty, out),
             Value::Unsigned(x) => x.to_sql(ty, out),
-            Value::BigUnsigned(x) => {
-                //unimplemented!("ToSql: {x:?}, {ty:?}, u64 not supported"), // x.map(|x| x as _).to_sql(ty, out),
-                x.map(|x| x as i64).to_sql(ty, out)
-            }
+            Value::BigUnsigned(x) => x.map(|x| x as i64).to_sql(ty, out),
             Value::Float(x) => x.to_sql(ty, out),
             Value::Double(x) => x.to_sql(ty, out),
             Value::String(x) => match x.as_ref() {
@@ -547,9 +542,24 @@ impl ToSql for ValueHolder {
                 .collect::<Vec<_>>()
                 .to_sql(ty, out),
             Value::Array(_, None) => Ok(IsNull::Yes),
-            Value::Vector(vector) => todo!(),
-            Value::IpNetwork(ip_network) => todo!(),
-            Value::MacAddress(mac_address) => todo!(),
+            Value::Vector(x) => x
+                .as_ref()
+                .map(|x| x.to_sql(ty, out))
+                .unwrap_or(Ok(IsNull::Yes)),
+            Value::IpNetwork(x) => match x.as_ref() {
+                Some(x) => {
+                    postgres_protocol::types::inet_to_sql(x.ip(), x.prefix(), out);
+                    Ok(IsNull::No)
+                }
+                None => Ok(IsNull::Yes),
+            },
+            Value::MacAddress(x) => match x.as_ref() {
+                Some(x) => {
+                    postgres_protocol::types::macaddr_to_sql(x.bytes(), out);
+                    Ok(IsNull::No)
+                }
+                None => Ok(IsNull::Yes),
+            },
         }
     }
 
@@ -561,4 +571,60 @@ impl ToSql for ValueHolder {
     }
 
     to_sql_checked!();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn encode(value: Value) -> Option<Vec<u8>> {
+        let mut out = BytesMut::new();
+        match ValueHolder(value).to_sql(&Type::BYTEA, &mut out).unwrap() {
+            IsNull::Yes => None,
+            IsNull::No => Some(out.to_vec()),
+        }
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    #[test]
+    fn binds_vector() {
+        assert_eq!(
+            encode(Value::Vector(Some(Box::new(pgvector::Vector::from(vec![
+                1.0f32, 2.0
+            ]))))),
+            Some(
+                [
+                    &[0, 2, 0, 0][..],
+                    &1.0f32.to_be_bytes()[..],
+                    &2.0f32.to_be_bytes()[..],
+                ]
+                .concat()
+            )
+        );
+        assert_eq!(encode(Value::Vector(None)), None);
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    #[test]
+    fn binds_ip_network() {
+        assert_eq!(
+            encode(Value::IpNetwork(Some(Box::new(
+                "10.0.0.1/24".parse().unwrap()
+            )))),
+            Some(vec![2, 24, 0, 4, 10, 0, 0, 1])
+        );
+        assert_eq!(encode(Value::IpNetwork(None)), None);
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    #[test]
+    fn binds_mac_address() {
+        assert_eq!(
+            encode(Value::MacAddress(Some(Box::new(
+                "00:11:22:33:44:55".parse().unwrap()
+            )))),
+            Some(vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55])
+        );
+        assert_eq!(encode(Value::MacAddress(None)), None);
+    }
 }

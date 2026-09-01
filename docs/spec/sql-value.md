@@ -8,13 +8,13 @@ including panic semantics and quirks inherited from sea-query.
 
 ## The Value container
 
-> [spec:pgorm:def:sql.value]
+> [spec:pgorm:def:sql.value+1]
 > `Value` is the single enum container for all SQL values. Every variant wraps
 > an `Option` of its payload; `None` encodes SQL NULL while preserving the type
 > tag. Payloads larger than one pointer are boxed so the enum stays small:
 > `Bool(Option<bool>)`, `TinyInt(i8)`, `SmallInt(i16)`, `Int(i32)`,
-> `BigInt(i64)`, `TinyUnsigned(u8)`, `SmallUnsigned(u16)`, `Unsigned(u32)`,
-> `BigUnsigned(u64)`, `Float(f32)`, `Double(f64)`, `String(Box<String>)`,
+> `BigInt(i64)`, `Unsigned(u32)`, `BigUnsigned(u64)`, `Float(f32)`,
+> `Double(f64)`, `String(Box<String>)`,
 > `Char(char)`, `Bytes(Box<Vec<u8>>)`, `Json(Box<serde_json::Value>)`,
 > `ChronoDate(Box<NaiveDate>)`, `ChronoTime(Box<NaiveTime>)`,
 > `ChronoDateTime(Box<NaiveDateTime>)`, `ChronoDateTimeUtc(Box<DateTime<Utc>>)`,
@@ -23,6 +23,14 @@ including panic semantics and quirks inherited from sea-query.
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)` and
 > `MacAddress(Box<MacAddress>)`.
+>
+> There are no `u8` or `u16` variants. Postgres has no unsigned integer
+> types, so the MySQL-era `TinyUnsigned`/`SmallUnsigned` spellings — whose
+> binding path panicked at runtime — were removed outright; a `u8` or `u16`
+> is now a compile error wherever a `Value` is required. The two surviving
+> unsigned variants both have a Postgres meaning: `Unsigned` (u32) is the
+> `OID` carrier (see `[spec:pgorm:sem:exec.decode.u32-oid]`) and
+> `BigUnsigned` (u64) is how `LIMIT`/`OFFSET` counts reach the builder.
 >
 > Unlike upstream sea-query, none of these variants are feature-gated in this
 > fork: chrono, serde_json, rust_decimal, uuid, ipnetwork, mac_address and
@@ -36,11 +44,12 @@ including panic semantics and quirks inherited from sea-query.
 > `Display` renders the value as a Postgres SQL literal by delegating to
 > `QueryBuilder.value_to_string`.
 
-> [spec:pgorm:def:sql.value.conversions]
+> [spec:pgorm:def:sql.value.conversions+1]
 > `From<T> for Value` covers the Rust primitives one-to-one: `bool`→`Bool`,
 > `i8`→`TinyInt`, `i16`→`SmallInt`, `i32`→`Int`, `i64`→`BigInt`,
-> `u8`→`TinyUnsigned`, `u16`→`SmallUnsigned`, `u32`→`Unsigned`,
-> `u64`→`BigUnsigned`, `f32`→`Float`, `f64`→`Double`, `char`→`Char`.
+> `u32`→`Unsigned`, `u64`→`BigUnsigned`, `f32`→`Float`, `f64`→`Double`,
+> `char`→`Char`. `u8` and `u16` have no conversion, no `Nullable` and no
+> `ValueType` impl — they are not part of the value vocabulary at all.
 > `&str`, `&String`, `String` and `Cow<'_, str>` all convert to `String`
 > (owned, boxed); `&[u8]` and `Vec<u8>` convert to `Bytes`. `serde_json::Value`,
 > `NaiveDate`, `NaiveTime`, `NaiveDateTime`, `Decimal`, `Uuid`, `IpNetwork`,
@@ -225,12 +234,12 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.column-type]
+> [spec:pgorm:def:sql.types.column-type+1]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen: `Char(Option<u32>)`, `String(StringLen)`, `Text`, `Blob`,
-> `TinyInteger`, `SmallInteger`, `Integer`, `BigInteger`, `TinyUnsigned`,
-> `SmallUnsigned`, `Unsigned`, `BigUnsigned`, `Float`, `Double`,
+> `TinyInteger`, `SmallInteger`, `Integer`, `BigInteger`, `Unsigned`,
+> `BigUnsigned`, `Float`, `Double`,
 > `Decimal(Option<(u32, u32)>)`, `DateTime`, `Timestamp`,
 > `TimestampWithTimeZone`, `Time`, `Date`, `Year`, `Interval(Option<PgInterval>,
 > Option<u32>)`, `Binary(u32)`, `VarBinary(StringLen)`, `Bit(Option<u32>)`,
@@ -238,7 +247,10 @@ including panic semantics and quirks inherited from sea-query.
 > `Uuid`, `Custom(DynIden)`, `Enum { name, variants }`,
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
 > and `LTree`. `Year` survives from the multi-backend ancestry but is
-> unrenderable on Postgres (see `[spec:pgorm:sem:sql.ddl.panics]`).
+> unrenderable on Postgres (see `[spec:pgorm:sem:sql.ddl.panics]`). There is
+> no `TinyUnsigned` or `SmallUnsigned`: Postgres has no unsigned integer
+> types, and the `ColumnDef::tiny_unsigned`/`small_unsigned` builders were
+> removed with the variants.
 >
 > `StringLen` parameterises varchar/varbinary length: `N(u32)`, `Max`, or the
 > default `None`. `PgInterval` enumerates the thirteen interval field

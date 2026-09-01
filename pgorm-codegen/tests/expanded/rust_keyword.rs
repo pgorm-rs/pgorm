@@ -13,9 +13,9 @@ impl EntityName for Entity {
 pub struct Model {
     pub id: i32,
     pub testing: i8,
-    pub rust: u8,
+    pub rust: i8,
     pub keywords: i16,
-    pub r#type: u16,
+    pub r#type: i16,
     pub r#typeof: i32,
     pub crate_: u32,
     pub self_: i64,
@@ -72,9 +72,9 @@ impl ColumnTrait for Column {
         match self {
             Self::Id => ColumnType::Integer.def(),
             Self::Testing => ColumnType::TinyInteger.def(),
-            Self::Rust => ColumnType::TinyUnsigned.def(),
+            Self::Rust => ColumnType::TinyInteger.def(),
             Self::Keywords => ColumnType::SmallInteger.def(),
-            Self::Type => ColumnType::SmallUnsigned.def(),
+            Self::Type => ColumnType::SmallInteger.def(),
             Self::Typeof => ColumnType::Integer.def(),
             Self::Crate => ColumnType::Unsigned.def(),
             Self::Self_ => ColumnType::BigInteger.def(),

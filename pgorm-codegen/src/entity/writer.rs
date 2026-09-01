@@ -1140,7 +1140,7 @@ mod tests {
                     },
                     Column {
                         name: "rust".to_owned(),
-                        col_type: ColumnType::TinyUnsigned,
+                        col_type: ColumnType::TinyInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,
@@ -1154,7 +1154,7 @@ mod tests {
                     },
                     Column {
                         name: "type".to_owned(),
-                        col_type: ColumnType::SmallUnsigned,
+                        col_type: ColumnType::SmallInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,

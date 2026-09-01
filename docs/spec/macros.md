@@ -89,18 +89,23 @@ including known limitations.
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+1]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
 > parsed `column_type` attribute if present; otherwise it is inferred by string-matching
 > the field's Rust type name: `char`→`Char(None)`, `String`/`&str`→`string(None)`,
-> `i8`/`u8`/`i16`/`u16`/`i32`/`u32`/`i64`/`u64` → Tiny/Small/plain/Big
-> (Unsigned) integers, `f32`→`Float`, `f64`→`Double`, `bool`→`Boolean`,
+> `i8`→`TinyInteger`, `i16`→`SmallInteger`, `i32`→`Integer`,
+> `i64`→`BigInteger`, `u32`→`Unsigned`, `u64`→`BigUnsigned`,
+> `f32`→`Float`, `f64`→`Double`, `bool`→`Boolean`,
 > `Date`/`NaiveDate`→`Date`, `Time`/`NaiveTime`→`Time`, `DateTime`/`NaiveDateTime`→
 > `DateTime`, `DateTimeUtc`/`DateTimeLocal`/`DateTimeWithTimeZone`→
 > `TimestampWithTimeZone`, `Uuid`→`Uuid`, `Json`→`Json`, `Decimal`→`Decimal(None)`,
 > `Vec<u8>`→`VarBinary(StringLen::None)`. Any other type is assumed to be an
 > `ActiveEnum`-style value and resolves at compile time via
-> `<T as ValueType>::column_type()`. An `Option<T>` wrapper (detected by string prefix
+> `<T as ValueType>::column_type()`. `u8` and `u16` are deliberately absent from
+> the table: they fall through to that `ValueType` path and, since neither
+> implements `ValueType` (see `[spec:pgorm:def:sql.value.conversions+1]`), a `u8`
+> or `u16` field is a compile error rather than a column type that panics when
+> bound. An `Option<T>` wrapper (detected by string prefix
 > on the printed type) is unwrapped to `T` and forces `nullable`. Modifier calls are
 > then chained in order: `.nullable()`, `.indexed()`, `.unique()`,
 > `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`).
@@ -273,7 +278,7 @@ including known limitations.
 > spanned compile error). Optional attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type-name tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def]`, falling back to
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+1]`, falling back to
 > `<T as ValueType>::column_type()`/`array_type()`. The expansion implements
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to
 > the inner type with `type_name()` = the struct name; no `Nullable` impl is generated.

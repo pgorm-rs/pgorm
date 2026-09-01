@@ -28,8 +28,6 @@ pub enum ArrayType {
     SmallInt,
     Int,
     BigInt,
-    TinyUnsigned,
-    SmallUnsigned,
     Unsigned,
     BigUnsigned,
     Float,
@@ -67,7 +65,7 @@ pub enum ArrayType {
 ///
 /// If the `hashable-value` feature is enabled, NaN == NaN, which contradicts Rust's built-in
 /// implementation of NaN != NaN.
-// [spec:pgorm:def:sql.value]
+// [spec:pgorm:def:sql.value+1]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(Option<bool>),
@@ -75,8 +73,6 @@ pub enum Value {
     SmallInt(Option<i16>),
     Int(Option<i32>),
     BigInt(Option<i64>),
-    TinyUnsigned(Option<u8>),
-    SmallUnsigned(Option<u16>),
     Unsigned(Option<u32>),
     BigUnsigned(Option<u64>),
     Float(Option<f32>),
@@ -140,7 +136,7 @@ fn hash_vector<H: std::hash::Hasher>(value: Option<&pgvector::Vector>, state: &m
     }
 }
 
-// [spec:pgorm:def:sql.value]
+// [spec:pgorm:def:sql.value+1]
 impl Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -149,8 +145,6 @@ impl Hash for Value {
             Value::SmallInt(value) => value.hash(state),
             Value::Int(value) => value.hash(state),
             Value::BigInt(value) => value.hash(state),
-            Value::TinyUnsigned(value) => value.hash(state),
-            Value::SmallUnsigned(value) => value.hash(state),
             Value::Unsigned(value) => value.hash(state),
             Value::BigUnsigned(value) => value.hash(state),
             Value::Float(value) => hash_f32(*value, state),
@@ -254,7 +248,7 @@ impl Value {
     }
 }
 
-// [spec:pgorm:def:sql.value.conversions]
+// [spec:pgorm:def:sql.value.conversions+1]
 macro_rules! type_to_value {
     ( $type: ty, $name: ident, $col_type: expr ) => {
         impl From<$type> for Value {
@@ -336,8 +330,6 @@ type_to_value!(i8, TinyInt, TinyInteger);
 type_to_value!(i16, SmallInt, SmallInteger);
 type_to_value!(i32, Int, Integer);
 type_to_value!(i64, BigInt, BigInteger);
-type_to_value!(u8, TinyUnsigned, TinyUnsigned);
-type_to_value!(u16, SmallUnsigned, SmallUnsigned);
 type_to_value!(u32, Unsigned, Unsigned);
 type_to_value!(u64, BigUnsigned, BigUnsigned);
 type_to_value!(f32, Float, Float);
@@ -370,7 +362,7 @@ impl Nullable for &str {
     }
 }
 
-// [spec:pgorm:def:sql.value.conversions]
+// [spec:pgorm:def:sql.value.conversions+1]
 impl<T> From<Option<T>> for Value
 where
     T: Into<Value> + Nullable,
@@ -636,7 +628,6 @@ pub mod with_array {
     impl NotU8 for i16 {}
     impl NotU8 for i32 {}
     impl NotU8 for i64 {}
-    impl NotU8 for u16 {}
     impl NotU8 for u32 {}
     impl NotU8 for u64 {}
     impl NotU8 for f32 {}
@@ -1131,8 +1122,6 @@ pub fn sea_value_to_json_value(value: &Value) -> Json {
         | Value::SmallInt(None)
         | Value::Int(None)
         | Value::BigInt(None)
-        | Value::TinyUnsigned(None)
-        | Value::SmallUnsigned(None)
         | Value::Unsigned(None)
         | Value::BigUnsigned(None)
         | Value::Float(None)
@@ -1156,8 +1145,6 @@ pub fn sea_value_to_json_value(value: &Value) -> Json {
         Value::SmallInt(Some(v)) => (*v).into(),
         Value::Int(Some(v)) => (*v).into(),
         Value::BigInt(Some(v)) => (*v).into(),
-        Value::TinyUnsigned(Some(v)) => (*v).into(),
-        Value::SmallUnsigned(Some(v)) => (*v).into(),
         Value::Unsigned(Some(v)) => (*v).into(),
         Value::BigUnsigned(Some(v)) => (*v).into(),
         Value::Float(Some(v)) => (*v).into(),
@@ -1216,7 +1203,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // [spec:pgorm:def:sql.value.conversions/test]
+    // [spec:pgorm:def:sql.value.conversions+1/test]
     #[test]
     fn test_value() {
         macro_rules! test_value {
@@ -1228,8 +1215,7 @@ mod tests {
             };
         }
 
-        test_value!(u8, 255);
-        test_value!(u16, 65535);
+        test_value!(u32, 4294967295);
         test_value!(i8, 127);
         test_value!(i16, 32767);
         test_value!(i32, 1073741824);
@@ -1256,15 +1242,13 @@ mod tests {
             };
         }
 
-        test_some_value!(u8, 255);
-        test_some_value!(u16, 65535);
+        test_some_value!(u32, 4294967295);
         test_some_value!(i8, 127);
         test_some_value!(i16, 32767);
         test_some_value!(i32, 1073741824);
         test_some_value!(i64, 8589934592);
 
-        test_none!(u8, TinyUnsigned);
-        test_none!(u16, SmallUnsigned);
+        test_none!(u32, Unsigned);
         test_none!(i8, TinyInt);
         test_none!(i16, SmallInt);
         test_none!(i32, Int);
@@ -1315,32 +1299,32 @@ mod tests {
             )
         );
         assert_eq!(
-            (1i32, 2.4f64, "b", 123u8).into_value_tuple(),
+            (1i32, 2.4f64, "b", 123i8).into_value_tuple(),
             ValueTuple::Many(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
-                Value::TinyUnsigned(Some(123))
+                Value::TinyInt(Some(123))
             ])
         );
         assert_eq!(
-            (1i32, 2.4f64, "b", 123u8, 456u16).into_value_tuple(),
+            (1i32, 2.4f64, "b", 123i8, 456i16).into_value_tuple(),
             ValueTuple::Many(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
-                Value::TinyUnsigned(Some(123)),
-                Value::SmallUnsigned(Some(456))
+                Value::TinyInt(Some(123)),
+                Value::SmallInt(Some(456))
             ])
         );
         assert_eq!(
-            (1i32, 2.4f64, "b", 123u8, 456u16, 789u32).into_value_tuple(),
+            (1i32, 2.4f64, "b", 123i8, 456i16, 789u32).into_value_tuple(),
             ValueTuple::Many(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
-                Value::TinyUnsigned(Some(123)),
-                Value::SmallUnsigned(Some(456)),
+                Value::TinyInt(Some(123)),
+                Value::SmallInt(Some(456)),
                 Value::Unsigned(Some(789))
             ])
         );
@@ -1370,17 +1354,17 @@ mod tests {
         val = FromValueTuple::from_value_tuple(val);
         assert_eq!(val, original);
 
-        let mut val = (1i32, 2.4f64, "b".to_owned(), 123u8);
+        let mut val = (1i32, 2.4f64, "b".to_owned(), 123i8);
         let original = val.clone();
         val = FromValueTuple::from_value_tuple(val);
         assert_eq!(val, original);
 
-        let mut val = (1i32, 2.4f64, "b".to_owned(), 123u8, 456u16);
+        let mut val = (1i32, 2.4f64, "b".to_owned(), 123i8, 456i16);
         let original = val.clone();
         val = FromValueTuple::from_value_tuple(val);
         assert_eq!(val, original);
 
-        let mut val = (1i32, 2.4f64, "b".to_owned(), 123u8, 456u16, 789u32);
+        let mut val = (1i32, 2.4f64, "b".to_owned(), 123i8, 456i16, 789u32);
         let original = val.clone();
         val = FromValueTuple::from_value_tuple(val);
         assert_eq!(val, original);
@@ -1406,17 +1390,17 @@ mod tests {
         );
         assert_eq!(iter.next(), None);
 
-        let mut iter = (1i32, 2.4f64, "b", 123u8).into_value_tuple().into_iter();
+        let mut iter = (1i32, 2.4f64, "b", 123i8).into_value_tuple().into_iter();
         assert_eq!(iter.next().unwrap(), Value::Int(Some(1)));
         assert_eq!(iter.next().unwrap(), Value::Double(Some(2.4)));
         assert_eq!(
             iter.next().unwrap(),
             Value::String(Some(Box::new("b".to_owned())))
         );
-        assert_eq!(iter.next().unwrap(), Value::TinyUnsigned(Some(123)));
+        assert_eq!(iter.next().unwrap(), Value::TinyInt(Some(123)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = (1i32, 2.4f64, "b", 123u8, 456u16)
+        let mut iter = (1i32, 2.4f64, "b", 123i8, 456i16)
             .into_value_tuple()
             .into_iter();
         assert_eq!(iter.next().unwrap(), Value::Int(Some(1)));
@@ -1425,11 +1409,11 @@ mod tests {
             iter.next().unwrap(),
             Value::String(Some(Box::new("b".to_owned())))
         );
-        assert_eq!(iter.next().unwrap(), Value::TinyUnsigned(Some(123)));
-        assert_eq!(iter.next().unwrap(), Value::SmallUnsigned(Some(456)));
+        assert_eq!(iter.next().unwrap(), Value::TinyInt(Some(123)));
+        assert_eq!(iter.next().unwrap(), Value::SmallInt(Some(456)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = (1i32, 2.4f64, "b", 123u8, 456u16, 789u32)
+        let mut iter = (1i32, 2.4f64, "b", 123i8, 456i16, 789u32)
             .into_value_tuple()
             .into_iter();
         assert_eq!(iter.next().unwrap(), Value::Int(Some(1)));
@@ -1438,8 +1422,8 @@ mod tests {
             iter.next().unwrap(),
             Value::String(Some(Box::new("b".to_owned())))
         );
-        assert_eq!(iter.next().unwrap(), Value::TinyUnsigned(Some(123)));
-        assert_eq!(iter.next().unwrap(), Value::SmallUnsigned(Some(456)));
+        assert_eq!(iter.next().unwrap(), Value::TinyInt(Some(123)));
+        assert_eq!(iter.next().unwrap(), Value::SmallInt(Some(456)));
         assert_eq!(iter.next().unwrap(), Value::Unsigned(Some(789)));
         assert_eq!(iter.next(), None);
     }
@@ -1527,7 +1511,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.conversions/test]
+    // [spec:pgorm:def:sql.value.conversions+1/test]
     #[test]
     fn test_uuid_value() {
         let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();

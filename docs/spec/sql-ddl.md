@@ -72,11 +72,11 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `ColumnDef` and `&mut ColumnDef` (via `take()`), enabling the
 > builder-by-reference doctest style.
 
-> [spec:pgorm:req:sql.ddl.column-types]
+> [spec:pgorm:req:sql.ddl.column-types+1]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
 > contract. It MUST spell: `Char(Some(n))`→`char(n)`, `Char(None)`→`char`;
 > `String(N(n))`→`varchar(n)`, `String(Max|None)`→`varchar`; `Text`→`text`;
-> `TinyInteger`/`TinyUnsigned`/`SmallInteger`/`SmallUnsigned`→`smallint`;
+> `TinyInteger`/`SmallInteger`→`smallint`;
 > `Integer`/`Unsigned`→`integer`; `BigInteger`/`BigUnsigned`→`bigint`;
 > `Float`→`real`; `Double`→`double precision`; `Decimal(Some((p,s)))`→
 > `decimal(p, s)`, `Decimal(None)`→`decimal`; `DateTime`→`timestamp without

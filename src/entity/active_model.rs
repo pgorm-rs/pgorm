@@ -688,8 +688,6 @@ impl_into_active_value!(i8);
 impl_into_active_value!(i16);
 impl_into_active_value!(i32);
 impl_into_active_value!(i64);
-impl_into_active_value!(u8);
-impl_into_active_value!(u16);
 impl_into_active_value!(u32);
 impl_into_active_value!(u64);
 impl_into_active_value!(f32);

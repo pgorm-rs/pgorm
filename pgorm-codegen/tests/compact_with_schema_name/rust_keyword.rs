@@ -6,9 +6,9 @@ pub struct Model {
     #[pgorm(primary_key)]
     pub id: i32,
     pub testing: i8,
-    pub rust: u8,
+    pub rust: i8,
     pub keywords: i16,
-    pub r#type: u16,
+    pub r#type: i16,
     pub r#typeof: i32,
     pub crate_: u32,
     pub self_: i64,

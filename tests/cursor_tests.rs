@@ -921,3 +921,121 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Db
 
     Ok(())
 }
+
+mod net_cursor {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "net_cursor")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+#[pgorm_macros::test]
+async fn cursor_over_network_types() -> Result<(), DbErr> {
+    use ipnetwork::IpNetwork;
+    use mac_address::MacAddress;
+    use net_cursor::{Column, Entity, Model};
+    use pgorm::{ValueHolder, types::ToSql};
+    use pgorm_query::{Alias, ColumnDef, IntoIden, Query, QueryBuilder, Table};
+
+    let ctx = TestContext::new("cursor_network_type_tests").await;
+    let db = ctx.db.get().await?;
+
+    let ip_col = Alias::new("ip");
+    let mac_col = Alias::new("mac");
+
+    let create = Table::create()
+        .table(Entity)
+        .col(
+            ColumnDef::new(Column::Id)
+                .integer()
+                .not_null()
+                .primary_key(),
+        )
+        .col(ColumnDef::new(Column::Label).string().not_null())
+        .col(ColumnDef::new(ip_col.clone()).inet().not_null())
+        .col(ColumnDef::new(mac_col.clone()).mac_address().not_null())
+        .to_owned();
+    create_table_without_asserts(&db, &create).await?;
+
+    let rows: Vec<(i32, &str, &str, &str)> = vec![
+        (1, "alpha", "10.0.0.1/32", "00:11:22:33:44:01"),
+        (2, "bravo", "10.0.0.2/32", "00:11:22:33:44:02"),
+        (3, "charlie", "10.0.0.3/32", "00:11:22:33:44:03"),
+        (4, "delta", "10.0.0.4/32", "00:11:22:33:44:04"),
+        (5, "echo", "2001:db8::5/128", "00:11:22:33:44:05"),
+    ];
+
+    for (id, label, ip, mac) in &rows {
+        let ip: IpNetwork = ip.parse().unwrap();
+        let mac: MacAddress = mac.parse().unwrap();
+        let (sql, values) = Query::insert()
+            .into_table(Entity)
+            .columns([
+                Column::Id.into_iden(),
+                Column::Label.into_iden(),
+                ip_col.clone().into_iden(),
+                mac_col.clone().into_iden(),
+            ])
+            .values_panic([(*id).into(), (*label).into(), ip.into(), mac.into()])
+            .to_owned()
+            .build(QueryBuilder);
+        let bound: Vec<ValueHolder> = values.into_iter().map(ValueHolder).collect();
+        let params: Vec<&(dyn ToSql + Sync)> =
+            bound.iter().map(|v| v as &(dyn ToSql + Sync)).collect();
+        db.execute(&sql, &params).await?;
+    }
+
+    let model = |id: i32, label: &str| Model {
+        id,
+        label: label.to_owned(),
+    };
+
+    let after: IpNetwork = "10.0.0.2/32".parse().unwrap();
+    assert_eq!(
+        Entity::find()
+            .cursor_by("ip")
+            .after(after)
+            .first(2)
+            .all(&db)
+            .await?,
+        [model(3, "charlie"), model(4, "delta")]
+    );
+
+    let before: IpNetwork = "10.0.0.3/32".parse().unwrap();
+    assert_eq!(
+        Entity::find()
+            .cursor_by("ip")
+            .before(before)
+            .last(2)
+            .all(&db)
+            .await?,
+        [model(1, "alpha"), model(2, "bravo")]
+    );
+
+    let after_mac: MacAddress = "00:11:22:33:44:03".parse().unwrap();
+    assert_eq!(
+        Entity::find()
+            .cursor_by("mac")
+            .after(after_mac)
+            .first(2)
+            .all(&db)
+            .await?,
+        [model(4, "delta"), model(5, "echo")]
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}

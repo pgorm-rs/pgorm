@@ -321,11 +321,11 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types]
+> [spec:pgorm:def:sql.render.ddl.types+1]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
-> `varchar(n)`/`varchar`; Text → `text`; TinyInteger/TinyUnsigned and
-> SmallInteger/SmallUnsigned → `smallint`; Integer/Unsigned → `integer`;
+> `varchar(n)`/`varchar`; Text → `text`; TinyInteger and SmallInteger →
+> `smallint`; Integer/Unsigned → `integer`;
 > BigInteger/BigUnsigned → `bigint`; Float → `real`; Double →
 > `double precision`; Decimal → `decimal(p, s)`/`decimal`; DateTime →
 > `timestamp without time zone`; Timestamp → `timestamp`;

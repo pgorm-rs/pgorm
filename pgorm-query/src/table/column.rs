@@ -25,8 +25,6 @@ pub trait IntoColumnDef {
 /// | SmallInteger          | smallint          | smallint                    | smallint                     |
 /// | Integer               | int               | integer                     | integer                      |
 /// | BigInteger            | bigint            | bigint                      | integer                      |
-/// | TinyUnsigned          | tinyint unsigned  | smallint                    | tinyint                      |
-/// | SmallUnsigned         | smallint unsigned | smallint                    | smallint                     |
 /// | Unsigned              | int unsigned      | integer                     | integer                      |
 /// | BigUnsigned           | bigint unsigned   | bigint                      | integer                      |
 /// | Float                 | float             | real                        | float                        |
@@ -56,7 +54,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | N/A               | inet                        | N/A                          |
 /// | MacAddr               | N/A               | macaddr                     | N/A                          |
 /// | LTree                 | N/A               | ltree                       | N/A                          |
-// [spec:pgorm:def:sql.types.column-type]
+// [spec:pgorm:def:sql.types.column-type+1]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -68,8 +66,6 @@ pub enum ColumnType {
     SmallInteger,
     Integer,
     BigInteger,
-    TinyUnsigned,
-    SmallUnsigned,
     Unsigned,
     BigUnsigned,
     Float,
@@ -114,7 +110,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type]
+// [spec:pgorm:def:sql.types.column-type+1]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -346,18 +342,6 @@ impl ColumnDef {
     /// Set column type as big_integer
     pub fn big_integer(&mut self) -> &mut Self {
         self.types = Some(ColumnType::BigInteger);
-        self
-    }
-
-    /// Set column type as tiny_unsigned
-    pub fn tiny_unsigned(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::TinyUnsigned);
-        self
-    }
-
-    /// Set column type as small_unsigned
-    pub fn small_unsigned(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::SmallUnsigned);
         self
     }
 

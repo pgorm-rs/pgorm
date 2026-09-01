@@ -1139,8 +1139,6 @@ impl QueryBuilder {
             | Value::SmallInt(None)
             | Value::Int(None)
             | Value::BigInt(None)
-            | Value::TinyUnsigned(None)
-            | Value::SmallUnsigned(None)
             | Value::Unsigned(None)
             | Value::BigUnsigned(None)
             | Value::Float(None)
@@ -1166,8 +1164,6 @@ impl QueryBuilder {
             Value::SmallInt(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Int(Some(v)) => write!(s, "{v}").unwrap(),
             Value::BigInt(Some(v)) => write!(s, "{v}").unwrap(),
-            Value::TinyUnsigned(Some(v)) => write!(s, "{v}").unwrap(),
-            Value::SmallUnsigned(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Unsigned(Some(v)) => write!(s, "{v}").unwrap(),
             Value::BigUnsigned(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Float(Some(v)) => write!(s, "{v}").unwrap(),
@@ -1576,7 +1572,7 @@ impl QueryBuilder {
     // COMMON
     // START: impl that ought not be here
     // [spec:pgorm:sem:sql.ddl.panics]
-    // [spec:pgorm:def:sql.render.ddl.types] (serial family for auto-increment columns)
+    // [spec:pgorm:def:sql.render.ddl.types+1] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match &column_type {
             ColumnType::SmallInteger => write!(sql, "smallserial").unwrap(),
@@ -1635,8 +1631,8 @@ impl QueryBuilder {
         self.prepare_column_def_common(column_def, sql, f);
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types]
-    // [spec:pgorm:def:sql.render.ddl.types]
+    // [spec:pgorm:req:sql.ddl.column-types+1]
+    // [spec:pgorm:def:sql.render.ddl.types+1]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1651,8 +1647,8 @@ impl QueryBuilder {
                     _ => "varchar".into(),
                 },
                 ColumnType::Text => "text".into(),
-                ColumnType::TinyInteger | ColumnType::TinyUnsigned => "smallint".into(),
-                ColumnType::SmallInteger | ColumnType::SmallUnsigned => "smallint".into(),
+                ColumnType::TinyInteger => "smallint".into(),
+                ColumnType::SmallInteger => "smallint".into(),
                 ColumnType::Integer | ColumnType::Unsigned => "integer".into(),
                 ColumnType::BigInteger | ColumnType::BigUnsigned => "bigint".into(),
                 ColumnType::Float => "real".into(),

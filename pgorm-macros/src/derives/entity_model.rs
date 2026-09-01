@@ -11,7 +11,7 @@ use syn::{
 // [spec:pgorm:sem:macros.derive.entity-model]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs]
 // [spec:pgorm:sem:macros.derive.entity-model.casing]
-// [spec:pgorm:sem:macros.derive.entity-model.column-def]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+1]
 // [spec:pgorm:sem:macros.derive.entity-model.primary-key]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct

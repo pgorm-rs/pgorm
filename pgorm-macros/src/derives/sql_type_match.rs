@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::{LitStr, Type};
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+1]
 pub fn col_type_match(
     col_type: Option<TokenStream>,
     field_type: &str,
@@ -15,9 +15,7 @@ pub fn col_type_match(
                 "char" => quote! { Char(None) },
                 "String" | "&str" => quote! { string(None) },
                 "i8" => quote! { TinyInteger },
-                "u8" => quote! { TinyUnsigned },
                 "i16" => quote! { SmallInteger },
-                "u16" => quote! { SmallUnsigned },
                 "i32" => quote! { Integer },
                 "u32" => quote! { Unsigned },
                 "i64" => quote! { BigInteger },
@@ -73,9 +71,7 @@ pub fn arr_type_match(
                 "char" => quote! { Char },
                 "String" | "&str" => quote! { String },
                 "i8" => quote! { TinyInt },
-                "u8" => quote! { TinyUnsigned },
                 "i16" => quote! { SmallInt },
-                "u16" => quote! { SmallUnsigned },
                 "i32" => quote! { Int },
                 "u32" => quote! { Unsigned },
                 "i64" => quote! { BigInt },

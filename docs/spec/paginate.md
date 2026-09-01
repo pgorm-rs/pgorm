@@ -62,7 +62,7 @@ including panicking gaps in parameter binding.
 > `cursor_by_other` installs the first entity's), giving joined cursors
 > a deterministic tiebreak.
 
-> [spec:pgorm:def:exec.cursor.binding]
+> [spec:pgorm:def:exec.cursor.binding+1]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
 > implementing `tokio_postgres::types::ToSql`; every executor path
 > (select, insert, update, delete, cursor, paginator) wraps built
@@ -74,19 +74,42 @@ including panicking gaps in parameter binding.
 > date/time variants, `Uuid`, and `Decimal` bind their payload, with
 > `None` payloads emitted as SQL `NULL` (`IsNull::Yes`); `Array`
 > recursively wraps its elements in `ValueHolder` (a `None` array is
-> `NULL`). `accepts` returns `true` for every Postgres type, so type
+> `NULL`).
+>
+> `Vector` delegates to `pgvector`'s own `ToSql` impl, which `pgorm-query`
+> enables through pgvector's `postgres` feature. `IpNetwork` and
+> `MacAddress` are encoded directly with
+> `postgres_protocol::types::inet_to_sql` (address, prefix length, and
+> `is_cidr` = 0 — so an `IpNetwork` keeps its prefix rather than being
+> flattened to a host address) and `postgres_protocol::types::macaddr_to_sql`
+> (the six raw bytes). Neither `ipnetwork` nor `mac_address` ships a `ToSql`
+> impl and the orphan rule forbids adding one here, so these two wire
+> formats are written by hand using the same helpers `postgres-types` uses
+> for its own `cidr`/`eui48` support.
+>
+> `accepts` returns `true` for every Postgres type, so type
 > mismatches are not caught client-side; they surface as errors from
 > Postgres at execution time.
 
-> [spec:pgorm:req:exec.cursor.binding-gaps]
-> Some `Value` variants cannot be bound and panic instead of erroring;
-> callers MUST NOT pass them as parameters. `Value::TinyUnsigned` (u8)
-> and `Value::SmallUnsigned` (u16) hit `unimplemented!` ("u8 not
-> supported" / "u16 not supported"), and `Value::Vector`,
-> `Value::IpNetwork`, and `Value::MacAddress` hit `todo!()` in
-> `ValueHolder`'s `ToSql` implementation. The time-crate date/time
-> variants have no binding arm (commented out). These are known
-> limitations of the current `ToSql` implementation.
+> [spec:pgorm:req:exec.cursor.binding-gaps+1]
+> `ValueHolder`'s `ToSql` implementation MUST bind every `Value` variant:
+> no arm may `panic!`, `unimplemented!` or `todo!`. The former panicking
+> arms are gone. `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned`
+> (u16) no longer exist as variants at all (see
+> `[spec:pgorm:def:sql.value+1]`), so passing a `u8` or `u16` is a compile
+> error rather than a runtime panic; `Value::Vector`, `Value::IpNetwork`
+> and `Value::MacAddress` bind per `[spec:pgorm:def:exec.cursor.binding+1]`.
+>
+> Two limitations remain, neither of which panics. The commented-out
+> time-crate arms (`TimeDate`, `TimeTime`, `TimeDateTime`,
+> `TimeDateTimeWithTimeZone`) are vestigial — this fork's `Value` has no
+> such variants, so there is nothing to bind. And because `accepts` is
+> unconditionally `true` and `to_sql` ignores its `Type` argument, each
+> variant is written in its own binary format regardless of the type
+> Postgres inferred for the placeholder; a mismatch is reported by the
+> server, not the client. The ignored `bits_tests` documents one such
+> case, where a `CAST($1 AS BIT(8))` makes Postgres expect `bit` while
+> `ValueHolder` writes an integer.
 
 ## Offset pagination (`exec.paginator`)
 

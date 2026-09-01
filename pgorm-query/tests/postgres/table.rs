@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 // [spec:pgorm:req:sql.ddl.create-table/test]
 // [spec:pgorm:req:sql.ddl.column-def/test]
 #[test]
-// [spec:pgorm:def:sql.render.ddl.types/test]
+// [spec:pgorm:def:sql.render.ddl.types+1/test]
 fn create_1() {
     assert_eq!(
         Table::create()
@@ -117,7 +117,7 @@ fn create_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types/test]
+// [spec:pgorm:req:sql.ddl.column-types+1/test]
 #[test]
 fn create_5() {
     assert_eq!(

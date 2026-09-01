@@ -28,7 +28,7 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
-    // [spec:pgorm:sem:codegen.entity.types]
+    // [spec:pgorm:sem:codegen.entity.types+1]
     // [spec:pgorm:sem:codegen.entity.types.datetime]
     // [spec:pgorm:req:codegen.entity.types.unsupported]
     pub fn get_rs_type(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
@@ -43,8 +43,6 @@ impl Column {
                 ColumnType::SmallInteger => "i16".to_owned(),
                 ColumnType::Integer => "i32".to_owned(),
                 ColumnType::BigInteger => "i64".to_owned(),
-                ColumnType::TinyUnsigned => "u8".to_owned(),
-                ColumnType::SmallUnsigned => "u16".to_owned(),
                 ColumnType::Unsigned => "u32".to_owned(),
                 ColumnType::BigUnsigned => "u64".to_owned(),
                 ColumnType::Float => "f32".to_owned(),
@@ -133,8 +131,6 @@ impl Column {
                 ColumnType::SmallInteger => quote! { ColumnType::SmallInteger },
                 ColumnType::Integer => quote! { ColumnType::Integer },
                 ColumnType::BigInteger => quote! { ColumnType::BigInteger },
-                ColumnType::TinyUnsigned => quote! { ColumnType::TinyUnsigned },
-                ColumnType::SmallUnsigned => quote! { ColumnType::SmallUnsigned },
                 ColumnType::Unsigned => quote! { ColumnType::Unsigned },
                 ColumnType::BigUnsigned => quote! { ColumnType::BigUnsigned },
                 ColumnType::Float => quote! { ColumnType::Float },
@@ -320,9 +316,7 @@ mod tests {
                 ColumnType::Custom(SeaRc::new(Alias::new("cus_col")))
             ),
             make_col!("CakeId", ColumnType::TinyInteger),
-            make_col!("CakeId", ColumnType::TinyUnsigned),
             make_col!("CakeId", ColumnType::SmallInteger),
-            make_col!("CakeId", ColumnType::SmallUnsigned),
             make_col!("CakeId", ColumnType::Integer),
             make_col!("CakeId", ColumnType::Unsigned),
             make_col!("CakeFillingId", ColumnType::BigInteger),
@@ -348,8 +342,6 @@ mod tests {
         let snack_cases = vec![
             "id",
             "id",
-            "cake_id",
-            "cake_id",
             "cake_id",
             "cake_id",
             "cake_id",
@@ -386,8 +378,6 @@ mod tests {
             "CakeId",
             "CakeId",
             "CakeId",
-            "CakeId",
-            "CakeId",
             "CakeFillingId",
             "CakeFillingId",
             "CakeFillingId",
@@ -417,9 +407,7 @@ mod tests {
             "String",
             "String",
             "i8",
-            "u8",
             "i16",
-            "u16",
             "i32",
             "u32",
             "i64",
@@ -463,9 +451,7 @@ mod tests {
             "String",
             "String",
             "i8",
-            "u8",
             "i16",
-            "u16",
             "i32",
             "u32",
             "i64",
@@ -508,9 +494,7 @@ mod tests {
             "ColumnType::String(StringLen::None).def()",
             "ColumnType::custom(\"cus_col\").def()",
             "ColumnType::TinyInteger.def()",
-            "ColumnType::TinyUnsigned.def()",
             "ColumnType::SmallInteger.def()",
-            "ColumnType::SmallUnsigned.def()",
             "ColumnType::Integer.def()",
             "ColumnType::Unsigned.def()",
             "ColumnType::BigInteger.def()",
