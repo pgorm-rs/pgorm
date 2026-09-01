@@ -731,6 +731,22 @@ children (
                 priority 2
                 kind @docs
                 deps (infra.metrics repair.features)
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T21:44:09.123381Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T21:53:13.404026Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

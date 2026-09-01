@@ -1,19 +1,18 @@
 # pgorm
 
-A fork of pgorm focused entirely on Postgres support.
+A fork of [SeaORM](https://github.com/SeaQL/sea-orm) focused entirely on Postgres support.
 
 ## Primary differences with SeaORM
 
 - Supports ONLY Postgres
 - Uses deadpool for the database pool
 - Uses tokio-postgres for the Postgres engine (i.e. no sqlx functionality)
-- Support for using pgparse to validate syntactic validity of SQL strings
 - More effective use of statements (you pass the arguments with the statement so it is prepared properly)
 - All Postgres-specific functionality is expected to be present
 - Significant performance and stability gains
-- Significantly simplified migration experience
+- Pared-back migrations: `pgorm-migration` is a minimal up-only runner with no down migrations or rollback (its future is under review)
 - Scoped transactions
-- Improved debugging
+- Opt-in metrics layer in `pgorm::metric` — wrap a pool to instrument it, pay nothing if you don't (see [METRICS.md](METRICS.md))
 - From<...> implementation for ActiveValue fields (less `ActiveValue::Set(...)`, more `.into()`)
 - `pgorm-query` (fork of `sea-query`) is in-tree and all non-Postgres functionality is removed
 - Failsafe behaviour for `insert_many` on an empty iterator

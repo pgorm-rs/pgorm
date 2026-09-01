@@ -244,6 +244,7 @@ assertions (
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id repair.cursor-tosql, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:16:54.2968Z}
     {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
+    {id decide.docs, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:53:13.404026Z}
 )
 
 impl_evidence (
