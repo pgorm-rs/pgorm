@@ -757,6 +757,17 @@ impl_evidence (
         {impl_name main, rule sql.value.tuple}
         {impl_name main, rule sql.value.value-type}
     )}
+    {id decide.migration, covered_rules (
+        migration.name
+        migration.runner
+        migration.up
+        migration.up-only
+    ), covered_claims (
+        {impl_name main, rule migration.name}
+        {impl_name main, rule migration.runner}
+        {impl_name main, rule migration.up}
+        {impl_name main, rule migration.up-only}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

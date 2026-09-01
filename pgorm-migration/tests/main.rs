@@ -1,261 +1,155 @@
 mod common;
 
-use common::migrator::*;
-use pgorm::{ConnectOptions, ConnectionTrait, Database, DbBackend, DbErr, Statement};
-use pgorm_migration::{migrator::MigrationStatus, prelude::*};
+use common::setup::{TestContext, count_rows, has_index, has_table};
+use pgorm_migration::migrator::MigrationStatus;
+use pgorm_migration::prelude::*;
 
-#[async_std::test]
-async fn main() -> Result<(), DbErr> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .with_test_writer()
-        .init();
+// DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test -p pgorm-migration
 
-    let url = &std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");
+/// A fresh database has nothing applied; `up` installs the tracking table and
+/// runs every pending migration in order.
+// [spec:pgorm:def:migration.runner/test]
+// [spec:pgorm:sem:migration.up/test]
+// [spec:pgorm:sem:migration.name/test]    asserted names are file stems
+#[tokio::test]
+async fn fresh_install_applies_all_pending() -> Result<(), DbErr> {
+    let ctx = TestContext::new("pgorm_migration_fresh").await;
+    let db = &ctx.db;
 
-    run_migration(url, default::Migrator, "pgorm_migration", "public").await?;
-    run_migration(
-        url,
-        default::Migrator,
-        "pgorm_migration_schema",
-        "my_schema",
-    )
-    .await?;
+    assert!(!has_table(db, "seaql_migrations").await?);
 
-    run_migration(
-        url,
-        override_migration_table_name::Migrator,
-        "pgorm_migration_table_name",
-        "public",
-    )
-    .await?;
-    run_migration(
-        url,
-        override_migration_table_name::Migrator,
-        "pgorm_migration_table_name_schema",
-        "my_schema",
-    )
-    .await?;
+    let pending =
+        common::migrator::default::Migrator::get_pending_migrations(&db.get().await?).await?;
+    assert_eq!(pending.len(), 5);
+    assert_eq!(pending[0].name(), "m20220118_000001_create_cake_table");
+    assert_eq!(pending[0].status(), MigrationStatus::Pending);
 
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
+
+    assert!(has_table(db, "seaql_migrations").await?);
+    assert!(has_table(db, "cake").await?);
+    assert!(has_table(db, "fruit").await?);
+    assert!(has_index(db, "cake", "cake_name_index").await?);
+    assert!(!has_index(db, "cake", "non_existent_index").await?);
+
+    // One row from the ActiveModel seed, one from the query-builder seed.
+    assert_eq!(count_rows(db, "cake").await?, 2);
+    assert_eq!(count_rows(db, "seaql_migrations").await?, 5);
+
+    let applied =
+        common::migrator::default::Migrator::get_applied_migrations(&db.get().await?).await?;
+    assert_eq!(applied.len(), 5);
+    assert_eq!(applied[0].name(), "m20220118_000001_create_cake_table");
+    assert_eq!(applied[0].status(), MigrationStatus::Applied);
+    assert!(
+        common::migrator::default::Migrator::get_pending_migrations(&db.get().await?)
+            .await?
+            .is_empty()
+    );
+
+    ctx.delete().await;
     Ok(())
 }
 
-async fn run_migration<Migrator>(
-    url: &str,
-    _: Migrator,
-    db_name: &str,
-    schema: &str,
-) -> Result<(), DbErr>
-where
-    Migrator: MigratorTrait,
-{
-    let db_connect = |url: String| async {
-        let connect_options = ConnectOptions::new(url)
-            .set_schema_search_path(schema.to_owned())
-            .to_owned();
+/// Re-running `up` on an already-migrated database is a no-op: no migration is
+/// re-applied and no extra ledger row is written.
+// [spec:pgorm:sem:migration.up/test]
+#[tokio::test]
+async fn repeated_up_is_idempotent() -> Result<(), DbErr> {
+    let ctx = TestContext::new("pgorm_migration_idempotent").await;
+    let db = &ctx.db;
 
-        Database::connect(connect_options).await
-    };
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
+    let first = count_rows(db, "cake").await?;
 
-    let db = db_connect(url.to_owned()).await?;
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
 
-    let db = &match db.get_database_backend() {
-        DbBackend::MySql => {
-            db.execute(Statement::from_string(
-                db.get_database_backend(),
-                format!("CREATE DATABASE IF NOT EXISTS `{db_name}`;"),
-            ))
-            .await?;
+    assert_eq!(count_rows(db, "cake").await?, first);
+    assert_eq!(count_rows(db, "seaql_migrations").await?, 5);
+    assert!(
+        common::migrator::default::Migrator::get_pending_migrations(&db.get().await?)
+            .await?
+            .is_empty()
+    );
 
-            let url = format!("{url}/{db_name}");
-            db_connect(url).await?
-        }
-        DbBackend::Postgres => {
-            db.execute(Statement::from_string(
-                db.get_database_backend(),
-                format!("DROP DATABASE IF EXISTS \"{db_name}\";"),
-            ))
-            .await?;
-            db.execute(Statement::from_string(
-                db.get_database_backend(),
-                format!("CREATE DATABASE \"{db_name}\";"),
-            ))
-            .await?;
+    ctx.delete().await;
+    Ok(())
+}
 
-            let url = format!("{url}/{db_name}");
-            let db = db_connect(url).await?;
+/// `steps` bounds how many pending migrations are applied, and `status` reports
+/// the split without altering it.
+// [spec:pgorm:def:migration.runner/test]
+// [spec:pgorm:sem:migration.up/test]
+#[tokio::test]
+async fn stepped_up_reports_status() -> Result<(), DbErr> {
+    let ctx = TestContext::new("pgorm_migration_status").await;
+    let db = &ctx.db;
 
-            db.execute(Statement::from_string(
-                db.get_database_backend(),
-                format!("CREATE SCHEMA IF NOT EXISTS \"{schema}\";"),
-            ))
-            .await?;
+    // `install` alone creates the ledger without applying anything.
+    common::migrator::default::Migrator::install(&db.get().await?).await?;
+    assert!(has_table(db, "seaql_migrations").await?);
+    assert!(!has_table(db, "cake").await?);
 
-            db
-        }
-        DbBackend::Sqlite => db,
-    };
-    let manager = SchemaManager::new(db);
+    common::migrator::default::Migrator::up(db.clone(), Some(0)).await?;
+    assert!(!has_table(db, "cake").await?);
 
-    println!("\nMigrator::status");
-    Migrator::status(db).await?;
+    common::migrator::default::Migrator::up(db.clone(), Some(1)).await?;
+    assert!(has_table(db, "cake").await?);
+    assert!(!has_table(db, "fruit").await?);
 
-    println!("\nMigrator::install");
-    Migrator::install(db).await?;
+    let conn = db.get().await?;
+    common::migrator::default::Migrator::status(&conn).await?;
 
-    let migration_table_name = Migrator::migration_table_name().to_string();
-    let migration_table_name = migration_table_name.as_str();
-    assert!(manager.has_table(migration_table_name).await?);
-    if migration_table_name != "seaql_migrations" {
-        assert!(!manager.has_table("seaql_migrations").await?);
-    }
+    let applied = common::migrator::default::Migrator::get_applied_migrations(&conn).await?;
+    assert_eq!(applied.len(), 1);
+    assert_eq!(applied[0].name(), "m20220118_000001_create_cake_table");
 
-    println!("\nMigrator::reset");
-    Migrator::reset(db).await?;
+    let pending = common::migrator::default::Migrator::get_pending_migrations(&conn).await?;
+    assert_eq!(pending.len(), 4);
+    assert_eq!(pending[0].name(), "m20220118_000002_create_fruit_table");
 
-    assert!(!manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
+    drop(conn);
+    ctx.delete().await;
+    Ok(())
+}
 
-    println!("\nMigrator::up");
-    Migrator::up(db, Some(0)).await?;
+/// `migration_table_name` is honoured everywhere, including by `install`.
+// [spec:pgorm:def:migration.runner/test]
+#[tokio::test]
+async fn migration_table_name_is_overridable() -> Result<(), DbErr> {
+    let ctx = TestContext::new("pgorm_migration_table_name").await;
+    let db = &ctx.db;
 
-    assert!(!manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
+    common::migrator::override_migration_table_name::Migrator::up(db.clone(), None).await?;
 
-    println!("\nMigrator::up");
-    Migrator::up(db, Some(1)).await?;
+    assert!(has_table(db, "override_migration_table_name").await?);
+    assert!(!has_table(db, "seaql_migrations").await?);
+    assert_eq!(count_rows(db, "override_migration_table_name").await?, 5);
+    assert!(has_table(db, "cake").await?);
 
-    println!("\nMigrator::get_pending_migrations");
-    let migrations = Migrator::get_pending_migrations(db).await?;
-    assert_eq!(migrations.len(), 5);
+    ctx.delete().await;
+    Ok(())
+}
 
-    let migration = migrations.get(0).unwrap();
-    assert_eq!(migration.name(), "m20220118_000002_create_fruit_table");
-    assert_eq!(migration.status(), MigrationStatus::Pending);
+/// The whole `up` run shares one transaction, so a failing migration rolls back
+/// every migration in the run along with the ledger rows.
+// [spec:pgorm:sem:migration.up/test]
+// [spec:pgorm:req:migration.up-only/test]    no rollback path other than the transaction
+#[tokio::test]
+async fn failed_migration_rolls_back_the_run() -> Result<(), DbErr> {
+    let ctx = TestContext::new("pgorm_migration_abort").await;
+    let db = &ctx.db;
 
-    assert!(manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
+    let err = common::migrator::abort::Migrator::up(db.clone(), None)
+        .await
+        .expect_err("the final migration must fail");
+    assert!(matches!(err, DbErr::Custom(ref msg) if msg == "Abort migration"));
 
-    println!("\nMigrator::down");
-    Migrator::down(db, Some(0)).await?;
+    assert!(!has_table(db, "cake").await?);
+    assert!(!has_table(db, "fruit").await?);
+    assert!(!has_table(db, "seaql_migrations").await?);
 
-    assert!(manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
-
-    println!("\nMigrator::down");
-    Migrator::down(db, Some(1)).await?;
-
-    assert!(!manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
-
-    // Tests rolling back changes of "migrate up" when running migration on Postgres
-    if matches!(db.get_database_backend(), DbBackend::Postgres) {
-        println!("\nRoll back changes when encounter errors");
-
-        // Set a flag to throw error inside `m20230109_000001_seed_cake_table.rs`
-        std::env::set_var("ABORT_MIGRATION", "YES");
-
-        // Should throw an error
-        println!("\nMigrator::up");
-        assert_eq!(
-            Migrator::up(db, None).await,
-            Err(DbErr::Migration(
-                "Abort migration and rollback changes".into()
-            ))
-        );
-
-        println!("\nMigrator::status");
-        Migrator::status(db).await?;
-
-        // Check migrations have been rolled back
-        assert!(!manager.has_table("cake").await?);
-        assert!(!manager.has_table("fruit").await?);
-
-        // Unset the flag
-        std::env::remove_var("ABORT_MIGRATION");
-    }
-
-    println!("\nMigrator::up");
-    Migrator::up(db, None).await?;
-
-    println!("\nMigrator::get_applied_migrations");
-    let migrations = Migrator::get_applied_migrations(db).await?;
-    assert_eq!(migrations.len(), 6);
-
-    assert!(!manager.has_index("cake", "non_existent_index").await?);
-    assert!(manager.has_index("cake", "cake_name_index").await?);
-
-    let migration = migrations.get(0).unwrap();
-    assert_eq!(migration.name(), "m20220118_000001_create_cake_table");
-    assert_eq!(migration.status(), MigrationStatus::Applied);
-
-    println!("\nMigrator::status");
-    Migrator::status(db).await?;
-
-    assert!(manager.has_table("cake").await?);
-    assert!(manager.has_table("fruit").await?);
-
-    assert!(manager.has_column("cake", "name").await?);
-    assert!(manager.has_column("fruit", "cake_id").await?);
-
-    // Tests rolling back changes of "migrate down" when running migration on Postgres
-    if matches!(db.get_database_backend(), DbBackend::Postgres) {
-        println!("\nRoll back changes when encounter errors");
-
-        // Set a flag to throw error inside `m20230109_000001_seed_cake_table.rs`
-        std::env::set_var("ABORT_MIGRATION", "YES");
-
-        // Should throw an error
-        println!("\nMigrator::down");
-        assert_eq!(
-            Migrator::down(db, None).await,
-            Err(DbErr::Migration(
-                "Abort migration and rollback changes".into()
-            ))
-        );
-
-        println!("\nMigrator::status");
-        Migrator::status(db).await?;
-
-        // Check migrations have been rolled back
-        assert!(manager.has_table("cake").await?);
-        assert!(manager.has_table("fruit").await?);
-
-        // Unset the flag
-        std::env::remove_var("ABORT_MIGRATION");
-    }
-
-    println!("\nMigrator::down");
-    Migrator::down(db, None).await?;
-
-    assert!(manager.has_table(migration_table_name).await?);
-    if migration_table_name != "seaql_migrations" {
-        assert!(!manager.has_table("seaql_migrations").await?);
-    }
-
-    assert!(!manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
-
-    println!("\nMigrator::fresh");
-    Migrator::fresh(db).await?;
-
-    assert!(manager.has_table("cake").await?);
-    assert!(manager.has_table("fruit").await?);
-
-    println!("\nMigrator::refresh");
-    Migrator::refresh(db).await?;
-
-    assert!(manager.has_table("cake").await?);
-    assert!(manager.has_table("fruit").await?);
-
-    println!("\nMigrator::reset");
-    Migrator::reset(db).await?;
-
-    assert!(!manager.has_table("cake").await?);
-    assert!(!manager.has_table("fruit").await?);
-
-    println!("\nMigrator::status");
-    Migrator::status(db).await?;
-
+    ctx.delete().await;
     Ok(())
 }

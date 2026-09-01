@@ -1,4 +1,5 @@
-use pgorm_migration::pgorm::{entity::*, query::*};
+use pgorm_migration::pgorm::ActiveValue::Set;
+use pgorm_migration::pgorm::entity::*;
 use pgorm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -6,26 +7,13 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let db = manager.get_connection();
-
+    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr> {
         cake::ActiveModel {
             name: Set("Cheesecake".to_owned()),
             ..Default::default()
         }
-        .insert(db)
+        .insert(tx)
         .await?;
-
-        Ok(())
-    }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let db = manager.get_connection();
-
-        cake::Entity::delete_many()
-            .filter(cake::Column::Name.eq("Cheesecake"))
-            .exec(db)
-            .await?;
 
         Ok(())
     }

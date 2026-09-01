@@ -9,11 +9,11 @@ impl MigrationTrait for Migration {
         let insert = Query::insert()
             .into_table(Cake::Table)
             .columns([Cake::Name])
-            .values_panic(["Tiramisu".into()])
+            .values_panic(["Battenberg".into()])
             .to_owned();
         tx.execute(&insert.to_string(QueryBuilder), &[]).await?;
 
-        Ok(())
+        Err(DbErr::Custom("Abort migration".to_owned()))
     }
 }
 

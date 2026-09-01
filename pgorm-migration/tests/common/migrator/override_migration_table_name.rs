@@ -12,7 +12,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20220118_000003_seed_cake_table::Migration),
             Box::new(m20220118_000004_create_tea_enum::Migration),
             Box::new(m20220923_000001_seed_cake_table::Migration),
-            Box::new(m20230109_000001_seed_cake_table::Migration),
         ]
     }
 

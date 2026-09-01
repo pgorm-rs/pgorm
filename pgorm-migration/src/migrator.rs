@@ -6,14 +6,17 @@ use std::time::SystemTime;
 use tracing::info;
 
 use super::{MigrationTrait, seaql_migrations};
-use pgorm::pgorm_query::{self, IntoIden, Order, Query, QueryBuilder, SelectStatement};
+use pgorm::pgorm_query::{
+    self, ColumnDef, IntoIden, Order, Query, QueryBuilder, SelectStatement, Table,
+};
 use pgorm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,
-    DynIden, EntityTrait, FromQueryResult, Iterable, Schema, TransactionTrait,
+    DynIden, EntityTrait, FromQueryResult, Iterable, TransactionTrait,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 /// Status of migration
+// [spec:pgorm:def:migration.runner]    reported status vocabulary
 pub enum MigrationStatus {
     /// Not yet applied
     Pending,
@@ -49,6 +52,8 @@ impl Migration {
 }
 
 /// Performing migrations on a database
+// [spec:pgorm:def:migration.runner]    runner surface
+// [spec:pgorm:req:migration.up-only]    no down/fresh/refresh/reset
 #[async_trait::async_trait]
 pub trait MigratorTrait: Send {
     /// Vector of migrations in time sequence
@@ -87,6 +92,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of migrations with status
+    // [spec:pgorm:sem:migration.up]    pending set difference + missing-file detection
     async fn get_migration_with_status(
         db: &(impl ConnectionTrait),
     ) -> Result<Vec<Migration>, DbErr> {
@@ -145,8 +151,24 @@ pub trait MigratorTrait: Send {
     }
 
     /// Create migration table `seaql_migrations` in the database
+    // [spec:pgorm:def:migration.runner]    self-provisioning ledger under migration_table_name()
     async fn install(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
-        db.execute("CREATE TABLE IF NOT EXISTS seaql_migrations (version TEXT NOT NULL, applied_at BIGINT NOT NULL)", &[]).await?;
+        let stmt = Table::create()
+            .table_name(Self::migration_table_name())
+            .if_not_exists()
+            .col(
+                ColumnDef::new(seaql_migrations::Column::Version)
+                    .text()
+                    .not_null()
+                    .primary_key(),
+            )
+            .col(
+                ColumnDef::new(seaql_migrations::Column::AppliedAt)
+                    .big_integer()
+                    .not_null(),
+            )
+            .to_owned();
+        db.execute(&stmt.build(QueryBuilder), &[]).await?;
         tracing::debug!("Installed");
         Ok(())
     }
@@ -165,6 +187,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Apply pending migrations
+    // [spec:pgorm:sem:migration.up]
     async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), DbErr> {
         tracing::debug!("Applying migrations");
         exec_with_connection::<'_, _>(db, move |manager| {
@@ -175,6 +198,7 @@ pub trait MigratorTrait: Send {
     }
 }
 
+// [spec:pgorm:sem:migration.up]    one connection, one transaction for the whole batch
 async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), DbErr>
 where
     F: for<'b> Fn(
@@ -187,6 +211,7 @@ where
     transaction.commit().await
 }
 
+// [spec:pgorm:sem:migration.up]    declaration-order application, step bound, ledger append
 async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
 where
     M: MigratorTrait + ?Sized,
@@ -261,18 +286,6 @@ where
 
     fn table_name(mut self, table_name: DynIden) -> pgorm::Insert<A> {
         pgorm::QueryTrait::query(&mut self).into_table(table_name);
-        self
-    }
-}
-
-impl<E> QueryTable for pgorm::DeleteMany<E>
-where
-    E: EntityTrait,
-{
-    type Statement = pgorm::DeleteMany<E>;
-
-    fn table_name(mut self, table_name: DynIden) -> pgorm::DeleteMany<E> {
-        pgorm::QueryTrait::query(&mut self).from_table(table_name);
         self
     }
 }

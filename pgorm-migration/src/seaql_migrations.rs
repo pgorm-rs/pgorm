@@ -1,5 +1,6 @@
 use pgorm::entity::prelude::*;
 
+// [spec:pgorm:def:migration.runner]    ledger schema
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 // One should override the name of migration table via `MigratorTrait::migration_table_name` method
 #[pgorm(table_name = "seaql_migrations")]

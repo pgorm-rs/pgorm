@@ -716,6 +716,29 @@ children (
                 id decide.migration
                 title "pgorm-migration: revive or retire"
                 priority 2
+                implements {
+                    main (
+                        [spec:pgorm:def:migration.runner]
+                        [spec:pgorm:sem:migration.up]
+                        [spec:pgorm:req:migration.up-only]
+                        [spec:pgorm:sem:migration.name]
+                    )
+                }
+                log (
+                    {
+                        at 2026-09-01T21:55:09.528152Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-01T21:55:12.279643Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: revive minimal. The up-only philosophy stays (it was the fork's deliberate simplification — no down/fresh/refresh/reset). Delete the fully-dead manager.rs (SchemaManager) and schema.rs outright rather than reviving them; fix the broken test target to the current MigratorTrait surface; fix the pgorm-cli migration template's generated migration so it matches the up-only trait (template ships todo!() in a down() that the trait doesn't have). Options rejected: full SeaORM-style revival (contradicts the advertised simplification), retiring the crate (working runner, real feature)."
+                    }
+                )
             }
 
             {

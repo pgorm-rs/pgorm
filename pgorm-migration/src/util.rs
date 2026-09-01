@@ -1,3 +1,4 @@
+// [spec:pgorm:sem:migration.name]    what DeriveMigrationName resolves `file!()` to
 pub fn get_file_stem(path: &str) -> &str {
     std::path::Path::new(path)
         .file_stem()
