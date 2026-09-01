@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-01T19:06:35.691668Z
+last_sync_at 2026-09-01T19:08:56.139253Z
 
 rule_versions (
     {id codegen.entity, version 0}
@@ -237,4 +237,516 @@ rule_versions (
     {id sql.value.value-type, version 0}
 )
 
-onboarding {kind @adopt, phase 6}
+impl_evidence (
+    {id codegen.generate, covered_rules (
+        codegen.entity
+        codegen.entity.compact
+        codegen.entity.compact.attrs
+        codegen.entity.compact.model
+        codegen.entity.context
+        codegen.entity.enums
+        codegen.entity.expanded
+        codegen.entity.expanded.blocks
+        codegen.entity.files
+        codegen.entity.imports
+        codegen.entity.keywords
+        codegen.entity.pk
+        codegen.entity.relations
+        codegen.entity.relations.related
+        codegen.entity.relations.via
+        codegen.entity.seaography
+        codegen.entity.serde
+        codegen.entity.serde.derives
+        codegen.entity.serde.skip
+        codegen.entity.transform
+        codegen.entity.transform.conjunct
+        codegen.entity.transform.inverse
+        codegen.entity.types
+        codegen.entity.types.datetime
+        codegen.entity.types.unsupported
+    ), covered_claims (
+        {impl_name main, rule codegen.entity}
+        {impl_name main, rule codegen.entity.compact}
+        {impl_name main, rule codegen.entity.compact.attrs}
+        {impl_name main, rule codegen.entity.compact.model}
+        {impl_name main, rule codegen.entity.context}
+        {impl_name main, rule codegen.entity.enums}
+        {impl_name main, rule codegen.entity.expanded}
+        {impl_name main, rule codegen.entity.expanded.blocks}
+        {impl_name main, rule codegen.entity.files}
+        {impl_name main, rule codegen.entity.imports}
+        {impl_name main, rule codegen.entity.keywords}
+        {impl_name main, rule codegen.entity.pk}
+        {impl_name main, rule codegen.entity.relations}
+        {impl_name main, rule codegen.entity.relations.related}
+        {impl_name main, rule codegen.entity.relations.via}
+        {impl_name main, rule codegen.entity.seaography}
+        {impl_name main, rule codegen.entity.serde}
+        {impl_name main, rule codegen.entity.serde.derives}
+        {impl_name main, rule codegen.entity.serde.skip}
+        {impl_name main, rule codegen.entity.transform}
+        {impl_name main, rule codegen.entity.transform.conjunct}
+        {impl_name main, rule codegen.entity.transform.inverse}
+        {impl_name main, rule codegen.entity.types}
+        {impl_name main, rule codegen.entity.types.datetime}
+        {impl_name main, rule codegen.entity.types.unsupported}
+    )}
+    {id codegen.macros, covered_rules (
+        macros.derive
+        macros.derive.active-enum
+        macros.derive.active-enum.expansion
+        macros.derive.active-model
+        macros.derive.column
+        macros.derive.entity
+        macros.derive.entity-model
+        macros.derive.entity-model.attrs
+        macros.derive.entity-model.casing
+        macros.derive.entity-model.column-def
+        macros.derive.entity-model.primary-key
+        macros.derive.entity-model.reject
+        macros.derive.enum-def
+        macros.derive.enum-iter
+        macros.derive.from-query-result
+        macros.derive.iden
+        macros.derive.iden.query
+        macros.derive.model
+        macros.derive.partial-model
+        macros.derive.relation
+        macros.derive.test-attr
+        macros.derive.value-type
+    ), covered_claims (
+        {impl_name main, rule macros.derive}
+        {impl_name main, rule macros.derive.active-enum}
+        {impl_name main, rule macros.derive.active-enum.expansion}
+        {impl_name main, rule macros.derive.active-model}
+        {impl_name main, rule macros.derive.column}
+        {impl_name main, rule macros.derive.entity}
+        {impl_name main, rule macros.derive.entity-model}
+        {impl_name main, rule macros.derive.entity-model.attrs}
+        {impl_name main, rule macros.derive.entity-model.casing}
+        {impl_name main, rule macros.derive.entity-model.column-def}
+        {impl_name main, rule macros.derive.entity-model.primary-key}
+        {impl_name main, rule macros.derive.entity-model.reject}
+        {impl_name main, rule macros.derive.enum-def}
+        {impl_name main, rule macros.derive.enum-iter}
+        {impl_name main, rule macros.derive.from-query-result}
+        {impl_name main, rule macros.derive.iden}
+        {impl_name main, rule macros.derive.iden.query}
+        {impl_name main, rule macros.derive.model}
+        {impl_name main, rule macros.derive.partial-model}
+        {impl_name main, rule macros.derive.relation}
+        {impl_name main, rule macros.derive.test-attr}
+        {impl_name main, rule macros.derive.value-type}
+    )}
+    {id infra.conn, covered_rules (
+        conn.pool
+        conn.pool.conn-trait
+        conn.pool.generic-client
+        conn.pool.get
+        conn.pool.lifecycle
+        conn.pool.multi
+        conn.pool.no-conn-trait
+        conn.pool.recycle
+        conn.pool.statement-cache
+        conn.statement
+        conn.statement.disabled-types
+        conn.tx
+        conn.tx.guard
+    ), covered_claims (
+        {impl_name main, rule conn.pool}
+        {impl_name main, rule conn.pool.conn-trait}
+        {impl_name main, rule conn.pool.generic-client}
+        {impl_name main, rule conn.pool.get}
+        {impl_name main, rule conn.pool.lifecycle}
+        {impl_name main, rule conn.pool.multi}
+        {impl_name main, rule conn.pool.no-conn-trait}
+        {impl_name main, rule conn.pool.recycle}
+        {impl_name main, rule conn.pool.statement-cache}
+        {impl_name main, rule conn.statement}
+        {impl_name main, rule conn.statement.disabled-types}
+        {impl_name main, rule conn.tx}
+        {impl_name main, rule conn.tx.guard}
+    )}
+    {id infra.error, covered_rules (
+        error.model
+        error.model.runtime
+        error.model.sql-class
+    ), covered_claims (
+        {impl_name main, rule error.model}
+        {impl_name main, rule error.model.runtime}
+        {impl_name main, rule error.model.sql-class}
+    )}
+    {id infra.metrics, covered_rules (
+        metric.layer
+        metric.layer.collector
+        metric.layer.delegate
+        metric.layer.tx
+    ), covered_claims (
+        {impl_name main, rule metric.layer}
+        {impl_name main, rule metric.layer.collector}
+        {impl_name main, rule metric.layer.delegate}
+        {impl_name main, rule metric.layer.tx}
+    )}
+    {id infra.schema-gen, covered_rules (
+        schema.from-entity
+        schema.from-entity.enum
+        schema.from-entity.index
+    ), covered_claims (
+        {impl_name main, rule schema.from-entity}
+        {impl_name main, rule schema.from-entity.enum}
+        {impl_name main, rule schema.from-entity.index}
+    )}
+    {id orm.entity, covered_rules (
+        entity.active-model
+        entity.active-model.active-value
+        entity.active-model.active-value.ops
+        entity.active-model.from-sugar
+        entity.active-model.hooks
+        entity.active-model.into
+        entity.active-model.json
+        entity.active-model.persistence
+        entity.active-model.save
+        entity.relation
+        entity.relation.builder
+        entity.relation.def
+        entity.relation.fk
+        entity.relation.linked
+        entity.traits
+        entity.traits.active-enum
+        entity.traits.active-enum.limits
+        entity.traits.column
+        entity.traits.column-def
+        entity.traits.column.enum-cast
+        entity.traits.crud
+        entity.traits.entity-name
+        entity.traits.from-query-result
+        entity.traits.model
+        entity.traits.primary-key
+    ), covered_claims (
+        {impl_name main, rule entity.active-model}
+        {impl_name main, rule entity.active-model.active-value}
+        {impl_name main, rule entity.active-model.active-value.ops}
+        {impl_name main, rule entity.active-model.from-sugar}
+        {impl_name main, rule entity.active-model.hooks}
+        {impl_name main, rule entity.active-model.into}
+        {impl_name main, rule entity.active-model.json}
+        {impl_name main, rule entity.active-model.persistence}
+        {impl_name main, rule entity.active-model.save}
+        {impl_name main, rule entity.relation}
+        {impl_name main, rule entity.relation.builder}
+        {impl_name main, rule entity.relation.def}
+        {impl_name main, rule entity.relation.fk}
+        {impl_name main, rule entity.relation.linked}
+        {impl_name main, rule entity.traits}
+        {impl_name main, rule entity.traits.active-enum}
+        {impl_name main, rule entity.traits.active-enum.limits}
+        {impl_name main, rule entity.traits.column}
+        {impl_name main, rule entity.traits.column-def}
+        {impl_name main, rule entity.traits.column.enum-cast}
+        {impl_name main, rule entity.traits.crud}
+        {impl_name main, rule entity.traits.entity-name}
+        {impl_name main, rule entity.traits.from-query-result}
+        {impl_name main, rule entity.traits.model}
+        {impl_name main, rule entity.traits.primary-key}
+    )}
+    {id orm.exec, covered_rules (
+        exec.crud
+        exec.crud.consolidate
+        exec.crud.delete
+        exec.crud.exec-result
+        exec.crud.insert
+        exec.crud.insert-returning
+        exec.crud.no-stream
+        exec.crud.select
+        exec.crud.try-insert
+        exec.crud.update
+        exec.decode
+        exec.decode.array
+        exec.decode.from-u64
+        exec.decode.json
+        exec.decode.many
+        exec.decode.many-arity
+        exec.decode.null
+        exec.decode.null-context
+        exec.decode.types
+        exec.decode.u32-oid
+    ), covered_claims (
+        {impl_name main, rule exec.crud}
+        {impl_name main, rule exec.crud.consolidate}
+        {impl_name main, rule exec.crud.delete}
+        {impl_name main, rule exec.crud.exec-result}
+        {impl_name main, rule exec.crud.insert}
+        {impl_name main, rule exec.crud.insert-returning}
+        {impl_name main, rule exec.crud.no-stream}
+        {impl_name main, rule exec.crud.select}
+        {impl_name main, rule exec.crud.try-insert}
+        {impl_name main, rule exec.crud.update}
+        {impl_name main, rule exec.decode}
+        {impl_name main, rule exec.decode.array}
+        {impl_name main, rule exec.decode.from-u64}
+        {impl_name main, rule exec.decode.json}
+        {impl_name main, rule exec.decode.many}
+        {impl_name main, rule exec.decode.many-arity}
+        {impl_name main, rule exec.decode.null}
+        {impl_name main, rule exec.decode.null-context}
+        {impl_name main, rule exec.decode.types}
+        {impl_name main, rule exec.decode.u32-oid}
+    )}
+    {id orm.paginate, covered_rules (
+        exec.cursor
+        exec.cursor.binding
+        exec.cursor.binding-gaps
+        exec.cursor.keyset
+        exec.cursor.order
+        exec.cursor.window
+        exec.paginator
+        exec.paginator.count
+        exec.paginator.fetch
+        exec.paginator.iterate
+        exec.paginator.page-size
+        exec.paginator.raw
+    ), covered_claims (
+        {impl_name main, rule exec.cursor}
+        {impl_name main, rule exec.cursor.binding}
+        {impl_name main, rule exec.cursor.binding-gaps}
+        {impl_name main, rule exec.cursor.keyset}
+        {impl_name main, rule exec.cursor.order}
+        {impl_name main, rule exec.cursor.window}
+        {impl_name main, rule exec.paginator}
+        {impl_name main, rule exec.paginator.count}
+        {impl_name main, rule exec.paginator.fetch}
+        {impl_name main, rule exec.paginator.iterate}
+        {impl_name main, rule exec.paginator.page-size}
+        {impl_name main, rule exec.paginator.raw}
+    )}
+    {id orm.query, covered_rules (
+        query.build
+        query.build.combine
+        query.build.debug-query
+        query.build.delete
+        query.build.filter
+        query.build.insert
+        query.build.insert.empty-failsafe
+        query.build.insert.uniform-columns
+        query.build.join
+        query.build.modifiers
+        query.build.query-trait
+        query.build.select-defaults
+        query.build.update
+        query.loader
+        query.loader.batching
+        query.loader.many-to-many
+        query.loader.regroup
+        query.loader.table-ref-limitation
+    ), covered_claims (
+        {impl_name main, rule query.build}
+        {impl_name main, rule query.build.combine}
+        {impl_name main, rule query.build.debug-query}
+        {impl_name main, rule query.build.delete}
+        {impl_name main, rule query.build.filter}
+        {impl_name main, rule query.build.insert}
+        {impl_name main, rule query.build.insert.empty-failsafe}
+        {impl_name main, rule query.build.insert.uniform-columns}
+        {impl_name main, rule query.build.join}
+        {impl_name main, rule query.build.modifiers}
+        {impl_name main, rule query.build.query-trait}
+        {impl_name main, rule query.build.select-defaults}
+        {impl_name main, rule query.build.update}
+        {impl_name main, rule query.loader}
+        {impl_name main, rule query.loader.batching}
+        {impl_name main, rule query.loader.many-to-many}
+        {impl_name main, rule query.loader.regroup}
+        {impl_name main, rule query.loader.table-ref-limitation}
+    )}
+    {id sql.ast, covered_rules (
+        sql.ast
+        sql.ast.build
+        sql.ast.case
+        sql.ast.condition
+        sql.ast.condition.flattening
+        sql.ast.condition.holder
+        sql.ast.delete
+        sql.ast.expr
+        sql.ast.expr.in
+        sql.ast.expr.operators
+        sql.ast.func
+        sql.ast.insert
+        sql.ast.insert.arity
+        sql.ast.keywords
+        sql.ast.on-conflict
+        sql.ast.order
+        sql.ast.returning
+        sql.ast.select
+        sql.ast.select.from
+        sql.ast.select.join
+        sql.ast.select.projection
+        sql.ast.select.union
+        sql.ast.update
+        sql.ast.window-statement
+        sql.ast.with
+        sql.ast.with.recursive
+    ), covered_claims (
+        {impl_name main, rule sql.ast}
+        {impl_name main, rule sql.ast.build}
+        {impl_name main, rule sql.ast.case}
+        {impl_name main, rule sql.ast.condition}
+        {impl_name main, rule sql.ast.condition.flattening}
+        {impl_name main, rule sql.ast.condition.holder}
+        {impl_name main, rule sql.ast.delete}
+        {impl_name main, rule sql.ast.expr}
+        {impl_name main, rule sql.ast.expr.in}
+        {impl_name main, rule sql.ast.expr.operators}
+        {impl_name main, rule sql.ast.func}
+        {impl_name main, rule sql.ast.insert}
+        {impl_name main, rule sql.ast.insert.arity}
+        {impl_name main, rule sql.ast.keywords}
+        {impl_name main, rule sql.ast.on-conflict}
+        {impl_name main, rule sql.ast.order}
+        {impl_name main, rule sql.ast.returning}
+        {impl_name main, rule sql.ast.select}
+        {impl_name main, rule sql.ast.select.from}
+        {impl_name main, rule sql.ast.select.join}
+        {impl_name main, rule sql.ast.select.projection}
+        {impl_name main, rule sql.ast.select.union}
+        {impl_name main, rule sql.ast.update}
+        {impl_name main, rule sql.ast.window-statement}
+        {impl_name main, rule sql.ast.with}
+        {impl_name main, rule sql.ast.with.recursive}
+    )}
+    {id sql.ddl, covered_rules (
+        sql.ddl
+        sql.ddl.alter-table
+        sql.ddl.column-def
+        sql.ddl.column-types
+        sql.ddl.create-table
+        sql.ddl.drop-rename-truncate
+        sql.ddl.extension
+        sql.ddl.foreign-key
+        sql.ddl.index-create
+        sql.ddl.index-drop
+        sql.ddl.panics
+        sql.ddl.type-alter-drop
+        sql.ddl.type-enum
+    ), covered_claims (
+        {impl_name main, rule sql.ddl}
+        {impl_name main, rule sql.ddl.alter-table}
+        {impl_name main, rule sql.ddl.column-def}
+        {impl_name main, rule sql.ddl.column-types}
+        {impl_name main, rule sql.ddl.create-table}
+        {impl_name main, rule sql.ddl.drop-rename-truncate}
+        {impl_name main, rule sql.ddl.extension}
+        {impl_name main, rule sql.ddl.foreign-key}
+        {impl_name main, rule sql.ddl.index-create}
+        {impl_name main, rule sql.ddl.index-drop}
+        {impl_name main, rule sql.ddl.panics}
+        {impl_name main, rule sql.ddl.type-alter-drop}
+        {impl_name main, rule sql.ddl.type-enum}
+    )}
+    {id sql.render, covered_rules (
+        sql.render
+        sql.render.condition-chain
+        sql.render.cte
+        sql.render.custom-expr
+        sql.render.ddl.enum-type
+        sql.render.ddl.extension
+        sql.render.ddl.types
+        sql.render.empty-in
+        sql.render.ident-quoting
+        sql.render.inject
+        sql.render.insert
+        sql.render.joins
+        sql.render.locking
+        sql.render.on-conflict
+        sql.render.operators
+        sql.render.param-vs-inline
+        sql.render.parens
+        sql.render.placeholders
+        sql.render.precedence
+        sql.render.returning
+        sql.render.select-order
+        sql.render.string-escape
+        sql.render.subquery
+        sql.render.update-delete
+        sql.render.value-literals
+        sql.render.window
+        sql.render.writer
+    ), covered_claims (
+        {impl_name main, rule sql.render}
+        {impl_name main, rule sql.render.condition-chain}
+        {impl_name main, rule sql.render.cte}
+        {impl_name main, rule sql.render.custom-expr}
+        {impl_name main, rule sql.render.ddl.enum-type}
+        {impl_name main, rule sql.render.ddl.extension}
+        {impl_name main, rule sql.render.ddl.types}
+        {impl_name main, rule sql.render.empty-in}
+        {impl_name main, rule sql.render.ident-quoting}
+        {impl_name main, rule sql.render.inject}
+        {impl_name main, rule sql.render.insert}
+        {impl_name main, rule sql.render.joins}
+        {impl_name main, rule sql.render.locking}
+        {impl_name main, rule sql.render.on-conflict}
+        {impl_name main, rule sql.render.operators}
+        {impl_name main, rule sql.render.param-vs-inline}
+        {impl_name main, rule sql.render.parens}
+        {impl_name main, rule sql.render.placeholders}
+        {impl_name main, rule sql.render.precedence}
+        {impl_name main, rule sql.render.returning}
+        {impl_name main, rule sql.render.select-order}
+        {impl_name main, rule sql.render.string-escape}
+        {impl_name main, rule sql.render.subquery}
+        {impl_name main, rule sql.render.update-delete}
+        {impl_name main, rule sql.render.value-literals}
+        {impl_name main, rule sql.render.window}
+        {impl_name main, rule sql.render.writer}
+    )}
+    {id sql.token, covered_rules (
+        sql.token
+        sql.token.limits
+        sql.token.quoted
+        sql.token.roundtrip
+        sql.token.scan
+        sql.token.space
+        sql.token.unquote
+        sql.token.word
+    ), covered_claims (
+        {impl_name main, rule sql.token}
+        {impl_name main, rule sql.token.limits}
+        {impl_name main, rule sql.token.quoted}
+        {impl_name main, rule sql.token.roundtrip}
+        {impl_name main, rule sql.token.scan}
+        {impl_name main, rule sql.token.space}
+        {impl_name main, rule sql.token.unquote}
+        {impl_name main, rule sql.token.word}
+    )}
+    {id sql.value, covered_rules (
+        sql.types
+        sql.types.column-ref
+        sql.types.column-type
+        sql.types.opers
+        sql.types.table-ref
+        sql.value
+        sql.value.accessor-panics
+        sql.value.array
+        sql.value.conversions
+        sql.value.render
+        sql.value.to-json
+        sql.value.tuple
+        sql.value.value-type
+    ), covered_claims (
+        {impl_name main, rule sql.types}
+        {impl_name main, rule sql.types.column-ref}
+        {impl_name main, rule sql.types.column-type}
+        {impl_name main, rule sql.types.opers}
+        {impl_name main, rule sql.types.table-ref}
+        {impl_name main, rule sql.value}
+        {impl_name main, rule sql.value.accessor-panics}
+        {impl_name main, rule sql.value.array}
+        {impl_name main, rule sql.value.conversions}
+        {impl_name main, rule sql.value.render}
+        {impl_name main, rule sql.value.to-json}
+        {impl_name main, rule sql.value.tuple}
+        {impl_name main, rule sql.value.value-type}
+    )}
+)
+
+onboarding {kind @adopt, phase 11}
