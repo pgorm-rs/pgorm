@@ -4,7 +4,7 @@ use crate::{ConnectionTrait, TransactionTrait, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
-    ToStatement,
+    RowStream, ToStatement,
     types::{BorrowToSql, ToSql},
 };
 
@@ -156,9 +156,19 @@ impl ConnectionTrait for &DatabaseConnection {
     {
         Ok(self.0.query(statement, params).await?)
     }
+
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self.0.query_raw(statement, params).await?)
+    }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait]    delegating impls
+// [spec:pgorm:def:conn.pool.conn-trait+1]    delegating impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
@@ -213,15 +223,16 @@ impl ConnectionTrait for DatabaseConnection {
         Ok(self.0.query(statement, params).await?)
     }
 
-    // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
-    // where
-    //     T: ?Sized + ToStatement,
-    //     P: BorrowToSql,
-    //     I: IntoIterator<Item = P> + Send,
-    //     I::IntoIter: ExactSizeIterator
-    // {
-    //     Ok(self.0.query_raw(statement, params).await?)
-    // }
+    // [spec:pgorm:def:exec.stream]    pooled-client row stream
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self.0.query_raw(statement, params).await?)
+    }
 }
 
 #[async_trait::async_trait]
@@ -293,15 +304,21 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         Ok(self.0.as_ref().unwrap().query(statement, params).await?)
     }
 
-    // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
-    // where
-    //     T: ?Sized + ToStatement,
-    //     P: BorrowToSql,
-    //     I: IntoIterator<Item = P>,
-    //     I::IntoIter: ExactSizeIterator
-    // {
-    //     Ok(self.query_raw(statement, params).await?)
-    // }
+    // [spec:pgorm:def:exec.stream]    in-transaction row stream
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Ok(self
+            .0
+            .as_ref()
+            .unwrap()
+            .query_raw(statement, params)
+            .await?)
+    }
 }
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseTransaction<'_> {

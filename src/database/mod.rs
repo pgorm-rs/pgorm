@@ -1,7 +1,6 @@
 mod connection;
 mod db_connection;
 // mod statement;
-// mod stream;
 // mod transaction;
 
 pub use connection::*;
@@ -16,7 +15,6 @@ use std::{
     sync::Arc,
 };
 // pub use statement::*;
-// pub use stream::*;
 use tokio_postgres::NoTls;
 // pub use transaction::*;
 

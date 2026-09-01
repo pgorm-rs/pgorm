@@ -4,7 +4,7 @@ use crate::{
 use async_trait::async_trait;
 use std::time::{Duration, Instant};
 use tokio_postgres::{
-    Row, ToStatement,
+    Row, RowStream, ToStatement,
     types::{BorrowToSql, ToSql},
 };
 
@@ -186,7 +186,7 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate]
+// [spec:pgorm:req:metric.layer.delegate+1]
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -326,6 +326,34 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
 
         result
     }
+
+    // [spec:pgorm:sem:exec.stream.decode]    row count unknown at stream creation
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let start = Instant::now();
+        let result = self.connection.query_raw(statement, params).await;
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok(_) => {
+                self.metrics
+                    .record_query_success("query_raw", elapsed, None)
+                    .await;
+            }
+            Err(e) => {
+                self.metrics
+                    .record_query_error("query_raw", elapsed, e)
+                    .await;
+            }
+        }
+
+        result
+    }
 }
 
 /// A transaction wrapper that instruments transaction operations
@@ -380,7 +408,7 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate]    statements inside a transaction
+// [spec:pgorm:req:metric.layer.delegate+1]    statements inside a transaction
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -534,6 +562,38 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
             Err(e) => {
                 self.metrics
                     .record_query_error("query_all", elapsed, e)
+                    .await;
+            }
+        }
+
+        result
+    }
+
+    // [spec:pgorm:sem:exec.stream.decode]    row count unknown at stream creation
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let start = Instant::now();
+        let result = if let Some(transaction) = &self.transaction {
+            transaction.query_raw(statement, params).await
+        } else {
+            unreachable!("Transaction already consumed")
+        };
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok(_) => {
+                self.metrics
+                    .record_query_success("query_raw", elapsed, None)
+                    .await;
+            }
+            Err(e) => {
+                self.metrics
+                    .record_query_error("query_raw", elapsed, e)
                     .await;
             }
         }

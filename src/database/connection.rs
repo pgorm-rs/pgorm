@@ -1,6 +1,6 @@
 use crate::DbErr;
 use tokio_postgres::{
-    Row, ToStatement,
+    Row, RowStream, ToStatement,
     types::{BorrowToSql, ToSql},
 };
 
@@ -8,7 +8,7 @@ use super::DatabaseTransaction;
 
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
-// [spec:pgorm:def:conn.pool.conn-trait]
+// [spec:pgorm:def:conn.pool.conn-trait+1]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a [Statement]
@@ -48,12 +48,15 @@ pub trait ConnectionTrait: Sync {
     where
         T: ?Sized + ToStatement + Send + Sync;
 
-    // async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
-    // where
-    //     T: ?Sized + ToStatement,
-    //     P: BorrowToSql,
-    //     I: IntoIterator<Item = P>,
-    //     I::IntoIter: ExactSizeIterator;
+    /// Execute a statement and return its rows as a stream, without buffering
+    /// the whole result set
+    // [spec:pgorm:def:exec.stream]
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    where
+        T: ?Sized + ToStatement + Send + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator;
 }
 
 /// Spawn database transaction

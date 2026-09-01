@@ -3,14 +3,21 @@ use crate::{
     PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
     QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany, error::*,
 };
-use futures::{Stream, TryStreamExt};
+use futures::{Stream, StreamExt};
 use pgorm_query::{QueryBuilder, SelectStatement, Value, Values};
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::{hash::Hash, marker::PhantomData};
-use tokio_postgres::ToStatement;
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
+
+/// A boxed stream of decoded rows.
+///
+/// Unlike [`PinBoxStream`](crate::PinBoxStream) this is `Send`, so it can be
+/// consumed from a spawned task.
+// [spec:pgorm:def:exec.stream]
+pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 'db>>;
 
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
 // [spec:pgorm:def:exec.crud]
@@ -428,7 +435,6 @@ where
     }
 
     /// Get all Models from the SELECT query
-    // [spec:pgorm:req:exec.crud.no-stream]
     pub async fn all<'a, C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
     where
         C: ConnectionTrait,
@@ -436,30 +442,31 @@ where
         self.into_model().all(db).await
     }
 
-    // /// Stream the results of a SELECT operation on a Model
-    // pub async fn stream<'a: 'b, 'b, C>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<impl Stream<Item = Result<E::Model, DbErr>> + 'b + Send, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    // {
-    //     // self.into_model().stream(db).await
-    //     todo!()
-    // }
+    /// Stream the results of a SELECT operation on a Model
+    // [spec:pgorm:def:exec.stream]
+    pub async fn stream<'b, C>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<E::Model, DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        E::Model: 'b,
+    {
+        self.into_model().stream(db).await
+    }
 
-    // /// Stream the result of the operation with PartialModel
-    // pub async fn stream_partial_model<'a: 'b, 'b, C, M>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<impl Stream<Item = Result<M, DbErr>> + 'b + Send, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    //     M: PartialModelTrait + Send + 'b,
-    // {
-    //     // self.into_partial_model().stream(db).await
-    //     todo!()
-    // }
+    /// Stream the result of the operation with PartialModel
+    // [spec:pgorm:def:exec.stream]
+    pub async fn stream_partial_model<'b, C, M>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<M, DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        M: PartialModelTrait + 'b,
+    {
+        self.into_partial_model::<M>().stream(db).await
+    }
 }
 
 impl<E, F> SelectTwo<E, F>
@@ -515,29 +522,33 @@ where
         self.into_model().all(db).await
     }
 
-    // /// Stream the results of a Select operation on a Model
-    // pub async fn stream<'a: 'b, 'b, C>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<impl Stream<Item = Result<(E::Model, Option<F::Model>), DbErr>> + 'b, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    // {
-    //     self.into_model().stream(db).await
-    // }
+    /// Stream the results of a Select operation on a Model
+    // [spec:pgorm:def:exec.stream]
+    pub async fn stream<'b, C>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<(E::Model, Option<F::Model>), DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        E::Model: 'b,
+        F::Model: 'b,
+    {
+        self.into_model().stream(db).await
+    }
 
-    // /// Stream the result of the operation with PartialModel
-    // pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<impl Stream<Item = Result<(M, Option<N>), DbErr>> + 'b + Send, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    //     M: PartialModelTrait + Send + 'b,
-    //     N: PartialModelTrait + Send + 'b,
-    // {
-    //     self.into_partial_model().stream(db).await
-    // }
+    /// Stream the result of the operation with PartialModel
+    // [spec:pgorm:def:exec.stream]
+    pub async fn stream_partial_model<'b, C, M, N>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<(M, Option<N>), DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        M: PartialModelTrait + 'b,
+        N: PartialModelTrait + 'b,
+    {
+        self.into_partial_model::<M, N>().stream(db).await
+    }
 }
 
 impl<E, F> SelectTwoMany<E, F>
@@ -568,30 +579,6 @@ where
         let select = N::select_cols(select);
         select.into_model()
     }
-
-    // /// Stream the result of the operation
-    // pub async fn stream<'a: 'b, 'b, C>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<RowStream, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    // {
-    //     self.into_model().stream(db).await
-    // }
-
-    // /// Stream the result of the operation with PartialModel
-    // pub async fn stream_partial_model<'a: 'b, 'b, C, M, N>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<RowStream, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    //     M: PartialModelTrait + Send + 'b,
-    //     N: PartialModelTrait + Send + 'b,
-    // {
-    //     self.into_partial_model().stream(db).await
-    // }
 
     /// Get all Models from the select operation
     ///
@@ -695,18 +682,18 @@ where
         self.into_selector_raw().all(db).await
     }
 
-    // /// Stream the results of the Select operation
-    // pub async fn stream<'a: 'b, 'b, C>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<RowStream, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    //     S: 'b,
-    //     S::Item: Send,
-    // {
-    //     self.into_selector_raw().stream(db).await
-    // }
+    /// Stream the results of the Select operation
+    // [spec:pgorm:def:exec.stream]
+    pub async fn stream<'b, C>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<S::Item, DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        S: 'b,
+    {
+        self.into_selector_raw().stream(db).await
+    }
 }
 
 impl<S> SelectorRaw<S>
@@ -996,17 +983,31 @@ where
         Ok(models)
     }
 
-    // /// Stream the results of the Select operation
-    // pub async fn stream<'a, C>(
-    //     self,
-    //     db: &'a C,
-    // ) -> Result<RowStream, DbErr>
-    // where
-    //     C: ConnectionTrait + Send,
-    // {
-    //     let stream = db.query_raw::<_, _, Vec<&(dyn ToSql + Sync)>>(&self.stmt, vec![]).await?;
-    //     Ok(stream)
-    // }
+    /// Stream the results of the Select operation, decoding each row as it
+    /// arrives rather than buffering the whole result set
+    // [spec:pgorm:sem:exec.stream.decode]
+    pub async fn stream<'b, C>(
+        self,
+        db: &C,
+    ) -> Result<PinBoxSendStream<'b, Result<S::Item, DbErr>>, DbErr>
+    where
+        C: ConnectionTrait,
+        S: 'b,
+    {
+        let values = self
+            .values
+            .0
+            .into_iter()
+            .map(ValueHolder)
+            .collect::<Vec<_>>();
+        let rows = db
+            .query_raw(&self.stmt, values.iter().map(|x| x as &(dyn ToSql + Sync)))
+            .await?;
+        Ok(Box::pin(rows.map(|row| match row {
+            Ok(row) => S::from_raw_query_result(QueryResult { row }),
+            Err(err) => Err(DbErr::Postgres(err)),
+        })))
+    }
 }
 
 // [spec:pgorm:sem:exec.crud.consolidate]

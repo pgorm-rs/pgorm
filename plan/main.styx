@@ -413,7 +413,6 @@ children (
                         [spec:pgorm:sem:exec.crud.update]
                         [spec:pgorm:sem:exec.crud.delete]
                         [spec:pgorm:def:exec.crud.exec-result]
-                        [spec:pgorm:req:exec.crud.no-stream]
                     )
                 }
             }
@@ -445,7 +444,18 @@ children (
                 title "Restore streaming selects"
                 priority 2
                 kind @feat
+                implements {
+                    main ([spec:pgorm:def:exec.stream] [spec:pgorm:sem:exec.stream.decode])
+                }
                 deps (orm.exec repair.tests-root)
+                log (
+                    {
+                        at 2026-09-01T22:48:47.915072Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

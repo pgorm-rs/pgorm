@@ -94,20 +94,22 @@ under **Statement seam** below.)
 
 ## Statement execution surface
 
-> [spec:pgorm:def:conn.pool.conn-trait]
+> [spec:pgorm:def:conn.pool.conn-trait+1]
 > `ConnectionTrait` is the uniform statement-execution surface over
-> connections and transactions. It defines five async methods, all generic
+> connections and transactions. It defines six async methods, all generic
 > over `T: ?Sized + ToStatement + Send + Sync` with parameter binding (no
 > string interpolation): `execute(stmt, params) -> u64` (affected-row count),
 > `execute_raw(stmt, params)` taking an `ExactSizeIterator` of
 > `BorrowToSql` values instead of a `&[&dyn ToSql]` slice, `query_one ->
-> Row` (errors if not exactly one row), `query_opt -> Option<Row>`, and
-> `query_all -> Vec<Row>`. Errors map to `DbErr::Postgres`.
+> Row` (errors if not exactly one row), `query_opt -> Option<Row>`,
+> `query_all -> Vec<Row>`, and `query_raw(stmt, params) -> RowStream`,
+> which takes the same `BorrowToSql` iterator as `execute_raw` and returns
+> the unbuffered row stream of `exec.stream`. Errors map to
+> `DbErr::Postgres`.
 >
 > It is implemented for `DatabaseConnection`, `&DatabaseConnection`, and
 > `DatabaseTransaction`, each delegating directly to the underlying
-> `pgorm-pool` client or transaction. Row streaming (`query_raw`) is
-> currently disabled (commented out) and not part of the surface.
+> `pgorm-pool` client or transaction.
 
 > [spec:pgorm:def:conn.pool.generic-client]
 > `pgorm_pool::GenericClient` is the sealed trait (`Sync` + a private

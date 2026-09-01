@@ -33,17 +33,19 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Delegation contract
 
-> [spec:pgorm:req:metric.layer.delegate]
+> [spec:pgorm:req:metric.layer.delegate+1]
 > Instrumented wrappers MUST delegate every operation to the wrapped type and
 > return its result unchanged — wrapping preserves `ConnectionTrait`
 > semantics, adding only timing and collector calls around each awaited
 > operation. Both `InstrumentedConnection` and `InstrumentedTransaction`
 > implement `ConnectionTrait`; on success they report
 > `record_query_success` with the operation name (`"execute"`,
-> `"execute_raw"`, `"query_one"`, `"query_opt"`, `"query_all"`) and a row
+> `"execute_raw"`, `"query_one"`, `"query_opt"`, `"query_all"`,
+> `"query_raw"`) and a row
 > count — the affected-row count for `execute`/`execute_raw`, `1` for
-> `query_one`, `1`/`0` for `query_opt` `Some`/`None`, and `rows.len()` for
-> `query_all` — and on failure they report `record_query_error` with the same
+> `query_one`, `1`/`0` for `query_opt` `Some`/`None`, `rows.len()` for
+> `query_all`, and `None` for `query_raw` per `exec.stream.decode` — and on
+> failure they report `record_query_error` with the same
 > operation name before propagating the `DbErr`. `InstrumentedPool::get`
 > times pool acquisition, reporting `record_connection_acquired` on success
 > (and returning an `InstrumentedConnection` sharing a clone of the

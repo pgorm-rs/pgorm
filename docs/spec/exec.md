@@ -220,12 +220,48 @@ These rules capture what the code does today, including known gaps.
 > `rows_affected()`. It carries no `last_insert_id`; insert ids are
 > obtained through `RETURNING` per `exec.crud.insert`.
 
-> [spec:pgorm:req:exec.crud.no-stream]
-> Row-level result streaming is not currently exposed. The
-> `stream`/`stream_partial_model` methods on `Select`, `SelectTwo`,
-> `SelectTwoMany`, `Selector`, and `SelectorRaw` are commented out
-> (select.rs:436-459 and related blocks), with the remaining bodies
-> stubbed as `todo!()` behind comments. Callers MUST NOT rely on a
-> streaming select API; incremental consumption is only available
-> page-batched through `Paginator::into_stream` or keyset-windowed
-> through `Cursor` (see `exec.paginator` and `exec.cursor`).
+## Streaming (`exec.stream`)
+
+> [spec:pgorm:def:exec.stream]
+> Row-level streaming is exposed through `ConnectionTrait::query_raw`, which
+> takes the same `BorrowToSql` `ExactSizeIterator` params as `execute_raw`
+> and returns a `tokio_postgres::RowStream`: rows are read from the
+> connection as they arrive instead of being buffered into a `Vec` the way
+> `query_all` does. It is implemented by `DatabaseConnection`,
+> `&DatabaseConnection`, `DatabaseTransaction`, `InstrumentedConnection`,
+> and `InstrumentedTransaction`.
+>
+> On top of it the executor exposes `stream` on `SelectorRaw`, `Selector`,
+> `Select`, and `SelectTwo`, plus `stream_partial_model` on `Select` and
+> `SelectTwo`, each returning
+> `PinBoxSendStream<'db, Result<Item, DbErr>>` — an alias for
+> `Pin<Box<dyn Stream<Item = ..> + Send + 'db>>`. Unlike `PinBoxStream`
+> (used by `Paginator::into_stream`) it is `Send`, so a streamed select can
+> be consumed from a spawned task. `SelectTwoMany` deliberately has no
+> `stream`: its output requires all rows of a parent before any entry is
+> complete (see `exec.crud.consolidate`). Page-batched and keyset-windowed
+> consumption remain available through `exec.paginator` and `exec.cursor`.
+
+> [spec:pgorm:sem:exec.stream.decode]
+> `SelectorRaw::stream` binds `Values` through the `ValueHolder` `ToSql`
+> adapter exactly as `all` does, then maps the `RowStream` item-wise: each
+> `Ok(row)` is decoded by `S::from_raw_query_result`, and each transport
+> error becomes `DbErr::Postgres`. Decoding is lazy and per-item — no row is
+> decoded until it is polled, and a decode failure is yielded as one `Err`
+> item rather than discarding the rest of the result set, which is the
+> deliberate difference from `all` (which aborts at the first bad row).
+>
+> The adapter is a stateless `map`: pgorm neither fuses the stream after an
+> error nor cancels the in-flight query. Dropping the stream before it is
+> exhausted is safe — the tokio-postgres connection task keeps paging
+> through and discarding the remaining messages, so the connection stays
+> usable — but the query still runs to completion server-side. A stream MUST
+> NOT be polled after the connection or transaction it came from is dropped:
+> `RowStream` is `'static` and does not borrow the connection, so doing so
+> compiles, and the stream then yields `DbErr::Postgres` for a closed
+> connection.
+>
+> The metric layer records `query_raw` at stream *creation*, timing only the
+> round-trip that produced the stream and reporting `rows: None` — the row
+> count is not knowable up front, and `MetricsCollector`'s hooks are `async`
+> so they cannot be invoked from the stream's `Drop`.
