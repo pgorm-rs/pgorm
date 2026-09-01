@@ -36,15 +36,16 @@ it.
 
 ## SQLSTATE classification
 
-> [spec:pgorm:sem:error.model.sql-class+1]
+> [spec:pgorm:sem:error.model.sql-class+2]
 > `SqlErr` classifies constraint failures:
 > `UniqueConstraintViolation(String)` for SQLSTATE `23505` and
 > `ForeignKeyConstraintViolation(String)` for SQLSTATE `23503`, each carrying
 > the server message. `DbErr::sql_err()` is the classifier entry point,
 > returning `None` for anything that is not one of these.
 >
-> Known limitation: `sql_err()` unconditionally returns `None` — it does
-> not yet inspect `DbErr::Postgres` /
-> `tokio_postgres::error::DbError::code()`. Callers needing SQLSTATE
-> discrimination must match on `DbErr::Postgres` and use
-> `tokio_postgres::Error::as_db_error()` themselves.
+> The classifier inspects only `DbErr::Postgres`, taking the driver error's
+> `as_db_error()` and matching the resulting `DbError::code()` against those
+> two SQLSTATEs; the `SqlErr` payload is that same `DbError`'s `message()`.
+> A `DbErr::Postgres` with no server-side `DbError` (a transport or protocol
+> failure), any other SQLSTATE, and every non-`Postgres` variant all yield
+> `None`.

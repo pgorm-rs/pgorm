@@ -538,6 +538,15 @@ children (
                 id infra.sql-err
                 title "Implement SqlErr classification over DbErr::Postgres SQLSTATEs"
                 kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-09-01T23:57:44.542609Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
 // [spec:pgorm:def:error.model]
@@ -143,7 +144,7 @@ where
 }
 
 /// An error from unsuccessful SQL query
-// [spec:pgorm:sem:error.model.sql-class+1]
+// [spec:pgorm:sem:error.model.sql-class+2]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SqlErr {
@@ -155,12 +156,23 @@ pub enum SqlErr {
     ForeignKeyConstraintViolation(String),
 }
 
-#[allow(dead_code)]
 impl DbErr {
     /// Classify a [`DbErr`] as a [`SqlErr`], returning `None` when the error is
     /// not a recognised constraint violation.
-    // [spec:pgorm:sem:error.model.sql-class+1]    classifier entry point
+    // [spec:pgorm:sem:error.model.sql-class+2]    classifier entry point
     pub fn sql_err(&self) -> Option<SqlErr> {
-        None
+        let db_error = match self {
+            DbErr::Postgres(e) => e.as_db_error()?,
+            _ => return None,
+        };
+        let code = db_error.code();
+        let message = db_error.message().to_owned();
+        if *code == SqlState::UNIQUE_VIOLATION {
+            Some(SqlErr::UniqueConstraintViolation(message))
+        } else if *code == SqlState::FOREIGN_KEY_VIOLATION {
+            Some(SqlErr::ForeignKeyConstraintViolation(message))
+        } else {
+            None
+        }
     }
 }

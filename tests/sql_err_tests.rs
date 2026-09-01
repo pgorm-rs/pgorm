@@ -71,9 +71,8 @@ pub async fn test_error(db: &DatabaseConnection) {
     assert_eq!(invalid_error.sql_err(), None);
 }
 
-// [spec:pgorm:sem:error.model.sql-class+1]
+// [spec:pgorm:sem:error.model.sql-class+2]
 #[pgorm_macros::test]
-#[ignore = "sql_err classifier not implemented for tokio-postgres"]
 async fn sql_err_classification() {
     let ctx = TestContext::new("bakery_chain_sql_err_classification_tests").await;
     create_tables(&ctx.db).await.unwrap();
