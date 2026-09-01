@@ -865,11 +865,12 @@ mod tests {
     #[test]
     fn test_delete_by_id_1() {
         use crate::tests_cfg::cake;
-        use crate::{DbBackend, entity::*, query::*};
+        use crate::{entity::*, query::*};
+        use pgorm_query::QueryBuilder;
         assert_eq!(
             cake::Entity::delete_by_id(1)
-                .build(DbBackend::Sqlite)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
         );
     }
@@ -877,11 +878,12 @@ mod tests {
     #[test]
     fn test_delete_by_id_2() {
         use crate::tests_cfg::cake_filling_price;
-        use crate::{DbBackend, entity::*, query::*};
+        use crate::{entity::*, query::*};
+        use pgorm_query::QueryBuilder;
         assert_eq!(
             cake_filling_price::Entity::delete_by_id((1, 2))
-                .build(DbBackend::Sqlite)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"DELETE FROM "public"."cake_filling_price" WHERE "cake_filling_price"."cake_id" = 1 AND "cake_filling_price"."filling_id" = 2"#,
         );
     }
@@ -941,7 +943,8 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn entity_model_3() {
-        use crate::{DbBackend, entity::*, query::*};
+        use crate::{entity::*, query::*};
+        use pgorm_query::QueryBuilder;
         use std::borrow::Cow;
 
         mod hello {
@@ -967,8 +970,8 @@ mod tests {
         {
             assert_eq!(
                 hello::Entity::delete_by_id(value)
-                    .build(DbBackend::Sqlite)
-                    .to_string(),
+                    .as_query()
+                    .to_string(QueryBuilder),
                 r#"DELETE FROM "world"."hello" WHERE "hello"."id" = 'UUID'"#
             );
         }

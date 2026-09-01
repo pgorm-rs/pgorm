@@ -162,7 +162,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::tests_cfg::{cake, fruit};
-    use crate::{ColumnTrait, DbBackend, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
+    use crate::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
+    use pgorm_query::QueryBuilder;
 
     #[test]
     fn alias_1() {
@@ -170,9 +171,9 @@ mod tests {
             cake::Entity::find()
                 .column_as(cake::Column::Id, "B")
                 .apply_alias("A_")
-                .build(DbBackend::MySql)
-                .to_string(),
-            "SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`, `cake`.`id` AS `A_B` FROM `cake`",
+                .as_query()
+                .to_string(QueryBuilder),
+            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", "cake"."id" AS "A_B" FROM "cake""#,
         );
     }
 
@@ -182,12 +183,12 @@ mod tests {
             cake::Entity::find()
                 .left_join(fruit::Entity)
                 .select_also(fruit::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,",
-                "`fruit`.`id` AS `B_id`, `fruit`.`name` AS `B_name`, `fruit`.`cake_id` AS `B_cake_id`",
-                "FROM `cake` LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake" LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
             ].join(" ")
         );
     }
@@ -198,13 +199,13 @@ mod tests {
             cake::Entity::find()
                 .left_join(fruit::Entity)
                 .select_with(fruit::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,",
-                "`fruit`.`id` AS `B_id`, `fruit`.`name` AS `B_name`, `fruit`.`cake_id` AS `B_cake_id`",
-                "FROM `cake` LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
-                "ORDER BY `cake`.`id` ASC",
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake" LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"ORDER BY "cake"."id" ASC"#,
             ].join(" ")
         );
     }
@@ -217,13 +218,13 @@ mod tests {
                 .select_also(fruit::Entity)
                 .filter(cake::Column::Id.eq(1))
                 .filter(fruit::Column::Id.eq(2))
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,",
-                "`fruit`.`id` AS `B_id`, `fruit`.`name` AS `B_name`, `fruit`.`cake_id` AS `B_cake_id`",
-                "FROM `cake` LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
-                "WHERE `cake`.`id` = 1 AND `fruit`.`id` = 2",
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake" LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"WHERE "cake"."id" = 1 AND "fruit"."id" = 2"#,
             ].join(" ")
         );
     }
@@ -236,14 +237,14 @@ mod tests {
                 .select_with(fruit::Entity)
                 .filter(cake::Column::Id.eq(1))
                 .filter(fruit::Column::Id.eq(2))
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,",
-                "`fruit`.`id` AS `B_id`, `fruit`.`name` AS `B_name`, `fruit`.`cake_id` AS `B_cake_id`",
-                "FROM `cake` LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
-                "WHERE `cake`.`id` = 1 AND `fruit`.`id` = 2",
-                "ORDER BY `cake`.`id` ASC",
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake" LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"WHERE "cake"."id" = 1 AND "fruit"."id" = 2"#,
+                r#"ORDER BY "cake"."id" ASC"#,
             ].join(" ")
         );
     }

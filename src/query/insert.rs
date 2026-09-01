@@ -395,10 +395,10 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use pgorm_query::OnConflict;
+    use pgorm_query::{OnConflict, QueryBuilder};
 
     use crate::tests_cfg::cake::{self};
-    use crate::{ActiveValue, DbBackend, DbErr, EntityTrait, Insert, IntoActiveModel, QueryTrait};
+    use crate::{ActiveValue, EntityTrait, Insert, IntoActiveModel, QueryTrait};
 
     #[test]
     fn insert_1() {
@@ -408,8 +408,8 @@ mod tests {
                     id: ActiveValue::not_set(),
                     name: ActiveValue::set("Apple Pie".to_owned()),
                 })
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie')"#,
         );
     }
@@ -422,8 +422,8 @@ mod tests {
                     id: ActiveValue::set(1),
                     name: ActiveValue::set("Apple Pie".to_owned()),
                 })
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
         );
     }
@@ -436,8 +436,8 @@ mod tests {
                     id: 1,
                     name: "Apple Pie".to_owned(),
                 })
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
         );
     }
@@ -456,8 +456,8 @@ mod tests {
                         name: "Orange Scone".to_owned(),
                     }
                 ])
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#,
         );
     }
@@ -476,8 +476,8 @@ mod tests {
         assert_eq!(
             Insert::<cake::ActiveModel>::new()
                 .add_many([apple, orange])
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (NULL, 'Apple'), (2, 'Orange')"#,
         );
     }
@@ -496,8 +496,8 @@ mod tests {
                         .do_nothing()
                         .to_owned()
                 )
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
         );
     }
@@ -516,16 +516,14 @@ mod tests {
                         .update_column(cake::Column::Name)
                         .to_owned()
                 )
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
         );
     }
 
-    #[smol_potat::test]
-    async fn insert_8() -> Result<(), DbErr> {
-        use crate::{DbBackend, MockDatabase, Statement, Transaction};
-
+    #[test]
+    fn insert_8() {
         mod post {
             use crate as pgorm;
             use crate::entity::prelude::*;
@@ -551,34 +549,16 @@ mod tests {
             text: "brbrbrrrbrbrbrr...".into(),
         };
 
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[model.clone()]])
-            .into_connection();
-
-        post::Entity::insert(model.into_active_model())
-            .exec(&db)
-            .await?;
-
         assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                r#"INSERT INTO "posts" ("id", "title", "text") VALUES (CAST($1 AS TEXT), $2, $3) RETURNING CAST("id" AS INTEGER)"#,
-                [
-                    1.into(),
-                    "News wrap up 2022".into(),
-                    "brbrbrrrbrbrbrr...".into(),
-                ]
-            )])]
+            post::Entity::insert(model.into_active_model())
+                .as_query()
+                .to_string(QueryBuilder),
+            r#"INSERT INTO "posts" ("id", "title", "text") VALUES (CAST(1 AS TEXT), 'News wrap up 2022', 'brbrbrrrbrbrbrr...')"#,
         );
-
-        Ok(())
     }
 
-    #[smol_potat::test]
-    async fn insert_9() -> Result<(), DbErr> {
-        use crate::{DbBackend, MockDatabase, MockExecResult, Statement, Transaction};
-
+    #[test]
+    fn insert_9() {
         mod post {
             use crate as pgorm;
             use crate::entity::prelude::*;
@@ -617,31 +597,15 @@ mod tests {
             text: "brbrbrrrbrbrbrr...".into(),
         };
 
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_results([MockExecResult {
-                last_insert_id: 1,
-                rows_affected: 1,
-            }])
-            .into_connection();
-
-        post::Entity::insert(model.into_active_model())
-            .exec(&db)
-            .await?;
-
         assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                r#"INSERT INTO "posts" ("id_primary", "id_secondary", "title", "text") VALUES (CAST($1 AS TEXT), CAST($2 AS TEXT), $3, $4) RETURNING CAST("id_primary" AS INTEGER), CAST("id_secondary" AS INTEGER)"#,
-                [
-                    1.into(),
-                    1001.into(),
-                    "News wrap up 2022".into(),
-                    "brbrbrrrbrbrbrr...".into(),
-                ]
-            )])]
+            post::Entity::insert(model.into_active_model())
+                .as_query()
+                .to_string(QueryBuilder),
+            [
+                r#"INSERT INTO "posts" ("id_primary", "id_secondary", "title", "text")"#,
+                r#"VALUES (CAST(1 AS TEXT), CAST(1001 AS TEXT), 'News wrap up 2022', 'brbrbrrrbrbrbrr...')"#,
+            ]
+            .join(" "),
         );
-
-        Ok(())
     }
 }

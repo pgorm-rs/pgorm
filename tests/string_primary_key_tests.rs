@@ -3,7 +3,12 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection,
+    entity::prelude::*,
+    entity::*,
+};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -11,14 +16,18 @@ use serde_json::json;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("features_schema_string_primary_key_tests").await;
     create_tables(&ctx.db).await?;
-    create_and_update_repository(&ctx.db).await?;
-    insert_and_delete_repository(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    create_and_update_repository(&db).await?;
+    insert_and_delete_repository(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_and_delete_repository(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-001".to_owned(),
         owner: "GC".to_owned(),
@@ -39,12 +48,10 @@ pub async fn insert_and_delete_repository(db: &DatabasePool) -> Result<(), DbErr
         }
     );
 
-    #[cfg(any(feature = "sqlx-sqlite", feature = "sqlx-postgres"))]
     {
         use pgorm::pgorm_query::OnConflict;
 
         let err = Repository::insert(repository)
-            // MySQL does not support DO NOTHING, we might workaround that later
             .on_conflict(OnConflict::new().do_nothing().to_owned())
             .exec(db)
             .await;
@@ -103,7 +110,7 @@ pub async fn insert_and_delete_repository(db: &DatabasePool) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn create_and_update_repository(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-002".to_owned(),
         owner: "GC".to_owned(),
@@ -115,7 +122,10 @@ pub async fn create_and_update_repository(db: &DatabasePool) -> Result<(), DbErr
         .exec(db)
         .await?;
 
-    assert_eq!(Repository::find().one(db).await?, Some(repository.clone()));
+    assert_eq!(
+        Repository::find().one_opt(db).await?,
+        Some(repository.clone())
+    );
 
     assert_eq!(res.last_insert_id, repository.id);
 
@@ -129,7 +139,9 @@ pub async fn create_and_update_repository(db: &DatabasePool) -> Result<(), DbErr
         .exec(db)
         .await;
 
-    assert_eq!(update_res, Err(DbErr::RecordNotUpdated));
+    // [spec:pgorm:sem:exec.crud.update] UpdateOne decodes through `one`, so a
+    // filter matching zero rows surfaces RecordNotFound.
+    assert_eq!(update_res, Err(DbErr::RecordNotFound));
 
     let update_res = Repository::update(updated_active_model)
         .filter(repository::Column::Id.eq("unique-id-002".to_owned()))

@@ -4,25 +4,27 @@ pub mod common;
 
 pub use chrono::offset::Utc;
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{DbErr, DerivePartialModel, FromQueryResult, entity::*, query::*};
+use pgorm::{ActiveValue::Set, DbErr, DerivePartialModel, FromQueryResult, entity::*, query::*};
 use pgorm_query::{Expr, Func, SimpleExpr};
 use pretty_assertions::assert_eq;
 pub use rust_decimal::prelude::*;
 pub use uuid::Uuid;
 
 // Run the test locally:
-// DATABASE_URL="mysql://root:@localhost" cargo test --features sqlx-mysql,runtime-async-std-native-tls --test relational_tests
+// DATABASE_URL="postgres://postgres:postgres@localhost" cargo test --test relational_tests
 #[pgorm_macros::test]
 pub async fn left_join() {
     let ctx = TestContext::new("test_left_join").await;
     create_tables(&ctx.db).await.unwrap();
+
+    let db = ctx.db.get().await.unwrap();
 
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -36,7 +38,7 @@ pub async fn left_join() {
         bakery_id: Set(Some(bakery.id)),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert baker");
 
@@ -46,7 +48,7 @@ pub async fn left_join() {
         bakery_id: Set(None),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert baker");
 
@@ -66,9 +68,8 @@ pub async fn left_join() {
     let result = select
         .clone()
         .into_model::<SelectResult>()
-        .one(&ctx.db)
+        .one(&db)
         .await
-        .unwrap()
         .unwrap();
     assert_eq!(result.name.as_str(), "Baker 1");
     assert_eq!(result.bakery_name, Some("SeaSide Bakery".to_string()));
@@ -87,9 +88,8 @@ pub async fn left_join() {
 
     let result = select
         .into_partial_model::<PartialSelectResult>()
-        .one(&ctx.db)
+        .one(&db)
         .await
-        .unwrap()
         .unwrap();
     assert_eq!(result.name.as_str(), "Baker 1");
     assert_eq!(result.bakery_name, Some("SeaSide Bakery".to_string()));
@@ -102,29 +102,26 @@ pub async fn left_join() {
         .column_as(bakery::Column::Name, "bakery_name")
         .filter(baker::Column::Name.contains("Baker 2"));
 
-    let result = select
-        .into_model::<SelectResult>()
-        .one(&ctx.db)
-        .await
-        .unwrap()
-        .unwrap();
+    let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
     assert_eq!(result.bakery_name, None);
 
+    drop(db);
     ctx.delete().await;
 }
 
 #[pgorm_macros::test]
-#[cfg(any(feature = "sqlx-mysql", feature = "sqlx-postgres"))]
 pub async fn right_join() {
     let ctx = TestContext::new("test_right_join").await;
     create_tables(&ctx.db).await.unwrap();
+
+    let db = ctx.db.get().await.unwrap();
 
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -132,7 +129,7 @@ pub async fn right_join() {
         name: Set("Kate".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -140,7 +137,7 @@ pub async fn right_join() {
         name: Set("Jim".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -152,7 +149,7 @@ pub async fn right_join() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -170,12 +167,7 @@ pub async fn right_join() {
         .column_as(order::Column::Total, "order_total")
         .filter(customer::Column::Name.contains("Kate"));
 
-    let result = select
-        .into_model::<SelectResult>()
-        .one(&ctx.db)
-        .await
-        .unwrap()
-        .unwrap();
+    let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
     assert_eq!(result.order_total, Some(rust_dec(15.10)));
 
     let select = order::Entity::find()
@@ -185,14 +177,10 @@ pub async fn right_join() {
         .column_as(order::Column::Total, "order_total")
         .filter(customer::Column::Name.contains("Jim"));
 
-    let result = select
-        .into_model::<SelectResult>()
-        .one(&ctx.db)
-        .await
-        .unwrap()
-        .unwrap();
+    let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
     assert_eq!(result.order_total, None);
 
+    drop(db);
     ctx.delete().await;
 }
 
@@ -201,12 +189,14 @@ pub async fn inner_join() {
     let ctx = TestContext::new("test_inner_join").await;
     create_tables(&ctx.db).await.unwrap();
 
+    let db = ctx.db.get().await.unwrap();
+
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -214,7 +204,7 @@ pub async fn inner_join() {
         name: Set("Kate".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -222,7 +212,7 @@ pub async fn inner_join() {
         name: Set("Jim".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -234,7 +224,7 @@ pub async fn inner_join() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -246,7 +236,7 @@ pub async fn inner_join() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -262,11 +252,7 @@ pub async fn inner_join() {
         .column(customer::Column::Name)
         .column_as(order::Column::Total, "order_total");
 
-    let results = select
-        .into_model::<SelectResult>()
-        .all(&ctx.db)
-        .await
-        .unwrap();
+    let results = select.into_model::<SelectResult>().all(&db).await.unwrap();
 
     assert_eq!(results.len(), 2);
     assert!(
@@ -282,6 +268,7 @@ pub async fn inner_join() {
                 && result.order_total == Some(kate_order_2.total))
     );
 
+    drop(db);
     ctx.delete().await;
 }
 
@@ -290,12 +277,14 @@ pub async fn group_by() {
     let ctx = TestContext::new("test_group_by").await;
     create_tables(&ctx.db).await.unwrap();
 
+    let db = ctx.db.get().await.unwrap();
+
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -303,7 +292,7 @@ pub async fn group_by() {
         name: Set("Kate".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -315,7 +304,7 @@ pub async fn group_by() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -327,19 +316,14 @@ pub async fn group_by() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
-
-    #[cfg(any(feature = "sqlx-postgres"))]
-    type Type = i64;
-    #[cfg(not(any(feature = "sqlx-postgres")))]
-    type Type = i32;
 
     #[derive(Debug, FromQueryResult)]
     struct SelectResult {
         name: String,
-        number_orders: Option<Type>,
+        number_orders: Option<i64>,
         total_spent: Option<Decimal>,
         min_spent: Option<Decimal>,
         max_spent: Option<Decimal>,
@@ -355,12 +339,7 @@ pub async fn group_by() {
         .column_as(order::Column::Total.max(), "max_spent")
         .group_by(customer::Column::Name);
 
-    let result = select
-        .into_model::<SelectResult>()
-        .one(&ctx.db)
-        .await
-        .unwrap()
-        .unwrap();
+    let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
 
     assert_eq!(result.name.as_str(), "Kate");
     assert_eq!(result.number_orders, Some(2));
@@ -376,6 +355,7 @@ pub async fn group_by() {
         result.max_spent,
         Some(kate_order_1.total.max(kate_order_2.total))
     );
+    drop(db);
     ctx.delete().await;
 }
 
@@ -385,12 +365,14 @@ pub async fn having() {
     let ctx = TestContext::new("test_having").await;
     create_tables(&ctx.db).await.unwrap();
 
+    let db = ctx.db.get().await.unwrap();
+
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -398,7 +380,7 @@ pub async fn having() {
         name: Set("Kate".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -410,7 +392,7 @@ pub async fn having() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -422,7 +404,7 @@ pub async fn having() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -430,7 +412,7 @@ pub async fn having() {
         name: Set("Bob".to_owned()),
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -442,7 +424,7 @@ pub async fn having() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -454,7 +436,7 @@ pub async fn having() {
 
         ..Default::default()
     }
-    .insert(&ctx.db)
+    .insert(&db)
     .await
     .expect("could not insert order");
 
@@ -473,7 +455,7 @@ pub async fn having() {
         .group_by(order::Column::Total)
         .having(order::Column::Total.gt(rust_dec(90.00)))
         .into_model::<SelectResult>()
-        .all(&ctx.db)
+        .all(&db)
         .await
         .unwrap();
 
@@ -481,6 +463,7 @@ pub async fn having() {
     assert_eq!(results[0].name, customer_kate.name.clone());
     assert_eq!(results[0].order_total, Some(kate_order_1.total));
 
+    drop(db);
     ctx.delete().await;
 }
 
@@ -491,13 +474,15 @@ pub async fn related() -> Result<(), DbErr> {
     let ctx = TestContext::new("test_related").await;
     create_tables(&ctx.db).await?;
 
+    let db = ctx.db.get().await?;
+
     // SeaSide Bakery
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
         ..Default::default()
     };
-    let seaside_bakery_res = Bakery::insert(seaside_bakery).exec(&ctx.db).await?;
+    let seaside_bakery_res = Bakery::insert(seaside_bakery).exec(&db).await?;
 
     // Bob's Baker
     let baker_bob = baker::ActiveModel {
@@ -510,7 +495,7 @@ pub async fn related() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let _baker_bob_res = Baker::insert(baker_bob).exec(&ctx.db).await?;
+    let _baker_bob_res = Baker::insert(baker_bob).exec(&db).await?;
 
     // Bobby's Baker
     let baker_bobby = baker::ActiveModel {
@@ -521,7 +506,7 @@ pub async fn related() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let _baker_bobby_res = Baker::insert(baker_bobby).exec(&ctx.db).await?;
+    let _baker_bobby_res = Baker::insert(baker_bobby).exec(&db).await?;
 
     // Terres Bakery
     let terres_bakery = bakery::ActiveModel {
@@ -529,7 +514,7 @@ pub async fn related() -> Result<(), DbErr> {
         profit_margin: Set(13.5),
         ..Default::default()
     };
-    let terres_bakery_res = Bakery::insert(terres_bakery).exec(&ctx.db).await?;
+    let terres_bakery_res = Bakery::insert(terres_bakery).exec(&db).await?;
 
     // Ada's Baker
     let baker_ada = baker::ActiveModel {
@@ -542,7 +527,7 @@ pub async fn related() -> Result<(), DbErr> {
         bakery_id: Set(Some(terres_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let _baker_ada_res = Baker::insert(baker_ada).exec(&ctx.db).await?;
+    let _baker_ada_res = Baker::insert(baker_ada).exec(&db).await?;
 
     // Stone Bakery, with no baker
     let stone_bakery = bakery::ActiveModel {
@@ -550,7 +535,7 @@ pub async fn related() -> Result<(), DbErr> {
         profit_margin: Set(13.5),
         ..Default::default()
     };
-    let _stone_bakery_res = Bakery::insert(stone_bakery).exec(&ctx.db).await?;
+    let _stone_bakery_res = Bakery::insert(stone_bakery).exec(&db).await?;
 
     #[derive(Debug, FromQueryResult, PartialEq)]
     struct BakerLite {
@@ -571,7 +556,7 @@ pub async fn related() -> Result<(), DbErr> {
         .order_by_asc(bakery::Column::Id)
         .order_by_asc(baker::Column::Id)
         .into_model()
-        .all(&ctx.db)
+        .all(&db)
         .await?;
 
     assert_eq!(
@@ -612,11 +597,10 @@ pub async fn related() -> Result<(), DbErr> {
 
     let seaside_bakery = Bakery::find()
         .filter(bakery::Column::Id.eq(1))
-        .one(&ctx.db)
-        .await?
-        .unwrap();
+        .one(&db)
+        .await?;
 
-    let bakers = seaside_bakery.find_related(Baker).all(&ctx.db).await?;
+    let bakers = seaside_bakery.find_related(Baker).all(&db).await?;
 
     assert_eq!(
         bakers,
@@ -647,26 +631,24 @@ pub async fn related() -> Result<(), DbErr> {
         .order_by_asc(baker::Column::Id);
 
     assert_eq!(
-        select_bakery_with_baker
-            .build(pgorm::DatabaseBackend::MySql)
-            .to_string(),
+        select_bakery_with_baker.build().0,
         [
-            "SELECT `bakery`.`id` AS `A_id`,",
-            "`bakery`.`name` AS `A_name`,",
-            "`bakery`.`profit_margin` AS `A_profit_margin`,",
-            "`baker`.`id` AS `B_id`,",
-            "`baker`.`name` AS `B_name`,",
-            "`baker`.`contact_details` AS `B_contact_details`,",
-            "`baker`.`bakery_id` AS `B_bakery_id`",
-            "FROM `bakery`",
-            "LEFT JOIN `baker` ON `bakery`.`id` = `baker`.`bakery_id`",
-            "ORDER BY `bakery`.`id` ASC, `baker`.`id` ASC"
+            r#"SELECT "bakery"."id" AS "A_id","#,
+            r#""bakery"."name" AS "A_name","#,
+            r#""bakery"."profit_margin" AS "A_profit_margin","#,
+            r#""baker"."id" AS "B_id","#,
+            r#""baker"."name" AS "B_name","#,
+            r#""baker"."contact_details" AS "B_contact_details","#,
+            r#""baker"."bakery_id" AS "B_bakery_id""#,
+            r#"FROM "bakery""#,
+            r#"LEFT JOIN "baker" ON "bakery"."id" = "baker"."bakery_id""#,
+            r#"ORDER BY "bakery"."id" ASC, "baker"."id" ASC"#
         ]
         .join(" ")
     );
 
     assert_eq!(
-        select_bakery_with_baker.all(&ctx.db).await?,
+        select_bakery_with_baker.all(&db).await?,
         [
             (
                 bakery::Model {
@@ -723,6 +705,7 @@ pub async fn related() -> Result<(), DbErr> {
         ]
     );
 
+    drop(db);
     ctx.delete().await;
 
     Ok(())
@@ -732,10 +715,12 @@ pub async fn related() -> Result<(), DbErr> {
 pub async fn linked() -> Result<(), DbErr> {
     use common::bakery_chain::Order;
     use pgorm::{SelectA, SelectB};
-    use pgorm_query::backend::{Alias, Expr};
+    use pgorm_query::{Alias, Expr};
 
     let ctx = TestContext::new("test_linked").await;
     create_tables(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
 
     // SeaSide Bakery
     let seaside_bakery = bakery::ActiveModel {
@@ -743,7 +728,7 @@ pub async fn linked() -> Result<(), DbErr> {
         profit_margin: Set(10.4),
         ..Default::default()
     };
-    let seaside_bakery_res = Bakery::insert(seaside_bakery).exec(&ctx.db).await?;
+    let seaside_bakery_res = Bakery::insert(seaside_bakery).exec(&db).await?;
 
     // Bob's Baker, Cake & Cake Baker
     let baker_bob = baker::ActiveModel {
@@ -756,7 +741,7 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let baker_bob_res = Baker::insert(baker_bob).exec(&ctx.db).await?;
+    let baker_bob_res = Baker::insert(baker_bob).exec(&db).await?;
     let mud_cake = cake::ActiveModel {
         name: Set("Mud Cake".to_owned()),
         price: Set(rust_dec(10.25)),
@@ -765,12 +750,12 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let mud_cake_res = Cake::insert(mud_cake).exec(&ctx.db).await?;
+    let mud_cake_res = Cake::insert(mud_cake).exec(&db).await?;
     let bob_cakes_bakers = cakes_bakers::ActiveModel {
         cake_id: Set(mud_cake_res.last_insert_id),
         baker_id: Set(baker_bob_res.last_insert_id),
     };
-    CakesBakers::insert(bob_cakes_bakers).exec(&ctx.db).await?;
+    CakesBakers::insert(bob_cakes_bakers).exec(&db).await?;
 
     // Bobby's Baker, Cake & Cake Baker
     let baker_bobby = baker::ActiveModel {
@@ -781,7 +766,7 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let baker_bobby_res = Baker::insert(baker_bobby).exec(&ctx.db).await?;
+    let baker_bobby_res = Baker::insert(baker_bobby).exec(&db).await?;
     let cheese_cake = cake::ActiveModel {
         name: Set("Cheese Cake".to_owned()),
         price: Set(rust_dec(20.5)),
@@ -790,14 +775,12 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let cheese_cake_res = Cake::insert(cheese_cake).exec(&ctx.db).await?;
+    let cheese_cake_res = Cake::insert(cheese_cake).exec(&db).await?;
     let bobby_cakes_bakers = cakes_bakers::ActiveModel {
         cake_id: Set(cheese_cake_res.last_insert_id),
         baker_id: Set(baker_bobby_res.last_insert_id),
     };
-    CakesBakers::insert(bobby_cakes_bakers)
-        .exec(&ctx.db)
-        .await?;
+    CakesBakers::insert(bobby_cakes_bakers).exec(&db).await?;
     let chocolate_cake = cake::ActiveModel {
         name: Set("Chocolate Cake".to_owned()),
         price: Set(rust_dec(30.15)),
@@ -806,14 +789,12 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let chocolate_cake_res = Cake::insert(chocolate_cake).exec(&ctx.db).await?;
+    let chocolate_cake_res = Cake::insert(chocolate_cake).exec(&db).await?;
     let bobby_cakes_bakers = cakes_bakers::ActiveModel {
         cake_id: Set(chocolate_cake_res.last_insert_id),
         baker_id: Set(baker_bobby_res.last_insert_id),
     };
-    CakesBakers::insert(bobby_cakes_bakers)
-        .exec(&ctx.db)
-        .await?;
+    CakesBakers::insert(bobby_cakes_bakers).exec(&db).await?;
 
     // Freerider's Baker, no cake baked
     let baker_freerider = baker::ActiveModel {
@@ -824,7 +805,7 @@ pub async fn linked() -> Result<(), DbErr> {
         bakery_id: Set(Some(seaside_bakery_res.last_insert_id)),
         ..Default::default()
     };
-    let _baker_freerider_res = Baker::insert(baker_freerider).exec(&ctx.db).await?;
+    let _baker_freerider_res = Baker::insert(baker_freerider).exec(&db).await?;
 
     // Kate's Customer, Order & Line Item
     let customer_kate = customer::ActiveModel {
@@ -832,7 +813,7 @@ pub async fn linked() -> Result<(), DbErr> {
         notes: Set(Some("Loves cheese cake".to_owned())),
         ..Default::default()
     };
-    let customer_kate_res = Customer::insert(customer_kate).exec(&ctx.db).await?;
+    let customer_kate_res = Customer::insert(customer_kate).exec(&db).await?;
     let kate_order_1 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
         customer_id: Set(customer_kate_res.last_insert_id),
@@ -840,7 +821,7 @@ pub async fn linked() -> Result<(), DbErr> {
         placed_at: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
-    let kate_order_1_res = Order::insert(kate_order_1).exec(&ctx.db).await?;
+    let kate_order_1_res = Order::insert(kate_order_1).exec(&db).await?;
     lineitem::ActiveModel {
         cake_id: Set(cheese_cake_res.last_insert_id),
         order_id: Set(kate_order_1_res.last_insert_id),
@@ -848,7 +829,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(2),
         ..Default::default()
     }
-    .save(&ctx.db)
+    .save(&db)
     .await?;
     let kate_order_2 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
@@ -857,7 +838,7 @@ pub async fn linked() -> Result<(), DbErr> {
         placed_at: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
-    let kate_order_2_res = Order::insert(kate_order_2).exec(&ctx.db).await?;
+    let kate_order_2_res = Order::insert(kate_order_2).exec(&db).await?;
     lineitem::ActiveModel {
         cake_id: Set(chocolate_cake_res.last_insert_id),
         order_id: Set(kate_order_2_res.last_insert_id),
@@ -865,7 +846,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(3),
         ..Default::default()
     }
-    .save(&ctx.db)
+    .save(&db)
     .await?;
 
     // Kara's Customer, Order & Line Item
@@ -874,7 +855,7 @@ pub async fn linked() -> Result<(), DbErr> {
         notes: Set(Some("Loves all cakes".to_owned())),
         ..Default::default()
     };
-    let customer_kara_res = Customer::insert(customer_kara).exec(&ctx.db).await?;
+    let customer_kara_res = Customer::insert(customer_kara).exec(&db).await?;
     let kara_order_1 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
         customer_id: Set(customer_kara_res.last_insert_id),
@@ -882,7 +863,7 @@ pub async fn linked() -> Result<(), DbErr> {
         placed_at: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
-    let kara_order_1_res = Order::insert(kara_order_1).exec(&ctx.db).await?;
+    let kara_order_1_res = Order::insert(kara_order_1).exec(&db).await?;
     lineitem::ActiveModel {
         cake_id: Set(mud_cake_res.last_insert_id),
         order_id: Set(kara_order_1_res.last_insert_id),
@@ -890,7 +871,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(2),
         ..Default::default()
     }
-    .save(&ctx.db)
+    .save(&db)
     .await?;
     let kara_order_2 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
@@ -899,7 +880,7 @@ pub async fn linked() -> Result<(), DbErr> {
         placed_at: Set(Utc::now().naive_utc()),
         ..Default::default()
     };
-    let kara_order_2_res = Order::insert(kara_order_2).exec(&ctx.db).await?;
+    let kara_order_2_res = Order::insert(kara_order_2).exec(&db).await?;
     lineitem::ActiveModel {
         cake_id: Set(cheese_cake_res.last_insert_id),
         order_id: Set(kara_order_2_res.last_insert_id),
@@ -907,7 +888,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(3),
         ..Default::default()
     }
-    .save(&ctx.db)
+    .save(&db)
     .await?;
 
     #[derive(Debug, FromQueryResult, PartialEq)]
@@ -936,7 +917,7 @@ pub async fn linked() -> Result<(), DbErr> {
         .order_by_asc(baker::Column::Id)
         .order_by_asc(Expr::col((Alias::new("r4"), customer::Column::Id)))
         .into_model()
-        .all(&ctx.db)
+        .all(&db)
         .await?;
 
     assert_eq!(
@@ -978,13 +959,12 @@ pub async fn linked() -> Result<(), DbErr> {
     // try to use find_linked instead
     let baker_bob = Baker::find()
         .filter(baker::Column::Id.eq(1))
-        .one(&ctx.db)
-        .await?
-        .unwrap();
+        .one(&db)
+        .await?;
 
     let baker_bob_customers = baker_bob
         .find_linked(baker::BakedForCustomer)
-        .all(&ctx.db)
+        .all(&db)
         .await?;
 
     assert_eq!(
@@ -1003,30 +983,28 @@ pub async fn linked() -> Result<(), DbErr> {
         .order_by_asc(Expr::col((Alias::new("r4"), customer::Column::Id)));
 
     assert_eq!(
-        select_baker_with_customer
-            .build(pgorm::DatabaseBackend::MySql)
-            .to_string(),
+        select_baker_with_customer.build().0,
         [
-            "SELECT `baker`.`id` AS `A_id`,",
-            "`baker`.`name` AS `A_name`,",
-            "`baker`.`contact_details` AS `A_contact_details`,",
-            "`baker`.`bakery_id` AS `A_bakery_id`,",
-            "`r4`.`id` AS `B_id`,",
-            "`r4`.`name` AS `B_name`,",
-            "`r4`.`notes` AS `B_notes`",
-            "FROM `baker`",
-            "LEFT JOIN `cakes_bakers` AS `r0` ON `baker`.`id` = `r0`.`baker_id`",
-            "LEFT JOIN `cake` AS `r1` ON `r0`.`cake_id` = `r1`.`id`",
-            "LEFT JOIN `lineitem` AS `r2` ON `r1`.`id` = `r2`.`cake_id`",
-            "LEFT JOIN `order` AS `r3` ON `r2`.`order_id` = `r3`.`id`",
-            "LEFT JOIN `customer` AS `r4` ON `r3`.`customer_id` = `r4`.`id`",
-            "ORDER BY `baker`.`id` ASC, `r4`.`id` ASC"
+            r#"SELECT "baker"."id" AS "A_id","#,
+            r#""baker"."name" AS "A_name","#,
+            r#""baker"."contact_details" AS "A_contact_details","#,
+            r#""baker"."bakery_id" AS "A_bakery_id","#,
+            r#""r4"."id" AS "B_id","#,
+            r#""r4"."name" AS "B_name","#,
+            r#""r4"."notes" AS "B_notes""#,
+            r#"FROM "baker""#,
+            r#"LEFT JOIN "cakes_bakers" AS "r0" ON "baker"."id" = "r0"."baker_id""#,
+            r#"LEFT JOIN "cake" AS "r1" ON "r0"."cake_id" = "r1"."id""#,
+            r#"LEFT JOIN "lineitem" AS "r2" ON "r1"."id" = "r2"."cake_id""#,
+            r#"LEFT JOIN "order" AS "r3" ON "r2"."order_id" = "r3"."id""#,
+            r#"LEFT JOIN "customer" AS "r4" ON "r3"."customer_id" = "r4"."id""#,
+            r#"ORDER BY "baker"."id" ASC, "r4"."id" ASC"#
         ]
         .join(" ")
     );
 
     assert_eq!(
-        select_baker_with_customer.all(&ctx.db).await?,
+        select_baker_with_customer.all(&db).await?,
         [
             (
                 baker::Model {
@@ -1086,6 +1064,7 @@ pub async fn linked() -> Result<(), DbErr> {
         ]
     );
 
+    drop(db);
     ctx.delete().await;
 
     Ok(())

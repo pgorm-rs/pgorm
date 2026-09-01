@@ -800,7 +800,7 @@ pub fn derive_partial_model(input: TokenStream) -> TokenStream {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.test-attr]
+// [spec:pgorm:sem:macros.derive.test-attr+1]
 #[doc(hidden)]
 #[cfg(feature = "derive")]
 #[proc_macro_attribute]
@@ -814,11 +814,6 @@ pub fn test(_: TokenStream, input: TokenStream) -> TokenStream {
 
     quote::quote! (
         #[test]
-        #[cfg(any(
-            feature = "sqlx-mysql",
-            feature = "sqlx-sqlite",
-            feature = "sqlx-postgres",
-        ))]
         #(#attrs)*
         fn #name() #ret {
             let _ = ::tracing_subscriber::fmt()

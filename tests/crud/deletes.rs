@@ -1,7 +1,7 @@
 pub use super::*;
 use uuid::Uuid;
 
-pub async fn test_delete_cake(db: &DbConn) {
+pub async fn test_delete_cake(db: &DatabaseConnection) {
     let initial_cakes = Cake::find().all(db).await.unwrap().len();
 
     let seaside_bakery = bakery::ActiveModel {
@@ -34,7 +34,7 @@ pub async fn test_delete_cake(db: &DbConn) {
     assert_eq!(cakes.len(), initial_cakes);
 }
 
-pub async fn test_delete_bakery(db: &DbConn) {
+pub async fn test_delete_bakery(db: &DatabaseConnection) {
     let initial_bakeries = Bakery::find().all(db).await.unwrap().len();
 
     let bakery = bakery::ActiveModel {

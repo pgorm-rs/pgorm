@@ -1,16 +1,13 @@
 use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
-use pgorm::{
-    ConnectionTrait, DatabasePool, DbBackend, DbConn, EntityName, ExecResult, Schema, error::*,
-    pgorm_query,
-};
+use pgorm::{ConnectionTrait, DatabasePool, EntityName, Schema, error::*, pgorm_query};
 use pgorm_query::{
-    Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, StringLen,
-    extension::postgres::Type,
+    Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, QueryBuilder, StringLen,
+    extension::Type,
 };
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
-    let db_backend = db.get_database_backend();
+    let db = &db.get().await?;
 
     create_log_table(db).await?;
     create_metadata_table(db).await?;
@@ -20,20 +17,19 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     create_satellites_table(db).await?;
     create_transaction_log_table(db).await?;
 
-    let create_enum_stmts = match db_backend {
-        DbBackend::MySql | DbBackend::Sqlite => Vec::new(),
-        DbBackend::Postgres => {
-            let schema = Schema::new(db_backend);
-            let enum_create_stmt = Type::create()
-                .as_enum(Alias::new("tea"))
-                .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
-                .to_owned();
-            assert_eq!(
-                db_backend.build(&enum_create_stmt),
-                db_backend.build(&schema.create_enum_from_active_enum::<Tea>())
-            );
-            vec![enum_create_stmt]
-        }
+    let create_enum_stmts = {
+        let schema = Schema::new();
+        let enum_create_stmt = Type::create()
+            .as_enum(Alias::new("tea"))
+            .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
+            .to_owned();
+        assert_eq!(
+            enum_create_stmt.to_string(QueryBuilder),
+            schema
+                .create_enum_from_active_enum::<Tea>()
+                .to_string(QueryBuilder)
+        );
+        vec![enum_create_stmt]
     };
     create_enum(db, &create_enum_stmts, ActiveEnum).await?;
 
@@ -45,9 +41,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     create_edit_log_table(db).await?;
     create_teas_table(db).await?;
     create_binary_table(db).await?;
-    if matches!(db_backend, DbBackend::Postgres) {
-        create_bits_table(db).await?;
-    }
+    create_bits_table(db).await?;
     create_dyn_table_name_lazy_static_table(db).await?;
     create_value_type_table(db).await?;
 
@@ -56,17 +50,18 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     create_json_string_vec_table(db).await?;
     create_json_struct_vec_table(db).await?;
 
-    if DbBackend::Postgres == db_backend {
-        create_value_type_postgres_table(db).await?;
-        create_collection_table(db).await?;
-        create_event_trigger_table(db).await?;
-        create_categories_table(db).await?;
-    }
+    create_value_type_postgres_table(db).await?;
+    create_collection_table(db).await?;
+    create_event_trigger_table(db).await?;
+    create_categories_table(db).await?;
 
     Ok(())
 }
 
-pub async fn create_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_log_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(applog::Entity)
         .comment("app logs")
@@ -101,7 +96,10 @@ pub async fn create_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Applog).await
 }
 
-pub async fn create_metadata_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_metadata_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(metadata::Entity)
         .col(
@@ -127,7 +125,10 @@ pub async fn create_metadata_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Metadata).await
 }
 
-pub async fn create_repository_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_repository_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(repository::Entity)
         .col(
@@ -148,7 +149,10 @@ pub async fn create_repository_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Repository).await
 }
 
-pub async fn create_self_join_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_self_join_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(self_join::Entity)
         .col(
@@ -172,12 +176,12 @@ pub async fn create_self_join_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, SelfJoin).await
 }
 
-pub async fn create_byte_primary_key_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_byte_primary_key_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let mut primary_key_col = ColumnDef::new(byte_primary_key::Column::Id);
-    match db.get_database_backend() {
-        DbBackend::MySql => primary_key_col.binary_len(3),
-        DbBackend::Sqlite | DbBackend::Postgres => primary_key_col.binary(),
-    };
+    primary_key_col.binary();
 
     let stmt = pgorm_query::Table::create()
         .table(byte_primary_key::Entity)
@@ -192,7 +196,10 @@ pub async fn create_byte_primary_key_table(db: &DbConn) -> Result<ExecResult, Db
     create_table_without_asserts(db, &stmt).await
 }
 
-pub async fn create_active_enum_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_active_enum_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(active_enum::Entity.table_ref())
         .col(
@@ -213,7 +220,10 @@ pub async fn create_active_enum_table(db: &DbConn) -> Result<ExecResult, DbErr> 
     create_table(db, &create_table_stmt, ActiveEnum).await
 }
 
-pub async fn create_active_enum_child_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_active_enum_child_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(active_enum_child::Entity.table_ref())
         .col(
@@ -247,7 +257,10 @@ pub async fn create_active_enum_child_table(db: &DbConn) -> Result<ExecResult, D
     create_table(db, &create_table_stmt, ActiveEnumChild).await
 }
 
-pub async fn create_satellites_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_satellites_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(satellite::Entity)
         .col(
@@ -279,7 +292,10 @@ pub async fn create_satellites_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Satellite).await
 }
 
-pub async fn create_transaction_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_transaction_log_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(transaction_log::Entity)
         .col(
@@ -314,7 +330,10 @@ pub async fn create_transaction_log_table(db: &DbConn) -> Result<ExecResult, DbE
     create_table(db, &stmt, TransactionLog).await
 }
 
-pub async fn create_insert_default_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_insert_default_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(insert_default::Entity.table_ref())
         .col(
@@ -329,7 +348,10 @@ pub async fn create_insert_default_table(db: &DbConn) -> Result<ExecResult, DbEr
     create_table(db, &create_table_stmt, InsertDefault).await
 }
 
-pub async fn create_json_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_json_vec_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(json_vec::Entity.table_ref())
         .col(
@@ -345,7 +367,10 @@ pub async fn create_json_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &create_table_stmt, JsonVec).await
 }
 
-pub async fn create_json_struct_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_json_struct_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(json_struct::Entity)
         .col(
@@ -367,7 +392,10 @@ pub async fn create_json_struct_table(db: &DbConn) -> Result<ExecResult, DbErr> 
     create_table(db, &stmt, JsonStruct).await
 }
 
-pub async fn create_json_string_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_json_string_vec_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(JsonStringVec.table_ref())
         .col(
@@ -383,7 +411,10 @@ pub async fn create_json_string_vec_table(db: &DbConn) -> Result<ExecResult, DbE
     create_table(db, &create_table_stmt, JsonStringVec).await
 }
 
-pub async fn create_json_struct_vec_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_json_struct_vec_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(JsonStructVec.table_ref())
         .col(
@@ -403,12 +434,12 @@ pub async fn create_json_struct_vec_table(db: &DbConn) -> Result<ExecResult, DbE
     create_table(db, &create_table_stmt, JsonStructVec).await
 }
 
-pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    db.execute(pgorm::Statement::from_string(
-        db.get_database_backend(),
-        "CREATE EXTENSION IF NOT EXISTS citext",
-    ))
-    .await?;
+pub async fn create_collection_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
+    db.execute("CREATE EXTENSION IF NOT EXISTS citext", &[])
+        .await?;
 
     let stmt = pgorm_query::Table::create()
         .table(collection::Entity)
@@ -473,7 +504,10 @@ pub async fn create_collection_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Collection).await
 }
 
-pub async fn create_pi_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_pi_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(pi::Entity)
         .col(
@@ -488,19 +522,16 @@ pub async fn create_pi_table(db: &DbConn) -> Result<ExecResult, DbErr> {
                 .decimal_len(11, 10)
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(pi::Column::BigDecimal)
-                .decimal_len(11, 10)
-                .not_null(),
-        )
         .col(ColumnDef::new(pi::Column::DecimalOpt).decimal_len(11, 10))
-        .col(ColumnDef::new(pi::Column::BigDecimalOpt).decimal_len(11, 10))
         .to_owned();
 
     create_table(db, &stmt, Pi).await
 }
 
-pub async fn create_event_trigger_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_event_trigger_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(event_trigger::Entity)
         .col(
@@ -520,7 +551,10 @@ pub async fn create_event_trigger_table(db: &DbConn) -> Result<ExecResult, DbErr
     create_table(db, &stmt, EventTrigger).await
 }
 
-pub async fn create_uuid_fmt_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_uuid_fmt_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(uuid_fmt::Entity)
         .col(
@@ -552,7 +586,10 @@ pub async fn create_uuid_fmt_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, UuidFmt).await
 }
 
-pub async fn create_edit_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_edit_log_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = pgorm_query::Table::create()
         .table(edit_log::Entity)
         .col(
@@ -569,7 +606,10 @@ pub async fn create_edit_log_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, EditLog).await
 }
 
-pub async fn create_teas_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_teas_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(teas::Entity.table_ref())
         .col(
@@ -585,7 +625,10 @@ pub async fn create_teas_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &create_table_stmt, Teas).await
 }
 
-pub async fn create_categories_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_categories_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(categories::Entity.table_ref())
         .col(
@@ -603,7 +646,10 @@ pub async fn create_categories_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &create_table_stmt, Categories).await
 }
 
-pub async fn create_binary_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_binary_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(binary::Entity.table_ref())
         .col(
@@ -629,7 +675,10 @@ pub async fn create_binary_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &create_table_stmt, Binary).await
 }
 
-pub async fn create_bits_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_bits_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let create_table_stmt = pgorm_query::Table::create()
         .table(bits::Entity.table_ref())
         .col(
@@ -674,7 +723,10 @@ pub async fn create_bits_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &create_table_stmt, Bits).await
 }
 
-pub async fn create_dyn_table_name_lazy_static_table(db: &DbConn) -> Result<(), DbErr> {
+pub async fn create_dyn_table_name_lazy_static_table<C>(db: &C) -> Result<(), DbErr>
+where
+    C: ConnectionTrait,
+{
     use dyn_table_name_lazy_static::*;
 
     let entities = [
@@ -704,7 +756,10 @@ pub async fn create_dyn_table_name_lazy_static_table(db: &DbConn) -> Result<(), 
     Ok(())
 }
 
-pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_value_type_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let general_stmt = pgorm_query::Table::create()
         .table(value_type::value_type_general::Entity)
         .col(
@@ -723,7 +778,10 @@ pub async fn create_value_type_table(db: &DbConn) -> Result<ExecResult, DbErr> {
 
     create_table(db, &general_stmt, value_type::value_type_general::Entity).await
 }
-pub async fn create_value_type_postgres_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_value_type_postgres_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let postgres_stmt = pgorm_query::Table::create()
         .table(value_type::value_type_pg::Entity)
         .col(

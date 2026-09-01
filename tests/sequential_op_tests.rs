@@ -4,32 +4,36 @@ pub mod common;
 
 use chrono::offset::Utc;
 use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{DatabasePool, FromQueryResult, entity::*, query::*};
+use pgorm::{ActiveValue::Set, DatabaseConnection, FromQueryResult, entity::*, query::*};
 use rust_decimal::prelude::*;
 use uuid::Uuid;
 
 // Run the test locally:
-// DATABASE_URL="mysql://root:@localhost" cargo test --features sqlx-mysql,runtime-async-std --test sequential_op_tests
+// DATABASE_URL="postgres://postgres:postgres@localhost" cargo test --test sequential_op_tests
 #[pgorm_macros::test]
-#[cfg(any(feature = "sqlx-mysql", feature = "sqlx-postgres"))]
 pub async fn test_multiple_operations() {
     let ctx = TestContext::new("multiple_sequential_operations").await;
 
     create_tables(&ctx.db).await.unwrap();
-    seed_data(&ctx.db).await;
-    let baker_least_sales = find_baker_least_sales(&ctx.db).await.unwrap();
+
+    let db = ctx.db.get().await.unwrap();
+
+    seed_data(&db).await;
+    let baker_least_sales = find_baker_least_sales(&db).await.unwrap();
     assert_eq!(baker_least_sales.name, "Baker 2");
 
-    let new_cake = create_cake(&ctx.db, baker_least_sales).await.unwrap();
-    create_order(&ctx.db, new_cake).await;
+    let new_cake = create_cake(&db, baker_least_sales).await.unwrap();
+    create_order(&db, new_cake).await;
 
-    let baker_least_sales = find_baker_least_sales(&ctx.db).await.unwrap();
+    let baker_least_sales = find_baker_least_sales(&db).await.unwrap();
     assert_eq!(baker_least_sales.name, "Baker 1");
+
+    drop(db);
 
     ctx.delete().await;
 }
 
-async fn seed_data(db: &DatabasePool) {
+async fn seed_data(db: &DatabaseConnection) {
     let bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -130,16 +134,11 @@ async fn seed_data(db: &DatabasePool) {
     .expect("could not insert order");
 }
 
-async fn find_baker_least_sales(db: &DatabasePool) -> Option<baker::Model> {
-    #[cfg(any(feature = "sqlx-postgres"))]
-    type Type = i64;
-    #[cfg(not(any(feature = "sqlx-postgres")))]
-    type Type = Decimal;
-
+async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model> {
     #[derive(Debug, FromQueryResult)]
     struct SelectResult {
         id: i32,
-        cakes_sold_opt: Option<Type>,
+        cakes_sold_opt: Option<i64>,
     }
 
     #[derive(Debug)]
@@ -187,12 +186,12 @@ async fn find_baker_least_sales(db: &DatabasePool) -> Option<baker::Model> {
     results.sort_by(|a, b| b.cakes_sold.cmp(&a.cakes_sold));
 
     Baker::find_by_id(results.last().unwrap().id)
-        .one(db)
+        .one_opt(db)
         .await
         .unwrap()
 }
 
-async fn create_cake(db: &DatabasePool, baker: baker::Model) -> Option<cake::Model> {
+async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cake::Model> {
     let new_cake = cake::ActiveModel {
         name: Set("New Cake".to_owned()),
         price: Set(rust_dec(8.00)),
@@ -222,12 +221,12 @@ async fn create_cake(db: &DatabasePool, baker: baker::Model) -> Option<cake::Mod
     );
 
     Cake::find_by_id(cake_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .unwrap()
 }
 
-async fn create_order(db: &DatabasePool, cake: cake::Model) {
+async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
     let another_customer = customer::ActiveModel {
         name: Set("John".to_owned()),
         ..Default::default()
@@ -258,29 +257,4 @@ async fn create_order(db: &DatabasePool, cake: cake::Model) {
     .save(db)
     .await
     .expect("could not insert order");
-}
-
-pub async fn test_delete_bakery(db: &DatabasePool) {
-    let initial_bakeries = Bakery::find().all(db).await.unwrap().len();
-
-    let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
-        ..Default::default()
-    }
-    .save(db)
-    .await
-    .expect("could not insert bakery");
-
-    assert_eq!(
-        Bakery::find().all(db).await.unwrap().len(),
-        initial_bakeries + 1
-    );
-
-    let _result = bakery.delete(db).await.expect("failed to delete bakery");
-
-    assert_eq!(
-        Bakery::find().all(db).await.unwrap().len(),
-        initial_bakeries
-    );
 }

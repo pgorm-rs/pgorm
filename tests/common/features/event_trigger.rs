@@ -1,6 +1,6 @@
 use pgorm::entity::prelude::*;
 use pgorm::{
-    TryGetError, TryGetable,
+    RowIndex, TryGetError, TryGetable,
     pgorm_query::{ArrayType, ColumnType, ValueType},
 };
 
@@ -39,7 +39,10 @@ impl From<Events> for Value {
 }
 
 impl TryGetable for Events {
-    fn try_get_by<I: pgorm::ColIdx>(res: &QueryResult, idx: I) -> Result<Self, TryGetError> {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
         let vec: Vec<String> = res.try_get_by(idx).map_err(TryGetError::DbErr)?;
         Ok(Events(vec.into_iter().map(Event).collect()))
     }

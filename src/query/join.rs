@@ -161,10 +161,9 @@ where
 mod tests {
     use crate::tests_cfg::{cake, cake_filling, cake_filling_price, entity_linked, filling, fruit};
     use crate::{
-        ColumnTrait, DbBackend, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait,
-        RelationTrait,
+        ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait, RelationTrait,
     };
-    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType};
+    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType, QueryBuilder};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -172,11 +171,11 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .left_join(fruit::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
             ]
             .join(" ")
         );
@@ -188,12 +187,12 @@ mod tests {
             cake::Entity::find()
                 .inner_join(fruit::Entity)
                 .filter(fruit::Column::Name.contains("cherry"))
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "INNER JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id`",
-                "WHERE `fruit`.`name` LIKE \'%cherry%\'"
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"INNER JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"WHERE "fruit"."name" LIKE '%cherry%'"#
             ]
             .join(" ")
         );
@@ -204,11 +203,11 @@ mod tests {
         assert_eq!(
             fruit::Entity::find()
                 .reverse_join(cake::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit`",
-                "INNER JOIN `cake` ON `cake`.`id` = `fruit`.`cake_id`",
+                r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
+                r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
             ]
             .join(" ")
         );
@@ -222,12 +221,12 @@ mod tests {
         assert_eq!(
             find_fruit
                 .filter(cake::Column::Id.eq(11))
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit`",
-                "INNER JOIN `cake` ON `cake`.`id` = `fruit`.`cake_id`",
-                "WHERE `cake`.`id` = 11",
+                r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
+                r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"WHERE "cake"."id" = 11"#,
             ]
             .join(" ")
         );
@@ -243,12 +242,12 @@ mod tests {
         assert_eq!(
             cake_model
                 .find_related(fruit::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit`",
-                "INNER JOIN `cake` ON `cake`.`id` = `fruit`.`cake_id`",
-                "WHERE `cake`.`id` = 12",
+                r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
+                r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"WHERE "cake"."id" = 12"#,
             ]
             .join(" ")
         );
@@ -259,12 +258,12 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .left_join(filling::Entity)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "LEFT JOIN `cake_filling` ON `cake`.`id` = `cake_filling`.`cake_id`",
-                "LEFT JOIN `filling` ON `cake_filling`.`filling_id` = `filling`.`id`",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
+                r#"LEFT JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id""#,
             ]
             .join(" ")
         );
@@ -276,11 +275,11 @@ mod tests {
 
         let find_filling: Select<filling::Entity> = cake::Entity::find_related();
         assert_eq!(
-            find_filling.build(DbBackend::MySql).to_string(),
+            find_filling.as_query().to_string(QueryBuilder),
             [
-                "SELECT `filling`.`id`, `filling`.`name`, `filling`.`vendor_id` FROM `filling`",
-                "INNER JOIN `cake_filling` ON `cake_filling`.`filling_id` = `filling`.`id`",
-                "INNER JOIN `cake` ON `cake`.`id` = `cake_filling`.`cake_id`",
+                r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id" FROM "filling""#,
+                r#"INNER JOIN "cake_filling" ON "cake_filling"."filling_id" = "filling"."id""#,
+                r#"INNER JOIN "cake" ON "cake"."id" = "cake_filling"."cake_id""#,
             ]
             .join(" ")
         );
@@ -293,7 +292,7 @@ mod tests {
         let find_cake_filling_price: Select<cake_filling_price::Entity> =
             cake_filling::Entity::find_related();
         assert_eq!(
-            find_cake_filling_price.build(DbBackend::Postgres).to_string(),
+            find_cake_filling_price.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "cake_filling_price"."cake_id", "cake_filling_price"."filling_id", "cake_filling_price"."price""#,
                 r#"FROM "public"."cake_filling_price""#,
@@ -312,7 +311,7 @@ mod tests {
         let find_cake_filling: Select<cake_filling::Entity> =
             cake_filling_price::Entity::find_related();
         assert_eq!(
-            find_cake_filling.build(DbBackend::Postgres).to_string(),
+            find_cake_filling.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id""#,
                 r#"FROM "cake_filling""#,
@@ -334,14 +333,14 @@ mod tests {
         assert_eq!(
             cake_model
                 .find_linked(entity_linked::CakeToFilling)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `filling`.`id`, `filling`.`name`, `filling`.`vendor_id`"#,
-                r#"FROM `filling`"#,
-                r#"INNER JOIN `cake_filling` AS `r0` ON `r0`.`filling_id` = `filling`.`id`"#,
-                r#"INNER JOIN `cake` AS `r1` ON `r1`.`id` = `r0`.`cake_id`"#,
-                r#"WHERE `r1`.`id` = 12"#,
+                r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id""#,
+                r#"FROM "filling""#,
+                r#"INNER JOIN "cake_filling" AS "r0" ON "r0"."filling_id" = "filling"."id""#,
+                r#"INNER JOIN "cake" AS "r1" ON "r1"."id" = "r0"."cake_id""#,
+                r#"WHERE "r1"."id" = 12"#,
             ]
             .join(" ")
         );
@@ -357,15 +356,15 @@ mod tests {
         assert_eq!(
             cake_model
                 .find_linked(entity_linked::CakeToFillingVendor)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `vendor`.`id`, `vendor`.`name`"#,
-                r#"FROM `vendor`"#,
-                r#"INNER JOIN `filling` AS `r0` ON `r0`.`vendor_id` = `vendor`.`id`"#,
-                r#"INNER JOIN `cake_filling` AS `r1` ON `r1`.`filling_id` = `r0`.`id`"#,
-                r#"INNER JOIN `cake` AS `r2` ON `r2`.`id` = `r1`.`cake_id`"#,
-                r#"WHERE `r2`.`id` = 18"#,
+                r#"SELECT "vendor"."id", "vendor"."name""#,
+                r#"FROM "vendor""#,
+                r#"INNER JOIN "filling" AS "r0" ON "r0"."vendor_id" = "vendor"."id""#,
+                r#"INNER JOIN "cake_filling" AS "r1" ON "r1"."filling_id" = "r0"."id""#,
+                r#"INNER JOIN "cake" AS "r2" ON "r2"."id" = "r1"."cake_id""#,
+                r#"WHERE "r2"."id" = 18"#,
             ]
             .join(" ")
         );
@@ -376,14 +375,14 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .find_also_linked(entity_linked::CakeToFilling)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,"#,
-                r#"`r1`.`id` AS `B_id`, `r1`.`name` AS `B_name`, `r1`.`vendor_id` AS `B_vendor_id`"#,
-                r#"FROM `cake`"#,
-                r#"LEFT JOIN `cake_filling` AS `r0` ON `cake`.`id` = `r0`.`cake_id`"#,
-                r#"LEFT JOIN `filling` AS `r1` ON `r0`.`filling_id` = `r1`.`id`"#,
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""r1"."id" AS "B_id", "r1"."name" AS "B_name", "r1"."vendor_id" AS "B_vendor_id""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
+                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
             ]
             .join(" ")
         );
@@ -394,15 +393,15 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .find_also_linked(entity_linked::CakeToFillingVendor)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,"#,
-                r#"`r2`.`id` AS `B_id`, `r2`.`name` AS `B_name`"#,
-                r#"FROM `cake`"#,
-                r#"LEFT JOIN `cake_filling` AS `r0` ON `cake`.`id` = `r0`.`cake_id`"#,
-                r#"LEFT JOIN `filling` AS `r1` ON `r0`.`filling_id` = `r1`.`id`"#,
-                r#"LEFT JOIN `vendor` AS `r2` ON `r1`.`vendor_id` = `r2`.`id`"#,
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
+                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
+                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
             ]
             .join(" ")
         );
@@ -413,11 +412,11 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def())
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id` AND `fruit`.`name` LIKE '%tropical%'",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
             ]
             .join(" ")
         );
@@ -433,15 +432,15 @@ mod tests {
         assert_eq!(
             cake_model
                 .find_linked(entity_linked::CheeseCakeToFillingVendor)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `vendor`.`id`, `vendor`.`name`"#,
-                r#"FROM `vendor`"#,
-                r#"INNER JOIN `filling` AS `r0` ON `r0`.`vendor_id` = `vendor`.`id`"#,
-                r#"INNER JOIN `cake_filling` AS `r1` ON `r1`.`filling_id` = `r0`.`id`"#,
-                r#"INNER JOIN `cake` AS `r2` ON `r2`.`id` = `r1`.`cake_id` AND `r2`.`name` LIKE '%cheese%'"#,
-                r#"WHERE `r2`.`id` = 18"#,
+                r#"SELECT "vendor"."id", "vendor"."name""#,
+                r#"FROM "vendor""#,
+                r#"INNER JOIN "filling" AS "r0" ON "r0"."vendor_id" = "vendor"."id""#,
+                r#"INNER JOIN "cake_filling" AS "r1" ON "r1"."filling_id" = "r0"."id""#,
+                r#"INNER JOIN "cake" AS "r2" ON "r2"."id" = "r1"."cake_id" AND "r2"."name" LIKE '%cheese%'"#,
+                r#"WHERE "r2"."id" = 18"#,
             ]
             .join(" ")
         );
@@ -456,15 +455,15 @@ mod tests {
         assert_eq!(
             cake_model
                 .find_linked(entity_linked::JoinWithoutReverse)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `vendor`.`id`, `vendor`.`name`"#,
-                r#"FROM `vendor`"#,
-                r#"INNER JOIN `filling` AS `r0` ON `r0`.`vendor_id` = `vendor`.`id`"#,
-                r#"INNER JOIN `cake_filling` AS `r1` ON `r1`.`filling_id` = `r0`.`id`"#,
-                r#"INNER JOIN `cake_filling` AS `r2` ON `r2`.`cake_id` = `r1`.`id` AND `r2`.`name` LIKE '%cheese%'"#,
-                r#"WHERE `r2`.`id` = 18"#,
+                r#"SELECT "vendor"."id", "vendor"."name""#,
+                r#"FROM "vendor""#,
+                r#"INNER JOIN "filling" AS "r0" ON "r0"."vendor_id" = "vendor"."id""#,
+                r#"INNER JOIN "cake_filling" AS "r1" ON "r1"."filling_id" = "r0"."id""#,
+                r#"INNER JOIN "cake_filling" AS "r2" ON "r2"."cake_id" = "r1"."id" AND "r2"."name" LIKE '%cheese%'"#,
+                r#"WHERE "r2"."id" = 18"#,
             ]
             .join(" ")
         );
@@ -475,15 +474,15 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .find_also_linked(entity_linked::CheeseCakeToFillingVendor)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                r#"SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,"#,
-                r#"`r2`.`id` AS `B_id`, `r2`.`name` AS `B_name`"#,
-                r#"FROM `cake`"#,
-                r#"LEFT JOIN `cake_filling` AS `r0` ON `cake`.`id` = `r0`.`cake_id` AND `cake`.`name` LIKE '%cheese%'"#,
-                r#"LEFT JOIN `filling` AS `r1` ON `r0`.`filling_id` = `r1`.`id`"#,
-                r#"LEFT JOIN `vendor` AS `r2` ON `r1`.`vendor_id` = `r2`.`id`"#,
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id" AND "cake"."name" LIKE '%cheese%'"#,
+                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
+                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
             ]
             .join(" ")
         );
@@ -494,15 +493,15 @@ mod tests {
         assert_eq!(
             cake::Entity::find()
                 .find_also_linked(entity_linked::JoinWithoutReverse)
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
                 [
-                    r#"SELECT `cake`.`id` AS `A_id`, `cake`.`name` AS `A_name`,"#,
-                    r#"`r2`.`id` AS `B_id`, `r2`.`name` AS `B_name`"#,
-                    r#"FROM `cake`"#,
-                    r#"LEFT JOIN `cake` AS `r0` ON `cake_filling`.`cake_id` = `r0`.`id` AND `cake_filling`.`name` LIKE '%cheese%'"#,
-                    r#"LEFT JOIN `filling` AS `r1` ON `r0`.`filling_id` = `r1`.`id`"#,
-                    r#"LEFT JOIN `vendor` AS `r2` ON `r1`.`vendor_id` = `r2`.`id`"#,
+                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                    r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
+                    r#"FROM "cake""#,
+                    r#"LEFT JOIN "cake" AS "r0" ON "cake_filling"."cake_id" = "r0"."id" AND "cake_filling"."name" LIKE '%cheese%'"#,
+                    r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
+                    r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
                 ]
                 .join(" ")
         );
@@ -535,14 +534,14 @@ mod tests {
                         })
                 )
                 .join(JoinType::LeftJoin, filling::Relation::Vendor.def())
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id` AND `fruit`.`name` LIKE '%tropical%'",
-                "LEFT JOIN `cake_filling` ON `cake`.`id` = `cake_filling`.`cake_id` AND `cake_filling`.`cake_id` > 10",
-                "LEFT JOIN `filling` ON `cake_filling`.`filling_id` = `filling`.`id` AND `filling`.`name` LIKE '%lemon%'",
-                "LEFT JOIN `vendor` ON `filling`.`vendor_id` = `vendor`.`id`",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
+                r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" AND "cake_filling"."cake_id" > 10"#,
+                r#"LEFT JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id" AND "filling"."name" LIKE '%lemon%'"#,
+                r#"LEFT JOIN "vendor" ON "filling"."vendor_id" = "vendor"."id""#,
             ]
             .join(" ")
         );
@@ -567,11 +566,11 @@ mod tests {
                         }),
                     Alias::new("fruit_alias")
                 )
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name`, `fruit_alias`.`name` AS `fruit_name` FROM `cake`",
-                "LEFT JOIN `fruit` AS `fruit_alias` ON `cake`.`id` = `fruit_alias`.`cake_id` AND `fruit_alias`.`name` LIKE '%tropical%'",
+                r#"SELECT "cake"."id", "cake"."name", "fruit_alias"."name" AS "fruit_name" FROM "cake""#,
+                r#"LEFT JOIN "fruit" AS "fruit_alias" ON "cake"."id" = "fruit_alias"."cake_id" AND "fruit_alias"."name" LIKE '%tropical%'"#,
             ]
             .join(" ")
         );
@@ -597,12 +596,12 @@ mod tests {
                         }),
                     Alias::new("cake_filling_alias")
                 )
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name`, `cake_filling_alias`.`cake_id` AS `cake_filling_cake_id` FROM `cake`",
-                "LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id` AND `fruit`.`name` LIKE '%tropical%'",
-                "LEFT JOIN `cake_filling` AS `cake_filling_alias` ON `cake_filling_alias`.`cake_id` = `cake`.`id` AND `cake_filling_alias`.`cake_id` > 10",
+                r#"SELECT "cake"."id", "cake"."name", "cake_filling_alias"."cake_id" AS "cake_filling_cake_id" FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
+                r#"LEFT JOIN "cake_filling" AS "cake_filling_alias" ON "cake_filling_alias"."cake_id" = "cake"."id" AND "cake_filling_alias"."cake_id" > 10"#,
             ]
             .join(" ")
         );
@@ -629,12 +628,12 @@ mod tests {
                         }),
                     Alias::new("cake_filling_alias")
                 )
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name`, `cake_filling_alias`.`cake_id` AS `cake_filling_cake_id` FROM `cake`",
-                "LEFT JOIN `fruit` ON `cake`.`id` = `fruit`.`cake_id` OR `fruit`.`name` LIKE '%tropical%'",
-                "LEFT JOIN `cake_filling` AS `cake_filling_alias` ON `cake_filling_alias`.`cake_id` = `cake`.`id` OR `cake_filling_alias`.`cake_id` > 10",
+                r#"SELECT "cake"."id", "cake"."name", "cake_filling_alias"."cake_id" AS "cake_filling_cake_id" FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" OR "fruit"."name" LIKE '%tropical%'"#,
+                r#"LEFT JOIN "cake_filling" AS "cake_filling_alias" ON "cake_filling_alias"."cake_id" = "cake"."id" OR "cake_filling_alias"."cake_id" > 10"#,
             ]
             .join(" ")
         );

@@ -182,7 +182,7 @@ mod tests {
             #[pgorm(table_name = "primary_key_of_4")]
             pub struct Model {
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_1: TimeDateTimeWithTimeZone,
+                pub id_1: DateTimeWithTimeZone,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_2: Uuid,
                 #[pgorm(primary_key, auto_increment = false)]
@@ -231,11 +231,11 @@ mod tests {
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_5: Time,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_6: TimeTime,
+                pub id_6: Time,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_7: DateTime,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_8: TimeDateTime,
+                pub id_8: DateTime,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_9: DateTimeLocal,
                 #[pgorm(primary_key, auto_increment = false)]
@@ -265,25 +265,25 @@ mod tests {
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_2: i8,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_3: u8,
+                pub id_3: i16,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_4: i16,
+                pub id_4: i32,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_5: u16,
+                pub id_5: u32,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_6: i32,
+                pub id_6: i64,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_7: u32,
+                pub id_7: f32,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_8: i64,
+                pub id_8: f64,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_9: u64,
+                pub id_9: bool,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_10: f32,
+                pub id_10: Uuid,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_11: f64,
+                pub id_11: Decimal,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_12: bool,
+                pub id_12: Date,
                 pub owner: String,
                 pub name: String,
                 pub description: String,

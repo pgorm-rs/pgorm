@@ -5,20 +5,24 @@ pub mod common;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::TryInsertResult;
 use pgorm::entity::prelude::*;
-use pgorm::{Set, pgorm_query::OnConflict};
+use pgorm::{ActiveValue::Set, DatabaseConnection, pgorm_query::OnConflict};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("upsert_tests").await;
     create_tables(&ctx.db).await?;
-    create_insert_default(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    create_insert_default(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
     let on_conflict = OnConflict::column(Column::Id)
@@ -34,6 +38,8 @@ pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
     .exec(db)
     .await;
 
+    // [spec:pgorm:sem:exec.crud.insert] last_insert_id comes from the last
+    // RETURNING row of the batch.
     assert_eq!(res?.last_insert_id, 3);
 
     let res = Entity::insert_many([

@@ -4,7 +4,9 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    ActiveEnum as ActiveEnumTrait, DatabasePool,
+    ActiveEnum as ActiveEnumTrait,
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
@@ -15,13 +17,17 @@ use pretty_assertions::assert_eq;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("enum_primary_key_tests").await;
     create_tables(&ctx.db).await?;
-    insert_teas(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    insert_teas(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), DbErr> {
     use teas::*;
 
     let model = Model {
@@ -40,7 +46,7 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
         .insert(db)
         .await?
     );
-    assert_eq!(model, Entity::find().one(db).await?.unwrap());
+    assert_eq!(model, Entity::find().one(db).await?);
     assert_eq!(
         model,
         Entity::find()
@@ -49,7 +55,6 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Color.is_null())
             .one(db)
             .await?
-            .unwrap()
     );
 
     // UNIQUE constraint failed
@@ -84,7 +89,7 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
     .save(db)
     .await?;
 
-    let model = Entity::find().one(db).await?.unwrap();
+    let model = Entity::find().one(db).await?;
     assert_eq!(
         model,
         Model {
@@ -101,7 +106,6 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Color.eq(Color::Black))
             .one(db)
             .await?
-            .unwrap()
     );
     assert_eq!(
         model,
@@ -112,7 +116,6 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
             )
             .one(db)
             .await?
-            .unwrap()
     );
     // Equivalent to the above.
     assert_eq!(
@@ -121,13 +124,12 @@ pub async fn insert_teas(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Id.is_in([Tea::EverydayTea]))
             .one(db)
             .await?
-            .unwrap()
     );
 
     let res = model.delete(db).await?;
 
     assert_eq!(res.rows_affected, 1);
-    assert_eq!(Entity::find().one(db).await?, None);
+    assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())
 }

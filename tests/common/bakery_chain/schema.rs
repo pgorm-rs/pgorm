@@ -1,9 +1,11 @@
 use super::*;
 use crate::common::setup::create_table;
-use pgorm::{DatabasePool, DbConn, ExecResult, error::*, pgorm_query};
+use pgorm::{ConnectionTrait, DatabasePool, error::*, pgorm_query};
 use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Table};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
+    let db = &db.get().await?;
+
     create_bakery_table(db).await?;
     create_baker_table(db).await?;
     create_customer_table(db).await?;
@@ -15,7 +17,10 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_bakery_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_bakery_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(bakery::Entity)
         .col(
@@ -36,7 +41,10 @@ pub async fn create_bakery_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Bakery).await
 }
 
-pub async fn create_baker_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_baker_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(baker::Entity)
         .col(
@@ -66,7 +74,10 @@ pub async fn create_baker_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Baker).await
 }
 
-pub async fn create_customer_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_customer_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(customer::Entity)
         .col(
@@ -83,7 +94,10 @@ pub async fn create_customer_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Customer).await
 }
 
-pub async fn create_order_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_order_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(order::Entity)
         .col(
@@ -128,7 +142,10 @@ pub async fn create_order_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Order).await
 }
 
-pub async fn create_lineitem_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_lineitem_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(lineitem::Entity)
         .col(
@@ -177,7 +194,10 @@ pub async fn create_lineitem_table(db: &DbConn) -> Result<ExecResult, DbErr> {
     create_table(db, &stmt, Lineitem).await
 }
 
-pub async fn create_cakes_bakers_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_cakes_bakers_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(cakes_bakers::Entity)
         .col(
@@ -215,7 +235,10 @@ pub async fn create_cakes_bakers_table(db: &DbConn) -> Result<ExecResult, DbErr>
     create_table(db, &stmt, CakesBakers).await
 }
 
-pub async fn create_cake_table(db: &DbConn) -> Result<ExecResult, DbErr> {
+pub async fn create_cake_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
     let stmt = Table::create()
         .table(cake::Entity)
         .col(

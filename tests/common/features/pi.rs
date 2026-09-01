@@ -8,11 +8,7 @@ pub struct Model {
     #[pgorm(column_type = "Decimal(Some((11, 10)))")]
     pub decimal: Decimal,
     #[pgorm(column_type = "Decimal(Some((11, 10)))")]
-    pub big_decimal: BigDecimal,
-    #[pgorm(column_type = "Decimal(Some((11, 10)))")]
     pub decimal_opt: Option<Decimal>,
-    #[pgorm(column_type = "Decimal(Some((11, 10)))")]
-    pub big_decimal_opt: Option<BigDecimal>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

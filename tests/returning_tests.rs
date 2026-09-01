@@ -3,17 +3,28 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{IntoActiveModel, Set, entity::prelude::*};
-pub use pgorm_query::{Expr, Query};
+use pgorm::{
+    ActiveValue::Set, ColumnTrait, DatabaseConnection, IntoActiveModel, ValueHolder,
+    entity::prelude::*, types::ToSql,
+};
+pub use pgorm_query::{Expr, Query, QueryBuilder, Values};
 use serde_json::json;
+
+fn holders(values: Values) -> Vec<ValueHolder> {
+    values.into_iter().map(ValueHolder).collect()
+}
+
+fn params(holders: &[ValueHolder]) -> Vec<&(dyn ToSql + Sync)> {
+    holders.iter().map(|v| v as &(dyn ToSql + Sync)).collect()
+}
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     use bakery::*;
 
     let ctx = TestContext::new("returning_tests").await;
-    let db = &ctx.db;
-    let builder = db.get_database_backend();
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
 
     let mut insert = Query::insert();
     insert
@@ -31,62 +42,39 @@ async fn main() -> Result<(), DbErr> {
         .and_where(Column::Id.eq(1));
 
     let columns = [Column::Id, Column::Name, Column::ProfitMargin];
-    let returning =
-        Query::returning().exprs(columns.into_iter().map(|c| c.into_returning_expr(builder)));
+    let returning = Query::returning().exprs(columns.into_iter().map(|c| c.into_returning_expr()));
 
-    create_tables(db).await?;
+    insert.returning(returning.clone());
+    let (sql, values) = insert.build(QueryBuilder);
+    let bound = holders(values);
+    let insert_res = db.query_one(&sql, &params(&bound)).await?;
+    let _id: i32 = insert_res.try_get("id")?;
+    let _name: String = insert_res.try_get("name")?;
+    let _profit_margin: f64 = insert_res.try_get("profit_margin")?;
 
-    if db.support_returning() {
-        insert.returning(returning.clone());
-        let insert_res = db
-            .query_one(builder.build(&insert))
-            .await?
-            .expect("Insert failed with query_one");
-        let _id: i32 = insert_res.try_get("", "id")?;
-        let _name: String = insert_res.try_get("", "name")?;
-        let _profit_margin: f64 = insert_res.try_get("", "profit_margin")?;
+    update.returning(returning.clone());
+    let (sql, values) = update.build(QueryBuilder);
+    let bound = holders(values);
+    let update_res = db.query_one(&sql, &params(&bound)).await?;
+    let _id: i32 = update_res.try_get("id")?;
+    let _name: String = update_res.try_get("name")?;
+    let _profit_margin: f64 = update_res.try_get("profit_margin")?;
 
-        update.returning(returning.clone());
-        let update_res = db
-            .query_one(builder.build(&update))
-            .await?
-            .expect("Update filed with query_one");
-        let _id: i32 = update_res.try_get("", "id")?;
-        let _name: String = update_res.try_get("", "name")?;
-        let _profit_margin: f64 = update_res.try_get("", "profit_margin")?;
-    } else {
-        let insert_res = db.execute(builder.build(&insert)).await?;
-        assert!(insert_res.rows_affected() > 0);
-
-        let update_res = db.execute(builder.build(&update)).await?;
-        assert!(update_res.rows_affected() > 0);
-    }
-
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
 #[pgorm_macros::test]
-#[cfg_attr(
-    any(
-        feature = "sqlx-mysql",
-        all(
-            feature = "sqlx-sqlite",
-            not(feature = "sqlite-use-returning-for-3_35")
-        )
-    ),
-    should_panic(expected = "Database backend doesn't support RETURNING")
-)]
 async fn update_many() {
     pub use common::{TestContext, features::*};
     use edit_log::*;
 
     let run = || async {
         let ctx = TestContext::new("returning_tests_update_many").await;
-        let db = &ctx.db;
-
-        create_tables(db).await?;
+        create_tables(&ctx.db).await?;
+        let db = ctx.db.get().await?;
 
         Entity::insert(
             Model {
@@ -96,7 +84,7 @@ async fn update_many() {
             }
             .into_active_model(),
         )
-        .exec(db)
+        .exec(&db)
         .await?;
 
         Entity::insert(
@@ -107,7 +95,7 @@ async fn update_many() {
             }
             .into_active_model(),
         )
-        .exec(db)
+        .exec(&db)
         .await?;
 
         Entity::insert(
@@ -118,11 +106,11 @@ async fn update_many() {
             }
             .into_active_model(),
         )
-        .exec(db)
+        .exec(&db)
         .await?;
 
         assert_eq!(
-            Entity::find().all(db).await?,
+            Entity::find().all(&db).await?,
             [
                 Model {
                     id: 1,
@@ -150,7 +138,7 @@ async fn update_many() {
                     Expr::value(json!({ "remarks": "save log" }))
                 )
                 .filter(Column::Action.eq("before_save"))
-                .exec_with_returning(db)
+                .exec_with_returning(&db)
                 .await?,
             [
                 Model {
@@ -175,10 +163,13 @@ async fn update_many() {
         assert_eq!(
             Entity::update_many()
                 .filter(Column::Action.eq("before_save"))
-                .exec_with_returning(db)
+                .exec_with_returning(&db)
                 .await?,
             []
         );
+
+        drop(db);
+        ctx.delete().await;
 
         Result::<(), DbErr>::Ok(())
     };

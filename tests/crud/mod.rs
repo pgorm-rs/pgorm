@@ -16,9 +16,9 @@ pub use updates::*;
 
 pub use super::common::bakery_chain::*;
 pub use crate::common::setup::rust_dec;
-use pgorm::{DbConn, entity::*};
+use pgorm::{ActiveValue::Set, DatabaseConnection, entity::*};
 
-pub async fn test_create_bakery(db: &DbConn) {
+pub async fn test_create_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -30,7 +30,7 @@ pub async fn test_create_bakery(db: &DbConn) {
         .expect("could not insert bakery");
 
     let bakery: Option<bakery::Model> = Bakery::find_by_id(res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find bakery");
 
@@ -40,7 +40,7 @@ pub async fn test_create_bakery(db: &DbConn) {
     assert!((bakery_model.profit_margin - 10.4).abs() < f64::EPSILON);
 }
 
-pub async fn test_create_customer(db: &DbConn) {
+pub async fn test_create_customer(db: &DatabaseConnection) {
     let customer_kate = customer::ActiveModel {
         name: Set("Kate".to_owned()),
         notes: Set(Some("Loves cheese cake".to_owned())),
@@ -52,7 +52,7 @@ pub async fn test_create_customer(db: &DbConn) {
         .expect("could not insert customer");
 
     let customer: Option<customer::Model> = Customer::find_by_id(res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find customer");
 

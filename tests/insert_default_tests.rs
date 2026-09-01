@@ -3,20 +3,24 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::entity::prelude::*;
+use pgorm::{DatabaseConnection, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("insert_default_tests").await;
     create_tables(&ctx.db).await?;
-    create_insert_default(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    create_insert_default(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
     let active_model = ActiveModel {

@@ -4,13 +4,13 @@ pub mod common;
 
 use active_enum::Entity as ActiveEnumEntity;
 pub use common::{TestContext, features::*, setup::*};
-#[cfg(feature = "sqlx-postgres")]
-use pgorm::QueryTrait;
 use pgorm::{
-    ActiveEnum as ActiveEnumTrait, DatabasePool,
+    ActiveEnum as ActiveEnumTrait,
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection, QueryTrait,
     entity::prelude::*,
     entity::*,
-    pgorm_query::{BinOper, Expr},
+    pgorm_query::{BinOper, Expr, QueryBuilder, QueryStatementWriter},
 };
 use pretty_assertions::assert_eq;
 
@@ -18,21 +18,21 @@ use pretty_assertions::assert_eq;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("active_enum_tests").await;
     create_tables(&ctx.db).await?;
-    insert_active_enum(&ctx.db).await?;
-    insert_active_enum_child(&ctx.db).await?;
 
-    #[cfg(feature = "sqlx-postgres")]
-    insert_active_enum_vec(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    insert_active_enum(&db).await?;
+    insert_active_enum_child(&db).await?;
+    insert_active_enum_vec(&db).await?;
+    find_related_active_enum(&db).await?;
+    find_linked_active_enum(&db).await?;
 
-    find_related_active_enum(&ctx.db).await?;
-    find_linked_active_enum(&ctx.db).await?;
-
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     use active_enum::*;
 
     let model = Model {
@@ -53,7 +53,7 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
         .insert(db)
         .await?
     );
-    assert_eq!(model, Entity::find().one(db).await?.unwrap());
+    assert_eq!(model, Entity::find().one(db).await?);
     assert_eq!(
         model,
         Entity::find()
@@ -63,7 +63,6 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Tea.is_null())
             .one(db)
             .await?
-            .unwrap()
     );
 
     let _ = ActiveModel {
@@ -75,7 +74,7 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     .save(db)
     .await?;
 
-    let model = Entity::find().one(db).await?.unwrap();
+    let model = Entity::find().one(db).await?;
     assert_eq!(
         model,
         Model {
@@ -94,7 +93,6 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Tea.eq(Tea::EverydayTea))
             .one(db)
             .await?
-            .unwrap()
     );
 
     assert_eq!(
@@ -106,27 +104,23 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             )
             .one(db)
             .await?
-            .unwrap()
     );
     // Equivalent to the above.
     let select_with_tea_in =
         Entity::find().filter(Column::Tea.is_in([Tea::EverydayTea, Tea::BreakfastTea]));
-    #[cfg(feature = "sqlx-postgres")]
     assert_eq!(
-        select_with_tea_in
-            .build(pgorm::DatabaseBackend::Postgres)
-            .to_string(),
+        select_with_tea_in.as_query().to_string(QueryBuilder),
         [
             r#"SELECT "active_enum"."id","#,
             r#""active_enum"."category","#,
             r#""active_enum"."color","#,
             r#"CAST("active_enum"."tea" AS text)"#,
-            r#"FROM "public"."active_enum""#,
+            r#"FROM "active_enum""#,
             r#"WHERE "active_enum"."tea" IN (CAST('EverydayTea' AS tea), CAST('BreakfastTea' AS tea))"#,
         ]
         .join(" ")
     );
-    assert_eq!(model, select_with_tea_in.one(db).await?.unwrap());
+    assert_eq!(model, select_with_tea_in.one(db).await?);
 
     assert_eq!(
         model,
@@ -138,33 +132,29 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             )
             .one(db)
             .await?
-            .unwrap()
     );
     // Equivalent to the above.
     let select_with_tea_not_in = Entity::find()
         .filter(Column::Tea.is_not_null())
         .filter(Column::Tea.is_not_in([Tea::BreakfastTea]));
 
-    #[cfg(feature = "sqlx-postgres")]
     assert_eq!(
-        select_with_tea_not_in
-            .build(pgorm::DatabaseBackend::Postgres)
-            .to_string(),
+        select_with_tea_not_in.as_query().to_string(QueryBuilder),
         [
             r#"SELECT "active_enum"."id","#,
             r#""active_enum"."category","#,
             r#""active_enum"."color","#,
             r#"CAST("active_enum"."tea" AS text)"#,
-            r#"FROM "public"."active_enum""#,
+            r#"FROM "active_enum""#,
             r#"WHERE "active_enum"."tea" IS NOT NULL"#,
             r#"AND "active_enum"."tea" NOT IN (CAST('BreakfastTea' AS tea))"#,
         ]
         .join(" ")
     );
 
-    assert_eq!(model, select_with_tea_not_in.one(db).await?.unwrap());
+    assert_eq!(model, select_with_tea_not_in.one(db).await?);
 
-    // String enums should be compared alphabetically in all supported DBs.
+    // String enums are compared alphabetically.
     // 'B' < 'S', so Big is considered "smaller" than Small.
     assert_eq!(
         model,
@@ -172,10 +162,9 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Category.lt(Category::Small))
             .one(db)
             .await?
-            .unwrap()
     );
 
-    // Integer enums should be compared by value in all supported DBs.
+    // Integer enums are compared by value.
     // 0 <= 1, so Black is considered "smaller or equal to" White.
     assert_eq!(
         model,
@@ -183,32 +172,13 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Color.lte(Color::White))
             .one(db)
             .await?
-            .unwrap()
     );
 
-    // Native enum comparisons are not portable.
-    //
     // Postgres enums are compared by their definition order
     // (see https://www.postgresql.org/docs/current/datatype-enum.html#DATATYPE-ENUM-ORDERING).
     // Tea was defined as ('EverydayTea', 'BreakfastTea'), so EverydayTea is considered "smaller" than BreakfastTea.
-    //
-    // SQLite doesn't support enum types and pgorm works around this limitation by storing them as strings.
-    // When treated as strings, EverydayTea is not "smaller" than BreakfastTea!
-    //
-    // MySQL should be the same as Postgres (see https://dev.mysql.com/doc/refman/8.0/en/enum.html#enum-sorting),
-    // but in practice this test case behaves like SQLite. I'm not sure why.
-    #[cfg(feature = "sqlx-postgres")]
     assert_eq!(
         model,
-        Entity::find()
-            .filter(Column::Tea.lt(Tea::BreakfastTea))
-            .one(db)
-            .await?
-            .unwrap()
-    );
-    #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-    assert_eq!(
-        None,
         Entity::find()
             .filter(Column::Tea.lt(Tea::BreakfastTea))
             .one(db)
@@ -218,12 +188,12 @@ pub async fn insert_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     let res = model.delete(db).await?;
 
     assert_eq!(res.rows_affected, 1);
-    assert_eq!(Entity::find().one(db).await?, None);
+    assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())
 }
 
-pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbErr> {
     use active_enum_child::*;
 
     active_enum::ActiveModel {
@@ -245,7 +215,7 @@ pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
     .insert(db)
     .await?;
 
-    let model = Entity::find().one(db).await?.unwrap();
+    let model = Entity::find().one(db).await?;
     assert_eq!(
         model,
         Model {
@@ -265,7 +235,6 @@ pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Tea.is_null())
             .one(db)
             .await?
-            .unwrap()
     );
 
     ActiveModel {
@@ -277,7 +246,7 @@ pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
     .save(db)
     .await?;
 
-    let model = Entity::find().one(db).await?.unwrap();
+    let model = Entity::find().one(db).await?;
     assert_eq!(
         model,
         Model {
@@ -297,13 +266,12 @@ pub async fn insert_active_enum_child(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Tea.eq(Tea::EverydayTea))
             .one(db)
             .await?
-            .unwrap()
     );
 
     Ok(())
 }
 
-pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
     use categories::*;
 
     let model = Model {
@@ -321,7 +289,7 @@ pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
         .insert(db)
         .await?
     );
-    assert_eq!(model, Entity::find().one(db).await?.unwrap());
+    assert_eq!(model, Entity::find().one(db).await?);
     assert_eq!(
         model,
         Entity::find()
@@ -329,7 +297,6 @@ pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
             .filter(Column::Categories.is_null())
             .one(db)
             .await?
-            .unwrap()
     );
 
     let _ = ActiveModel {
@@ -340,7 +307,7 @@ pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
     .save(db)
     .await?;
 
-    let model = Entity::find().one(db).await?.unwrap();
+    let model = Entity::find().one(db).await?;
     assert_eq!(
         model,
         Model {
@@ -358,18 +325,17 @@ pub async fn insert_active_enum_vec(db: &DatabasePool) -> Result<(), DbErr> {
             ))
             .one(db)
             .await?
-            .unwrap()
     );
 
     let res = model.delete(db).await?;
 
     assert_eq!(res.rows_affected, 1);
-    assert_eq!(Entity::find().one(db).await?, None);
+    assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())
 }
 
-pub async fn find_related_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     assert_eq!(
         active_enum::Model {
             id: 2,
@@ -495,7 +461,7 @@ pub async fn find_related_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn find_linked_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     assert_eq!(
         active_enum::Model {
             id: 2,
@@ -624,7 +590,8 @@ pub async fn find_linked_active_enum(db: &DatabasePool) -> Result<(), DbErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use pgorm::{DbBackend, QueryTrait};
+    pub use pgorm::QueryTrait;
+    pub use pgorm::pgorm_query::{QueryBuilder, QueryStatementWriter};
     pub use pretty_assertions::assert_eq;
 
     #[test]
@@ -635,80 +602,26 @@ mod tests {
             color: None,
             tea: None,
         };
-        let _select = active_enum_model.find_related(ActiveEnumChild);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select.build(DbBackend::Sqlite).to_string(),
-                [
-                    r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", "active_enum_child"."tea""#,
-                    r#"FROM "active_enum_child""#,
-                    r#"INNER JOIN "active_enum" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
-                    r#"WHERE "active_enum"."id" = 1"#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select.build(DbBackend::MySql).to_string(),
-                [
-                    "SELECT `active_enum_child`.`id`, `active_enum_child`.`parent_id`, `active_enum_child`.`category`, `active_enum_child`.`color`, `active_enum_child`.`tea`",
-                    "FROM `active_enum_child`",
-                    "INNER JOIN `active_enum` ON `active_enum`.`id` = `active_enum_child`.`parent_id`",
-                    "WHERE `active_enum`.`id` = 1",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = active_enum_model.find_related(ActiveEnumChild);
         assert_eq!(
-            _select.build(DbBackend::Postgres).to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", CAST("active_enum_child"."tea" AS text)"#,
-                r#"FROM "public"."active_enum_child""#,
-                r#"INNER JOIN "public"."active_enum" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
+                r#"FROM "active_enum_child""#,
+                r#"INNER JOIN "active_enum" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
                 r#"WHERE "active_enum"."id" = 1"#,
             ]
             .join(" ")
         );
 
-        let _select = ActiveEnumEntity::find().find_also_related(ActiveEnumChild);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select
-                    .build(DbBackend::Sqlite)
-                    .to_string(),
-                [
-                    r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", "active_enum"."tea" AS "A_tea","#,
-                    r#""active_enum_child"."id" AS "B_id", "active_enum_child"."parent_id" AS "B_parent_id", "active_enum_child"."category" AS "B_category", "active_enum_child"."color" AS "B_color", "active_enum_child"."tea" AS "B_tea""#,
-                    r#"FROM "active_enum""#,
-                    r#"LEFT JOIN "active_enum_child" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select
-                    .build(DbBackend::MySql)
-                    .to_string(),
-                [
-                    "SELECT `active_enum`.`id` AS `A_id`, `active_enum`.`category` AS `A_category`, `active_enum`.`color` AS `A_color`, `active_enum`.`tea` AS `A_tea`,",
-                    "`active_enum_child`.`id` AS `B_id`, `active_enum_child`.`parent_id` AS `B_parent_id`, `active_enum_child`.`category` AS `B_category`, `active_enum_child`.`color` AS `B_color`, `active_enum_child`.`tea` AS `B_tea`",
-                    "FROM `active_enum`",
-                    "LEFT JOIN `active_enum_child` ON `active_enum`.`id` = `active_enum_child`.`parent_id`",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = ActiveEnumEntity::find().find_also_related(ActiveEnumChild);
         assert_eq!(
-            _select
-                .build(DbBackend::Postgres)
-                .to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
                 r#""active_enum_child"."id" AS "B_id", "active_enum_child"."parent_id" AS "B_parent_id", "active_enum_child"."category" AS "B_category", "active_enum_child"."color" AS "B_color", CAST("active_enum_child"."tea" AS text) AS "B_tea""#,
-                r#"FROM "public"."active_enum""#,
-                r#"LEFT JOIN "public"."active_enum_child" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
+                r#"FROM "active_enum""#,
+                r#"LEFT JOIN "active_enum_child" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
             ]
             .join(" ")
         );
@@ -722,80 +635,26 @@ mod tests {
             color: None,
             tea: None,
         };
-        let _select = active_enum_model.find_linked(active_enum::ActiveEnumChildLink);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select.build(DbBackend::Sqlite).to_string(),
-                [
-                    r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", "active_enum_child"."tea""#,
-                    r#"FROM "active_enum_child""#,
-                    r#"INNER JOIN "active_enum" AS "r0" ON "r0"."id" = "active_enum_child"."parent_id""#,
-                    r#"WHERE "r0"."id" = 1"#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select.build(DbBackend::MySql).to_string(),
-                [
-                    "SELECT `active_enum_child`.`id`, `active_enum_child`.`parent_id`, `active_enum_child`.`category`, `active_enum_child`.`color`, `active_enum_child`.`tea`",
-                    "FROM `active_enum_child`",
-                    "INNER JOIN `active_enum` AS `r0` ON `r0`.`id` = `active_enum_child`.`parent_id`",
-                    "WHERE `r0`.`id` = 1",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = active_enum_model.find_linked(active_enum::ActiveEnumChildLink);
         assert_eq!(
-            _select.build(DbBackend::Postgres).to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", CAST("active_enum_child"."tea" AS text)"#,
-                r#"FROM "public"."active_enum_child""#,
-                r#"INNER JOIN "public"."active_enum" AS "r0" ON "r0"."id" = "active_enum_child"."parent_id""#,
+                r#"FROM "active_enum_child""#,
+                r#"INNER JOIN "active_enum" AS "r0" ON "r0"."id" = "active_enum_child"."parent_id""#,
                 r#"WHERE "r0"."id" = 1"#,
             ]
             .join(" ")
         );
 
-        let _select = ActiveEnumEntity::find().find_also_linked(active_enum::ActiveEnumChildLink);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select
-                    .build(DbBackend::Sqlite)
-                    .to_string(),
-                [
-                    r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", "active_enum"."tea" AS "A_tea","#,
-                    r#""r0"."id" AS "B_id", "r0"."parent_id" AS "B_parent_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", "r0"."tea" AS "B_tea""#,
-                    r#"FROM "active_enum""#,
-                    r#"LEFT JOIN "active_enum_child" AS "r0" ON "active_enum"."id" = "r0"."parent_id""#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select
-                    .build(DbBackend::MySql)
-                    .to_string(),
-                [
-                    "SELECT `active_enum`.`id` AS `A_id`, `active_enum`.`category` AS `A_category`, `active_enum`.`color` AS `A_color`, `active_enum`.`tea` AS `A_tea`,",
-                    "`r0`.`id` AS `B_id`, `r0`.`parent_id` AS `B_parent_id`, `r0`.`category` AS `B_category`, `r0`.`color` AS `B_color`, `r0`.`tea` AS `B_tea`",
-                    "FROM `active_enum`",
-                    "LEFT JOIN `active_enum_child` AS `r0` ON `active_enum`.`id` = `r0`.`parent_id`",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = ActiveEnumEntity::find().find_also_linked(active_enum::ActiveEnumChildLink);
         assert_eq!(
-            _select
-                .build(DbBackend::Postgres)
-                .to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
                 r#""r0"."id" AS "B_id", "r0"."parent_id" AS "B_parent_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
-                r#"FROM "public"."active_enum""#,
-                r#"LEFT JOIN "public"."active_enum_child" AS "r0" ON "active_enum"."id" = "r0"."parent_id""#,
+                r#"FROM "active_enum""#,
+                r#"LEFT JOIN "active_enum_child" AS "r0" ON "active_enum"."id" = "r0"."parent_id""#,
             ]
             .join(" ")
         );
@@ -810,80 +669,26 @@ mod tests {
             color: None,
             tea: None,
         };
-        let _select = active_enum_child_model.find_related(ActiveEnum);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select.build(DbBackend::Sqlite).to_string(),
-                [
-                    r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", "active_enum"."tea""#,
-                    r#"FROM "active_enum""#,
-                    r#"INNER JOIN "active_enum_child" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
-                    r#"WHERE "active_enum_child"."id" = 1"#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select.build(DbBackend::MySql).to_string(),
-                [
-                    "SELECT `active_enum`.`id`, `active_enum`.`category`, `active_enum`.`color`, `active_enum`.`tea`",
-                    "FROM `active_enum`",
-                    "INNER JOIN `active_enum_child` ON `active_enum_child`.`parent_id` = `active_enum`.`id`",
-                    "WHERE `active_enum_child`.`id` = 1",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = active_enum_child_model.find_related(ActiveEnum);
         assert_eq!(
-            _select.build(DbBackend::Postgres).to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", CAST("active_enum"."tea" AS text)"#,
-                r#"FROM "public"."active_enum""#,
-                r#"INNER JOIN "public"."active_enum_child" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
+                r#"FROM "active_enum""#,
+                r#"INNER JOIN "active_enum_child" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
                 r#"WHERE "active_enum_child"."id" = 1"#,
             ]
             .join(" ")
         );
 
-        let _select = ActiveEnumChild::find().find_also_related(ActiveEnum);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select
-                    .build(DbBackend::Sqlite)
-                    .to_string(),
-                [
-                    r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", "active_enum_child"."tea" AS "A_tea","#,
-                    r#""active_enum"."id" AS "B_id", "active_enum"."category" AS "B_category", "active_enum"."color" AS "B_color", "active_enum"."tea" AS "B_tea""#,
-                    r#"FROM "active_enum_child""#,
-                    r#"LEFT JOIN "active_enum" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select
-                    .build(DbBackend::MySql)
-                    .to_string(),
-                [
-                    "SELECT `active_enum_child`.`id` AS `A_id`, `active_enum_child`.`parent_id` AS `A_parent_id`, `active_enum_child`.`category` AS `A_category`, `active_enum_child`.`color` AS `A_color`, `active_enum_child`.`tea` AS `A_tea`,",
-                    "`active_enum`.`id` AS `B_id`, `active_enum`.`category` AS `B_category`, `active_enum`.`color` AS `B_color`, `active_enum`.`tea` AS `B_tea`",
-                    "FROM `active_enum_child`",
-                    "LEFT JOIN `active_enum` ON `active_enum_child`.`parent_id` = `active_enum`.`id`",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = ActiveEnumChild::find().find_also_related(ActiveEnum);
         assert_eq!(
-            _select
-                .build(DbBackend::Postgres)
-                .to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
                 r#""active_enum"."id" AS "B_id", "active_enum"."category" AS "B_category", "active_enum"."color" AS "B_color", CAST("active_enum"."tea" AS text) AS "B_tea""#,
-                r#"FROM "public"."active_enum_child""#,
-                r#"LEFT JOIN "public"."active_enum" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
+                r#"FROM "active_enum_child""#,
+                r#"LEFT JOIN "active_enum" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
             ]
             .join(" ")
         );
@@ -898,80 +703,26 @@ mod tests {
             color: None,
             tea: None,
         };
-        let _select = active_enum_child_model.find_linked(active_enum_child::ActiveEnumLink);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select.build(DbBackend::Sqlite).to_string(),
-                [
-                    r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", "active_enum"."tea""#,
-                    r#"FROM "active_enum""#,
-                    r#"INNER JOIN "active_enum_child" AS "r0" ON "r0"."parent_id" = "active_enum"."id""#,
-                    r#"WHERE "r0"."id" = 1"#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select.build(DbBackend::MySql).to_string(),
-                [
-                    "SELECT `active_enum`.`id`, `active_enum`.`category`, `active_enum`.`color`, `active_enum`.`tea`",
-                    "FROM `active_enum`",
-                    "INNER JOIN `active_enum_child` AS `r0` ON `r0`.`parent_id` = `active_enum`.`id`",
-                    "WHERE `r0`.`id` = 1",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = active_enum_child_model.find_linked(active_enum_child::ActiveEnumLink);
         assert_eq!(
-            _select.build(DbBackend::Postgres).to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", CAST("active_enum"."tea" AS text)"#,
-                r#"FROM "public"."active_enum""#,
-                r#"INNER JOIN "public"."active_enum_child" AS "r0" ON "r0"."parent_id" = "active_enum"."id""#,
+                r#"FROM "active_enum""#,
+                r#"INNER JOIN "active_enum_child" AS "r0" ON "r0"."parent_id" = "active_enum"."id""#,
                 r#"WHERE "r0"."id" = 1"#,
             ]
             .join(" ")
         );
 
-        let _select = ActiveEnumChild::find().find_also_linked(active_enum_child::ActiveEnumLink);
-        #[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite"))]
-        {
-            assert_eq!(
-                _select
-                    .build(DbBackend::Sqlite)
-                    .to_string(),
-                [
-                    r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", "active_enum_child"."tea" AS "A_tea","#,
-                    r#""r0"."id" AS "B_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", "r0"."tea" AS "B_tea""#,
-                    r#"FROM "active_enum_child""#,
-                    r#"LEFT JOIN "active_enum" AS "r0" ON "active_enum_child"."parent_id" = "r0"."id""#,
-                ]
-                .join(" ")
-            );
-            assert_eq!(
-                _select
-                    .build(DbBackend::MySql)
-                    .to_string(),
-                [
-                    "SELECT `active_enum_child`.`id` AS `A_id`, `active_enum_child`.`parent_id` AS `A_parent_id`, `active_enum_child`.`category` AS `A_category`, `active_enum_child`.`color` AS `A_color`, `active_enum_child`.`tea` AS `A_tea`,",
-                    "`r0`.`id` AS `B_id`, `r0`.`category` AS `B_category`, `r0`.`color` AS `B_color`, `r0`.`tea` AS `B_tea`",
-                    "FROM `active_enum_child`",
-                    "LEFT JOIN `active_enum` AS `r0` ON `active_enum_child`.`parent_id` = `r0`.`id`",
-                ]
-                .join(" ")
-            );
-        }
-        #[cfg(feature = "sqlx-postgres")]
+        let select = ActiveEnumChild::find().find_also_linked(active_enum_child::ActiveEnumLink);
         assert_eq!(
-            _select
-                .build(DbBackend::Postgres)
-                .to_string(),
+            select.as_query().to_string(QueryBuilder),
             [
                 r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
                 r#""r0"."id" AS "B_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
-                r#"FROM "public"."active_enum_child""#,
-                r#"LEFT JOIN "public"."active_enum" AS "r0" ON "active_enum_child"."parent_id" = "r0"."id""#,
+                r#"FROM "active_enum_child""#,
+                r#"LEFT JOIN "active_enum" AS "r0" ON "active_enum_child"."parent_id" = "r0"."id""#,
             ]
             .join(" ")
         );
@@ -979,29 +730,24 @@ mod tests {
 
     #[test]
     fn create_enum_from() {
-        use pgorm::{Schema, Statement};
+        use pgorm::Schema;
 
-        let db_postgres = DbBackend::Postgres;
-        let schema = Schema::new(db_postgres);
+        let schema = Schema::new();
 
         assert_eq!(
             schema
                 .create_enum_from_entity(active_enum::Entity)
                 .iter()
-                .map(|stmt| db_postgres.build(stmt))
+                .map(|stmt| stmt.to_string(QueryBuilder))
                 .collect::<Vec<_>>(),
-            [Statement::from_string(
-                db_postgres,
-                r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#.to_owned()
-            ),]
+            [r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#.to_owned()]
         );
 
         assert_eq!(
-            db_postgres.build(&schema.create_enum_from_active_enum::<Tea>()),
-            Statement::from_string(
-                db_postgres,
-                r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#.to_owned()
-            )
+            schema
+                .create_enum_from_active_enum::<Tea>()
+                .to_string(QueryBuilder),
+            r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
         );
     }
 

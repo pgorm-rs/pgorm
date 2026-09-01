@@ -1150,691 +1150,81 @@ where
 
 #[cfg(test)]
 mod tests {
+    use pgorm::tests_cfg::*;
+    use pgorm::{EntityTrait, QueryTrait};
+    use pgorm_query::QueryBuilder;
     use pretty_assertions::assert_eq;
 
-    fn cake_fruit_model(
-        cake_id: i32,
-        fruit_id: i32,
-    ) -> (
-        pgorm::tests_cfg::cake::Model,
-        pgorm::tests_cfg::fruit::Model,
-    ) {
-        (cake_model(cake_id), fruit_model(fruit_id, Some(cake_id)))
-    }
-
-    fn cake_model(id: i32) -> pgorm::tests_cfg::cake::Model {
-        let name = match id {
-            1 => "apple cake",
-            2 => "orange cake",
-            3 => "fruit cake",
-            4 => "chocolate cake",
-            _ => "",
-        }
-        .to_string();
-        pgorm::tests_cfg::cake::Model { id, name }
-    }
-
-    fn filling_model(id: i32) -> pgorm::tests_cfg::filling::Model {
-        let name = match id {
-            1 => "apple juice",
-            2 => "orange jam",
-            3 => "fruit",
-            4 => "chocolate crust",
-            _ => "",
-        }
-        .to_string();
-        pgorm::tests_cfg::filling::Model {
-            id,
-            name,
-            vendor_id: Some(1),
-            ignored_attr: 0,
-        }
-    }
-
-    fn cake_filling_models(
-        cake_id: i32,
-        filling_id: i32,
-    ) -> (
-        pgorm::tests_cfg::cake::Model,
-        pgorm::tests_cfg::filling::Model,
-    ) {
-        (cake_model(cake_id), filling_model(filling_id))
-    }
-
-    fn fruit_model(id: i32, cake_id: Option<i32>) -> pgorm::tests_cfg::fruit::Model {
-        let name = match id {
-            1 => "apple",
-            2 => "orange",
-            3 => "grape",
-            4 => "strawberry",
-            _ => "",
-        }
-        .to_string();
-        pgorm::tests_cfg::fruit::Model { id, name, cake_id }
-    }
-
-    fn cake_vendor_link(
-        cake_id: i32,
-        vendor_id: i32,
-    ) -> (
-        pgorm::tests_cfg::cake::Model,
-        pgorm::tests_cfg::vendor::Model,
-    ) {
-        (cake_model(cake_id), vendor_model(vendor_id))
-    }
-
-    fn vendor_model(id: i32) -> pgorm::tests_cfg::vendor::Model {
-        let name = match id {
-            1 => "Apollo",
-            2 => "Benny",
-            3 => "Christine",
-            4 => "David",
-            _ => "",
-        }
-        .to_string();
-        pgorm::tests_cfg::vendor::Model { id, name }
-    }
-
-    #[smol_potat::test]
-    pub async fn also_related() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[cake_fruit_model(1, 1)]])
-            .into_connection();
-
+    #[test]
+    fn also_related_query() {
         assert_eq!(
-            Cake::find().find_also_related(Fruit).all(&db).await?,
-            [(cake_model(1), Some(fruit_model(1, Some(1))))]
-        );
-
-        assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                [
-                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                    r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-                    r#"FROM "cake""#,
-                    r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
-                ]
-                .join(" ")
-                .as_str(),
-                []
-            ),])]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_related_2() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[cake_fruit_model(1, 1), cake_fruit_model(1, 2)]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_also_related(Fruit).all(&db).await?,
+            Cake::find()
+                .find_also_related(Fruit)
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                (cake_model(1), Some(fruit_model(1, Some(1)))),
-                (cake_model(1), Some(fruit_model(2, Some(1))))
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
             ]
+            .join(" ")
         );
-
-        Ok(())
     }
 
-    #[smol_potat::test]
-    pub async fn also_related_3() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_fruit_model(1, 1),
-                cake_fruit_model(1, 2),
-                cake_fruit_model(2, 3),
-            ]])
-            .into_connection();
-
+    #[test]
+    fn with_related_query() {
         assert_eq!(
-            Cake::find().find_also_related(Fruit).all(&db).await?,
+            Cake::find()
+                .find_with_related(Fruit)
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                (cake_model(1), Some(fruit_model(1, Some(1)))),
-                (cake_model(1), Some(fruit_model(2, Some(1)))),
-                (cake_model(2), Some(fruit_model(3, Some(2))))
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+                r#"ORDER BY "cake"."id" ASC"#,
             ]
+            .join(" ")
         );
-
-        Ok(())
     }
 
-    #[smol_potat::test]
-    pub async fn also_related_4() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_fruit_model(1, 1).into_mock_row(),
-                cake_fruit_model(1, 2).into_mock_row(),
-                cake_fruit_model(2, 3).into_mock_row(),
-                (cake_model(3), None::<fruit::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_also_related(Fruit).all(&db).await?,
-            [
-                (cake_model(1), Some(fruit_model(1, Some(1)))),
-                (cake_model(1), Some(fruit_model(2, Some(1)))),
-                (cake_model(2), Some(fruit_model(3, Some(2)))),
-                (cake_model(3), None)
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_related_many_to_many() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_filling_models(1, 1).into_mock_row(),
-                cake_filling_models(1, 2).into_mock_row(),
-                cake_filling_models(2, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_also_related(Filling).all(&db).await?,
-            [
-                (cake_model(1), Some(filling_model(1))),
-                (cake_model(1), Some(filling_model(2))),
-                (cake_model(2), Some(filling_model(2))),
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_related_many_to_many_2() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_filling_models(1, 1).into_mock_row(),
-                cake_filling_models(1, 2).into_mock_row(),
-                cake_filling_models(2, 2).into_mock_row(),
-                (cake_model(3), None::<filling::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_also_related(Filling).all(&db).await?,
-            [
-                (cake_model(1), Some(filling_model(1))),
-                (cake_model(1), Some(filling_model(2))),
-                (cake_model(2), Some(filling_model(2))),
-                (cake_model(3), None)
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_related() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_fruit_model(1, 1),
-                cake_fruit_model(2, 2),
-                cake_fruit_model(2, 3),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_with_related(Fruit).all(&db).await?,
-            [
-                (cake_model(1), vec![fruit_model(1, Some(1))]),
-                (
-                    cake_model(2),
-                    vec![fruit_model(2, Some(2)), fruit_model(3, Some(2))]
-                )
-            ]
-        );
-
-        assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                [
-                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                    r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-                    r#"FROM "cake""#,
-                    r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
-                    r#"ORDER BY "cake"."id" ASC"#
-                ]
-                .join(" ")
-                .as_str(),
-                []
-            ),])]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_related_2() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_fruit_model(1, 1).into_mock_row(),
-                cake_fruit_model(2, 2).into_mock_row(),
-                cake_fruit_model(2, 3).into_mock_row(),
-                cake_fruit_model(2, 4).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_with_related(Fruit).all(&db).await?,
-            [
-                (cake_model(1), vec![fruit_model(1, Some(1)),]),
-                (
-                    cake_model(2),
-                    vec![
-                        fruit_model(2, Some(2)),
-                        fruit_model(3, Some(2)),
-                        fruit_model(4, Some(2)),
-                    ]
-                ),
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_related_empty() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_fruit_model(1, 1).into_mock_row(),
-                cake_fruit_model(2, 2).into_mock_row(),
-                cake_fruit_model(2, 3).into_mock_row(),
-                cake_fruit_model(2, 4).into_mock_row(),
-                (cake_model(3), None::<fruit::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_with_related(Fruit).all(&db).await?,
-            [
-                (cake_model(1), vec![fruit_model(1, Some(1)),]),
-                (
-                    cake_model(2),
-                    vec![
-                        fruit_model(2, Some(2)),
-                        fruit_model(3, Some(2)),
-                        fruit_model(4, Some(2)),
-                    ]
-                ),
-                (cake_model(3), vec![])
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_related_many_to_many() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_filling_models(1, 1).into_mock_row(),
-                cake_filling_models(1, 2).into_mock_row(),
-                cake_filling_models(2, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_with_related(Filling).all(&db).await?,
-            [
-                (cake_model(1), vec![filling_model(1), filling_model(2)]),
-                (cake_model(2), vec![filling_model(2)]),
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_related_many_to_many_2() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_filling_models(1, 1).into_mock_row(),
-                cake_filling_models(1, 2).into_mock_row(),
-                cake_filling_models(2, 2).into_mock_row(),
-                (cake_model(3), None::<filling::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find().find_with_related(Filling).all(&db).await?,
-            [
-                (cake_model(1), vec![filling_model(1), filling_model(2)]),
-                (cake_model(2), vec![filling_model(2)]),
-                (cake_model(3), vec![])
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_linked_base() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[cake_vendor_link(1, 1)]])
-            .into_connection();
-
+    #[test]
+    fn also_linked_query() {
         assert_eq!(
             Cake::find()
                 .find_also_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [(cake_model(1), Some(vendor_model(1)))]
-        );
-
-        assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                [
-                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                    r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                    r#"FROM "cake""#,
-                    r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                    r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                    r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-                ]
-                .join(" ")
-                .as_str(),
-                []
-            ),])]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_linked_same_cake() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1),
-                cake_vendor_link(1, 2),
-                cake_vendor_link(2, 3),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                (cake_model(1), Some(vendor_model(1))),
-                (cake_model(1), Some(vendor_model(2))),
-                (cake_model(2), Some(vendor_model(3)))
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
+                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
+                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
             ]
+            .join(" ")
         );
-
-        Ok(())
     }
 
-    #[smol_potat::test]
-    pub async fn also_linked_same_vendor() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(2, 1).into_mock_row(),
-                cake_vendor_link(3, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), Some(vendor_model(1))),
-                (cake_model(2), Some(vendor_model(1))),
-                (cake_model(3), Some(vendor_model(2))),
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_linked_many_to_many() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(1, 2).into_mock_row(),
-                cake_vendor_link(1, 3).into_mock_row(),
-                cake_vendor_link(2, 1).into_mock_row(),
-                cake_vendor_link(2, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), Some(vendor_model(1))),
-                (cake_model(1), Some(vendor_model(2))),
-                (cake_model(1), Some(vendor_model(3))),
-                (cake_model(2), Some(vendor_model(1))),
-                (cake_model(2), Some(vendor_model(2))),
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn also_linked_empty() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(2, 2).into_mock_row(),
-                cake_vendor_link(3, 3).into_mock_row(),
-                (cake_model(4), None::<vendor::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), Some(vendor_model(1))),
-                (cake_model(2), Some(vendor_model(2))),
-                (cake_model(3), Some(vendor_model(3))),
-                (cake_model(4), None)
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_linked_base() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, MockDatabase, Statement, Transaction};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1),
-                cake_vendor_link(2, 2),
-                cake_vendor_link(2, 3),
-            ]])
-            .into_connection();
-
+    #[test]
+    fn with_linked_query() {
         assert_eq!(
             Cake::find()
                 .find_with_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                (cake_model(1), vec![vendor_model(1)]),
-                (cake_model(2), vec![vendor_model(2), vendor_model(3)])
+                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
+                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
+                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
+                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
             ]
+            .join(" ")
         );
-
-        assert_eq!(
-            db.into_transaction_log(),
-            [Transaction::many([Statement::from_sql_and_values(
-                DbBackend::Postgres,
-                [
-                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                    r#""r2"."id" AS "B_id", "r2"."name" AS "B_name" FROM "cake""#,
-                    r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                    r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                    r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-                ]
-                .join(" ")
-                .as_str(),
-                []
-            ),])]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_linked_same_vendor() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(2, 2).into_mock_row(),
-                cake_vendor_link(3, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_with_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), vec![vendor_model(1)]),
-                (cake_model(2), vec![vendor_model(2)]),
-                (cake_model(3), vec![vendor_model(2)])
-            ]
-        );
-
-        Ok(())
-    }
-
-    #[smol_potat::test]
-    pub async fn with_linked_empty() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(2, 1).into_mock_row(),
-                cake_vendor_link(2, 2).into_mock_row(),
-                (cake_model(3), None::<vendor::Model>).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_with_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), vec![vendor_model(1)]),
-                (cake_model(2), vec![vendor_model(1), vendor_model(2)]),
-                (cake_model(3), vec![])
-            ]
-        );
-
-        Ok(())
-    }
-
-    // normally would not happen
-    #[smol_potat::test]
-    pub async fn with_linked_repeated() -> Result<(), pgorm::DbErr> {
-        use pgorm::tests_cfg::*;
-        use pgorm::{DbBackend, EntityTrait, IntoMockRow, MockDatabase};
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_query_results([[
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(1, 1).into_mock_row(),
-                cake_vendor_link(2, 1).into_mock_row(),
-                cake_vendor_link(2, 2).into_mock_row(),
-            ]])
-            .into_connection();
-
-        assert_eq!(
-            Cake::find()
-                .find_with_linked(entity_linked::CakeToFillingVendor)
-                .all(&db)
-                .await?,
-            [
-                (cake_model(1), vec![vendor_model(1), vendor_model(1)]),
-                (cake_model(2), vec![vendor_model(1), vendor_model(2)]),
-            ]
-        );
-
-        Ok(())
     }
 }

@@ -3,7 +3,6 @@ use pgorm::entity::prelude::*;
 use pgorm::{ActiveValue, IntoActiveValue};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[cfg_attr(feature = "sqlx-postgres", pgorm(schema_name = "public"))]
 #[pgorm(table_name = "custom_active_model")]
 pub struct Model {
     #[pgorm(primary_key)]

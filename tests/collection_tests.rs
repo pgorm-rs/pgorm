@@ -3,24 +3,32 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, DerivePartialModel, FromQueryResult, entity::prelude::*, entity::*};
+use pgorm::{
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection, DerivePartialModel, FromQueryResult,
+    entity::prelude::*,
+    entity::*,
+};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
 #[pgorm_macros::test]
-#[cfg(all(feature = "sqlx-postgres", feature = "postgres-array"))]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("collection_tests").await;
     create_tables(&ctx.db).await?;
-    insert_collection(&ctx.db).await?;
-    update_collection(&ctx.db).await?;
-    select_collection(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    insert_collection(&db).await?;
+    update_collection(&db).await?;
+    select_collection(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_collection(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
@@ -113,64 +121,16 @@ pub async fn insert_collection(db: &DatabasePool) -> Result<(), DbErr> {
             uuid: vec![uuid],
             uuid_hyphenated: vec![uuid.hyphenated()],
         }
-    );
-
-    assert_eq!(
-        Entity::find_by_id(1).into_json().one(db).await?,
-        Some(json!({
-            "id": 1,
-            "name": "Collection 1",
-            "integers": [1, 2, 3],
-            "integers_opt": [1, 2, 3],
-            "teas": ["BreakfastTea"],
-            "teas_opt": ["BreakfastTea"],
-            "colors": [0],
-            "colors_opt": [0],
-            "uuid": [uuid],
-            "uuid_hyphenated": [uuid.hyphenated()],
-        }))
-    );
-
-    assert_eq!(
-        Entity::find_by_id(2).into_json().one(db).await?,
-        Some(json!({
-            "id": 2,
-            "name": "Collection 2",
-            "integers": [10, 9],
-            "integers_opt": null,
-            "teas": ["BreakfastTea"],
-            "teas_opt": null,
-            "colors": [0],
-            "colors_opt": null,
-            "uuid": [uuid],
-            "uuid_hyphenated": [uuid.hyphenated()],
-        }))
-    );
-
-    assert_eq!(
-        Entity::find_by_id(3).into_json().one(db).await?,
-        Some(json!({
-            "id": 3,
-            "name": "Collection 3",
-            "integers": [],
-            "integers_opt": [],
-            "teas": [],
-            "teas_opt": [],
-            "colors": [],
-            "colors_opt": [],
-            "uuid": [uuid],
-            "uuid_hyphenated": [uuid.hyphenated()],
-        }))
     );
 
     Ok(())
 }
 
-pub async fn update_collection(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn update_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
-    let model = Entity::find_by_id(1).one(db).await?.unwrap();
+    let model = Entity::find_by_id(1).one(db).await?;
 
     ActiveModel {
         integers: Set(vec![4, 5, 6]),
@@ -202,7 +162,7 @@ pub async fn update_collection(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn select_collection(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn select_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     use collection::*;
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq)]
@@ -213,7 +173,7 @@ pub async fn select_collection(db: &DatabasePool) -> Result<(), DbErr> {
 
     let result = Entity::find_by_id(1)
         .into_partial_model::<PartialSelectResult>()
-        .one(db)
+        .one_opt(db)
         .await?;
 
     assert_eq!(

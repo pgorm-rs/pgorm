@@ -185,7 +185,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::tests_cfg::{cake, fruit};
-    use crate::{DbBackend, entity::*, query::*};
+    use crate::{entity::*, query::*};
+    use pgorm_query::QueryBuilder;
 
     #[test]
     fn delete_1() {
@@ -194,8 +195,8 @@ mod tests {
                 id: 1,
                 name: "Apple Pie".to_owned(),
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
         );
         assert_eq!(
@@ -203,8 +204,8 @@ mod tests {
                 id: ActiveValue::set(1),
                 name: ActiveValue::set("Apple Pie".to_owned()),
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
         );
     }
@@ -214,8 +215,8 @@ mod tests {
         assert_eq!(
             Delete::many(fruit::Entity)
                 .filter(fruit::Column::Name.contains("Cheese"))
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Cheese%'"#,
         );
     }

@@ -3,20 +3,24 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("uuid_fmt_tests").await;
     create_tables(&ctx.db).await?;
-    insert_uuid_fmt(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    insert_uuid_fmt(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_uuid_fmt(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_uuid_fmt(db: &DatabaseConnection) -> Result<(), DbErr> {
     let uuid = Uuid::new_v4();
 
     let uuid_fmt = uuid_fmt::Model {

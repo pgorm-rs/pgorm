@@ -13,7 +13,12 @@ pub use common::{
     },
     setup::*,
 };
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection,
+    entity::prelude::*,
+    entity::*,
+};
 use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
 use pretty_assertions::assert_eq;
 
@@ -21,15 +26,17 @@ use pretty_assertions::assert_eq;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("value_type_tests").await;
     create_tables(&ctx.db).await?;
-    insert_value(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    insert_value(&db).await?;
+    drop(db);
     ctx.delete().await;
 
-    if cfg!(feature = "sqlx-postgres") {
-        let ctx = TestContext::new("value_type_postgres_tests").await;
-        create_tables(&ctx.db).await?;
-        postgres_insert_value(&ctx.db).await?;
-        ctx.delete().await;
-    }
+    let ctx = TestContext::new("value_type_postgres_tests").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    postgres_insert_value(&db).await?;
+    drop(db);
+    ctx.delete().await;
 
     type_test();
     conversion_test();
@@ -37,7 +44,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_value(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
     let model = value_type_general::Model {
         id: 1,
         number: 48.into(),
@@ -48,7 +55,7 @@ pub async fn insert_value(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn postgres_insert_value(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn postgres_insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
     let model = value_type_pg::Model {
         id: 1,
         number: 48.into(),

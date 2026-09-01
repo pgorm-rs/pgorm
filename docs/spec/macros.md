@@ -339,11 +339,9 @@ including known limitations.
 > are rejected ("This macro doesn't support enums with lifetimes."); type parameters
 > are supported via a `PhantomData` marker.
 
-> [spec:pgorm:sem:macros.derive.test-attr]
+> [spec:pgorm:sem:macros.derive.test-attr+1]
 > `#[pgorm_macros::test]` is a hidden test-harness attribute: it rewrites an async test
 > body into a `#[test]` fn that initialises a `tracing_subscriber` at DEBUG level with a
-> test writer and drives the body through `crate::block_on!`. The generated test is
-> additionally gated on `#[cfg(any(feature = "sqlx-mysql", feature = "sqlx-sqlite",
-> feature = "sqlx-postgres"))]` — feature names inherited from SeaORM that no pgorm
-> crate defines — so in this workspace every test wrapped by this attribute is
-> unconditionally compiled out.
+> test writer and drives the body through `crate::block_on!`. Caller attributes are
+> passed through to the generated fn verbatim. The expansion adds no cfg gating of its
+> own, so wrapped tests compile unconditionally.

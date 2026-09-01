@@ -460,10 +460,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ColumnTrait, Condition, DbBackend, EntityTrait, QueryFilter, QueryTrait, tests_cfg::*,
-    };
-    use pgorm_query::Query;
+    use crate::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryTrait, tests_cfg::*};
+    use pgorm_query::{Query, QueryBuilder};
 
     #[test]
     fn test_in_subquery_1() {
@@ -479,11 +477,11 @@ mod tests {
                         )
                     )
                 )
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "WHERE `cake`.`id` IN (SELECT MAX(`cake`.`id`) FROM `cake`)",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"WHERE "cake"."id" IN (SELECT MAX("cake"."id") FROM "cake")"#,
             ]
             .join(" ")
         );
@@ -503,11 +501,11 @@ mod tests {
                         )
                     )
                 )
-                .build(DbBackend::MySql)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             [
-                "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-                "WHERE `cake`.`id` IN (SELECT `cake_id` FROM `cake_filling`)",
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"WHERE "cake"."id" IN (SELECT "cake_id" FROM "cake_filling")"#,
             ]
             .join(" ")
         );
@@ -562,18 +560,12 @@ mod tests {
                 pub four: i32,
                 #[pgorm(unique, indexed, nullable)]
                 pub five: i64,
-                #[pgorm(unique)]
-                pub six: u8,
-                #[pgorm(indexed)]
-                pub seven: u16,
                 #[pgorm(nullable)]
                 pub eight: u32,
-                #[pgorm(unique, indexed, nullable)]
-                pub nine: u64,
                 #[pgorm(default_expr = "Expr::current_timestamp()")]
                 pub ten: DateTimeUtc,
                 #[pgorm(default_value = 7)]
-                pub eleven: u8,
+                pub eleven: i8,
                 #[pgorm(default_value = "twelve_value")]
                 pub twelve: String,
                 #[pgorm(default_expr = "\"twelve_value\"")]
@@ -604,20 +596,8 @@ mod tests {
             ColumnType::BigInteger.def().unique().indexed().nullable()
         );
         assert_eq!(
-            hello::Column::Six.def(),
-            ColumnType::TinyUnsigned.def().unique()
-        );
-        assert_eq!(
-            hello::Column::Seven.def(),
-            ColumnType::SmallUnsigned.def().indexed()
-        );
-        assert_eq!(
             hello::Column::Eight.def(),
             ColumnType::Unsigned.def().nullable()
-        );
-        assert_eq!(
-            hello::Column::Nine.def(),
-            ColumnType::BigUnsigned.def().unique().indexed().nullable()
         );
         assert_eq!(
             hello::Column::Ten.def(),
@@ -627,7 +607,7 @@ mod tests {
         );
         assert_eq!(
             hello::Column::Eleven.def(),
-            ColumnType::TinyUnsigned.def().default(7)
+            ColumnType::TinyInteger.def().default(7)
         );
         assert_eq!(
             hello::Column::Twelve.def(),
@@ -1099,13 +1079,11 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().build(DbBackend::Postgres).to_string(),
+                E::find().as_query().to_string(QueryBuilder),
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model)
-                    .build(DbBackend::Postgres)
-                    .to_string(),
+                Update::one(active_model).as_query().to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = 2, "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1230,13 +1208,11 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().build(DbBackend::Postgres).to_string(),
+                E::find().as_query().to_string(QueryBuilder),
                 r#"SELECT "hello"."id", "hello"."one1", "hello"."two", "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model)
-                    .build(DbBackend::Postgres)
-                    .to_string(),
+                Update::one(active_model).as_query().to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1368,13 +1344,11 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().build(DbBackend::Postgres).to_string(),
+                E::find().as_query().to_string(QueryBuilder),
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model)
-                    .build(DbBackend::Postgres)
-                    .to_string(),
+                Update::one(active_model).as_query().to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }

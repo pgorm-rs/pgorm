@@ -232,17 +232,15 @@ mod tests {
 
     #[test]
     fn test_create_table_from_entity_table_ref() {
-        for builder in [DbBackend::Postgres] {
-            let schema = Schema::new(builder);
-            assert_eq!(
-                builder.build(&schema.create_table_from_entity(CakeFillingPrice)),
-                builder.build(
-                    &get_cake_filling_price_stmt()
-                        .table(CakeFillingPrice.table_ref())
-                        .to_owned()
-                )
-            );
-        }
+        let schema = Schema::new();
+        assert_eq!(
+            schema
+                .create_table_from_entity(CakeFillingPrice)
+                .to_string(QueryBuilder),
+            get_cake_filling_price_stmt()
+                .table(CakeFillingPrice.table_ref())
+                .to_string(QueryBuilder)
+        );
     }
 
     fn get_cake_filling_price_stmt() -> TableCreateStatement {
@@ -284,35 +282,39 @@ mod tests {
 
     #[test]
     fn test_create_index_from_entity_table_ref() {
-        for builder in [DbBackend::Postgres] {
-            let schema = Schema::new(builder);
+        let schema = Schema::new();
 
-            assert_eq!(
-                builder.build(&schema.create_table_from_entity(indexes::Entity)),
-                builder.build(
-                    &get_indexes_stmt()
-                        .table(indexes::Entity.table_ref())
-                        .to_owned()
-                )
-            );
+        assert_eq!(
+            schema
+                .create_table_from_entity(indexes::Entity)
+                .to_string(QueryBuilder),
+            get_indexes_stmt()
+                .table(indexes::Entity.table_ref())
+                .to_string(QueryBuilder)
+        );
 
-            let stmts = schema.create_index_from_entity(indexes::Entity);
-            assert_eq!(stmts.len(), 2);
+        let stmts = schema.create_index_from_entity(indexes::Entity);
+        assert_eq!(stmts.len(), 2);
 
-            let idx: IndexCreateStatement = Index::create()
-                .name("idx-indexes-index1_attr")
-                .table(indexes::Entity)
-                .col(indexes::Column::Index1Attr)
-                .to_owned();
-            assert_eq!(builder.build(&stmts[0]), builder.build(&idx));
+        let idx: IndexCreateStatement = Index::create()
+            .name("idx-indexes-index1_attr")
+            .table(indexes::Entity)
+            .col(indexes::Column::Index1Attr)
+            .to_owned();
+        assert_eq!(
+            stmts[0].to_string(QueryBuilder),
+            idx.to_string(QueryBuilder)
+        );
 
-            let idx: IndexCreateStatement = Index::create()
-                .name("idx-indexes-index2_attr")
-                .table(indexes::Entity)
-                .col(indexes::Column::Index2Attr)
-                .to_owned();
-            assert_eq!(builder.build(&stmts[1]), builder.build(&idx));
-        }
+        let idx: IndexCreateStatement = Index::create()
+            .name("idx-indexes-index2_attr")
+            .table(indexes::Entity)
+            .col(indexes::Column::Index2Attr)
+            .to_owned();
+        assert_eq!(
+            stmts[1].to_string(QueryBuilder),
+            idx.to_string(QueryBuilder)
+        );
     }
 
     fn get_indexes_stmt() -> TableCreateStatement {

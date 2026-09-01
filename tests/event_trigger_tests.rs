@@ -10,21 +10,29 @@ pub use common::{
     },
     setup::*,
 };
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection,
+    entity::prelude::*,
+    entity::*,
+};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-#[cfg(all(feature = "sqlx-postgres", feature = "postgres-array"))]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("event_trigger_tests").await;
     create_tables(&ctx.db).await?;
-    insert_event_trigger(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    insert_event_trigger(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_event_trigger(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_event_trigger(db: &DatabaseConnection) -> Result<(), DbErr> {
     let event_trigger = event_trigger::Model {
         id: 1,
         events: Events(
@@ -41,7 +49,7 @@ pub async fn insert_event_trigger(db: &DatabasePool) -> Result<(), DbErr> {
 
     let model = event_trigger::Entity::find()
         .filter(event_trigger::Column::Id.eq(event_trigger.id))
-        .one(db)
+        .one_opt(db)
         .await?;
 
     assert_eq!(model, Some(event_trigger));

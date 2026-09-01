@@ -932,6 +932,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::ActiveValue::{NotSet, Set, Unchanged};
     use crate::{DbErr, entity::*, tests_cfg::*};
     use pretty_assertions::assert_eq;
 
@@ -1268,72 +1269,6 @@ mod tests {
         Ok(())
     }
 
-    #[smol_potat::test]
-    #[cfg(feature = "with-json")]
-    async fn test_active_model_set_from_json_3() -> Result<(), DbErr> {
-        use crate::*;
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_results([
-                MockExecResult {
-                    last_insert_id: 1,
-                    rows_affected: 1,
-                },
-                MockExecResult {
-                    last_insert_id: 1,
-                    rows_affected: 1,
-                },
-            ])
-            .append_query_results([
-                [fruit::Model {
-                    id: 1,
-                    name: "Apple".to_owned(),
-                    cake_id: None,
-                }],
-                [fruit::Model {
-                    id: 2,
-                    name: "Orange".to_owned(),
-                    cake_id: Some(1),
-                }],
-            ])
-            .into_connection();
-
-        let mut fruit: fruit::ActiveModel = Default::default();
-        fruit.set_from_json(json!({
-            "name": "Apple",
-        }))?;
-        fruit.save(&db).await?;
-
-        let mut fruit = fruit::ActiveModel {
-            id: Set(2),
-            ..Default::default()
-        };
-        fruit.set_from_json(json!({
-            "id": 9,
-            "name": "Orange",
-            "cake_id": 1,
-        }))?;
-        fruit.save(&db).await?;
-
-        assert_eq!(
-            db.into_transaction_log(),
-            [
-                Transaction::from_sql_and_values(
-                    DbBackend::Postgres,
-                    r#"INSERT INTO "fruit" ("name") VALUES ($1) RETURNING "id", "name", "cake_id""#,
-                    ["Apple".into()],
-                ),
-                Transaction::from_sql_and_values(
-                    DbBackend::Postgres,
-                    r#"UPDATE "fruit" SET "name" = $1, "cake_id" = $2 WHERE "fruit"."id" = $3 RETURNING "id", "name", "cake_id""#,
-                    ["Orange".into(), 1i32.into(), 2i32.into()],
-                ),
-            ]
-        );
-
-        Ok(())
-    }
-
     #[test]
     fn test_active_model_is_changed() {
         let mut fruit: fruit::ActiveModel = Default::default();
@@ -1402,72 +1337,5 @@ mod tests {
                 cake_id: Set(Some(2)),
             },
         );
-    }
-
-    #[smol_potat::test]
-    async fn test_reset_2() -> Result<(), DbErr> {
-        use crate::*;
-
-        let db = MockDatabase::new(DbBackend::Postgres)
-            .append_exec_results(vec![
-                MockExecResult {
-                    last_insert_id: 1,
-                    rows_affected: 1,
-                },
-                MockExecResult {
-                    last_insert_id: 1,
-                    rows_affected: 1,
-                },
-            ])
-            .append_query_results(vec![
-                vec![fruit::Model {
-                    id: 1,
-                    name: "Apple".to_owned(),
-                    cake_id: None,
-                }],
-                vec![fruit::Model {
-                    id: 1,
-                    name: "Apple".to_owned(),
-                    cake_id: None,
-                }],
-            ])
-            .into_connection();
-
-        fruit::Model {
-            id: 1,
-            name: "Apple".into(),
-            cake_id: None,
-        }
-        .into_active_model()
-        .update(&db)
-        .await?;
-
-        fruit::Model {
-            id: 1,
-            name: "Apple".into(),
-            cake_id: None,
-        }
-        .into_active_model()
-        .reset_all()
-        .update(&db)
-        .await?;
-
-        assert_eq!(
-            db.into_transaction_log(),
-            vec![
-                Transaction::from_sql_and_values(
-                    DbBackend::Postgres,
-                    r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit" WHERE "fruit"."id" = $1 LIMIT $2"#,
-                    vec![1i32.into(), 1u64.into()],
-                ),
-                Transaction::from_sql_and_values(
-                    DbBackend::Postgres,
-                    r#"UPDATE "fruit" SET "name" = $1, "cake_id" = $2 WHERE "fruit"."id" = $3 RETURNING "id", "name", "cake_id""#,
-                    vec!["Apple".into(), Option::<i32>::None.into(), 1i32.into()],
-                ),
-            ]
-        );
-
-        Ok(())
     }
 }

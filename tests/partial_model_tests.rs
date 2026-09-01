@@ -1,7 +1,13 @@
 #![allow(unused_imports, dead_code)]
 
+pub mod common;
+
+pub use common::{TestContext, bakery_chain::*, setup::*};
 use entity::{Column, Entity};
-use pgorm::{ColumnTrait, DerivePartialModel, EntityTrait, FromQueryResult, ModelTrait};
+use pgorm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbErr, DerivePartialModel, EntityTrait,
+    FromQueryResult, ModelTrait, QueryOrder,
+};
 use pgorm_query::Expr;
 
 mod entity {
@@ -55,4 +61,78 @@ struct FieldFromExpr {
     _foo: f64,
     #[pgorm(from_expr = "Expr::col(Column::Id).equals(Column::Foo)")]
     _bar: bool,
+}
+
+#[derive(Debug, PartialEq, FromQueryResult, DerivePartialModel)]
+#[pgorm(entity = "bakery::Entity")]
+struct PartialBakery {
+    id: i32,
+    #[pgorm(from_col = "name")]
+    title: String,
+    #[pgorm(from_expr = "Expr::col(bakery::Column::ProfitMargin).mul(2.0)")]
+    double_margin: f64,
+}
+
+#[derive(Debug, PartialEq, FromQueryResult, DerivePartialModel)]
+#[pgorm(entity = "bakery::Entity")]
+struct MarginTotal {
+    #[pgorm(from_expr = "bakery::Column::ProfitMargin.sum()")]
+    total: f64,
+}
+
+#[pgorm_macros::test]
+async fn partial_model_select() -> Result<(), DbErr> {
+    let ctx = TestContext::new("partial_model_select").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    bakery::ActiveModel {
+        name: Set("SeaSide Bakery".to_owned()),
+        profit_margin: Set(10.5),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await?;
+
+    bakery::ActiveModel {
+        name: Set("Top Bakery".to_owned()),
+        profit_margin: Set(4.5),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await?;
+
+    let bakeries = bakery::Entity::find()
+        .order_by_asc(bakery::Column::Id)
+        .into_partial_model::<PartialBakery>()
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        bakeries,
+        [
+            PartialBakery {
+                id: 1,
+                title: "SeaSide Bakery".to_owned(),
+                double_margin: 21.0,
+            },
+            PartialBakery {
+                id: 2,
+                title: "Top Bakery".to_owned(),
+                double_margin: 9.0,
+            },
+        ]
+    );
+
+    let total = bakery::Entity::find()
+        .into_partial_model::<MarginTotal>()
+        .one(&db)
+        .await?;
+
+    assert_eq!(total, MarginTotal { total: 15.0 });
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
 }

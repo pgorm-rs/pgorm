@@ -2,7 +2,7 @@ pub use super::*;
 use chrono::offset::Utc;
 use uuid::Uuid;
 
-pub async fn test_create_order(db: &DbConn) {
+pub async fn test_create_order(db: &DatabaseConnection) {
     // Bakery
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
@@ -97,7 +97,7 @@ pub async fn test_create_order(db: &DbConn) {
         .expect("could not insert lineitem");
 
     let order: Option<order::Model> = Order::find_by_id(order_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find order");
 
@@ -106,7 +106,7 @@ pub async fn test_create_order(db: &DbConn) {
     assert_eq!(order_model.total, rust_dec(15.10));
 
     let customer: Option<customer::Model> = Customer::find_by_id(order_model.customer_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find customer");
 
@@ -114,7 +114,7 @@ pub async fn test_create_order(db: &DbConn) {
     assert_eq!(customer_model.name, "Kate");
 
     let bakery: Option<bakery::Model> = Bakery::find_by_id(order_model.bakery_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find bakery");
 

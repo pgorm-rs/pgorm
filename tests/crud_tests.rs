@@ -5,21 +5,23 @@ mod crud;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use crud::*;
-use pgorm::DatabasePool;
+use pgorm::DatabaseConnection;
 
 // Run the test locally:
-// DATABASE_URL="sqlite::memory:" cargo test --features sqlx-sqlite,runtime-async-std-native-tls --test crud_tests
-// DATABASE_URL="mysql://root:root@localhost" cargo test --features sqlx-mysql,runtime-async-std-native-tls --test crud_tests
-// DATABASE_URL="postgres://root:root@localhost" cargo test --features sqlx-postgres,runtime-async-std-native-tls --test crud_tests
+// DATABASE_URL="postgres://postgres:postgres@localhost" cargo test --test crud_tests
 #[pgorm_macros::test]
 async fn main() {
     let ctx = TestContext::new("bakery_chain_schema_crud_tests").await;
     create_tables(&ctx.db).await.unwrap();
-    create_entities(&ctx.db).await;
+
+    let db = ctx.db.get().await.unwrap();
+    create_entities(&db).await;
+    drop(db);
+
     ctx.delete().await;
 }
 
-pub async fn create_entities(db: &DatabasePool) {
+pub async fn create_entities(db: &DatabaseConnection) {
     test_create_bakery(db).await;
     test_create_baker(db).await;
     test_create_customer(db).await;
@@ -32,6 +34,6 @@ pub async fn create_entities(db: &DatabasePool) {
     test_update_deleted_customer(db).await;
 
     test_delete_cake(db).await;
-    test_cake_error_sqlx(db).await;
+    test_cake_error(db).await;
     test_delete_bakery(db).await;
 }

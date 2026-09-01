@@ -1,8 +1,8 @@
 pub use super::*;
-use pgorm::{DbErr, query::*};
+use pgorm::{DbErr, PaginatorTrait, query::*};
 use uuid::Uuid;
 
-pub async fn test_update_cake(db: &DbConn) {
+pub async fn test_update_cake(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -28,7 +28,7 @@ pub async fn test_update_cake(db: &DbConn) {
         .expect("could not insert cake");
 
     let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find cake");
 
@@ -47,7 +47,7 @@ pub async fn test_update_cake(db: &DbConn) {
     let _cake_update_res: cake::Model = cake_am.update(db).await.expect("could not update cake");
 
     let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find cake");
     let cake_model = cake.unwrap();
@@ -56,7 +56,7 @@ pub async fn test_update_cake(db: &DbConn) {
     assert!(!cake_model.gluten_free);
 }
 
-pub async fn test_update_bakery(db: &DbConn) {
+pub async fn test_update_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -68,7 +68,7 @@ pub async fn test_update_bakery(db: &DbConn) {
         .expect("could not insert bakery");
 
     let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find bakery");
 
@@ -85,7 +85,7 @@ pub async fn test_update_bakery(db: &DbConn) {
         bakery_am.update(db).await.expect("could not update bakery");
 
     let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find bakery");
     let bakery_model = bakery.unwrap();
@@ -93,7 +93,7 @@ pub async fn test_update_bakery(db: &DbConn) {
     assert!((bakery_model.profit_margin - 12.00).abs() < f64::EPSILON);
 }
 
-pub async fn test_update_deleted_customer(db: &DbConn) {
+pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
     let init_n_customers = Customer::find().count(db).await.unwrap();
 
     let customer = customer::ActiveModel {
@@ -123,12 +123,12 @@ pub async fn test_update_deleted_customer(db: &DbConn) {
 
     let customer_update_res = customer.update(db).await;
 
-    assert_eq!(customer_update_res, Err(DbErr::RecordNotUpdated));
+    assert_eq!(customer_update_res, Err(DbErr::RecordNotFound));
 
     assert_eq!(Customer::find().count(db).await.unwrap(), init_n_customers);
 
     let customer: Option<customer::Model> = Customer::find_by_id(customer_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find customer");
 

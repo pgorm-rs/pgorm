@@ -2,20 +2,23 @@
 
 pub mod common;
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, IntoActiveModel, entity::prelude::*};
+use pgorm::{DatabaseConnection, IntoActiveModel, entity::prelude::*};
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("delete_by_id_tests").await;
     create_tables(&ctx.db).await?;
-    create_and_delete_applog(&ctx.db).await?;
 
+    let db = ctx.db.get().await?;
+    create_and_delete_applog(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn create_and_delete_applog(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_and_delete_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
     let log1 = applog::Model {
         id: 1,
         action: "Testing".to_owned(),

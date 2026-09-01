@@ -4,7 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    DatabasePool, Delete, IntoActiveModel, Iterable, QueryTrait, Set, Update, entity::prelude::*,
+    ActiveValue::Set, DatabaseConnection, Delete, IntoActiveModel, Iterable, QueryTrait, Update,
+    entity::prelude::*,
 };
 use pgorm_query::{Expr, Query};
 use pretty_assertions::assert_eq;
@@ -13,13 +14,17 @@ use pretty_assertions::assert_eq;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("dyn_table_name_tests").await;
     create_tables(&ctx.db).await?;
-    dyn_table_name_lazy_static(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    dyn_table_name_lazy_static(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn dyn_table_name_lazy_static(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), DbErr> {
     use dyn_table_name_lazy_static::*;
 
     for i in 1..=2 {
@@ -46,7 +51,7 @@ pub async fn dyn_table_name_lazy_static(db: &DatabasePool) -> Result<(), DbErr> 
             .from(entity.table_ref())
             .to_owned();
         // Execute the select statement
-        assert_eq!(select.clone().one(db).await?, Some(model.clone()));
+        assert_eq!(select.clone().one(db).await?, model.clone());
 
         // Prepare update statement
         let update = Update::many(entity).set(ActiveModel {
@@ -58,17 +63,17 @@ pub async fn dyn_table_name_lazy_static(db: &DatabasePool) -> Result<(), DbErr> 
 
         assert_eq!(
             select.clone().one(db).await?,
-            Some(Model {
+            Model {
                 id: 1,
                 name: "1st Row (edited)".into(),
-            })
+            }
         );
 
         // Prepare delete statement
         let delete = Delete::many(entity).filter(Expr::col(Column::Id).eq(1));
         // Execute the delete statement
         assert_eq!(delete.exec(db).await?.rows_affected, 1);
-        assert_eq!(select.one(db).await?, None);
+        assert_eq!(select.one_opt(db).await?, None);
     }
 
     Ok(())

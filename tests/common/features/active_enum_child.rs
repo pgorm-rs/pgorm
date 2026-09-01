@@ -2,7 +2,6 @@ use super::pgorm_active_enums::*;
 use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[cfg_attr(feature = "sqlx-postgres", pgorm(schema_name = "public"))]
 #[pgorm(table_name = "active_enum_child")]
 pub struct Model {
     #[pgorm(primary_key)]

@@ -3,20 +3,29 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{
+    ActiveValue::{Set, Unchanged},
+    DatabaseConnection,
+    entity::prelude::*,
+    entity::*,
+};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("byte_primary_key_tests").await;
     create_tables(&ctx.db).await?;
-    create_and_update(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    create_and_update(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
     use common::features::byte_primary_key::*;
 
     let model = Model {
@@ -28,7 +37,7 @@ pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
         .exec(db)
         .await?;
 
-    assert_eq!(Entity::find().one(db).await?, Some(model.clone()));
+    assert_eq!(Entity::find().one_opt(db).await?, Some(model.clone()));
 
     assert_eq!(res.last_insert_id, model.id);
 
@@ -42,7 +51,9 @@ pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
         .exec(db)
         .await;
 
-    assert_eq!(update_res, Err(DbErr::RecordNotUpdated));
+    // [spec:pgorm:sem:exec.crud.update] UpdateOne decodes through `one`, so a
+    // filter matching zero rows surfaces RecordNotFound.
+    assert_eq!(update_res, Err(DbErr::RecordNotFound));
 
     let update_res = Entity::update(updated_active_model)
         .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
@@ -60,7 +71,7 @@ pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
     assert_eq!(
         Entity::find()
             .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
-            .one(db)
+            .one_opt(db)
             .await?,
         Some(Model {
             id: vec![1, 2, 3],
@@ -72,7 +83,7 @@ pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
         Entity::find()
             .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
             .into_values::<_, Column>()
-            .one(db)
+            .one_opt(db)
             .await?,
         Some((vec![1_u8, 2_u8, 3_u8], "First Row (Updated)".to_owned(),))
     );
@@ -81,7 +92,7 @@ pub async fn create_and_update(db: &DatabasePool) -> Result<(), DbErr> {
         Entity::find()
             .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
             .into_tuple()
-            .one(db)
+            .one_opt(db)
             .await?,
         Some((vec![1_u8, 2_u8, 3_u8], "First Row (Updated)".to_owned(),))
     );

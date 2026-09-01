@@ -214,9 +214,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::tests_cfg::{cake, fruit, lunch_set, pgorm_active_enums::Tea};
-    use crate::{DbBackend, entity::*, query::*};
-    use pgorm_query::{Expr, Value};
+    use crate::ActiveValue::{Set, Unchanged};
+    use crate::tests_cfg::{cake, fruit, lunch_set, sea_orm_active_enums::Tea};
+    use crate::{entity::*, query::*};
+    use pgorm_query::{Expr, QueryBuilder, Value};
 
     #[test]
     fn update_1() {
@@ -225,8 +226,8 @@ mod tests {
                 id: ActiveValue::set(1),
                 name: ActiveValue::set("Apple Pie".to_owned()),
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
         );
     }
@@ -239,8 +240,8 @@ mod tests {
                 name: ActiveValue::set("Orange".to_owned()),
                 cake_id: ActiveValue::not_set(),
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#,
         );
     }
@@ -253,8 +254,8 @@ mod tests {
                 name: ActiveValue::unchanged("Apple".to_owned()),
                 cake_id: ActiveValue::set(Some(3)),
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "cake_id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -265,8 +266,8 @@ mod tests {
             Update::many(fruit::Entity)
                 .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
                 .filter(fruit::Column::Id.eq(2))
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "cake_id" = NULL WHERE "fruit"."id" = 2"#,
         );
     }
@@ -281,8 +282,8 @@ mod tests {
                     ..Default::default()
                 })
                 .filter(fruit::Column::Id.eq(2))
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "name" = 'Apple', "cake_id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -296,8 +297,8 @@ mod tests {
                     ..Default::default()
                 })
                 .filter(fruit::Column::Id.eq(2))
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -311,8 +312,8 @@ mod tests {
                     ..Default::default()
                 })
                 .filter(lunch_set::Column::Tea.eq(Tea::BreakfastTea))
-                .build(DbBackend::Postgres)
-                .to_string(),
+                .as_query()
+                .to_string(QueryBuilder),
             r#"UPDATE "lunch_set" SET "tea" = CAST('EverydayTea' AS tea) WHERE "lunch_set"."tea" = (CAST('BreakfastTea' AS tea))"#,
         );
     }
@@ -325,8 +326,8 @@ mod tests {
                 tea: Set(Tea::EverydayTea),
                 ..Default::default()
             })
-            .build(DbBackend::Postgres)
-            .to_string(),
+            .as_query()
+            .to_string(QueryBuilder),
             r#"UPDATE "lunch_set" SET "tea" = CAST('EverydayTea' AS tea) WHERE "lunch_set"."id" = 1"#,
         );
     }

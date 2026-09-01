@@ -1,7 +1,7 @@
 pub use super::*;
 use serde::{Deserialize, Serialize};
 
-pub async fn test_create_baker(db: &DbConn) {
+pub async fn test_create_baker(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -36,7 +36,7 @@ pub async fn test_create_baker(db: &DbConn) {
         .expect("could not insert baker");
 
     let baker: Option<baker::Model> = Baker::find_by_id(res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find baker");
 
@@ -58,13 +58,12 @@ pub async fn test_create_baker(db: &DbConn) {
             .one(db)
             .await
             .expect("Bakery not found")
-            .unwrap()
             .name,
         "SeaSide Bakery"
     );
 
     let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .unwrap();
 

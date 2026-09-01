@@ -1,7 +1,7 @@
 pub use super::*;
 use uuid::Uuid;
 
-pub async fn test_create_cake(db: &DbConn) {
+pub async fn test_create_cake(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -43,7 +43,7 @@ pub async fn test_create_cake(db: &DbConn) {
         .expect("could not insert cake");
 
     let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find cake");
 
@@ -71,7 +71,6 @@ pub async fn test_create_cake(db: &DbConn) {
             .one(db)
             .await
             .expect("Bakery not found")
-            .unwrap()
             .name,
         "SeaSide Bakery"
     );
@@ -86,7 +85,7 @@ pub async fn test_create_cake(db: &DbConn) {
     assert_eq!(related_bakers[0].name, "Baker Bob");
 
     let baker: Option<baker::Model> = Baker::find_by_id(baker_insert_res.last_insert_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find baker");
 

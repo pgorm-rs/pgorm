@@ -3,20 +3,24 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, IntoActiveModel, Set, entity::prelude::*};
+use pgorm::{ActiveValue::Set, DatabaseConnection, IntoActiveModel, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("features_parallel_tests").await;
     create_tables(&ctx.db).await?;
-    crud_in_parallel(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    crud_in_parallel(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn crud_in_parallel(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn crud_in_parallel(db: &DatabaseConnection) -> Result<(), DbErr> {
     let metadata = [
         metadata::Model {
             uuid: Uuid::new_v4(),
@@ -54,9 +58,9 @@ pub async fn crud_in_parallel(db: &DatabasePool) -> Result<(), DbErr> {
     )?;
 
     let find_res = futures::try_join!(
-        Metadata::find_by_id(metadata[0].uuid).one(db),
-        Metadata::find_by_id(metadata[1].uuid).one(db),
-        Metadata::find_by_id(metadata[2].uuid).one(db),
+        Metadata::find_by_id(metadata[0].uuid).one_opt(db),
+        Metadata::find_by_id(metadata[1].uuid).one_opt(db),
+        Metadata::find_by_id(metadata[2].uuid).one_opt(db),
     )?;
 
     assert_eq!(
@@ -85,9 +89,9 @@ pub async fn crud_in_parallel(db: &DatabasePool) -> Result<(), DbErr> {
     )?;
 
     let find_res = futures::try_join!(
-        Metadata::find_by_id(metadata[0].uuid).one(db),
-        Metadata::find_by_id(metadata[1].uuid).one(db),
-        Metadata::find_by_id(metadata[2].uuid).one(db),
+        Metadata::find_by_id(metadata[0].uuid).one_opt(db),
+        Metadata::find_by_id(metadata[1].uuid).one_opt(db),
+        Metadata::find_by_id(metadata[2].uuid).one_opt(db),
     )?;
 
     assert_eq!(

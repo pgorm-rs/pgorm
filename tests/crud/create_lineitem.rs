@@ -2,7 +2,7 @@ pub use super::*;
 use chrono::offset::Utc;
 use uuid::Uuid;
 
-pub async fn test_create_lineitem(db: &DbConn) {
+pub async fn test_create_lineitem(db: &DatabaseConnection) {
     // Bakery
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
@@ -98,7 +98,7 @@ pub async fn test_create_lineitem(db: &DbConn) {
 
     let lineitem: Option<lineitem::Model> =
         Lineitem::find_by_id(lineitem_insert_res.last_insert_id)
-            .one(db)
+            .one_opt(db)
             .await
             .expect("could not find lineitem");
 
@@ -108,7 +108,7 @@ pub async fn test_create_lineitem(db: &DbConn) {
     assert_eq!(lineitem_model.price, rust_dec(7.55));
 
     let cake: Option<cake::Model> = Cake::find_by_id(lineitem_model.cake_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find cake");
 
@@ -116,7 +116,7 @@ pub async fn test_create_lineitem(db: &DbConn) {
     assert_eq!(cake_model.name, "Mud Cake");
 
     let order: Option<order::Model> = Order::find_by_id(lineitem_model.order_id)
-        .one(db)
+        .one_opt(db)
         .await
         .expect("could not find order");
 

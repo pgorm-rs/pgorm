@@ -3,25 +3,31 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DerivePartialModel, FromQueryResult, QuerySelect, Set, entity::prelude::*};
+use pgorm::{
+    ActiveValue::Set, DatabaseConnection, DerivePartialModel, FromQueryResult, QuerySelect,
+    entity::prelude::*,
+};
 use pretty_assertions::assert_eq;
-use serde_json::json;
 
 #[pgorm_macros::test]
 async fn cursor_tests() -> Result<(), DbErr> {
     let ctx = TestContext::new("cursor_tests").await;
     create_tables(&ctx.db).await?;
-    create_insert_default(&ctx.db).await?;
-    cursor_pagination(&ctx.db).await?;
     bakery_chain_schema::create_tables(&ctx.db).await?;
-    create_baker_cake(&ctx.db).await?;
-    cursor_related_pagination(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    create_insert_default(&db).await?;
+    cursor_pagination(&db).await?;
+    create_baker_cake(&db).await?;
+    cursor_related_pagination(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
     for _ in 0..10 {
@@ -51,7 +57,7 @@ pub async fn create_insert_default(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn cursor_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
     // Before 5, i.e. id < 5
@@ -403,23 +409,11 @@ pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
         [Row { id: 7 }, Row { id: 6 }]
     );
 
-    // Fetch JSON value
+    // Fetch partial model
 
     let mut cursor = Entity::find().cursor_by(Column::Id);
 
     cursor.after(5).before(8);
-
-    let mut cursor = cursor.into_json();
-
-    assert_eq!(
-        cursor.first(2).all(db).await?,
-        [json!({ "id": 6 }), json!({ "id": 7 })]
-    );
-
-    assert_eq!(
-        cursor.first(3).all(db).await?,
-        [json!({ "id": 6 }), json!({ "id": 7 })]
-    );
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq, Clone)]
     #[pgorm(entity = "Entity")]
@@ -460,23 +454,11 @@ pub async fn cursor_pagination(db: &DatabasePool) -> Result<(), DbErr> {
         ]
     );
 
-    // Fetch JSON value desc
+    // Fetch partial model desc
 
     let mut cursor = Entity::find().cursor_by(Column::Id);
 
     cursor.after(8).before(5).desc();
-
-    let mut cursor = cursor.into_json();
-
-    assert_eq!(
-        cursor.first(2).all(db).await?,
-        [json!({ "id": 7 }), json!({ "id": 6 })]
-    );
-
-    assert_eq!(
-        cursor.first(3).all(db).await?,
-        [json!({ "id": 7 }), json!({ "id": 6 })]
-    );
 
     let mut cursor = cursor.into_partial_model::<PartialRow>();
 
@@ -549,7 +531,7 @@ fn cakebaker(cake: char, baker: char) -> CakeBakerlite {
     }
 }
 
-pub async fn create_baker_cake(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
     let mut bakeries: Vec<bakery::ActiveModel> = vec![];
     // bakeries named from 1 to 10
     for i in 1..=10 {
@@ -607,7 +589,7 @@ pub async fn create_baker_cake(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn cursor_related_pagination(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
     use common::bakery_chain::*;
 
     assert_eq!(

@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -11,14 +11,18 @@ use serde_json::json;
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("json_struct_tests").await;
     create_tables(&ctx.db).await?;
-    insert_json_struct_1(&ctx.db).await?;
-    insert_json_struct_2(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    insert_json_struct_1(&db).await?;
+    insert_json_struct_2(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_json_struct_1(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> {
     use json_struct::*;
 
     let model = Model {
@@ -50,7 +54,7 @@ pub async fn insert_json_struct_1(db: &DatabasePool) -> Result<(), DbErr> {
     assert_eq!(
         Entity::find()
             .filter(Column::Id.eq(model.id))
-            .one(db)
+            .one_opt(db)
             .await?,
         Some(model)
     );
@@ -58,7 +62,7 @@ pub async fn insert_json_struct_1(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_struct_2(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_json_struct_2(db: &DatabaseConnection) -> Result<(), DbErr> {
     use json_struct::*;
 
     let model = Model {
@@ -85,7 +89,7 @@ pub async fn insert_json_struct_2(db: &DatabasePool) -> Result<(), DbErr> {
     assert_eq!(
         Entity::find()
             .filter(Column::Id.eq(model.id))
-            .one(db)
+            .one_opt(db)
             .await?,
         Some(model)
     );

@@ -5,22 +5,26 @@ mod crud;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::{
-    DatabasePool, DbBackend, EntityName, ExecResult, entity::*, error::DbErr, tests_cfg,
+    ActiveValue::Set, DatabaseConnection, DatabasePool, EntityName, entity::*, error::DbErr,
+    tests_cfg,
 };
 
 pub use crud::*;
-// use common::bakery_chain::*;
-use pgorm::{DbConn, TryInsertResult};
+use pgorm::TryInsertResult;
 
 #[pgorm_macros::test]
 async fn main() {
     let ctx = TestContext::new("bakery_chain_empty_insert_tests").await;
     create_tables(&ctx.db).await.unwrap();
-    test(&ctx.db).await;
+
+    let db = ctx.db.get().await.unwrap();
+    test(&db).await;
+
+    drop(db);
     ctx.delete().await;
 }
 
-pub async fn test(db: &DbConn) {
+pub async fn test(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
         profit_margin: Set(10.4),
@@ -47,6 +51,8 @@ pub async fn test(db: &DbConn) {
 
     assert!(matches!(conflict_insert, Ok(TryInsertResult::Conflicted)));
 
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe] An empty batch is a
+    // no-op that reports Empty before any SQL is issued.
     let empty_insert = Bakery::insert_many(std::iter::empty::<bakery::ActiveModel>())
         .on_empty_do_nothing()
         .exec(db)

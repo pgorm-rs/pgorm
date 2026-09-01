@@ -752,10 +752,6 @@ try_from_u64_err!(uuid::Uuid);
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
-    use pgorm_query::Value;
-
     use super::*;
 
     #[test]
@@ -777,7 +773,6 @@ mod tests {
 
     #[test]
     fn build_with_query() {
-        use pgorm::{DbBackend, Statement};
         use pgorm_query::*;
 
         let base_query = SelectStatement::new()
@@ -836,29 +831,16 @@ mod tests {
         let with_query = select.with(with_clause).to_owned();
 
         assert_eq!(
-            DbBackend::MySql.build(&with_query),
-            Statement::from_sql_and_values(
-                DbBackend::MySql,
-                r#"WITH RECURSIVE `cte_traversal` (`id`, `depth`, `next`, `value`) AS (SELECT `id`, ?, `next`, `value` FROM `table` UNION ALL (SELECT `id`, `depth` + ?, `next`, `value` FROM `table` INNER JOIN `cte_traversal` ON `cte_traversal`.`next` = `table`.`id`)) SELECT * FROM `cte_traversal`"#,
-                [1.into(), 1.into()]
-            )
-        );
-    }
-
-    #[test]
-    fn column_names_from_query_result() {
-        let mut values = BTreeMap::new();
-        values.insert("id".to_string(), Value::Int(Some(1)));
-        values.insert(
-            "name".to_string(),
-            Value::String(Some(Box::new("Abc".to_owned()))),
-        );
-        let query_result = QueryResult {
-            row: QueryResultRow::Mock(crate::MockRow { values }),
-        };
-        assert_eq!(
-            query_result.column_names(),
-            vec!["id".to_owned(), "name".to_owned()]
+            with_query.to_string(QueryBuilder),
+            [
+                r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS"#,
+                r#"(SELECT "id", 1, "next", "value" FROM "table" UNION ALL"#,
+                r#"(SELECT "id", "depth" + 1, "next", "value" FROM "table""#,
+                r#"INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id"))"#,
+                r#"CYCLE "id" SET "looped" USING "traversal_path""#,
+                r#"SELECT * FROM "cte_traversal""#,
+            ]
+            .join(" ")
         );
     }
 }

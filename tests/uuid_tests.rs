@@ -3,22 +3,25 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabasePool, entity::prelude::*, entity::*};
+use pgorm::{ActiveValue::Set, DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
-use serde_json::json;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("bakery_chain_schema_uuid_tests").await;
     create_tables(&ctx.db).await?;
-    create_and_update_metadata(&ctx.db).await?;
-    insert_metadata(&ctx.db).await?;
+
+    let db = ctx.db.get().await?;
+    create_and_update_metadata(&db).await?;
+    insert_metadata(&db).await?;
+
+    drop(db);
     ctx.delete().await;
 
     Ok(())
 }
 
-pub async fn insert_metadata(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),
@@ -33,29 +36,17 @@ pub async fn insert_metadata(db: &DatabasePool) -> Result<(), DbErr> {
 
     assert_eq!(result, metadata);
 
-    let json = metadata::Entity::find()
+    let found = metadata::Entity::find()
         .filter(metadata::Column::Uuid.eq(metadata.uuid))
-        .into_json()
-        .one(db)
+        .one_opt(db)
         .await?;
 
-    assert_eq!(
-        json,
-        Some(json!({
-            "uuid": metadata.uuid,
-            "type": metadata.ty,
-            "key": metadata.key,
-            "value": metadata.value,
-            "bytes": metadata.bytes,
-            "date": metadata.date,
-            "time": metadata.time,
-        }))
-    );
+    assert_eq!(found, Some(metadata));
 
     Ok(())
 }
 
-pub async fn create_and_update_metadata(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),
@@ -70,7 +61,7 @@ pub async fn create_and_update_metadata(db: &DatabasePool) -> Result<(), DbErr> 
         .exec(db)
         .await?;
 
-    assert_eq!(Metadata::find().one(db).await?, Some(metadata.clone()));
+    assert_eq!(Metadata::find().one_opt(db).await?, Some(metadata.clone()));
 
     assert_eq!(res.last_insert_id, metadata.uuid);
 
@@ -82,7 +73,7 @@ pub async fn create_and_update_metadata(db: &DatabasePool) -> Result<(), DbErr> 
     .exec(db)
     .await;
 
-    assert_eq!(update_res, Err(DbErr::RecordNotUpdated));
+    assert_eq!(update_res, Err(DbErr::RecordNotFound));
 
     Ok(())
 }

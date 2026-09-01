@@ -1,5 +1,5 @@
 use super::edit_log;
-use pgorm::{ConnectionTrait, Set, TryIntoModel, entity::prelude::*};
+use pgorm::{ActiveValue::Set, ConnectionTrait, TryIntoModel, entity::prelude::*};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize)]
