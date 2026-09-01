@@ -26,6 +26,7 @@ impl ToTokens for FromQueryResultItem {
 }
 
 /// Method to derive a [QueryResult](pgorm::QueryResult)
+// [spec:pgorm:sem:macros.derive.from-query-result]
 pub fn expand_derive_from_query_result(
     ident: Ident,
     data: Data,

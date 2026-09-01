@@ -7,6 +7,7 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::{Data, DataStruct, Expr, Field, Fields, LitStr, Type, punctuated::IntoIter};
 
 /// Method to derive an [ActiveModel](pgorm::ActiveModel)
+// [spec:pgorm:sem:macros.derive.active-model]
 pub fn expand_derive_active_model(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     // including ignored fields
     let all_fields = match data {

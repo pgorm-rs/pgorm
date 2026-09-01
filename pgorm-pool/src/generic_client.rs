@@ -18,6 +18,7 @@ mod private {
 /// A trait allowing abstraction over connections and transactions.
 ///
 /// This trait is "sealed", and cannot be implemented outside of this crate.
+// [spec:pgorm:def:conn.pool.generic-client]
 #[async_trait]
 pub trait GenericClient: Sync + private::Sealed {
     /// Like `Client::execute`.
@@ -89,6 +90,7 @@ pub trait GenericClient: Sync + private::Sealed {
 
 impl private::Sealed for Client {}
 
+// [spec:pgorm:def:conn.pool.generic-client]    Client delegation
 #[async_trait]
 impl GenericClient for Client {
     async fn execute<T>(&self, query: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
@@ -178,6 +180,7 @@ impl GenericClient for Client {
 
 impl private::Sealed for Transaction<'_> {}
 
+// [spec:pgorm:def:conn.pool.generic-client]    Transaction delegation
 #[async_trait]
 #[allow(clippy::needless_lifetimes)]
 impl GenericClient for Transaction<'_> {

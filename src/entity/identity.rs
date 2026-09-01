@@ -3,6 +3,7 @@ use pgorm_query::{Alias, DynIden, Iden, IntoIden, SeaRc};
 use std::fmt;
 
 /// List of column identifier
+// [spec:pgorm:def:entity.relation.def]
 #[derive(Debug, Clone)]
 pub enum Identity {
     /// Column identifier consists of 1 column

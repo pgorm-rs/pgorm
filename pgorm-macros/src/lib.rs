@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 
 use syn::{DeriveInput, Error, parse_macro_input};
 
+// [spec:pgorm:def:macros.derive]
 #[cfg(feature = "derive")]
 mod derives;
 
@@ -133,6 +134,8 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// #
 /// # impl ActiveModelBehavior for ActiveModel {}
 /// ```
+// [spec:pgorm:sem:macros.derive.entity-model]
+// [spec:pgorm:req:macros.derive.entity-model.reject]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveEntityModel, attributes(pgorm))]
 pub fn derive_entity_model(input: TokenStream) -> TokenStream {
@@ -797,6 +800,7 @@ pub fn derive_partial_model(input: TokenStream) -> TokenStream {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.test-attr]
 #[doc(hidden)]
 #[cfg(feature = "derive")]
 #[proc_macro_attribute]

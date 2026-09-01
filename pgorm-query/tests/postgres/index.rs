@@ -1,6 +1,7 @@
 use super::*;
 use pretty_assertions::assert_eq;
 
+// [spec:pgorm:req:sql.ddl.index-create/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -68,6 +69,7 @@ fn create_5() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.index-create/test]
 #[test]
 fn create_6() {
     assert_eq!(
@@ -83,6 +85,7 @@ fn create_6() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.index-drop/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -93,6 +96,7 @@ fn drop_1() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.index-drop/test]
 #[test]
 fn drop_2() {
     assert_eq!(
@@ -115,6 +119,7 @@ fn drop_3() {
     );
 }
 
+// [spec:pgorm:sem:sql.ddl.panics/test]
 #[test]
 #[should_panic(expected = "Not supported")]
 fn drop_4() {

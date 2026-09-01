@@ -55,6 +55,7 @@ impl Extension {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
+// [spec:pgorm:req:sql.ddl.extension]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensionCreateStatement {
     pub(crate) name: String,
@@ -428,6 +429,7 @@ where
     }
 }
 
+// [spec:pgorm:req:sql.ddl.type-enum]
 #[derive(Debug, Clone, Default)]
 pub struct TypeCreateStatement {
     pub(crate) name: Option<TypeRef>,
@@ -451,6 +453,7 @@ pub struct TypeDropStatement {
     pub(crate) if_exists: bool,
 }
 
+// [spec:pgorm:req:sql.ddl.type-alter-drop]
 #[derive(Debug, Clone, Default)]
 pub struct TypeAlterStatement {
     pub(crate) name: Option<TypeRef>,

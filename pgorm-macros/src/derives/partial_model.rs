@@ -173,6 +173,7 @@ impl DerivePartialModel {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.partial-model]
 pub fn expand_derive_partial_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 
@@ -248,6 +249,7 @@ struct PartialModel{
     expr_field : i32
 }
 "#;
+    // [spec:pgorm:sem:macros.derive.partial-model/test]
     #[test]
     fn test_load_macro_input() -> StdResult<()> {
         let input = parse_str::<DeriveInput>(CODE_SNIPPET)?;

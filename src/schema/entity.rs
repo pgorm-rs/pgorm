@@ -89,6 +89,7 @@ impl Schema {
     }
 }
 
+// [spec:pgorm:sem:schema.from-entity.enum]    from a single ActiveEnum
 pub(crate) fn create_enum_from_active_enum<A>() -> TypeCreateStatement
 where
     A: ActiveEnum,
@@ -106,6 +107,7 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> TypeCreateS
     Type::create().as_enum(name).values(values).to_owned()
 }
 
+// [spec:pgorm:sem:schema.from-entity.enum]
 #[allow(clippy::needless_borrow)]
 pub(crate) fn create_enum_from_entity<E>(_: E) -> Vec<TypeCreateStatement>
 where
@@ -124,6 +126,7 @@ where
     vec
 }
 
+// [spec:pgorm:sem:schema.from-entity.index]
 pub(crate) fn create_index_from_entity<E>(entity: E) -> Vec<IndexCreateStatement>
 where
     E: EntityTrait,
@@ -148,6 +151,7 @@ where
     vec
 }
 
+// [spec:pgorm:sem:schema.from-entity]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -182,6 +186,7 @@ where
     stmt.table(entity.table_ref()).take()
 }
 
+// [spec:pgorm:sem:schema.from-entity]    column + primary-key projection
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,

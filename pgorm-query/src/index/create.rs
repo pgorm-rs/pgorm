@@ -100,6 +100,7 @@ use super::common::*;
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
+// [spec:pgorm:req:sql.ddl.index-create]
 #[derive(Default, Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: Option<TableRef>,

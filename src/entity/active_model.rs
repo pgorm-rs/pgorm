@@ -36,6 +36,7 @@ pub use ActiveValue::NotSet;
 ///     r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#
 /// );
 /// ```
+// [spec:pgorm:def:entity.active-model.active-value]
 #[derive(Clone, Debug)]
 pub enum ActiveValue<V>
 where
@@ -49,6 +50,7 @@ where
     NotSet,
 }
 
+// [spec:pgorm:req:entity.active-model.from-sugar]
 impl<V: Into<Value>> From<V> for ActiveValue<V> {
     fn from(value: V) -> Self {
         ActiveValue::Set(value)
@@ -58,6 +60,7 @@ impl<V: Into<Value>> From<V> for ActiveValue<V> {
 /// A Trait for ActiveModel to perform Create, Update or Delete operation.
 /// The type must also implement the [EntityTrait].
 /// See module level docs [crate::entity] for a full example
+// [spec:pgorm:req:entity.active-model]
 #[async_trait]
 pub trait ActiveModelTrait: Clone + Debug {
     /// The Entity this ActiveModel belongs to
@@ -248,6 +251,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:req:entity.active-model.persistence]
     async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -373,6 +377,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:req:entity.active-model.persistence]
     async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -386,6 +391,7 @@ pub trait ActiveModelTrait: Clone + Debug {
 
     /// Insert the model if primary key is `NotSet`, update otherwise.
     /// Only works if the entity has auto increment primary key.
+    // [spec:pgorm:req:entity.active-model.save]
     async fn save<'a, C>(self, db: &'a C) -> Result<Self, DbErr>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -451,6 +457,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:req:entity.active-model.hooks]
     async fn delete<'a, C>(self, db: &'a C) -> Result<DeleteResult, DbErr>
     where
         Self: ActiveModelBehavior + 'a,
@@ -466,6 +473,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// Set the corresponding attributes in the ActiveModel from a JSON value
     ///
     /// Note that this method will not alter the primary key values in ActiveModel.
+    // [spec:pgorm:req:entity.active-model.json]
     #[cfg(feature = "with-json")]
     fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), DbErr>
     where
@@ -496,6 +504,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Create ActiveModel from a JSON value
+    // [spec:pgorm:req:entity.active-model.json]
     #[cfg(feature = "with-json")]
     fn from_json(json: serde_json::Value) -> Result<Self, DbErr>
     where
@@ -565,6 +574,7 @@ pub trait ActiveModelTrait: Clone + Debug {
 /// impl ActiveModelBehavior for ActiveModel {}
 /// ```
 /// See module level docs [crate::entity] for a full example
+// [spec:pgorm:req:entity.active-model.hooks]
 #[allow(unused_variables)]
 #[async_trait]
 pub trait ActiveModelBehavior: ActiveModelTrait {
@@ -611,6 +621,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
 }
 
 /// A Trait for any type that can be converted into an ActiveModel
+// [spec:pgorm:req:entity.active-model.into]
 pub trait IntoActiveModel<A>
 where
     A: ActiveModelTrait,
@@ -629,6 +640,7 @@ where
 }
 
 /// Any type that can be converted into an [ActiveValue]
+// [spec:pgorm:req:entity.active-model.into]
 pub trait IntoActiveValue<V>
 where
     V: Into<Value>,
@@ -748,6 +760,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:entity.active-model.active-value.ops]
 impl<V> ActiveValue<V>
 where
     V: Into<Value>,
@@ -887,6 +900,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:entity.active-model.active-value.ops]
 impl<V> std::convert::AsRef<V> for ActiveValue<V>
 where
     V: Into<Value>,
@@ -918,6 +932,7 @@ where
     }
 }
 
+// [spec:pgorm:req:entity.active-model.from-sugar]
 impl<V> From<ActiveValue<V>> for ActiveValue<Option<V>>
 where
     V: Into<Value> + Nullable,

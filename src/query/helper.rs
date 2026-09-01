@@ -16,6 +16,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
+// [spec:pgorm:sem:query.build.modifiers]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -587,6 +588,7 @@ pub trait QuerySelect: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
+// [spec:pgorm:sem:query.build.modifiers]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;
@@ -682,6 +684,7 @@ pub trait QueryOrder: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Perform a FILTER opertation on a statement
+// [spec:pgorm:sem:query.build.filter]
 pub trait QueryFilter: Sized {
     #[allow(missing_docs)]
     type QueryStatement: ConditionalStatement;
@@ -865,6 +868,7 @@ pub trait QueryFilter: Sized {
     }
 }
 
+// [spec:pgorm:sem:query.build.join]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
     let from_tbl = match unpack_table_alias(&rel.from_tbl) {

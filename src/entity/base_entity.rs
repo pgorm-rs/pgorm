@@ -8,12 +8,14 @@ use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
 /// Ensure the identifier for an Entity can be converted to a static str
+// [spec:pgorm:def:entity.traits]
 pub trait IdenStatic: Iden + Copy + Debug + 'static {
     /// Method to call to get the static string identity
     fn as_str(&self) -> &str;
 }
 
 /// A Trait for mapping an Entity to a database table
+// [spec:pgorm:req:entity.traits.entity-name]
 pub trait EntityName: IdenStatic + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {
@@ -54,6 +56,8 @@ pub trait EntityName: IdenStatic + Default {
 /// - Insert: `insert`, `insert_*`
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
+// [spec:pgorm:def:entity.traits]
+// [spec:pgorm:req:entity.traits.crud]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]
     type Model: ModelTrait<Entity = Self> + FromQueryResult;
@@ -268,6 +272,7 @@ pub trait EntityTrait: EntityName {
     /// # Panics
     ///
     /// Panics if arity of input values don't match arity of primary key
+    // [spec:pgorm:req:entity.traits.crud]
     fn find_by_id<T>(values: T) -> Select<Self>
     where
         T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,

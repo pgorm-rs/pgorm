@@ -29,6 +29,7 @@ where
     pub(crate) entity: PhantomData<E>,
 }
 
+// [spec:pgorm:sem:query.build.delete]
 impl Delete {
     /// Delete one Model or ActiveModel
     ///
@@ -101,6 +102,7 @@ impl Delete {
     }
 }
 
+// [spec:pgorm:sem:query.build.delete]
 impl<A> DeleteOne<A>
 where
     A: ActiveModelTrait,

@@ -95,6 +95,7 @@ impl Display {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.active-enum.expansion]
 pub fn expand_derive_active_enum_display(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

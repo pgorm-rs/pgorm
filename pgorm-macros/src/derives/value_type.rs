@@ -136,6 +136,7 @@ impl DeriveValueType {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.value-type]
 pub fn expand_derive_value_type(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let input_span = input.span();
     match DeriveValueType::new(input) {

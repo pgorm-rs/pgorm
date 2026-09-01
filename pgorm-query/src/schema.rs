@@ -9,6 +9,7 @@ pub enum SchemaStatement {
     ForeignKeyStatement(ForeignKeyStatement),
 }
 
+// [spec:pgorm:req:sql.ddl]
 pub trait SchemaStatementBuilder {
     /// Build corresponding SQL statement for certain database backend and return SQL string
     fn build(&self, schema_builder: QueryBuilder) -> String;

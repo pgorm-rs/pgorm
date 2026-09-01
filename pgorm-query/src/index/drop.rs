@@ -19,6 +19,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, TableIndex, types::*};
 ///     r#"DROP INDEX "idx-character-id""#
 /// );
 /// ```
+// [spec:pgorm:req:sql.ddl.index-drop]
 #[derive(Default, Debug, Clone)]
 pub struct IndexDropStatement {
     pub(crate) table: Option<TableRef>,

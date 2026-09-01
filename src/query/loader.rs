@@ -13,6 +13,7 @@ pub trait EntityOrSelect<E: EntityTrait>: Send {
 }
 
 /// This trait implements the Data Loader API
+// [spec:pgorm:req:query.loader]
 #[async_trait]
 pub trait LoaderTrait {
     /// Source model
@@ -119,6 +120,7 @@ where
     }
 }
 
+// [spec:pgorm:req:query.loader]
 #[async_trait]
 impl<M> LoaderTrait for &[M]
 where
@@ -126,6 +128,7 @@ where
 {
     type Model = M;
 
+    // [spec:pgorm:sem:query.loader.regroup]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -176,6 +179,7 @@ where
         Ok(result)
     }
 
+    // [spec:pgorm:sem:query.loader.regroup]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -235,6 +239,7 @@ where
         Ok(result)
     }
 
+    // [spec:pgorm:sem:query.loader.many-to-many]
     async fn load_many_to_many<R, S, V, C>(
         &self,
         stmt: S,
@@ -335,6 +340,7 @@ fn cmp_table_ref(left: &TableRef, right: &TableRef) -> bool {
     format!("{left:?}") == format!("{right:?}")
 }
 
+// [spec:pgorm:sem:query.loader.batching]
 fn extract_key<Model>(target_col: &Identity, model: &Model) -> ValueTuple
 where
     Model: ModelTrait,
@@ -398,6 +404,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:query.loader.batching]
 fn prepare_condition(table: &TableRef, col: &Identity, keys: &[ValueTuple]) -> Condition {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
@@ -430,6 +437,7 @@ fn prepare_condition(table: &TableRef, col: &Identity, keys: &[ValueTuple]) -> C
     }
 }
 
+// [spec:pgorm:req:query.loader.table-ref-limitation]
 fn table_column(tbl: &TableRef, col: &DynIden) -> ColumnRef {
     match tbl.to_owned() {
         TableRef::Table(tbl) => (tbl, col.clone()).into_column_ref(),

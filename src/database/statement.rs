@@ -3,6 +3,7 @@ pub use pgorm_query::{Value, Values};
 use std::fmt;
 
 /// Defines an SQL statement
+// [spec:pgorm:def:conn.statement]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statement {
     /// The SQL query
@@ -12,6 +13,7 @@ pub struct Statement {
 }
 
 /// Any type that can build a [Statement]
+// [spec:pgorm:def:conn.statement]    builder trait
 pub trait StatementBuilder {
     /// Method to call in order to build a [Statement]
     fn build(&self) -> Statement;
@@ -50,6 +52,7 @@ impl Statement {
     }
 }
 
+// [spec:pgorm:def:conn.statement]    display via parameter injection
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.values {
@@ -80,6 +83,7 @@ macro_rules! build_postgres_stmt {
     };
 }
 
+// [spec:pgorm:def:conn.statement]    query statements keep parameter values
 macro_rules! build_query_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
@@ -97,6 +101,7 @@ build_query_stmt!(pgorm_query::UpdateStatement);
 build_query_stmt!(pgorm_query::DeleteStatement);
 build_query_stmt!(pgorm_query::WithQuery);
 
+// [spec:pgorm:def:conn.statement]    schema statements render to SQL only
 macro_rules! build_schema_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {
@@ -118,6 +123,7 @@ build_schema_stmt!(pgorm_query::IndexDropStatement);
 build_schema_stmt!(pgorm_query::ForeignKeyCreateStatement);
 build_schema_stmt!(pgorm_query::ForeignKeyDropStatement);
 
+// [spec:pgorm:sem:conn.statement.disabled-types]
 macro_rules! build_type_stmt {
     ($stmt: ty) => {
         impl StatementBuilder for $stmt {

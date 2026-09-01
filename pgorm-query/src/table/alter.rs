@@ -26,6 +26,7 @@ use inherent::inherent;
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
+// [spec:pgorm:req:sql.ddl.alter-table]
 #[derive(Default, Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: Option<TableRef>,

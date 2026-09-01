@@ -6,6 +6,7 @@ pub(crate) struct CaseStatementCondition {
     pub(crate) result: SimpleExpr,
 }
 
+// [spec:pgorm:def:sql.ast.case]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CaseStatement {
     pub(crate) when: Vec<CaseStatementCondition>,

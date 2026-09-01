@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use pgorm_query::{Expr, IntoColumnRef, SelectStatement, SimpleExpr};
 
 /// Defines a structure to perform select operations
+// [spec:pgorm:req:query.build]
 #[derive(Clone, Debug)]
 pub struct Select<E>
 where
@@ -36,6 +37,7 @@ where
 }
 
 /// Performs a conversion to [SimpleExpr]
+// [spec:pgorm:def:query.build.query-trait]
 pub trait IntoSimpleExpr {
     /// Method to perform the conversion
     fn into_simple_expr(self) -> SimpleExpr;
@@ -109,6 +111,7 @@ impl<E> Select<E>
 where
     E: EntityTrait,
 {
+    // [spec:pgorm:sem:query.build.select-defaults]
     pub(crate) fn new() -> Self {
         Self {
             query: SelectStatement::new(),

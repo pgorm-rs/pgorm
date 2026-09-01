@@ -13,6 +13,7 @@ pub struct ActiveEnum {
 }
 
 impl ActiveEnum {
+    // [spec:pgorm:sem:codegen.entity.enums]
     pub fn impl_active_enum(
         &self,
         with_serde: &WithSerde,

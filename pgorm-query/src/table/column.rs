@@ -1,6 +1,7 @@
 use crate::{expr::*, types::*};
 
 /// Specification of a table column
+// [spec:pgorm:req:sql.ddl.column-def]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableRef>,
@@ -55,6 +56,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | N/A               | inet                        | N/A                          |
 /// | MacAddr               | N/A               | macaddr                     | N/A                          |
 /// | LTree                 | N/A               | ltree                       | N/A                          |
+// [spec:pgorm:def:sql.types.column-type]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -112,6 +114,7 @@ pub enum StringLen {
     None,
 }
 
+// [spec:pgorm:def:sql.types.column-type]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

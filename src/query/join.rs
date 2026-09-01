@@ -5,6 +5,8 @@ use crate::{
 pub use pgorm_query::JoinType;
 use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
 
+// [spec:pgorm:sem:query.build.join]
+// [spec:pgorm:sem:query.build.combine]
 impl<E> Select<E>
 where
     E: EntityTrait,

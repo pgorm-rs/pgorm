@@ -20,6 +20,7 @@ use mac_address::MacAddress;
 use crate::{ColumnType, QueryBuilder, StringLen};
 
 /// [`Value`] types variant for Postgres array
+// [spec:pgorm:def:sql.value.array]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -66,6 +67,7 @@ pub enum ArrayType {
 ///
 /// If the `hashable-value` feature is enabled, NaN == NaN, which contradicts Rust's built-in
 /// implementation of NaN != NaN.
+// [spec:pgorm:def:sql.value]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(Option<bool>),
@@ -138,6 +140,7 @@ fn hash_vector<H: std::hash::Hasher>(value: Option<&pgvector::Vector>, state: &m
     }
 }
 
+// [spec:pgorm:def:sql.value]
 impl Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -178,6 +181,7 @@ impl std::fmt::Display for Value {
     }
 }
 
+// [spec:pgorm:def:sql.value.value-type]
 pub trait ValueType: Sized {
     fn try_from(v: Value) -> Result<Self, ValueTypeErr>;
 
@@ -207,9 +211,11 @@ impl std::fmt::Display for ValueTypeErr {
     }
 }
 
+// [spec:pgorm:def:sql.value.tuple]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Values(pub Vec<Value>);
 
+// [spec:pgorm:def:sql.value.tuple]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ValueTuple {
     One(Value),
@@ -248,6 +254,7 @@ impl Value {
     }
 }
 
+// [spec:pgorm:def:sql.value.conversions]
 macro_rules! type_to_value {
     ( $type: ty, $name: ident, $col_type: expr ) => {
         impl From<$type> for Value {
@@ -363,6 +370,7 @@ impl Nullable for &str {
     }
 }
 
+// [spec:pgorm:def:sql.value.conversions]
 impl<T> From<Option<T>> for Value
 where
     T: Into<Value> + Nullable,
@@ -375,6 +383,7 @@ where
     }
 }
 
+// [spec:pgorm:def:sql.value.value-type]
 impl<T> ValueType for Option<T>
 where
     T: ValueType + Nullable,
@@ -612,6 +621,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
+// [spec:pgorm:def:sql.value.array]
 pub mod with_array {
     use super::*;
     use crate::RcOrArc;
@@ -759,6 +769,7 @@ macro_rules! box_to_opt_ref {
     };
 }
 
+// [spec:pgorm:sem:sql.value.accessor-panics]
 impl Value {
     pub fn is_json(&self) -> bool {
         matches!(self, Self::Json(_))
@@ -850,6 +861,7 @@ impl Value {
     }
 }
 
+// [spec:pgorm:sem:sql.value.accessor-panics]
 impl Value {
     pub fn chrono_as_naive_utc_in_string(&self) -> Option<String> {
         match self {
@@ -1109,6 +1121,7 @@ mod impl_from_value_tuple {
 }
 
 /// Convert value to json value
+// [spec:pgorm:sem:sql.value.to-json]
 #[allow(clippy::many_single_char_names)]
 
 pub fn sea_value_to_json_value(value: &Value) -> Json {
@@ -1203,6 +1216,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    // [spec:pgorm:def:sql.value.conversions/test]
     #[test]
     fn test_value() {
         macro_rules! test_value {
@@ -1222,6 +1236,7 @@ mod tests {
         test_value!(i64, 8589934592);
     }
 
+    // [spec:pgorm:def:sql.value.value-type/test]
     #[test]
     fn test_option_value() {
         macro_rules! test_some_value {
@@ -1273,6 +1288,7 @@ mod tests {
         assert_eq!(out, val);
     }
 
+    // [spec:pgorm:def:sql.value.tuple/test]
     #[test]
     fn test_value_tuple() {
         assert_eq!(
@@ -1330,6 +1346,7 @@ mod tests {
         );
     }
 
+    // [spec:pgorm:def:sql.value.tuple/test]
     #[test]
     #[allow(clippy::clone_on_copy)]
     fn test_from_value_tuple() {
@@ -1491,6 +1508,7 @@ mod tests {
         assert_eq!(out, timestamp);
     }
 
+    // [spec:pgorm:sem:sql.value.render/test]
     #[test]
 
     fn test_chrono_query() {
@@ -1509,6 +1527,7 @@ mod tests {
         );
     }
 
+    // [spec:pgorm:def:sql.value.conversions/test]
     #[test]
     fn test_uuid_value() {
         let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
@@ -1549,6 +1568,7 @@ mod tests {
         assert_eq!(out.to_string(), num);
     }
 
+    // [spec:pgorm:def:sql.value.array/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
@@ -1557,6 +1577,7 @@ mod tests {
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
+    // [spec:pgorm:def:sql.value.array/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);

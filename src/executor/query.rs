@@ -5,6 +5,7 @@ use std::error::Error;
 use crate::debug_print;
 
 /// Defines the result of a query operation on a Model
+// [spec:pgorm:def:exec.decode]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct QueryResult {
@@ -12,6 +13,7 @@ pub struct QueryResult {
 }
 
 /// An interface to get a value from the query result
+// [spec:pgorm:def:exec.decode]
 pub trait TryGetable: Sized {
     /// Get a value from the query result with an RowIndex
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -44,6 +46,7 @@ pub enum TryGetError {
     Null(String),
 }
 
+// [spec:pgorm:sem:exec.decode.null]
 impl TryGetError {
     fn postgres(value: tokio_postgres::Error) -> Self {
         let Some(source) = value.source() else {
@@ -131,6 +134,7 @@ impl QueryResult {
 
 // TryGetable //
 
+// [spec:pgorm:sem:exec.decode.null]
 impl<T: TryGetable> TryGetable for Option<T> {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
         res: &QueryResult,
@@ -144,6 +148,7 @@ impl<T: TryGetable> TryGetable for Option<T> {
     }
 }
 
+// [spec:pgorm:def:exec.decode.types]
 macro_rules! try_getable_all {
     ( $type: ty ) => {
         impl TryGetable for $type {
@@ -288,6 +293,7 @@ try_getable_uuid!(uuid::fmt::Simple, uuid::Uuid::simple);
 #[cfg(feature = "with-uuid")]
 try_getable_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 
+// [spec:pgorm:sem:exec.decode.u32-oid]
 impl TryGetable for u32 {
     #[allow(unused_variables)]
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -299,11 +305,13 @@ impl TryGetable for u32 {
     }
 }
 
+// [spec:pgorm:sem:exec.decode.null-context]
 #[allow(dead_code)]
 fn err_null_idx_col<I: RowIndex + std::fmt::Display>(idx: I) -> TryGetError {
     TryGetError::Null("TODO".into()) //format!("{idx:?}"))
 }
 
+// [spec:pgorm:def:exec.decode.array]
 #[cfg(feature = "postgres-array")]
 mod postgres_array {
     use super::*;
@@ -405,6 +413,7 @@ mod postgres_array {
     #[cfg(feature = "with-uuid")]
     try_getable_postgres_array_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 
+    // [spec:pgorm:sem:exec.decode.u32-oid]
     impl TryGetable for Vec<u32> {
         #[allow(unused_variables)]
         fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -426,6 +435,7 @@ mod postgres_array {
 // TryGetableMany //
 
 /// An interface to get a tuple value from the query result
+// [spec:pgorm:def:exec.decode.many]
 pub trait TryGetableMany: Sized {
     /// Get a tuple value from the query result with prefixed column name
     fn try_get_many(res: &QueryResult, pre: &str, cols: &[String]) -> Result<Self, TryGetError>;
@@ -528,6 +538,7 @@ where
     }
 }
 
+// [spec:pgorm:def:exec.decode.many]
 macro_rules! impl_try_get_many {
     ( $LEN:expr, $($T:ident : $N:expr),+ $(,)? ) => {
         impl< $($T),+ > TryGetableMany for ( $($T),+ )
@@ -567,6 +578,7 @@ mod impl_try_get_many {
     impl_try_get_many!(12, T0:0, T1:1, T2:2, T3:3, T4:4, T5:5, T6:6, T7:7, T8:8, T9:9, T10:10, T11:11);
 }
 
+// [spec:pgorm:req:exec.decode.many-arity]
 fn try_get_many_with_slice_len_of(len: usize, cols: &[String]) -> Result<(), TryGetError> {
     if cols.len() < len {
         Err(type_err(format!(
@@ -585,6 +597,7 @@ fn try_get_many_with_slice_len_of(len: usize, cols: &[String]) -> Result<(), Try
 /// A blanket impl is provided for `TryGetableFromJson`, while the impl for `ActiveEnum`
 /// is provided by the `DeriveActiveEnum` macro. So as an end user you won't normally
 /// touch this trait.
+// [spec:pgorm:def:exec.decode.json]
 pub trait TryGetableArray: Sized {
     /// Just a delegate
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -608,6 +621,7 @@ where
 // TryGetableFromJson //
 
 /// An interface to get a JSON from the query result
+// [spec:pgorm:def:exec.decode.json]
 #[cfg(feature = "with-json")]
 pub trait TryGetableFromJson: Sized
 where
@@ -668,6 +682,7 @@ where
 
 // TryFromU64 //
 /// Try to convert a type to a u64
+// [spec:pgorm:def:exec.decode.from-u64]
 pub trait TryFromU64: Sized {
     /// The method to convert the type to a u64
     fn try_from_u64(n: u64) -> Result<Self, DbErr>;

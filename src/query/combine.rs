@@ -27,6 +27,7 @@ macro_rules! select_def {
 select_def!(SelectA, "A_");
 select_def!(SelectB, "B_");
 
+// [spec:pgorm:sem:query.build.combine]
 impl<E> Select<E>
 where
     E: EntityTrait,

@@ -10,10 +10,12 @@ use tokio_postgres::{
 
 /// Handle a database connection depending on the backend enabled by the feature
 /// flags. This creates a database pool.
+// [spec:pgorm:req:conn.pool.no-conn-trait]
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabasePool(pub(crate) Pool);
 
+// [spec:pgorm:sem:conn.pool.multi]    tag-keyed accessor surface
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabaseMultiPool(pub(crate) BTreeMap<Arc<String>, DatabasePool>);
@@ -39,6 +41,7 @@ impl DatabaseMultiPool {
 //     }
 // }
 
+// [spec:pgorm:sem:conn.pool.get]
 impl DatabasePool {
     pub async fn get(&self) -> Result<DatabaseConnection, DbErr> {
         let conn = Pool::get(&self.0).await?;
@@ -77,6 +80,7 @@ impl DatabaseConnection {
     }
 }
 
+// [spec:pgorm:sem:conn.tx.guard]
 #[derive(Debug)]
 pub struct DatabaseTransaction<'a>(pub(crate) Option<Transaction<'a>>);
 
@@ -90,6 +94,7 @@ impl DatabaseTransaction<'_> {
     }
 }
 
+// [spec:pgorm:sem:conn.tx.guard]    rollback-on-drop warning
 impl Drop for DatabaseTransaction<'_> {
     fn drop(&mut self) {
         if self.0.is_some() {
@@ -153,6 +158,7 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 }
 
+// [spec:pgorm:def:conn.pool.conn-trait]    delegating impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
@@ -306,6 +312,7 @@ impl TransactionTrait for DatabaseTransaction<'_> {
     }
 }
 
+// [spec:pgorm:req:conn.tx]    BEGIN on the pooled client
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {

@@ -2,6 +2,8 @@ use crate::{ColumnTrait, IntoIdentity, IntoSimpleExpr, QuerySelect};
 use pgorm_query::{QueryStatementBuilder, Values};
 
 /// A Trait for any type performing queries on a Model or ActiveModel
+// [spec:pgorm:req:query.build]
+// [spec:pgorm:def:query.build.query-trait]
 pub trait QueryTrait {
     /// Constrain the QueryStatement to [QueryStatementBuilder] trait
     type QueryStatement: QueryStatementBuilder;

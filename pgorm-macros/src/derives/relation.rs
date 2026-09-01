@@ -216,6 +216,7 @@ impl DeriveRelation {
 }
 
 /// Method to derive a Relation
+// [spec:pgorm:syn:macros.derive.relation]
 pub fn expand_derive_relation(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

@@ -3,12 +3,14 @@
 use crate::*;
 pub use std::fmt::Write;
 
+// [spec:pgorm:def:sql.render.writer]
 pub trait SqlWriter: Write + ToString {
     fn push_param(&mut self, value: Value, query_builder: &QueryBuilder);
 
     fn as_writer(&mut self) -> &mut dyn Write;
 }
 
+// [spec:pgorm:def:sql.render.writer] (inline-rendering sink for the to_string() path)
 impl SqlWriter for String {
     fn push_param(&mut self, value: Value, query_builder: &QueryBuilder) {
         self.push_str(&query_builder.value_to_string(&value))
@@ -59,6 +61,7 @@ impl std::fmt::Display for SqlWriterValues {
     }
 }
 
+// [spec:pgorm:req:sql.render.placeholders] (counter increments then emits $N; value collected)
 impl SqlWriter for SqlWriterValues {
     fn push_param(&mut self, value: Value, _: &QueryBuilder) {
         self.counter += 1;
@@ -76,6 +79,7 @@ impl SqlWriter for SqlWriterValues {
     }
 }
 
+// [spec:pgorm:sem:sql.render.inject]
 pub fn inject_parameters<I>(sql: &str, params: I, query_builder: &QueryBuilder) -> String
 where
     I: IntoIterator<Item = Value>,
@@ -115,6 +119,7 @@ where
     output.into_iter().collect()
 }
 
+// [spec:pgorm:sem:sql.render.inject/test]
 #[cfg(test)]
 mod tests_postgres {
     use super::*;

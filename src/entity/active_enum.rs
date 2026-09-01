@@ -110,6 +110,7 @@ use tokio_postgres::row::RowIndex;
 ///
 /// impl ActiveModelBehavior for ActiveModel {}
 /// ```
+// [spec:pgorm:def:entity.traits.active-enum]
 pub trait ActiveEnum: Sized + Iterable {
     /// Define the Rust type that each enum variant corresponds.
     type Value: ActiveEnumValue;
@@ -146,6 +147,7 @@ pub trait ActiveEnum: Sized + Iterable {
 }
 
 /// The Rust Value backing ActiveEnums
+// [spec:pgorm:req:entity.traits.active-enum.limits]
 pub trait ActiveEnumValue: Into<Value> + ValueType + Nullable + TryGetable {
     /// For getting an array of enum. Postgres only
     fn try_get_vec_by<I: RowIndex + std::fmt::Display>(
@@ -195,6 +197,7 @@ impl_active_enum_value_with_pg_array!(i16);
 impl_active_enum_value_with_pg_array!(i32);
 impl_active_enum_value_with_pg_array!(i64);
 
+// [spec:pgorm:req:entity.traits.active-enum.limits]
 impl<T> TryFromU64 for T
 where
     T: ActiveEnum,

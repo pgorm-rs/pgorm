@@ -7,8 +7,10 @@ use crate::{
 };
 use std::ops::Deref;
 
+// [spec:pgorm:req:sql.render.ident-quoting] (the double-quote pair; doubling in Iden::quoted)
 const QUOTE: Quote = Quote(b'"', b'"');
 
+// [spec:pgorm:def:sql.render]
 #[derive(Debug, Clone, Copy)]
 pub struct QueryBuilder;
 
@@ -17,10 +19,12 @@ impl QueryBuilder {
         QUOTE
     }
 
+    // [spec:pgorm:req:sql.render.placeholders]
     pub const fn placeholder(&self) -> (&str, bool) {
         ("$", true)
     }
 
+    // [spec:pgorm:req:sql.render.custom-expr] (top-level AsEnum rewritten to CAST)
     pub(crate) fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::AsEnum(type_name, expr) => {
@@ -67,6 +71,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.render.select-order] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -79,10 +84,12 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.render.param-vs-inline]
     fn prepare_value(&self, value: &Value, sql: &mut dyn SqlWriter) {
         sql.push_param(value.clone(), self as _);
     }
 
+    // [spec:pgorm:req:sql.render.string-escape] (single-quote wrapping; E-string when a backslash is present)
     fn write_string_quoted(&self, string: &str, buffer: &mut String) {
         let escaped = self.escape_string(string);
         let string = if escaped.find('\\').is_some() {
@@ -111,6 +118,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`InsertStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.render.insert]
     pub(crate) fn prepare_insert_statement(
         &self,
         insert: &InsertStatement,
@@ -192,6 +200,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.render.select-order]
     pub(crate) fn prepare_select_statement(
         &self,
         select: &SelectStatement,
@@ -296,6 +305,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UpdateStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.render.update-delete] (UPDATE half)
     pub(crate) fn prepare_update_statement(
         &self,
         update: &UpdateStatement,
@@ -354,6 +364,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`DeleteStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.render.update-delete] (DELETE half)
     pub(crate) fn prepare_delete_statement(
         &self,
         delete: &DeleteStatement,
@@ -399,6 +410,9 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:sem:sql.render.empty-in]
+    // [spec:pgorm:req:sql.render.subquery] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.custom-expr]
     fn prepare_simple_expr_common(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::Column(column_ref) => {
@@ -530,6 +544,7 @@ impl QueryBuilder {
     fn prepare_index_hints(&self, _select: &SelectStatement, _sql: &mut dyn SqlWriter) {}
 
     /// Translate [`LockType`] into SQL statement.
+    // [spec:pgorm:sem:sql.render.locking]
     fn prepare_select_lock(&self, lock: &LockClause, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -587,6 +602,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinExpr`] into SQL statement.
+    // [spec:pgorm:req:sql.render.joins]
     fn prepare_join_expr(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
         self.prepare_join_type(&join_expr.join, sql);
         write!(sql, " ").unwrap();
@@ -604,6 +620,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableRef`] into SQL statement.
+    // [spec:pgorm:req:sql.render.subquery] (value-bearing table refs carry mandatory aliases)
     fn prepare_table_ref(&self, table_ref: &TableRef, sql: &mut dyn SqlWriter) {
         match table_ref {
             TableRef::SubQuery(query, alias) => {
@@ -656,6 +673,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
+    // [spec:pgorm:def:sql.render.operators] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -667,6 +685,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
+    // [spec:pgorm:def:sql.render.operators]
     fn prepare_bin_oper_common(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -739,6 +758,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`LogicalChainOper`] into SQL statement.
+    // [spec:pgorm:req:sql.render.condition-chain] (legacy and_where/or_where chain links)
     fn prepare_logical_chain_oper(
         &self,
         log_chain_oper: &LogicalChainOper,
@@ -832,6 +852,7 @@ impl QueryBuilder {
         self.prepare_query_statement(query.query.as_ref().unwrap().deref(), sql);
     }
 
+    // [spec:pgorm:req:sql.render.cte]
     pub(crate) fn prepare_with_clause(&self, with_clause: &WithClause, sql: &mut dyn SqlWriter) {
         self.prepare_with_clause_start(with_clause, sql);
         self.prepare_with_clause_common_tables(with_clause, sql);
@@ -894,6 +915,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.render.cte] (assert-refusal of zero CTEs / recursive with multiple CTEs)
     fn prepare_with_clause_common_tables(&self, with_clause: &WithClause, sql: &mut dyn SqlWriter) {
         let mut cte_first = true;
         assert_ne!(
@@ -1012,6 +1034,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinOn`] into SQL statement.
+    // [spec:pgorm:req:sql.render.joins] (JoinOn::Columns unimplemented; only ON conditions render)
     fn prepare_join_on(&self, join_on: &JoinOn, sql: &mut dyn SqlWriter) {
         match join_on {
             JoinOn::Condition(c) => self.prepare_condition(c, "ON", sql),
@@ -1050,6 +1073,7 @@ impl QueryBuilder {
     }
 
     /// Write [`Value`] inline.
+    // [spec:pgorm:req:sql.render.param-vs-inline] (Constant is always rendered inline)
     fn prepare_constant(&self, value: &Value, sql: &mut dyn SqlWriter) {
         let string = self.value_to_string(value);
         write!(sql, "{string}").unwrap();
@@ -1101,10 +1125,12 @@ impl QueryBuilder {
     }
 
     /// Convert a SQL value into syntax-specific string
+    // [spec:pgorm:sem:sql.value.render]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         self.value_to_string_common(v)
     }
 
+    // [spec:pgorm:def:sql.render.value-literals]
     fn value_to_string_common(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {
@@ -1195,6 +1221,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Write ON CONFLICT expression
+    // [spec:pgorm:req:sql.render.on-conflict]
     fn prepare_on_conflict(&self, on_conflict: &Option<OnConflict>, sql: &mut dyn SqlWriter) {
         if let Some(on_conflict) = on_conflict {
             self.prepare_on_conflict_keywords(sql);
@@ -1318,10 +1345,12 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Hook to insert "OUTPUT" expressions.
+    // [spec:pgorm:req:sql.render.returning] (pre-source OUTPUT hook is a no-op)
     fn prepare_output(&self, _returning: &Option<ReturningClause>, _sql: &mut dyn SqlWriter) {}
 
     #[doc(hidden)]
     /// Hook to insert "RETURNING" statements.
+    // [spec:pgorm:req:sql.render.returning]
     fn prepare_returning(&self, returning: &Option<ReturningClause>, sql: &mut dyn SqlWriter) {
         if let Some(returning) = returning {
             write!(sql, " RETURNING ").unwrap();
@@ -1351,6 +1380,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate a condition to a "WHERE" clause.
+    // [spec:pgorm:req:sql.render.condition-chain]
     fn prepare_condition(
         &self,
         condition: &ConditionHolder,
@@ -1381,6 +1411,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`Frame`] into SQL statement.
+    // [spec:pgorm:req:sql.render.window] (frame bounds; no space between $N and PRECEDING/FOLLOWING)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
@@ -1399,6 +1430,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`WindowStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.render.window]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();
@@ -1440,6 +1472,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate a binary expr to SQL.
+    // [spec:pgorm:req:sql.render.parens]
     fn binary_expr(
         &self,
         left: &SimpleExpr,
@@ -1542,6 +1575,8 @@ impl QueryBuilder {
 
     // COMMON
     // START: impl that ought not be here
+    // [spec:pgorm:sem:sql.ddl.panics]
+    // [spec:pgorm:def:sql.render.ddl.types] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match &column_type {
             ColumnType::SmallInteger => write!(sql, "smallserial").unwrap(),
@@ -1571,6 +1606,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.column-def]
     fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
     where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
@@ -1599,6 +1635,8 @@ impl QueryBuilder {
         self.prepare_column_def_common(column_def, sql, f);
     }
 
+    // [spec:pgorm:req:sql.ddl.column-types]
+    // [spec:pgorm:def:sql.render.ddl.types]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1682,6 +1720,7 @@ impl QueryBuilder {
         ""
     }
 
+    // [spec:pgorm:req:sql.ddl.alter-table]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1813,6 +1852,7 @@ impl QueryBuilder {
         });
     }
 
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate]
     pub(crate) fn prepare_table_rename_statement(
         &self,
         rename: &TableRenameStatement,
@@ -1829,6 +1869,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.ddl.create-table]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1887,6 +1928,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableRef`] into SQL statement.
+    // [spec:pgorm:sem:sql.ddl.panics]
     pub(crate) fn prepare_table_ref_table_stmt(
         &self,
         table_ref: &TableRef,
@@ -1953,6 +1995,7 @@ impl QueryBuilder {
     // }
 
     /// Translate [`TableDropStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate]
     pub(crate) fn prepare_table_drop_statement(
         &self,
         drop: &TableDropStatement,
@@ -2066,6 +2109,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
+    // [spec:pgorm:req:sql.ddl.index-create]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -2113,6 +2157,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.index-drop]
     pub(crate) fn prepare_index_drop_statement(
         &self,
         drop: &IndexDropStatement,
@@ -2229,6 +2274,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.foreign-key]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2350,6 +2396,7 @@ impl QueryBuilder {
     // ESCAPE
 
     /// Escape a SQL string literal
+    // [spec:pgorm:req:sql.render.string-escape]
     pub fn escape_string(&self, string: &str) -> String {
         string
             .replace('\\', "\\\\")
@@ -2465,6 +2512,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
+    // [spec:pgorm:req:sql.render.ddl.enum-type] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2498,6 +2546,8 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.type-enum]
+    // [spec:pgorm:req:sql.render.ddl.enum-type]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,
@@ -2553,6 +2603,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.type-alter-drop]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
@@ -2591,6 +2642,8 @@ impl QueryBuilder {
     }
 
     // EXTENSION
+    // [spec:pgorm:req:sql.ddl.extension]
+    // [spec:pgorm:sem:sql.render.ddl.extension] (CREATE EXTENSION; strings interpolated raw)
     pub(crate) fn prepare_extension_create_statement(
         &self,
         create: &ExtensionCreateStatement,
@@ -2617,6 +2670,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:sem:sql.render.ddl.extension] (DROP EXTENSION; strings interpolated raw)
     pub(crate) fn prepare_extension_drop_statement(
         &self,
         drop: &ExtensionDropStatement,
@@ -2639,6 +2693,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:def:sql.render.precedence]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2661,6 +2716,7 @@ impl QueryBuilder {
         common_answer || pg_specific_answer
     }
 
+    // [spec:pgorm:req:sql.render.parens] (left-associative flattening incl. || for Postgres)
     fn well_known_left_associative(&self, op: &BinOper) -> bool {
         let common_answer = common_well_known_left_associative(op);
         let pg_specific_answer = matches!(op, BinOper::Concatenate);
@@ -2697,6 +2753,7 @@ impl SubQueryStatement {
     }
 }
 
+// [spec:pgorm:def:sql.render.precedence] (backend-independent portion of the elision table)
 pub(crate) fn common_inner_expr_well_known_greater_precedence(
     inner: &SimpleExpr,
     outer_oper: &Oper,

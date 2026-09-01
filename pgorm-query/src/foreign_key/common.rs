@@ -1,6 +1,7 @@
 use crate::types::*;
 
 /// Specification of a foreign key
+// [spec:pgorm:req:sql.ddl.foreign-key]
 #[derive(Default, Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<String>,

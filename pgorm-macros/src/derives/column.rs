@@ -94,6 +94,7 @@ pub fn impl_col_from_str(ident: &Ident, data: &Data) -> syn::Result<TokenStream>
     ))
 }
 
+// [spec:pgorm:sem:macros.derive.column]
 pub fn expand_derive_column(ident: &Ident, data: &Data) -> syn::Result<TokenStream> {
     let impl_iden = expand_derive_custom_column(ident, data)?;
 
@@ -110,6 +111,7 @@ pub fn expand_derive_column(ident: &Ident, data: &Data) -> syn::Result<TokenStre
 }
 
 /// Derive a column with a non_snake_case name
+// [spec:pgorm:sem:macros.derive.column]
 pub fn expand_derive_custom_column(ident: &Ident, data: &Data) -> syn::Result<TokenStream> {
     let impl_default_as_str = impl_default_as_str(ident, data)?;
     let impl_col_from_str = impl_col_from_str(ident, data)?;

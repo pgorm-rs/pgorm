@@ -28,6 +28,7 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1.23, "image" = '123' WHERE "id" = 1"#
 /// );
 /// ```
+// [spec:pgorm:req:sql.ast.update]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
     pub(crate) table: Option<Box<TableRef>>,
@@ -78,6 +79,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.update]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,

@@ -7,6 +7,7 @@
 use crate::{func::*, query::*, types::*, value::*};
 
 /// Helper to build a [`SimpleExpr`].
+// [spec:pgorm:def:sql.ast.expr]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -19,6 +20,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
+// [spec:pgorm:def:sql.ast.expr]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -1009,6 +1011,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.expr.operators]
     pub fn binary<O, T>(self, op: O, right: T) -> SimpleExpr
     where
         O: Into<BinOper>,
@@ -1202,6 +1205,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'b'"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.expr.in]
     #[allow(clippy::wrong_self_convention)]
     pub fn is_in<V, I>(mut self, v: I) -> SimpleExpr
     where
@@ -1237,6 +1241,7 @@ impl Expr {
     ///     r#"SELECT "character", "font_id" FROM "character" WHERE ("character", "font_id") IN ((1, '1'), (2, '2'))"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.expr.in]
     #[allow(clippy::wrong_self_convention)]
     pub fn in_tuples<V, I>(mut self, v: I) -> SimpleExpr
     where
@@ -2136,6 +2141,7 @@ impl SimpleExpr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.expr.operators]
     pub fn binary<O, T>(self, op: O, right: T) -> Self
     where
         O: Into<BinOper>,

@@ -7,6 +7,7 @@ use crate::{ColumnRef, IntoColumnRef, SimpleExpr};
 /// * SQLite
 ///     - SQLite version >= 3.35.0
 ///     - **Note that pgorm-query won't try to enforce either of these constraints**
+// [spec:pgorm:def:sql.ast.returning]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReturningClause {
     All,
@@ -15,6 +16,7 @@ pub enum ReturningClause {
 }
 
 /// Shorthand for constructing [`ReturningClause`]
+// [spec:pgorm:def:sql.ast.returning]
 #[derive(Clone, Debug, Default)]
 pub struct Returning;
 

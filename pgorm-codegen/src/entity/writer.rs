@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
 
+// [spec:pgorm:def:codegen.entity]
 #[derive(Clone, Debug)]
 pub struct EntityWriter {
     pub(crate) entities: Vec<Entity>,
@@ -21,6 +22,7 @@ pub struct OutputFile {
     pub content: String,
 }
 
+// [spec:pgorm:def:codegen.entity.serde]
 #[derive(PartialEq, Eq, Debug)]
 pub enum WithSerde {
     None,
@@ -29,6 +31,7 @@ pub enum WithSerde {
     Both,
 }
 
+// [spec:pgorm:sem:codegen.entity.types.datetime]
 #[derive(Debug)]
 pub enum DateTimeCrate {
     Chrono,
@@ -53,6 +56,7 @@ pub struct EntityWriterContext {
 }
 
 impl WithSerde {
+    // [spec:pgorm:sem:codegen.entity.serde.derives]
     pub fn extra_derive(&self) -> TokenStream {
         let mut extra_derive = match self {
             Self::None => {
@@ -82,6 +86,7 @@ impl WithSerde {
 }
 
 /// Converts *_extra_derives argument to token stream
+// [spec:pgorm:sem:codegen.entity.context]    extra-derive normalization
 pub(crate) fn bonus_derive<T, I>(extra_derives: I) -> TokenStream
 where
     T: Into<String>,
@@ -97,6 +102,7 @@ where
 }
 
 /// convert *_extra_attributes argument to token stream
+// [spec:pgorm:sem:codegen.entity.context]    extra-attribute normalization
 pub(crate) fn bonus_attributes<T, I>(attributes: I) -> TokenStream
 where
     T: Into<String>,
@@ -117,6 +123,7 @@ where
 impl FromStr for WithSerde {
     type Err = crate::Error;
 
+    // [spec:pgorm:def:codegen.entity.serde]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "none" => Self::None,
@@ -133,6 +140,7 @@ impl FromStr for WithSerde {
 }
 
 impl EntityWriterContext {
+    // [spec:pgorm:sem:codegen.entity.context]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         expanded_format: bool,
@@ -168,6 +176,7 @@ impl EntityWriterContext {
 }
 
 impl EntityWriter {
+    // [spec:pgorm:req:codegen.entity.files]
     pub fn generate(self, context: &EntityWriterContext) -> WriterOutput {
         let mut files = Vec::new();
         files.extend(self.write_entities(context));
@@ -184,6 +193,8 @@ impl EntityWriter {
         WriterOutput { files }
     }
 
+    // [spec:pgorm:sem:codegen.entity.serde.skip]
+    // [spec:pgorm:sem:codegen.entity.context]    date_time_crate threading
     pub fn write_entities(&self, context: &EntityWriterContext) -> Vec<OutputFile> {
         self.entities
             .iter()
@@ -245,6 +256,7 @@ impl EntityWriter {
             .collect()
     }
 
+    // [spec:pgorm:req:codegen.entity.files]
     pub fn write_index_file(&self, lib: bool) -> OutputFile {
         let mut lines = Vec::new();
         Self::write_doc_comment(&mut lines);
@@ -288,6 +300,7 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.enums]
     pub fn write_pgorm_active_enums(
         &self,
         with_serde: &WithSerde,
@@ -336,6 +349,8 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
+    // [spec:pgorm:def:codegen.entity.expanded]
+    // [spec:pgorm:sem:codegen.entity.expanded.blocks]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
         entity: &Entity,
@@ -379,6 +394,7 @@ impl EntityWriter {
         code_blocks
     }
 
+    // [spec:pgorm:def:codegen.entity.compact]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_code_blocks(
         entity: &Entity,
@@ -416,6 +432,7 @@ impl EntityWriter {
         code_blocks
     }
 
+    // [spec:pgorm:sem:codegen.entity.imports]
     pub fn gen_import(with_serde: &WithSerde) -> TokenStream {
         let prelude_import = quote!(
             use pgorm::entity::prelude::*;
@@ -474,6 +491,7 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.imports]    active-enum imports
     pub fn gen_import_active_enum(entity: &Entity) -> TokenStream {
         entity
             .columns
@@ -497,6 +515,7 @@ impl EntityWriter {
             .0
     }
 
+    // [spec:pgorm:sem:codegen.entity.expanded.blocks]    expanded Model block
     pub fn gen_model_struct(
         entity: &Entity,
         with_serde: &WithSerde,
@@ -558,6 +577,7 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.pk]
     pub fn gen_impl_primary_key(entity: &Entity, date_time_crate: &DateTimeCrate) -> TokenStream {
         let primary_key_auto_increment = entity.get_primary_key_auto_increment();
         let value_type = entity.get_primary_key_rs_type(date_time_crate);
@@ -621,6 +641,7 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.relations.related]
     pub fn gen_impl_related(entity: &Entity) -> Vec<TokenStream> {
         entity
             .relations
@@ -648,6 +669,7 @@ impl EntityWriter {
     }
 
     /// Used to generate `enum RelatedEntity` that is useful to the Seaography project
+    // [spec:pgorm:sem:codegen.entity.seaography]
     pub fn gen_related_entity(entity: &Entity) -> TokenStream {
         let related_enum_name = entity.get_related_entity_enum_name();
         let related_attrs = entity.get_related_entity_attrs();
@@ -663,6 +685,7 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.relations.via]
     pub fn gen_impl_conjunct_related(entity: &Entity) -> Vec<TokenStream> {
         let table_name_camel_case = entity.get_table_name_camel_case_ident();
         let via_snake_case = entity.get_conjunct_relations_via_snake_case();
@@ -712,6 +735,8 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.compact.attrs]
+    // [spec:pgorm:sem:codegen.entity.compact.model]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
         entity: &Entity,

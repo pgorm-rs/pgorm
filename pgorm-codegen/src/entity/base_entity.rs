@@ -121,6 +121,7 @@ impl Entity {
     }
 
     /// Used to generate the attributes for the `enum RelatedEntity` that is useful to the Seaography project
+    // [spec:pgorm:sem:codegen.entity.seaography]
     pub fn get_related_entity_attrs(&self) -> Vec<TokenStream> {
         // 1st step get conjunct relations data
         let conjunct_related_attrs = self.conjunct_relations.iter().map(|conj| {
@@ -178,6 +179,7 @@ impl Entity {
             .collect()
     }
 
+    // [spec:pgorm:sem:codegen.entity.pk]
     pub fn get_primary_key_auto_increment(&self) -> Ident {
         let auto_increment = self.columns.iter().any(|col| col.auto_increment);
         format_ident!("{}", auto_increment)
@@ -229,6 +231,7 @@ impl Entity {
             .collect()
     }
 
+    // [spec:pgorm:sem:codegen.entity.types]
     pub fn get_eq_needed(&self) -> TokenStream {
         fn is_floats(col_type: &ColumnType) -> bool {
             match col_type {

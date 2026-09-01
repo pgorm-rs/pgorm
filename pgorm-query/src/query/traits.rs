@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use crate::{SqlWriter, SqlWriterValues, SubQueryStatement, backend::QueryBuilder, value::Values};
 
+// [spec:pgorm:req:sql.ast.build]
 pub trait QueryStatementBuilder: Debug {
     /// Build corresponding SQL statement for certain database backend and collect query parameters into a vector
     fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values) {
@@ -23,6 +24,7 @@ pub trait QueryStatementBuilder: Debug {
     fn into_sub_query_statement(self) -> SubQueryStatement;
 }
 
+// [spec:pgorm:req:sql.ast.build]
 pub trait QueryStatementWriter: QueryStatementBuilder {
     /// Build corresponding SQL statement for certain database backend and return SQL string
     ///

@@ -68,6 +68,7 @@ where
     Deleter::new(query).exec(db).await
 }
 
+// [spec:pgorm:sem:exec.crud.delete]
 async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, DbErr>
 where
     C: ConnectionTrait,

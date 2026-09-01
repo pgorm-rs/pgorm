@@ -3,12 +3,15 @@
 use std::fmt::Write;
 use std::iter::Iterator;
 
+// [spec:pgorm:def:sql.token]
+// [spec:pgorm:sem:sql.token.limits]
 #[derive(Debug, Default)]
 pub struct Tokenizer {
     pub chars: Vec<char>,
     pub p: usize,
 }
 
+// [spec:pgorm:def:sql.token] (the four token classes)
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Quoted(String),
@@ -41,6 +44,7 @@ impl Tokenizer {
         self.p == self.chars.len()
     }
 
+    // [spec:pgorm:req:sql.token.space]
     fn space(&mut self) -> Option<Token> {
         let mut string = String::new();
         while !self.end() {
@@ -59,6 +63,7 @@ impl Tokenizer {
         }
     }
 
+    // [spec:pgorm:req:sql.token.word]
     fn unquoted(&mut self) -> Option<Token> {
         let mut string = String::new();
         let mut first = true;
@@ -82,6 +87,7 @@ impl Tokenizer {
         }
     }
 
+    // [spec:pgorm:req:sql.token.quoted]
     fn quoted(&mut self) -> Option<Token> {
         let mut string = String::new();
         let mut first = true;
@@ -122,6 +128,7 @@ impl Tokenizer {
     }
 
     /// unquote a quoted string
+    // [spec:pgorm:sem:sql.token.unquote]
     fn unquote(mut self) -> String {
         let mut string = String::new();
         let mut first = true;
@@ -155,6 +162,7 @@ impl Tokenizer {
         string
     }
 
+    // [spec:pgorm:req:sql.token.scan] (single-character punctuation fallback)
     fn punctuation(&mut self) -> Option<Token> {
         let mut string = String::new();
         if !self.end() {
@@ -211,6 +219,7 @@ impl Tokenizer {
     }
 }
 
+// [spec:pgorm:req:sql.token.scan]
 impl Iterator for Tokenizer {
     type Item = Token;
 
@@ -257,6 +266,7 @@ impl Token {
         }
     }
 
+    // [spec:pgorm:sem:sql.token.unquote] (public entry; Quoted tokens only)
     pub fn unquote(&self) -> Option<String> {
         if self.is_quoted() {
             let tokenizer = Tokenizer::new(self.as_str());
@@ -267,6 +277,7 @@ impl Token {
     }
 }
 
+// [spec:pgorm:thm:sql.token.roundtrip] (verbatim reproduction of carried text)
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -282,6 +293,12 @@ impl std::fmt::Display for Token {
     }
 }
 
+// [spec:pgorm:req:sql.token.scan/test]
+// [spec:pgorm:req:sql.token.space/test]
+// [spec:pgorm:req:sql.token.word/test]
+// [spec:pgorm:req:sql.token.quoted/test]
+// [spec:pgorm:sem:sql.token.unquote/test]
+// [spec:pgorm:thm:sql.token.roundtrip/test]
 #[cfg(test)]
 mod tests {
     use super::*;

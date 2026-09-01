@@ -64,6 +64,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:exec.crud.update]
 impl Updater {
     /// Instantiate an update using an [UpdateStatement]
     pub fn new(query: UpdateStatement) -> Self {
@@ -162,6 +163,7 @@ impl Updater {
     }
 }
 
+// [spec:pgorm:sem:exec.crud.update]
 async fn find_updated_model_by_id<A, C>(
     model: A,
     db: &C,

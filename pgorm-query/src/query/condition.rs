@@ -7,6 +7,7 @@ pub enum ConditionType {
 }
 
 /// Represents the value of an [`Condition::any`] or [`Condition::all`]: a set of disjunctive or conjunctive conditions.
+// [spec:pgorm:def:sql.ast.condition]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Condition {
     pub(crate) negate: bool,
@@ -14,6 +15,7 @@ pub struct Condition {
     pub(crate) conditions: Vec<ConditionExpression>,
 }
 
+// [spec:pgorm:def:sql.ast.condition]
 pub trait IntoCondition {
     fn into_condition(self) -> Condition;
 }
@@ -37,6 +39,7 @@ pub enum ConditionHolderContents {
     Condition(Condition),
 }
 
+// [spec:pgorm:req:sql.ast.condition.holder]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ConditionHolder {
     pub contents: ConditionHolderContents,
@@ -65,6 +68,7 @@ impl Condition {
     ///     r#"SELECT "id" FROM "glyph" WHERE (NOT "aspect" = 0) AND (NOT "id" = 0)"#
     /// );
     /// ```
+    // [spec:pgorm:sem:sql.ast.condition.flattening]
     #[allow(clippy::should_implement_trait)]
     pub fn add<C>(mut self, condition: C) -> Self
     where
@@ -261,6 +265,7 @@ impl Condition {
         self.conditions.len()
     }
 
+    // [spec:pgorm:sem:sql.ast.condition.flattening]
     pub(crate) fn to_simple_expr(&self) -> SimpleExpr {
         let mut inner_exprs = vec![];
         for ce in &self.conditions {
@@ -634,6 +639,7 @@ impl ConditionHolder {
         }
     }
 
+    // [spec:pgorm:req:sql.ast.condition.holder]
     pub fn add_condition(&mut self, mut addition: Condition) {
         match std::mem::take(&mut self.contents) {
             ConditionHolderContents::Empty => {

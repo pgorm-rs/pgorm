@@ -1,0 +1,47 @@
+# Schema Generation from Entities
+
+`src/schema/` projects compile-time entity definitions (`EntityTrait`) into
+`pgorm_query` DDL statements. `Schema` is a stateless helper — `Schema::new()`
+takes no backend argument because pgorm is PostgreSQL-only. The statements are
+returned to the caller (typically migrations or test setup); nothing here
+executes SQL.
+
+## Table projection
+
+> [spec:pgorm:sem:schema.from-entity]
+> `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
+> for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
+> and one column per `E::Column` variant projected from `ColumnTrait::def()` —
+> the declared `ColumnType` (with `Enum { name, .. }` rewritten to a custom
+> type reference naming the Postgres enum), `NOT NULL` unless the column is
+> nullable, a unique key for `unique` columns, plus any default value and
+> column comment.
+>
+> Primary-key handling depends on key arity: a column matching a primary-key
+> column gains `auto_increment` when `E::PrimaryKey::auto_increment()` is
+> true, and the inline `PRIMARY KEY` flag only when the key arity is 1;
+> composite keys (arity > 1) instead emit a table-level primary-key index
+> named `pk-{table}`. Foreign keys are generated from `E::Relation` entries
+> whose `RelationDef` has `is_owner == false` (the belongs-to side); owner-side
+> relations produce no constraint.
+
+## Secondary indexes
+
+> [spec:pgorm:sem:schema.from-entity.index]
+> `Schema::create_index_from_entity::<E>()` returns one `IndexCreateStatement`
+> per column whose `ColumnDef` has the `indexed` flag, named
+> `idx-{table}-{column}` over that single column, and an empty `Vec` when no
+> column is indexed. Unique columns are not covered here — uniqueness is
+> emitted as a column-level unique key by the table projection, not as a
+> separate index statement — and multi-column indexes cannot be expressed.
+
+## Postgres enum types
+
+> [spec:pgorm:sem:schema.from-entity.enum]
+> `Schema::create_enum_from_entity::<E>()` scans `E::Column` and returns one
+> `TypeCreateStatement` (`CREATE TYPE {name} AS ENUM ({variants})`) per column
+> whose type is `ColumnType::Enum`, preserving declared variant order.
+> `Schema::create_enum_from_active_enum::<A>()` builds the same statement from
+> `A::db_type()` for a single `ActiveEnum`, and panics if the resolved column
+> type is not `ColumnType::Enum`. Emitting duplicates is the caller's problem:
+> two columns sharing one enum type yield two identical statements.

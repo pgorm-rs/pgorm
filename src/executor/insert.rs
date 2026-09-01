@@ -31,6 +31,7 @@ where
 }
 
 /// The types of results for an INSERT operation
+// [spec:pgorm:sem:exec.crud.try-insert]
 #[derive(Debug)]
 pub enum TryInsertResult<T> {
     /// The INSERT statement did not have any value to insert
@@ -41,6 +42,7 @@ pub enum TryInsertResult<T> {
     Inserted(T),
 }
 
+// [spec:pgorm:sem:exec.crud.try-insert]
 impl<A> TryInsert<A>
 where
     A: ActiveModelTrait,
@@ -112,6 +114,7 @@ where
     A: ActiveModelTrait,
 {
     /// Execute an insert operation
+    // [spec:pgorm:sem:exec.crud.insert]
     #[allow(unused_mut)]
     pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + '_
     where
@@ -205,6 +208,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:exec.crud.insert]
 async fn exec_insert<A, C>(
     primary_key: Option<ValueTuple>,
     statement: InsertStatement,
@@ -249,6 +253,7 @@ where
     Ok(InsertResult { last_insert_id })
 }
 
+// [spec:pgorm:sem:exec.crud.insert-returning]
 async fn exec_insert_without_returning<C>(
     insert_statement: InsertStatement,
     db: &C,
@@ -267,6 +272,7 @@ where
     Ok(exec_result)
 }
 
+// [spec:pgorm:sem:exec.crud.insert-returning]
 async fn exec_insert_with_returning<A, C>(
     primary_key: Option<ValueTuple>,
     mut insert_statement: InsertStatement,

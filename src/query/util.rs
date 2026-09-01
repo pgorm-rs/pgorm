@@ -1,6 +1,7 @@
 use crate::QueryTrait;
 
 /// This structure provides debug capabilities
+// [spec:pgorm:def:query.build.debug-query]
 #[derive(Debug)]
 pub struct DebugQuery<'a, Q, T> {
     /// The query to debug
@@ -78,6 +79,7 @@ macro_rules! debug_query_build {
 ///     r#"INSERT INTO `cake` (`id`, `name`) VALUES (1, 'Apple Pie')"#
 /// );
 /// ```
+// [spec:pgorm:def:query.build.debug-query]
 #[macro_export]
 macro_rules! debug_query_stmt {
     ($query:expr,$value:expr) => {

@@ -26,6 +26,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:query.build.insert]
 impl<A> Insert<A>
 where
     A: ActiveModelTrait,
@@ -113,6 +114,7 @@ where
     /// # Panics
     ///
     /// Panics if the column value has discrepancy across rows
+    // [spec:pgorm:req:query.build.insert.uniform-columns]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
     where
@@ -258,6 +260,7 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe]
     pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -295,6 +298,7 @@ where
 /// Performs INSERT operations on a ActiveModel, will do nothing if input is empty.
 ///
 /// All functions works the same as if it is Insert<A>. Please refer to Insert<A> page for more information
+// [spec:pgorm:sem:query.build.insert.empty-failsafe]
 #[derive(Debug)]
 pub struct TryInsert<A>
 where

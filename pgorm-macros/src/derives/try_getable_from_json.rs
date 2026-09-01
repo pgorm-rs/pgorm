@@ -1,6 +1,7 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
+// [spec:pgorm:sem:macros.derive.from-query-result]
 pub fn expand_derive_from_json_query_result(ident: Ident) -> syn::Result<TokenStream> {
     let impl_not_u8 = quote!(
         #[automatically_derived]

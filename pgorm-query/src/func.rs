@@ -37,6 +37,7 @@ pub enum Function {
 }
 
 /// Function call.
+// [spec:pgorm:def:sql.ast.func]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub(crate) func: Function,
@@ -99,6 +100,7 @@ impl FunctionCall {
 }
 
 /// Function call helper.
+// [spec:pgorm:def:sql.ast.func]
 #[derive(Debug, Clone)]
 pub struct Func;
 

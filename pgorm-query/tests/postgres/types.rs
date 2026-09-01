@@ -2,7 +2,9 @@ use super::*;
 use pgorm_query::extension::Type;
 use pretty_assertions::assert_eq;
 
+// [spec:pgorm:req:sql.ddl.type-enum/test]
 #[test]
+// [spec:pgorm:req:sql.render.ddl.enum-type/test]
 fn create_1() {
     assert_eq!(
         Type::create()
@@ -56,6 +58,7 @@ fn create_3() {
     }
 }
 
+// [spec:pgorm:req:sql.ddl.type-alter-drop/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -98,6 +101,7 @@ fn drop_4() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.type-alter-drop/test]
 #[test]
 fn alter_1() {
     assert_eq!(

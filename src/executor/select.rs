@@ -13,6 +13,7 @@ use tokio_postgres::types::ToSql;
 use super::ValueHolder;
 
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
+// [spec:pgorm:def:exec.crud]
 #[derive(Clone, Debug)]
 pub struct Selector<S>
 where
@@ -35,6 +36,7 @@ where
 }
 
 /// A Trait for any type that can perform SELECT queries
+// [spec:pgorm:def:exec.crud]
 pub trait SelectorTrait {
     #[allow(missing_docs)]
     type Item: Sized;
@@ -426,6 +428,7 @@ where
     }
 
     /// Get all Models from the SELECT query
+    // [spec:pgorm:req:exec.crud.no-stream]
     pub async fn all<'a, C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
     where
         C: ConnectionTrait,
@@ -598,6 +601,7 @@ where
     /// > then use [`ModelTrait::find_related`] on the model.
     /// >
     /// > See https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading for details.
+    // [spec:pgorm:sem:exec.crud.consolidate]
     pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
@@ -665,6 +669,7 @@ where
     // }
 
     /// Get an item from the Select query
+    // [spec:pgorm:sem:exec.crud.select]
     pub async fn one<'a, C>(mut self, db: &C) -> Result<S::Item, DbErr>
     where
         C: ConnectionTrait,
@@ -852,6 +857,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:sem:exec.crud.select]
     pub async fn one<'a, C>(self, db: &C) -> Result<S::Item, DbErr>
     where
         C: ConnectionTrait,
@@ -1003,6 +1009,7 @@ where
     // }
 }
 
+// [spec:pgorm:sem:exec.crud.consolidate]
 #[allow(clippy::unwrap_used)]
 fn consolidate_query_result<L, R>(
     rows: Vec<(L::Model, Option<R::Model>)>,

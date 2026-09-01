@@ -1,5 +1,6 @@
 use pgorm_query::TableRef;
 
+// [spec:pgorm:sem:codegen.entity.keywords]
 pub(crate) fn escape_rust_keyword<T>(string: T) -> String
 where
     T: ToString,

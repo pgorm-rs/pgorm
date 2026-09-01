@@ -37,6 +37,7 @@ impl Default for GenEnumArgs {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.enum-def]
 #[proc_macro_attribute]
 pub fn enum_def(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {

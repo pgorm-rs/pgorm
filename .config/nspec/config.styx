@@ -1,0 +1,35 @@
+specs ({
+    name pgorm,
+    include (docs/spec/**/*.md),
+    impls ({
+        name main,
+        languages (@rust),
+        include (
+            src/**/*.rs
+            pgorm-macros/src/**/*.rs
+            pgorm-codegen/src/**/*.rs
+            pgorm-migration/src/**/*.rs
+            pgorm-pool/src/**/*.rs
+            pgorm-query/src/**/*.rs
+            pgorm-query/pgorm-query-attr/src/**/*.rs
+            pgorm-query/pgorm-query-derive/src/**/*.rs
+        ),
+        test_include (
+            tests/**/*.rs
+            pgorm-macros/tests/**/*.rs
+            pgorm-codegen/tests/**/*.rs
+            pgorm-migration/tests/**/*.rs
+            pgorm-pool/tests/**/*.rs
+            pgorm-query/tests/**/*.rs
+            pgorm-query/pgorm-query-attr/tests/**/*.rs
+            pgorm-query/pgorm-query-derive/tests/**/*.rs
+        ),
+        exclude (
+            target/**
+            sea-orm/**
+            issues/**
+            examples/**
+            pgorm-cli/**
+        )
+    })
+})

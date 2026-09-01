@@ -105,6 +105,7 @@ fn impl_iden_for_enum(
     }
 }
 
+// [spec:pgorm:sem:macros.derive.iden]
 pub fn expand_derive_iden(input: DeriveInput) -> syn::Result<TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 

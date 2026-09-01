@@ -46,6 +46,7 @@ use inherent::inherent;
 ///     DELETE FROM table WHERE table.a = cte_name.a)
 ///
 /// It is mandatory to set the [Self::table_name] and the [Self::query].
+// [spec:pgorm:def:sql.ast.with]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CommonTableExpression {
     pub(crate) table_name: Option<DynIden>,
@@ -204,6 +205,7 @@ pub enum SearchOrder {
 ///
 /// Setting [Self::order] and [Self::expr] is mandatory. The [SelectExpr] used must specify an alias
 /// which will be the name that you can use to order the result of the [CommonTableExpression].
+// [spec:pgorm:req:sql.ast.with.recursive]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Search {
     pub(crate) order: Option<SearchOrder>,
@@ -262,6 +264,7 @@ impl Search {
 /// A query can have both SEARCH and CYCLE clauses.
 ///
 /// Setting [Self::set], [Self::expr] and [Self::using] is mandatory.
+// [spec:pgorm:req:sql.ast.with.recursive]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Cycle {
     pub(crate) expr: Option<SimpleExpr>,
@@ -418,6 +421,7 @@ impl Cycle {
 ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) CYCLE "id" SET "looped" USING "traversal_path" SELECT * FROM "cte_traversal""#
 /// );
 /// ```
+// [spec:pgorm:def:sql.ast.with]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WithClause {
     pub(crate) recursive: bool,

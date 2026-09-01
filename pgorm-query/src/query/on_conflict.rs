@@ -1,5 +1,6 @@
 use crate::{ConditionHolder, DynIden, IntoCondition, IntoIden, SimpleExpr};
 
+// [spec:pgorm:req:sql.ast.on-conflict]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct OnConflict {
     pub(crate) targets: Vec<OnConflictTarget>,
@@ -18,6 +19,7 @@ pub enum OnConflictTarget {
 }
 
 /// Represents ON CONFLICT (upsert) actions
+// [spec:pgorm:req:sql.ast.on-conflict]
 #[derive(Debug, Clone, PartialEq)]
 pub enum OnConflictAction {
     /// Do nothing

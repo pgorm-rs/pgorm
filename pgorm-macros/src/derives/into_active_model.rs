@@ -91,6 +91,7 @@ impl IntoActiveModel {
 }
 
 /// Method to derive the ActiveModel from the [ActiveModelTrait](pgorm::ActiveModelTrait)
+// [spec:pgorm:sem:macros.derive.active-model]
 pub fn expand_into_active_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

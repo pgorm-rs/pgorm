@@ -142,6 +142,7 @@ impl DeriveEntity {
     }
 }
 
+// [spec:pgorm:sem:macros.derive.entity]
 pub fn expand_derive_entity(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     Ok(DeriveEntity::new(input)?.expand())
 }

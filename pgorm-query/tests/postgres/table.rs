@@ -1,7 +1,10 @@
 use super::*;
 use pretty_assertions::assert_eq;
 
+// [spec:pgorm:req:sql.ddl.create-table/test]
+// [spec:pgorm:req:sql.ddl.column-def/test]
 #[test]
+// [spec:pgorm:def:sql.render.ddl.types/test]
 fn create_1() {
     assert_eq!(
         Table::create()
@@ -114,6 +117,7 @@ fn create_4() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.column-types/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -335,6 +339,7 @@ fn create_15() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -377,6 +382,7 @@ fn truncate_2() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.alter-table/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -393,6 +399,7 @@ fn alter_1() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.alter-table/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -528,6 +535,7 @@ fn alter_10() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate/test]
 #[test]
 fn rename_1() {
     assert_eq!(

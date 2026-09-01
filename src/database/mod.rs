@@ -21,6 +21,7 @@ use tokio_postgres::NoTls;
 // pub use transaction::*;
 
 /// Method to create a [DatabasePool] on a database
+// [spec:pgorm:req:conn.pool]
 pub fn connect(config: Config) -> DatabasePool {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
@@ -32,6 +33,7 @@ pub fn connect(config: Config) -> DatabasePool {
     DatabasePool(pool)
 }
 
+// [spec:pgorm:req:conn.pool]    builder customization
 pub fn connect_with_builder(
     config: Config,
     build: impl Fn(PoolBuilder) -> PoolBuilder,
@@ -45,6 +47,7 @@ pub fn connect_with_builder(
     builder.build().map(DatabasePool).unwrap()
 }
 
+// [spec:pgorm:sem:conn.pool.multi]    per-tag pool construction
 pub fn connect_multi_with_builder(
     config: Config,
     build: BTreeMap<String, Box<dyn Fn(PoolBuilder) -> PoolBuilder>>,

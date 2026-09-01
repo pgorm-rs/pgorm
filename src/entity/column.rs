@@ -9,6 +9,7 @@ use std::str::FromStr;
 pub use pgorm_query::ColumnType;
 
 /// Defines a Column for an Entity
+// [spec:pgorm:req:entity.traits.column-def]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDef {
     pub(crate) col_type: ColumnType,
@@ -68,6 +69,7 @@ macro_rules! bind_subquery_func {
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
+// [spec:pgorm:def:entity.traits.column]
 pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -260,6 +262,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         cast_enum_as(expr, self, |col, _, col_type| {
             let type_name = match col_type {
@@ -278,6 +281,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
 
     /// Cast value of an enum column as enum type; do nothing if `self` is not an enum.
     /// Will also transform `Array(Vec<Json>)` into `Json(Vec<Json>)` if the column type is `Json`.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         cast_enum_as(val, self, |col, enum_name, col_type| {
             let type_name = match col_type {
@@ -300,6 +304,7 @@ pub trait ColumnTypeTrait {
     fn get_enum_name(&self) -> Option<&DynIden>;
 }
 
+// [spec:pgorm:req:entity.traits.column-def]
 impl ColumnTypeTrait for ColumnType {
     fn def(self) -> ColumnDef {
         ColumnDef {

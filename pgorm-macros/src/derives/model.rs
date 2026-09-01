@@ -179,6 +179,7 @@ impl DeriveModel {
 }
 
 /// Method to derive an ActiveModel
+// [spec:pgorm:sem:macros.derive.model]
 pub fn expand_derive_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
     match DeriveModel::new(input) {

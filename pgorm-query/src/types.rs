@@ -8,10 +8,12 @@ pub use std::sync::Arc as RcOrArc;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
+// [spec:pgorm:def:sql.types]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
         pub trait Iden where $(Self: $bounds),* {
+            // [spec:pgorm:req:sql.render.ident-quoting] (wrap in quote pair; embedded right-quote doubled)
             fn prepare(&self, s: &mut dyn fmt::Write, q: Quote) {
                 write!(s, "{}{}{}", q.left(), self.quoted(q), q.right()).unwrap();
             }
@@ -62,6 +64,7 @@ impl Clone for SeaRc<dyn Iden> {
     }
 }
 
+// [spec:pgorm:def:sql.types]
 impl PartialEq for SeaRc<dyn Iden> {
     fn eq(&self, other: &Self) -> bool {
         let (self_vtable, other_vtable) = unsafe {
@@ -100,6 +103,8 @@ impl fmt::Debug for dyn Iden {
 }
 
 /// Column references
+// [spec:pgorm:def:sql.types.column-ref]
+// [spec:pgorm:def:sql.ast.keywords]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(DynIden),
@@ -109,11 +114,13 @@ pub enum ColumnRef {
     TableAsterisk(DynIden),
 }
 
+// [spec:pgorm:def:sql.types.column-ref]
 pub trait IntoColumnRef {
     fn into_column_ref(self) -> ColumnRef;
 }
 
 /// Table references
+// [spec:pgorm:def:sql.types.table-ref]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableRef {
@@ -142,12 +149,14 @@ pub trait IntoTableRef {
 }
 
 /// Unary operator
+// [spec:pgorm:def:sql.types.opers]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
+// [spec:pgorm:def:sql.types.opers]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -243,6 +252,7 @@ pub enum JoinOn {
 }
 
 /// Ordering options
+// [spec:pgorm:req:sql.ast.order]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     Asc,
@@ -299,6 +309,7 @@ pub struct NullAlias;
 pub struct Asterisk;
 
 /// SQL Keywords
+// [spec:pgorm:def:sql.ast.keywords]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,
@@ -506,6 +517,7 @@ where
     }
 }
 
+// [spec:pgorm:def:sql.types.table-ref]
 impl TableRef {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
@@ -608,6 +620,7 @@ mod tests {
         assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hello-World_""#);
     }
 
+    // [spec:pgorm:def:sql.types/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -622,6 +635,7 @@ mod tests {
         assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hel""""lo""#);
     }
 
+    // [spec:pgorm:def:sql.types/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

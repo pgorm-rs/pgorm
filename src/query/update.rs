@@ -85,6 +85,7 @@ impl Update {
     }
 }
 
+// [spec:pgorm:sem:query.build.update]
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
@@ -179,6 +180,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:query.build.update]
 impl<E> UpdateMany<E>
 where
     E: EntityTrait,

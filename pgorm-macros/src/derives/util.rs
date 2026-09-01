@@ -41,6 +41,7 @@ where
         .to_string()
 }
 
+// [spec:pgorm:sem:macros.derive.entity-model.casing]
 pub(crate) fn escape_rust_keyword<T>(string: T) -> String
 where
     T: ToString,
@@ -163,6 +164,7 @@ pub(crate) const RUST_SPECIAL_KEYWORDS: [&str; 3] = ["crate", "Self", "self"];
 mod tests {
     use super::*;
 
+    // [spec:pgorm:sem:macros.derive.active-enum.expansion/test]
     #[test]
     fn test_non_uax31_escape() {
         // Test empty string

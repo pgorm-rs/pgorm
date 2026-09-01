@@ -28,6 +28,7 @@ pub struct Relation {
 }
 
 impl Relation {
+    // [spec:pgorm:sem:codegen.entity.relations]
     pub fn get_enum_name(&self) -> Ident {
         let name = if self.self_referencing {
             format_ident!("SelfRef")
@@ -94,6 +95,7 @@ impl Relation {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.relations]
     pub fn get_attrs(&self) -> TokenStream {
         let rel_type = self.get_rel_type();
         let module_name = if let Some(module_name) = self.get_module_name() {

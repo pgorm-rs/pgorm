@@ -1,5 +1,6 @@
 target
 firedbg
+/sea-orm/
 Cargo.lock
 *.sublime*
 .vscode

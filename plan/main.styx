@@ -1,0 +1,500 @@
+name pgorm
+
+source {
+    url "git@github.com:pgorm-rs/pgorm.git"
+    ref main
+}
+
+children (
+    {
+        id repair
+        title "Repair & unblock spine"
+        priority 0
+        kind @fix
+        children (
+            {
+                id repair.tests-cfg
+                title "Revive src/tests_cfg and the tests-cfg feature"
+                priority 0
+                kind @test
+            }
+
+            {
+                id repair.tests-root
+                title "Restore root integration test targets"
+                priority 0
+                kind @test
+                deps (repair.tests-cfg)
+            }
+
+            {
+                id repair.tests-crates
+                title "Fix pgorm-pool and pgorm-macros test targets"
+                priority 0
+                kind @test
+            }
+
+            {
+                id repair.cursor-tosql
+                title "Complete cursor.rs ToSql stubs (Vector/IpNetwork/MacAddress, u8/u16)"
+                priority 0
+                kind @fix
+                deps (repair.tests-root)
+            }
+
+            {
+                id repair.features
+                title "Dead cfg-gate and feature-surface cleanup"
+                priority 0
+                kind @chore
+                deps (repair.tests-cfg)
+            }
+        )
+    }
+
+    {
+        id sql
+        title "pgorm-query: SQL building layer"
+        priority 1
+        kind @docs
+        children (
+            {
+                id sql.render
+                title "Postgres SQL rendering"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:sql.render]
+                        [spec:pgorm:def:sql.render.writer]
+                        [spec:pgorm:req:sql.render.placeholders]
+                        [spec:pgorm:req:sql.render.param-vs-inline]
+                        [spec:pgorm:req:sql.render.ident-quoting]
+                        [spec:pgorm:req:sql.render.string-escape]
+                        [spec:pgorm:def:sql.render.value-literals]
+                        [spec:pgorm:def:sql.render.operators]
+                        [spec:pgorm:def:sql.render.precedence]
+                        [spec:pgorm:req:sql.render.parens]
+                        [spec:pgorm:sem:sql.render.empty-in]
+                        [spec:pgorm:req:sql.render.condition-chain]
+                        [spec:pgorm:req:sql.render.select-order]
+                        [spec:pgorm:req:sql.render.joins]
+                        [spec:pgorm:sem:sql.render.locking]
+                        [spec:pgorm:req:sql.render.window]
+                        [spec:pgorm:req:sql.render.subquery]
+                        [spec:pgorm:req:sql.render.cte]
+                        [spec:pgorm:req:sql.render.insert]
+                        [spec:pgorm:req:sql.render.on-conflict]
+                        [spec:pgorm:req:sql.render.returning]
+                        [spec:pgorm:req:sql.render.update-delete]
+                        [spec:pgorm:req:sql.render.custom-expr]
+                        [spec:pgorm:sem:sql.render.inject]
+                        [spec:pgorm:def:sql.render.ddl.types]
+                        [spec:pgorm:req:sql.render.ddl.enum-type]
+                        [spec:pgorm:sem:sql.render.ddl.extension]
+                    )
+                }
+            }
+
+            {
+                id sql.ast
+                title "Query AST builders"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:req:sql.ast]
+                        [spec:pgorm:req:sql.ast.build]
+                        [spec:pgorm:def:sql.ast.select]
+                        [spec:pgorm:req:sql.ast.select.projection]
+                        [spec:pgorm:req:sql.ast.select.from]
+                        [spec:pgorm:req:sql.ast.select.join]
+                        [spec:pgorm:sem:sql.ast.select.union]
+                        [spec:pgorm:req:sql.ast.order]
+                        [spec:pgorm:def:sql.ast.condition]
+                        [spec:pgorm:sem:sql.ast.condition.flattening]
+                        [spec:pgorm:req:sql.ast.condition.holder]
+                        [spec:pgorm:def:sql.ast.expr]
+                        [spec:pgorm:req:sql.ast.expr.operators]
+                        [spec:pgorm:req:sql.ast.expr.in]
+                        [spec:pgorm:def:sql.ast.keywords]
+                        [spec:pgorm:def:sql.ast.insert]
+                        [spec:pgorm:req:sql.ast.insert.arity]
+                        [spec:pgorm:req:sql.ast.on-conflict]
+                        [spec:pgorm:def:sql.ast.returning]
+                        [spec:pgorm:req:sql.ast.update]
+                        [spec:pgorm:def:sql.ast.delete]
+                        [spec:pgorm:def:sql.ast.with]
+                        [spec:pgorm:req:sql.ast.with.recursive]
+                        [spec:pgorm:def:sql.ast.window-statement]
+                        [spec:pgorm:def:sql.ast.case]
+                        [spec:pgorm:def:sql.ast.func]
+                    )
+                }
+            }
+
+            {
+                id sql.value
+                title "Value and type system"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:sql.value]
+                        [spec:pgorm:def:sql.types]
+                        [spec:pgorm:def:sql.value.conversions]
+                        [spec:pgorm:def:sql.value.value-type]
+                        [spec:pgorm:sem:sql.value.accessor-panics]
+                        [spec:pgorm:def:sql.value.array]
+                        [spec:pgorm:def:sql.value.tuple]
+                        [spec:pgorm:sem:sql.value.to-json]
+                        [spec:pgorm:sem:sql.value.render]
+                        [spec:pgorm:def:sql.types.column-ref]
+                        [spec:pgorm:def:sql.types.table-ref]
+                        [spec:pgorm:def:sql.types.opers]
+                        [spec:pgorm:def:sql.types.column-type]
+                    )
+                }
+            }
+
+            {
+                id sql.ddl
+                title "Schema DDL statement builders"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:req:sql.ddl]
+                        [spec:pgorm:req:sql.ddl.create-table]
+                        [spec:pgorm:req:sql.ddl.column-def]
+                        [spec:pgorm:req:sql.ddl.column-types]
+                        [spec:pgorm:req:sql.ddl.alter-table]
+                        [spec:pgorm:req:sql.ddl.drop-rename-truncate]
+                        [spec:pgorm:req:sql.ddl.index-create]
+                        [spec:pgorm:req:sql.ddl.index-drop]
+                        [spec:pgorm:req:sql.ddl.foreign-key]
+                        [spec:pgorm:req:sql.ddl.type-enum]
+                        [spec:pgorm:req:sql.ddl.type-alter-drop]
+                        [spec:pgorm:req:sql.ddl.extension]
+                        [spec:pgorm:sem:sql.ddl.panics]
+                    )
+                }
+            }
+
+            {
+                id sql.token
+                title "SQL tokenizer"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:sql.token]
+                        [spec:pgorm:req:sql.token.scan]
+                        [spec:pgorm:req:sql.token.space]
+                        [spec:pgorm:req:sql.token.word]
+                        [spec:pgorm:req:sql.token.quoted]
+                        [spec:pgorm:sem:sql.token.unquote]
+                        [spec:pgorm:thm:sql.token.roundtrip]
+                        [spec:pgorm:sem:sql.token.limits]
+                    )
+                }
+            }
+        )
+    }
+
+    {
+        id orm
+        title "Core ORM runtime"
+        priority 1
+        kind @docs
+        children (
+            {
+                id orm.entity
+                title "Entity system"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:entity.traits]
+                        [spec:pgorm:req:entity.active-model]
+                        [spec:pgorm:req:entity.relation]
+                        [spec:pgorm:req:entity.traits.entity-name]
+                        [spec:pgorm:req:entity.traits.crud]
+                        [spec:pgorm:def:entity.traits.column]
+                        [spec:pgorm:req:entity.traits.column-def]
+                        [spec:pgorm:sem:entity.traits.column.enum-cast]
+                        [spec:pgorm:def:entity.traits.primary-key]
+                        [spec:pgorm:def:entity.traits.model]
+                        [spec:pgorm:def:entity.traits.from-query-result]
+                        [spec:pgorm:def:entity.traits.active-enum]
+                        [spec:pgorm:req:entity.traits.active-enum.limits]
+                        [spec:pgorm:def:entity.active-model.active-value]
+                        [spec:pgorm:sem:entity.active-model.active-value.ops]
+                        [spec:pgorm:req:entity.active-model.from-sugar]
+                        [spec:pgorm:req:entity.active-model.persistence]
+                        [spec:pgorm:req:entity.active-model.save]
+                        [spec:pgorm:req:entity.active-model.hooks]
+                        [spec:pgorm:req:entity.active-model.into]
+                        [spec:pgorm:req:entity.active-model.json]
+                        [spec:pgorm:def:entity.relation.def]
+                        [spec:pgorm:req:entity.relation.builder]
+                        [spec:pgorm:req:entity.relation.linked]
+                        [spec:pgorm:req:entity.relation.fk]
+                    )
+                }
+            }
+
+            {
+                id orm.query
+                title "ORM query builders"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:req:query.build]
+                        [spec:pgorm:req:query.loader]
+                        [spec:pgorm:sem:query.build.select-defaults]
+                        [spec:pgorm:def:query.build.query-trait]
+                        [spec:pgorm:sem:query.build.filter]
+                        [spec:pgorm:sem:query.build.modifiers]
+                        [spec:pgorm:sem:query.build.join]
+                        [spec:pgorm:sem:query.build.combine]
+                        [spec:pgorm:sem:query.build.insert]
+                        [spec:pgorm:req:query.build.insert.uniform-columns]
+                        [spec:pgorm:sem:query.build.insert.empty-failsafe]
+                        [spec:pgorm:sem:query.build.update]
+                        [spec:pgorm:sem:query.build.delete]
+                        [spec:pgorm:def:query.build.debug-query]
+                        [spec:pgorm:sem:query.loader.batching]
+                        [spec:pgorm:sem:query.loader.regroup]
+                        [spec:pgorm:sem:query.loader.many-to-many]
+                        [spec:pgorm:req:query.loader.table-ref-limitation]
+                    )
+                }
+            }
+
+            {
+                id orm.exec
+                title "Query execution and row decoding"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:exec.decode]
+                        [spec:pgorm:sem:exec.decode.null]
+                        [spec:pgorm:sem:exec.decode.null-context]
+                        [spec:pgorm:def:exec.decode.types]
+                        [spec:pgorm:sem:exec.decode.u32-oid]
+                        [spec:pgorm:def:exec.decode.array]
+                        [spec:pgorm:def:exec.decode.many]
+                        [spec:pgorm:req:exec.decode.many-arity]
+                        [spec:pgorm:def:exec.decode.json]
+                        [spec:pgorm:def:exec.decode.from-u64]
+                        [spec:pgorm:def:exec.crud]
+                        [spec:pgorm:sem:exec.crud.select]
+                        [spec:pgorm:sem:exec.crud.consolidate]
+                        [spec:pgorm:sem:exec.crud.insert]
+                        [spec:pgorm:sem:exec.crud.insert-returning]
+                        [spec:pgorm:sem:exec.crud.try-insert]
+                        [spec:pgorm:sem:exec.crud.update]
+                        [spec:pgorm:sem:exec.crud.delete]
+                        [spec:pgorm:def:exec.crud.exec-result]
+                        [spec:pgorm:req:exec.crud.no-stream]
+                    )
+                }
+            }
+
+            {
+                id orm.paginate
+                title "Pagination (offset and keyset cursor)"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:exec.cursor]
+                        [spec:pgorm:sem:exec.cursor.keyset]
+                        [spec:pgorm:sem:exec.cursor.window]
+                        [spec:pgorm:sem:exec.cursor.order]
+                        [spec:pgorm:def:exec.cursor.binding]
+                        [spec:pgorm:req:exec.cursor.binding-gaps]
+                        [spec:pgorm:def:exec.paginator]
+                        [spec:pgorm:req:exec.paginator.page-size]
+                        [spec:pgorm:sem:exec.paginator.fetch]
+                        [spec:pgorm:sem:exec.paginator.count]
+                        [spec:pgorm:sem:exec.paginator.iterate]
+                        [spec:pgorm:sem:exec.paginator.raw]
+                    )
+                }
+            }
+
+            {
+                id orm.stream
+                title "Restore streaming selects"
+                priority 2
+                kind @feat
+                deps (orm.exec repair.tests-root)
+            }
+        )
+    }
+
+    {
+        id infra
+        title "Connection, schema, metrics, errors"
+        priority 1
+        kind @docs
+        children (
+            {
+                id infra.conn
+                title "Connection, pool and transactions"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:req:conn.pool]
+                        [spec:pgorm:req:conn.tx]
+                        [spec:pgorm:sem:conn.pool.get]
+                        [spec:pgorm:req:conn.pool.no-conn-trait]
+                        [spec:pgorm:sem:conn.pool.multi]
+                        [spec:pgorm:sem:conn.pool.lifecycle]
+                        [spec:pgorm:sem:conn.pool.recycle]
+                        [spec:pgorm:sem:conn.pool.statement-cache]
+                        [spec:pgorm:def:conn.pool.conn-trait]
+                        [spec:pgorm:sem:conn.tx.guard]
+                        [spec:pgorm:def:conn.statement]
+                        [spec:pgorm:sem:conn.statement.disabled-types]
+                        [spec:pgorm:def:conn.pool.generic-client]
+                    )
+                }
+            }
+
+            {
+                id infra.schema-gen
+                title "Schema DDL from entities"
+                priority 1
+                implements {
+                    main ([spec:pgorm:sem:schema.from-entity] [spec:pgorm:sem:schema.from-entity.index] [spec:pgorm:sem:schema.from-entity.enum])
+                }
+                deps (orm.entity)
+            }
+
+            {
+                id infra.metrics
+                title "Metrics and instrumentation layer"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:metric.layer]
+                        [spec:pgorm:def:metric.layer.collector]
+                        [spec:pgorm:req:metric.layer.delegate]
+                        [spec:pgorm:sem:metric.layer.tx]
+                    )
+                }
+            }
+
+            {
+                id infra.error
+                title "Error model"
+                priority 1
+                implements {
+                    main ([spec:pgorm:def:error.model] [spec:pgorm:def:error.model.runtime] [spec:pgorm:sem:error.model.sql-class])
+                }
+            }
+        )
+    }
+
+    {
+        id codegen
+        title "Macros and entity generation"
+        priority 1
+        kind @docs
+        children (
+            {
+                id codegen.macros
+                title "Derive macros"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:macros.derive]
+                        [spec:pgorm:sem:macros.derive.entity-model]
+                        [spec:pgorm:req:macros.derive.entity-model.reject]
+                        [spec:pgorm:syn:macros.derive.entity-model.attrs]
+                        [spec:pgorm:sem:macros.derive.entity-model.casing]
+                        [spec:pgorm:sem:macros.derive.entity-model.column-def]
+                        [spec:pgorm:sem:macros.derive.entity-model.primary-key]
+                        [spec:pgorm:sem:macros.derive.entity]
+                        [spec:pgorm:sem:macros.derive.column]
+                        [spec:pgorm:sem:macros.derive.model]
+                        [spec:pgorm:sem:macros.derive.active-model]
+                        [spec:pgorm:syn:macros.derive.active-enum]
+                        [spec:pgorm:sem:macros.derive.active-enum.expansion]
+                        [spec:pgorm:syn:macros.derive.relation]
+                        [spec:pgorm:sem:macros.derive.partial-model]
+                        [spec:pgorm:sem:macros.derive.from-query-result]
+                        [spec:pgorm:sem:macros.derive.value-type]
+                        [spec:pgorm:sem:macros.derive.iden]
+                        [spec:pgorm:sem:macros.derive.iden.query]
+                        [spec:pgorm:sem:macros.derive.enum-def]
+                        [spec:pgorm:sem:macros.derive.enum-iter]
+                        [spec:pgorm:sem:macros.derive.test-attr]
+                    )
+                }
+                deps (orm.entity)
+            }
+
+            {
+                id codegen.generate
+                title "Entity codegen from live schema"
+                priority 1
+                implements {
+                    main (
+                        [spec:pgorm:def:codegen.entity]
+                        [spec:pgorm:sem:codegen.entity.transform]
+                        [spec:pgorm:sem:codegen.entity.transform.inverse]
+                        [spec:pgorm:sem:codegen.entity.transform.conjunct]
+                        [spec:pgorm:req:codegen.entity.files]
+                        [spec:pgorm:def:codegen.entity.compact]
+                        [spec:pgorm:def:codegen.entity.expanded]
+                        [spec:pgorm:sem:codegen.entity.compact.attrs]
+                        [spec:pgorm:sem:codegen.entity.types]
+                        [spec:pgorm:sem:codegen.entity.types.datetime]
+                        [spec:pgorm:req:codegen.entity.types.unsupported]
+                        [spec:pgorm:def:codegen.entity.serde]
+                        [spec:pgorm:sem:codegen.entity.serde.skip]
+                        [spec:pgorm:sem:codegen.entity.pk]
+                        [spec:pgorm:sem:codegen.entity.relations]
+                        [spec:pgorm:sem:codegen.entity.relations.related]
+                        [spec:pgorm:sem:codegen.entity.relations.via]
+                        [spec:pgorm:sem:codegen.entity.enums]
+                        [spec:pgorm:sem:codegen.entity.keywords]
+                        [spec:pgorm:sem:codegen.entity.seaography]
+                        [spec:pgorm:sem:codegen.entity.context]
+                        [spec:pgorm:sem:codegen.entity.expanded.blocks]
+                        [spec:pgorm:sem:codegen.entity.compact.model]
+                        [spec:pgorm:sem:codegen.entity.imports]
+                        [spec:pgorm:sem:codegen.entity.serde.derives]
+                    )
+                }
+                deps (codegen.macros)
+            }
+        )
+    }
+
+    {
+        id decide
+        title "Revival-or-retirement decisions and doc truth"
+        priority 2
+        kind @chore
+        children (
+            {
+                id decide.migration
+                title "pgorm-migration: revive or retire"
+                priority 2
+            }
+
+            {
+                id decide.cli
+                title "pgorm-cli: revive or retire"
+                priority 2
+                deps (codegen.generate decide.migration)
+            }
+
+            {
+                id decide.docs
+                title "Docs reconciliation (METRICS.md, CLAUDE.md, README)"
+                priority 2
+                kind @docs
+                deps (infra.metrics repair.features)
+            }
+        )
+    }
+)

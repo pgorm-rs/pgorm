@@ -1,5 +1,6 @@
 use crate::{expr::*, types::*};
 
+// [spec:pgorm:req:sql.ast.order]
 pub trait OrderedStatement {
     #[doc(hidden)]
     // Implementation for the trait.

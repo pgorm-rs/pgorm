@@ -29,6 +29,7 @@ use inherent::inherent;
 ///     r#"DELETE FROM "glyph" WHERE "id" < 1 OR "id" > 10"#
 /// );
 /// ```
+// [spec:pgorm:def:sql.ast.delete]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
     pub(crate) table: Option<Box<TableRef>>,

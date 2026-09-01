@@ -14,6 +14,7 @@ use super::{QueryResult, ValueHolder};
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
 
 /// Defined a structure to handle pagination of a result from a query operation on a Model
+// [spec:pgorm:def:exec.paginator]
 #[derive(Clone, Debug)]
 pub struct Paginator<'db, C, S>
 where
@@ -44,6 +45,7 @@ where
     S: SelectorTrait + 'db,
 {
     /// Fetch a specific page; page index starts from zero
+    // [spec:pgorm:sem:exec.paginator.fetch]
     pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
         let query = self
             .query
@@ -67,11 +69,13 @@ where
     }
 
     /// Fetch the current page
+    // [spec:pgorm:sem:exec.paginator.fetch]
     pub async fn fetch(&self) -> Result<Vec<S::Item>, DbErr> {
         self.fetch_page(self.page).await
     }
 
     /// Get the total number of items
+    // [spec:pgorm:sem:exec.paginator.count]
     pub async fn num_items(&self) -> Result<u64, DbErr> {
         let stmt = SelectStatement::new()
             .expr(Expr::cust("COUNT(*) AS num_items"))
@@ -119,6 +123,7 @@ where
     }
 
     /// Compute the number of pages for the current page
+    // [spec:pgorm:sem:exec.paginator.count]
     fn compute_pages_number(&self, num_items: u64) -> u64 {
         (num_items / self.page_size) + (num_items % self.page_size > 0) as u64
     }
@@ -165,6 +170,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:sem:exec.paginator.iterate]
     pub async fn fetch_and_next(&mut self) -> Result<Option<Vec<S::Item>>, DbErr> {
         let vec = self.fetch().await?;
         self.next();
@@ -206,6 +212,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
+    // [spec:pgorm:sem:exec.paginator.iterate]
     pub fn into_stream(mut self) -> PinBoxStream<'db, Result<Vec<S::Item>, DbErr>> {
         Box::pin(stream! {
             while let Some(vec) = self.fetch_and_next().await? {
@@ -217,6 +224,7 @@ where
 
 #[async_trait::async_trait]
 /// A Trait for any type that can paginate results
+// [spec:pgorm:def:exec.paginator]
 pub trait PaginatorTrait<'db, C>
 where
     C: ConnectionTrait,
@@ -243,6 +251,7 @@ where
 {
     type Selector = S;
 
+    // [spec:pgorm:req:exec.paginator.page-size]
     fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
         assert!(page_size != 0, "page_size should not be zero");
         Paginator {
@@ -261,6 +270,8 @@ where
     S: SelectorTrait + Send + Sync + 'db,
 {
     type Selector = S;
+    // [spec:pgorm:req:exec.paginator.page-size]
+    // [spec:pgorm:sem:exec.paginator.raw]
     fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
         assert!(page_size != 0, "page_size should not be zero");
         let sql = self.stmt.trim()[6..].trim();

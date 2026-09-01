@@ -8,6 +8,7 @@ use pgorm_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
+// [spec:pgorm:def:entity.traits.model]
 #[async_trait]
 pub trait ModelTrait: Clone + Send + Debug {
     #[allow(missing_docs)]
@@ -29,6 +30,7 @@ pub trait ModelTrait: Clone + Send + Debug {
     }
 
     /// Find linked Models
+    // [spec:pgorm:req:entity.relation.linked]
     fn find_linked<L>(&self, l: L) -> Select<L::ToEntity>
     where
         L: Linked<FromEntity = Self::Entity>,
@@ -49,6 +51,7 @@ pub trait ModelTrait: Clone + Send + Debug {
 }
 
 /// A Trait for implementing a [QueryResult]
+// [spec:pgorm:def:entity.traits.from-query-result]
 pub trait FromQueryResult: Sized {
     /// Instantiate a Model from a [QueryResult]
     fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, DbErr>;

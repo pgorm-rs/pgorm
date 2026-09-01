@@ -37,6 +37,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
+// [spec:pgorm:def:entity.traits.primary-key]
 pub trait PrimaryKeyTrait: IdenStatic + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -68,6 +69,7 @@ pub trait PrimaryKeyToColumn {
 }
 
 /// How many columns this Primary Key comprises
+// [spec:pgorm:def:entity.traits.primary-key]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

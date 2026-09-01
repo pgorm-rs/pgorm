@@ -313,6 +313,7 @@ impl Config {
 ///
 /// [`Fast`]: RecyclingMethod::Fast
 /// [`Verified`]: RecyclingMethod::Verified
+// [spec:pgorm:sem:conn.pool.recycle]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum RecyclingMethod {
     /// Only run [`Client::is_closed()`][1] when recycling existing connections.
@@ -411,6 +412,7 @@ static DEFAULT_TAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(transparent)]
 pub(crate) struct Tag(pub Arc<String>);
 
+// [spec:pgorm:sem:conn.pool.get]    generated default tag
 impl Default for Tag {
     fn default() -> Self {
         Self(Arc::new(format!(

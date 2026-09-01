@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 /// An error from unsuccessful database operations
+// [spec:pgorm:def:error.model]
 #[derive(Error, Debug)]
 pub enum DbErr {
     /// Postgres error
@@ -67,6 +68,7 @@ pub enum DbErr {
 }
 
 /// Connection Acquire error
+// [spec:pgorm:def:error.model.runtime]    acquisition failure taxonomy
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ConnAcquireErr {
     /// Connection pool timed out
@@ -78,6 +80,7 @@ pub enum ConnAcquireErr {
 }
 
 /// Runtime error
+// [spec:pgorm:def:error.model.runtime]
 #[derive(Error, Debug)]
 pub enum RuntimeErr {
     /// Error generated from within pgorm
@@ -85,6 +88,7 @@ pub enum RuntimeErr {
     Internal(String),
 }
 
+// [spec:pgorm:def:error.model]    Display-string equality
 impl PartialEq for DbErr {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
@@ -139,6 +143,7 @@ where
 }
 
 /// An error from unsuccessful SQL query
+// [spec:pgorm:sem:error.model.sql-class]
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SqlErr {
@@ -153,6 +158,7 @@ pub enum SqlErr {
 #[allow(dead_code)]
 impl DbErr {
     /// Convert generic DbErr by sqlx to SqlErr, return none if the error is not any type of SqlErr
+    // [spec:pgorm:sem:error.model.sql-class]    classifier entry point
     pub fn sql_err(&self) -> Option<SqlErr> {
         #[cfg(any(
             feature = "sqlx-mysql",

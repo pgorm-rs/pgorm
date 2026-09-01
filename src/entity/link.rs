@@ -4,6 +4,7 @@ use crate::{
 use pgorm_query::{Alias, Condition, IntoIden, JoinType, SeaRc};
 
 /// A Trait for links between Entities
+// [spec:pgorm:req:entity.relation.linked]
 pub trait Linked {
     #[allow(missing_docs)]
     type FromEntity: EntityTrait;

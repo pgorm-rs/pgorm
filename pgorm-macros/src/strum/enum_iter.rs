@@ -4,6 +4,7 @@ use syn::{Data, DeriveInput, Fields, Ident};
 
 use super::helpers::{HasStrumVariantProperties, HasTypeProperties, non_enum_error};
 
+// [spec:pgorm:sem:macros.derive.enum-iter]
 pub fn enum_iter_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
     let name = &ast.ident;
     let gen_ = &ast.generics;

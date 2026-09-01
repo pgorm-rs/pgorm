@@ -15,6 +15,7 @@ pub struct Column {
 }
 
 impl Column {
+    // [spec:pgorm:sem:codegen.entity.keywords]
     pub fn get_name_snake_case(&self) -> Ident {
         format_ident!("{}", escape_rust_keyword(self.name.to_snake_case()))
     }
@@ -27,6 +28,9 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
+    // [spec:pgorm:sem:codegen.entity.types]
+    // [spec:pgorm:sem:codegen.entity.types.datetime]
+    // [spec:pgorm:req:codegen.entity.types.unsupported]
     pub fn get_rs_type(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType, date_time_crate: &DateTimeCrate) -> String {
             #[allow(unreachable_patterns)]
@@ -77,6 +81,7 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type, date_time_crate))
                 }
+                other => unimplemented!("column type {other:?} is not supported by codegen"),
             }
         }
         let ident: TokenStream = write_rs_type(&self.col_type, date_time_crate)
@@ -88,6 +93,7 @@ impl Column {
         }
     }
 
+    // [spec:pgorm:sem:codegen.entity.compact.attrs]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -109,6 +115,7 @@ impl Column {
         col_type.map(|ty| quote! { column_type = #ty })
     }
 
+    // [spec:pgorm:req:codegen.entity.types.unsupported]
     pub fn get_def(&self) -> TokenStream {
         fn write_col_def(col_type: &ColumnType) -> TokenStream {
             match col_type {
@@ -223,6 +230,7 @@ impl Column {
         info
     }
 
+    // [spec:pgorm:sem:codegen.entity.serde.skip]
     pub fn get_serde_attribute(
         &self,
         is_primary_key: bool,

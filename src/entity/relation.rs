@@ -20,12 +20,14 @@ pub enum RelationType {
 pub(crate) type ForeignKeyAction = pgorm_query::ForeignKeyAction;
 
 /// Defines the relations of an Entity
+// [spec:pgorm:req:entity.relation]
 pub trait RelationTrait: Iterable + Debug + 'static {
     /// The method to call
     fn def(&self) -> RelationDef;
 }
 
 /// Checks if Entities are related
+// [spec:pgorm:req:entity.relation]
 pub trait Related<R>
 where
     R: EntityTrait,
@@ -45,6 +47,7 @@ where
 }
 
 /// Defines a relationship
+// [spec:pgorm:def:entity.relation.def]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
@@ -109,6 +112,7 @@ fn debug_on_condition(
 }
 
 /// Defines a helper to build a relation
+// [spec:pgorm:req:entity.relation.builder]
 pub struct RelationBuilder<E, R>
 where
     E: EntityTrait,
@@ -391,6 +395,7 @@ where
     }
 }
 
+// [spec:pgorm:req:entity.relation.builder]
 impl<E, R> From<RelationBuilder<E, R>> for RelationDef
 where
     E: EntityTrait,
@@ -443,6 +448,7 @@ macro_rules! set_foreign_key_stmt {
     };
 }
 
+// [spec:pgorm:req:entity.relation.fk]
 impl From<RelationDef> for ForeignKeyCreateStatement {
     fn from(relation: RelationDef) -> Self {
         let mut foreign_key_stmt = Self::new();
@@ -481,6 +487,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     "ALTER TABLE `foo` ADD CONSTRAINT `foo-bar` FOREIGN KEY (`bar_id`) REFERENCES `bar` (`bar_id`)"
 /// );
 /// ```
+// [spec:pgorm:req:entity.relation.fk]
 impl From<RelationDef> for TableForeignKey {
     fn from(relation: RelationDef) -> Self {
         let mut foreign_key = Self::new();

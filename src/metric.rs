@@ -9,6 +9,7 @@ use tokio_postgres::{
 };
 
 /// Trait for collecting database metrics
+// [spec:pgorm:def:metric.layer.collector]
 #[async_trait]
 pub trait MetricsCollector: Clone + Send + Sync + 'static {
     /// Record a successful database operation
@@ -58,6 +59,7 @@ impl MetricsCollector for NoOpMetrics {
 #[derive(Clone, Debug)]
 pub struct LoggingMetrics;
 
+// [spec:pgorm:def:metric.layer.collector]    LoggingMetrics tracing levels
 #[async_trait]
 impl MetricsCollector for LoggingMetrics {
     async fn record_query_success(&self, operation: &str, duration: Duration, rows: Option<u64>) {
@@ -104,6 +106,7 @@ impl MetricsCollector for LoggingMetrics {
 }
 
 /// A connection pool wrapper that produces instrumented connections
+// [spec:pgorm:def:metric.layer]    pool wrapper
 #[derive(Debug, Clone)]
 pub struct InstrumentedPool<M: MetricsCollector> {
     pool: DatabasePool,
@@ -156,6 +159,7 @@ impl<M: MetricsCollector> InstrumentedPool<M> {
 }
 
 /// A connection wrapper that instruments all database operations
+// [spec:pgorm:def:metric.layer]    connection wrapper
 #[derive(Debug)]
 pub struct InstrumentedConnection<M: MetricsCollector> {
     connection: DatabaseConnection,
@@ -182,6 +186,7 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     }
 }
 
+// [spec:pgorm:req:metric.layer.delegate]
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -324,6 +329,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
 }
 
 /// A transaction wrapper that instruments transaction operations
+// [spec:pgorm:sem:metric.layer.tx]    commit reporting + no-op drop
 #[derive(Debug)]
 pub struct InstrumentedTransaction<'a, M: MetricsCollector> {
     transaction: Option<DatabaseTransaction<'a>>,
@@ -374,6 +380,7 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
     }
 }
 
+// [spec:pgorm:req:metric.layer.delegate]    statements inside a transaction
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -535,6 +542,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     }
 }
 
+// [spec:pgorm:sem:metric.layer.tx]    timed begin
 #[async_trait]
 impl<M: MetricsCollector> TransactionTrait for InstrumentedConnection<M> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {

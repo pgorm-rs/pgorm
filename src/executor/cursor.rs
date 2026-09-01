@@ -19,6 +19,7 @@ use strum::IntoEnumIterator as Iterable;
 // use crate::JsonValue;
 
 /// Cursor pagination
+// [spec:pgorm:def:exec.cursor]
 #[derive(Debug, Clone)]
 pub struct Cursor<S>
 where
@@ -79,6 +80,7 @@ where
         self
     }
 
+    // [spec:pgorm:sem:exec.cursor.keyset]
     fn apply_filters(&mut self) -> &mut Self {
         if let Some(values) = self.after.clone() {
             let condition = self.apply_filter(values, |c, v| {
@@ -99,6 +101,7 @@ where
         self
     }
 
+    // [spec:pgorm:sem:exec.cursor.keyset]
     fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Condition
     where
         F: Fn(&DynIden, Value) -> SimpleExpr,
@@ -200,6 +203,7 @@ where
     }
 
     /// Limit result set to only first N rows in ascending order of the order by column
+    // [spec:pgorm:sem:exec.cursor.window]
     pub fn first(&mut self, num_rows: u64) -> &mut Self {
         self.last = None;
         self.first = Some(num_rows);
@@ -213,6 +217,7 @@ where
         self
     }
 
+    // [spec:pgorm:sem:exec.cursor.window]
     fn resolve_sort_order(&mut self) -> Order {
         let should_reverse_order = self.last.is_some();
         self.is_result_reversed = should_reverse_order;
@@ -234,6 +239,7 @@ where
         self
     }
 
+    // [spec:pgorm:sem:exec.cursor.order]
     fn apply_order_by(&mut self) -> &mut Self {
         self.query.clear_order_by();
         let ord = self.resolve_sort_order();
@@ -272,6 +278,7 @@ where
     }
 
     /// Fetch the paginated result
+    // [spec:pgorm:sem:exec.cursor.order]
     pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, DbErr>
     where
         C: ConnectionTrait,
@@ -356,6 +363,7 @@ where
 }
 
 /// A trait for any type that can be turn into a cursor
+// [spec:pgorm:def:exec.cursor]
 pub trait CursorTrait {
     /// Select operation
     type Selector: SelectorTrait + Send + Sync;
@@ -2400,6 +2408,7 @@ mod tests {
     }
 }
 
+// [spec:pgorm:def:exec.cursor.binding]
 pub struct ValueHolder(pub Value);
 
 impl std::fmt::Debug for ValueHolder {
@@ -2417,7 +2426,9 @@ fn accepts<T: ToSql>(input: T, ty: &Type) -> bool {
     T::accepts(ty)
 }
 
+// [spec:pgorm:def:exec.cursor.binding]
 impl ToSql for ValueHolder {
+    // [spec:pgorm:req:exec.cursor.binding-gaps]
     fn to_sql(
         &self,
         ty: &Type,

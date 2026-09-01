@@ -2,6 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::{LitStr, Type};
 
+// [spec:pgorm:sem:macros.derive.entity-model.column-def]
 pub fn col_type_match(
     col_type: Option<TokenStream>,
     field_type: &str,

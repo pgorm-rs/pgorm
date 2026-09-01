@@ -8,6 +8,7 @@ use super::DatabaseTransaction;
 
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
+// [spec:pgorm:def:conn.pool.conn-trait]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a [Statement]
@@ -56,6 +57,7 @@ pub trait ConnectionTrait: Sync {
 }
 
 /// Spawn database transaction
+// [spec:pgorm:req:conn.tx]
 #[async_trait::async_trait]
 pub trait TransactionTrait {
     /// Execute SQL `BEGIN` transaction.

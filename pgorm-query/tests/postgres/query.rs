@@ -1,6 +1,9 @@
 use super::*;
 use pretty_assertions::assert_eq;
 
+// [spec:pgorm:req:sql.ast/test]
+// [spec:pgorm:def:sql.ast.select/test]
+// [spec:pgorm:req:sql.render.ident-quoting/test]
 #[test]
 fn select_1() {
     assert_eq!(
@@ -14,6 +17,7 @@ fn select_1() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.expr/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -39,6 +43,7 @@ fn select_3() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.select.from/test]
 #[test]
 fn select_4() {
     assert_eq!(
@@ -56,6 +61,7 @@ fn select_4() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.expr.in/test]
 #[test]
 fn select_5() {
     assert_eq!(
@@ -68,6 +74,7 @@ fn select_5() {
     );
 }
 
+// [spec:pgorm:req:sql.render.condition-chain/test]
 #[test]
 fn select_6() {
     assert_eq!(
@@ -94,6 +101,7 @@ fn select_7() {
     );
 }
 
+// [spec:pgorm:req:sql.render.joins/test]
 #[test]
 fn select_8() {
     assert_eq!(
@@ -109,6 +117,7 @@ fn select_8() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.select.join/test]
 #[test]
 fn select_9() {
     assert_eq!(
@@ -292,6 +301,7 @@ fn select_21() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.condition/test]
 #[test]
 fn select_22() {
     assert_eq!(
@@ -521,6 +531,7 @@ fn select_36() {
     assert_eq!(values.0, vec![]);
 }
 
+// [spec:pgorm:sem:sql.ast.condition.flattening/test]
 #[test]
 fn select_37() {
     let (statement, values) = Query::select()
@@ -797,6 +808,7 @@ fn select_50() {
     )
 }
 
+// [spec:pgorm:req:sql.ast.order/test]
 #[test]
 fn select_51() {
     assert_eq!(
@@ -872,6 +884,7 @@ fn select_53() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.select.projection/test]
 #[test]
 fn select_54() {
     assert_eq!(
@@ -915,6 +928,7 @@ fn select_55() {
     );
 }
 
+// [spec:pgorm:req:sql.render.select-order/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -949,6 +963,7 @@ fn select_56() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.order/test]
 #[test]
 fn select_57() {
     assert_eq!(
@@ -982,6 +997,8 @@ fn select_57() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.with/test]
+// [spec:pgorm:req:sql.render.cte/test]
 #[test]
 fn select_58() {
     let select = SelectStatement::new()
@@ -1009,6 +1026,7 @@ fn select_58() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.case/test]
 #[test]
 fn select_59() {
     let query = Query::select()
@@ -1028,6 +1046,10 @@ fn select_59() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.build/test]
+// [spec:pgorm:req:sql.render.placeholders/test]
+// [spec:pgorm:req:sql.render.param-vs-inline/test]
+// [spec:pgorm:req:sql.render.custom-expr/test]
 #[test]
 fn select_60() {
     let (cust_query, cust_values) = Query::select()
@@ -1048,6 +1070,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
+// [spec:pgorm:req:sql.ast.expr.operators/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1064,6 +1087,8 @@ fn select_61() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.select.from/test]
+// [spec:pgorm:req:sql.render.subquery/test]
 #[test]
 fn select_62() {
     let select = SelectStatement::new()
@@ -1091,6 +1116,9 @@ fn select_62() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.insert/test]
+// [spec:pgorm:req:sql.render.insert/test]
+// [spec:pgorm:def:sql.render.value-literals/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_2() {
@@ -1196,6 +1224,7 @@ fn insert_from_select() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.with/test]
 #[test]
 fn insert_6() -> error::Result<()> {
     let select = SelectStatement::new()
@@ -1273,8 +1302,10 @@ fn insert_10() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.on-conflict/test]
 #[test]
 #[allow(clippy::approx_constant)]
+// [spec:pgorm:req:sql.render.on-conflict/test]
 fn insert_on_conflict_1() {
     assert_eq!(
         Query::insert()
@@ -1515,6 +1546,7 @@ fn insert_on_conflict_9() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.on-conflict/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_on_conflict_do_nothing() {
@@ -1561,8 +1593,10 @@ fn insert_on_conflict_do_nothing_on() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.returning/test]
 #[test]
 #[allow(clippy::approx_constant)]
+// [spec:pgorm:req:sql.render.returning/test]
 fn insert_returning_all_columns() {
     assert_eq!(
         Query::insert()
@@ -1595,7 +1629,9 @@ fn insert_returning_specific_columns() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.update/test]
 #[test]
+// [spec:pgorm:req:sql.render.update-delete/test]
 fn update_1() {
     assert_eq!(
         Query::update()
@@ -1681,7 +1717,9 @@ fn update_returning_specified_columns() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.delete/test]
 #[test]
+// [spec:pgorm:req:sql.render.update-delete/test]
 fn delete_1() {
     assert_eq!(
         Query::delete()
@@ -1693,6 +1731,7 @@ fn delete_1() {
 }
 
 #[test]
+// [spec:pgorm:req:sql.render.string-escape/test]
 fn escape_1() {
     let test = r#" "abc" "#;
     assert_eq!(QueryBuilder.escape_string(test), r#" \"abc\" "#.to_owned());
@@ -1769,6 +1808,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
+// [spec:pgorm:def:sql.render.operators/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -1857,6 +1897,7 @@ fn select_custom_operator() {
     );
 }
 
+// [spec:pgorm:sem:sql.ast.select.union/test]
 #[test]
 fn union_1() {
     assert_eq!(
@@ -1884,6 +1925,7 @@ fn union_1() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.func/test]
 #[test]
 fn sub_query_with_fn() {
     #[derive(Iden)]
@@ -1953,6 +1995,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.expr.operators/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2016,6 +2059,7 @@ fn regex_case_insensitive_bin_oper() {
 }
 
 #[test]
+// [spec:pgorm:req:sql.render.parens/test]
 fn test_issue_674_nested_logical() {
     let t = SimpleExpr::Value(true.into());
     let f = SimpleExpr::Value(false.into());
@@ -2036,6 +2080,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
+// [spec:pgorm:def:sql.render.precedence/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
@@ -2075,6 +2120,7 @@ fn test_issue_674_and_inside_not() {
     );
 }
 
+// [spec:pgorm:sem:sql.ast.condition.flattening/test]
 #[test]
 fn test_issue_674_nested_logical_panic() {
     let e = SimpleExpr::from(true).and(SimpleExpr::from(true).and(true.into()).and(true.into()));

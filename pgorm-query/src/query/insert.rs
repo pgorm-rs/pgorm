@@ -9,6 +9,7 @@ use inherent::inherent;
 ///
 /// [`InsertValueSource`] is a node in the expression tree and can represent a raw value set
 /// ('VALUES') or a select query.
+// [spec:pgorm:def:sql.ast.insert]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum InsertValueSource {
     Values(Vec<Vec<SimpleExpr>>),
@@ -34,6 +35,7 @@ pub(crate) enum InsertValueSource {
 ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (5.15, '12A'), (4.21, '123')"#
 /// );
 /// ```
+// [spec:pgorm:def:sql.ast.insert]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
     pub(crate) replace: bool,
@@ -125,6 +127,7 @@ impl InsertStatement {
     ///     r#"INSERT INTO "glyph" ("image") SELECT 'hello' WHERE NOT EXISTS(SELECT 'world')"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.insert.arity]
     pub fn select_from<S>(&mut self, select: S) -> Result<&mut Self>
     where
         S: Into<SelectStatement>,
@@ -164,6 +167,7 @@ impl InsertStatement {
     ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, CAST('2020-02-02 00:00:00' AS DATE))"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.insert.arity]
     pub fn values<I>(&mut self, values: I) -> Result<&mut Self>
     where
         I: IntoIterator<Item = SimpleExpr>,

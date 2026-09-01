@@ -31,6 +31,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
+// [spec:pgorm:def:sql.ast.select]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
     pub(crate) distinct: Option<SelectDistinct>,
@@ -58,6 +59,7 @@ pub enum SelectDistinct {
 }
 
 /// Window type in [`SelectExpr`]
+// [spec:pgorm:def:sql.ast.window-statement]
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindowSelectType {
     /// Name in [`SelectStatement`]
@@ -101,6 +103,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
+// [spec:pgorm:def:sql.ast.select]
 #[derive(Debug, Clone, PartialEq)]
 pub struct LockClause {
     pub(crate) r#type: LockType,
@@ -280,6 +283,7 @@ impl SelectStatement {
     ///     r#"SELECT 42, MAX("id"), 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 FROM "character""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.select.projection]
     pub fn expr<T>(&mut self, expr: T) -> &mut Self
     where
         T: Into<SelectExpr>,
@@ -386,6 +390,7 @@ impl SelectStatement {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
+    // [spec:pgorm:req:sql.ast.select.projection]
     pub fn distinct_on<T, I>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,
@@ -730,6 +735,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM "character", "font" WHERE "font"."id" = "character"."font_id""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.select.from]
     pub fn from<R>(&mut self, tbl_ref: R) -> &mut Self
     where
         R: IntoTableRef,
@@ -753,6 +759,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.select.from]
     pub fn from_values<I, V, A>(&mut self, value_tuples: I, alias: A) -> &mut Self
     where
         I: IntoIterator<Item = V>,
@@ -1163,6 +1170,7 @@ impl SelectStatement {
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.select.join]
     pub fn join<R, C>(&mut self, join: JoinType, tbl_ref: R, condition: C) -> &mut Self
     where
         R: IntoTableRef,
@@ -1345,6 +1353,7 @@ impl SelectStatement {
     ///     r#"SELECT "name" FROM "font" LEFT JOIN LATERAL (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id" AND "font"."id" = "sub_glyph"."id""#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.select.join]
     pub fn join_lateral<T, C>(
         &mut self,
         join: JoinType,
@@ -1805,6 +1814,7 @@ impl SelectStatement {
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4)"#
     /// );
     /// ```
+    // [spec:pgorm:sem:sql.ast.select.union]
     pub fn union(&mut self, union_type: UnionType, query: SelectStatement) -> &mut Self {
         self.unions.push((union_type, query));
         self

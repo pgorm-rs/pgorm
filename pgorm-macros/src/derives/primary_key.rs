@@ -4,6 +4,8 @@ use quote::{quote, quote_spanned};
 use syn::{Data, DataEnum, Expr, Fields, LitStr, Variant};
 
 /// Method to derive a Primary Key for a Model using the [PrimaryKeyTrait](pgorm::PrimaryKeyTrait)
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key]
+// [spec:pgorm:req:macros.derive.entity-model.reject]
 pub fn expand_derive_primary_key(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     let variants = match data {
         syn::Data::Enum(DataEnum { variants, .. }) => variants,

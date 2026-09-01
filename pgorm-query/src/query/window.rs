@@ -71,6 +71,7 @@ pub struct FrameClause {
 /// 1. <https://dev.mysql.com/doc/refman/8.0/en/window-function-descriptions.html>
 /// 2. <https://www.sqlite.org/windowfunctions.html>
 /// 3. <https://www.postgresql.org/docs/current/tutorial-window.html>
+// [spec:pgorm:def:sql.ast.window-statement]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,

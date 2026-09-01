@@ -121,6 +121,7 @@ where
     }
 }
 
+// [spec:pgorm:sem:macros.derive.iden.query]
 #[proc_macro_derive(Iden, attributes(iden, method))]
 pub fn derive_iden(input: TokenStream) -> TokenStream {
     let DeriveInput {
@@ -154,6 +155,7 @@ pub fn derive_iden(input: TokenStream) -> TokenStream {
     output.into()
 }
 
+// [spec:pgorm:sem:macros.derive.iden.query]
 #[proc_macro_derive(IdenStatic, attributes(iden, method))]
 pub fn derive_iden_static(input: TokenStream) -> TokenStream {
     let pgorm_query_path = pgorm_query_path();

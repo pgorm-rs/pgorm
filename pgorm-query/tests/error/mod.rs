@@ -1,5 +1,6 @@
 use pgorm_query::{error::*, tests_cfg::*, *};
 
+// [spec:pgorm:req:sql.ast.insert.arity/test]
 #[test]
 fn insert_values_1() {
     let mut insert = Query::insert();
