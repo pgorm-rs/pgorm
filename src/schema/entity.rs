@@ -126,7 +126,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity.index]
+// [spec:pgorm:sem:schema.from-entity.index+1]
 pub(crate) fn create_index_from_entity<E>(entity: E) -> Vec<IndexCreateStatement>
 where
     E: EntityTrait,
@@ -139,7 +139,7 @@ where
         }
         let stmt = Index::create()
             .name(format!("idx-{}-{}", entity.to_string(), column.to_string()))
-            .table(entity)
+            .table(entity.table_ref())
             .col(column)
             .to_owned();
         vec.push(stmt)
@@ -291,7 +291,7 @@ mod tests {
 
         let idx: IndexCreateStatement = Index::create()
             .name("idx-indexes-index1_attr")
-            .table(indexes::Entity)
+            .table(indexes::Entity.table_ref())
             .col(indexes::Column::Index1Attr)
             .to_owned();
         assert_eq!(
@@ -301,7 +301,7 @@ mod tests {
 
         let idx: IndexCreateStatement = Index::create()
             .name("idx-indexes-index2_attr")
-            .table(indexes::Entity)
+            .table(indexes::Entity.table_ref())
             .col(indexes::Column::Index2Attr)
             .to_owned();
         assert_eq!(

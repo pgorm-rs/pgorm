@@ -27,13 +27,17 @@ executes SQL.
 
 ## Secondary indexes
 
-> [spec:pgorm:sem:schema.from-entity.index]
+> [spec:pgorm:sem:schema.from-entity.index+1]
 > `Schema::create_index_from_entity::<E>()` returns one `IndexCreateStatement`
 > per column whose `ColumnDef` has the `indexed` flag, named
 > `idx-{table}-{column}` over that single column, and an empty `Vec` when no
-> column is indexed. Unique columns are not covered here — uniqueness is
-> emitted as a column-level unique key by the table projection, not as a
-> separate index statement — and multi-column indexes cannot be expressed.
+> column is indexed. Each statement targets `entity.table_ref()`, the same ref
+> the table projection uses, so the index is schema-qualified
+> (`ON "{schema}"."{table}"`) exactly when the entity declares a
+> `schema_name` and bare (`ON "{table}"`) when it does not. Unique columns are
+> not covered here — uniqueness is emitted as a column-level unique key by the
+> table projection, not as a separate index statement — and multi-column
+> indexes cannot be expressed.
 
 ## Postgres enum types
 

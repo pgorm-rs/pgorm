@@ -307,6 +307,7 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id polish.warnings, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:09.331931Z}
     {id polish.gates, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:56.935942Z}
+    {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
 )
 
 impl_evidence (

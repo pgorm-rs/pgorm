@@ -779,12 +779,20 @@ children (
                 id infra.schema-index-qualify
                 title "Schema-qualify create_index_from_entity (index DDL drops the schema of qualified tables)"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-02T11:32:37.723612Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by verify.misc: create_index_from_entity calls .table(entity) (bare iden) while create_table_from_entity uses entity.table_ref(), so a schema_name=\"public\" entity renders CREATE TABLE \"public\".\"widget\" but ON \"widget\" for its indexes (src/schema/entity.rs:145). Pinned in tests/schema_gen_tests.rs. Fixing the behavior means bumping schema.from-entity.index and updating the pinning assertions."
+                    }
+
+                    {
+                        at 2026-09-02T12:11:17.901701Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

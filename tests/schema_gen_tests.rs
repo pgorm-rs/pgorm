@@ -28,6 +28,24 @@ mod factory {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+mod gadget {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "gadget")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(indexed)]
+        pub batch: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 mod widget {
     use pgorm::entity::prelude::*;
 
@@ -293,18 +311,16 @@ fn create_table_composite_key_emits_index() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity.index/test]    one statement per indexed column, named idx-{table}-{column}
+// [spec:pgorm:sem:schema.from-entity.index+1/test]    one statement per indexed column, named idx-{table}-{column}
 #[test]
 fn create_index_from_entity_names_indexed_columns() {
     let schema = Schema::new();
 
     let stmts = schema.create_index_from_entity(widget::Entity);
     assert_eq!(stmts.len(), 1, "only `batch` is flagged `indexed`");
-    // Note the table here is `entity`, not `entity.table_ref()`, so unlike the table
-    // projection the index statement is not schema-qualified.
     assert_eq!(
         stmts[0].to_string(QueryBuilder),
-        r#"CREATE INDEX "idx-widget-batch" ON "widget" ("batch")"#
+        r#"CREATE INDEX "idx-widget-batch" ON "public"."widget" ("batch")"#
     );
 
     // Unique columns are not covered here: `code` gets a column-level unique key from
@@ -322,6 +338,32 @@ fn create_index_from_entity_names_indexed_columns() {
     assert!(
         schema.create_index_from_entity(factory::Entity).is_empty(),
         "an entity with no indexed column produces no statements"
+    );
+}
+
+// [spec:pgorm:sem:schema.from-entity.index+1/test]    the index targets entity.table_ref(), so it is schema-qualified exactly when the entity declares one
+#[test]
+fn create_index_from_entity_uses_table_ref() {
+    let schema = Schema::new();
+
+    assert_eq!(widget::Entity.schema_name(), Some("public"));
+    let qualified = schema.create_index_from_entity(widget::Entity);
+    assert_eq!(
+        qualified[0].to_string(QueryBuilder),
+        r#"CREATE INDEX "idx-widget-batch" ON "public"."widget" ("batch")"#
+    );
+    let table = schema.create_table_from_entity(widget::Entity);
+    assert_eq!(
+        table.get_table_name(),
+        Some(&widget::Entity.table_ref()),
+        "index and table projections agree on the target ref"
+    );
+
+    assert_eq!(gadget::Entity.schema_name(), None);
+    let bare = schema.create_index_from_entity(gadget::Entity);
+    assert_eq!(
+        bare[0].to_string(QueryBuilder),
+        r#"CREATE INDEX "idx-gadget-batch" ON "gadget" ("batch")"#
     );
 }
 
@@ -379,7 +421,7 @@ fn create_enum_from_active_enum_panics_non_enum() {
 }
 
 // [spec:pgorm:sem:schema.from-entity/test]    the projected DDL is accepted by Postgres and enforces what it declares
-// [spec:pgorm:sem:schema.from-entity.index/test]    the projected index reaches pg_indexes under its generated name
+// [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
 // [spec:pgorm:sem:schema.from-entity.enum/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
 async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
@@ -404,12 +446,14 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         db.execute(&entity_stmt.build(QueryBuilder), &[]).await?;
     }
     for index in schema.create_index_from_entity(widget::Entity) {
-        db.execute(&index.to_string(QueryBuilder), &[]).await?;
+        let sql = index.to_string(QueryBuilder);
+        assert!(sql.contains(r#"ON "public"."widget""#), "{sql}");
+        db.execute(&sql, &[]).await?;
     }
 
     let indexes: Vec<String> = db
         .query_all(
-            "SELECT indexname FROM pg_indexes WHERE tablename = 'widget'",
+            "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'widget'",
             &[],
         )
         .await?
@@ -418,7 +462,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         .collect();
     assert!(
         indexes.contains(&"idx-widget-batch".to_owned()),
-        "the generated index is on the table: {indexes:?}"
+        "the generated index is on the schema-qualified table: {indexes:?}"
     );
 
     let factory = factory::ActiveModel {
