@@ -917,6 +917,112 @@ children (
                     }
                 )
             }
+
+            {
+                id decide.statement
+                title "Statement/StatementBuilder: revive or delete the dormant module"
+                kind @refactor
+            }
+        )
+    }
+
+    {
+        id polish
+        title "Workspace hygiene follow-ups"
+        kind @chore
+        children (
+            {
+                id polish.warnings
+                title "Drive workspace warnings to zero (42: missing docs, elided lifetimes, dead code)"
+            }
+
+            {
+                id polish.gates
+                title "Reinstate cargo clippy -D warnings in commit checks"
+                kind @ci
+                deps (polish.warnings)
+            }
+
+            {
+                id polish.claude-md
+                title "Reconcile CLAUDE.md: doctests now pass; dormant-module claims per decide.statement"
+                kind @docs
+                deps (decide.statement)
+            }
+
+            {
+                id polish.sea-bae
+                title "Replace sea-bae/proc-macro-error2 attribute parsing in pgorm-macros"
+                kind @refactor
+            }
+
+            {
+                id polish.conn-acquire
+                title "Remove the unconstructed ConnAcquireErr / DbErr::ConnectionAcquire variant (spec bump on error.model)"
+                kind @refactor
+            }
+
+            {
+                id polish.pool-tests
+                title "Wire the 11 pgorm-pool socket tests to the DATABASE_URL harness"
+                kind @test
+            }
+        )
+    }
+
+    {
+        id verify
+        title "Verification coverage campaign: /test annotations for all 241 rules"
+        kind @test
+        children (
+            {
+                id verify.sql
+                title "Verify pgorm-query rules: ast, render, ddl, token, types, value (21 rules)"
+            }
+
+            {
+                id verify.entity
+                title "Verify entity-system rules: active-model, relations, traits (25 rules)"
+            }
+
+            {
+                id verify.query
+                title "Verify ORM query-builder and loader rules (18 rules)"
+            }
+
+            {
+                id verify.exec
+                title "Verify executor rules: crud, decode, cursor, paginator (29 rules)"
+            }
+
+            {
+                id verify.conn
+                title "Verify connection, pool and tx-guard rules (9 rules)"
+                deps (decide.statement polish.pool-tests)
+            }
+
+            {
+                id verify.macros
+                title "Verify derive-macro rules (20 rules)"
+            }
+
+            {
+                id verify.codegen
+                title "Verify entity-codegen rules (25 rules)"
+            }
+
+            {
+                id verify.misc
+                title "Verify error-model, metric-layer and schema-gen rules (8 rules)"
+            }
+        )
+        log (
+            {
+                at 2026-09-02T01:03:55.714388Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Campaign ground rules: children are no-implements leaves because every rule already has impl coverage — implements-derived status would mark them Done immediately. A child completes (via nplan_complete) when `nplan spec untested` returns zero rules for its area. Verify annotations go only where the test target compiles and actually exercises the rule (established policy from the adoption: no false /test claims). Baseline at campaign start: 86/241 rules tested (36%), 155 untested. Areas are footprint-disjoint except conn (waits on decide.statement for the two dormant-module rules, and on polish.pool-tests so pgorm-pool test targets run in the harness) — the other seven are a parallel antichain."
+            }
         )
     }
 )
