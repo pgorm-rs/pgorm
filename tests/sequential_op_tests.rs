@@ -33,7 +33,7 @@ pub async fn test_multiple_operations() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.insert/test]    a composite primary key comes back
+// [spec:pgorm:sem:exec.crud.insert+1/test]    a composite primary key comes back
 // as the entity's `PrimaryKey::ValueType` tuple
 async fn seed_data(db: &DatabaseConnection) {
     let bakery = bakery::ActiveModel {

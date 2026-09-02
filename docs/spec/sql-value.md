@@ -126,21 +126,30 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Value tuples
 
-> [spec:pgorm:def:sql.value.tuple]
+> [spec:pgorm:def:sql.value.tuple+1]
 > `ValueTuple` represents an ordered tuple of values for composite keys and
 > VALUES lists: `One(Value)`, `Two(Value, Value)`, `Three(Value, Value,
 > Value)` or `Many(Vec<Value>)`. `IntoValueTuple` is implemented for any
 > single `Into<Value>` (producing `One`), for 2- and 3-tuples (producing
 > `Two`/`Three` in field order), and for 4- through 12-tuples (producing
 > `Many` in field order). `IntoIterator for ValueTuple` yields the values in
-> that same positional order.
+> that same positional order. `ValueTuple::shape` projects a tuple onto its
+> arity alone as a `ValueTupleShape` — `One`, `Two`, `Three`, or `Many(len)` —
+> which displays as `ValueTuple::One` and, for the last, `ValueTuple::Many
+> with length of N`.
 >
-> `FromValueTuple` inverts the mapping and is arity-strict: the scalar impl
-> panics unless given `One`, the pair impl unless given `Two`, the triple impl
-> unless given `Three`, and the 4..=12 impls unless given `Many` with exactly
-> the expected length (panic message `not ValueTuple::Many with length of N`).
-> Element extraction uses `ValueType::unwrap`, so a type mismatch at any
-> position also panics.
+> `TryFromValueTuple` inverts the mapping, is arity-strict, and is fallible:
+> it returns `Result<Self, ValueTupleErr>` and never panics. The scalar impl
+> requires `One`, the pair impl `Two`, the triple impl `Three`, and the 4..=12
+> impls `Many` with exactly the expected length; anything else is
+> `ValueTupleErr::Arity { expected, actual }`, naming both shapes. Element
+> extraction goes through `ValueType::try_from`, so a type mismatch at any
+> position is `ValueTupleErr::Element { position, expected }`, naming the
+> zero-based position and the `ValueType::type_name` required there. The
+> conversion is short-circuiting: the leftmost failing position is the one
+> reported. `ValueTupleErr` implements `std::error::Error`; `Arity` displays
+> as `expected {expected}, received {actual}` and `Element` as `value at
+> position {position} is not a valid {expected}`, the type name backquoted.
 >
 > `Values` is a `Vec<Value>` newtype with `iter()` and `IntoIterator`, used to
 > carry a statement's collected parameters.

@@ -18,7 +18,7 @@ pub use super::common::bakery_chain::*;
 pub use crate::common::setup::rust_dec;
 use pgorm::{ActiveValue::Set, DatabaseConnection, entity::*};
 
-// [spec:pgorm:sem:exec.crud.insert/test]    a server-generated key is read from
+// [spec:pgorm:sem:exec.crud.insert+1/test]    a server-generated key is read from
 // the RETURNING row by name
 pub async fn test_create_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {

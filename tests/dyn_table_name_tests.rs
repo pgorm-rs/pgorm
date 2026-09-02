@@ -24,7 +24,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+2/test]    `UpdateMany::exec` returns
+// [spec:pgorm:sem:exec.crud.update+3/test]    `UpdateMany::exec` returns
 // `UpdateResult { rows_affected }`
 // [spec:pgorm:sem:exec.crud.delete/test]    `DeleteMany::exec` returns
 // `DeleteResult { rows_affected }`

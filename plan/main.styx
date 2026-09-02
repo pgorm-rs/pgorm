@@ -1515,6 +1515,13 @@ children (
                         kind @note
                         text "Audit: pgorm-query/src/value.rs:1110/:1126/:1143/:1165 — FromValueTuple arity mismatches panic, and both ORM call sites are on the CRUD hot path (src/executor/insert.rs:236, src/executor/update.rs:179 — every insert/update carrying an explicit PK). Both call sites already return Result<_, DbErr>. Remedy: fallible TryFromValueTuple (or Result-returning from_value_tuple), DbErr at the exec boundary. Bumps sql.value.tuple. Breaking inside pgorm-query only."
                     }
+
+                    {
+                        at 2026-09-02T16:46:15.258382Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

@@ -1,9 +1,9 @@
 use crate::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable,
-    PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert,
-    error::*,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityName, EntityTrait, Insert,
+    IntoActiveModel, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel,
+    SelectorRaw, TryInsert, error::*,
 };
-use pgorm_query::{FromValueTuple, Iden, InsertStatement, Query, QueryBuilder, ValueTuple};
+use pgorm_query::{Iden, InsertStatement, Query, QueryBuilder, TryFromValueTuple, ValueTuple};
 use std::{future::Future, marker::PhantomData};
 use tokio_postgres::types::ToSql;
 
@@ -124,7 +124,7 @@ where
     A: ActiveModelTrait,
 {
     /// Execute an insert operation
-    // [spec:pgorm:sem:exec.crud.insert]
+    // [spec:pgorm:sem:exec.crud.insert+1]
     #[allow(unused_mut)]
     pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
     where
@@ -218,7 +218,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert]
+// [spec:pgorm:sem:exec.crud.insert+1]
 async fn exec_insert<A, C>(
     primary_key: Option<ValueTuple>,
     statement: InsertStatement,
@@ -243,7 +243,9 @@ where
             if res == 0 {
                 return Err(DbErr::RecordNotInserted);
             }
-            FromValueTuple::from_value_tuple(value_tuple)
+            TryFromValueTuple::try_from_value_tuple(value_tuple).map_err(|err| {
+                primary_key_type_err(<A::Entity as Default>::default().table_name(), err)
+            })?
         }
         None => {
             let mut rows = db.query_all(&stmt, &values).await?;

@@ -84,12 +84,12 @@ explicit limitations.
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.
 
-> [spec:pgorm:def:entity.traits.primary-key]
+> [spec:pgorm:def:entity.traits.primary-key+1]
 > `PrimaryKeyTrait: IdenStatic + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
-> `Sized + Send + Debug + PartialEq + IntoValueTuple + FromValueTuple + TryGetableMany
-> + TryFromU64 + PrimaryKeyArity`; `auto_increment()` reports whether the key is
+> `Sized + Send + Debug + PartialEq + IntoValueTuple + TryFromValueTuple
+> + TryGetableMany + TryFromU64 + PrimaryKeyArity`; `auto_increment()` reports whether the key is
 > database-generated. `PrimaryKeyToColumn` maps key variants to columns (`into_column`)
 > and back (`from_column -> Option<Self>`). `PrimaryKeyArity` exposes a
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls

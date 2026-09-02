@@ -11,7 +11,10 @@ use pgorm::{
     RelationDef, RelationTrait, Schema, Select, SelectColumns, TryIntoModel, Value,
     entity::prelude::*,
 };
-use pgorm_query::{Alias, Expr, IntoIden, QueryBuilder, TableRef};
+use pgorm_query::{
+    Alias, Expr, IntoIden, QueryBuilder, TableRef, TryFromValueTuple, ValueTuple, ValueTupleErr,
+    ValueTupleShape,
+};
 use pretty_assertions::assert_eq;
 
 // ---------------------------------------------------------------------------
@@ -190,6 +193,67 @@ mod too_few_values {
             match self {
                 Self::Id1 => ColumnType::Integer.def(),
                 Self::Id2 => ColumnType::Integer.def(),
+            }
+        }
+    }
+
+    impl RelationTrait for Relation {
+        fn def(&self) -> RelationDef {
+            unreachable!("no relations")
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// One key column of type `i32`, but a `ValueType` declaring `String`. The
+/// arities agree, so `get_primary_key_value` builds a well-shaped tuple and the
+/// element type is what disagrees on the insert and update hot paths.
+mod mistyped_key {
+    use pgorm::entity::prelude::*;
+    use pgorm::{RelationDef, RelationTrait};
+
+    #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+    pub struct Entity;
+
+    impl EntityName for Entity {
+        fn table_name(&self) -> &str {
+            "mistyped_key"
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+    pub struct Model {
+        pub id: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+    pub enum Column {
+        Id,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+    pub enum PrimaryKey {
+        Id,
+    }
+
+    impl PrimaryKeyTrait for PrimaryKey {
+        type ValueType = String;
+
+        fn auto_increment() -> bool {
+            false
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter)]
+    pub enum Relation {}
+
+    impl ColumnTrait for Column {
+        type EntityName = Entity;
+
+        fn def(&self) -> ColumnDef {
+            match self {
+                Self::Id => ColumnType::Integer.def(),
             }
         }
     }
@@ -489,6 +553,74 @@ fn delete_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::delete_by_id(1);
 }
 
+// [spec:pgorm:def:sql.value.tuple+1/test]    the conversion `exec_insert` and
+// `find_updated_model_by_id` run a cached primary-key tuple through errs on a
+// shape the entity's `ValueType` does not have, naming both shapes
+#[test]
+fn primary_key_value_type_errs_on_arity() {
+    type ItemKey = <item::PrimaryKey as PrimaryKeyTrait>::ValueType;
+    type PairKey = <pair::PrimaryKey as PrimaryKeyTrait>::ValueType;
+
+    assert_eq!(
+        ItemKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), 2i32.into())),
+        Err(ValueTupleErr::Arity {
+            expected: ValueTupleShape::One,
+            actual: ValueTupleShape::Two,
+        })
+    );
+    assert_eq!(
+        PairKey::try_from_value_tuple(ValueTuple::One(1i32.into())),
+        Err(ValueTupleErr::Arity {
+            expected: ValueTupleShape::Two,
+            actual: ValueTupleShape::One,
+        })
+    );
+    assert_eq!(
+        PairKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), "b".into())),
+        Err(ValueTupleErr::Element {
+            position: 1,
+            expected: "i32".to_owned(),
+        })
+    );
+}
+
+// [spec:pgorm:sem:exec.crud.insert+1/test]    reconstructing `last_insert_id`
+// from the cached tuple returns `DbErr::Type` naming the table and the
+// mismatch when the entity's `ValueType` disagrees, rather than panicking
+// [spec:pgorm:sem:exec.crud.update+3/test]    the no-op re-fetch rebuilds the
+// same typed key and fails the same way
+#[pgorm_macros::test]
+async fn mistyped_primary_key_errs_on_crud() -> Result<(), DbErr> {
+    let ctx = TestContext::new("mistyped_primary_key").await;
+    let db = ctx.db.get().await?;
+    let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity);
+    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+
+    let expected = DbErr::Type(
+        "primary key of `mistyped_key` does not match its declared `ValueType`: \
+         value at position 0 is not a valid `String`"
+            .to_owned(),
+    );
+
+    let inserted = mistyped_key::Entity::insert(mistyped_key::ActiveModel {
+        id: ActiveValue::Set(1),
+    })
+    .exec(&db)
+    .await;
+    assert_eq!(inserted.unwrap_err(), expected);
+
+    let updated = mistyped_key::Entity::update(mistyped_key::ActiveModel {
+        id: ActiveValue::Unchanged(1),
+    })?
+    .exec(&db)
+    .await;
+    assert_eq!(updated.unwrap_err(), expected);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // entity.traits.column
 // ---------------------------------------------------------------------------
@@ -734,7 +866,7 @@ fn column_def_defaults_and_builders() {
 // entity.traits.primary-key
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.primary-key/test]    `PrimaryKeyArity::ARITY` is
+// [spec:pgorm:def:entity.traits.primary-key+1/test]    `PrimaryKeyArity::ARITY` is
 // 1 for any single scalar and matches the component count for tuples up to 12;
 // `auto_increment` reports whether the key is database-generated; and
 // `PrimaryKeyToColumn` maps variants to columns and back, with `from_column`

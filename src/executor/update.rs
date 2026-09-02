@@ -1,8 +1,8 @@
 use crate::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, Iterable,
-    PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne, error::*,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityName, EntityTrait, IntoActiveModel,
+    Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne, error::*,
 };
-use pgorm_query::{FromValueTuple, Query, QueryBuilder, UpdateStatement};
+use pgorm_query::{Query, QueryBuilder, TryFromValueTuple, UpdateStatement};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
@@ -60,7 +60,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+2]
+// [spec:pgorm:sem:exec.crud.update+3]
 impl Updater {
     /// Instantiate an update using an [UpdateStatement]
     pub fn new(query: UpdateStatement) -> Self {
@@ -159,7 +159,7 @@ impl Updater {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+2]
+// [spec:pgorm:sem:exec.crud.update+3]
 async fn find_updated_model_by_id<A, C>(
     model: A,
     db: &C,
@@ -172,7 +172,8 @@ where
     type ValueType<A> = <<Entity<A> as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType;
 
     let primary_key_value = match model.get_primary_key_value() {
-        Some(val) => ValueType::<A>::from_value_tuple(val),
+        Some(val) => ValueType::<A>::try_from_value_tuple(val)
+            .map_err(|err| primary_key_type_err(Entity::<A>::default().table_name(), err))?,
         None => return Err(DbErr::PrimaryKeyNotSet),
     };
     let found = Entity::<A>::find_by_id(primary_key_value).one(db).await?;

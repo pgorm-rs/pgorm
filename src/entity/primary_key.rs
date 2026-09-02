@@ -1,6 +1,6 @@
 use super::{ColumnTrait, IdenStatic, Iterable};
 use crate::{TryFromU64, TryGetableMany};
-use pgorm_query::{FromValueTuple, IntoValueTuple};
+use pgorm_query::{IntoValueTuple, TryFromValueTuple};
 use std::fmt::Debug;
 
 //LINT: composite primary key cannot auto increment
@@ -37,7 +37,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key]
+// [spec:pgorm:def:entity.traits.primary-key+1]
 pub trait PrimaryKeyTrait: IdenStatic + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -45,7 +45,7 @@ pub trait PrimaryKeyTrait: IdenStatic + Iterable {
         + Debug
         + PartialEq
         + IntoValueTuple
-        + FromValueTuple
+        + TryFromValueTuple
         + TryGetableMany
         + TryFromU64
         + PrimaryKeyArity;
@@ -69,7 +69,7 @@ pub trait PrimaryKeyToColumn {
 }
 
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key]
+// [spec:pgorm:def:entity.traits.primary-key+1]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

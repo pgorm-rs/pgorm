@@ -186,14 +186,17 @@ These rules capture what the code does today, including known gaps.
 > pagination: `one()` was dropped, and `paginate`/`count` are absent
 > because a page boundary could split one parent's children.
 
-> [spec:pgorm:sem:exec.crud.insert]
+> [spec:pgorm:sem:exec.crud.insert+1]
 > `Insert::exec` appends a `RETURNING` clause of the entity's primary-key
 > columns and resolves `InsertResult::last_insert_id` (typed as the
 > entity's `PrimaryKey::ValueType`) in one of two modes. When the insert
 > captured a client-supplied primary-key `ValueTuple`, the statement runs
 > through `execute`; zero rows affected fails with
 > `DbErr::RecordNotInserted`, and `last_insert_id` is reconstructed from
-> the cached tuple. Otherwise the statement runs through `query_all` and
+> the cached tuple through `sql.value.tuple`. A tuple whose shape or
+> element types disagree with the entity's declared `ValueType` fails with
+> `DbErr::Type` naming the table and the mismatch, rather than panicking.
+> Otherwise the statement runs through `query_all` and
 > the **last** returned row's primary-key columns are read by name;
 > an empty result fails with `DbErr::RecordNotInserted`, and a decode
 > failure of the key columns fails with `DbErr::UnpackInsertId`.
@@ -226,7 +229,7 @@ These rules capture what the code does today, including known gaps.
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update+2]
+> [spec:pgorm:sem:exec.crud.update+3]
 > `Updater::exec` short-circuits when the update statement carries no SET
 > values, returning a default `UpdateResult` (zero `rows_affected`)
 > without a database round-trip; otherwise it executes and returns
@@ -241,7 +244,11 @@ These rules capture what the code does today, including known gaps.
 > `DbErr::PrimaryKeyNotSet` guard for an active model with no
 > primary-key value, but the guard is defensive only: `query.build.update`
 > rejects an unset primary key when the `UpdateOne` is built, so no caller
-> can reach `exec` with one. `UpdateMany::exec_with_returning` appends the
+> can reach `exec` with one. Rebuilding the typed key from that tuple goes
+> through `sql.value.tuple`, so a shape or element-type disagreement with
+> the entity's declared `ValueType` fails with `DbErr::Type` naming the
+> table and the mismatch, rather than panicking.
+> `UpdateMany::exec_with_returning` appends the
 > same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
 > no-op path returns an empty `Vec`.
 
