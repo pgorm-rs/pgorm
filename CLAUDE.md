@@ -30,7 +30,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 - `pgorm-pool` - Database connection pool (vendored deadpool-postgres fork)
 - `pgorm-query` - SQL query builder (fork of sea-query, PostgreSQL-only), with its own `pgorm-query-attr` and `pgorm-query-derive` members
 
-`pgorm-cli` exists on disk but declares its own `[workspace]`, so it is **not** a member of the root workspace and is not built or tested by `cargo build`/`cargo test` at the root. It still depends on `sqlx` and `sea-schema`, contradicting the rest of the fork's direction; treat it as orphaned pending a decision about its fate, and do not assume changes elsewhere have been propagated into it.
+There is no CLI crate: the inherited `pgorm-cli` was retired (it targeted sqlx/sea-schema and a migration surface this fork dropped). Entity generation is available as a library through `pgorm-codegen`; a starter migration-crate template lives at `pgorm-migration/template/migration/`.
 
 ### Core Components
 - **Entity System**: `src/entity/` - Entity definitions, active models, relations

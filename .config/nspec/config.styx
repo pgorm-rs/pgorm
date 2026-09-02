@@ -29,7 +29,6 @@ specs ({
             sea-orm/**
             issues/**
             examples/**
-            pgorm-cli/**
         )
     })
 })

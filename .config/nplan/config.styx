@@ -25,3 +25,20 @@ commit {
 adoption {
     scope "maintenance"
 }
+
+quality {
+    // scaffold templates are starting shapes for downstream
+    // crates, not code any structural gate can judge
+    exempt-paths (pgorm-migration/template/**)
+    test-footprint {
+        // roll the test:prod ratio up per crate so tests/
+        // counts toward src/ — the directory scope penalized
+        // every crate that keeps tests out-of-tree
+        scope "crate"
+    }
+    function-density {
+        // count production functions only; inline #[cfg(test)]
+        // modules shouldn't consume the per-file budget
+        exempt-test-scope true
+    }
+}

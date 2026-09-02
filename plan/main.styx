@@ -810,6 +810,29 @@ children (
                 title "pgorm-cli: revive or retire"
                 priority 2
                 deps (codegen.generate decide.migration)
+                sealed true
+                log (
+                    {
+                        at 2026-09-02T00:32:32.701744Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-02T00:32:35.150317Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: retire pgorm-cli. Rationale: orphaned since the flattening, still bound to sea-schema/sqlx multi-backend deps, and its migrate surface targets an API (down/fresh/refresh/reset) the up-only runner deliberately dropped. Entity generation remains available as a library (pgorm-codegen). The already-fixed migration template moves to pgorm-migration/template/ as a copy-paste starting shape rather than dying with the crate. Rejected: revive-minimal (no operator appetite for maintaining a CLI surface)."
+                    }
+
+                    {
+                        at 2026-09-02T00:33:17.849875Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
