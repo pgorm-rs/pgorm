@@ -1076,6 +1076,14 @@ children (
             {
                 id verify.query
                 title "Verify ORM query-builder and loader rules (18 rules)"
+                log (
+                    {
+                        at 2026-09-02T09:45:21.141182Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

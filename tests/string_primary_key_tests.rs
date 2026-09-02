@@ -114,6 +114,9 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
 
 // [spec:pgorm:sem:exec.crud.insert/test]    the client-supplied primary-key
 // path: `last_insert_id` is reconstructed from the cached `ValueTuple`
+// [spec:pgorm:sem:query.build.insert/test]    the capture that makes that
+// possible: `Insert::add` records the model's primary-key value tuple when the
+// entity's key is not auto-increment
 // [spec:pgorm:sem:exec.crud.update/test]    `UpdateOne::exec` returns the model
 // built from the full-column RETURNING, including a column set back to NULL
 pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {

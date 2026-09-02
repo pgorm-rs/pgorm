@@ -265,6 +265,9 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
 // [spec:pgorm:sem:exec.crud.try-insert/test]    `TryInsertResult` across all
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from RecordNotInserted, and any other error propagating
+// [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    the same three
+// entry points reading the recorded column bitmap: an insert over an empty
+// iterator returns Empty with the database left untouched
 #[pgorm_macros::test]
 async fn try_insert_result_variants() -> Result<(), DbErr> {
     use pgorm::TryInsertResult;

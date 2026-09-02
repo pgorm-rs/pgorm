@@ -26,6 +26,9 @@ async fn main() {
 
 // [spec:pgorm:sem:exec.crud.try-insert/test]    `TryInsert::exec` reporting
 // Inserted, Conflicted and Empty
+// [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    `on_empty_do_nothing`
+// / `on_conflict_do_nothing` produce a `TryInsert` whose `exec` maps
+// RecordNotInserted to Conflicted and an empty batch to Empty
 pub async fn test(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),
