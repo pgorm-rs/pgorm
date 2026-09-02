@@ -1503,6 +1503,13 @@ children (
                         kind @note
                         text "Diagnosed by the char-render agent after a one-in-four flake: tests/common/setup/mod.rs:30 discards the CREATE DATABASE result (let _create_db_result = ...), so under parallel contention the create can fail silently and the test connects to an unprovisioned database (observed: active_enum_tests main failing then passing in isolation). Related but distinct: the DROP DATABASE ... WITH (FORCE) teardown kills peer connections at high nextest parallelism (the recurring 57P01 \"terminating connection due to administrator command\" flakes that forced -j 4). Fix both: propagate the create result (retry-once on the known contention error if needed), and make teardown not shoot peers — or serialize creates/drops through an advisory lock on the maintenance connection. Goal: full-parallelism nextest runs stop flaking and the -j 4 crutch can go."
                     }
+
+                    {
+                        at 2026-09-02T18:15:49.653955Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope addition: pgorm-macros/tests/compile-fail/value_type_lifetime_field.stderr is churn-fragile — it snapshots an E0277 whose bound list re-renders on every ValueType/IntoIdentity trait-surface change (re-blessed three times in one campaign; also the source of the false \"pre-existing failure\" reports from worktree agents whose stale expected-files diverged). The lifetime-rejection contract is already pinned by the churn-proof unit tests in sql_type_match.rs (macro-spans added them for exactly this reason). When working this node, decide: delete the fragile fixture in favor of the unit pins, or keep it and accept the re-bless ritual."
+                    }
                 )
             }
         )
