@@ -71,7 +71,7 @@ pub struct FrameClause {
 /// 1. <https://dev.mysql.com/doc/refman/8.0/en/window-function-descriptions.html>
 /// 2. <https://www.sqlite.org/windowfunctions.html>
 /// 3. <https://www.postgresql.org/docs/current/tutorial-window.html>
-// [spec:pgorm:def:sql.ast.window-statement]
+// [spec:pgorm:def:sql.ast.window-statement+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,
@@ -122,7 +122,7 @@ impl WindowStatement {
     /// let query = Query::select()
     ///     .from(Char::Table)
     ///     .expr_window_as(
-    ///         Expr::col(Char::Character),
+    ///         Func::count(Expr::col(Char::Id)),
     ///         WindowStatement::partition_by(Char::FontSize)
     ///             .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
     ///             .take(),
@@ -131,7 +131,7 @@ impl WindowStatement {
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "character" OVER ( PARTITION BY "font_size" ROWS UNBOUNDED PRECEDING ) AS "C" FROM "character""#
+    ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ROWS UNBOUNDED PRECEDING ) AS "C" FROM "character""#
     /// );
     /// ```
     pub fn frame_start(&mut self, r#type: FrameType, start: Frame) -> &mut Self {
@@ -148,7 +148,7 @@ impl WindowStatement {
     /// let query = Query::select()
     ///     .from(Char::Table)
     ///     .expr_window_as(
-    ///         Expr::col(Char::Character),
+    ///         Func::count(Expr::col(Char::Id)),
     ///         WindowStatement::partition_by(Char::FontSize)
     ///             .frame_between(FrameType::Rows, Frame::UnboundedPreceding, Frame::UnboundedFollowing)
     ///             .take(),
@@ -157,7 +157,7 @@ impl WindowStatement {
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "character" OVER ( PARTITION BY "font_size" ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) AS "C" FROM "character""#
+    ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) AS "C" FROM "character""#
     /// );
     /// ```
     pub fn frame_between(&mut self, r#type: FrameType, start: Frame, end: Frame) -> &mut Self {

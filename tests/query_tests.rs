@@ -432,3 +432,59 @@ pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
 
     Ok(())
 }
+
+// [spec:pgorm:req:sql.render.select-order+1/test]    a named window combined with ORDER BY and
+// LIMIT, run against a live server
+// [spec:pgorm:req:sql.render.window+1/test]
+#[pgorm_macros::test]
+pub async fn named_window_over_a_real_query() -> Result<(), DbErr> {
+    use pgorm::pgorm_query::{Alias, Expr, Func, Order, Query, QueryBuilder, WindowStatement};
+
+    let ctx = TestContext::new("named_window_over_a_real_query").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    for (name, profit_margin) in [("A", 1.0), ("B", 1.0), ("C", 2.0), ("D", 2.0), ("E", 2.0)] {
+        bakery::ActiveModel {
+            name: Set(name.to_owned()),
+            profit_margin: Set(profit_margin),
+            ..Default::default()
+        }
+        .save(&db)
+        .await?;
+    }
+
+    let sql = Query::select()
+        .column(bakery::Column::Name)
+        .expr_window_name(
+            Func::count(Expr::col(bakery::Column::Id)),
+            Alias::new("margin"),
+        )
+        .from(bakery::Entity)
+        .window(
+            Alias::new("margin"),
+            WindowStatement::partition_by(bakery::Column::ProfitMargin),
+        )
+        .order_by(bakery::Column::Name, Order::Asc)
+        .limit(4)
+        .to_string(QueryBuilder);
+
+    // The window is counted over the whole partition, so LIMIT cannot reach it.
+    let rows = db.query_all(&sql, &[]).await?;
+    let peers: Vec<(String, i64)> = rows.iter().map(|row| (row.get(0), row.get(1))).collect();
+
+    pretty_assertions::assert_eq!(
+        peers,
+        [
+            ("A".to_owned(), 2),
+            ("B".to_owned(), 2),
+            ("C".to_owned(), 3),
+            ("D".to_owned(), 3),
+        ]
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}

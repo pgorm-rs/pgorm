@@ -13,7 +13,7 @@ fn base() -> SelectStatement {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the select clause vocabulary
-// [spec:pgorm:req:sql.render.select-order/test]
+// [spec:pgorm:req:sql.render.select-order+1/test]
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([
@@ -274,7 +274,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window/test]
+// [spec:pgorm:req:sql.render.window+1/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {

@@ -260,18 +260,19 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order]
+> [spec:pgorm:req:sql.render.select-order+1]
 > `prepare_select_statement` MUST emit clauses in exactly this order:
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
 > expression per join; the WHERE condition; ` GROUP BY ` expressions; the
-> HAVING condition; any union clauses; ` ORDER BY ` expressions; ` LIMIT $N`;
-> ` OFFSET $N`; the row-locking clause; and finally an optional named window
-> declaration ` WINDOW "name" AS …`. Note as a current limitation that the
-> `WINDOW` clause is emitted after ORDER BY/LIMIT/locking, whereas PostgreSQL
-> grammar requires it between HAVING and ORDER BY — combining a named window
-> with those clauses yields SQL Postgres rejects.
+> HAVING condition; the optional named window declaration
+> ` WINDOW "name" AS ( … )`; any union clauses; ` ORDER BY ` expressions;
+> ` LIMIT $N`; ` OFFSET $N`; and the row-locking clause. The window
+> declaration belongs to the same query level as HAVING, so it MUST precede
+> the set operations and the ORDER BY/LIMIT/OFFSET/locking tail that apply to
+> the combined result — that is the position PostgreSQL's grammar requires,
+> and emitting it later makes a named window unusable with any of them.
 >
 > Each order expression renders the expression, then ` ASC` / ` DESC`, then
 > optionally ` NULLS FIRST` / ` NULLS LAST`. An `Order::Field(values)`
@@ -294,17 +295,31 @@ an ideal Postgres renderer would emit.
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
 
-> [spec:pgorm:req:sql.render.window]
-> A windowed select expression renders ` OVER "name"` for a named window
-> reference or ` OVER ( … )` for an inline window (note the spaces inside the
-> parentheses). A window specification renders `PARTITION BY expr, …`, then
+> [spec:pgorm:req:sql.render.window+1]
+> A window specification is never emitted bare: `prepare_window_spec` wraps it
+> in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
+> way a specification reaches the sink. Both spelling sites therefore agree —
+> an inline windowed projection renders ` OVER ( … )` and a statement-level
+> declaration renders ` WINDOW "name" AS ( … )` — and an empty specification
+> renders as the legal `(  )`. A projection that references a declared window
+> by name instead renders ` OVER "name"`, with any projection alias following
+> the window in either form (` OVER … AS "alias"`).
+>
+> `OVER` MUST only be attached to a projection whose expression renders as a
+> function call (`SimpleExpr::FunctionCall`, i.e. the `Func::…` constructors),
+> because that is the only production PostgreSQL's grammar allows it after; a
+> windowed column reference, arithmetic expression, `CASE` or `CAST` is
+> rejected by the grammar no matter how it is spelled. The AST does not yet
+> enforce this — see `sql.ast.window-statement`.
+>
+> Within the parentheses a specification renders `PARTITION BY expr, …`, then
 > ` ORDER BY ` order-exprs, then the frame clause: ` RANGE ` or ` ROWS `,
 > followed by either `BETWEEN start AND end` when an end bound exists or the
 > start bound alone. Frame bounds render `UNBOUNDED PRECEDING`,
 > `CURRENT ROW`, `UNBOUNDED FOLLOWING`; bounded offsets render the value as a
 > parameter immediately followed by the keyword with **no separating space**
 > (`$1PRECEDING`, `$1FOLLOWING`) — a known limitation of the current frame
-> renderer.
+> renderer, and the one window render PostgreSQL still rejects.
 
 > [spec:pgorm:req:sql.render.subquery]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,

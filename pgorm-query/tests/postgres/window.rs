@@ -1,27 +1,28 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    PARTITION BY accumulates from all four entry
+fn counted() -> FunctionCall {
+    Func::count(Expr::col(Char::Id))
+}
+
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    PARTITION BY accumulates from all four entry
 // points
-// [spec:pgorm:req:sql.render.window/test]    an inline window renders ` OVER ( … )`
+// [spec:pgorm:req:sql.render.window+1/test]    an inline window renders ` OVER ( … )`
 #[test]
 fn window_1() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window(
-                Expr::col(Char::Character),
-                WindowStatement::partition_by(Char::FontSize)
-            )
+            .expr_window(counted(), WindowStatement::partition_by(Char::FontSize))
             .to_string(QueryBuilder),
-        r#"SELECT "character" OVER ( PARTITION BY "font_size" ) FROM "character""#
+        r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
     );
 
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window_as(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by_custom("\"font_size\"")
                     .partition_by(Char::SizeW)
                     .partition_by_columns([Char::SizeH])
@@ -31,7 +32,7 @@ fn window_1() {
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size", "size_w", "size_h", "font_id" ) AS "C""#,
             r#"FROM "character""#,
         ]
@@ -39,16 +40,16 @@ fn window_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    ORDER BY comes from the shared
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    ORDER BY comes from the shared
 // `OrderedStatement` trait
-// [spec:pgorm:req:sql.render.window/test]    ` PARTITION BY … ORDER BY …`
+// [spec:pgorm:req:sql.render.window+1/test]    ` PARTITION BY … ORDER BY …`
 #[test]
 fn window_2() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window_as(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .order_by(Char::Id, Order::Asc)
                     .order_by(Char::SizeW, Order::Desc)
@@ -57,7 +58,7 @@ fn window_2() {
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ORDER BY "id" ASC, "size_w" DESC ) AS "C""#,
             r#"FROM "character""#,
         ]
@@ -65,47 +66,56 @@ fn window_2() {
     );
 
     // A window with no partition at all is just its ORDER BY.
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::new().order_by(Char::Id, Order::Asc).take()
             )
             .to_string(QueryBuilder),
-        r#"SELECT "character" OVER (  ORDER BY "id" ASC ) FROM "character""#
+        r#"SELECT COUNT("id") OVER (  ORDER BY "id" ASC ) FROM "character""#
+    );
+
+    // An empty specification still renders its parentheses.
+    assert_eq!(
+        Query::select()
+            .from(Char::Table)
+            .expr_window(counted(), WindowStatement::new())
+            .to_string(QueryBuilder),
+        r#"SELECT COUNT("id") OVER (  ) FROM "character""#
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    `frame_start` sets a single bound,
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    `frame_start` sets a single bound,
 // `frame_between` sets both, for either frame type
-// [spec:pgorm:req:sql.render.window/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
+// [spec:pgorm:req:sql.render.window+1/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
 // the start bound alone
 #[test]
 fn window_3() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
                     .take()
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS UNBOUNDED PRECEDING )"#,
             r#"FROM "character""#,
         ]
         .join(" ")
     );
 
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .frame_between(
                         FrameType::Range,
@@ -116,7 +126,7 @@ fn window_3() {
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )"#,
             r#"FROM "character""#,
         ]
@@ -124,11 +134,11 @@ fn window_3() {
     );
 
     // The last `frame`/`frame_start`/`frame_between` call wins.
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .frame_between(
                         FrameType::Range,
@@ -140,7 +150,7 @@ fn window_3() {
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS CURRENT ROW )"#,
             r#"FROM "character""#,
         ]
@@ -148,15 +158,16 @@ fn window_3() {
     );
 }
 
-// [spec:pgorm:req:sql.render.window/test]    a bounded offset renders as a parameter immediately
-// followed by the keyword, with no separating space
+// [spec:pgorm:req:sql.render.window+1/test]    a bounded offset renders as a parameter immediately
+// followed by the keyword, with no separating space — still pinned as invalid by
+// `oracle_pins_window_frame_offset_spacing`
 #[test]
 fn window_4() {
     assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .frame_between(FrameType::Rows, Frame::Preceding(2), Frame::Following(3))
                     .take()
@@ -164,7 +175,7 @@ fn window_4() {
             .build(QueryBuilder),
         (
             [
-                r#"SELECT "character" OVER ("#,
+                r#"SELECT COUNT("id") OVER ("#,
                 r#"PARTITION BY "font_size" ROWS BETWEEN $1PRECEDING AND $2FOLLOWING )"#,
                 r#"FROM "character""#,
             ]
@@ -178,14 +189,14 @@ fn window_4() {
         Query::select()
             .from(Char::Table)
             .expr_window(
-                Expr::col(Char::Character),
+                counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .frame_start(FrameType::Rows, Frame::Preceding(2))
                     .take()
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER ("#,
+            r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS 2PRECEDING )"#,
             r#"FROM "character""#,
         ]
@@ -193,52 +204,53 @@ fn window_4() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    `WindowSelectType::Name` references a window
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    `WindowSelectType::Name` references a window
 // declared at statement level with `SelectStatement::window`
-// [spec:pgorm:req:sql.render.window/test]    a named reference renders ` OVER "name"`
+// [spec:pgorm:req:sql.render.window+1/test]    a named reference renders ` OVER "name"` and its
+// declaration ` WINDOW "name" AS ( … )`
 #[test]
 fn window_5() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(Expr::col(Char::Character), Alias::new("w"))
+            .expr_window_name(counted(), Alias::new("w"))
             .window(
                 Alias::new("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER "w" FROM "character""#,
-            r#"WINDOW "w" AS PARTITION BY "font_size""#,
+            r#"SELECT COUNT("id") OVER "w" FROM "character""#,
+            r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
         ]
         .join(" ")
     );
 
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name_as(Expr::col(Char::Character), Alias::new("w"), Alias::new("C"))
+            .expr_window_name_as(counted(), Alias::new("w"), Alias::new("C"))
             .window(
                 Alias::new("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER "w" AS "C" FROM "character""#,
-            r#"WINDOW "w" AS PARTITION BY "font_size""#,
+            r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character""#,
+            r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
         ]
         .join(" ")
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    the statement holds at most one named window:
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    the statement holds at most one named window:
 // a second `window()` call replaces the first
 #[test]
 fn window_6() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(Expr::col(Char::Character), Alias::new("w2"))
+            .expr_window_name(counted(), Alias::new("w2"))
             .window(
                 Alias::new("w1"),
                 WindowStatement::partition_by(Char::FontSize)
@@ -246,14 +258,14 @@ fn window_6() {
             .window(Alias::new("w2"), WindowStatement::partition_by(Char::SizeW))
             .to_string(QueryBuilder),
         [
-            r#"SELECT "character" OVER "w2" FROM "character""#,
-            r#"WINDOW "w2" AS PARTITION BY "size_w""#,
+            r#"SELECT COUNT("id") OVER "w2" FROM "character""#,
+            r#"WINDOW "w2" AS ( PARTITION BY "size_w" )"#,
         ]
         .join(" ")
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement/test]    `take()` moves the contents out and leaves the
+// [spec:pgorm:def:sql.ast.window-statement+1/test]    `take()` moves the contents out and leaves the
 // builder empty
 #[test]
 fn window_7() {
@@ -264,4 +276,78 @@ fn window_7() {
     let taken = window.take();
     assert_eq!(window, WindowStatement::new());
     assert_ne!(taken, WindowStatement::new());
+}
+
+// [spec:pgorm:req:sql.render.select-order+1/test]    WINDOW sits with HAVING, ahead of the tail
+// clauses that apply to the whole result
+// [spec:pgorm:req:sql.render.window+1/test]
+#[test]
+fn window_clause_precedes_order_limit_lock() {
+    assert_eq!(
+        Query::select()
+            .from(Char::Table)
+            .expr_window_name(counted(), Alias::new("w"))
+            .add_group_by([Expr::col(Char::FontSize).into()])
+            .and_having(Expr::col(Char::SizeW).gt(1))
+            .window(
+                Alias::new("w"),
+                WindowStatement::partition_by(Char::FontSize)
+            )
+            .order_by(Char::Id, Order::Asc)
+            .limit(5)
+            .offset(2)
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT COUNT("id") OVER "w" FROM "character""#,
+            r#"GROUP BY "font_size" HAVING "size_w" > 1"#,
+            r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
+            r#"ORDER BY "id" ASC LIMIT 5 OFFSET 2"#,
+        ]
+        .join(" ")
+    );
+
+    assert_eq!(
+        Query::select()
+            .from(Char::Table)
+            .expr_window_name(counted(), Alias::new("w"))
+            .window(
+                Alias::new("w"),
+                WindowStatement::partition_by(Char::FontSize)
+            )
+            .lock(LockType::Update)
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT COUNT("id") OVER "w" FROM "character""#,
+            r#"WINDOW "w" AS ( PARTITION BY "font_size" ) FOR UPDATE"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.render.select-order+1/test]    a named window belongs to its own query level,
+// so it is written before the set operation
+#[test]
+fn window_clause_precedes_union() {
+    assert_eq!(
+        Query::select()
+            .from(Char::Table)
+            .expr_window_name(counted(), Alias::new("w"))
+            .window(
+                Alias::new("w"),
+                WindowStatement::partition_by(Char::FontSize)
+            )
+            .union(
+                UnionType::All,
+                Query::select().column(Char::Id).from(Char::Table).take()
+            )
+            .order_by(Char::Id, Order::Asc)
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT COUNT("id") OVER "w" FROM "character""#,
+            r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
+            r#"UNION ALL (SELECT "id" FROM "character")"#,
+            r#"ORDER BY "id" ASC"#,
+        ]
+        .join(" ")
+    );
 }

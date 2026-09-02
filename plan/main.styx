@@ -1419,6 +1419,13 @@ children (
                         kind @note
                         text "Oracle expansion of scope: the position fix alone is not enough. (1) Named windows render without parentheses — WINDOW \"w\" AS PARTITION BY ... is invalid even in isolation; PG requires WINDOW \"w\" AS (PARTITION BY ...). (2) The six window_* tests all render unparseable SQL for a second reason: OVER is being attached to a bare column expression in projection contexts where PG rejects it — read oracle_pins_window_clause_parens and the assert_eq_unparsed! sites in window.rs (12 marked) for the full picture. Fix all three defects together and flip the pins + the 12 unparsed markers to oracle-checked assertions. sql.render.window and possibly sql.ast.window-statement bump."
                     }
+
+                    {
+                        at 2026-09-02T17:26:32.961595Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -1752,7 +1759,6 @@ children (
                 id unrep.condition-chain
                 title "Delete the chain condition style; ConditionHolder collapses to Option of Condition"
                 deps (pgparse.oracle)
-                sealed true
                 log (
                     {
                         at 2026-09-02T12:36:26.397942Z

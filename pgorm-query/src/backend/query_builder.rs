@@ -68,7 +68,7 @@ impl QueryBuilder {
         self.prepare_function_name_common(function, sql)
     }
 
-    // [spec:pgorm:req:sql.render.select-order] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+1] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -200,7 +200,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order]
+    // [spec:pgorm:req:sql.render.select-order+1]
     pub(crate) fn prepare_select_statement(
         &self,
         select: &SelectStatement,
@@ -255,6 +255,13 @@ impl QueryBuilder {
 
         self.prepare_condition(&select.having, "HAVING", sql);
 
+        if let Some((name, query)) = &select.window {
+            write!(sql, " WINDOW ").unwrap();
+            name.prepare(sql.as_writer(), self.quote());
+            write!(sql, " AS ").unwrap();
+            self.prepare_window_spec(query, sql);
+        }
+
         if !select.unions.is_empty() {
             select.unions.iter().for_each(|(union_type, query)| {
                 self.prepare_union_statement(*union_type, query, sql);
@@ -277,13 +284,6 @@ impl QueryBuilder {
         if let Some(lock) = &select.lock {
             write!(sql, " ").unwrap();
             self.prepare_select_lock(lock, sql);
-        }
-
-        if let Some((name, query)) = &select.window {
-            write!(sql, " WINDOW ").unwrap();
-            name.prepare(sql.as_writer(), self.quote());
-            write!(sql, " AS ").unwrap();
-            self.prepare_window_statement(query, sql);
         }
     }
 
@@ -576,6 +576,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
+    // [spec:pgorm:req:sql.render.window+1] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -585,9 +586,7 @@ impl QueryBuilder {
             }
             Some(WindowSelectType::Query(window)) => {
                 write!(sql, " OVER ").unwrap();
-                write!(sql, "( ").unwrap();
-                self.prepare_window_statement(window, sql);
-                write!(sql, " )").unwrap();
+                self.prepare_window_spec(window, sql);
             }
             None => {}
         };
@@ -1361,7 +1360,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`Frame`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window] (frame bounds; no space between $N and PRECEDING/FOLLOWING)
+    // [spec:pgorm:req:sql.render.window+1] (frame bounds; no space between $N and PRECEDING/FOLLOWING)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
@@ -1379,8 +1378,18 @@ impl QueryBuilder {
     }
 
     #[doc(hidden)]
+    /// Translate a [`WindowStatement`] into the parenthesized window
+    /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
+    // [spec:pgorm:req:sql.render.window+1]
+    fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
+        write!(sql, "( ").unwrap();
+        self.prepare_window_statement(window, sql);
+        write!(sql, " )").unwrap();
+    }
+
+    #[doc(hidden)]
     /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window]
+    // [spec:pgorm:req:sql.render.window+1]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();

@@ -371,7 +371,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement]
+> [spec:pgorm:def:sql.ast.window-statement+1]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, `partition_by_custom`, and the `OverStatement` trait's
 > `partition_by_columns`/`partition_by_customs`), ORDER BY expressions (shared
@@ -386,8 +386,19 @@ today, including panicking edges and deliberate failsafes.
 > `expr_window_as` render `OVER ( ... )`), while `Name` references a named
 > window (`expr_window_name`, `expr_window_name_as` render `OVER "w"`) that is
 > declared at statement level with `SelectStatement::window(name, window)`,
-> rendering a `WINDOW "w" AS ...` clause. The statement holds at most one named
-> window; a second `window()` call replaces the first.
+> rendering a `WINDOW "w" AS ( ... )` clause. The statement holds at most one
+> named window; a second `window()` call replaces the first.
+>
+> All four `expr_window*` constructors take `T: Into<SimpleExpr>`, so a window
+> can be attached to any expression — but PostgreSQL accepts `OVER` only after
+> a function call, so every windowed projection whose expression is not a
+> `SimpleExpr::FunctionCall` is a constructible AST with no valid rendering.
+> The signature, not the renderer, is what admits it, so closing the gap is
+> type-level work: narrowing the four constructors to `FunctionCall` (per
+> `[dec:pgorm:invalid-states-unrepresentable]`) is an API break tracked
+> separately and pinned by `oracle_pins_over_on_a_bare_expression`. Until
+> then the invalid combination is representable and MUST be understood as a
+> caller obligation, not a rendering guarantee.
 
 ## CASE expressions
 

@@ -931,7 +931,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order/test]
+// [spec:pgorm:req:sql.render.select-order+1/test]
 #[test]
 fn select_56() {
     assert_eq!(

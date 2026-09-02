@@ -312,6 +312,7 @@ assertions (
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
     {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
+    {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}
     {id decide.cli, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:33:17.849875Z}
     {id decide.docs, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:53:13.404026Z}
     {id decide.schema-comments, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:38:16.477006Z}
@@ -350,6 +351,7 @@ assertions (
     {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
+    {id unrep.condition-chain, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:20:22.136562Z}
     {id unrep.transaction-mode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:45:38.889783Z}
     {id verify.codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:24:36.309541Z}
     {id verify.conn, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:40:21.722896Z}
@@ -359,7 +361,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id unrep.condition-chain, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:20:22.136562Z}
 )
 
 impl_evidence (

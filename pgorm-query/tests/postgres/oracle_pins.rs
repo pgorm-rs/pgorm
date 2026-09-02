@@ -9,58 +9,12 @@ use super::*;
 use crate::oracle::{assert_parses, assert_rejected};
 use pgorm_query::extension::{Extension, Type};
 
-fn windowed() -> SelectStatement {
-    Query::select()
-        .from(Char::Table)
-        .expr_window_name(Func::count(Expr::col(Char::Id)), Alias::new("w"))
-        .window(
-            Alias::new("w"),
-            WindowStatement::partition_by(Char::FontSize),
-        )
-        .take()
-}
-
-// Fixed by plan node `bug.window-position`: the named WINDOW clause is written
-// after ORDER BY / LIMIT / locking, where PostgreSQL wants it between HAVING and
-// ORDER BY.
-// [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.select-order/test]
-#[test]
-fn oracle_pins_window_clause_position() {
-    let sql = windowed()
-        .order_by(Char::Id, Order::Asc)
-        .limit(5)
-        .to_string(QueryBuilder);
-
-    assert!(sql.contains(r#"LIMIT 5 WINDOW "w""#));
-    assert!(assert_rejected(&sql).contains("WINDOW"));
-}
-
-// Fixed by plan node `bug.window-position`: the window specification is written
-// bare after `AS`, where PostgreSQL requires it parenthesized — so a named window
-// is invalid even on its own, before the clause-order defect applies.
-// [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window/test]
-#[test]
-fn oracle_pins_window_clause_parens() {
-    let sql = windowed().to_string(QueryBuilder);
-
-    assert!(sql.ends_with(r#"WINDOW "w" AS PARTITION BY "font_size""#));
-    assert!(assert_rejected(&sql).contains("PARTITION"));
-
-    let parenthesized = sql.replace(
-        r#"AS PARTITION BY "font_size""#,
-        r#"AS (PARTITION BY "font_size")"#,
-    );
-    assert_parses(&parenthesized);
-}
-
 // No plan node yet. `sql.render.window` pins the missing space as a known
 // limitation of the frame renderer: the bound value is written immediately
 // against the keyword, so PostgreSQL lexes `2PRECEDING` as trailing junk after a
 // numeric literal.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window/test]
+// [spec:pgorm:req:sql.render.window+1/test]
 #[test]
 fn oracle_pins_window_frame_offset_spacing() {
     let sql = Query::select()
@@ -78,11 +32,13 @@ fn oracle_pins_window_frame_offset_spacing() {
     assert_parses(&sql.replace("2PRECEDING", "2 PRECEDING"));
 }
 
-// No plan node yet. `expr_window` accepts any expression, but PostgreSQL allows
-// OVER only after a function call, so a windowed column reference is
-// unrepresentable in the grammar while being constructible in the AST.
+// Follow-up: narrow the four `expr_window*` constructors from `Into<SimpleExpr>`
+// to `FunctionCall`, per [dec:pgorm:invalid-states-unrepresentable]. No plan node
+// yet — it is an API break, not a render fix. PostgreSQL allows OVER only after a
+// function call, so a windowed column reference stays constructible in the AST
+// with no valid rendering, and no change to the renderer can close it.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.ast.window-statement/test]
+// [spec:pgorm:def:sql.ast.window-statement+1/test]
 #[test]
 fn oracle_pins_over_on_a_bare_expression() {
     let sql = Query::select()
