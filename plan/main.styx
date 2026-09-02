@@ -1939,6 +1939,13 @@ children (
                         kind @decision
                         text "Operator decision: DELETE save() outright per delete-don't-deprecate — callers choose insert/update explicitly (upsert remains available through the on_conflict surface). The broken inference goes away rather than being redefined. Rejected: redefining save() as ON CONFLICT-backed upsert. entity.active-model.save retires or is rewritten to specify the absence; persistence rule bumps."
                     }
+
+                    {
+                        at 2026-09-02T18:58:52.648048Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

@@ -54,25 +54,26 @@ async fn crud_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
         ..Default::default()
     };
 
-    let mut apple = apple.save(db).await?;
+    let apple = apple.insert(db).await?;
 
     assert_eq!(
         apple,
-        cake::ActiveModel {
-            id: Unchanged(1),
-            name: Unchanged("Apple Pie".to_owned()),
+        cake::Model {
+            id: 1,
+            name: "Apple Pie".to_owned(),
         }
     );
 
+    let mut apple: cake::ActiveModel = apple.into_active_model();
     apple.name = Set("Lemon Tart".to_owned());
 
-    let apple = apple.save(db).await?;
+    let apple = apple.update(db).await?;
 
     assert_eq!(
         apple,
-        cake::ActiveModel {
-            id: Unchanged(1),
-            name: Unchanged("Lemon Tart".to_owned()),
+        cake::Model {
+            id: 1,
+            name: "Lemon Tart".to_owned(),
         }
     );
 

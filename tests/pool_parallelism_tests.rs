@@ -18,7 +18,7 @@ where
         profit_margin: Set(profit_margin),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await?;
 
     Ok(())

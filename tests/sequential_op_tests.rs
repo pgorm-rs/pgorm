@@ -41,27 +41,27 @@ async fn seed_data(db: &DatabaseConnection) {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert bakery");
 
     let baker_1 = baker::ActiveModel {
         name: Set("Baker 1".to_owned()),
         contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(Some(bakery.id.clone().unwrap())),
+        bakery_id: Set(Some(bakery.id)),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert baker");
 
     let _baker_2 = baker::ActiveModel {
         name: Set("Baker 2".to_owned()),
         contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(Some(bakery.id.clone().unwrap())),
+        bakery_id: Set(Some(bakery.id)),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert baker");
 
@@ -70,7 +70,7 @@ async fn seed_data(db: &DatabaseConnection) {
         price: Set(rust_dec(10.25)),
         gluten_free: Set(false),
         serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(bakery.id.clone().unwrap())),
+        bakery_id: Set(Some(bakery.id)),
         ..Default::default()
     };
 
@@ -81,7 +81,7 @@ async fn seed_data(db: &DatabaseConnection) {
 
     let cake_baker = cakes_bakers::ActiveModel {
         cake_id: Set(cake_insert_res.last_insert_id),
-        baker_id: Set(baker_1.id.clone().unwrap()),
+        baker_id: Set(baker_1.id),
     };
 
     let cake_baker_res = CakesBakers::insert(cake_baker.clone())
@@ -97,19 +97,19 @@ async fn seed_data(db: &DatabaseConnection) {
         name: Set("Kate".to_owned()),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert customer");
 
     let kate_order_1 = order::ActiveModel {
-        bakery_id: Set(bakery.id.clone().unwrap()),
-        customer_id: Set(customer_kate.id.clone().unwrap()),
+        bakery_id: Set(bakery.id),
+        customer_id: Set(customer_kate.id),
         total: Set(rust_dec(99.95)),
         placed_at: Set(Utc::now().naive_utc()),
 
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert order");
 
@@ -117,10 +117,10 @@ async fn seed_data(db: &DatabaseConnection) {
         cake_id: Set(cake_insert_res.last_insert_id),
         price: Set(rust_dec(10.00)),
         quantity: Set(12),
-        order_id: Set(kate_order_1.id.clone().unwrap()),
+        order_id: Set(kate_order_1.id),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert order");
 
@@ -128,10 +128,10 @@ async fn seed_data(db: &DatabaseConnection) {
         cake_id: Set(cake_insert_res.last_insert_id),
         price: Set(rust_dec(50.00)),
         quantity: Set(2),
-        order_id: Set(kate_order_1.id.clone().unwrap()),
+        order_id: Set(kate_order_1.id),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert order");
 }
@@ -233,19 +233,19 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
         name: Set("John".to_owned()),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert customer");
 
     let order = order::ActiveModel {
         bakery_id: Set(cake.bakery_id.unwrap()),
-        customer_id: Set(another_customer.id.clone().unwrap()),
+        customer_id: Set(another_customer.id),
         total: Set(rust_dec(200.00)),
         placed_at: Set(Utc::now().naive_utc()),
 
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert order");
 
@@ -253,10 +253,10 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
         cake_id: Set(cake.id),
         price: Set(rust_dec(10.00)),
         quantity: Set(300),
-        order_id: Set(order.id.clone().unwrap()),
+        order_id: Set(order.id),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert order");
 }

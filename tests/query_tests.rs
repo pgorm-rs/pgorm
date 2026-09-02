@@ -39,13 +39,13 @@ pub async fn find_one_with_result() {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
     let result = Bakery::find().one(&db).await.unwrap();
 
-    assert_eq!(result.id, bakery.id.unwrap());
+    assert_eq!(result.id, bakery.id);
 
     drop(db);
     ctx.delete().await;
@@ -81,16 +81,13 @@ pub async fn find_by_id_with_result() {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
-    let result = Bakery::find_by_id(bakery.id.clone().unwrap())
-        .one(&db)
-        .await
-        .unwrap();
+    let result = Bakery::find_by_id(bakery.id).one(&db).await.unwrap();
 
-    assert_eq!(result.id, bakery.id.unwrap());
+    assert_eq!(result.id, bakery.id);
 
     drop(db);
     ctx.delete().await;
@@ -121,7 +118,7 @@ pub async fn find_all_with_result() {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -130,7 +127,7 @@ pub async fn find_all_with_result() {
         profit_margin: Set(15.0),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -153,7 +150,7 @@ pub async fn find_all_filter_no_result() {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -162,7 +159,7 @@ pub async fn find_all_filter_no_result() {
         profit_margin: Set(15.0),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -189,7 +186,7 @@ pub async fn find_all_filter_with_results() {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -198,7 +195,7 @@ pub async fn find_all_filter_with_results() {
         profit_margin: Set(15.0),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert bakery");
 
@@ -229,7 +226,7 @@ pub async fn empty_in_and_not_in_filter_asymmetry() {
             profit_margin: Set(10.4),
             ..Default::default()
         }
-        .save(&db)
+        .insert(&db)
         .await
         .expect("could not insert bakery");
     }
@@ -287,7 +284,7 @@ pub async fn select_only_exclude_option_fields() {
         notes: Set(Some("Want to communicate with Bob".to_owned())),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -296,7 +293,7 @@ pub async fn select_only_exclude_option_fields() {
         notes: Set(Some("Just listening".to_owned())),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert customer");
 
@@ -450,7 +447,7 @@ pub async fn named_window_over_a_real_query() -> Result<(), DbErr> {
             profit_margin: Set(profit_margin),
             ..Default::default()
         }
-        .save(&db)
+        .insert(&db)
         .await?;
     }
 

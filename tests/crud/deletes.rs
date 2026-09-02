@@ -23,7 +23,7 @@ pub async fn test_delete_cake(db: &DatabaseConnection) {
         ..Default::default()
     };
 
-    let cake = mud_cake.save(db).await.expect("could not insert cake");
+    let cake = mud_cake.insert(db).await.expect("could not insert cake");
 
     let cakes = Cake::find().all(db).await.unwrap();
     assert_eq!(cakes.len(), initial_cakes + 1);
@@ -42,7 +42,7 @@ pub async fn test_delete_bakery(db: &DatabaseConnection) {
         profit_margin: Set(10.4),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert bakery");
 

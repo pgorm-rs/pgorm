@@ -42,7 +42,7 @@ pub async fn test_error(db: &DatabaseConnection) {
         ..Default::default()
     };
 
-    let cake = mud_cake.save(db).await.expect("could not insert cake");
+    let cake = mud_cake.insert(db).await.expect("could not insert cake");
 
     let error: DbErr = cake
         .into_active_model()
@@ -90,7 +90,7 @@ async fn sql_err_classification() {
         ..Default::default()
     };
 
-    let cake = mud_cake.save(&db).await.expect("could not insert cake");
+    let cake = mud_cake.insert(&db).await.expect("could not insert cake");
 
     let error: DbErr = cake
         .into_active_model()
@@ -142,7 +142,7 @@ async fn sql_err_payload_carries_server_message() {
         bakery_id: Set(None),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await
     .expect("could not insert cake");
 

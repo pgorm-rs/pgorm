@@ -60,8 +60,16 @@ impl<V: Into<Value>> From<V> for ActiveValue<V> {
 
 /// A Trait for ActiveModel to perform Create, Update or Delete operation.
 /// The type must also implement the [EntityTrait].
+///
+/// Writes state their intent: pick [`ActiveModelTrait::insert`] or
+/// [`ActiveModelTrait::update`]. There is no `save` that guesses between the two
+/// from the primary-key state, because `Set` and `Unchanged` keys are
+/// indistinguishable to such a guess. For insert-or-update in one statement,
+/// attach an `ON CONFLICT` clause with [`Insert::on_conflict`](crate::Insert::on_conflict).
+///
 /// See module level docs [crate::entity] for a full example
 // [spec:pgorm:req:entity.active-model+1]
+// [spec:pgorm:req:entity.active-model.save+1]
 #[async_trait]
 pub trait ActiveModelTrait: Clone + Debug {
     /// The Entity this ActiveModel belongs to
@@ -164,7 +172,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:entity.active-model.persistence]
+    // [spec:pgorm:req:entity.active-model.persistence+1]
     async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -202,7 +210,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:entity.active-model.persistence]
+    // [spec:pgorm:req:entity.active-model.persistence+1]
     async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -213,31 +221,6 @@ pub trait ActiveModelTrait: Clone + Debug {
         let model: <Self::Entity as EntityTrait>::Model =
             Self::Entity::update(am)?.exec(db).await?;
         Self::after_save(model, db, false).await
-    }
-
-    /// Insert the model if primary key is `NotSet`, update otherwise.
-    /// Only works if the entity has auto increment primary key.
-    // [spec:pgorm:req:entity.active-model.save]
-    async fn save<'a, C>(self, db: &'a C) -> Result<Self, DbErr>
-    where
-        <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
-        Self: ActiveModelBehavior + 'a,
-        C: ConnectionTrait,
-    {
-        let mut is_update = true;
-        for key in <Self::Entity as EntityTrait>::PrimaryKey::iter() {
-            let col = key.into_column();
-            if self.is_not_set(col) {
-                is_update = false;
-                break;
-            }
-        }
-        let res = if !is_update {
-            self.insert(db).await
-        } else {
-            self.update(db).await
-        }?;
-        Ok(res.into_active_model())
     }
 
     /// Delete an active model by its primary key
@@ -384,7 +367,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
         <Self as ActiveModelTrait>::default()
     }
 
-    /// Will be called before `ActiveModel::insert`, `ActiveModel::update`, and `ActiveModel::save`
+    /// Will be called before `ActiveModel::insert` (`insert: true`) and
+    /// `ActiveModel::update` (`insert: false`)
     async fn before_save<C>(self, db: &C, insert: bool) -> Result<Self, DbErr>
     where
         C: ConnectionTrait,
@@ -392,7 +376,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
         Ok(self)
     }
 
-    /// Will be called after `ActiveModel::insert`, `ActiveModel::update`, and `ActiveModel::save`
+    /// Will be called after `ActiveModel::insert` (`insert: true`) and
+    /// `ActiveModel::update` (`insert: false`)
     async fn after_save<C>(
         model: <Self::Entity as EntityTrait>::Model,
         db: &C,
@@ -422,7 +407,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
 }
 
 /// A Trait for any type that can be converted into an ActiveModel
-// [spec:pgorm:req:entity.active-model.into]
+// [spec:pgorm:req:entity.active-model.into+1]
 pub trait IntoActiveModel<A>
 where
     A: ActiveModelTrait,
@@ -441,7 +426,7 @@ where
 }
 
 /// Any type that can be converted into an [ActiveValue]
-// [spec:pgorm:req:entity.active-model.into]
+// [spec:pgorm:req:entity.active-model.into+1]
 pub trait IntoActiveValue<V>
 where
     V: Into<Value>,

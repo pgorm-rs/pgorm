@@ -36,7 +36,8 @@ mod row {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// Manual (non auto-increment) single-column key, for the `save` routing divergence.
+/// Manual (non auto-increment) single-column key: the caller supplies the key,
+/// so the operation cannot be read off the model's state.
 mod manual_key {
     use pgorm::entity::prelude::*;
 
@@ -549,7 +550,7 @@ mod row_dto {
 }
 use row_dto::{NewRow, UpdateRow};
 
-// [spec:pgorm:req:entity.active-model.into/test]    the blanket identity
+// [spec:pgorm:req:entity.active-model.into+1/test]    the blanket identity
 // `IntoActiveModel` impl, the derived `Model -> ActiveModel` conversion putting
 // every field in `Unchanged`, and the `IntoActiveValue` state mapping for
 // `Option<V>`, `Option<Option<V>>` and the plain scalar impls
@@ -786,7 +787,7 @@ where
     Ok(())
 }
 
-// [spec:pgorm:req:entity.active-model.persistence/test]    `insert` comes back
+// [spec:pgorm:req:entity.active-model.persistence+1/test]    `insert` comes back
 // with the database-generated key populated (the single `INSERT ... RETURNING`
 // round trip), `update` returns the freshly written `Model`, and `delete`
 // returns a `DeleteResult` keyed on the primary key
@@ -854,84 +855,75 @@ async fn active_model_persistence() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.active-model.save/test]    `save` inspects every
-// primary-key column: at least one `NotSet` routes to `insert`, all of them
-// holding values routes to `update`, and the result is converted back through
-// `IntoActiveModel` and returned as `Self`
+// [spec:pgorm:req:entity.active-model.save+1/test]    the operation is the
+// caller's choice, not a reading of the model: `update` accepts a primary key in
+// either the `Set` or the `Unchanged` state, the two states an inference would
+// have had to tell apart
+// [spec:pgorm:req:entity.active-model.persistence+1/test]
 #[pgorm_macros::test]
-async fn active_model_save_routing() -> Result<(), DbErr> {
-    let ctx = TestContext::new("active_model_save_routing").await;
+async fn update_accepts_set_or_unchanged_key() -> Result<(), DbErr> {
+    let ctx = TestContext::new("update_accepts_set_or_unchanged_key").await;
     let db = ctx.db.get().await?;
     create_row_table(&db).await?;
 
-    // `id` is NotSet -> insert. The return value is `Self`, i.e. an ActiveModel
-    // rebuilt from the inserted Model, so every column is `Unchanged`.
-    let saved = row::ActiveModel {
+    let inserted = row::ActiveModel {
         id: NotSet,
         name: ActiveValue::Set("Apple".to_owned()),
         note: NotSet,
     }
-    .save(&db)
+    .insert(&db)
     .await?;
-    let id = saved.id.clone().unwrap();
-    assert_eq!(
-        saved,
-        row::ActiveModel {
-            id: ActiveValue::Unchanged(id),
-            name: ActiveValue::Unchanged("Apple".to_owned()),
-            note: ActiveValue::Unchanged(None),
-        }
-    );
-    assert_eq!(row::Entity::find().all(&db).await?.len(), 1);
+    let id = inserted.id;
 
-    // Every key column now holds a value (`Unchanged` counts) -> update.
-    let mut am = saved;
+    // An `Unchanged` key, as it comes back from `IntoActiveModel`.
+    let mut am = inserted.into_active_model();
+    assert_eq!(am.id, ActiveValue::Unchanged(id));
     am.name = ActiveValue::Set("Apple Pie".to_owned());
-    let saved = am.save(&db).await?;
-    assert_eq!(saved.name, ActiveValue::Unchanged("Apple Pie".to_owned()));
-    // Still one row: it updated rather than inserting a second.
-    assert_eq!(
-        row::Entity::find().all(&db).await?,
-        [row::Model {
-            id,
-            name: "Apple Pie".to_owned(),
-            note: None,
-        }]
-    );
+    let updated = am.update(&db).await?;
+    assert_eq!(updated.name, "Apple Pie");
 
-    // `Set` on the key column also counts as "holding a value" -> update.
-    let saved = row::ActiveModel {
+    // A `Set` key, as a caller writes it by hand. Same statement, same row.
+    let updated = row::ActiveModel {
         id: ActiveValue::Set(id),
         name: ActiveValue::Set("Apple Tart".to_owned()),
         note: NotSet,
     }
-    .save(&db)
+    .update(&db)
     .await?;
-    assert_eq!(saved.name, ActiveValue::Unchanged("Apple Tart".to_owned()));
-    assert_eq!(row::Entity::find().all(&db).await?.len(), 1);
+    assert_eq!(updated.name, "Apple Tart");
+
+    // Neither wrote a second row.
+    assert_eq!(
+        row::Entity::find().all(&db).await?,
+        [row::Model {
+            id,
+            name: "Apple Tart".to_owned(),
+            note: None,
+        }]
+    );
 
     drop(db);
     ctx.delete().await;
     Ok(())
 }
 
-// [spec:pgorm:req:entity.active-model.save/test]    the documented limitation:
-// `save` only does insert-or-update for auto-increment keys. With a manual key
-// the caller always populates it, so `save` routes to `update` and a row that
-// does not exist yet fails rather than being inserted
+// [spec:pgorm:req:entity.active-model.save+1/test]    a manually keyed entity
+// creates rows through `insert` — the case an inference over the key state could
+// never reach, since the caller has to populate the key to name the row at all —
+// while `update` against a key that matches nothing still fails
 #[pgorm_macros::test]
-async fn active_model_save_manual_key_always_updates() -> Result<(), DbErr> {
-    let ctx = TestContext::new("active_model_save_manual_key").await;
+async fn manual_key_insert_and_update_are_explicit() -> Result<(), DbErr> {
+    let ctx = TestContext::new("manual_key_insert_and_update").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(manual_key::Entity);
     db.execute(&stmt.build(QueryBuilder), &[]).await?;
 
-    // A fully populated manual key routes to `update`, which finds no row.
+    // `update` on a key that matches no row reports it rather than creating one.
     let err = manual_key::ActiveModel {
         id: ActiveValue::Set(1),
         name: ActiveValue::Set("Apple".to_owned()),
     }
-    .save(&db)
+    .update(&db)
     .await
     .unwrap_err();
     assert!(
@@ -940,24 +932,30 @@ async fn active_model_save_manual_key_always_updates() -> Result<(), DbErr> {
     );
     assert_eq!(manual_key::Entity::find().all(&db).await?.len(), 0);
 
-    // Leaving the key NotSet is the only way to reach `insert` — but then the
-    // database has to supply the value, which for a plain integer column it
-    // cannot, so this entity is simply not `save`-able for creation.
-    manual_key::Entity::insert(manual_key::ActiveModel {
+    // The caller states the intent, so a populated manual key inserts.
+    let inserted = manual_key::ActiveModel {
         id: ActiveValue::Set(1),
         name: ActiveValue::Set("Apple".to_owned()),
-    })
-    .exec(&db)
+    }
+    .insert(&db)
     .await?;
+    assert_eq!(
+        inserted,
+        manual_key::Model {
+            id: 1,
+            name: "Apple".to_owned(),
+        }
+    );
 
-    // Now that the row exists, the same `save` succeeds as an update.
-    let saved = manual_key::ActiveModel {
+    // And the same key now updates the row it names.
+    let updated = manual_key::ActiveModel {
         id: ActiveValue::Set(1),
         name: ActiveValue::Set("Apple Pie".to_owned()),
     }
-    .save(&db)
+    .update(&db)
     .await?;
-    assert_eq!(saved.name, ActiveValue::Unchanged("Apple Pie".to_owned()));
+    assert_eq!(updated.name, "Apple Pie");
+    assert_eq!(manual_key::Entity::find().all(&db).await?.len(), 1);
 
     drop(db);
     ctx.delete().await;

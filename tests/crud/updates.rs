@@ -101,7 +101,7 @@ pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
         notes: Set(None),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await
     .expect("could not insert customer");
 
@@ -110,7 +110,7 @@ pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
         init_n_customers + 1
     );
 
-    let customer_id = customer.id.clone().unwrap();
+    let customer_id = customer.id;
 
     let _ = customer.delete(db).await;
     assert_eq!(Customer::find().count(db).await.unwrap(), init_n_customers);

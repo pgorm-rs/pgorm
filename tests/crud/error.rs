@@ -12,7 +12,7 @@ pub async fn test_cake_error(db: &DatabaseConnection) {
         ..Default::default()
     };
 
-    let cake = mud_cake.save(db).await.expect("could not insert cake");
+    let cake = mud_cake.insert(db).await.expect("could not insert cake");
 
     let error: DbErr = cake
         .into_active_model()

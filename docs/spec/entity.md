@@ -184,23 +184,31 @@ explicit limitations.
 > column position while preserving the variant (`Set(v)` → `Set(Some(v))`,
 > `Unchanged(v)` → `Unchanged(Some(v))`, `NotSet` → `NotSet`).
 
-> [spec:pgorm:req:entity.active-model.persistence]
+> [spec:pgorm:req:entity.active-model.persistence+1]
 > `ActiveModelTrait::insert` MUST execute via `Insert::exec_with_returning`, so on
 > PostgreSQL the insert and the returned `Model` are a single `INSERT ... RETURNING`
 > round trip. `ActiveModelTrait::update` executes `Entity::update(am).exec(db)`
 > (an `UPDATE ... RETURNING` statement keyed on the primary key) and likewise returns
 > the fresh `Model`. `ActiveModelTrait::delete` deletes by the model's primary key and
 > returns the `DeleteResult`. All three are async and generic over any
-> `ConnectionTrait` (`src/entity/active_model.rs`).
+> `ConnectionTrait` (`src/entity/active_model.rs`). `insert` and `update` are the
+> trait's only write entry points, and which of them runs is the caller's stated
+> choice rather than a property of the model
+> (`[spec:pgorm:req:entity.active-model.save+1]`). Both accept a primary key in
+> either the `Set` or the `Unchanged` state.
 
-> [spec:pgorm:req:entity.active-model.save]
-> `ActiveModelTrait::save` (`src/entity/active_model.rs`) is the insert-or-update
-> decision rule: it MUST iterate every primary-key column and choose `insert` when at
-> least one key column is `NotSet`, and `update` when all key columns hold values
-> (`Set` or `Unchanged`). The resulting `Model` is converted back through
-> `IntoActiveModel` and returned as `Self`. Per its documentation this only works for
-> entities with an auto-increment primary key — a fully populated manual key always
-> routes to `update`.
+> [spec:pgorm:req:entity.active-model.save+1]
+> `ActiveModelTrait` MUST NOT carry a `save` operation that infers insert-versus-update
+> from the primary-key state. The inherited inference — `insert` when at least one key
+> column is `NotSet`, `update` otherwise — reads a distinction the input does not carry:
+> `Set` and `Unchanged` are both "holds a value", so an entity with a manually assigned
+> key, whose caller must populate that key to name the row at all, could never reach
+> `insert` through it, and creating such a row was possible only by bypassing the
+> ActiveModel API. Intent that is unrepresentable in the input is stated by the caller
+> instead: `insert` and `update` (`[spec:pgorm:req:entity.active-model.persistence+1]`)
+> are separate entry points, and insert-or-update in a single statement is expressed
+> explicitly through `Insert::on_conflict`. The removal is deliberate and `save` MUST
+> NOT be reintroduced under this or another name (`src/entity/active_model.rs`).
 
 > [spec:pgorm:req:entity.active-model.hooks]
 > `ActiveModelBehavior: ActiveModelTrait` (`src/entity/active_model.rs`) defines
@@ -212,10 +220,11 @@ explicit limitations.
 > hook aborts the operation. `new()` defaults to `ActiveModelTrait::default()` and is
 > the hook for constructing an active model with default values.
 
-> [spec:pgorm:req:entity.active-model.into]
+> [spec:pgorm:req:entity.active-model.into+1]
 > `IntoActiveModel<A>` converts a type into an active model and has a blanket identity
 > impl for any `ActiveModelTrait`; derived models convert `Model` → `ActiveModel` with
-> every field `Unchanged` (used by `save`, `Model::delete`, and `set_from_json`).
+> every field `Unchanged` (used by `Model::delete`, `set_from_json`, and by callers
+> turning a returned `Model` back into an active model to update it).
 > `IntoActiveValue<V>` governs how `DeriveIntoActiveModel` fields become states:
 > `Option<V>` MUST map `Some(v)` → `Set(Some(v))` and `None` → `NotSet`;
 > `Option<Option<V>>` MUST map `Some(inner)` → `Set(inner)` (allowing an explicit

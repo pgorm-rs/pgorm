@@ -19,7 +19,7 @@ where
         profit_margin: Set(profit_margin),
         ..Default::default()
     }
-    .save(db)
+    .insert(db)
     .await?;
 
     Ok(())
@@ -481,7 +481,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
                 gluten_free: Set(false),
                 ..Default::default()
             }
-            .save(&txn)
+            .insert(&txn)
             .await,
             Err(DbErr::Custom(
                 "[before_save] Invalid Price, insert: true".to_owned()
@@ -497,7 +497,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
                 gluten_free: Set(false),
                 ..Default::default()
             }
-            .save(&txn)
+            .insert(&txn)
             .await,
             Err(DbErr::Custom(
                 "[after_save] Invalid Price, insert: true".to_owned()
@@ -512,7 +512,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
             gluten_free: Set(true),
             ..Default::default()
         }
-        .save(&txn)
+        .insert(&txn)
         .await?;
 
         assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
@@ -532,7 +532,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
             gluten_free: Set(true),
             ..Default::default()
         }
-        .save(&txn)
+        .insert(&txn)
         .await?;
 
         assert_eq!(cake::Entity::find().all(&txn).await?.len(), 3);

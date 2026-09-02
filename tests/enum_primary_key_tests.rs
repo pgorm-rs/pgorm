@@ -86,7 +86,7 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), DbErr> {
         color: Set(Some(Color::Black)),
         ..model.into_active_model()
     }
-    .save(db)
+    .update(db)
     .await?;
 
     let model = Entity::find().one(db).await?;

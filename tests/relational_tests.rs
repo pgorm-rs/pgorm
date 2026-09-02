@@ -843,7 +843,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(2),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await?;
     let kate_order_2 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
@@ -860,7 +860,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(3),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await?;
 
     // Kara's Customer, Order & Line Item
@@ -885,7 +885,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(2),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await?;
     let kara_order_2 = order::ActiveModel {
         bakery_id: Set(seaside_bakery_res.last_insert_id),
@@ -902,7 +902,7 @@ pub async fn linked() -> Result<(), DbErr> {
         quantity: Set(3),
         ..Default::default()
     }
-    .save(&db)
+    .insert(&db)
     .await?;
 
     #[derive(Debug, FromQueryResult, PartialEq)]

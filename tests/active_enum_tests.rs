@@ -71,7 +71,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
         tea: Set(Some(Tea::EverydayTea)),
         ..model.into_active_model()
     }
-    .save(db)
+    .update(db)
     .await?;
 
     let model = Entity::find().one(db).await?;
@@ -243,7 +243,7 @@ pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbE
         tea: Set(Some(Tea::EverydayTea)),
         ..am.into_active_model()
     }
-    .save(db)
+    .update(db)
     .await?;
 
     let model = Entity::find().one(db).await?;
@@ -302,7 +302,7 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr
         id: Set(1),
         categories: Set(Some(vec![Category::Big, Category::Small])),
     }
-    .save(db)
+    .update(db)
     .await?;
 
     let model = Entity::find().one(db).await?;
