@@ -61,7 +61,7 @@ fn select_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.in/test]
+// [spec:pgorm:req:sql.ast.expr.in+1/test]
 #[test]
 fn select_5() {
     assert_eq!(
@@ -2503,8 +2503,8 @@ fn with_recursive_5() {
         .expr(Expr::col(Glyph::Id));
 }
 
-// [spec:pgorm:sem:sql.render.empty-in/test]    an empty `IN` is rewritten to the always-false
-// comparison of two string values
+// [spec:pgorm:sem:sql.render.empty-in+1/test]    an empty `IN` is rewritten to the always-false
+// comparison of two distinct string values
 #[test]
 fn empty_in_1() {
     assert_eq!(
@@ -2529,8 +2529,8 @@ fn empty_in_1() {
     );
 }
 
-// [spec:pgorm:sem:sql.render.empty-in/test]    an empty `NOT IN` renders the *same* always-false
-// expression — the current limitation
+// [spec:pgorm:sem:sql.render.empty-in+1/test]    an empty `NOT IN` renders the always-true
+// comparison instead — vacuous non-membership matches every row
 #[test]
 fn empty_in_2() {
     assert_eq!(
@@ -2538,8 +2538,20 @@ fn empty_in_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_not_in(Vec::<i32>::new()))
+            .build(QueryBuilder),
+        (
+            r#"SELECT "id" FROM "glyph" WHERE $1 = $2"#.to_owned(),
+            Values(vec!["a".into(), "a".into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_not_in(Vec::<i32>::new()))
             .to_string(QueryBuilder),
-        r#"SELECT "id" FROM "glyph" WHERE 'a' = 'b'"#
+        r#"SELECT "id" FROM "glyph" WHERE 'a' = 'a'"#
     );
 
     // A non-empty list is unaffected.

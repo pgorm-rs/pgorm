@@ -214,6 +214,44 @@ pub async fn find_all_filter_with_results() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:sql.render.empty-in+1/test]    against a live server: an empty
+// `IN` selects nothing, an empty `NOT IN` selects everything
+// [spec:pgorm:req:sql.ast.expr.in+1/test]
+#[pgorm_macros::test]
+pub async fn empty_in_and_not_in_filter_asymmetry() {
+    let ctx = TestContext::new("empty_in_and_not_in_filter_asymmetry").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+
+    for name in ["SeaSide Bakery", "Top Bakery"] {
+        bakery::ActiveModel {
+            name: Set(name.to_owned()),
+            profit_margin: Set(10.4),
+            ..Default::default()
+        }
+        .save(&db)
+        .await
+        .expect("could not insert bakery");
+    }
+
+    let none = Bakery::find()
+        .filter(bakery::Column::Id.is_in(Vec::<i32>::new()))
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(none.len(), 0);
+
+    let all = Bakery::find()
+        .filter(bakery::Column::Id.is_not_in(Vec::<i32>::new()))
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(all.len(), 2);
+
+    drop(db);
+    ctx.delete().await;
+}
+
 // [spec:pgorm:sem:exec.crud.select/test]    `all` aborts on the first decode
 // error instead of yielding a partial result set
 #[pgorm_macros::test]

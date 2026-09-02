@@ -224,13 +224,15 @@ today, including panicking edges and deliberate failsafes.
 > `count_distinct`, and `if_null` wrap the expression in the corresponding
 > function call.
 
-> [spec:pgorm:req:sql.ast.expr.in]
+> [spec:pgorm:req:sql.ast.expr.in+1]
 > `is_in`/`is_not_in` MUST build an `IN`/`NOT IN` over a `Tuple` of the given
-> operands. When the operand collection is empty, rendering MUST fall back to
-> the always-false comparison `'a' = 'b'` for both `IN` and `NOT IN` — a
-> deliberate failsafe so an empty list can never produce invalid SQL such as
-> `IN ()`. (Note the current limitation: an empty `NOT IN`, which is logically
-> always-true, also renders the always-false form.)
+> operands. When the operand collection is empty, rendering MUST fall back to a
+> constant comparison rather than emit invalid SQL such as `IN ()`, and the two
+> fall-backs MUST carry the vacuous truth value of the predicate they stand in
+> for: an empty `IN` renders the always-false `'a' = 'b'`, because membership in
+> the empty set holds for nothing; an empty `NOT IN` renders the always-true
+> `'a' = 'a'`, because non-membership in the empty set holds for everything,
+> including a NULL operand.
 >
 > `in_tuples` MUST build multi-column membership tests
 > (`(a, b) IN ((..), (..))`) from `IntoValueTuple` rows, and

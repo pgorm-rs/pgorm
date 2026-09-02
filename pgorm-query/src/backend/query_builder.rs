@@ -410,7 +410,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:sem:sql.render.empty-in]
+    // [spec:pgorm:sem:sql.render.empty-in+1]
     // [spec:pgorm:req:sql.render.subquery] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr]
     fn prepare_simple_expr_common(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
@@ -448,7 +448,7 @@ impl QueryBuilder {
                 (BinOper::NotIn, SimpleExpr::Tuple(t)) if t.is_empty() => self.binary_expr(
                     &SimpleExpr::Value("a".into()),
                     &BinOper::Equal,
-                    &SimpleExpr::Value("b".into()),
+                    &SimpleExpr::Value("a".into()),
                     sql,
                 ),
                 _ => self.binary_expr(left, op, right, sql),

@@ -1205,7 +1205,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'b'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.in]
+    // [spec:pgorm:req:sql.ast.expr.in+1]
     #[allow(clippy::wrong_self_convention)]
     pub fn is_in<V, I>(mut self, v: I) -> SimpleExpr
     where
@@ -1241,7 +1241,7 @@ impl Expr {
     ///     r#"SELECT "character", "font_id" FROM "character" WHERE ("character", "font_id") IN ((1, '1'), (2, '2'))"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.in]
+    // [spec:pgorm:req:sql.ast.expr.in+1]
     #[allow(clippy::wrong_self_convention)]
     pub fn in_tuples<V, I>(mut self, v: I) -> SimpleExpr
     where
@@ -1287,9 +1287,10 @@ impl Expr {
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'b'"#
+    ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'a'"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ast.expr.in+1]
     #[allow(clippy::wrong_self_convention)]
     pub fn is_not_in<V, I>(mut self, v: I) -> SimpleExpr
     where

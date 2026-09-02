@@ -233,14 +233,14 @@ an ideal Postgres renderer would emit.
 > in parentheses unless the operand is higher-precedence per
 > `sql.render.precedence`.
 
-> [spec:pgorm:sem:sql.render.empty-in]
-> A binary `IN` or `NOT IN` whose right side is an empty tuple is rewritten to
-> the always-false comparison of two string values `'a'` and `'b'`: it renders
-> as `$N = $M` with parameters `'a'`, `'b'` (or `'a' = 'b'` inline). This makes
-> empty `IN` safe (matches nothing) — but note the current limitation that
-> empty `NOT IN` renders the *same* always-false expression, where three-valued
-> logic would suggest an always-true result. Both cases produce a query that
-> matches no rows.
+> [spec:pgorm:sem:sql.render.empty-in+1]
+> A binary `IN` or `NOT IN` whose right side is an empty tuple is rewritten to a
+> comparison of two string values, rendering as `$N = $M` with those values as
+> parameters (or with the literals inline under `to_string`). The rewrite is
+> asymmetric, so each side keeps the truth value its predicate has over an empty
+> set: empty `IN` becomes `'a' = 'b'` and matches no rows, empty `NOT IN`
+> becomes `'a' = 'a'` and matches every row. Both operands are non-NULL literals
+> in either form, so neither can evaluate to UNKNOWN.
 
 ## Conditions
 

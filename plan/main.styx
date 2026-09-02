@@ -1370,6 +1370,13 @@ children (
                         kind @note
                         text "Audit: pgorm-query/src/backend/query_builder.rs:440-451 maps BOTH In and NotIn over an empty tuple to the always-false 'a'='b'. Empty NOT IN is vacuously TRUE — current behavior silently returns zero rows where all rows are correct. Two-line fix (render always-true for NotIn); bumps sql.ast.expr.in and sql.render.empty-in, both of which pin the wrong behavior, and flips the pinning tests."
                     }
+
+                    {
+                        at 2026-09-02T16:28:52.457567Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
