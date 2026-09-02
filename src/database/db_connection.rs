@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{ConnectionTrait, TransactionTrait, error::*};
+use crate::{ConnectionTrait, RetryableError, TransactionTrait, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
@@ -101,6 +101,174 @@ impl DatabaseConnection {
         }
 
         Ok(DatabaseTransaction(Some(builder.start().await?)))
+    }
+
+    /// Run `f` inside a transaction, committing when it returns `Ok` and
+    /// rolling back when it returns `Err`.
+    ///
+    /// The rollback is awaited, so the transaction is over by the time this
+    /// returns. `Ok` is returned only once `COMMIT` succeeded; a failing
+    /// `BEGIN` or `COMMIT` is [`TransactionError::Connection`] and the
+    /// closure's own error is [`TransactionError::Transaction`].
+    // [spec:pgorm:sem:conn.tx.closure]    plain BEGIN
+    pub async fn transaction<'s, T, E, F>(&'s mut self, f: F) -> Result<T, TransactionError<E>>
+    where
+        F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+    {
+        let txn = TransactionTrait::begin(self)
+            .await
+            .map_err(TransactionError::Connection)?;
+
+        drive(txn, f).await
+    }
+
+    /// [`DatabaseConnection::transaction`] over a transaction configured by
+    /// `opts`, as [`DatabaseConnection::begin_with`] would open it.
+    // [spec:pgorm:sem:conn.tx.closure]    configured BEGIN
+    pub async fn transaction_with<'s, T, E, F>(
+        &'s mut self,
+        opts: TransactionOptions,
+        f: F,
+    ) -> Result<T, TransactionError<E>>
+    where
+        F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+    {
+        let txn = DatabaseConnection::begin_with(self, opts)
+            .await
+            .map_err(TransactionError::Connection)?;
+
+        drive(txn, f).await
+    }
+
+    /// Run `f` inside a transaction configured by `opts`, retrying the whole
+    /// begin/run/commit cycle up to `max_retries` extra times while the failure
+    /// is retryable.
+    ///
+    /// Intended for `IsolationLevel::Serializable`, where the server may reject
+    /// a transaction that would break serial order and expects the client to
+    /// replay it. `f` is [`AsyncFnMut`] because it is called once per attempt,
+    /// and must therefore be replayable: every effect it has outside the
+    /// transaction happens again on each attempt.
+    // [spec:pgorm:sem:conn.tx.retry]
+    pub async fn transaction_with_retry<T, E, F>(
+        &mut self,
+        opts: TransactionOptions,
+        max_retries: u32,
+        mut f: F,
+    ) -> Result<T, TransactionError<E>>
+    where
+        F: AsyncFnMut(&mut DatabaseTransaction<'_>) -> Result<T, E>,
+        E: RetryableError,
+    {
+        let mut retries = 0;
+
+        loop {
+            let mut txn = self
+                .begin_with(opts)
+                .await
+                .map_err(TransactionError::Connection)?;
+
+            let outcome = match f(&mut txn).await {
+                Ok(value) => match txn.commit().await {
+                    Ok(()) => return Ok(value),
+                    Err(error) => Retryable::Connection(error),
+                },
+                Err(error) => {
+                    rollback(txn).await;
+                    Retryable::Transaction(error)
+                }
+            };
+
+            let (retryable, raised_by) = match &outcome {
+                Retryable::Connection(error) => (error.is_retryable(), "commit"),
+                Retryable::Transaction(error) => (error.is_retryable(), "closure"),
+            };
+
+            if !retryable || retries == max_retries {
+                return Err(match outcome {
+                    Retryable::Connection(error) => TransactionError::Connection(error),
+                    Retryable::Transaction(error) => TransactionError::Transaction(error),
+                });
+            }
+
+            retries += 1;
+            tracing::debug!(retries, max_retries, raised_by, "retrying transaction");
+        }
+    }
+}
+
+enum Retryable<E> {
+    Connection(DbErr),
+    Transaction(E),
+}
+
+// [spec:pgorm:sem:conn.tx.closure]    commit on Ok, awaited rollback on Err
+async fn drive<'s, T, E, F>(
+    mut txn: DatabaseTransaction<'s>,
+    f: F,
+) -> Result<T, TransactionError<E>>
+where
+    F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+{
+    match f(&mut txn).await {
+        Ok(value) => txn
+            .commit()
+            .await
+            .map(|()| value)
+            .map_err(TransactionError::Connection),
+        Err(error) => {
+            rollback(txn).await;
+            Err(TransactionError::Transaction(error))
+        }
+    }
+}
+
+// [spec:pgorm:sem:conn.tx.closure]    a failed ROLLBACK does not displace the closure error
+async fn rollback(txn: DatabaseTransaction<'_>) {
+    if let Err(error) = txn.rollback().await {
+        tracing::error!(
+            %error,
+            "ROLLBACK failed after the transaction closure returned an error"
+        );
+    }
+}
+
+/// Why a closure transaction did not commit.
+///
+/// The two variants keep the closure's own failure distinct from a failure of
+/// the transaction machinery itself, which is why there is deliberately no
+/// `From<DbErr>` impl: with `E = DbErr` it would silently file every
+/// closure-side error under `Connection` and erase that distinction.
+// [spec:pgorm:sem:conn.tx.closure]    error wrapper
+#[derive(Debug)]
+pub enum TransactionError<E> {
+    /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.
+    Connection(DbErr),
+    /// The closure returned an error; the transaction was rolled back.
+    Transaction(E),
+}
+
+impl<E> std::fmt::Display for TransactionError<E>
+where
+    E: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connection(error) => write!(f, "Transaction Connection Error: {error}"),
+            Self::Transaction(error) => write!(f, "Transaction Error: {error}"),
+        }
+    }
+}
+
+impl<E> std::error::Error for TransactionError<E>
+where
+    E: std::error::Error + 'static,
+{
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Connection(error) => Some(error),
+            Self::Transaction(error) => Some(error),
+        }
     }
 }
 

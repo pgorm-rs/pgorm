@@ -186,6 +186,70 @@ under **Statement seam** below.)
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
+> [spec:pgorm:sem:conn.tx.closure]
+> `DatabaseConnection::transaction(f)` and `transaction_with(opts, f)` run a
+> closure inside a transaction, taking `F: AsyncFnOnce(&mut
+> DatabaseTransaction<'s>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
+> boxed future — where `'s` is the lifetime of the `&'s mut self` receiver.
+> `transaction` opens the transaction with `TransactionTrait::begin`,
+> `transaction_with` with `begin_with(opts)`; the rest of the cycle is shared.
+> `Ok(value)` is followed by `COMMIT`, and `value` is returned only once the
+> `COMMIT` succeeded. `Err(e)` is followed by an *awaited* `rollback()`, so the
+> transaction is over by the time the caller is resumed — this is the explicit
+> path of `conn.tx.guard`, not the fire-and-forget `Drop` path, and it is why
+> the closure API does not inherit that rule's unobservable-rollback caveat.
+>
+> The `&'s mut self` borrow is MOVED into the opening call
+> (`TransactionTrait::begin(self)` / `DatabaseConnection::begin_with(self,
+> opts)`) rather than reborrowed, so the closure is handed the concrete
+> `DatabaseTransaction<'s>` and `F` needs no higher-ranked bound over the
+> transaction's own lifetime.
+>
+> Failures are wrapped in `TransactionError<E>`, whose two variants keep the two
+> kinds of failure apart: `Connection(DbErr)` for a failing `BEGIN` or `COMMIT`
+> — the transaction machinery — and `Transaction(E)` for the closure's own
+> error. It is `Debug` unconditionally, `Display` where `E: Display`, and
+> `std::error::Error` with a `source()` where `E: Error + 'static`. There is
+> deliberately no `From<DbErr> for TransactionError<E>`: with `E = DbErr`, the
+> common case, it would file every closure-side error under `Connection` and
+> erase the distinction the enum exists to draw.
+>
+> When the closure returned an error AND the `ROLLBACK` then fails, the closure
+> error is what the caller receives; the rollback failure is reported through
+> `tracing::error!` and not substituted. The closure error is the cause and the
+> failed rollback its consequence, so promoting the latter would replace the
+> answer to "why did this transaction fail?" with a symptom.
+
+> [spec:pgorm:sem:conn.tx.retry]
+> `DatabaseConnection::transaction_with_retry(opts, max_retries, f)` is
+> `transaction_with` plus replay: it retries the whole begin/run/commit cycle —
+> not the failing statement — while the failure is retryable, for at most `1 +
+> max_retries` attempts. Each attempt reborrows the connection for a fresh
+> `begin_with(opts)`, so unlike `conn.tx.closure` the bound is higher-ranked
+> over the transaction lifetime: `F: AsyncFnMut(&mut DatabaseTransaction<'_>) ->
+> Result<T, E>`. A failed attempt is rolled back exactly as `conn.tx.closure`
+> specifies before the next one begins.
+>
+> Retryable means SQLSTATE `40001` (`serialization_failure`) or `40P01`
+> (`deadlock_detected`) — the transaction-rollback errors PostgreSQL raises
+> expecting the client to replay — as decided by `DbErr::is_retryable()`, which
+> is `false` for every non-`DbErr::Postgres` variant and for any `Postgres`
+> error carrying no `DbError`. Anything else returns immediately, on the first
+> attempt, with its variant intact.
+>
+> Both failure sites are classified, because a serialization failure can surface
+> either mid-transaction (a statement raises it, reaching the helper as the
+> closure's `E`) or at `COMMIT` (reaching it as a `DbErr`). Classifying the
+> closure's error requires seeing inside an otherwise opaque `E`, so
+> `transaction_with_retry` bounds `E: RetryableError` — a single-method trait
+> (`is_retryable(&self) -> bool`) implemented for `DbErr` and implementable for
+> a domain error type. `transaction` and `transaction_with` carry no such bound.
+>
+> `F` is `AsyncFnMut` rather than `AsyncFnOnce` because it is called once per
+> attempt, which makes replayability the caller's obligation: work the closure
+> does inside the transaction is undone by the rollback, but any effect outside
+> it happens again on every attempt.
+
 ## Statement seam
 
 > [spec:pgorm:def:conn.statement]

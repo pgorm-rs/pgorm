@@ -446,6 +446,13 @@ impl_evidence (
         {impl_name main, rule schema.from-entity.enum}
         {impl_name main, rule schema.from-entity.index}
     )}
+    {id infra.tx.closure, covered_rules (
+        conn.tx.closure
+        conn.tx.retry
+    ), covered_claims (
+        {impl_name main, rule conn.tx.closure}
+        {impl_name main, rule conn.tx.retry}
+    )}
     {id orm.binding-types, covered_rules (
         exec.cursor.binding-coerce
         sql.render.cast-param-type

@@ -675,6 +675,9 @@ children (
                         id infra.tx.closure
                         title "Closure transaction API (AsyncFnOnce) + serializable-retry helper"
                         kind @feat
+                        implements {
+                            main ([spec:pgorm:sem:conn.tx.closure] [spec:pgorm:sem:conn.tx.retry])
+                        }
                         deps (infra.tx.rollback)
                         log (
                             {

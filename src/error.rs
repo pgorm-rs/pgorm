@@ -156,7 +156,40 @@ pub enum SqlErr {
     ForeignKeyConstraintViolation(String),
 }
 
+/// An error after which re-running the whole transaction may succeed.
+///
+/// Implemented for [`DbErr`]; implement it for a domain error type to use that
+/// type as the closure error of
+/// [`DatabaseConnection::transaction_with_retry`](crate::DatabaseConnection::transaction_with_retry).
+// [spec:pgorm:sem:conn.tx.retry]    retryability predicate
+pub trait RetryableError {
+    /// Whether the transaction that produced this error is worth retrying.
+    fn is_retryable(&self) -> bool;
+}
+
+// [spec:pgorm:sem:conn.tx.retry]
+impl RetryableError for DbErr {
+    fn is_retryable(&self) -> bool {
+        DbErr::is_retryable(self)
+    }
+}
+
 impl DbErr {
+    /// Whether this is a transaction-rollback error PostgreSQL expects the
+    /// client to retry: SQLSTATE `40001` (`serialization_failure`) or `40P01`
+    /// (`deadlock_detected`).
+    // [spec:pgorm:sem:conn.tx.retry]    SQLSTATE classification
+    pub fn is_retryable(&self) -> bool {
+        let DbErr::Postgres(error) = self else {
+            return false;
+        };
+        let Some(db_error) = error.as_db_error() else {
+            return false;
+        };
+        let code = db_error.code();
+        *code == SqlState::T_R_SERIALIZATION_FAILURE || *code == SqlState::T_R_DEADLOCK_DETECTED
+    }
+
     /// Classify a [`DbErr`] as a [`SqlErr`], returning `None` when the error is
     /// not a recognised constraint violation.
     // [spec:pgorm:sem:error.model.sql-class+2]    classifier entry point
