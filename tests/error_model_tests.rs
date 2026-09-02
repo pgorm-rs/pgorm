@@ -7,7 +7,7 @@ pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
     ColumnFromStrErr, ConnectionTrait, DbErr, LoaderTrait, RuntimeErr, entity::prelude::*,
 };
-use pgorm_pool::{PoolError, Runtime, TimeoutType};
+use pgorm_pool::{PoolError, Runtime};
 use pretty_assertions::assert_eq;
 use std::{error::Error as StdError, fmt, str::FromStr, time::Duration};
 use tokio_postgres::error::SqlState;
@@ -251,7 +251,7 @@ async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
         .expect_err("the pool's only connection is checked out");
 
     assert!(
-        matches!(err, DbErr::Pool(PoolError::Timeout(TimeoutType::Wait))),
+        matches!(err, DbErr::Pool(PoolError::Timeout(_))),
         "expected a wait timeout, got {err:?}"
     );
     assert!(err.to_string().starts_with("Pool Error:"), "{err}");

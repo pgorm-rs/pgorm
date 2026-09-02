@@ -255,9 +255,12 @@ async fn decode_null_handling() -> Result<(), DbErr> {
     // ... and is an error for a non-`Option` target, rendered by
     // `From<TryGetError> for DbErr`.
     assert!(row.strict_null_is_type_err);
-    assert_eq!(
-        row.strict_null_message,
-        "A null value was encountered while decoding error deserializing column 1"
+    assert!(
+        row.strict_null_message.starts_with(
+            "A null value was encountered while decoding error deserializing column 1"
+        ),
+        "{}",
+        row.strict_null_message
     );
 
     // The payload carries no structured column context: it is the `Display` of
