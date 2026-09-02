@@ -47,7 +47,6 @@ rust_decimal = { version = "1", features = ["db-tokio-postgres"], default-featur
 pg_query = "6.2.0"
 pgorm-macros = { version = "~1.0.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
 pgorm-sql-macro = { version = "0.1.0", path = "pgorm-sql-macro", optional = true }
-pg_query = { version = "6.2.0", optional = true }
 pgorm-query.workspace = true
 strum = { version = "0.26", default-features = false }
 serde_json = { version = "1.0", default-features = false, optional = true }
@@ -96,7 +95,7 @@ macros = ["pgorm-macros/derive"]
 sql-macro = ["dep:pgorm-sql-macro"]
 # Off by default: fingerprinting links libpg_query at runtime, so only builds
 # that want query identities in their metrics pay to compile it.
-metrics-fingerprint = ["dep:pg_query"]
+metrics-fingerprint = []
 with-json = ["serde_json", "chrono?/serde", "uuid?/serde"]
 with-chrono = ["chrono"]
 with-rust_decimal = ["rust_decimal"]
