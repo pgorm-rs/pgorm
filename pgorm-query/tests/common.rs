@@ -1,7 +1,5 @@
 pub use std::fmt::Write as FmtWrite;
 
-pub use serde_json::json;
-
 use pgorm_query::Iden;
 
 /// Representation of a database table named `BloB`.

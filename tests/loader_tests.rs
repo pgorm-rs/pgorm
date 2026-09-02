@@ -616,9 +616,7 @@ async fn loader_panics_on_unsupported_table_ref() -> Result<(), DbErr> {
         .await;
     std::panic::set_hook(hook);
 
-    let payload = outcome
-        .err()
-        .expect("an aliased TableRef must abort the load");
+    let payload = outcome.expect_err("an aliased TableRef must abort the load");
     let message = payload
         .downcast_ref::<String>()
         .map(String::as_str)

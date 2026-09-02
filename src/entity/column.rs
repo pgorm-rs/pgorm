@@ -403,13 +403,13 @@ struct TextArray;
 
 impl Iden for Text {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-        write!(s, "text").unwrap();
+        write!(s, "text").expect("write to sql sink");
     }
 }
 
 impl Iden for TextArray {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-        write!(s, "text[]").unwrap();
+        write!(s, "text[]").expect("write to sql sink");
     }
 }
 

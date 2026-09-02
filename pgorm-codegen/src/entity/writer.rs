@@ -1699,7 +1699,7 @@ mod tests {
 
     #[test]
     fn test_gen_with_serde() -> io::Result<()> {
-        let cake_entity = setup().get(0).unwrap().clone();
+        let cake_entity = setup().first().unwrap().clone();
 
         assert_eq!(cake_entity.get_table_name_snake_case(), "cake");
 
@@ -2115,7 +2115,7 @@ mod tests {
 
     #[test]
     fn test_gen_with_attributes() -> io::Result<()> {
-        let cake_entity = setup().get(0).unwrap().clone();
+        let cake_entity = setup().first().unwrap().clone();
 
         assert_eq!(cake_entity.get_table_name_snake_case(), "cake");
 
@@ -2249,7 +2249,7 @@ mod tests {
 
     #[test]
     fn test_gen_postgres() -> io::Result<()> {
-        let entities = vec![
+        let entities = [
             // This tests that the JsonBinary column type is annotated
             // correctly in compact entity form. More information can be found
             // in this issue:
@@ -2344,7 +2344,7 @@ mod tests {
 
     #[test]
     fn test_gen_import_active_enum() -> io::Result<()> {
-        let entities = vec![
+        let entities = [
             Entity {
                 table_name: "tea_pairing".to_owned(),
                 columns: vec![

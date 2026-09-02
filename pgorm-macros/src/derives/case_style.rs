@@ -1,4 +1,4 @@
-//! Copied from https://github.com/Peternator7/strum/blob/master/strum_macros/src/helpers/case_style.rs
+//! Copied from <https://github.com/Peternator7/strum/blob/master/strum_macros/src/helpers/case_style.rs>
 use heck::{
     ToKebabCase, ToLowerCamelCase, ToShoutySnakeCase, ToSnakeCase, ToTitleCase, ToUpperCamelCase,
 };

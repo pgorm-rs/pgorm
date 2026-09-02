@@ -55,9 +55,7 @@ impl QueryBuilder {
     }
 
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
-        match bin_oper {
-            _ => self.prepare_bin_oper_common(bin_oper, sql),
-        }
+        self.prepare_bin_oper_common(bin_oper, sql)
     }
 
     fn prepare_query_statement(&self, query: &SubQueryStatement, sql: &mut dyn SqlWriter) {
@@ -65,10 +63,7 @@ impl QueryBuilder {
     }
 
     fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
-        match function {
-            // TODO: remove this
-            _ => self.prepare_function_name_common(function, sql),
-        }
+        self.prepare_function_name_common(function, sql)
     }
 
     // [spec:pgorm:req:sql.render.select-order] (order expressions: ASC/DESC, NULLS, Order::Field)
@@ -131,10 +126,13 @@ impl QueryBuilder {
             self.prepare_table_ref(table, sql);
         }
 
-        if insert.default_values.is_some() && insert.columns.is_empty() && insert.source.is_none() {
+        if let (Some(num_rows), true, true) = (
+            insert.default_values,
+            insert.columns.is_empty(),
+            insert.source.is_none(),
+        ) {
             self.prepare_output(&insert.returning, sql);
             write!(sql, " ").unwrap();
-            let num_rows = insert.default_values.unwrap();
             self.insert_default_values(num_rows, sql);
         } else {
             write!(sql, " ").unwrap();
@@ -592,13 +590,10 @@ impl QueryBuilder {
             None => {}
         };
 
-        match &select_expr.alias {
-            Some(alias) => {
-                write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
-            }
-            None => {}
-        };
+        if let Some(alias) = &select_expr.alias {
+            write!(sql, " AS ").unwrap();
+            alias.prepare(sql.as_writer(), self.quote());
+        }
     }
 
     /// Translate [`JoinExpr`] into SQL statement.

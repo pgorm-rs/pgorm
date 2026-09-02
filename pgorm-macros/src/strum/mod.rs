@@ -1,4 +1,4 @@
-//! Source code adapted from https://github.com/Peternator7/strum
+//! Source code adapted from <https://github.com/Peternator7/strum>
 
 #![allow(dead_code)]
 

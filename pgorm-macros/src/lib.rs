@@ -158,7 +158,7 @@ pub fn derive_entity_model(input: TokenStream) -> TokenStream {
     ts
 }
 
-/// The DerivePrimaryKey derive macro will implement [PrimaryKeyToColumn]
+/// The DerivePrimaryKey derive macro will implement `PrimaryKeyToColumn`
 /// for PrimaryKey which defines tedious mappings between primary keys and columns.
 /// The [EnumIter] is also derived, allowing iteration over all enum variants.
 ///
@@ -235,7 +235,7 @@ pub fn derive_primary_key(input: TokenStream) -> TokenStream {
     }
 }
 
-/// The DeriveColumn derive macro will implement [ColumnTrait] for Columns.
+/// The DeriveColumn derive macro will implement `ColumnTrait` for Columns.
 /// It defines the identifier of each column by implementing Iden and IdenStatic.
 /// The EnumIter is also derived, allowing iteration over all enum variants.
 ///

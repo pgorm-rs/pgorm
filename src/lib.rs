@@ -1,3 +1,8 @@
+//! An async, dynamic ORM for PostgreSQL, built on tokio-postgres and deadpool.
+//!
+//! Entities are declared as Rust types, queries are composed through the
+//! [`pgorm_query`] builder and executed with their values bound as parameters
+//! rather than interpolated.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![warn(missing_docs)]
 #![deny(

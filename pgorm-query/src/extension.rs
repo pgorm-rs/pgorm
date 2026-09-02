@@ -328,7 +328,7 @@ impl TryFrom<&str> for PgInterval {
 ///
 /// The `path` column is then populated to generate the tree.
 ///
-/// ```ignore
+/// ```sql
 /// CREATE TABLE test (path ltree);
 /// INSERT INTO test VALUES ('Top');
 /// INSERT INTO test VALUES ('Top.Science');
@@ -349,7 +349,7 @@ impl TryFrom<&str> for PgInterval {
 ///
 /// The set of queries above will generate the following tree:
 ///
-/// ```ignore
+/// ```text
 ///                        Top
 ///                     /   |  \
 ///              Science Hobbies Collections

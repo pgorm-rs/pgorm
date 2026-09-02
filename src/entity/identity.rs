@@ -34,20 +34,20 @@ impl Iden for Identity {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         match self {
             Identity::Unary(iden) => {
-                write!(s, "{}", iden.to_string()).unwrap();
+                write!(s, "{}", iden.to_string()).expect("write to sql sink");
             }
             Identity::Binary(iden1, iden2) => {
-                write!(s, "{}", iden1.to_string()).unwrap();
-                write!(s, "{}", iden2.to_string()).unwrap();
+                write!(s, "{}", iden1.to_string()).expect("write to sql sink");
+                write!(s, "{}", iden2.to_string()).expect("write to sql sink");
             }
             Identity::Ternary(iden1, iden2, iden3) => {
-                write!(s, "{}", iden1.to_string()).unwrap();
-                write!(s, "{}", iden2.to_string()).unwrap();
-                write!(s, "{}", iden3.to_string()).unwrap();
+                write!(s, "{}", iden1.to_string()).expect("write to sql sink");
+                write!(s, "{}", iden2.to_string()).expect("write to sql sink");
+                write!(s, "{}", iden3.to_string()).expect("write to sql sink");
             }
             Identity::Many(vec) => {
                 for iden in vec.iter() {
-                    write!(s, "{}", iden.to_string()).unwrap();
+                    write!(s, "{}", iden.to_string()).expect("write to sql sink");
                 }
             }
         }

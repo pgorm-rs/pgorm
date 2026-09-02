@@ -30,6 +30,8 @@ pub use truncate::*;
 pub struct Table;
 
 /// All available types of table statement
+// Boxing a variant would change the public shape of a DDL statement enum callers match on.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum TableStatement {
     Create(TableCreateStatement),

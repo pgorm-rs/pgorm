@@ -20,6 +20,8 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// The literals are the fixture: this exercises decimal round-tripping of pi.
+#[allow(clippy::approx_constant)]
 pub async fn create_and_update_pi(db: &DatabaseConnection) -> Result<(), DbErr> {
     let pi = pi::Model {
         id: 1,

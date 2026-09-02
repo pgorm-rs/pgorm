@@ -283,7 +283,8 @@ where
 
 /// Performs INSERT operations on a ActiveModel, will do nothing if input is empty.
 ///
-/// All functions works the same as if it is Insert<A>. Please refer to Insert<A> page for more information
+/// All functions works the same as if it is `Insert<A>`. Please refer to the
+/// `Insert<A>` page for more information
 // [spec:pgorm:sem:query.build.insert.empty-failsafe]
 #[derive(Debug)]
 pub struct TryInsert<A>

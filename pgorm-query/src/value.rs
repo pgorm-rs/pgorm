@@ -1187,7 +1187,6 @@ mod impl_from_value_tuple {
 /// Convert value to json value
 // [spec:pgorm:sem:sql.value.to-json]
 #[allow(clippy::many_single_char_names)]
-
 pub fn sea_value_to_json_value(value: &Value) -> Json {
     match value {
         Value::Bool(None)

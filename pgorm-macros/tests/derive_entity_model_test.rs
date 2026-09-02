@@ -250,7 +250,7 @@ fn struct_attributes_drive_entity_and_entity_name() {
     let entity = filling::Entity;
     let copied = entity;
     assert_eq!(format!("{:?}", copied), "Entity");
-    assert_eq!(format!("{:?}", filling::Entity::default()), "Entity");
+    assert_eq!(format!("{:?}", filling::Entity {}), "Entity");
 }
 
 // [spec:pgorm:sem:macros.derive.entity-model/test]    one derive yields the whole entity module

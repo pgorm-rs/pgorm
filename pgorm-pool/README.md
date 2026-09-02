@@ -31,7 +31,7 @@ and `password` in the connection config or use an alternative
 [authentication method](https://www.postgresql.org/docs/current/auth-methods.html).
 
 ```rust,no_run
-use pgorm_pool::{Config, ManagerConfig, RecyclingMethod, Runtime};
+use pgorm_pool::{Config, ManagerConfig, RecyclingMethod};
 use tokio_postgres::NoTls;
 
 #[tokio::main]
@@ -40,8 +40,9 @@ async fn main() {
     cfg.dbname = Some("deadpool".to_string());
     cfg.manager = Some(ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
+        tag: None,
     });
-    let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls).unwrap();
+    let pool = cfg.create_pool(NoTls).unwrap();
     for i in 1..10i32 {
         let client = pool.get().await.unwrap();
         let stmt = client.prepare_cached("SELECT 1 + $1").await.unwrap();
@@ -59,8 +60,7 @@ async fn main() {
 PG__DBNAME=deadpool
 ```
 
-```rust
-use pgorm_pool::Runtime;
+```rust,no_run
 use dotenvy::dotenv;
 use tokio_postgres::NoTls;
 
@@ -82,7 +82,7 @@ impl Config {
 async fn main() {
     dotenv().ok();
     let cfg = Config::from_env().unwrap();
-    let pool = cfg.pg.create_pool(Some(Runtime::Tokio1), NoTls).unwrap();
+    let pool = cfg.pg.create_pool(NoTls).unwrap();
     for i in 1..10i32 {
         let client = pool.get().await.unwrap();
         let stmt = client.prepare_cached("SELECT 1 + $1").await.unwrap();
@@ -114,6 +114,7 @@ async fn main() {
     pg_config.dbname("deadpool");
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
+        tag: None,
     };
     let mgr = Manager::from_config(pg_config, NoTls, mgr_config);
     let pool = Pool::builder(mgr).max_size(16).build().unwrap();

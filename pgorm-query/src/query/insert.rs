@@ -256,8 +256,8 @@ impl InsertStatement {
     /// # Examples
     ///
     /// - [`OnConflict::update_columns`]: Update column value of existing row with inserting value
-    /// - [`OnConflict::update_values`]: Update column value of existing row with value
-    /// - [`OnConflict::update_exprs`]: Update column value of existing row with expression
+    /// - [`OnConflict::value`]: Update a column of the existing row with a value
+    /// - [`OnConflict::values`]: Update columns of the existing row with values
     pub fn on_conflict(&mut self, on_conflict: OnConflict) -> &mut Self {
         self.on_conflict = Some(on_conflict);
         self

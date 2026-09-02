@@ -57,7 +57,7 @@ where
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
-            .map(|x| &*x as _)
+            .map(|x| x as _)
             .collect::<Vec<&(dyn ToSql + Sync)>>();
         let rows = self.db.query_all(&stmt, &values).await?;
         let mut buffer = Vec::with_capacity(rows.len());
@@ -93,7 +93,7 @@ where
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
-            .map(|x| &*x as _)
+            .map(|x| x as _)
             .collect::<Vec<&(dyn ToSql + Sync)>>();
         let result = match self.db.query_opt(&stmt, &values).await? {
             Some(res) => res,

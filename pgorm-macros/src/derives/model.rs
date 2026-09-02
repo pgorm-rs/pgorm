@@ -118,13 +118,10 @@ impl DeriveModel {
             })
             .collect();
 
-        let foo = ident.to_string();
-
         quote!(
             #[automatically_derived]
             impl pgorm::FromQueryResult for #ident {
                 fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::DbErr> {
-                    // tracing::debug!("from_query_result: {}", #foo);
                     Ok(Self {
                         #(#field_idents: #field_values),*
                     })

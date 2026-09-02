@@ -16,6 +16,8 @@ impl MigrationTrait for Migration {
     }
 }
 
+// Variants are named after the SQL enum labels this migration creates.
+#[allow(clippy::enum_variant_names)]
 #[derive(DeriveIden)]
 pub enum Tea {
     #[pgorm(iden = "tea")]

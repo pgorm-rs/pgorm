@@ -60,7 +60,7 @@ impl EntityTransformer {
                         > 0;
                     col
                 })
-                .map(|col| {
+                .inspect(|col| {
                     if let pgorm_query::ColumnType::Enum { name, variants } =
                         col.get_inner_col_type()
                     {
@@ -72,7 +72,6 @@ impl EntityTransformer {
                             },
                         );
                     }
-                    col
                 })
                 .collect();
             let mut ref_table_counts: BTreeMap<String, usize> = BTreeMap::new();

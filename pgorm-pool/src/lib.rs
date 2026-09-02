@@ -144,6 +144,8 @@ impl Manager {
         }
     }
 
+    /// The tag identifying this manager's pool, either the one given in
+    /// [`ManagerConfig`] or a generated `default-N`.
     pub fn tag(&self) -> Arc<String> {
         self.tag.0.clone()
     }

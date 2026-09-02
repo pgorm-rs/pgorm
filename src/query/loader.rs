@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use pgorm_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
 use std::{collections::HashMap, str::FromStr};
 
-/// Entity, or a Select<Entity>; to be used as parameters in [`LoaderTrait`]
+/// Entity, or a `Select<Entity>`; to be used as parameters in [`LoaderTrait`]
 pub trait EntityOrSelect<E: EntityTrait>: Send {
     /// If self is Entity, use Entity::find()
     fn select(self) -> Select<E>;

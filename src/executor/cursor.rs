@@ -4,8 +4,8 @@ use crate::{
     SelectTwoModel, SelectorTrait,
 };
 use pgorm_query::{
-    ArrayType, Condition, DynIden, Expr, IntoValueTuple, Order, QueryBuilder, SeaRc,
-    SelectStatement, SimpleExpr, Value, ValueTuple,
+    Condition, DynIden, Expr, IntoValueTuple, Order, QueryBuilder, SeaRc, SelectStatement,
+    SimpleExpr, Value, ValueTuple,
 };
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -288,7 +288,7 @@ where
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
-            .map(|x| &*x as _)
+            .map(|x| x as _)
             .collect::<Vec<&(dyn ToSql + Sync)>>();
 
         let rows = db.query_all(&stmt, &values).await?;
@@ -322,7 +322,8 @@ where
         }
     }
 
-    /// Return a [Selector] from `Self` that wraps a [SelectModel] with a [PartialModel](PartialModelTrait)
+    /// Return a [`Cursor`] from `Self` that wraps a [`SelectModel`] decoding a
+    /// [`PartialModelTrait`] type
     pub fn into_partial_model<M>(self) -> Cursor<SelectModel<M>>
     where
         M: PartialModelTrait,
@@ -450,6 +451,8 @@ where
     }
 }
 
+/// Adapter binding a [`Value`] as a query parameter, converting it to the
+/// Postgres type inferred for that placeholder.
 // [spec:pgorm:def:exec.cursor.binding+2]
 pub struct ValueHolder(pub Value);
 
@@ -463,11 +466,6 @@ use bytes::BytesMut;
 use rust_decimal::Decimal;
 
 use super::QueryResult;
-
-#[inline(always)]
-fn accepts<T: ToSql>(input: T, ty: &Type) -> bool {
-    T::accepts(ty)
-}
 
 type BindResult = Result<IsNull, Box<dyn std::error::Error + Sync + Send>>;
 

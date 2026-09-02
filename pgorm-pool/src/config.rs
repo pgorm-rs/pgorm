@@ -314,13 +314,14 @@ impl Config {
 /// [`Fast`]: RecyclingMethod::Fast
 /// [`Verified`]: RecyclingMethod::Verified
 // [spec:pgorm:sem:conn.pool.recycle]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum RecyclingMethod {
     /// Only run [`Client::is_closed()`][1] when recycling existing connections.
     ///
     /// Unless you have special needs this is a safe choice.
     ///
     /// [1]: tokio_postgres::Client::is_closed
+    #[default]
     Fast,
 
     /// Run [`Client::is_closed()`][1] and execute a test query.
@@ -358,12 +359,6 @@ pub enum RecyclingMethod {
     ///
     /// [`Verified`]: RecyclingMethod::Verified
     Custom(String),
-}
-
-impl Default for RecyclingMethod {
-    fn default() -> Self {
-        Self::Fast
-    }
 }
 
 impl RecyclingMethod {
@@ -417,9 +412,7 @@ impl Default for Tag {
     fn default() -> Self {
         Self(Arc::new(format!(
             "default-{}",
-            DEFAULT_TAG_COUNT
-                .fetch_add(1, Ordering::Relaxed)
-                .to_string()
+            DEFAULT_TAG_COUNT.fetch_add(1, Ordering::Relaxed)
         )))
     }
 }

@@ -15,16 +15,20 @@ use tokio_postgres::{
 #[repr(transparent)]
 pub struct DatabasePool(pub(crate) Pool);
 
+/// A set of [`DatabasePool`]s keyed by their tags, as built by
+/// [`connect_multi_with_builder`](crate::connect_multi_with_builder).
 // [spec:pgorm:sem:conn.pool.multi]    tag-keyed accessor surface
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabaseMultiPool(pub(crate) BTreeMap<Arc<String>, DatabasePool>);
 
 impl DatabaseMultiPool {
+    /// The pool tagged `key`, or `None` if no pool carries that tag.
     pub fn get(&self, key: Arc<String>) -> Option<DatabasePool> {
         self.0.get(&key).cloned()
     }
 
+    /// The current [`Status`] of every pool, keyed by tag.
     pub fn status(&self) -> BTreeMap<Arc<String>, Status> {
         self.0
             .iter()
@@ -33,30 +37,26 @@ impl DatabaseMultiPool {
     }
 }
 
-// impl Deref for DatabasePool {
-//     type Target = Pool;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-
 // [spec:pgorm:sem:conn.pool.get]
 impl DatabasePool {
+    /// Take a connection from the pool, waiting for one to become available.
     pub async fn get(&self) -> Result<DatabaseConnection, DbErr> {
         let conn = Pool::get(&self.0).await?;
         Ok(DatabaseConnection(conn))
     }
 
+    /// The tag this pool was built with, or its generated `default-N` tag.
     pub fn tag(&self) -> Arc<String> {
         self.0.manager().tag()
     }
 
+    /// A snapshot of the pool's size and how many connections are in use.
     pub fn status(&self) -> Status {
         self.0.status()
     }
 }
 
+/// A connection checked out of a [`DatabasePool`], returned to the pool on drop.
 #[derive(Debug)]
 pub struct DatabaseConnection(pub(crate) Object);
 
@@ -273,13 +273,29 @@ where
 }
 
 // [spec:pgorm:sem:conn.tx.guard+1]
+/// An open transaction, borrowing the [`DatabaseConnection`] or parent
+/// transaction it was opened on. Rolls back if dropped uncommitted.
 #[derive(Debug)]
 pub struct DatabaseTransaction<'a>(pub(crate) Option<Transaction<'a>>);
 
-impl DatabaseTransaction<'_> {
+impl<'a> DatabaseTransaction<'a> {
+    /// The open transaction. The `Option` is emptied only by `commit` and
+    /// `rollback`, both of which consume the handle, so it is always `Some`
+    /// here.
+    fn tx(&self) -> &Transaction<'a> {
+        self.0.as_ref().expect("transaction already consumed")
+    }
+
+    /// As [`DatabaseTransaction::tx`], for the mutable borrow a nested
+    /// savepoint needs.
+    fn tx_mut(&mut self) -> &mut Transaction<'a> {
+        self.0.as_mut().expect("transaction already consumed")
+    }
+
+    /// Commits the transaction, making every change made within it permanent.
     pub async fn commit(mut self) -> Result<(), DbErr> {
         if let Some(tx) = self.0.take() {
-            tx.commit().await.map_err(|e| DbErr::Postgres(e))
+            tx.commit().await.map_err(DbErr::Postgres)
         } else {
             unreachable!()
         }
@@ -295,7 +311,7 @@ impl DatabaseTransaction<'_> {
     /// consumes the handle so no warning is emitted.
     pub async fn rollback(mut self) -> Result<(), DbErr> {
         if let Some(tx) = self.0.take() {
-            tx.rollback().await.map_err(|e| DbErr::Postgres(e))
+            tx.rollback().await.map_err(DbErr::Postgres)
         } else {
             unreachable!()
         }
@@ -458,7 +474,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.as_ref().unwrap().execute(statement, params).await?)
+        Ok(self.tx().execute(statement, params).await?)
     }
 
     // #[instrument(level = "trace")]
@@ -469,12 +485,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        Ok(self
-            .0
-            .as_ref()
-            .unwrap()
-            .execute_raw(statement, params)
-            .await?)
+        Ok(self.tx().execute_raw(statement, params).await?)
     }
 
     async fn query_one<T>(
@@ -485,12 +496,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self
-            .0
-            .as_ref()
-            .unwrap()
-            .query_one(statement, params)
-            .await?)
+        Ok(self.tx().query_one(statement, params).await?)
     }
 
     async fn query_opt<T>(
@@ -501,12 +507,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self
-            .0
-            .as_ref()
-            .unwrap()
-            .query_opt(statement, params)
-            .await?)
+        Ok(self.tx().query_opt(statement, params).await?)
     }
 
     async fn query_all<T>(
@@ -517,7 +518,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + ToStatement + Send + Sync,
     {
-        Ok(self.0.as_ref().unwrap().query(statement, params).await?)
+        Ok(self.tx().query(statement, params).await?)
     }
 
     // [spec:pgorm:def:exec.stream]    in-transaction row stream
@@ -528,23 +529,18 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        Ok(self
-            .0
-            .as_ref()
-            .unwrap()
-            .query_raw(statement, params)
-            .await?)
+        Ok(self.tx().query_raw(statement, params).await?)
     }
 
     async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
-        Ok(pgorm_pool::GenericClient::batch_execute(self.0.as_ref().unwrap(), sql).await?)
+        Ok(pgorm_pool::GenericClient::batch_execute(self.tx(), sql).await?)
     }
 }
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseTransaction<'_> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
         Ok(DatabaseTransaction(Some(
-            self.0.as_mut().unwrap().transaction().await?,
+            self.tx_mut().transaction().await?,
         )))
     }
 }

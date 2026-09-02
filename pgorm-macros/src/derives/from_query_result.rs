@@ -62,12 +62,10 @@ pub fn expand_derive_from_query_result(
     }
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let foo = ident.to_string();
     Ok(quote!(
         #[automatically_derived]
         impl #impl_generics pgorm::FromQueryResult for #ident #ty_generics #where_clause {
             fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::DbErr> {
-                // tracing::debug!("from_query_result: {}", #foo);
                 Ok(Self {
                     #(#field)*
                 })

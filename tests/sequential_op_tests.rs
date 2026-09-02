@@ -185,7 +185,7 @@ async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model>
         })
         .collect();
 
-    results.sort_by(|a, b| b.cakes_sold.cmp(&a.cakes_sold));
+    results.sort_by_key(|r| std::cmp::Reverse(r.cakes_sold));
 
     Baker::find_by_id(results.last().unwrap().id)
         .one_opt(db)

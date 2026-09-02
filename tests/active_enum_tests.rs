@@ -284,7 +284,6 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr
         ActiveModel {
             id: Set(1),
             categories: Set(None),
-            ..Default::default()
         }
         .insert(db)
         .await?
@@ -302,7 +301,6 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr
     let _ = ActiveModel {
         id: Set(1),
         categories: Set(Some(vec![Category::Big, Category::Small])),
-        ..model.into_active_model()
     }
     .save(db)
     .await?;

@@ -36,6 +36,8 @@ fn create_3() {
         r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
     );
 
+    // Variants are named after the SQL enum labels the assertion above expects.
+    #[allow(clippy::enum_variant_names)]
     enum Tea {
         Enum,
         EverydayTea,

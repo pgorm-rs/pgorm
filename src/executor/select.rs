@@ -146,13 +146,10 @@ impl<E> Select<E>
 where
     E: EntityTrait,
 {
-    /// Perform a Select operation on a Model using a [Statement]
+    /// Perform a Select operation on a Model using a raw SQL string and its
+    /// bound parameter values
     #[allow(clippy::wrong_self_convention)]
-    pub fn from_raw_sql<'a>(
-        self,
-        stmt: String,
-        values: Values,
-    ) -> SelectorRaw<SelectModel<E::Model>> {
+    pub fn from_raw_sql(self, stmt: String, values: Values) -> SelectorRaw<SelectModel<E::Model>> {
         SelectorRaw {
             stmt,
             values,
@@ -375,7 +372,7 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one<'a, C>(self, db: &C) -> Result<E::Model, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<E::Model, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -383,7 +380,7 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -391,7 +388,7 @@ where
     }
 
     /// Get all Models from the SELECT query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -455,7 +452,7 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one<'a, C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), DbErr>
     where
         C: ConnectionTrait,
     {
@@ -463,7 +460,7 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -471,7 +468,7 @@ where
     }
 
     /// Get all Models from the Select query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -524,18 +521,6 @@ where
         }
     }
 
-    /// Performs a conversion to [Selector] with partial model
-    fn into_partial_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: PartialModelTrait,
-        N: PartialModelTrait,
-    {
-        let select = self.select_only();
-        let select = M::select_cols(select);
-        let select = N::select_cols(select);
-        select.into_model()
-    }
-
     /// Get all Models from the select operation
     ///
     /// > `SelectTwoMany::one()` method has been dropped (#486)
@@ -543,9 +528,9 @@ where
     /// > You can get `(Entity, Vec<relatedEntity>)` by first querying a single model from Entity,
     /// > then use [`ModelTrait::find_related`] on the model.
     /// >
-    /// > See https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading for details.
+    /// > See <https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading> for details.
     // [spec:pgorm:sem:exec.crud.consolidate]
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -604,16 +589,9 @@ where
         }
     }
 
-    /// Get the SQL statement
-    // pub fn into_statement(self) -> Statement {
-    //     // This is probably wrong <_<
-    //     let (stmt, _) = self.query.build(QueryBuilder);
-    //     stmt
-    // }
-
     /// Get an item from the Select query
     // [spec:pgorm:sem:exec.crud.select]
-    pub async fn one<'a, C>(mut self, db: &C) -> Result<S::Item, DbErr>
+    pub async fn one<C>(mut self, db: &C) -> Result<S::Item, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -622,7 +600,7 @@ where
     }
 
     /// Get an item from the Select query
-    pub async fn one_opt<'a, C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one_opt<C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -631,7 +609,7 @@ where
     }
 
     /// Get all items from the Select query
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -656,7 +634,8 @@ impl<S> SelectorRaw<S>
 where
     S: SelectorTrait,
 {
-    /// Select a custom Model from a raw SQL [Statement].
+    /// Select a custom Model from a raw SQL string and its bound parameter
+    /// values.
     pub fn from_statement<M>(stmt: String, values: Values) -> SelectorRaw<SelectModel<M>>
     where
         M: FromQueryResult,
@@ -750,7 +729,7 @@ where
     /// # }
     /// ```
     // [spec:pgorm:sem:exec.crud.select]
-    pub async fn one<'a, C>(self, db: &C) -> Result<S::Item, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<S::Item, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -758,7 +737,7 @@ where
             .values
             .0
             .into_iter()
-            .map(|x| ValueHolder(x))
+            .map(ValueHolder)
             .collect::<Vec<_>>();
         let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
         let row = db.query_opt(&self.stmt, &values).await?;
@@ -787,7 +766,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn one_opt<'a, C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -795,7 +774,7 @@ where
             .values
             .0
             .into_iter()
-            .map(|x| ValueHolder(x))
+            .map(ValueHolder)
             .collect::<Vec<_>>();
         let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
         let row = db.query_opt(&self.stmt, &values).await?;
@@ -824,7 +803,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn all<'a, C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
     where
         C: ConnectionTrait,
     {
@@ -833,7 +812,7 @@ where
             .values
             .0
             .into_iter()
-            .map(|x| ValueHolder(x))
+            .map(ValueHolder)
             .collect::<Vec<_>>();
         let values = values.iter().map(|x| x as _).collect::<Vec<_>>();
         let rows = db.query_all(&self.stmt, &values).await?;

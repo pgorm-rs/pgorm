@@ -504,6 +504,9 @@ mod tests {
             assert_eq!(PopOSTypos::try_from_value(&val.to_owned()), Ok(variant));
         }
 
+        // Only the derived `…Variant` type is exercised; the enum itself is
+        // the derive's input.
+        #[allow(dead_code)]
         #[derive(Clone, Debug, PartialEq, EnumIter, DeriveActiveEnum, DeriveDisplay)]
         #[pgorm(
             rs_type = "String",

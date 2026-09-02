@@ -1,9 +1,9 @@
 //! 1. Async
 //!
-//!     Built on [tokio-postgres](https://github.com/sfackler/rust-postgres) and
-//!     [deadpool](https://github.com/bikeshedder/deadpool), pgorm is async from
-//!     day 1: a connection is a pooled handle, and independent queries can be
-//!     driven concurrently on separate handles.
+//!    Built on [tokio-postgres](https://github.com/sfackler/rust-postgres) and
+//!    [deadpool](https://github.com/bikeshedder/deadpool), pgorm is async from
+//!    day 1: a connection is a pooled handle, and independent queries can be
+//!    driven concurrently on separate handles.
 //!
 //! ```no_run
 //! # use pgorm::{entity::*, error::*, query::*, tests_cfg::*, DatabasePool};
@@ -21,7 +21,7 @@
 //!
 //! 2. Dynamic
 //!
-//!     Built upon [SeaQuery](https://github.com/SeaQL/sea-query), pgorm allows you to build complex queries without 'fighting the ORM'.
+//!    Built upon [SeaQuery](https://github.com/SeaQL/sea-query), pgorm allows you to build complex queries without 'fighting the ORM'.
 //!
 //! ```no_run
 //! # use pgorm_query::Query;
@@ -48,8 +48,8 @@
 //!
 //! 3. Inspectable
 //!
-//!     Every builder renders to PostgreSQL text plus its bound parameters
-//!     before it is sent, so a query can be asserted on without a database.
+//!    Every builder renders to PostgreSQL text plus its bound parameters
+//!    before it is sent, so a query can be asserted on without a database.
 //!
 //! ```
 //! use pgorm::pgorm_query::{Value, Values};
@@ -71,10 +71,10 @@
 //!
 //! 4. Service Oriented
 //!
-//!     Quickly build services that join, filter, sort and paginate data in APIs.
+//!    Quickly build services that join, filter, sort and paginate data in APIs.
 //!
-//!     The sketch below is `ignore`d because it is written against a web
-//!     framework (Rocket) that pgorm does not depend on.
+//!    The sketch below is `ignore`d because it is written against a web
+//!    framework (Rocket) that pgorm does not depend on.
 //!
 //! ```ignore
 //! #[get("/?<page>&<posts_per_page>")]

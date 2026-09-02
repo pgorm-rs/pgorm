@@ -416,7 +416,7 @@ fn via_impls_follow_the_plain_related_impls() {
 // the UpperCamelCase target of every conjunct relation
 #[test]
 fn seaography_lists_relations_reverses_then_conjuncts() {
-    let schema = vec![
+    let schema = [
         self_referencing_cake(),
         bare("filling"),
         fruit(),
@@ -438,13 +438,7 @@ fn seaography_lists_relations_reverses_then_conjuncts() {
             ..Default::default()
         },
     ] {
-        let generated = generate(
-            schema
-                .iter()
-                .cloned()
-                .collect::<Vec<TableCreateStatement>>(),
-            opts,
-        );
+        let generated = generate(schema.to_vec(), opts);
 
         assert_contains(
             generated.file("cake.rs"),

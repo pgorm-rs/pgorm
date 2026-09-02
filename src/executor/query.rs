@@ -155,7 +155,7 @@ macro_rules! try_getable_all {
                 idx: I,
             ) -> Result<Self, TryGetError> {
                 let result: Result<$type, _> = res.row.try_get(idx);
-                result.map_err(|e| TryGetError::postgres(e))
+                result.map_err(TryGetError::postgres)
             }
         }
     };
@@ -170,7 +170,7 @@ macro_rules! try_getable_date_time {
                 res: &QueryResult,
                 idx: I,
             ) -> Result<Self, TryGetError> {
-                let result: $type = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
+                let result: $type = res.row.try_get(idx).map_err(TryGetError::postgres)?;
                 Ok(result)
             }
         }
@@ -218,7 +218,7 @@ impl TryGetable for Decimal {
         res: &QueryResult,
         idx: I,
     ) -> Result<Self, TryGetError> {
-        let result: Decimal = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
+        let result: Decimal = res.row.try_get(idx).map_err(TryGetError::postgres)?;
         Ok(result)
     }
 }
@@ -340,14 +340,14 @@ impl TryGetable for u32 {
         idx: I,
     ) -> Result<Self, TryGetError> {
         let result: Result<Oid, _> = res.row.try_get(idx);
-        result.map_err(|e| TryGetError::postgres(e).into())
+        result.map_err(TryGetError::postgres)
     }
 }
 
 // [spec:pgorm:sem:exec.decode.null-context]
 #[allow(dead_code)]
-fn err_null_idx_col<I: RowIndex + std::fmt::Display>(idx: I) -> TryGetError {
-    TryGetError::Null("TODO".into()) //format!("{idx:?}"))
+fn err_null_idx_col<I: RowIndex + std::fmt::Display>(_idx: I) -> TryGetError {
+    TryGetError::Null("TODO".into()) //format!("{_idx:?}"))
 }
 
 // [spec:pgorm:def:exec.decode.array+1]
@@ -364,8 +364,7 @@ mod postgres_array {
                     res: &QueryResult,
                     idx: I,
                 ) -> Result<Self, TryGetError> {
-                    let result: Vec<$type> =
-                        res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
+                    let result: Vec<$type> = res.row.try_get(idx).map_err(TryGetError::postgres)?;
                     Ok(result)
                 }
             }
@@ -415,7 +414,7 @@ mod postgres_array {
                     idx: I,
                 ) -> Result<Self, TryGetError> {
                     let res: Vec<uuid::Uuid> =
-                        res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
+                        res.row.try_get(idx).map_err(TryGetError::postgres)?;
                     Ok(res.into_iter().map($conversion_fn).collect())
                 }
             }
@@ -444,7 +443,7 @@ mod postgres_array {
             res: &QueryResult,
             idx: I,
         ) -> Result<Self, TryGetError> {
-            let result: Vec<Oid> = res.row.try_get(idx).map_err(|e| TryGetError::postgres(e))?;
+            let result: Vec<Oid> = res.row.try_get(idx).map_err(TryGetError::postgres)?;
             Ok(result)
         }
     }
@@ -452,7 +451,7 @@ mod postgres_array {
 
 // impl TryGetable for Row {
 //     fn try_get_by<I: RowIndex + std::fmt::Display>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
-//         res.row.try_get(index).map_err(|e| TryGetError::postgres(e))
+//         res.row.try_get(index).map_err(TryGetError::postgres)
 //     }
 // }
 
@@ -630,10 +629,10 @@ where
         idx: I,
     ) -> Result<Self, TryGetError> {
         let result: Result<Json<Self>, _> = res.row.try_get(idx);
-        result.map_err(|e| TryGetError::postgres(e)).map(|x| x.0)
+        result.map_err(TryGetError::postgres).map(|x| x.0)
     }
 
-    /// Get a Vec<Self> from an Array of Json
+    /// Get a `Vec<Self>` from an Array of Json
     fn from_json_vec(value: serde_json::Value) -> Result<Vec<Self>, TryGetError> {
         match value {
             serde_json::Value::Array(values) => {

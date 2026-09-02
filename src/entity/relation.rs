@@ -179,7 +179,7 @@ impl RelationDef {
     ///
     /// Here's a short synthetic example.
     /// In real life you'd use aliases when the table name comes up twice and you need to disambiguate,
-    /// e.g. https://github.com/pgorm-rs/pgorm/discussions/2133
+    /// e.g. <https://github.com/pgorm-rs/pgorm/discussions/2133>
     ///
     /// ```
     /// use pgorm::{

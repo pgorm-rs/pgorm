@@ -11,12 +11,14 @@ use super::DatabaseTransaction;
 // [spec:pgorm:def:conn.pool.conn-trait+2]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
-    /// Execute a [Statement]
+    /// Execute a SQL statement with its bound parameters, returning the number
+    /// of rows it affected
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
     where
         T: ?Sized + ToStatement + Send + Sync;
 
-    /// Execute a unprepared [Statement]
+    /// [`ConnectionTrait::execute`] over parameters supplied as an iterator of
+    /// individually-typed values rather than a slice of one trait object type
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
     where
         T: ?Sized + ToStatement + Send + Sync,
@@ -24,6 +26,8 @@ pub trait ConnectionTrait: Sync {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator;
 
+    /// Execute a SQL statement with its bound parameters, expecting exactly one
+    /// row; any other row count is an error
     async fn query_one<T>(
         &self,
         statement: &T,
@@ -32,6 +36,8 @@ pub trait ConnectionTrait: Sync {
     where
         T: ?Sized + ToStatement + Send + Sync;
 
+    /// Execute a SQL statement with its bound parameters, expecting at most one
+    /// row; more than one is an error
     async fn query_opt<T>(
         &self,
         statement: &T,
@@ -40,6 +46,8 @@ pub trait ConnectionTrait: Sync {
     where
         T: ?Sized + ToStatement + Send + Sync;
 
+    /// Execute a SQL statement with its bound parameters, buffering every row
+    /// it returns
     async fn query_all<T>(
         &self,
         statement: &T,

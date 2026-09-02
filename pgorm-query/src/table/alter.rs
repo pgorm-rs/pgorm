@@ -41,6 +41,8 @@ pub struct AddColumnOption {
 }
 
 /// All available table alter options
+// Boxing a variant would change the public shape of a DDL statement enum callers match on.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),

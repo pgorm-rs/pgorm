@@ -1277,7 +1277,7 @@ async fn cursor_boundary_arity_mismatch() -> Result<(), DbErr> {
     std::panic::set_hook(hook);
 
     for outcome in [unary, many] {
-        let payload = outcome.err().expect("an arity mismatch must panic");
+        let payload = outcome.expect_err("an arity mismatch must panic");
         let message = payload
             .downcast_ref::<String>()
             .map(String::as_str)

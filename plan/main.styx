@@ -983,6 +983,15 @@ children (
             {
                 id polish.warnings
                 title "Drive workspace warnings to zero (42: missing docs, elided lifetimes, dead code)"
+                sealed true
+                log (
+                    {
+                        at 2026-09-02T10:36:09.331931Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

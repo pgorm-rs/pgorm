@@ -62,7 +62,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
             .find_linked(self_join::SelfReferencingLink)
             .all(db)
             .await?,
-        [model.clone()]
+        std::slice::from_ref(&model)
     );
 
     assert_eq!(

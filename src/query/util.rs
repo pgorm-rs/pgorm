@@ -1,5 +1,3 @@
-use crate::QueryTrait;
-
 /// This structure provides debug capabilities
 // [spec:pgorm:def:query.build.debug-query]
 #[derive(Debug)]
@@ -10,14 +8,17 @@ pub struct DebugQuery<'a, Q, T> {
     pub value: T,
 }
 
+// Never invoked, but the query.build.debug-query rule above describes it as
+// retained-and-uninvoked, so it is not dead code to delete.
+#[allow(unused_macros)]
 macro_rules! debug_query_build {
     ($impl_obj:ty, $db_expr:expr) => {
         impl<'a, Q> DebugQuery<'a, Q, $impl_obj>
         where
-            Q: QueryTrait,
+            Q: crate::QueryTrait,
         {
-            /// This macro builds a [Statement] when invoked
-            pub fn build(&self) -> Statement {
+            /// Builds the SQL string and its bound parameter values
+            pub fn build(&self) -> (String, pgorm_query::Values) {
                 let func = $db_expr;
                 // let db_backend = func(self);
                 self.query.build()

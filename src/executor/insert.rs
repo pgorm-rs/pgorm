@@ -116,7 +116,7 @@ where
     /// Execute an insert operation
     // [spec:pgorm:sem:exec.crud.insert]
     #[allow(unused_mut)]
-    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + '_
+    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -137,7 +137,7 @@ where
     pub fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<u64, DbErr>> + '_
+    ) -> impl Future<Output = Result<u64, DbErr>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -150,7 +150,7 @@ where
     pub fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + '_
+    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -174,7 +174,7 @@ where
     }
 
     /// Execute an insert operation, returning the last inserted id
-    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + '_
+    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -186,7 +186,7 @@ where
     pub fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<u64, DbErr>> + '_
+    ) -> impl Future<Output = Result<u64, DbErr>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -198,13 +198,13 @@ where
     pub fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + '_
+    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
         A: 'a,
     {
-        exec_insert_with_returning::<A, _>(self.primary_key, self.query, db)
+        exec_insert_with_returning::<A, _>(self.query, db)
     }
 }
 
@@ -222,11 +222,10 @@ where
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
         .iter()
-        .map(|x| &*x as _)
+        .map(|x| x as _)
         .collect::<Vec<&(dyn ToSql + Sync)>>();
 
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
-    type ValueTypeOf<A> = <PrimaryKey<A> as PrimaryKeyTrait>::ValueType;
 
     let last_insert_id = match primary_key {
         Some(value_tuple) => {
@@ -265,7 +264,7 @@ where
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
         .iter()
-        .map(|x| &*x as _)
+        .map(|x| x as _)
         .collect::<Vec<&(dyn ToSql + Sync)>>();
 
     let exec_result = db.execute(&stmt, &values).await?;
@@ -274,7 +273,6 @@ where
 
 // [spec:pgorm:sem:exec.crud.insert-returning]
 async fn exec_insert_with_returning<A, C>(
-    primary_key: Option<ValueTuple>,
     mut insert_statement: InsertStatement,
     db: &C,
 ) -> Result<<A::Entity as EntityTrait>::Model, DbErr>

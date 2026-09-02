@@ -138,11 +138,7 @@ where
             continue;
         }
         let stmt = Index::create()
-            .name(&format!(
-                "idx-{}-{}",
-                entity.to_string(),
-                column.to_string()
-            ))
+            .name(format!("idx-{}-{}", entity.to_string(), column.to_string()))
             .table(entity)
             .col(column)
             .to_owned();
@@ -172,7 +168,7 @@ where
         for primary_key in E::PrimaryKey::iter() {
             idx_pk.col(primary_key);
         }
-        stmt.primary_key(idx_pk.name(&format!("pk-{}", entity.to_string())).primary());
+        stmt.primary_key(idx_pk.name(format!("pk-{}", entity.to_string())).primary());
     }
 
     for relation in E::Relation::iter() {
@@ -193,10 +189,7 @@ where
 {
     let orm_column_def = column.def();
     let types = match orm_column_def.col_type {
-        ColumnType::Enum {
-            ref name,
-            ref variants,
-        } => ColumnType::Custom(SeaRc::clone(name)),
+        ColumnType::Enum { ref name, .. } => ColumnType::Custom(SeaRc::clone(name)),
         _ => orm_column_def.col_type,
     };
     let mut column_def = ColumnDef::new_with_type(column, types);
