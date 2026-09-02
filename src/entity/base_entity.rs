@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, Delete, DeleteMany, DeleteOne,
+    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, DbErr, Delete, DeleteMany, DeleteOne,
     FromQueryResult, Insert, ModelTrait, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related,
     RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany, UpdateOne,
 };
@@ -294,6 +294,9 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
+    /// Fails with [`DbErr::UpdateGetPrimaryKey`] when a primary-key column of
+    /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -310,7 +313,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// // `exec` returns the updated model through `RETURNING`, and fails with
     /// // `DbErr::RecordNotFound` when the statement matches no row.
-    /// let updated: fruit::Model = fruit::Entity::update(orange)
+    /// let updated: fruit::Model = fruit::Entity::update(orange)?
     ///     .filter(fruit::Column::Name.contains("orange"))
     ///     .exec(&db)
     ///     .await?;
@@ -329,6 +332,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// assert_eq!(
     ///     fruit::Entity::update(orange)
+    ///         .expect("the primary key is set")
     ///         .filter(fruit::Column::Name.contains("orange"))
     ///         .build()
     ///         .0,
@@ -339,7 +343,7 @@ pub trait EntityTrait: EntityName {
     ///     .join(" ")
     /// );
     /// ```
-    fn update<A>(model: A) -> UpdateOne<A>
+    fn update<A>(model: A) -> Result<UpdateOne<A>, DbErr>
     where
         A: ActiveModelTrait<Entity = Self>,
     {

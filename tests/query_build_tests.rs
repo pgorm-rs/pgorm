@@ -19,10 +19,10 @@ use pgorm::tests_cfg::{
     sea_orm_active_enums::Tea, vendor,
 };
 use pgorm::{
-    ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
-    IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectColumns, SelectTwo,
-    SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
+    ActiveValue, ColumnTrait, Condition, DbErr, DebugQuery, Delete, DeleteMany, DeleteOne,
+    EntityTrait, IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select,
+    SelectColumns, SelectTwo, SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -77,7 +77,8 @@ fn every_builder_wraps_one_statement() {
     let try_insert: TryInsert<cake::ActiveModel> = Insert::one(apple()).do_nothing();
     let _: InsertStatement = try_insert.into_query();
 
-    let update_one: UpdateOne<cake::ActiveModel> = Update::one(apple());
+    let update_one: UpdateOne<cake::ActiveModel> =
+        Update::one(apple()).expect("the primary key is set");
     assert_eq!(
         update_one.as_query().to_string(QueryBuilder),
         r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#
@@ -1048,7 +1049,7 @@ fn try_insert_conversions_and_conflict_clause() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update/test]    `Update::one` filters on every
+// [spec:pgorm:sem:query.build.update+1/test]    `Update::one` filters on every
 // primary-key column and SETs only `Set`, non-key columns
 #[test]
 fn update_one_sets_changed_non_key_columns() {
@@ -1057,6 +1058,7 @@ fn update_one_sets_changed_non_key_columns() {
             id: ActiveValue::Set(1),
             name: ActiveValue::Set("Apple Pie".to_owned()),
         })
+        .expect("the primary key is set")
         .as_query()
         .to_string(QueryBuilder),
         r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#
@@ -1070,6 +1072,7 @@ fn update_one_sets_changed_non_key_columns() {
             name: ActiveValue::Set("Apple".to_owned()),
             cake_id: ActiveValue::Unchanged(Some(2)),
         })
+        .expect("the primary key is unchanged, not unset")
         .as_query()
         .to_string(QueryBuilder),
         r#"UPDATE "fruit" SET "name" = 'Apple' WHERE "fruit"."id" = 1"#
@@ -1083,6 +1086,7 @@ fn update_one_sets_changed_non_key_columns() {
             filling_id: ActiveValue::Set(2),
             price: ActiveValue::Set(rust_decimal::Decimal::ONE),
         })
+        .expect("both primary-key columns are set")
         .as_query()
         .to_string(QueryBuilder),
         [
@@ -1094,18 +1098,36 @@ fn update_one_sets_changed_non_key_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update/test]    a `NotSet` primary key has no
-// filter to contribute, so `Update::one` panics
+// [spec:pgorm:sem:query.build.update+1/test]    a `NotSet` primary key has no
+// filter to contribute, so `Update::one` refuses to build the statement
 #[test]
-#[should_panic(expected = "PrimaryKey is not set")]
-fn update_one_panics_on_unset_primary_key() {
-    let _ = Update::one(cake::ActiveModel {
+fn update_one_errs_on_unset_primary_key() {
+    let err = Update::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
         name: ActiveValue::Set("Apple Pie".to_owned()),
-    });
+    })
+    .expect_err("a NotSet primary key cannot narrow the update");
+    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
+
+    // A composite key rejects the model when any one of its columns is unset.
+    let err = Update::one(cake_filling_price::ActiveModel {
+        cake_id: ActiveValue::Set(1),
+        filling_id: ActiveValue::NotSet,
+        price: ActiveValue::Set(rust_decimal::Decimal::ONE),
+    })
+    .expect_err("half a composite key is not a key");
+    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
+
+    // `EntityTrait::update` forwards the same error.
+    let err = cake::Entity::update(cake::ActiveModel {
+        id: ActiveValue::NotSet,
+        name: ActiveValue::Set("Apple Pie".to_owned()),
+    })
+    .expect_err("the entry point forwards the builder's error");
+    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
 }
 
-// [spec:pgorm:sem:query.build.update/test]    `Update::many` adds no implicit
+// [spec:pgorm:sem:query.build.update+1/test]    `Update::many` adds no implicit
 // filter; `set` writes `Set` columns including primary keys, `col_expr` writes
 // a raw expression, and `QueryFilter` supplies the WHERE clause
 #[test]

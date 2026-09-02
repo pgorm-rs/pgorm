@@ -68,7 +68,7 @@ pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), D
     let update_res = Metadata::update(metadata::ActiveModel {
         value: Set("0.22".to_owned()),
         ..metadata.clone().into_active_model()
-    })
+    })?
     .filter(metadata::Column::Uuid.eq(Uuid::default()))
     .exec(db)
     .await;

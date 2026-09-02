@@ -23,7 +23,7 @@ impl fmt::Display for Boom {
 
 impl StdError for Boom {}
 
-// [spec:pgorm:def:error.model+1/test]    the variants pgorm constructs itself, and how each renders
+// [spec:pgorm:def:error.model+2/test]    the variants pgorm constructs itself, and how each renders
 #[test]
 fn db_err_variants_render_expected_messages() {
     let cases: Vec<(DbErr, &str)> = vec![
@@ -34,14 +34,6 @@ fn db_err_variants_render_expected_messages() {
                 source: Box::new(Boom("out of range")),
             },
             "Error converting `i64` into `u8`: out of range",
-        ),
-        (
-            DbErr::Conn(RuntimeErr::Internal("no socket".to_owned())),
-            "Connection Error: no socket",
-        ),
-        (
-            DbErr::Exec(RuntimeErr::Internal("bad plan".to_owned())),
-            "Execution Error: bad plan",
         ),
         (
             DbErr::Query(RuntimeErr::Internal("bad filter".to_owned())),
@@ -82,7 +74,7 @@ fn db_err_variants_render_expected_messages() {
     }
 }
 
-// [spec:pgorm:def:error.model+1/test]    PartialEq/Eq compare rendered messages, not payloads
+// [spec:pgorm:def:error.model+2/test]    PartialEq/Eq compare rendered messages, not payloads
 #[test]
 fn db_err_eq_compares_rendered_messages() {
     fn assert_is_eq<T: Eq>() {}
@@ -108,7 +100,7 @@ fn db_err_eq_compares_rendered_messages() {
     assert_eq!(DbErr::RecordNotFound, DbErr::RecordNotFound);
 }
 
-// [spec:pgorm:def:error.model+1/test]    ColumnFromStrErr covers FromStr failures on entity columns
+// [spec:pgorm:def:error.model+2/test]    ColumnFromStrErr covers FromStr failures on entity columns
 #[test]
 fn column_from_str_err_reports_bad_input() {
     assert!(matches!(
@@ -125,7 +117,7 @@ fn column_from_str_err_reports_bad_input() {
     );
 }
 
-// [spec:pgorm:def:error.model.runtime+1/test]    Internal is the only variant, and the payload of Conn/Exec/Query
+// [spec:pgorm:def:error.model.runtime+2/test]    Internal is the only variant, and the payload of Query
 #[test]
 fn runtime_err_wraps_internal_message() {
     let runtime = RuntimeErr::Internal("boom".to_owned());
@@ -134,24 +126,19 @@ fn runtime_err_wraps_internal_message() {
     assert_eq!(message, "boom");
     assert_eq!(runtime.to_string(), "boom");
 
-    for err in [
-        DbErr::Conn(RuntimeErr::Internal("boom".to_owned())),
-        DbErr::Exec(RuntimeErr::Internal("boom".to_owned())),
-        DbErr::Query(RuntimeErr::Internal("boom".to_owned())),
-    ] {
-        let (DbErr::Conn(inner) | DbErr::Exec(inner) | DbErr::Query(inner)) = &err else {
-            panic!("expected a RuntimeErr-carrying variant, got {err:?}");
-        };
-        let RuntimeErr::Internal(message) = inner;
-        assert_eq!(message, "boom");
-        assert!(
-            StdError::source(&err).is_some(),
-            "the RuntimeErr is the error source: {err:?}"
-        );
-    }
+    let err = DbErr::Query(RuntimeErr::Internal("boom".to_owned()));
+    let DbErr::Query(inner) = &err else {
+        panic!("expected a RuntimeErr-carrying variant, got {err:?}");
+    };
+    let RuntimeErr::Internal(message) = inner;
+    assert_eq!(message, "boom");
+    assert!(
+        StdError::source(&err).is_some(),
+        "the RuntimeErr is the error source: {err:?}"
+    );
 }
 
-// [spec:pgorm:def:error.model.runtime+1/test]    a real internal failure arrives as Query(Internal(..))
+// [spec:pgorm:def:error.model.runtime+2/test]    a real internal failure arrives as Query(Internal(..))
 #[pgorm_macros::test]
 async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
     let ctx = TestContext::new("error_model_runtime_errmodel").await;
@@ -179,7 +166,7 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+1/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
+// [spec:pgorm:def:error.model+2/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
 #[pgorm_macros::test]
 async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
     let ctx = TestContext::new("error_model_postgres_errmodel").await;
@@ -230,7 +217,7 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+1/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
+// [spec:pgorm:def:error.model+2/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
 #[pgorm_macros::test]
 async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
     let db_name = "error_model_pool_errmodel";

@@ -1083,7 +1083,10 @@ mod tests {
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model).as_query().to_string(QueryBuilder),
+                Update::one(active_model)
+                    .expect("the primary key is set")
+                    .as_query()
+                    .to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = 2, "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1212,7 +1215,10 @@ mod tests {
                 r#"SELECT "hello"."id", "hello"."one1", "hello"."two", "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model).as_query().to_string(QueryBuilder),
+                Update::one(active_model)
+                    .expect("the primary key is set")
+                    .as_query()
+                    .to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1348,7 +1354,10 @@ mod tests {
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
-                Update::one(active_model).as_query().to_string(QueryBuilder),
+                Update::one(active_model)
+                    .expect("the primary key is set")
+                    .as_query()
+                    .to_string(QueryBuilder),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }

@@ -159,14 +159,17 @@ what makes it total over partially-set models.
 > is mapped to `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.
 
-> [spec:pgorm:sem:query.build.update]
+> [spec:pgorm:sem:query.build.update+1]
 > `Update::one(model)` builds an `UpdateOne<A>` in two passes over the
-> ActiveModel. Filters: every primary-key column contributes a
-> `WHERE pk = value` equality from a `Set` or `Unchanged` value; a `NotSet`
-> primary key panics with `"PrimaryKey is not set"`. Values: only `Set`,
-> non-primary-key columns are written into the SET clause (through
+> ActiveModel and returns `Result<UpdateOne<A>, DbErr>`. Filters: every
+> primary-key column contributes a `WHERE pk = value` equality from a `Set`
+> or `Unchanged` value; a `NotSet` primary key aborts the build with
+> `Err(DbErr::UpdateGetPrimaryKey)` rather than panicking, so an `UpdateOne`
+> can never exist without a filter on every primary-key column. Values: only
+> `Set`, non-primary-key columns are written into the SET clause (through
 > `col.save_as`); `Unchanged` and `NotSet` columns are omitted, so only
 > changed values are updated and primary keys are never SET by `UpdateOne`.
+> `EntityTrait::update` forwards both the success and the error.
 >
 > `Update::many(entity)` builds a bare `UPDATE <table>` with no implicit
 > filter; `set(model)` applies the same `Set`-only rule but does not exclude

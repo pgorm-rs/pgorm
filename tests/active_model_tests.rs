@@ -342,6 +342,7 @@ fn active_value_three_state_machine() {
             name: ActiveValue::Set("Apple".to_owned()),
             note: ActiveValue::Unchanged(Some("old".to_owned())),
         })
+        .expect("the primary key is unchanged, not unset")
         .build()
         .0,
         r#"UPDATE "am_row" SET "name" = $1 WHERE "am_row"."id" = $2"#

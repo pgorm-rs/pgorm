@@ -226,7 +226,7 @@ These rules capture what the code does today, including known gaps.
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update]
+> [spec:pgorm:sem:exec.crud.update+1]
 > `Updater::exec` short-circuits when the update statement carries no SET
 > values, returning a default `UpdateResult` (zero `rows_affected`)
 > without a database round-trip; otherwise it executes and returns
@@ -237,11 +237,13 @@ These rules capture what the code does today, including known gaps.
 > clause of all entity columns and decodes through `SelectorRaw::one`, so
 > an update matching zero rows surfaces the `DbErr::RecordNotFound` of
 > `exec.crud.select`. On the no-op path (nothing to set) it instead
-> re-fetches the current model by primary key, failing with
-> `DbErr::UpdateGetPrimaryKey` when the active model has no primary-key
-> value. `UpdateMany::exec_with_returning` appends the same full-column
-> `RETURNING` and returns `Vec<Model>` via `all`; its no-op path returns
-> an empty `Vec`.
+> re-fetches the current model by primary key. That re-fetch keeps a
+> `DbErr::UpdateGetPrimaryKey` guard for an active model with no
+> primary-key value, but the guard is defensive only: `query.build.update`
+> rejects an unset primary key when the `UpdateOne` is built, so no caller
+> can reach `exec` with one. `UpdateMany::exec_with_returning` appends the
+> same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
+> no-op path returns an empty `Vec`.
 
 > [spec:pgorm:sem:exec.crud.delete]
 > `DeleteOne::exec`, `DeleteMany::exec`, and `Deleter::exec` all build

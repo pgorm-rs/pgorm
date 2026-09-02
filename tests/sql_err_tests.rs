@@ -203,7 +203,7 @@ async fn sql_err_none_for_unclassified_errors() {
         DbErr::Custom("random error".to_owned()),
         DbErr::RecordNotFound,
         DbErr::RecordNotInserted,
-        DbErr::Conn(RuntimeErr::Internal("no socket".to_owned())),
+        DbErr::Query(RuntimeErr::Internal("no socket".to_owned())),
         DbErr::Type("not a date".to_owned()),
     ] {
         assert_eq!(err.sql_err(), None, "{err:?}");

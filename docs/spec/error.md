@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+1]
+> [spec:pgorm:def:error.model+2]
 > `DbErr` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -14,22 +14,26 @@ it.
 > `Pool(pgorm_pool::PoolError)` (produced by `DatabasePool::get`; pool
 > exhaustion and acquisition timeouts surface here). The remaining variants
 > are constructed by pgorm itself: `TryIntoErr { from, into, source }`,
-> `Conn(RuntimeErr)`, `Exec(RuntimeErr)`, `Query(RuntimeErr)`,
-> `ConvertFromU64(&'static str)`, `UnpackInsertId`, `UpdateGetPrimaryKey`,
-> `AttrNotSet(String)`, `Type(String)`, `Json(String)`, `RecordNotFound`,
-> `RecordNotInserted`, `RecordNotUpdated`, and `Custom(String)`.
+> `Query(RuntimeErr)`, `ConvertFromU64(&'static str)`, `UnpackInsertId`,
+> `UpdateGetPrimaryKey`, `AttrNotSet(String)`, `Type(String)`,
+> `Json(String)`, `RecordNotFound`, `RecordNotInserted`, `RecordNotUpdated`,
+> and `Custom(String)`. Every variant MUST have at least one construction
+> site: variants that no code can produce are removed rather than kept as
+> documentation.
 >
 > `DbErr` implements `PartialEq`/`Eq` by comparing `Display` strings, so two
 > errors with distinct payloads but identical rendered messages compare
 > equal. A separate `ColumnFromStrErr(String)` covers `FromStr` failures on
 > entity columns.
 
-> [spec:pgorm:def:error.model.runtime+1]
+> [spec:pgorm:def:error.model.runtime+2]
 > `RuntimeErr` has exactly one variant, `Internal(String)`, wrapping
-> pgorm-internal failure messages, and is the payload of the `Conn`, `Exec`,
-> and `Query` variants of `DbErr`. Crate-private helpers (`conn_err`,
-> `exec_err`, `query_err`, `type_err`, `json_err`) build the corresponding
-> `DbErr` variants from anything `ToString`.
+> pgorm-internal failure messages, and is the payload of the sole
+> `RuntimeErr`-carrying variant of `DbErr`, `Query`. Three crate-private
+> helpers build a `DbErr` from anything `ToString`: `query_err`
+> (`Query(Internal(..))`), `type_err` (`Type`) and `json_err` (`Json`). Each
+> helper has at least one call site; a helper whose variant or whose call
+> sites are gone is removed rather than kept behind `#[allow(dead_code)]`.
 
 ## SQLSTATE classification
 

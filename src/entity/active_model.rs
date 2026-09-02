@@ -31,6 +31,7 @@ pub use ActiveValue::NotSet;
 ///         name: ActiveValue::set("Orange".to_owned()),
 ///         cake_id: ActiveValue::not_set(),
 ///     })
+///     .expect("the primary key is set")
 ///     .as_query()
 ///     .to_string(QueryBuilder),
 ///     r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#
@@ -212,7 +213,8 @@ pub trait ActiveModelTrait: Clone + Debug {
         C: ConnectionTrait,
     {
         let am = ActiveModelBehavior::before_save(self, db, false).await?;
-        let model: <Self::Entity as EntityTrait>::Model = Self::Entity::update(am).exec(db).await?;
+        let model: <Self::Entity as EntityTrait>::Model =
+            Self::Entity::update(am)?.exec(db).await?;
         Self::after_save(model, db, false).await
     }
 

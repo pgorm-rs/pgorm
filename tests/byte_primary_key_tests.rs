@@ -27,7 +27,7 @@ async fn main() -> Result<(), DbErr> {
 
 // [spec:pgorm:def:exec.crud/test]    `into_values` decoding through
 // `SelectGetableValue` and `into_tuple` through `SelectGetableTuple`
-// [spec:pgorm:sem:exec.crud.update/test]    `UpdateOne::exec` returns the
+// [spec:pgorm:sem:exec.crud.update+1/test]    `UpdateOne::exec` returns the
 // updated model, and surfaces RecordNotFound when the filter matches nothing
 pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
     use common::features::byte_primary_key::*;
@@ -50,16 +50,16 @@ pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
         ..model.clone().into_active_model()
     };
 
-    let update_res = Entity::update(updated_active_model.clone())
+    let update_res = Entity::update(updated_active_model.clone())?
         .filter(Column::Id.eq(vec![1_u8, 2_u8, 4_u8])) // annotate it as Vec<u8> explicitly
         .exec(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+1] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(DbErr::RecordNotFound));
 
-    let update_res = Entity::update(updated_active_model)
+    let update_res = Entity::update(updated_active_model)?
         .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
         .exec(db)
         .await?;

@@ -1177,6 +1177,13 @@ children (
                         kind @decision
                         text "Operator decision: wire UpdateGetPrimaryKey — Update::one's prepare_filters returns Err(DbErr::UpdateGetPrimaryKey) instead of panicking \"PrimaryKey is not set\" (first application of [dec:pgorm:no-panic]: a caller's unset PK is a caller mistake, so it comes back as a value). The plainly dead surface — DbErr::Conn, DbErr::Exec, conn_err, exec_err, json_err — is deleted. error.model and exec.crud.update bump accordingly."
                     }
+
+                    {
+                        at 2026-09-02T12:21:39.370499Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

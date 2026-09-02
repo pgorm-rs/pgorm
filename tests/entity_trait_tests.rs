@@ -311,6 +311,7 @@ fn entity_name_defaults_and_table_ref() {
             id: ActiveValue::Unchanged(1),
             name: ActiveValue::Set("x".to_owned()),
         })
+        .expect("the primary key is unchanged, not unset")
         .build()
         .0,
         r#"UPDATE "warehouse"."item" SET "name" = $1 WHERE "item"."id" = $2"#
@@ -408,6 +409,7 @@ fn entity_crud_surface() {
             name: ActiveValue::Set("Apple".to_owned()),
             note: NotSet,
         })
+        .expect("the primary key is unchanged, not unset")
         .build()
         .0,
         r#"UPDATE "item" SET "name" = $1 WHERE "item"."id" = $2"#

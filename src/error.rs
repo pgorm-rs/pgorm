@@ -2,7 +2,7 @@ use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+1]
+// [spec:pgorm:def:error.model+2]
 #[derive(Error, Debug)]
 pub enum DbErr {
     /// Postgres error
@@ -21,12 +21,6 @@ pub enum DbErr {
         /// TryError
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    /// There was a problem with the database connection
-    #[error("Connection Error: {0}")]
-    Conn(#[source] RuntimeErr),
-    /// An operation did not execute successfully
-    #[error("Execution Error: {0}")]
-    Exec(#[source] RuntimeErr),
     /// An error occurred while performing a query
     #[error("Query Error: {0}")]
     Query(#[source] RuntimeErr),
@@ -66,7 +60,7 @@ pub enum DbErr {
 }
 
 /// Runtime error
-// [spec:pgorm:def:error.model.runtime+1]
+// [spec:pgorm:def:error.model.runtime+2]
 #[derive(Error, Debug)]
 pub enum RuntimeErr {
     /// Error generated from within pgorm
@@ -74,7 +68,7 @@ pub enum RuntimeErr {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+1]    Display-string equality
+// [spec:pgorm:def:error.model+2]    Display-string equality
 impl PartialEq for DbErr {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
@@ -87,22 +81,6 @@ impl Eq for DbErr {}
 #[derive(Error, Debug)]
 #[error("Failed to match \"{0}\" as Column")]
 pub struct ColumnFromStrErr(pub String);
-
-#[allow(dead_code)]
-pub(crate) fn conn_err<T>(s: T) -> DbErr
-where
-    T: ToString,
-{
-    DbErr::Conn(RuntimeErr::Internal(s.to_string()))
-}
-
-#[allow(dead_code)]
-pub(crate) fn exec_err<T>(s: T) -> DbErr
-where
-    T: ToString,
-{
-    DbErr::Exec(RuntimeErr::Internal(s.to_string()))
-}
 
 #[allow(dead_code)]
 pub(crate) fn query_err<T>(s: T) -> DbErr

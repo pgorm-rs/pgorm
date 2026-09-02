@@ -290,6 +290,7 @@ assertions (
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}
+    {id polish.error-dead-code, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:21:39.370499Z}
     {id polish.gates, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:56.935942Z}
     {id polish.instructions, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:25:30.26102Z}
     {id polish.pool-tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:18:45.917955Z}

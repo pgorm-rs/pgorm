@@ -68,7 +68,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update/test]    `UpdateMany::exec_with_returning`
+// [spec:pgorm:sem:exec.crud.update+1/test]    `UpdateMany::exec_with_returning`
 // returns every updated model, and an empty `Vec` on the no-op path
 #[pgorm_macros::test]
 async fn update_many() {
@@ -373,7 +373,7 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update/test]    the no-op short-circuit of
+// [spec:pgorm:sem:exec.crud.update+1/test]    the no-op short-circuit of
 // `Updater::exec` and `UpdateOne::exec`, plus `check_record_exists`
 #[pgorm_macros::test]
 async fn update_noop_and_record_check() -> Result<(), DbErr> {
@@ -427,7 +427,7 @@ async fn update_noop_and_record_check() -> Result<(), DbErr> {
         id: Unchanged(seaside.id),
         name: Unchanged(seaside.name.clone()),
         profit_margin: Unchanged(seaside.profit_margin),
-    })
+    })?
     .exec(&db)
     .await?;
     assert_eq!(

@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Iterable, PrimaryKeyToColumn,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityTrait, Iterable, PrimaryKeyToColumn,
     QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
@@ -32,6 +32,10 @@ where
 impl Update {
     /// Update one ActiveModel
     ///
+    /// Fails with [`DbErr::UpdateGetPrimaryKey`] when a primary-key column of
+    /// `model` is [`ActiveValue::NotSet`], since there would be nothing to
+    /// narrow the statement to a single row.
+    ///
     /// ```
     /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
@@ -40,24 +44,37 @@ impl Update {
     ///         id: ActiveValue::set(1),
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
+    ///     .expect("the primary key is set")
     ///     .as_query()
     ///     .to_string(QueryBuilder),
     ///     r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
     /// );
     /// ```
-    pub fn one<E, A>(model: A) -> UpdateOne<A>
+    ///
+    /// ```
+    /// use pgorm::{entity::*, error::DbErr, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     Update::one(cake::ActiveModel {
+    ///         id: ActiveValue::not_set(),
+    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///     })
+    ///     .unwrap_err(),
+    ///     DbErr::UpdateGetPrimaryKey,
+    /// );
+    /// ```
+    pub fn one<E, A>(model: A) -> Result<UpdateOne<A>, DbErr>
     where
         E: EntityTrait,
         A: ActiveModelTrait<Entity = E>,
     {
-        UpdateOne {
+        let one = UpdateOne {
             query: UpdateStatement::new()
                 .table(A::Entity::default().table_ref())
                 .to_owned(),
             model,
-        }
-        .prepare_filters()
-        .prepare_values()
+        };
+        Ok(one.prepare_filters()?.prepare_values())
     }
 
     /// Update many ActiveModel
@@ -85,22 +102,22 @@ impl Update {
     }
 }
 
-// [spec:pgorm:sem:query.build.update]
+// [spec:pgorm:sem:query.build.update+1]
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
 {
-    fn prepare_filters(mut self) -> Self {
+    fn prepare_filters(mut self) -> Result<Self, DbErr> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
             match self.model.get(col) {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
-                ActiveValue::NotSet => panic!("PrimaryKey is not set"),
+                ActiveValue::NotSet => return Err(DbErr::UpdateGetPrimaryKey),
             }
         }
-        self
+        Ok(self)
     }
 
     fn prepare_values(mut self) -> Self {
@@ -180,7 +197,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.update]
+// [spec:pgorm:sem:query.build.update+1]
 impl<E> UpdateMany<E>
 where
     E: EntityTrait,
@@ -226,6 +243,7 @@ mod tests {
                 id: ActiveValue::set(1),
                 name: ActiveValue::set("Apple Pie".to_owned()),
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
@@ -240,6 +258,7 @@ mod tests {
                 name: ActiveValue::set("Orange".to_owned()),
                 cake_id: ActiveValue::not_set(),
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#,
@@ -254,6 +273,7 @@ mod tests {
                 name: ActiveValue::unchanged("Apple".to_owned()),
                 cake_id: ActiveValue::set(Some(3)),
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"UPDATE "fruit" SET "cake_id" = 3 WHERE "fruit"."id" = 2"#,
@@ -326,6 +346,7 @@ mod tests {
                 tea: Set(Tea::EverydayTea),
                 ..Default::default()
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"UPDATE "lunch_set" SET "tea" = CAST('EverydayTea' AS tea) WHERE "lunch_set"."id" = 1"#,
