@@ -1484,6 +1484,20 @@ children (
                     }
                 )
             }
+
+            {
+                id bug.test-harness
+                title "Test harness swallows CREATE DATABASE failures and races teardown under parallelism"
+                kind @test
+                log (
+                    {
+                        at 2026-09-02T16:56:52.912497Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Diagnosed by the char-render agent after a one-in-four flake: tests/common/setup/mod.rs:30 discards the CREATE DATABASE result (let _create_db_result = ...), so under parallel contention the create can fail silently and the test connects to an unprovisioned database (observed: active_enum_tests main failing then passing in isolation). Related but distinct: the DROP DATABASE ... WITH (FORCE) teardown kills peer connections at high nextest parallelism (the recurring 57P01 \"terminating connection due to administrator command\" flakes that forced -j 4). Fix both: propagate the create result (retry-once on the known contention error if needed), and make teardown not shoot peers — or serialize creates/drops through an advisory lock on the maintenance connection. Goal: full-parallelism nextest runs stop flaking and the -j 4 crutch can go."
+                    }
+                )
+            }
         )
     }
 
