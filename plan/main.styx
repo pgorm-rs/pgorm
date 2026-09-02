@@ -361,6 +361,13 @@ children (
                         kind @decision
                         text "Operator decision, superseding the earlier panic-at-build framing: NO PANIC — per [dec:pgorm:no-panic], an empty select list must surface as a typed error, not a panic. The rendering API (to_string/build) has no Result channel, so the guard belongs at the nearest fallible boundary: the ORM execution/build path returns DbErr::Query before anything is sent (and the QueryTrait::build surface, which is fallible-adjacent, per implementation judgment). pgorm-query's raw to_string stays documented as producing what it produces. Rejected: panic with a clear message (violates the no-panic ban); leave-as-is (invalid SQL failing server-side with an opaque error)."
                     }
+
+                    {
+                        at 2026-09-02T12:23:43.854243Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

@@ -8,7 +8,7 @@ use pgorm_query::{Alias, Expr, QueryBuilder, SelectStatement};
 use std::{marker::PhantomData, pin::Pin};
 use tokio_postgres::types::ToSql;
 
-use super::{QueryResult, ValueHolder};
+use super::{QueryResult, ValueHolder, select::ensure_select_list};
 
 /// Pin a Model so that stream operations can be performed on the model
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
@@ -47,6 +47,7 @@ where
     /// Fetch a specific page; page index starts from zero
     // [spec:pgorm:sem:exec.paginator.fetch]
     pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
+        ensure_select_list(&self.query)?;
         let query = self
             .query
             .clone()
@@ -77,6 +78,7 @@ where
     /// Get the total number of items
     // [spec:pgorm:sem:exec.paginator.count]
     pub async fn num_items(&self) -> Result<u64, DbErr> {
+        ensure_select_list(&self.query)?;
         let stmt = SelectStatement::new()
             .expr(Expr::cust("COUNT(*) AS num_items"))
             .from_subquery(

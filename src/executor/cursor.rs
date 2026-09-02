@@ -1,3 +1,4 @@
+use super::select::ensure_select_list;
 use crate::{
     ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoIdentity,
     PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select, SelectModel, SelectTwo,
@@ -283,6 +284,7 @@ where
         self.apply_limit();
         self.apply_order_by();
         self.apply_filters();
+        ensure_select_list(&self.query)?;
 
         let (stmt, values) = self.query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();

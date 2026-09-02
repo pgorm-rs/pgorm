@@ -264,6 +264,25 @@ impl SelectStatement {
         self
     }
 
+    /// The accumulated projection list, in call order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let mut query = Query::select();
+    /// query.from(Char::Table).column(Char::Character);
+    /// assert_eq!(query.selects().len(), 1);
+    ///
+    /// query.clear_selects();
+    /// assert!(query.selects().is_empty());
+    /// ```
+    // [spec:pgorm:req:sql.ast.select.projection+1]
+    pub fn selects(&self) -> &[SelectExpr] {
+        &self.selects
+    }
+
     /// Add an expression to the select expression list.
     ///
     /// # Examples
@@ -283,7 +302,7 @@ impl SelectStatement {
     ///     r#"SELECT 42, MAX("id"), 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.projection]
+    // [spec:pgorm:req:sql.ast.select.projection+1]
     pub fn expr<T>(&mut self, expr: T) -> &mut Self
     where
         T: Into<SelectExpr>,
@@ -390,7 +409,7 @@ impl SelectStatement {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
-    // [spec:pgorm:req:sql.ast.select.projection]
+    // [spec:pgorm:req:sql.ast.select.projection+1]
     pub fn distinct_on<T, I>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,

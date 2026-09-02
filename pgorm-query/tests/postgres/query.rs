@@ -886,7 +886,7 @@ fn select_53() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.projection/test]
+// [spec:pgorm:req:sql.ast.select.projection+1/test]
 #[test]
 fn select_54() {
     assert_eq!(

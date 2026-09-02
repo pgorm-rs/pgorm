@@ -365,20 +365,12 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+1/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions, and
 // `SelectColumns` re-exposes the first two
 #[test]
 fn select_list_modifiers_rewrite_the_list() {
-    assert_eq!(
-        cake::Entity::find()
-            .select_only()
-            .as_query()
-            .to_string(QueryBuilder),
-        r#"SELECT  FROM "cake""#
-    );
-
     assert_eq!(
         cake::Entity::find()
             .select_only()
@@ -434,7 +426,22 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+1/test]    rendering a cleared select
+// list still emits the text as written — `to_string` and `build` have no
+// `Result` channel, so the empty projection is refused at execution instead
+// (see `empty_select_tests.rs`)
+#[test]
+fn cleared_select_list_renders_verbatim() {
+    let query = cake::Entity::find().select_only();
+
+    assert_eq!(
+        query.as_query().to_string(QueryBuilder),
+        r#"SELECT  FROM "cake""#
+    );
+    assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
+}
+
+// [spec:pgorm:sem:query.build.modifiers+1/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -470,7 +477,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+1/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -518,7 +525,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+1/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {

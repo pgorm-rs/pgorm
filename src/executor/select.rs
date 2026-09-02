@@ -19,6 +19,19 @@ use super::ValueHolder;
 // [spec:pgorm:def:exec.stream]
 pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 'db>>;
 
+/// The guard every ORM path that sends a `SELECT` passes through: a statement
+/// whose projection list is empty renders as `SELECT  FROM "tbl"`, which the
+/// server rejects with an opaque syntax error, so it is refused here instead.
+// [spec:pgorm:sem:query.build.modifiers+1]
+pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), DbErr> {
+    if query.selects().is_empty() {
+        return Err(DbErr::Query(RuntimeErr::Internal(
+            "select list is empty; add at least one column or expression".to_owned(),
+        )));
+    }
+    Ok(())
+}
+
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
 // [spec:pgorm:def:exec.crud]
 #[derive(Clone, Debug)]
@@ -579,14 +592,15 @@ where
         }
     }
 
-    fn into_selector_raw(self) -> SelectorRaw<S> {
+    fn into_selector_raw(self) -> Result<SelectorRaw<S>, DbErr> {
+        ensure_select_list(&self.query)?;
         let (stmt, values) = self.query.build(QueryBuilder);
 
-        SelectorRaw {
+        Ok(SelectorRaw {
             stmt,
             values,
             selector: self.selector,
-        }
+        })
     }
 
     /// Get an item from the Select query
@@ -596,7 +610,7 @@ where
         C: ConnectionTrait,
     {
         self.query.limit(1);
-        self.into_selector_raw().one(db).await
+        self.into_selector_raw()?.one(db).await
     }
 
     /// Get an item from the Select query
@@ -605,7 +619,7 @@ where
         C: ConnectionTrait,
     {
         self.query.limit(1);
-        self.into_selector_raw().one_opt(db).await
+        self.into_selector_raw()?.one_opt(db).await
     }
 
     /// Get all items from the Select query
@@ -613,7 +627,7 @@ where
     where
         C: ConnectionTrait,
     {
-        self.into_selector_raw().all(db).await
+        self.into_selector_raw()?.all(db).await
     }
 
     /// Stream the results of the Select operation
@@ -626,7 +640,7 @@ where
         C: ConnectionTrait,
         S: 'b,
     {
-        self.into_selector_raw().stream(db).await
+        self.into_selector_raw()?.stream(db).await
     }
 }
 

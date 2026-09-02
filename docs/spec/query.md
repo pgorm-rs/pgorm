@@ -58,7 +58,7 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias string.
 
-> [spec:pgorm:sem:query.build.modifiers]
+> [spec:pgorm:sem:query.build.modifiers+1]
 > `QuerySelect` mutates the select statement in place: `select_only()` clears
 > the entire select list; `column` appends a column through
 > `col.select_as(col.into_expr())` (same enum-cast rule as the default list);
@@ -71,6 +71,25 @@ is what `EntityTrait::find()` produces.
 > `lock_exclusive` and `lock_with_behavior` add row-locking clauses.
 > `SelectColumns` (in `traits.rs`) re-exposes `column`/`column_as` as
 > `select_column`/`select_column_as` for partial-model queries.
+>
+> `select_only()` therefore leaves the statement in a state that renders as
+> `SELECT  FROM "tbl"` until a column or expression is re-added, and rendering
+> keeps emitting exactly that: `to_string` / `build` have no `Result` channel,
+> so they are not where the mistake is caught. The guard is at the execution
+> boundary instead. Every ORM path that would send a SELECT whose projection
+> list is empty MUST return
+> `DbErr::Query(RuntimeErr::Internal("select list is empty; add at least one
+> column or expression"))` before any statement reaches the server: the paths
+> are `Selector::one` / `one_opt` / `all` / `stream` (and everything routed
+> through them, including `Select::all`, `SelectTwo`/`SelectTwoMany`,
+> `into_tuple`, `into_values`, `into_model` and `into_partial_model`),
+> `Paginator::fetch_page` (so also `fetch`, `fetch_and_next` and
+> `into_stream`), `Paginator::num_items` — which checks the *inner* query it is
+> about to wrap in `SELECT COUNT(*) FROM (…)`, since the wrapper's own
+> projection is never empty — and so `num_pages`, `num_items_and_pages` and
+> `PaginatorTrait::count`, and `Cursor::all`. `SelectorRaw` is exempt: its
+> statement is a caller-supplied string, not a projection list. A statement
+> with a non-empty projection is unaffected.
 >
 > `QueryOrder` appends ORDER BY expressions in call order (`order_by` with an
 > explicit `Order`, `order_by_asc`, `order_by_desc`, and

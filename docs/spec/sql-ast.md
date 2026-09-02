@@ -62,12 +62,14 @@ today, including panicking edges and deliberate failsafes.
 > Structural-control helpers `conditions(bool, then, else)`, `apply_if(Option, f)`
 > and `apply(f)` let callers branch while chaining.
 
-> [spec:pgorm:req:sql.ast.select.projection]
+> [spec:pgorm:req:sql.ast.select.projection+1]
 > Projections MUST accumulate in call order: `expr`/`exprs` push anything
 > convertible to `SelectExpr`, `column`/`columns` push `SimpleExpr::Column`
 > projections from any `IntoColumnRef` (bare column, `(table, column)`, or
 > `(schema, table, column)` tuples), and `expr_as` attaches an `AS` alias.
-> `clear_selects` MUST empty the projection list.
+> `clear_selects` MUST empty the projection list, and `selects()` MUST expose
+> the accumulated list for inspection — the read side callers need to tell an
+> empty projection from a populated one without rendering the statement.
 >
 > `distinct()` MUST set `SelectDistinct::Distinct`. `distinct_on(cols)` MUST set
 > `SelectDistinct::DistinctOn` when the column collection is non-empty, and MUST
