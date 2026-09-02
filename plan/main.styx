@@ -267,6 +267,14 @@ children (
                         text "sql.ast.condition.holder v0 overclaimed since adoption: it named and_where/and_where_option as the builders of the Chain state, but in this fork ConditionalStatement::and_where delegates to cond_where (Condition state) and or_where no longer exists — the only Chain entry point is the doc-hidden and_or_where. Found by verify.sql while writing honest panic tests; rule corrected at +1 with operator approval, all refs re-pinned."
                         after_done true
                     }
+
+                    {
+                        at 2026-09-02T14:41:32.602052Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Stale epoch closed: sql.ast.select.projection bumped to +1 by sql.empty-select-list (the selects() accessor clause); references re-pinned and the accessor spec'd, tested and verified in that branch (spec_stale clean, 893 tests green). No drift in this node's own implementation — the contract grew, and the growth shipped covered."
+                        after_done true
+                    }
                 )
             }
 
@@ -320,6 +328,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @errata
                         text "sql.ddl v0 carried three inaccuracies since adoption: (1) it claimed universal quote-doubling, but only identifiers on the Iden::prepare path double embedded quotes — index/constraint names are written raw between quotes; (2) it claimed all four wrapper enums dispatch to the builders, but only TableStatement has build/build_any/to_string methods; (3) its \"current limitation\" paragraph described src/database/statement.rs, deleted by decide.statement. Found by verify.sql; rule corrected at +1 with operator approval, all refs re-pinned."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-09-02T14:41:26.167995Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Stale epoch closed: sql.ddl bumped to +2 by decide.schema-comments (Comment joined the entry-point list) and create-table/column-def bumped +1 in the same commit; every impl and test reference was re-pinned in that branch and verified against the new text there (spec_stale clean, 893 tests green). No drift in this node's own implementation — the contract grew, and the growth shipped covered."
                         after_done true
                     }
                 )
