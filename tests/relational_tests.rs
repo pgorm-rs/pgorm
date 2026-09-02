@@ -472,6 +472,10 @@ pub async fn having() {
 // [spec:pgorm:sem:exec.crud.consolidate/test]    `SelectTwoMany::all` grouping
 // on a unary primary key: children in row order, one entry per left key, and an
 // empty `Vec` for a left row with no right model
+// [spec:pgorm:req:entity.relation/test]    `Related::find_related` inner-joins
+// `to()` onto a fresh `Select<R>`, exercised against real rows
+// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::find_related` scopes
+// that select to a single model instance
 #[pgorm_macros::test]
 pub async fn related() -> Result<(), DbErr> {
     use pgorm::{SelectA, SelectB};
@@ -716,6 +720,11 @@ pub async fn related() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:req:entity.relation.linked/test]    a five-hop `Linked` chain
+// resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
+// filtering on the final alias, both verified against real rows
+// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::find_linked` scopes
+// a multi-hop join to one model instance
 #[pgorm_macros::test]
 pub async fn linked() -> Result<(), DbErr> {
     use common::bakery_chain::Order;
@@ -1267,4 +1276,579 @@ pub async fn consolidate_composite_key() -> Result<(), DbErr> {
     ctx.delete().await;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Relation definitions, builders, links and foreign keys
+// ---------------------------------------------------------------------------
+
+/// `Identity` is `Iden` but not `Display`; render one for comparison.
+fn ident(i: &Identity) -> String {
+    pgorm::Iden::to_string(i)
+}
+
+/// `ForeignKeyAction` is not `PartialEq`; compare its debug rendering.
+fn action(a: &Option<pgorm_query::ForeignKeyAction>) -> String {
+    format!("{a:?}")
+}
+
+// [spec:pgorm:req:entity.relation/test]    `RelationType` has exactly two
+// variants; `belongs_to` starts a `HasOne` builder with `is_owner = false`;
+// `has_one` / `has_many` derive theirs from `R::to().rev()` with
+// `is_owner = true`; and `Related::to` / `via` / `find_related` behave as stated
+#[test]
+fn relation_trait_and_ownership_direction() {
+    use pgorm::{RelationBuilder, RelationType};
+    use pgorm_query::QueryBuilder;
+
+    // `RelationType` is a closed two-variant enum: belongs-to is expressed as
+    // ownership direction, not a third type. This match is exhaustive.
+    for rel_type in [RelationType::HasOne, RelationType::HasMany] {
+        match rel_type {
+            RelationType::HasOne | RelationType::HasMany => {}
+        }
+    }
+    assert_ne!(RelationType::HasOne, RelationType::HasMany);
+
+    // `RelationTrait::def` maps each variant of the entity's Relation enum to a
+    // definition. `baker::Relation::Bakery` is a `belongs_to`.
+    let def = baker::Relation::Bakery.def();
+    assert_eq!(def.rel_type, RelationType::HasOne);
+    assert!(!def.is_owner, "belongs_to is the non-owning side");
+    assert_eq!(def.from_tbl, baker::Entity.table_ref());
+    assert_eq!(def.to_tbl, bakery::Entity.table_ref());
+
+    // `belongs_to` starts a HasOne builder with `is_owner = false`, whatever the
+    // columns end up being.
+    let built: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id),
+    );
+    assert_eq!(built.rel_type, RelationType::HasOne);
+    assert!(!built.is_owner);
+
+    // `has_many` requires `R: Related<Self>` and derives its builder from the
+    // related entity's definition reversed, with `is_owner = true`.
+    let owner: RelationDef = bakery::Entity::has_many(baker::Entity).into();
+    let reversed = <baker::Entity as Related<bakery::Entity>>::to().rev();
+    assert_eq!(owner.rel_type, RelationType::HasMany);
+    assert!(owner.is_owner, "has_many is the owning side");
+    assert_eq!(owner.from_tbl, reversed.from_tbl);
+    assert_eq!(owner.to_tbl, reversed.to_tbl);
+    assert_eq!(ident(&owner.from_col), ident(&reversed.from_col));
+    assert_eq!(ident(&owner.to_col), ident(&reversed.to_col));
+    // Note: `RelationBuilder::from_rel` takes only the tables and columns from
+    // the reversed definition; the FK actions the related side declared
+    // (`on_update = Cascade`, `on_delete = SetNull`) do NOT carry over.
+    assert_eq!(action(&reversed.on_delete), "Some(SetNull)");
+    assert_eq!(action(&owner.on_delete), "None");
+    assert_eq!(action(&owner.on_update), "None");
+
+    // `has_one` is the same derivation with a HasOne type.
+    let one: RelationDef = bakery::Entity::has_one(baker::Entity).into();
+    assert_eq!(one.rel_type, RelationType::HasOne);
+    assert!(one.is_owner);
+
+    // `Related::via` defaults to `None`...
+    assert!(<bakery::Entity as Related<baker::Entity>>::via().is_none());
+    // ...and `find_related` inner-joins `to()` onto a fresh `Select<R>`.
+    assert_eq!(
+        <bakery::Entity as Related<baker::Entity>>::find_related()
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details", "baker"."bakery_id""#,
+            r#"FROM "baker""#,
+            r#"INNER JOIN "bakery" ON "bakery"."id" = "baker"."bakery_id""#,
+        ]
+        .join(" ")
+    );
+
+    // `Some(via)` denotes a junction-table hop, joined in reverse alongside `to()`.
+    assert!(<baker::Entity as Related<cake::Entity>>::via().is_some());
+    assert_eq!(
+        <baker::Entity as Related<cake::Entity>>::find_related()
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "cake"."id", "cake"."name", "cake"."price", "cake"."bakery_id", "cake"."gluten_free", "cake"."serial""#,
+            r#"FROM "cake""#,
+            r#"INNER JOIN "cakes_bakers" ON "cakes_bakers"."cake_id" = "cake"."id""#,
+            r#"INNER JOIN "baker" ON "baker"."id" = "cakes_bakers"."baker_id""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:def:entity.relation.def/test]    the `RelationDef` record and its
+// combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
+// keeps everything else; `from_alias` re-points the source table; `on_condition`
+// replaces any existing custom condition; `condition_type` picks AND vs OR.
+// Also `Identity`'s arity encoding and the `IntoIdentity` / `IdentityOf`
+// conversions
+#[test]
+fn relation_def_record_and_combinators() {
+    use pgorm::{Identity, IntoIdentity, RelationType};
+    use pgorm_query::{Alias, ConditionType, IntoCondition, QueryBuilder, TableRef};
+
+    // Start from a definition carrying every optional attribute.
+    let def: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id)
+            .on_delete(pgorm_query::ForeignKeyAction::Cascade)
+            .on_update(pgorm_query::ForeignKeyAction::Restrict)
+            .fk_name("fk-custom")
+            .condition_type(ConditionType::Any),
+    );
+    assert_eq!(def.rel_type, RelationType::HasOne);
+    assert_eq!(def.from_tbl, baker::Entity.table_ref());
+    assert_eq!(def.to_tbl, bakery::Entity.table_ref());
+    assert_eq!(ident(&def.from_col), "bakery_id");
+    assert_eq!(ident(&def.to_col), "id");
+    assert!(!def.is_owner);
+    assert_eq!(action(&def.on_delete), "Some(Cascade)");
+    assert_eq!(action(&def.on_update), "Some(Restrict)");
+    assert_eq!(def.fk_name.as_deref(), Some("fk-custom"));
+    assert_eq!(def.condition_type, ConditionType::Any);
+    assert!(def.on_condition.is_none());
+
+    // `rev()` swaps the tables and the columns, negates `is_owner`, drops the
+    // fk name, and keeps rel_type / actions / condition_type.
+    let rev = def.rev();
+    assert_eq!(rev.from_tbl, bakery::Entity.table_ref());
+    assert_eq!(rev.to_tbl, baker::Entity.table_ref());
+    assert_eq!(ident(&rev.from_col), "id");
+    assert_eq!(ident(&rev.to_col), "bakery_id");
+    assert!(rev.is_owner, "rev() negates is_owner");
+    assert_eq!(rev.fk_name, None, "rev() clears fk_name");
+    assert_eq!(rev.rel_type, RelationType::HasOne);
+    assert_eq!(action(&rev.on_delete), "Some(Cascade)");
+    assert_eq!(action(&rev.on_update), "Some(Restrict)");
+    assert_eq!(rev.condition_type, ConditionType::Any);
+    // Reversing twice is the identity on tables, columns and ownership.
+    let round = rev.rev();
+    assert_eq!(round.from_tbl, baker::Entity.table_ref());
+    assert_eq!(ident(&round.from_col), "bakery_id");
+    assert!(!round.is_owner);
+
+    // `from_alias` re-points `from_tbl` at an alias, which is what makes a
+    // self-join disambiguation possible.
+    let aliased = baker::Relation::Bakery.def().from_alias(Alias::new("b2"));
+    assert!(matches!(
+        &aliased.from_tbl,
+        TableRef::TableAlias(table, alias)
+            if table.to_string() == "baker" && alias.to_string() == "b2"
+    ));
+    // Joining through the re-pointed definition qualifies the source side of
+    // the ON clause with the alias instead of the real table name.
+    assert_eq!(
+        baker::Entity::find()
+            .join(JoinType::LeftJoin, aliased)
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details", "baker"."bakery_id""#,
+            r#"FROM "baker""#,
+            r#"LEFT JOIN "bakery" ON "b2"."bakery_id" = "bakery"."id""#,
+        ]
+        .join(" ")
+    );
+
+    // `on_condition` sets a custom join condition, and calling it again replaces
+    // rather than accumulates: the second predicate is the only one present.
+    let once = baker::Relation::Bakery.def().on_condition(|_l, r| {
+        Expr::col((r, bakery::Column::Id))
+            .gt(10i32)
+            .into_condition()
+    });
+    let sql_once = bakery::Entity::find()
+        .join(JoinType::LeftJoin, once)
+        .as_query()
+        .to_string(QueryBuilder);
+    assert!(sql_once.contains(r#""bakery"."id" > 10"#));
+
+    let twice = baker::Relation::Bakery
+        .def()
+        .on_condition(|_l, r| {
+            Expr::col((r, bakery::Column::Id))
+                .gt(10i32)
+                .into_condition()
+        })
+        .on_condition(|_l, r| {
+            Expr::col((r, bakery::Column::Id))
+                .lt(99i32)
+                .into_condition()
+        });
+    let sql_twice = bakery::Entity::find()
+        .join(JoinType::LeftJoin, twice)
+        .as_query()
+        .to_string(QueryBuilder);
+    assert!(sql_twice.contains(r#""bakery"."id" < 99"#));
+    assert!(
+        !sql_twice.contains(r#""bakery"."id" > 10"#),
+        "on_condition replaces, it does not accumulate"
+    );
+
+    // `condition_type` decides how the generated column equality and the custom
+    // condition combine: All -> AND, Any -> OR.
+    let on_clause = |ct: ConditionType| {
+        let rel = baker::Relation::Bakery
+            .def()
+            .condition_type(ct)
+            .on_condition(|_l, r| {
+                Expr::col((r, bakery::Column::Id))
+                    .gt(10i32)
+                    .into_condition()
+            });
+        bakery::Entity::find()
+            .join(JoinType::LeftJoin, rel)
+            .as_query()
+            .to_string(QueryBuilder)
+            .split_once(" ON ")
+            .expect("an ON clause")
+            .1
+            .to_owned()
+    };
+    assert_eq!(
+        on_clause(ConditionType::All),
+        r#""baker"."bakery_id" = "bakery"."id" AND "bakery"."id" > 10"#
+    );
+    assert_eq!(
+        on_clause(ConditionType::Any),
+        r#""baker"."bakery_id" = "bakery"."id" OR "bakery"."id" > 10"#
+    );
+
+    // `Identity` encodes column-set arity, and `IntoIdentity` reaches it from
+    // `&str`, `String`, any `IdenStatic`, and tuples.
+    assert!(matches!("code".into_identity(), Identity::Unary(_)));
+    assert!(matches!(
+        "code".to_owned().into_identity(),
+        Identity::Unary(_)
+    ));
+    assert!(matches!(
+        bakery::Column::Id.into_identity(),
+        Identity::Unary(_)
+    ));
+    assert!(matches!(
+        (bakery::Column::Id, bakery::Column::Name).into_identity(),
+        Identity::Binary(..)
+    ));
+    assert!(matches!(
+        (
+            bakery::Column::Id,
+            bakery::Column::Name,
+            bakery::Column::ProfitMargin
+        )
+            .into_identity(),
+        Identity::Ternary(..)
+    ));
+    assert!(matches!(
+        (
+            cake::Column::Id,
+            cake::Column::Name,
+            cake::Column::Price,
+            cake::Column::BakeryId
+        )
+            .into_identity(),
+        Identity::Many(v) if v.len() == 4
+    ));
+
+    // An `Identity` iterates its components in order.
+    let components: Vec<String> = (bakery::Column::Id, bakery::Column::Name)
+        .into_identity()
+        .into_iter()
+        .map(|i| i.to_string())
+        .collect();
+    assert_eq!(components, ["id", "name"]);
+
+    // `IdentityOf<E>` restricts a builder's columns to that entity's, which is
+    // how a composite foreign key is declared as a tuple.
+    let composite: RelationDef = RelationDef::from(
+        cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
+            .from((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
+            .to((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId)),
+    );
+    assert!(matches!(composite.from_col, Identity::Binary(..)));
+    assert!(matches!(composite.to_col, Identity::Binary(..)));
+}
+
+// [spec:pgorm:req:entity.relation.builder/test]    the `belongs_to` path starts
+// with no columns and both must be supplied; the `has_one` / `has_many` path
+// pre-fills them from the reversed related definition; the optional attributes
+// are settable; and `condition_type` defaults to `All`
+#[test]
+fn relation_builder_accumulates_a_definition() {
+    use pgorm::{Identity, RelationBuilder, RelationType};
+    use pgorm_query::ConditionType;
+
+    // A `belongs_to` builder with both columns converts cleanly.
+    let def: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id),
+    );
+    assert!(matches!(def.from_col, Identity::Unary(_)));
+    assert!(matches!(def.to_col, Identity::Unary(_)));
+    // Nothing optional was set, and `condition_type` defaults to All.
+    assert_eq!(action(&def.on_delete), "None");
+    assert_eq!(action(&def.on_update), "None");
+    assert_eq!(def.fk_name, None);
+    assert!(def.on_condition.is_none());
+    assert_eq!(def.condition_type, ConditionType::All);
+
+    // The `has_many` path pre-fills both columns, so no `.from` / `.to` needed.
+    let prefilled: RelationDef = bakery::Entity::has_many(baker::Entity).into();
+    assert_eq!(ident(&prefilled.from_col), "id");
+    assert_eq!(ident(&prefilled.to_col), "bakery_id");
+    assert_eq!(prefilled.condition_type, ConditionType::All);
+
+    // Every optional attribute is settable through the builder.
+    let full: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id)
+            .on_delete(pgorm_query::ForeignKeyAction::SetNull)
+            .on_update(pgorm_query::ForeignKeyAction::Cascade)
+            .on_condition(|_l, _r| pgorm_query::Condition::all())
+            .fk_name("fk-baker-bakery_id")
+            .condition_type(ConditionType::Any),
+    );
+    assert_eq!(action(&full.on_delete), "Some(SetNull)");
+    assert_eq!(action(&full.on_update), "Some(Cascade)");
+    assert_eq!(full.fk_name.as_deref(), Some("fk-baker-bakery_id"));
+    assert!(full.on_condition.is_some());
+    assert_eq!(full.condition_type, ConditionType::Any);
+    assert_eq!(full.rel_type, RelationType::HasOne);
+}
+
+// [spec:pgorm:req:entity.relation.builder/test]    a `belongs_to` builder
+// missing `.from(..)` panics on conversion
+#[test]
+#[should_panic(expected = "Reference column is not set")]
+fn relation_builder_without_from_panics() {
+    let _: RelationDef =
+        RelationDef::from(baker::Entity::belongs_to(bakery::Entity).to(bakery::Column::Id));
+}
+
+// [spec:pgorm:req:entity.relation.builder/test]    ...and one missing `.to(..)`
+// panics with the other message
+#[test]
+#[should_panic(expected = "Owner column is not set")]
+fn relation_builder_without_to_panics() {
+    let _: RelationDef =
+        RelationDef::from(baker::Entity::belongs_to(bakery::Entity).from(baker::Column::BakeryId));
+}
+
+// [spec:pgorm:req:entity.relation.fk/test]    `From<RelationDef>` for both
+// `ForeignKeyCreateStatement` and `TableForeignKey` maps every column pair,
+// applies the `on_delete` / `on_update` actions, takes the constraint name from
+// `fk_name` when set and otherwise derives `fk-{from_table}-{from_cols}`, and
+// reduces schema-qualified table references to bare tables
+#[test]
+fn relation_def_converts_to_foreign_key_forms() {
+    use pgorm_query::{
+        Alias, ConditionType, ForeignKeyCreateStatement, IntoIden, QueryBuilder,
+        SchemaStatementBuilder, TableAlterStatement, TableForeignKey, TableRef,
+    };
+
+    let alter = |fk: &mut TableForeignKey| {
+        TableAlterStatement::new()
+            .table(baker::Entity)
+            .add_foreign_key(fk)
+            .to_string(QueryBuilder)
+    };
+
+    // With an explicit `fk_name`, that name is used verbatim.
+    let named: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id)
+            .fk_name("fk-custom-name"),
+    );
+    let stmt: ForeignKeyCreateStatement = named.into();
+    assert_eq!(
+        stmt.to_string(QueryBuilder),
+        [
+            r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-custom-name""#,
+            r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id")"#,
+        ]
+        .join(" ")
+    );
+
+    // Without one, the name is derived as `fk-{from_table}-{from_cols}`, and the
+    // FK actions are applied.
+    let derived: RelationDef = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id)
+            .on_delete(pgorm_query::ForeignKeyAction::SetNull)
+            .on_update(pgorm_query::ForeignKeyAction::Cascade),
+    );
+    let stmt: ForeignKeyCreateStatement = derived.into();
+    assert_eq!(
+        stmt.to_string(QueryBuilder),
+        [
+            r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-baker-bakery_id""#,
+            r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id")"#,
+            r#"ON DELETE SET NULL ON UPDATE CASCADE"#,
+        ]
+        .join(" ")
+    );
+
+    // Composite keys map every component, and the derived name joins the source
+    // columns with '-'.
+    let composite: RelationDef = RelationDef::from(
+        cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
+            .from((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
+            .to((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId)),
+    );
+    let stmt: ForeignKeyCreateStatement = composite.into();
+    assert_eq!(
+        stmt.to_string(QueryBuilder),
+        [
+            r#"ALTER TABLE "cakes_bakers" ADD CONSTRAINT "fk-cakes_bakers-cake_id-baker_id""#,
+            r#"FOREIGN KEY ("cake_id", "baker_id") REFERENCES "cakes_bakers" ("cake_id", "baker_id")"#,
+        ]
+        .join(" ")
+    );
+
+    // The `TableForeignKey` conversion carries the same mapping.
+    let mut fk: TableForeignKey = RelationDef::from(
+        baker::Entity::belongs_to(bakery::Entity)
+            .from(baker::Column::BakeryId)
+            .to(bakery::Column::Id)
+            .on_delete(pgorm_query::ForeignKeyAction::Cascade),
+    )
+    .into();
+    assert_eq!(
+        alter(&mut fk),
+        [
+            r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-baker-bakery_id""#,
+            r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id") ON DELETE CASCADE"#,
+        ]
+        .join(" ")
+    );
+
+    // Schema information is reduced away: a schema-qualified `TableRef` becomes
+    // a bare table on both sides, and the derived name uses the bare name too.
+    let qualified = RelationDef {
+        rel_type: RelationType::HasOne,
+        from_tbl: TableRef::SchemaTable(
+            Alias::new("warehouse").into_iden(),
+            Alias::new("child").into_iden(),
+        ),
+        to_tbl: TableRef::SchemaTable(
+            Alias::new("warehouse").into_iden(),
+            Alias::new("parent").into_iden(),
+        ),
+        from_col: "parent_id".into_identity(),
+        to_col: "id".into_identity(),
+        is_owner: false,
+        on_delete: None,
+        on_update: None,
+        on_condition: None,
+        fk_name: None,
+        condition_type: ConditionType::All,
+    };
+    let stmt: ForeignKeyCreateStatement = qualified.into();
+    assert_eq!(
+        stmt.to_string(QueryBuilder),
+        [
+            r#"ALTER TABLE "child" ADD CONSTRAINT "fk-child-parent_id""#,
+            r#"FOREIGN KEY ("parent_id") REFERENCES "parent" ("id")"#,
+        ]
+        .join(" ")
+    );
+}
+
+/// A two-hop link with a custom condition on the outer hop, to pin the
+/// `on_condition` augmentation `find_linked` applies per hop.
+struct FilteredBakerCakes;
+
+impl Linked for FilteredBakerCakes {
+    // `IntoCondition` has to be in scope for the `on_condition` closures below.
+    type FromEntity = baker::Entity;
+    type ToEntity = cake::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        use pgorm_query::IntoCondition;
+
+        vec![
+            cakes_bakers::Relation::Baker
+                .def()
+                .rev()
+                .on_condition(|_l, r| {
+                    Expr::col((r, cakes_bakers::Column::CakeId))
+                        .gt(10i32)
+                        .into_condition()
+                }),
+            cakes_bakers::Relation::Cake.def(),
+        ]
+    }
+}
+
+// [spec:pgorm:req:entity.relation.linked/test]    `find_linked` walks the chain
+// in reverse, aliasing each hop's source table `r0`, `r1`, ... and inner-joining
+// it to the previous alias while the innermost hop joins the unaliased target
+// table; each hop's `on_condition` closure is added to that hop's join
+// condition; and `ModelTrait::find_linked` scopes the result on `r{len - 1}`
+#[test]
+fn linked_chain_aliasing_and_conditions() {
+    use pgorm_query::QueryBuilder;
+
+    // `link()` is the ordered chain from FromEntity to ToEntity.
+    assert_eq!(baker::BakedForCustomer.link().len(), 5);
+
+    // `find_linked` reverses it: the last hop's source becomes `r0` joined to
+    // the unaliased target table, then r1 joins r0, and so on.
+    assert_eq!(
+        baker::BakedForCustomer
+            .find_linked()
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "customer"."id", "customer"."name", "customer"."notes""#,
+            r#"FROM "customer""#,
+            r#"INNER JOIN "order" AS "r0" ON "r0"."customer_id" = "customer"."id""#,
+            r#"INNER JOIN "lineitem" AS "r1" ON "r1"."order_id" = "r0"."id""#,
+            r#"INNER JOIN "cake" AS "r2" ON "r2"."id" = "r1"."cake_id""#,
+            r#"INNER JOIN "cakes_bakers" AS "r3" ON "r3"."cake_id" = "r2"."id""#,
+            r#"INNER JOIN "baker" AS "r4" ON "r4"."id" = "r3"."baker_id""#,
+        ]
+        .join(" ")
+    );
+
+    // `ModelTrait::find_linked` scopes that to one instance by filtering on the
+    // final alias, `r{len - 1}` = r4 for a five-hop chain.
+    let bob = baker::Model {
+        id: 1,
+        name: "Baker Bob".to_owned(),
+        contact_details: serde_json::json!({}),
+        bakery_id: Some(1),
+    };
+    assert!(
+        bob.find_linked(baker::BakedForCustomer)
+            .as_query()
+            .to_string(QueryBuilder)
+            .ends_with(r#"WHERE "r4"."id" = 1"#)
+    );
+
+    // A hop's `on_condition` is added to that hop's join condition, alongside
+    // the generated column equality rather than replacing it.
+    let sql = FilteredBakerCakes
+        .find_linked()
+        .as_query()
+        .to_string(QueryBuilder);
+    assert_eq!(
+        sql,
+        [
+            r#"SELECT "cake"."id", "cake"."name", "cake"."price", "cake"."bakery_id", "cake"."gluten_free", "cake"."serial""#,
+            r#"FROM "cake""#,
+            r#"INNER JOIN "cakes_bakers" AS "r0" ON "r0"."cake_id" = "cake"."id""#,
+            r#"INNER JOIN "baker" AS "r1" ON "r1"."id" = "r0"."baker_id" AND "r0"."cake_id" > 10"#,
+        ]
+        .join(" ")
+    );
 }

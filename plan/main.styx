@@ -1071,6 +1071,14 @@ children (
             {
                 id verify.entity
                 title "Verify entity-system rules: active-model, relations, traits (25 rules)"
+                log (
+                    {
+                        at 2026-09-02T09:55:08.691426Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
