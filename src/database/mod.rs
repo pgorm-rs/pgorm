@@ -1,7 +1,5 @@
 mod connection;
 mod db_connection;
-// mod statement;
-// mod transaction;
 
 pub use connection::*;
 pub use db_connection::*;
@@ -14,9 +12,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-// pub use statement::*;
 use tokio_postgres::NoTls;
-// pub use transaction::*;
 
 /// Method to create a [DatabasePool] on a database
 // [spec:pgorm:req:conn.pool]

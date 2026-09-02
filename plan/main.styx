@@ -513,8 +513,6 @@ children (
                         [spec:pgorm:sem:conn.pool.statement-cache]
                         [spec:pgorm:def:conn.pool.conn-trait]
                         [spec:pgorm:sem:conn.tx.guard]
-                        [spec:pgorm:def:conn.statement]
-                        [spec:pgorm:sem:conn.statement.disabled-types]
                         [spec:pgorm:def:conn.pool.generic-client]
                     )
                 }
@@ -928,6 +926,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator decision: delete the dormant module. src/database/statement.rs goes, along with the commented-out mod/pub-use lines in src/database/mod.rs (including the transaction corpse lines), and the two spec rules documenting the dormancy (conn.statement, conn.statement.disabled-types) retire from docs/spec/conn.md with infra.conn's implements claims trimmed to match. Rationale: nothing in the crate needs Statement/StatementBuilder — execution passes SQL + params directly, and the fork's policy is delete-don't-deprecate. Rejected: revival as public API (no consumer, and it would resurrect the inject_parameters Display path the fork deliberately moved away from)."
+                    }
+
+                    {
+                        at 2026-09-02T01:17:07.694429Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

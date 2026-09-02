@@ -4,10 +4,6 @@ pgorm's connection layer is a thin composition over a vendored deadpool-postgres
 fork (`pgorm-pool`) and `tokio-postgres`. `src/database/` exposes the pool and
 connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 `pgorm-pool/src/` owns connection lifecycle, recycling, and statement caching.
-(`src/database/stream/` is currently disabled — commented out of
-`src/database/mod.rs` — and is deliberately not specified here;
-`src/database/statement.rs` is likewise disabled but its seam is specified
-under **Statement seam** below.)
 
 ## Pool construction and access
 
@@ -265,34 +261,3 @@ under **Statement seam** below.)
 > attempt, which makes replayability the caller's obligation: work the closure
 > does inside the transaction is undone by the rollback, but any effect outside
 > it happens again on every attempt.
-
-## Statement seam
-
-> [spec:pgorm:def:conn.statement]
-> A `Statement` is `{ sql: String, values: Option<Values> }`, with `Value`
-> / `Values` re-exported from `pgorm_query`. Constructors:
-> `from_string(sql)` yields `values: None`;
-> `from_sql_and_values(sql, values)` collects an iterator of `Value` into
-> `Values`. `StatementBuilder` is the single-method trait
-> `build(&self) -> Statement`, implemented by macro for the `pgorm_query`
-> statement types: the query statements (`InsertStatement`,
-> `SelectStatement`, `UpdateStatement`, `DeleteStatement`, `WithQuery`)
-> build with `pgorm_query::QueryBuilder` and keep the collected parameter
-> values; the schema statements (`TableCreate/Drop/Alter/Rename/Truncate`,
-> `IndexCreate/Drop`, `ForeignKeyCreate/Drop`) render to SQL only, with
-> `values: None`. `Display` for `Statement` splices the values into the SQL
-> via `inject_parameters` when present, otherwise prints the raw SQL.
->
-> The whole module is currently dormant: `mod statement;` is commented out
-> of `src/database/mod.rs`, so none of these types are reachable through
-> the public pgorm crate today.
-
-> [spec:pgorm:sem:conn.statement.disabled-types]
-> A third macro, `build_type_stmt!`, renders a statement to a plain SQL
-> string via `to_string(QueryBuilder)` for the PostgreSQL `TYPE` DDL
-> statements — but every invocation of it
-> (`pgorm_query::extension::postgres::TypeCreateStatement`,
-> `TypeAlterStatement`, `TypeDropStatement`) is commented out pending the
-> postgres `TYPE` extension's return to `pgorm_query`. Consequently
-> `StatementBuilder` has no impl for CREATE/ALTER/DROP TYPE statements: the
-> macro is defined but currently unused.

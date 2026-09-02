@@ -279,6 +279,7 @@ assertions (
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
     {id decide.turso, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:54:51.122793Z}
+    {id decide.statement, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:07.694429Z}
 )
 
 impl_evidence (
