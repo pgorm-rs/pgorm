@@ -743,7 +743,7 @@ impl SelectStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Expr::asterisk())
+    ///     .column(Asterisk)
     ///     .from(Char::Table)
     ///     .from(Font::Table)
     ///     .and_where(Expr::col((Font::Table, Font::Id)).equals((Char::Table, Char::FontId)))
@@ -769,7 +769,7 @@ impl SelectStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Expr::asterisk())
+    ///     .column(Asterisk)
     ///     .from_values([(1, "hello"), (2, "world")], Alias::new("x"))
     ///     .to_owned();
     ///
