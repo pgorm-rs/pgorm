@@ -13,7 +13,8 @@ use pgorm::{ActiveValue::Set, DatabaseConnection, DbErr, RuntimeErr, Schema, ent
 async fn loader_load_one() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_load_one").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_0 = insert_bakery(db, "SeaSide Bakery").await?;
 
@@ -45,6 +46,9 @@ async fn loader_load_one() -> Result<(), DbErr> {
         )))
     );
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -58,7 +62,8 @@ async fn loader_load_one() -> Result<(), DbErr> {
 async fn loader_load_many() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_load_many").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
     let bakery_2 = insert_bakery(db, "Offshore Bakery").await?;
@@ -121,6 +126,9 @@ async fn loader_load_many() -> Result<(), DbErr> {
         ]
     );
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -128,7 +136,8 @@ async fn loader_load_many() -> Result<(), DbErr> {
 async fn loader_load_many_multi() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_load_many_multi").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
     let bakery_2 = insert_bakery(db, "Offshore Bakery").await?;
@@ -150,6 +159,9 @@ async fn loader_load_many_multi() -> Result<(), DbErr> {
     assert_eq!(bakers, [vec![baker_1, baker_2], vec![baker_3]]);
     assert_eq!(cakes, [vec![cake_1], vec![cake_2, cake_3]]);
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -163,7 +175,8 @@ async fn loader_load_many_multi() -> Result<(), DbErr> {
 async fn loader_load_many_to_many() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_load_many_to_many").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
 
@@ -224,6 +237,9 @@ async fn loader_load_many_to_many() -> Result<(), DbErr> {
             vec![]
         ]
     );
+
+    drop(conn);
+    ctx.delete().await;
 
     Ok(())
 }
@@ -449,7 +465,8 @@ async fn insert_ledger(
 async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_relation_shapes").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
     let baker_1 = insert_baker(db, "Jane", bakery_1.id).await?;
@@ -501,6 +518,9 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
     let slice: &[baker::Model] = bakers.as_slice();
     assert_eq!(slice.load_one(bakery::Entity, db).await?, [Some(bakery_1)]);
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -511,7 +531,8 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
 async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_empty_input").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let poisoned_bakery = || bakery::Entity::find().filter(Expr::cust("no_such_column IS NULL"));
     let poisoned_baker = || baker::Entity::find().filter(Expr::cust("no_such_column IS NULL"));
@@ -540,6 +561,9 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
         Vec::<Vec<cake::Model>>::new()
     );
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -557,7 +581,8 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
 async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_composite_keys").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
     let baker_1 = insert_baker(db, "Jane", bakery_1.id).await?;
@@ -612,6 +637,9 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
         ]
     );
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -625,7 +653,8 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
 async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_last_row_wins").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
     create_ledger_table(db).await?;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
@@ -642,6 +671,9 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
 
     assert_eq!(ledgers, [Some(second.clone()), None, Some(second)]);
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -653,7 +685,8 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
 async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_table_ref_limit").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
     create_ledger_table(db).await?;
 
     let customers = vec![
@@ -676,6 +709,9 @@ async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
     assert!(message.contains("SchemaTableAlias"), "{message}");
     assert!(message.contains("ledger"), "{message}");
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -686,7 +722,8 @@ async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
 async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_unknown_column").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
     create_ledger_table(db).await?;
 
     let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
@@ -701,6 +738,9 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
         "Relation names column `no_such_column`, which is not a column of `baker`"
     );
 
+    drop(conn);
+    ctx.delete().await;
+
     Ok(())
 }
 
@@ -712,7 +752,8 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
 async fn loader_errors_on_unmatched_returned_key() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_unmatched_key").await;
     create_tables(&ctx.db).await?;
-    let db = &ctx.db.get().await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
     create_padded_table(db).await?;
 
     let bakery_1 = insert_bakery(db, "ab").await?;
@@ -738,6 +779,9 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), DbErr> {
         ),
         "{message}"
     );
+
+    drop(conn);
+    ctx.delete().await;
 
     Ok(())
 }

@@ -245,18 +245,17 @@ pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
 // [spec:pgorm:sem:conn.tx.guard+1/test]    the ROLLBACK queued by Drop still lands after the connection returns to the pool
 #[pgorm_macros::test]
 pub async fn transaction_drop_rollback_survives_handback() -> Result<(), DbErr> {
-    const DB_NAME: &str = "transaction_drop_rollback_survives_handback";
-
-    let ctx = TestContext::new(DB_NAME).await;
+    let ctx = TestContext::new("transaction_drop_rollback_survives_handback").await;
     create_tables(&ctx.db).await?;
 
     let base_url =
         std::env::var("DATABASE_URL").expect("Enviroment variable 'DATABASE_URL' not set");
     // One connection only, so the next checkout is guaranteed to be the very
     // connection the dropped transaction queued its ROLLBACK on.
-    let pool = pgorm::connect_with_builder(common::setup::config(&base_url, DB_NAME), |builder| {
-        builder.max_size(1)
-    })?;
+    let pool =
+        pgorm::connect_with_builder(common::setup::config(&base_url, ctx.db_name()), |builder| {
+            builder.max_size(1)
+        })?;
 
     let mut db = pool.get().await?;
     let pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);

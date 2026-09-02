@@ -217,11 +217,10 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
 // [spec:pgorm:def:error.model+3/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
 #[pgorm_macros::test]
 async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
-    let db_name = "error_model_pool_errmodel";
-    let ctx = TestContext::new(db_name).await;
+    let ctx = TestContext::new("error_model_pool_errmodel").await;
     let base_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is set by TestContext");
 
-    let pool = pgorm::connect_with_builder(config(&base_url, db_name), |builder| {
+    let pool = pgorm::connect_with_builder(config(&base_url, ctx.db_name()), |builder| {
         builder
             .max_size(1)
             .wait_timeout(Some(Duration::from_millis(100)))

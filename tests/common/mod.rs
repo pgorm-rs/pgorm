@@ -18,16 +18,33 @@ impl TestContext {
 
         let base_url =
             std::env::var("DATABASE_URL").expect("Enviroment variable 'DATABASE_URL' not set");
-        let db: DatabasePool = setup::setup(&base_url, test_name).await;
+        let db_name = setup::scoped_db_name(test_name);
+        let db: DatabasePool = setup::setup(&base_url, &db_name).await;
 
         Self {
             base_url,
-            db_name: test_name.to_string(),
+            db_name,
             db,
         }
     }
 
-    pub async fn delete(&self) {
-        setup::tear_down(&self.base_url, &self.db_name).await;
+    /// The database this context provisioned, for a test that opens a second
+    /// pool of its own against it.
+    pub fn db_name(&self) -> &str {
+        &self.db_name
+    }
+
+    /// Drop the database, taking the context by value so its pool — and every
+    /// connection idling in it — is closed before the server is asked to drop
+    /// the database out from under it.
+    pub async fn delete(self) {
+        let Self {
+            base_url,
+            db_name,
+            db,
+        } = self;
+        drop(db);
+
+        setup::tear_down(&base_url, &db_name).await;
     }
 }
