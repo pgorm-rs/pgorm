@@ -22,7 +22,7 @@ pub use pgvector::Vector;
 use crate::{ColumnType, QueryBuilder, StringLen};
 
 /// [`Value`] types variant for Postgres array
-// [spec:pgorm:def:sql.value.array]
+// [spec:pgorm:def:sql.value.array+1]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -686,7 +686,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
-// [spec:pgorm:def:sql.value.array]
+// [spec:pgorm:def:sql.value.array+1]
 pub mod with_array {
     use super::*;
     use crate::RcOrArc;
@@ -765,7 +765,7 @@ pub mod with_array {
         fn try_from(v: Value) -> Result<Self, ValueTypeErr> {
             match v {
                 Value::Array(ty, Some(v)) if T::array_type() == ty => {
-                    Ok(v.into_iter().map(|e| e.unwrap()).collect())
+                    v.into_iter().map(T::try_from).collect()
                 }
                 _ => Err(ValueTypeErr),
             }
@@ -1624,7 +1624,7 @@ mod tests {
         assert_eq!(out.to_string(), num);
     }
 
-    // [spec:pgorm:def:sql.value.array/test]
+    // [spec:pgorm:def:sql.value.array+1/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
@@ -1633,7 +1633,7 @@ mod tests {
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
-    // [spec:pgorm:def:sql.value.array/test]
+    // [spec:pgorm:def:sql.value.array+1/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);

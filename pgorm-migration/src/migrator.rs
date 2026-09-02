@@ -241,7 +241,9 @@ where
         info!("Migration '{}' has been applied", migration.name());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("SystemTime before UNIX EPOCH!");
+            .map_err(|err| {
+                DbErr::Custom(format!("system clock is before the Unix epoch: {err}"))
+            })?;
         seaql_migrations::Entity::insert(seaql_migrations::ActiveModel {
             version: ActiveValue::Set(migration.name().to_owned()),
             applied_at: ActiveValue::Set(now.as_secs() as i64),

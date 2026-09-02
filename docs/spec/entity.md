@@ -126,11 +126,12 @@ explicit limitations.
 > and `values()` enumerates every variant's database value in iterator order. The
 > `ValueVec` associated type has no purpose and is documented for removal.
 
-> [spec:pgorm:req:entity.traits.active-enum.limits]
+> [spec:pgorm:req:entity.traits.active-enum.limits+1]
 > `ActiveEnumValue` is implemented for `String`, `i8`, `i16`, `i32`, `i64` and `u32`
 > only (`src/entity/active_enum.rs`). `try_get_vec_by` — reading an array of enum
-> values, a Postgres-only capability — MUST panic for `u32` (not supported by
-> `postgres-array`) and MUST panic for the other types when the `postgres-array`
+> values, a Postgres-only capability — MUST NOT panic when it cannot decode: it
+> MUST return `TryGetError::DbErr(DbErr::Type(_))` for `u32` (not supported by
+> `postgres-array`), and likewise for the other types when the `postgres-array`
 > feature is disabled. The blanket `TryFromU64` impl for every `ActiveEnum` MUST
 > return `DbErr::ConvertFromU64`, so a primary key containing an active-enum field
 > MUST declare `auto_increment = false` to be usable.

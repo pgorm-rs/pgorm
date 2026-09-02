@@ -66,7 +66,7 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array]`).
+> `[spec:pgorm:def:sql.value.array+1]`).
 
 > [spec:pgorm:def:sql.value.value-type]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
@@ -107,7 +107,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Arrays
 
-> [spec:pgorm:def:sql.value.array]
+> [spec:pgorm:def:sql.value.array+1]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
 > chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`). There is no
@@ -118,8 +118,9 @@ including panic semantics and quirks inherited from sea-query.
 > implementing the `NotU8` marker trait (all supported element types except
 > `u8`), because `Vec<u8>` is claimed by the `Bytes` conversion. `Nullable for
 > Vec<T>` produces `Array(tag, None)`. `ValueType for Vec<T>` requires the
-> stored tag to equal `T::array_type()` and then unwraps every element —
-> a mismatched element inside the vector panics rather than erroring.
+> stored tag to equal `T::array_type()` and then converts every element through
+> `T::try_from`, so a mismatched element inside the vector surfaces as
+> `ValueTypeErr` rather than panicking.
 > `ValueType::column_type()` for `Vec<T>` is
 > `ColumnType::Array(Arc::new(T::column_type()))`.
 

@@ -1,5 +1,5 @@
 use crate::{
-    ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Iterable, PrimaryKeyArity,
+    ActiveEnum, ColumnTrait, ColumnType, DbErr, EntityTrait, Iterable, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
@@ -9,8 +9,12 @@ use pgorm_query::{
 };
 
 impl Schema {
-    /// Creates Postgres enums from an ActiveEnum. See [TypeCreateStatement] for more details
-    pub fn create_enum_from_active_enum<A>(&self) -> TypeCreateStatement
+    /// Creates Postgres enums from an ActiveEnum. See [TypeCreateStatement] for more details.
+    ///
+    /// An `ActiveEnum` may be backed by a plain column type — a `String` column,
+    /// say — rather than a database enum, in which case there is no type to
+    /// create and this returns [`DbErr::Type`].
+    pub fn create_enum_from_active_enum<A>(&self) -> Result<TypeCreateStatement, DbErr>
     where
         A: ActiveEnum,
     {
@@ -146,26 +150,33 @@ impl Schema {
     }
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum]    from a single ActiveEnum
-pub(crate) fn create_enum_from_active_enum<A>() -> TypeCreateStatement
+// [spec:pgorm:sem:schema.from-entity.enum+1]    from a single ActiveEnum
+pub(crate) fn create_enum_from_active_enum<A>() -> Result<TypeCreateStatement, DbErr>
 where
     A: ActiveEnum,
 {
     let col_def = A::db_type();
-    let col_type = col_def.get_column_type();
-    create_enum_from_column_type(col_type)
+    create_enum_from_column_type(col_def.get_column_type()).ok_or_else(|| {
+        DbErr::Type(format!(
+            "`{}` is not backed by a database enum, so there is no type to create",
+            A::name().to_string()
+        ))
+    })
 }
 
-pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> TypeCreateStatement {
-    let (name, values) = match col_type {
-        ColumnType::Enum { name, variants } => (name.clone(), variants.clone()),
-        _ => panic!("Should be ColumnType::Enum"),
+pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<TypeCreateStatement> {
+    let ColumnType::Enum { name, variants } = col_type else {
+        return None;
     };
-    Type::create().as_enum(name).values(values).to_owned()
+    Some(
+        Type::create()
+            .as_enum(name.clone())
+            .values(variants.clone())
+            .to_owned(),
+    )
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum]
-#[allow(clippy::needless_borrow)]
+// [spec:pgorm:sem:schema.from-entity.enum+1]
 pub(crate) fn create_enum_from_entity<E>(_: E) -> Vec<TypeCreateStatement>
 where
     E: EntityTrait,
@@ -173,12 +184,7 @@ where
     let mut vec = Vec::new();
     for col in E::Column::iter() {
         let col_def = col.def();
-        let col_type = col_def.get_column_type();
-        if !matches!(col_type, ColumnType::Enum { .. }) {
-            continue;
-        }
-        let stmt = create_enum_from_column_type(&col_type);
-        vec.push(stmt);
+        vec.extend(create_enum_from_column_type(col_def.get_column_type()));
     }
     vec
 }

@@ -12,7 +12,7 @@ macro_rules! select_def {
 
         impl Iden for $ident {
             fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                write!(s, "{}", self.as_str()).unwrap();
+                write!(s, "{}", self.as_str()).expect("write to sql sink");
             }
         }
 

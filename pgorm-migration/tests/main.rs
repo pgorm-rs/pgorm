@@ -10,7 +10,7 @@ use pgorm_migration::prelude::*;
 /// runs every pending migration in order.
 // [spec:pgorm:def:migration.runner/test]
 // [spec:pgorm:sem:migration.up/test]
-// [spec:pgorm:sem:migration.name/test]    asserted names are file stems
+// [spec:pgorm:sem:migration.name+1/test]    asserted names are file stems
 // [spec:pgorm:def:macros.derive/test]    `DeriveMigrationName` names each migration after the file stem
 #[tokio::test]
 async fn fresh_install_applies_all_pending() -> Result<(), DbErr> {

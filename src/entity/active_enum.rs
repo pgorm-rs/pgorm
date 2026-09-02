@@ -147,7 +147,7 @@ pub trait ActiveEnum: Sized + Iterable {
 }
 
 /// The Rust Value backing ActiveEnums
-// [spec:pgorm:req:entity.traits.active-enum.limits]
+// [spec:pgorm:req:entity.traits.active-enum.limits+1]
 pub trait ActiveEnumValue: Into<Value> + ValueType + Nullable + TryGetable {
     /// For getting an array of enum. Postgres only
     fn try_get_vec_by<I: RowIndex + std::fmt::Display>(
@@ -163,7 +163,10 @@ macro_rules! impl_active_enum_value {
                 _res: &QueryResult,
                 _index: I,
             ) -> Result<Vec<Self>, TryGetError> {
-                panic!("Not supported by `postgres-array`")
+                Err(TryGetError::DbErr(DbErr::Type(format!(
+                    "reading an array of `{}` enum values is not supported by `postgres-array`",
+                    stringify!($type)
+                ))))
             }
         }
     };
@@ -181,7 +184,12 @@ macro_rules! impl_active_enum_value_with_pg_array {
                     <Vec<Self>>::try_get_by(_res, _index)
                 }
                 #[cfg(not(feature = "postgres-array"))]
-                panic!("`postgres-array` is not enabled")
+                {
+                    Err(TryGetError::DbErr(DbErr::Type(format!(
+                        "reading an array of `{}` enum values requires the `postgres-array` feature",
+                        stringify!($type)
+                    ))))
+                }
             }
         }
     };
@@ -197,7 +205,7 @@ impl_active_enum_value_with_pg_array!(i16);
 impl_active_enum_value_with_pg_array!(i32);
 impl_active_enum_value_with_pg_array!(i64);
 
-// [spec:pgorm:req:entity.traits.active-enum.limits]
+// [spec:pgorm:req:entity.traits.active-enum.limits+1]
 impl<T> TryFromU64 for T
 where
     T: ActiveEnum,

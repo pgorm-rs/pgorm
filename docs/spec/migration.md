@@ -83,14 +83,17 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > monotonic, auditable log. Callers needing a reversal write it as the next
 > migration.
 
-> [spec:pgorm:sem:migration.name]
+> [spec:pgorm:sem:migration.name+1]
 > A migration's identity — the value written to and matched against the
 > ledger's `version` column — is its **source filename** without extension, not
 > its type name. `DeriveMigrationName` implements `MigrationName::name` as
 > `util::get_file_stem(file!())`, which takes the `file!()` path's file stem, so
 > every migration in a project must live in its own uniquely-named file and the
 > conventional `m<timestamp>_<description>.rs` naming is what makes
-> declaration order legible.
+> declaration order legible. `get_file_stem` is public API — the derive expands
+> in the caller's crate — so it is reachable with any string and MUST be total:
+> a path carrying no file stem, or one that is not valid UTF-8, yields that path
+> unchanged rather than panicking.
 >
 > The consequence is that renaming a migration file renames the migration:
 > the old name remains in the ledger with no matching entry in `migrations()`,

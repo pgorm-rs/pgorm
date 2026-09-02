@@ -122,7 +122,7 @@ fn active_enum_trait_surface() {
 
 fn assert_is_active_enum_value<T: ActiveEnumValue>() {}
 
-// [spec:pgorm:req:entity.traits.active-enum.limits/test]    `ActiveEnumValue` is
+// [spec:pgorm:req:entity.traits.active-enum.limits+1/test]    `ActiveEnumValue` is
 // implemented for exactly `String`, `i8`, `i16`, `i32`, `i64` and `u32`, and the
 // blanket `TryFromU64` impl for every `ActiveEnum` returns `DbErr::ConvertFromU64`
 // — which is why an active-enum primary key has to declare `auto_increment = false`
@@ -153,27 +153,32 @@ fn active_enum_value_limits() {
 
 /// Probes the `u32` branch of `try_get_vec_by`, which cannot be constructed
 /// without a real `QueryResult`.
+#[derive(Debug)]
 struct U32VecProbe;
 
 impl FromQueryResult for U32VecProbe {
     fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
-        let _ = <u32 as ActiveEnumValue>::try_get_vec_by(res, "ids");
+        <u32 as ActiveEnumValue>::try_get_vec_by(res, "ids")?;
         Ok(Self)
     }
 }
 
-// [spec:pgorm:req:entity.traits.active-enum.limits/test]    reading an array of
+// [spec:pgorm:req:entity.traits.active-enum.limits+1/test]    reading an array of
 // enum values is a Postgres-only capability, and `u32` is not covered by
-// `postgres-array`, so `try_get_vec_by` panics rather than decoding
+// `postgres-array`, so `try_get_vec_by` errors rather than decoding
 #[pgorm_macros::test]
-#[should_panic(expected = "Not supported by `postgres-array`")]
-fn active_enum_u32_vec_read_panics() {
-    let ctx = TestContext::new("active_enum_u32_vec_read_panics").await;
+fn active_enum_u32_vec_read_errors() {
+    let ctx = TestContext::new("active_enum_u32_vec_read_errors").await;
     let db = ctx.db.get().await.unwrap();
 
-    let _ = U32VecProbe::find_by_statement(r#"SELECT ARRAY[1, 2] AS "ids""#, vec![])
+    let err = U32VecProbe::find_by_statement(r#"SELECT ARRAY[1, 2] AS "ids""#, vec![])
         .one(&db)
-        .await;
+        .await
+        .expect_err("a `u32` enum array cannot be decoded");
+    assert!(
+        matches!(err, DbErr::Type(ref msg) if msg.contains("postgres-array")),
+        "expected a postgres-array type error, got {err:?}"
+    );
 
     drop(db);
     ctx.delete().await;

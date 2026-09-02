@@ -1588,6 +1588,13 @@ children (
                         kind @note
                         text "Audit free-win list: src/entity/active_enum.rs:166/:184 panic inside fns already returning Result<_, TryGetError> — return Err (zero API break); pgorm-query/src/value.rs:768 Array try_from maps .unwrap() over element conversions INSIDE a Result fn, discarding the error — collect::<Result<_,_>>(); src/query/combine.rs:15 lone bare unwrap escaping the lint via macro — .expect for consistency; stale # Panics docs with no panic behind them (src/entity/active_model.rs:102, src/executor/update.rs:54 — the latter still claims a backend switch this fork deleted); pgorm-migration/src/util.rs:6 get_file_stem unwrap — make pub(crate) so it's a true internal invariant; migrator.rs:244 SystemTime expect inside Result fn -> DbErr. Schema::create_enum_from_active_enum (src/schema/entity.rs:105) panics on non-enum db_type — input the crate's OWN doc example constructs (active_enum.rs:76-79); return Result (rule schema.from-entity.enum bumps). Pool's 8 poison unwraps deliberately SKIPPED: verbatim upstream deadpool, currently unreachable — divergence cost outweighs defence-in-depth."
                     }
+
+                    {
+                        at 2026-09-02T16:36:41.268568Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

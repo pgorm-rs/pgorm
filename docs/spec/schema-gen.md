@@ -52,11 +52,14 @@ executes SQL.
 
 ## Postgres enum types
 
-> [spec:pgorm:sem:schema.from-entity.enum]
+> [spec:pgorm:sem:schema.from-entity.enum+1]
 > `Schema::create_enum_from_entity::<E>()` scans `E::Column` and returns one
 > `TypeCreateStatement` (`CREATE TYPE {name} AS ENUM ({variants})`) per column
-> whose type is `ColumnType::Enum`, preserving declared variant order.
+> whose type is `ColumnType::Enum`, preserving declared variant order; a column
+> of any other type contributes no statement, so this form cannot fail.
 > `Schema::create_enum_from_active_enum::<A>()` builds the same statement from
-> `A::db_type()` for a single `ActiveEnum`, and panics if the resolved column
-> type is not `ColumnType::Enum`. Emitting duplicates is the caller's problem:
-> two columns sharing one enum type yield two identical statements.
+> `A::db_type()` for a single `ActiveEnum`, and returns `DbErr::Type` naming the
+> enum if the resolved column type is not `ColumnType::Enum` — an `ActiveEnum`
+> backed by a plain column type has no database enum to create. Emitting
+> duplicates is the caller's problem: two columns sharing one enum type yield
+> two identical statements.

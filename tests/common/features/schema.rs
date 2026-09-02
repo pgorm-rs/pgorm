@@ -26,7 +26,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
         assert_eq!(
             enum_create_stmt.to_string(QueryBuilder),
             schema
-                .create_enum_from_active_enum::<Tea>()
+                .create_enum_from_active_enum::<Tea>()?
                 .to_string(QueryBuilder)
         );
         vec![enum_create_stmt]

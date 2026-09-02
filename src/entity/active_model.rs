@@ -99,10 +99,6 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Get the primary key of the ActiveModel
-    ///
-    /// # Panics
-    ///
-    /// Panics if arity of primary key exceed maximum arity of [ValueTuple]
     #[allow(clippy::question_mark)]
     fn get_primary_key_value(&self) -> Option<ValueTuple> {
         let mut cols = <Self::Entity as EntityTrait>::PrimaryKey::iter();

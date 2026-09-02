@@ -744,6 +744,7 @@ mod tests {
         assert_eq!(
             schema
                 .create_enum_from_active_enum::<Tea>()
+                .expect("Tea resolves to ColumnType::Enum")
                 .to_string(QueryBuilder),
             r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
         );
