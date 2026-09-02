@@ -354,6 +354,13 @@ children (
                         kind @note
                         text "Found by verify.query: select_only() (or any statement whose projection list ends up empty) renders `SELECT  FROM \"cake\"` — syntactically invalid, fails only at execution. The rule text is accurate (\"clears the entire select list\") so no spec lie; this is an ergonomics fix. Options: panic at build time with a clear message (matches the builder's existing panic conventions, e.g. the mixing panic), or leave a documented footgun. Pinned in tests/query_build_tests.rs. Touches pgorm-query's builder; query.build.modifiers and possibly sql.render.select-order bump if behavior changes."
                     }
+
+                    {
+                        at 2026-09-02T12:01:28.508426Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision, superseding the earlier panic-at-build framing: NO PANIC — per [dec:pgorm:no-panic], an empty select list must surface as a typed error, not a panic. The rendering API (to_string/build) has no Result channel, so the guard belongs at the nearest fallible boundary: the ORM execution/build path returns DbErr::Query before anything is sent (and the QueryTrait::build surface, which is fallible-adjacent, per implementation judgment). pgorm-query's raw to_string stays documented as producing what it produces. Rejected: panic with a clear message (violates the no-panic ban); leave-as-is (invalid SQL failing server-side with an opaque error)."
+                    }
                 )
             }
         )
@@ -1026,6 +1033,13 @@ children (
                         kind @note
                         text "Found by verify.misc: the schema projection stores the entity comment (get_comment) and ColumnSpec::Comment as the rule describes, but the Postgres builder's column_comment is an empty function and the table comment is never emitted — no comment reaches the database. Options: emit COMMENT ON TABLE/COLUMN statements (schema-gen grows a second statement stream) or delete the carried data (delete-don't-deprecate). Pinned in tests/schema_gen_tests.rs; schema.from-entity bumps either way. Deps on infra.schema-index-qualify only for the shared file footprint (src/schema/entity.rs, schema_gen_tests.rs)."
                     }
+
+                    {
+                        at 2026-09-02T12:01:43.656215Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: render. Schema generation emits COMMENT ON TABLE / COMMENT ON COLUMN statements so the existing #[pgorm(comment = ...)] attribute surface becomes real instead of silently discarded. schema.from-entity bumps; the verify.misc tests that assert comments never reach SQL flip to asserting they do. Rejected: dropping the carried data (would cascade into the derive macros and delete a genuinely useful PG feature)."
+                    }
                 )
             }
         )
@@ -1141,6 +1155,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by verify.misc and verify.exec: DbErr::UpdateGetPrimaryKey is unreachable (Update::one's prepare_filters panics \"PrimaryKey is not set\" before find_updated_model_by_id could report it); DbErr::Conn and DbErr::Exec plus the conn_err/exec_err/json_err helpers have no production call sites (#[allow(dead_code)]). Same shape as the removed ConnAcquireErr. Options per item: delete, or make reachable (e.g. prepare_filters returning Err(UpdateGetPrimaryKey) instead of panicking — an API improvement worth considering while there). error.model is at +1; this bumps it again. Pinned in tests/error_model_tests.rs and noted in tests/returning_tests.rs."
+                    }
+
+                    {
+                        at 2026-09-02T12:01:36.634929Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: wire UpdateGetPrimaryKey — Update::one's prepare_filters returns Err(DbErr::UpdateGetPrimaryKey) instead of panicking \"PrimaryKey is not set\" (first application of [dec:pgorm:no-panic]: a caller's unset PK is a caller mistake, so it comes back as a value). The plainly dead surface — DbErr::Conn, DbErr::Exec, conn_err, exec_err, json_err — is deleted. error.model and exec.crud.update bump accordingly."
                     }
                 )
             }
