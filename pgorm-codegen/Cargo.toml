@@ -18,6 +18,10 @@ path = "src/lib.rs"
 
 [dependencies]
 pgorm-query.workspace = true
+# libpg_query, the PostgreSQL server's own parser, is a plain dependency here:
+# pgorm-codegen is a build-time tool nothing links into a running application,
+# so the C build cost lands on people generating entities and on nobody else.
+pg_query = "6.2.0"
 syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "derive", "printing"] }
 quote = { version = "1", default-features = false }
 heck = { version = "0.4", default-features = false }

@@ -2147,12 +2147,20 @@ children (
                 id pgparse.codegen-ddl
                 title "Entities from schema.sql: bridge the PG parse tree into TableCreateStatement for codegen"
                 deps (pgparse.oracle nopanic.codegen-gate)
+                sealed true
                 log (
                     {
                         at 2026-09-02T14:49:29.4323Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Entities from a schema.sql with no live database: parse CREATE TABLE (and CREATE TYPE ... AS ENUM, CREATE INDEX, COMMENT ON) via pg_query, bridge the PG parse tree into pgorm-query's TableCreateStatement/TypeCreateStatement, and feed the existing EntityTransformer pipeline. Scope decision at start: the supported DDL subset (start with what the transformer consumes — columns, types, PK/unique/FK constraints, enums; reject the rest with named TransformErrors, never silently drop — the Turso COMPAT.md's \"silently ignored\" pattern is the anti-goal). Deps on nopanic.codegen-gate (build on the fallible transform surface, avoid churn collision in pgorm-codegen) and pgparse.oracle (plumbing). New spec rules under codegen.; the bridge is also reusable groundwork if migration diffing ever becomes a want."
+                    }
+
+                    {
+                        at 2026-09-02T21:15:51.896227Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

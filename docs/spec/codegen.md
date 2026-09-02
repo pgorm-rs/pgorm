@@ -5,7 +5,9 @@ files. The pipeline has two stages: `EntityTransformer::transform` converts a
 list of `TableCreateStatement`s into an in-memory `Entity` model, and
 `EntityWriter::generate` renders those entities into output files. Everything
 below describes what the code emits today; text-level shapes are pinned by the
-golden fixtures under `pgorm-codegen/tests/`.
+golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
+a live database reach the same pipeline through `sql_schema`, specified under
+[Schema from DDL text](#schema-from-ddl-text).
 
 > [spec:pgorm:def:codegen.entity]
 > The entity generator is the pipeline
@@ -483,3 +485,168 @@ golden fixtures under `pgorm-codegen/tests/`.
 > impl (self-referencing, conjunct-shadowed, or suffixed) additionally carry
 > `def = "Relation::<Variant>.def()"` — with `.def().rev()` for the
 > `Reverse` variants — so Seaography can resolve them without `Related`.
+
+## Schema from DDL text
+
+`pgorm_codegen::sql_schema` reads a `schema.sql` — DDL text, with no database to
+inspect — using libpg_query, the PostgreSQL server's own parser, and bridges the
+parse tree into the statements the transformer already consumes. `pg_query` is a
+plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
+build-time tool nothing links into a running application, so the cost of
+compiling the C parser falls on people generating entities and on nobody else.
+
+> [spec:pgorm:def:codegen.ddl]
+> `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
+> parses DDL text with `pg_query::parse` and returns one statement per
+> `CREATE TABLE`, in file order, with every other statement it read folded into
+> the table that statement describes.
+> `sql_schema::entities_from_sql(&str, EntityWriterOptions) -> Result<WriterOutput, Error>`
+> runs the whole pipeline: it builds the `EntityWriterContext` first — so an
+> unusable option is reported before the schema is read — then `parse_schema`,
+> `EntityTransformer::transform` and `EntityWriter::generate`.
+>
+> Both report failure as `Error::TransformError`, the channel the transform gate
+> already uses, and neither panics on any input: text the grammar rejects comes
+> back as ``TransformError("schema SQL did not parse: <parser message>")``,
+> carrying libpg_query's own message. The bridge validates only what it must to
+> build statements; whether the result can be generated at all stays the
+> transform gate's decision (`codegen.entity.transform`), so a column type
+> `pgorm-query` can spell but `codegen.entity.types.unsupported` cannot render
+> is refused there, by name, rather than here.
+>
+> The bridge is the inverse of the DDL builder: statements built with
+> `pgorm-query` and rendered through `SchemaStatementBuilder`
+> (`sql.ddl.create-table`, `sql.ddl.type-enum`) MUST, when parsed back, generate
+> the same entity files as the statements themselves. One documented asymmetry:
+> a column carrying `ColumnSpec::UniqueKey`, which `transform` discards on the
+> statement path (`codegen.entity.transform`) but which the bridge preserves as
+> the unique index Postgres creates for it (`codegen.ddl.tables`), so the
+> round trip yields a `unique` the statement path drops.
+
+> [spec:pgorm:req:codegen.ddl.unsupported]
+> The supported subset is what the entity model can hold: `CREATE TABLE` with
+> its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
+> constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
+> / `COMMENT ON COLUMN`. Everything else in the file MUST be reported — never
+> skipped, never quietly reinterpreted. A construct outside the subset is
+> ``TransformError("unsupported DDL: <what> at statement <n>")``; a construct
+> inside it that this schema cannot resolve is
+> ``TransformError("statement <n>: <problem>")``. `<n>` is the statement's
+> 1-based position in the text, and `<what>` names the construct the way its
+> author wrote it — `ALTER TABLE`, `CREATE TRIGGER`,
+> ``a PARTITION BY clause on table `t` ``,
+> ``a DEFAULT clause on column `t`.`c` `` — with `an unrecognised statement` as
+> the fallback for a statement kind the namer does not know.
+>
+> Named rejections MUST cover at least: every statement other than the four
+> above; `INHERITS`, `PARTITION BY`, `PARTITION OF`, `OF <type>`, `LIKE`, `WITH`
+> storage options, `TABLESPACE`, `USING <access method>`, `ON COMMIT`,
+> catalog-qualified table names and temporary or unlogged tables; column
+> `DEFAULT`, `CHECK`, `GENERATED`,
+> identity, `COLLATE`, `STORAGE` and `COMPRESSION` clauses; table-level `CHECK`
+> and `EXCLUDE` constraints, deferrable and `NO INHERIT` constraints, `INCLUDE`
+> columns, constraint index and storage options, and `MATCH` clauses;
+> `REFERENCES` without a referenced column list, which no catalog is present to
+> resolve; index `WHERE`, `INCLUDE`, `CONCURRENTLY`, `COLLATE`, operator
+> classes, `NULLS FIRST`/`NULLS LAST`, expression columns, tablespaces and
+> storage options; and `COMMENT ON` any object other than a table or a column.
+> Type spellings outside the vocabulary are named the same way
+> (`codegen.ddl.types`).
+>
+> Unresolved references are named as well: an index or comment naming a table
+> the file never creates, a column comment naming a column its table does not
+> have, and a table or enum type declared twice — both are keyed by name
+> downstream, so a duplicate would otherwise overwrite in silence.
+>
+> One construct is accepted without being carried, and only this one: a
+> non-unique `CREATE INDEX`. It states no fact the entity model holds —
+> `codegen.entity.transform` reads unique and primary-key indexes and nothing
+> else — and `pgorm-query` renders an index embedded in a `CREATE TABLE` as a
+> constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
+> rejects. Its table must still exist.
+
+> [spec:pgorm:sem:codegen.ddl.types]
+> Column types map back through the `ColumnType` → Postgres spelling contract of
+> `sql.ddl.column-types`, read over the names the grammar produces: keyword
+> spellings arrive qualified as `pg_catalog.<name>`, everything else bare, and
+> both forms are accepted. `bpchar` → `Char`, `varchar` → `String`,
+> `text` → `Text`, `int2`/`int4`/`int8` →
+> `SmallInteger`/`Integer`/`BigInteger`, `float4`/`float8` → `Float`/`Double`,
+> `numeric` → `Decimal`, `timestamptz` → `TimestampWithTimeZone`,
+> `time` → `Time`, `date` → `Date`, `interval` → `Interval(None, None)`,
+> `bool` → `Boolean`, `money` → `Money(None)`, `bytea` → `Blob`, `bit` → `Bit`,
+> `varbit` → `VarBit`, `json` → `Json`, `jsonb` → `JsonBinary`, `uuid` → `Uuid`,
+> `inet`/`cidr`/`macaddr`/`ltree` → `Inet`/`Cidr`/`MacAddr`/`LTree`,
+> `vector` → `Vector`. `serial`, `bigserial` and `smallserial` (and
+> `serial4`/`serial8`/`serial2`) are `Integer`/`BigInteger`/`SmallInteger` plus
+> the auto-increment fact the renderer spells as the serial family. A name the
+> file declared as an enum type resolves to `ColumnType::Enum` carrying that
+> type's values, and an unqualified name is looked up as an enum before the
+> table above. A type argument the vocabulary can hold is kept
+> (`varchar(255)`, `numeric(10, 2)`, `bit(8)`, `vector(3)`), a single-argument
+> `numeric(p)` reading as `Decimal(Some((p, 0)))` — its own meaning. An array
+> bound wraps the element type in `Array`; only one unsized `[]` is accepted.
+>
+> Where the spelling contract is many-to-one, the reverse takes the faithful
+> branch and the collapse is stated rather than hidden: `timestamp` reads as
+> `ColumnType::DateTime`, because Postgres' `timestamp` is `timestamp without
+> time zone` and the naive Rust type is its match, leaving `ColumnType::Timestamp`
+> with no reverse; `bytea` reads as `Blob`, `Binary` and `VarBinary` rendering
+> the same spelling with their lengths already discarded; `Unsigned`,
+> `BigUnsigned` and `TinyInteger` have no reverse either, their spellings
+> belonging to `Integer`, `BigInteger` and `SmallInteger`. `ColumnType::Custom`
+> is deliberately not produced: a type name outside the table above is an error,
+> not a `String` column that quietly means something else. `varbit` without a
+> length, a modifier the vocabulary cannot hold (`timestamp(3)`), a sized or
+> multi-dimensional array, and a non-integer type modifier are all named
+> rejections per `codegen.ddl.unsupported`.
+
+> [spec:pgorm:sem:codegen.ddl.tables]
+> A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
+> its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
+> a catalog-qualified `db.schema.table` names a cross-database reference
+> Postgres does not implement and `TableName` cannot hold, so it is a named
+> rejection rather than a name quietly shortened to its last two parts. The
+> statement also carries its `IF NOT EXISTS` flag and one `ColumnDef` per
+> column definition, in declaration order. Column constraints set the matching
+> `ColumnSpec` —
+> `NOT NULL`, `NULL`, `PRIMARY KEY` — and a column-level `REFERENCES` becomes a
+> foreign key on that one column. A column-level `UNIQUE` becomes a one-column
+> unique index on the table, which is both what Postgres creates for it and the
+> only form the entity model reads: `codegen.entity.transform` assigns `unique`
+> from the table's indexes and discards a `ColumnSpec::UniqueKey`, so setting
+> that spec instead would drop the fact. A primary-key column is `NOT NULL`
+> whether or not the DDL spells it, which is Postgres' own rule: the entity
+> model reads nullability off the column alone, so an unstated `NOT NULL` would
+> otherwise generate an `Option` primary key.
+>
+> Table-level `PRIMARY KEY` and `UNIQUE` constraints become the table's
+> primary-key and unique indexes, keeping the constraint name and
+> `NULLS NOT DISTINCT`; a table-level `FOREIGN KEY` becomes a foreign key with
+> its columns, referenced table and referenced columns, and both forms keep the
+> constraint name. Referential actions map `RESTRICT`, `CASCADE`, `SET NULL` and
+> `SET DEFAULT` onto `ForeignKeyAction`. `NO ACTION` reads as no action
+> declared: the grammar fills that same code in when a foreign key declares
+> nothing, the two are indistinguishable in the parse tree, and it is
+> Postgres' default — so the generated relation carries an `on_update` or
+> `on_delete` exactly where the schema chose something other than the default.
+
+> [spec:pgorm:sem:codegen.ddl.objects]
+> Statements are resolved against each other rather than in file order: a
+> `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
+> `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
+> its name and values to every column typed with it (`codegen.ddl.types`), which
+> is where `transform` discovers enums; an enum type no column names contributes
+> nothing and is returned as no statement of its own.
+>
+> A unique `CREATE INDEX` is folded into its table's indexes, keeping its name,
+> columns, `ASC`/`DESC` ordering, `NULLS NOT DISTINCT`, `IF NOT EXISTS` and
+> access method (`btree` is the default, `hash` → `IndexType::Hash`,
+> `gin` → `IndexType::FullText`, anything else `IndexType::Custom`);
+> `codegen.entity.transform` then reads a single-column unique index as that
+> column's `unique` flag. `COMMENT ON TABLE` becomes the statement's comment and
+> `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column; both accept a
+> schema-qualified target and both attach by table name, the same key the
+> transformer holds tables under. Neither comment reaches the generated
+> entities, which have no comment surface — they ride on the statements so a
+> caller reading `parse_schema`'s output still has them.
