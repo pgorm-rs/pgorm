@@ -1,8 +1,8 @@
 use super::*;
 use pretty_assertions::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.create-table/test]
-// [spec:pgorm:req:sql.ddl.column-def/test]
+// [spec:pgorm:req:sql.ddl.create-table+1/test]
+// [spec:pgorm:req:sql.ddl.column-def+1/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+1/test]
 fn create_1() {

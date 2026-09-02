@@ -1,7 +1,7 @@
 use crate::{expr::*, types::*};
 
 /// Specification of a table column
-// [spec:pgorm:req:sql.ddl.column-def]
+// [spec:pgorm:req:sql.ddl.column-def+1]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableRef>,

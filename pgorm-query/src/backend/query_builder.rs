@@ -1603,7 +1603,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.column-def]
+    // [spec:pgorm:req:sql.ddl.column-def+1]
     fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
     where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
@@ -1866,7 +1866,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table]
+    // [spec:pgorm:req:sql.ddl.create-table+1]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1958,12 +1958,58 @@ impl QueryBuilder {
                 self.prepare_generated_column(expr, *stored, sql)
             }
             ColumnSpec::Extra(string) => write!(sql, "{string}").unwrap(),
-            ColumnSpec::Comment(comment) => self.column_comment(comment, sql),
+            ColumnSpec::Comment(_) => {}
         }
     }
 
-    /// column comment
-    fn column_comment(&self, _comment: &str, _sql: &mut dyn SqlWriter) {}
+    /// Translate [`CommentStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.ddl.comment]
+    pub(crate) fn prepare_comment_statement(
+        &self,
+        statement: &CommentStatement,
+        sql: &mut dyn SqlWriter,
+    ) {
+        write!(sql, "COMMENT ON ").unwrap();
+        match &statement.target {
+            CommentTarget::Table(table) => {
+                write!(sql, "TABLE ").unwrap();
+                self.prepare_comment_table(table, sql);
+            }
+            CommentTarget::Column(table, column) => {
+                write!(sql, "COLUMN ").unwrap();
+                self.prepare_comment_table(table, sql);
+                write!(sql, ".").unwrap();
+                column.prepare(sql.as_writer(), self.quote());
+            }
+        }
+        write!(sql, " IS ").unwrap();
+        self.prepare_comment_text(&statement.comment, sql);
+    }
+
+    /// Translate [`CommentTable`] into SQL statement.
+    fn prepare_comment_table(&self, table: &CommentTable, sql: &mut dyn SqlWriter) {
+        match table {
+            CommentTable::Table(table) => table.prepare(sql.as_writer(), self.quote()),
+            CommentTable::SchemaTable(schema, table) => {
+                schema.prepare(sql.as_writer(), self.quote());
+                write!(sql, ".").unwrap();
+                table.prepare(sql.as_writer(), self.quote());
+            }
+            CommentTable::DatabaseSchemaTable(database, schema, table) => {
+                database.prepare(sql.as_writer(), self.quote());
+                write!(sql, ".").unwrap();
+                schema.prepare(sql.as_writer(), self.quote());
+                write!(sql, ".").unwrap();
+                table.prepare(sql.as_writer(), self.quote());
+            }
+        }
+    }
+
+    /// Write comment text as a standard-conforming string literal.
+    // [spec:pgorm:req:sql.ddl.comment]
+    fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
+        write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
+    }
 
     /// Translate [`TableOpt`] into SQL statement.
     fn prepare_table_opt(&self, create: &TableCreateStatement, sql: &mut dyn SqlWriter) {

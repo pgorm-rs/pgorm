@@ -2,7 +2,7 @@ use super::*;
 use pgorm_query::extension::{Extension, Type};
 use pretty_assertions::assert_eq;
 
-// [spec:pgorm:req:sql.ddl+1/test]    the whole DDL surface is reachable through the five
+// [spec:pgorm:req:sql.ddl+2/test]    the whole DDL surface is reachable through the six
 // entry-point helpers
 #[test]
 fn every_ddl_entry_point_is_reachable() {
@@ -103,9 +103,20 @@ fn every_ddl_entry_point_is_reachable() {
             .to_string(QueryBuilder)
             .starts_with("DROP EXTENSION")
     );
+
+    assert!(
+        Comment::on_table(Glyph::Table, "glyphs")
+            .to_string(QueryBuilder)
+            .starts_with("COMMENT ON TABLE")
+    );
+    assert!(
+        Comment::on_column(Glyph::Table, Glyph::Id, "the id")
+            .to_string(QueryBuilder)
+            .starts_with("COMMENT ON COLUMN")
+    );
 }
 
-// [spec:pgorm:req:sql.ddl+1/test]    table, index and foreign-key statements implement
+// [spec:pgorm:req:sql.ddl+2/test]    table, index, foreign-key and comment statements implement
 // `SchemaStatementBuilder`, whose `build` / `build_any` / `to_string` all delegate to the same
 // `prepare_*` method on the single Postgres `QueryBuilder`
 #[test]
@@ -157,9 +168,13 @@ fn schema_statement_builder_trio_agrees() {
         ForeignKey::drop().name("fk").table(Char::Table),
         r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#,
     );
+    assert_trio(
+        &Comment::on_table(Glyph::Table, "glyphs"),
+        r#"COMMENT ON TABLE "glyph" IS 'glyphs'"#,
+    );
 }
 
-// [spec:pgorm:req:sql.ddl+1/test]    `TableStatement` is an enum wrapper dispatching to the same
+// [spec:pgorm:req:sql.ddl+2/test]    `TableStatement` is an enum wrapper dispatching to the same
 // builders
 #[test]
 fn table_statement_wrapper_dispatches() {
@@ -240,7 +255,7 @@ fn table_statement_wrapper_dispatches() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+1/test]    identifiers render double-quoted, with embedded quotes doubled
+// [spec:pgorm:req:sql.ddl+2/test]    identifiers render double-quoted, with embedded quotes doubled
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(

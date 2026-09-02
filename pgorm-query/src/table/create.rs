@@ -49,7 +49,7 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table]
+// [spec:pgorm:req:sql.ddl.create-table+1]
 #[derive(Default, Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: Option<TableRef>,

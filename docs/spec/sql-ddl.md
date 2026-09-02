@@ -4,16 +4,18 @@ This section specifies the schema (DDL) statement builders in `pgorm-query`:
 table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
 `pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` and extension
-statements (`pgorm-query/src/extension.rs`), and the rendering contract
+statements (`pgorm-query/src/extension.rs`), `COMMENT ON` statements
+(`pgorm-query/src/comment.rs`), and the rendering contract
 implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including panics and leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+1]
+> [spec:pgorm:req:sql.ddl+2]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`truncate`), `Index` (`create`/`drop`),
-> `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`) and
-> `Extension` (`create`/`drop`). Table, index and foreign-key statements
+> `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
+> `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`). Table,
+> index, foreign-key and comment statements
 > implement `SchemaStatementBuilder` (`build`, `build_any`, `to_string`), all
 > of which delegate to the corresponding `prepare_*` method on the single
 > Postgres `QueryBuilder`; type and extension statements provide equivalent
@@ -28,7 +30,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table]
+> [spec:pgorm:req:sql.ddl.create-table+1]
 > `TableCreateStatement` composes a table name (`table()`, any
 > `IntoTableRef`), ordered `ColumnDef`s (`col()`, which stamps the table ref
 > onto each column), table-level indexes (`index()` and `primary_key()` — the
@@ -46,9 +48,11 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > options still render verbatim (`ENGINE=`, `COLLATE=`, `DEFAULT CHARSET=`) —
 > a leftover that produces invalid Postgres if used — followed by the `extra`
 > string (e.g. `USING columnar`). The table-level `comment` is stored and
-> exposed via `get_comment()` but is never rendered.
+> exposed via `get_comment()` but is not rendered here: on Postgres a table
+> comment is a statement of its own, built through
+> `[spec:pgorm:req:sql.ddl.comment]`.
 
-> [spec:pgorm:req:sql.ddl.column-def]
+> [spec:pgorm:req:sql.ddl.column-def+1]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr, stored }`,
@@ -64,10 +68,10 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > even though Postgres does not accept it), and `Extra` verbatim.
 > `AutoIncrement` produces no keyword; instead it replaces the type spelling
 > with the serial family — `SmallInteger`→`smallserial`, `Integer`→`serial`,
-> `BigInteger`→`bigserial`. `Comment` specs are skipped entirely
-> (`column_comment` is a no-op on Postgres). `IntoColumnDef` accepts both
-> `ColumnDef` and `&mut ColumnDef` (via `take()`), enabling the
-> builder-by-reference doctest style.
+> `BigInteger`→`bigserial`. `Comment` specs are skipped entirely — a column
+> comment is a statement of its own (`[spec:pgorm:req:sql.ddl.comment]`).
+> `IntoColumnDef` accepts both `ColumnDef` and `&mut ColumnDef` (via
+> `take()`), enabling the builder-by-reference doctest style.
 
 > [spec:pgorm:req:sql.ddl.column-types+1]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
@@ -116,6 +120,33 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > MUST render `ALTER TABLE <from> RENAME TO <to>`. `TableTruncateStatement`
 > MUST render `TRUNCATE TABLE <table>`; no `CASCADE`/`RESTART IDENTITY`
 > options are exposed.
+
+## Comments
+
+> [spec:pgorm:req:sql.ddl.comment]
+> A comment is a statement of its own on Postgres, not a clause of `CREATE
+> TABLE`, so `CommentStatement` is built separately from the DDL creating the
+> object it describes. `Comment::on_table(table, text)` and
+> `Comment::on_column(table, column, text)` are the only constructors and both
+> take target and text up front, so every `CommentStatement` denotes a
+> complete statement and no build path can fail or panic. The target table is
+> a `CommentTable` — `Table`, `SchemaTable` or `DatabaseSchemaTable`, i.e. the
+> subset of `TableRef` that names a table — reachable through
+> `IntoCommentTable` from an iden, a `(schema, table)` or a
+> `(database, schema, table)` tuple, or from a `TableRef` through `TryFrom`,
+> which drops a trailing alias and rejects the subquery, values-list and
+> function-call forms with `UnnamedTableRef` rather than panicking.
+>
+> Rendering MUST emit `COMMENT ON TABLE <table> IS '<text>'` or
+> `COMMENT ON COLUMN <table>.<column> IS '<text>'`, where the table, schema,
+> database and column names render through `Iden::prepare` (double-quoted,
+> embedded quotes doubled) and the text renders as a standard-conforming
+> string literal: wrapped in single quotes with every embedded single quote
+> doubled and nothing else altered — backslashes are literal, so no `E''`
+> prefix is used and the escaping of
+> `[spec:pgorm:req:sql.render.string-escape]` does not apply here. The text is
+> never a bind parameter (`SchemaStatementBuilder` yields SQL alone), so this
+> quoting is the whole injection boundary for comment text.
 
 ## Indexes
 

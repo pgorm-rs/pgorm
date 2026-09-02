@@ -139,6 +139,27 @@ mod widget_tag {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// A bare (unqualified) entity whose comments contain the one character the
+/// comment literal has to escape.
+mod quirk {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "quirk", comment = "it's a table")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(comment = "don't drop it")]
+        pub note: String,
+        pub plain: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// An `ActiveEnum` whose `db_type()` is not `ColumnType::Enum`.
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[pgorm(rs_type = "String", db_type = "String(StringLen::N(1))")]
@@ -182,7 +203,7 @@ fn flags(col: &ColumnDef) -> Flags {
     flags
 }
 
-// [spec:pgorm:sem:schema.from-entity/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
+// [spec:pgorm:sem:schema.from-entity+1/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
 #[test]
 fn create_table_from_entity_projects_columns() {
     let schema = Schema::new();
@@ -285,7 +306,7 @@ fn create_table_from_entity_projects_columns() {
     assert!(!widget::Relation::Factory.def().is_owner);
 }
 
-// [spec:pgorm:sem:schema.from-entity/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
+// [spec:pgorm:sem:schema.from-entity+1/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
 #[test]
 fn create_table_composite_key_emits_index() {
     let schema = Schema::new();
@@ -308,6 +329,58 @@ fn create_table_composite_key_emits_index() {
     assert!(
         rendered.contains("\"widget_id\", \"tag\""),
         "both key columns are in the table-level index: {rendered}"
+    );
+}
+
+// [spec:pgorm:sem:schema.from-entity+1/test]    the entity comment first, then the commented
+// columns in Column order, targeting entity.table_ref() with the text quoted
+#[test]
+fn create_comments_from_entity_emits_statements() {
+    let schema = Schema::new();
+
+    let rendered: Vec<String> = schema
+        .create_comments_from_entity(widget::Entity)
+        .iter()
+        .map(|stmt| stmt.to_string(QueryBuilder))
+        .collect();
+    assert_eq!(
+        rendered,
+        vec![
+            r#"COMMENT ON TABLE "public"."widget" IS 'one row per widget'"#.to_owned(),
+            r#"COMMENT ON COLUMN "public"."widget"."origin" IS 'supplier of record'"#.to_owned(),
+        ],
+        "comments target the same qualified name the table projection uses"
+    );
+
+    // The text still rides on the create statement, where it stays inert.
+    let table = schema.create_table_from_entity(widget::Entity);
+    assert_eq!(
+        table.get_comment().map(String::as_str),
+        Some("one row per widget")
+    );
+    let create = table.to_string(QueryBuilder);
+    assert!(!create.contains("one row per widget"), "{create}");
+    assert!(!create.contains("supplier of record"), "{create}");
+
+    // An entity with no schema stays unqualified, and a quote in the text is doubled.
+    let rendered: Vec<String> = schema
+        .create_comments_from_entity(quirk::Entity)
+        .iter()
+        .map(|stmt| stmt.to_string(QueryBuilder))
+        .collect();
+    assert_eq!(
+        rendered,
+        vec![
+            r#"COMMENT ON TABLE "quirk" IS 'it''s a table'"#.to_owned(),
+            r#"COMMENT ON COLUMN "quirk"."note" IS 'don''t drop it'"#.to_owned(),
+        ]
+    );
+
+    assert!(
+        schema
+            .create_comments_from_entity(factory::Entity)
+            .is_empty(),
+        "an entity that declares no comment produces no statements"
     );
 }
 
@@ -420,7 +493,7 @@ fn create_enum_from_active_enum_panics_non_enum() {
     let _ = Schema::new().create_enum_from_active_enum::<Size>();
 }
 
-// [spec:pgorm:sem:schema.from-entity/test]    the projected DDL is accepted by Postgres and enforces what it declares
+// [spec:pgorm:sem:schema.from-entity+1/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
 // [spec:pgorm:sem:schema.from-entity.enum/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
@@ -463,6 +536,22 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
     assert!(
         indexes.contains(&"idx-widget-batch".to_owned()),
         "the generated index is on the schema-qualified table: {indexes:?}"
+    );
+
+    for comment in schema.create_comments_from_entity(widget::Entity) {
+        db.execute(&comment.build(QueryBuilder), &[]).await?;
+    }
+    let table_comment: Option<String> = db
+        .query_one(
+            "SELECT obj_description('public.widget'::regclass, 'pg_class')",
+            &[],
+        )
+        .await?
+        .get(0);
+    assert_eq!(
+        table_comment.as_deref(),
+        Some("one row per widget"),
+        "the qualified comment target resolves to the same table"
     );
 
     let factory = factory::ActiveModel {
@@ -541,6 +630,53 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         composite.sql_err(),
         Some(pgorm::SqlErr::UniqueConstraintViolation(_))
     ));
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:schema.from-entity+1/test]    the comment statements execute, and only they
+// attach anything: the text arrives in pg_description exactly as declared
+#[pgorm_macros::test]
+async fn entity_comments_land_in_pg_description() -> Result<(), DbErr> {
+    const TABLE_COMMENT: &str = "SELECT obj_description('quirk'::regclass, 'pg_class')";
+    const COLUMN_COMMENT: &str = "SELECT col_description('quirk'::regclass, attnum) \
+         FROM pg_attribute WHERE attrelid = 'quirk'::regclass AND attname = 'note'";
+
+    let ctx = TestContext::new("schema_gen_comments_schemagen").await;
+    let db = ctx.db.get().await?;
+    let schema = Schema::new();
+
+    db.execute(
+        &schema
+            .create_table_from_entity(quirk::Entity)
+            .build(QueryBuilder),
+        &[],
+    )
+    .await?;
+
+    let after_create: Option<String> = db.query_one(TABLE_COMMENT, &[]).await?.get(0);
+    assert_eq!(
+        after_create, None,
+        "creating the table attaches no comment on its own"
+    );
+    let after_create: Option<String> = db.query_one(COLUMN_COMMENT, &[]).await?.get(0);
+    assert_eq!(after_create, None);
+
+    for comment in schema.create_comments_from_entity(quirk::Entity) {
+        db.execute(&comment.build(QueryBuilder), &[]).await?;
+    }
+
+    let table_comment: Option<String> = db.query_one(TABLE_COMMENT, &[]).await?.get(0);
+    assert_eq!(
+        table_comment.as_deref(),
+        Some("it's a table"),
+        "the doubled quote round-trips as one quote"
+    );
+    let column_comment: Option<String> = db.query_one(COLUMN_COMMENT, &[]).await?.get(0);
+    assert_eq!(column_comment.as_deref(), Some("don't drop it"));
 
     drop(db);
     ctx.delete().await;

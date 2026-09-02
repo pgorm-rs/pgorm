@@ -1061,6 +1061,13 @@ children (
                         kind @decision
                         text "Operator decision: render. Schema generation emits COMMENT ON TABLE / COMMENT ON COLUMN statements so the existing #[pgorm(comment = ...)] attribute surface becomes real instead of silently discarded. schema.from-entity bumps; the verify.misc tests that assert comments never reach SQL flip to asserting they do. Rejected: dropping the carried data (would cascade into the derive macros and delete a genuinely useful PG feature)."
                     }
+
+                    {
+                        at 2026-09-02T12:38:16.477006Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

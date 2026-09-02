@@ -3,7 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Iden, Index, IndexCreateStatement, SeaRc, TableCreateStatement,
+    ColumnDef, Comment, CommentStatement, CommentTable, Iden, Index, IndexCreateStatement, SeaRc,
+    TableCreateStatement,
     extension::{Type, TypeCreateStatement},
 };
 
@@ -39,6 +40,62 @@ impl Schema {
         E: EntityTrait,
     {
         create_index_from_entity(entity)
+    }
+
+    /// Creates the comments from an Entity, returning an empty Vec if neither the
+    /// entity nor any of its columns declares one. A comment is a statement of its
+    /// own in Postgres, so these are executed alongside — not as part of — the
+    /// statement from [`Schema::create_table_from_entity`].
+    /// See [CommentStatement] for more details.
+    ///
+    /// ```
+    /// use crate::pgorm::IdenStatic;
+    /// use pgorm::{
+    ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, EntityName, EntityTrait,
+    ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
+    /// };
+    /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
+    /// use pgorm_query::QueryBuilder;
+    ///
+    /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    /// #[pgorm(table_name = "posts", comment = "one row per post")]
+    /// pub struct Model {
+    ///     #[pgorm(primary_key)]
+    ///     pub id: i32,
+    ///     #[pgorm(comment = "the author's title")]
+    ///     pub title: String,
+    /// }
+    ///
+    /// #[derive(Copy, Clone, Debug, EnumIter)]
+    /// pub enum Relation {}
+    ///
+    /// impl RelationTrait for Relation {
+    ///     fn def(&self) -> RelationDef {
+    ///         panic!("No RelationDef")
+    ///     }
+    /// }
+    /// impl ActiveModelBehavior for ActiveModel {}
+    ///
+    /// let schema = Schema::new();
+    /// let comments: Vec<String> = schema
+    ///     .create_comments_from_entity(Entity)
+    ///     .iter()
+    ///     .map(|stmt| stmt.to_string(QueryBuilder))
+    ///     .collect();
+    ///
+    /// assert_eq!(
+    ///     comments,
+    ///     [
+    ///         r#"COMMENT ON TABLE "posts" IS 'one row per post'"#,
+    ///         r#"COMMENT ON COLUMN "posts"."title" IS 'the author''s title'"#,
+    ///     ]
+    /// );
+    /// ```
+    pub fn create_comments_from_entity<E>(&self, entity: E) -> Vec<CommentStatement>
+    where
+        E: EntityTrait,
+    {
+        create_comments_from_entity(entity)
     }
 
     /// Creates a column definition for example to update a table.
@@ -147,7 +204,28 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity]
+// [spec:pgorm:sem:schema.from-entity+1]    the comment statements, one stream per entity
+pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
+where
+    E: EntityTrait,
+{
+    let Ok(table) = CommentTable::try_from(entity.table_ref()) else {
+        return Vec::new();
+    };
+
+    let mut vec = Vec::new();
+    if let Some(comment) = entity.comment() {
+        vec.push(Comment::on_table(table.clone(), comment));
+    }
+    for column in E::Column::iter() {
+        if let Some(comment) = column.def().comment {
+            vec.push(Comment::on_column(table.clone(), column, comment));
+        }
+    }
+    vec
+}
+
+// [spec:pgorm:sem:schema.from-entity+1]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -182,7 +260,7 @@ where
     stmt.table(entity.table_ref()).take()
 }
 
-// [spec:pgorm:sem:schema.from-entity]    column + primary-key projection
+// [spec:pgorm:sem:schema.from-entity+1]    column + primary-key projection
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
