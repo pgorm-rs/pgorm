@@ -48,9 +48,10 @@ including known limitations.
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
 > a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key]`).
 
-> [spec:pgorm:req:macros.derive.entity-model.reject]
+> [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier
-> makes the proc macro panic with "Struct name must be Model", failing compilation. The
+> is the compile error "DeriveEntityModel requires the struct to be named `Model`",
+> spanned at the offending identifier rather than raised as a macro panic. The
 > entity MUST have at least one `#[pgorm(primary_key)]` field: with none, the generated
 > `PrimaryKey` enum is empty and `DerivePrimaryKey` emits the compile error "Entity must
 > have a primary key column. See <https://github.com/pgorm-rs/pgorm/issues/485> for
@@ -74,12 +75,21 @@ including known limitations.
 > silently skipped (their value expression is parsed only to advance the stream), so
 > typos in attribute names are not diagnosed.
 
-> [spec:pgorm:sem:macros.derive.entity-model.casing]
+> [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 > Column-variant naming: the field identifier is stripped of a leading `r#`, converted
 > to UpperCamelCase, and then keyword-escaped — any of the 49 reserved Rust keywords
 > becomes a raw identifier (`r#type`), while `crate`/`Self`/`self` get a trailing
 > underscore. An `enum_name` attribute replaces the computed variant name entirely (and
 > is itself keyword-escaped).
+>
+> Case conversion drops characters that are neither alphanumeric nor word boundaries, so
+> the derived name can fail to spell an identifier: the legal field names `__` and `_1`
+> derive `""` and `"1"`. Each MUST be a compile error naming the field and the derived
+> spelling, spanned at the field identifier, rather than a panic inside `Ident::new`.
+> Validity is judged on the keyword-escaped spelling, so `SELF` — which derives `Self`
+> and escapes to `Self_` — stays legal. An `enum_name` literal that does not spell an
+> identifier is likewise a compile error, spanned at the literal. The same rules govern
+> the variant names `DeriveModel` and `DeriveActiveModel` compute.
 >
 > The SQL column name is attached as `#[pgorm(column_name = "...")]` on the generated
 > variant only when needed: an explicit `column_name` always wins; with `rename_all`,
@@ -89,26 +99,40 @@ including known limitations.
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def+1]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+2]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
-> parsed `column_type` attribute if present; otherwise it is inferred by string-matching
-> the field's Rust type name: `char`→`Char(None)`, `String`/`&str`→`string(None)`,
+> parsed `column_type` attribute if present; otherwise it is inferred by matching the
+> field's Rust type structurally — against the `syn::Type`, never against a
+> whitespace-stripped rendering of it: `char`→`Char(None)`,
+> `String`/`&str`→`string(None)`,
 > `i8`→`TinyInteger`, `i16`→`SmallInteger`, `i32`→`Integer`,
 > `i64`→`BigInteger`, `u32`→`Unsigned`, `u64`→`BigUnsigned`,
 > `f32`→`Float`, `f64`→`Double`, `bool`→`Boolean`,
 > `Date`/`NaiveDate`→`Date`, `Time`/`NaiveTime`→`Time`, `DateTime`/`NaiveDateTime`→
 > `DateTime`, `DateTimeUtc`/`DateTimeLocal`/`DateTimeWithTimeZone`→
 > `TimestampWithTimeZone`, `Uuid`→`Uuid`, `Json`→`Json`, `Decimal`→`Decimal(None)`,
-> `Vec<u8>`→`VarBinary(StringLen::None)`. Any other type is assumed to be an
+> `Vec<u8>`→`VarBinary(StringLen::None)`. A named row matches only a bare,
+> single-segment path carrying no generic arguments, so a qualified spelling
+> (`std::string::String`) is not in the table; `&str` matches only a shared reference
+> with neither lifetime nor `mut`, and `Vec<u8>` only that exact one-argument spelling.
+> Any other type is assumed to be an
 > `ActiveEnum`-style value and resolves at compile time via
-> `<T as ValueType>::column_type()`. `u8` and `u16` are deliberately absent from
+> `<T as ValueType>::column_type()`, reproducing the type exactly as written: a
+> lifetime, `dyn`, or `impl` inside it MUST NOT fuse with the token beside it
+> (`&'a str` becoming `&'astr`), and the fallback MUST NOT be able to fail to re-parse.
+> `u8` and `u16` are deliberately absent from
 > the table: they fall through to that `ValueType` path and, since neither
 > implements `ValueType` (see `[spec:pgorm:def:sql.value.conversions+1]`), a `u8`
 > or `u16` field is a compile error rather than a column type that panics when
-> bound. An `Option<T>` wrapper (detected by string prefix
-> on the printed type) is unwrapped to `T` and forces `nullable`. Modifier calls are
+> bound. An `Option<T>` wrapper — a bare, single-segment `Option` with exactly one type
+> argument — is unwrapped one level to `T` and forces `nullable`. Modifier calls are
 > then chained in order: `.nullable()`, `.indexed()`, `.unique()`,
 > `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`).
+>
+> The parallel `ArrayType` table that `DeriveValueType` reads
+> (`[spec:pgorm:sem:macros.derive.value-type+1]`) is matched the same way and carries the
+> same rows mapped to their `ArrayType` counterparts, except `Vec<u8>`, which it does not
+> carry at all.
 
 > [spec:pgorm:sem:macros.derive.entity-model.primary-key]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
@@ -151,7 +175,7 @@ including known limitations.
 > impls. `FromQueryResult`: each field is read with
 > `row.try_get(pre, Column::<Variant>.as_str())`, where the variant name follows the
 > same trim/UpperCamelCase/keyword-escape/`enum_name` rules as
-> `[spec:pgorm:sem:macros.derive.entity-model.casing]`; `#[pgorm(ignore)]` fields are
+> `[spec:pgorm:sem:macros.derive.entity-model.casing+1]`; `#[pgorm(ignore)]` fields are
 > filled with `Default::default()` instead. `ModelTrait`: `get` clones the field and
 > converts it `.into()` a `Value`, `set` assigns `v.unwrap()`; ignored fields have no
 > match arm, so `get`/`set` on them panics with "field does not exist on {Model}". The
@@ -272,22 +296,24 @@ including known limitations.
 > type and array type are `Json`); `Nullable` returning `Value::Json(None)`; and the
 > `NotU8` marker.
 
-> [spec:pgorm:sem:macros.derive.value-type]
+> [spec:pgorm:sem:macros.derive.value-type+1]
 > `DeriveValueType` targets newtype tuple structs; it reads only the first unnamed
-> field, and non-tuple-struct input aborts expansion by panicking (via `expect`, not a
-> spanned compile error). Optional attributes `column_type = "..."` and
+> field. Any other input shape is a compile error spanned at the struct identifier —
+> "DeriveValueType can only be derived on a tuple struct", or "DeriveValueType requires
+> the tuple struct to hold a value field" for an empty one — not a macro panic. Optional
+> attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
-> use the same Rust-type-name tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+1]`, falling back to
-> `<T as ValueType>::column_type()`/`array_type()`. The expansion implements
+> use the same Rust-type tables (and `Option<T>` unwrapping) as
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+2]`, falling back to
+> `<T as ValueType>::column_type()`/`array_type()`. Attribute errors propagate: a
+> non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a
+> spanned compile error rather than being silently ignored. The expansion implements
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to
 > the inner type with `type_name()` = the struct name; no `Nullable` impl is generated.
-> Limitation: attribute parse errors, including unknown keys, are swallowed by an
-> `unwrap_or(())`, so invalid attributes are silently ignored.
 
 ## Iden derives and query helpers
 
-> [spec:pgorm:sem:macros.derive.iden]
+> [spec:pgorm:sem:macros.derive.iden+1]
 > `DeriveIden` (in `pgorm-macros`) supports enums and unit structs; anything else is
 > the compile error "you can only derive DeriveIden on unit struct or enum", and an
 > empty enum expands to nothing. A unit struct renders the snake_case of its type name,
@@ -297,8 +323,8 @@ including known limitations.
 > string. The `Iden::prepare` override (which wraps the name in quote characters) is
 > emitted only when every rendered name is a "valid iden" (first char `_` or ASCII
 > alphabetic, rest `_` or ASCII alphanumeric); otherwise the trait default handles
-> quoting. Limitation: a malformed variant-level attribute panics the macro through
-> `.expect("something something")` instead of producing a spanned error.
+> quoting. A malformed variant-level attribute is the parser's own spanned compile
+> error, propagated out of the derive rather than panicking the macro.
 
 > [spec:pgorm:sem:macros.derive.iden.query]
 > `pgorm-query-derive` defines `Iden` and `IdenStatic` derives over enums and unit

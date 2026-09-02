@@ -1,0 +1,5 @@
+error: field `__` derives the identifier "", which is not a valid Rust identifier
+  --> tests/compile-fail/entity_model_empty_derived_name.rs:10:9
+   |
+10 |     pub __: i32,
+   |         ^^

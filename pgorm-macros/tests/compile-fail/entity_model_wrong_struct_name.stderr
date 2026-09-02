@@ -1,7 +1,5 @@
-error: proc-macro derive panicked
- --> tests/compile-fail/entity_model_wrong_struct_name.rs:4:35
+error: DeriveEntityModel requires the struct to be named `Model`
+ --> tests/compile-fail/entity_model_wrong_struct_name.rs:6:12
   |
-4 | #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-  |                                   ^^^^^^^^^^^^^^^^^
-  |
-  = help: message: Struct name must be Model
+6 | pub struct Cake {
+  |            ^^^^

@@ -380,7 +380,7 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+1/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
@@ -417,7 +417,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+1/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.
@@ -431,7 +431,7 @@ fn an_explicit_column_type_overrides_the_inferred_one() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.casing/test]
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1/test]
 #[test]
 fn column_variant_names_follow_the_casing_rules() {
     // Raw identifier trimmed, then UpperCamelCase.
@@ -443,7 +443,7 @@ fn column_variant_names_follow_the_casing_rules() {
     assert_eq!(casing::Column::Wholly.to_string(), "wholly");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.casing/test]    when the SQL name is pinned
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1/test]    when the SQL name is pinned
 #[test]
 fn sql_column_names_are_pinned_only_when_needed() {
     // Clean snake_case: no attribute, the name falls out of `DeriveColumn`.

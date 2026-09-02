@@ -61,7 +61,7 @@ impl Iden for EmptyIden {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.iden/test]    unit structs, enums, `Table`, and the `iden` override
+// [spec:pgorm:sem:macros.derive.iden+1/test]    unit structs, enums, `Table`, and the `iden` override
 #[test]
 fn main() -> Result<(), DbErr> {
     assert_eq!(ClassName::Table.to_string(), "class_name");
@@ -81,7 +81,7 @@ fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:macros.derive.iden/test]    `prepare` is emitted only for statically-valid idens
+// [spec:pgorm:sem:macros.derive.iden+1/test]    `prepare` is emitted only for statically-valid idens
 #[test]
 fn prepare_override_is_conditional() {
     // Emitted: the name is written between the quote pair verbatim.
@@ -105,7 +105,7 @@ fn prepare_override_is_conditional() {
     assert_eq!(s, "`id`");
 }
 
-// [spec:pgorm:sem:macros.derive.iden/test]    an empty enum expands to nothing
+// [spec:pgorm:sem:macros.derive.iden+1/test]    an empty enum expands to nothing
 #[test]
 fn empty_enum_expands_to_nothing() {
     fn assert_iden<T: Iden>() {}

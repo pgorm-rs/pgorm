@@ -135,7 +135,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// # impl ActiveModelBehavior for ActiveModel {}
 /// ```
 // [spec:pgorm:sem:macros.derive.entity-model]
-// [spec:pgorm:req:macros.derive.entity-model.reject]
+// [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveEntityModel, attributes(pgorm))]
 pub fn derive_entity_model(input: TokenStream) -> TokenStream {
@@ -145,7 +145,12 @@ pub fn derive_entity_model(input: TokenStream) -> TokenStream {
     } = parse_macro_input!(input as DeriveInput);
 
     if ident != "Model" {
-        panic!("Struct name must be Model");
+        return Error::new(
+            ident.span(),
+            "DeriveEntityModel requires the struct to be named `Model`",
+        )
+        .into_compile_error()
+        .into();
     }
 
     let mut ts: TokenStream = derives::expand_derive_entity_model(data, attrs)

@@ -12,6 +12,7 @@ use syn::token::Comma;
 use syn::Meta;
 
 use self::util::GetAsKVMeta;
+use super::util::parse_derived_ident;
 
 #[derive(Debug)]
 enum Error {
@@ -24,15 +25,18 @@ enum Error {
 #[derive(Debug, PartialEq, Eq)]
 enum ColumnAs {
     /// column in the model
-    Col(syn::Ident),
+    Col { entity: syn::Type, col: syn::Ident },
     /// alias from a column in model
-    ColAlias { col: syn::Ident, field: String },
+    ColAlias {
+        entity: syn::Type,
+        col: syn::Ident,
+        field: String,
+    },
     /// from an expr
     Expr { expr: syn::Expr, field_name: String },
 }
 
 struct DerivePartialModel {
-    entity: Option<syn::Type>,
     ident: syn::Ident,
     fields: Vec<ColumnAs>,
 }
@@ -75,6 +79,7 @@ impl DerivePartialModel {
 
         for field in fields {
             let field_span = field.span();
+            let field_name = field.ident.ok_or(Error::InputNotStruct)?;
 
             let mut from_col = None;
             let mut from_expr = None;
@@ -89,7 +94,11 @@ impl DerivePartialModel {
                     for meta in list.iter() {
                         from_col = meta
                             .get_as_kv("from_col")
-                            .map(|s| format_ident!("{}", s.to_upper_camel_case()));
+                            .map(|s| {
+                                parse_derived_ident(&s.to_upper_camel_case(), &field_name)
+                                    .map_err(Error::Syn)
+                            })
+                            .transpose()?;
                         from_expr = meta
                             .get_as_kv("from_expr")
                             .map(|s| syn::parse_str::<Expr>(&s).map_err(Error::Syn))
@@ -98,37 +107,30 @@ impl DerivePartialModel {
                 }
             }
 
-            let field_name = field.ident.unwrap();
-
             let col_as = match (from_col, from_expr) {
-                (None, None) => {
-                    if entity.is_none() {
-                        return Err(Error::EntityNotSpecific);
-                    }
-                    ColumnAs::Col(format_ident!(
-                        "{}",
-                        field_name.to_string().to_upper_camel_case()
-                    ))
-                }
+                (None, None) => ColumnAs::Col {
+                    entity: entity.clone().ok_or(Error::EntityNotSpecific)?,
+                    col: parse_derived_ident(
+                        &field_name.to_string().to_upper_camel_case(),
+                        &field_name,
+                    )
+                    .map_err(Error::Syn)?,
+                },
                 (None, Some(expr)) => ColumnAs::Expr {
                     expr,
                     field_name: field_name.to_string(),
                 },
-                (Some(col), None) => {
-                    if entity.is_none() {
-                        return Err(Error::EntityNotSpecific);
-                    }
-
-                    let field = field_name.to_string();
-                    ColumnAs::ColAlias { col, field }
-                }
+                (Some(col), None) => ColumnAs::ColAlias {
+                    entity: entity.clone().ok_or(Error::EntityNotSpecific)?,
+                    col,
+                    field: field_name.to_string(),
+                },
                 (Some(_), Some(_)) => return Err(Error::BothFromColAndFromExpr(field_span)),
             };
             column_as_list.push(col_as);
         }
 
         Ok(Self {
-            entity,
             ident: input.ident,
             fields: column_as_list,
         })
@@ -140,19 +142,13 @@ impl DerivePartialModel {
 
     fn impl_partial_model_trait(&self) -> TokenStream {
         let select_ident = format_ident!("select");
-        let DerivePartialModel {
-            entity,
-            ident,
-            fields,
-        } = self;
+        let DerivePartialModel { ident, fields } = self;
         let select_col_code_gen = fields.iter().map(|col_as| match col_as {
-            ColumnAs::Col(ident) => {
-                let entity = entity.as_ref().unwrap();
+            ColumnAs::Col { entity, col: ident } => {
                 let col_value = quote!( <#entity as pgorm::EntityTrait>::Column:: #ident);
                 quote!(let #select_ident =  pgorm::SelectColumns::select_column(#select_ident, #col_value);)
             },
-            ColumnAs::ColAlias { col, field } => {
-                let entity = entity.as_ref().unwrap();
+            ColumnAs::ColAlias { entity, col, field } => {
                 let col_value = quote!( <#entity as pgorm::EntityTrait>::Column:: #col);
                 quote!(let #select_ident =  pgorm::SelectColumns::select_column_as(#select_ident, #col_value, #field);)
             },
@@ -255,16 +251,19 @@ struct PartialModel{
         let input = parse_str::<DeriveInput>(CODE_SNIPPET)?;
 
         let middle = DerivePartialModel::new(input).unwrap();
-        assert_eq!(middle.entity, Some(parse_str::<Type>("Entity").unwrap()));
         assert_eq!(middle.ident, format_ident!("PartialModel"));
         assert_eq!(middle.fields.len(), 3);
         assert_eq!(
             middle.fields[0],
-            ColumnAs::Col(format_ident!("DefaultField"))
+            ColumnAs::Col {
+                entity: parse_str::<Type>("Entity").unwrap(),
+                col: format_ident!("DefaultField")
+            }
         );
         assert_eq!(
             middle.fields[1],
             ColumnAs::ColAlias {
+                entity: parse_str::<Type>("Entity").unwrap(),
                 col: format_ident!("Bar"),
                 field: "alias_field".to_string()
             },

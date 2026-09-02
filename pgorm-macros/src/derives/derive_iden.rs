@@ -42,12 +42,12 @@ fn impl_iden_for_unit_struct(
 fn impl_iden_for_enum(
     ident: &proc_macro2::Ident,
     variants: Punctuated<Variant, syn::token::Comma>,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let variants = variants.iter();
     let mut all_valid = true;
 
     let match_pair: Vec<TokenStream> = variants
-        .map(|v| {
+        .map(|v| -> syn::Result<TokenStream> {
             let var_ident = &v.ident;
             let var_name = if var_ident == "Table" {
                 ident
@@ -72,11 +72,10 @@ fn impl_iden_for_enum(
                         }
                         Ok(())
                     })
-                })
-                .expect("something something");
-            quote! { Self::#var_ident => write!(s, "{}", #var_name).unwrap() }
+                })?;
+            Ok(quote! { Self::#var_ident => write!(s, "{}", #var_name).unwrap() })
         })
-        .collect();
+        .collect::<syn::Result<_>>()?;
 
     let match_arms: TokenStream = quote! { #(#match_pair),* };
 
@@ -92,7 +91,7 @@ fn impl_iden_for_enum(
         quote! {}
     };
 
-    quote! {
+    Ok(quote! {
         impl pgorm::pgorm_query::Iden for #ident {
             #prepare
 
@@ -102,10 +101,10 @@ fn impl_iden_for_enum(
                 };
             }
         }
-    }
+    })
 }
 
-// [spec:pgorm:sem:macros.derive.iden]
+// [spec:pgorm:sem:macros.derive.iden+1]
 pub fn expand_derive_iden(input: DeriveInput) -> syn::Result<TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
@@ -135,7 +134,7 @@ pub fn expand_derive_iden(input: DeriveInput) -> syn::Result<TokenStream> {
             if variants.is_empty() {
                 Ok(TokenStream::new())
             } else {
-                Ok(impl_iden_for_enum(&ident, variants))
+                impl_iden_for_enum(&ident, variants)
             }
         }
         syn::Data::Struct(DataStruct {

@@ -42,12 +42,11 @@ struct MyOptional(Option<i64>);
 #[pgorm(column_type = "Text", array_type = "String")]
 struct MyText(String);
 
-/// Attribute parse errors — including unknown keys — are swallowed by an
-/// `unwrap_or(())`, so this compiles and behaves exactly as if the attribute
-/// were absent.
+/// A `#[pgorm(...)]` key the derive does not read is a spanned compile error;
+/// see `tests/compile-fail/value_type_unknown_attribute.rs`. With no attribute
+/// at all the inference stands on its own.
 #[derive(DeriveValueType, Debug, PartialEq)]
-#[pgorm(no_such_key = "silently ignored")]
-struct MySwallowed(i32);
+struct MyPlain(i32);
 
 #[derive(Debug, Clone, PartialEq, Eq, pgorm::EnumIter, pgorm::DeriveActiveEnum)]
 #[pgorm(rs_type = "String", db_type = "String(StringLen::N(1))")]
@@ -61,7 +60,7 @@ enum Tea {
 #[derive(DeriveValueType, Debug, PartialEq)]
 struct MyTea(Tea);
 
-// [spec:pgorm:sem:macros.derive.value-type/test]    the inferred ColumnType / ArrayType
+// [spec:pgorm:sem:macros.derive.value-type+1/test]    the inferred ColumnType / ArrayType
 #[test]
 fn column_and_array_types_inferred_from_inner_type() {
     assert_eq!(MyString::column_type(), ColumnType::string(None));
@@ -83,19 +82,19 @@ fn column_and_array_types_inferred_from_inner_type() {
     assert_eq!(MyTea::array_type(), <Tea as ValueType>::array_type());
 }
 
-// [spec:pgorm:sem:macros.derive.value-type/test]    the attribute overrides
+// [spec:pgorm:sem:macros.derive.value-type+1/test]    the attribute overrides
 #[test]
 fn column_type_and_array_type_attributes_override() {
     // `String` would infer `string(None)` / `ArrayType::String`.
     assert_eq!(MyText::column_type(), ColumnType::Text);
     assert_eq!(MyText::array_type(), ArrayType::String);
 
-    // An unknown key is swallowed, leaving the inference untouched.
-    assert_eq!(MySwallowed::column_type(), ColumnType::Integer);
-    assert_eq!(MySwallowed::array_type(), ArrayType::Int);
+    // Without an override, the inference stands.
+    assert_eq!(MyPlain::column_type(), ColumnType::Integer);
+    assert_eq!(MyPlain::array_type(), ArrayType::Int);
 }
 
-// [spec:pgorm:sem:macros.derive.value-type/test]    From<T> for Value, ValueType, TryGetable
+// [spec:pgorm:sem:macros.derive.value-type+1/test]    From<T> for Value, ValueType, TryGetable
 #[test]
 fn the_three_generated_impls() {
     // `From<T> for Value` goes through `self.0`.

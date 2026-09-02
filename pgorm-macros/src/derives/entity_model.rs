@@ -1,17 +1,143 @@
 use super::case_style::{CaseStyle, CaseStyleHelpers};
-use super::util::{escape_rust_keyword, trim_starting_raw_identifier};
+use super::sql_type_match::unwrap_option;
+use super::util::{
+    column_variant_ident, escape_rust_keyword, parse_derived_ident, trim_starting_raw_identifier,
+};
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-    Attribute, Data, Expr, Fields, Lit, punctuated::Punctuated, spanned::Spanned, token::Comma,
+    Attribute, Data, Expr, Field, Fields, Lit, Type, punctuated::Punctuated, spanned::Spanned,
+    token::Comma,
 };
+
+/// The field-level `#[pgorm(...)]` configuration of one model field.
+#[derive(Default)]
+struct FieldAttrs {
+    sql_type: Option<TokenStream>,
+    column_name: Option<String>,
+    enum_name: Option<Ident>,
+    comment: Option<Lit>,
+    default_value: Option<Lit>,
+    default_expr: Option<TokenStream>,
+    select_as: Option<String>,
+    save_as: Option<String>,
+    is_primary_key: bool,
+    nullable: bool,
+    indexed: bool,
+    unique: bool,
+    ignore: bool,
+}
+
+/// `column_name` carries the name derived before any attribute is read, which an
+/// explicit `column_name` key overrides. `auto_increment` and `primary_key_types`
+/// are entity-wide and accumulate across every field.
+// [spec:pgorm:syn:macros.derive.entity-model.attrs]
+fn parse_field_attrs(
+    field: &Field,
+    column_name: Option<String>,
+    auto_increment: &mut bool,
+    primary_key_types: &mut Punctuated<Type, Comma>,
+) -> syn::Result<FieldAttrs> {
+    let mut parsed = FieldAttrs {
+        column_name,
+        ..Default::default()
+    };
+
+    // search for #[pgorm(primary_key, auto_increment = false, column_type = "String(Some(255))", default_value = "new user", default_expr = "gen_random_uuid()", column_name = "name", enum_name = "Name", nullable, indexed, unique)]
+    for attr in field.attrs.iter() {
+        if !attr.path().is_ident("pgorm") {
+            continue;
+        }
+
+        // single param
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("column_type") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    let ty: TokenStream = syn::parse_str(&litstr.value())?;
+                    parsed.sql_type = Some(ty);
+                } else {
+                    return Err(meta.error(format!("Invalid column_type {:?}", lit)));
+                }
+            } else if meta.path.is_ident("auto_increment") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Bool(litbool) = lit {
+                    *auto_increment = litbool.value();
+                } else {
+                    return Err(meta.error(format!("Invalid auto_increment = {:?}", lit)));
+                }
+            } else if meta.path.is_ident("comment") {
+                parsed.comment = Some(meta.value()?.parse::<Lit>()?);
+            } else if meta.path.is_ident("default_value") {
+                parsed.default_value = Some(meta.value()?.parse::<Lit>()?);
+            } else if meta.path.is_ident("default_expr") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    let value_expr: TokenStream = syn::parse_str(&litstr.value())?;
+                    parsed.default_expr = Some(value_expr);
+                } else {
+                    return Err(meta.error(format!("Invalid column_type {:?}", lit)));
+                }
+            } else if meta.path.is_ident("column_name") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    parsed.column_name = Some(litstr.value());
+                } else {
+                    return Err(meta.error(format!("Invalid column_name {:?}", lit)));
+                }
+            } else if meta.path.is_ident("enum_name") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    let ty: Ident = syn::parse_str(&litstr.value())?;
+                    parsed.enum_name = Some(ty);
+                } else {
+                    return Err(meta.error(format!("Invalid enum_name {:?}", lit)));
+                }
+            } else if meta.path.is_ident("select_as") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    parsed.select_as = Some(litstr.value());
+                } else {
+                    return Err(meta.error(format!("Invalid select_as {:?}", lit)));
+                }
+            } else if meta.path.is_ident("save_as") {
+                let lit = meta.value()?.parse()?;
+                if let Lit::Str(litstr) = lit {
+                    parsed.save_as = Some(litstr.value());
+                } else {
+                    return Err(meta.error(format!("Invalid save_as {:?}", lit)));
+                }
+            } else if meta.path.is_ident("ignore") {
+                parsed.ignore = true;
+            } else if meta.path.is_ident("primary_key") {
+                parsed.is_primary_key = true;
+                primary_key_types.push(field.ty.clone());
+            } else if meta.path.is_ident("nullable") {
+                parsed.nullable = true;
+            } else if meta.path.is_ident("indexed") {
+                parsed.indexed = true;
+            } else if meta.path.is_ident("unique") {
+                parsed.unique = true;
+            } else {
+                // Reads the value expression to advance the parse stream.
+                // Some parameters, such as `primary_key`, do not have any value,
+                // so ignoring an error occurred here.
+                let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+            }
+
+            Ok(())
+        })?;
+    }
+
+    Ok(parsed)
+}
 
 /// Method to derive an Model
 // [spec:pgorm:sem:macros.derive.entity-model]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs]
-// [spec:pgorm:sem:macros.derive.entity-model.casing]
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+1]
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+2]
 // [spec:pgorm:sem:macros.derive.entity-model.primary-key]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
@@ -81,7 +207,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     let mut columns_select_as: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_save_as: Punctuated<_, Comma> = Punctuated::new();
     let mut primary_keys: Punctuated<_, Comma> = Punctuated::new();
-    let mut primary_key_types: Punctuated<_, Comma> = Punctuated::new();
+    let mut primary_key_types: Punctuated<Type, Comma> = Punctuated::new();
     let mut auto_increment = true;
     if table_iden {
         if let Some(table_name) = table_name {
@@ -102,22 +228,10 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
             for field in fields.named {
                 if let Some(ident) = &field.ident {
                     let original_field_name = trim_starting_raw_identifier(ident);
-                    let mut field_name = Ident::new(
-                        &original_field_name.to_upper_camel_case(),
-                        Span::call_site(),
-                    );
+                    let mut field_name =
+                        column_variant_ident(&original_field_name.to_upper_camel_case(), ident)?;
 
-                    let mut nullable = false;
-                    let mut default_value = None;
-                    let mut comment = None;
-                    let mut default_expr = None;
-                    let mut select_as = None;
-                    let mut save_as = None;
-                    let mut indexed = false;
-                    let mut ignore = false;
-                    let mut unique = false;
-                    let mut sql_type = None;
-                    let mut column_name = if let Some(case_style) = rename_all {
+                    let derived_column_name = if let Some(case_style) = rename_all {
                         Some(field_name.convert_case(Some(case_style)))
                     } else if original_field_name
                         != original_field_name.to_upper_camel_case().to_snake_case()
@@ -128,107 +242,32 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                         None
                     };
 
-                    let mut enum_name = None;
-                    let mut is_primary_key = false;
-                    // search for #[pgorm(primary_key, auto_increment = false, column_type = "String(Some(255))", default_value = "new user", default_expr = "gen_random_uuid()", column_name = "name", enum_name = "Name", nullable, indexed, unique)]
-                    for attr in field.attrs.iter() {
-                        if !attr.path().is_ident("pgorm") {
-                            continue;
-                        }
-
-                        // single param
-                        attr.parse_nested_meta(|meta| {
-                            if meta.path.is_ident("column_type") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    let ty: TokenStream = syn::parse_str(&litstr.value())?;
-                                    sql_type = Some(ty);
-                                } else {
-                                    return Err(
-                                        meta.error(format!("Invalid column_type {:?}", lit))
-                                    );
-                                }
-                            } else if meta.path.is_ident("auto_increment") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Bool(litbool) = lit {
-                                    auto_increment = litbool.value();
-                                } else {
-                                    return Err(
-                                        meta.error(format!("Invalid auto_increment = {:?}", lit))
-                                    );
-                                }
-                            } else if meta.path.is_ident("comment") {
-                                comment = Some(meta.value()?.parse::<Lit>()?);
-                            } else if meta.path.is_ident("default_value") {
-                                default_value = Some(meta.value()?.parse::<Lit>()?);
-                            } else if meta.path.is_ident("default_expr") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    let value_expr: TokenStream = syn::parse_str(&litstr.value())?;
-                                    default_expr = Some(value_expr);
-                                } else {
-                                    return Err(
-                                        meta.error(format!("Invalid column_type {:?}", lit))
-                                    );
-                                }
-                            } else if meta.path.is_ident("column_name") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    column_name = Some(litstr.value());
-                                } else {
-                                    return Err(
-                                        meta.error(format!("Invalid column_name {:?}", lit))
-                                    );
-                                }
-                            } else if meta.path.is_ident("enum_name") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    let ty: Ident = syn::parse_str(&litstr.value())?;
-                                    enum_name = Some(ty);
-                                } else {
-                                    return Err(meta.error(format!("Invalid enum_name {:?}", lit)));
-                                }
-                            } else if meta.path.is_ident("select_as") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    select_as = Some(litstr.value());
-                                } else {
-                                    return Err(meta.error(format!("Invalid select_as {:?}", lit)));
-                                }
-                            } else if meta.path.is_ident("save_as") {
-                                let lit = meta.value()?.parse()?;
-                                if let Lit::Str(litstr) = lit {
-                                    save_as = Some(litstr.value());
-                                } else {
-                                    return Err(meta.error(format!("Invalid save_as {:?}", lit)));
-                                }
-                            } else if meta.path.is_ident("ignore") {
-                                ignore = true;
-                            } else if meta.path.is_ident("primary_key") {
-                                is_primary_key = true;
-                                primary_key_types.push(field.ty.clone());
-                            } else if meta.path.is_ident("nullable") {
-                                nullable = true;
-                            } else if meta.path.is_ident("indexed") {
-                                indexed = true;
-                            } else if meta.path.is_ident("unique") {
-                                unique = true;
-                            } else {
-                                // Reads the value expression to advance the parse stream.
-                                // Some parameters, such as `primary_key`, do not have any value,
-                                // so ignoring an error occurred here.
-                                let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
-                            }
-
-                            Ok(())
-                        })?;
-                    }
+                    let FieldAttrs {
+                        sql_type,
+                        column_name,
+                        enum_name,
+                        comment,
+                        default_value,
+                        default_expr,
+                        select_as,
+                        save_as,
+                        is_primary_key,
+                        mut nullable,
+                        indexed,
+                        unique,
+                        ignore,
+                    } = parse_field_attrs(
+                        &field,
+                        derived_column_name,
+                        &mut auto_increment,
+                        &mut primary_key_types,
+                    )?;
 
                     if let Some(enum_name) = enum_name {
                         field_name = enum_name;
                     }
 
-                    field_name = Ident::new(&escape_rust_keyword(field_name), Span::call_site());
+                    field_name = parse_derived_ident(&escape_rust_keyword(&field_name), ident)?;
 
                     let variant_attrs = match &column_name {
                         Some(column_name) => quote! {
@@ -267,15 +306,12 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                         });
                     }
 
-                    let field_type = &field.ty;
-                    let field_type = quote! { #field_type }
-                        .to_string() //E.g.: "Option < String >"
-                        .replace(' ', ""); // Remove spaces
-                    let field_type = if field_type.starts_with("Option<") {
-                        nullable = true;
-                        &field_type[7..(field_type.len() - 1)] // Extract `T` out of `Option<T>`
-                    } else {
-                        field_type.as_str()
+                    let field_type = match unwrap_option(&field.ty) {
+                        Some(inner) => {
+                            nullable = true;
+                            inner
+                        }
+                        None => &field.ty,
                     };
                     let field_span = field.span();
 

@@ -1,0 +1,5 @@
+error: field `_1` derives the identifier "1", which is not a valid Rust identifier
+ --> tests/compile-fail/entity_model_numeric_derived_name.rs:9:9
+  |
+9 |     pub _1: i32,
+  |         ^^

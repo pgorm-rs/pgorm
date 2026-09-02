@@ -1561,6 +1561,13 @@ children (
                         kind @note
                         text "Audit: pgorm-macros unspanned panics on real user code. sql_type_match.rs:48/:101 — quote!{ty}.to_string().replace(' ',\"\") mangles whitespace-bearing types (&'a str -> &'astr) then .parse().expect fires; fix by matching &syn::Type structurally (this IS the unrepresentable rung). lib.rs:148 \"Struct name must be Model\"; value_type.rs:24/:26 expects; derive_iden.rs:76 expect(\"something something\") — all become spanned syn::Error (each is spec-pinned as a wart: entity-model.reject, value-type, iden). active_model.rs:55 + model.rs:60 enum_name parse_str().unwrap() — closures already return syn::Result, just ?. Ident::new/format_ident! on camel-cased field names (entity_model.rs:105, active_model.rs:46, model.rs:52, partial_model.rs:92/:108) — heck maps _ -> \"\" and _1 -> \"1\", both panic; spanned error on field.ident. Also value_type.rs:62 .unwrap_or(()) silently swallows attribute parse errors — pinned as Limitation, fix with ?. Generated-code runtime panics (model/active_model field-mismatch, entity_model.rs:96 Table-as-column) are NOT this node — they need trait-signature decisions; left for a future unrep node. partial_model.rs:150/:155 entity unwrap: move entity into the ColumnAs variants (S, internal)."
                     }
+
+                    {
+                        at 2026-09-02T16:03:59.296253Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

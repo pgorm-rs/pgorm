@@ -1,6 +1,9 @@
 use super::{
     attributes::derive_attr,
-    util::{escape_rust_keyword, field_not_ignored, trim_starting_raw_identifier},
+    util::{
+        escape_rust_keyword, field_not_ignored, parse_derived_ident, parse_enum_name,
+        trim_starting_raw_identifier,
+    },
 };
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
@@ -46,10 +49,10 @@ impl DeriveModel {
         let column_idents = fields
             .iter()
             .map(|field| {
-                let ident = field.ident.as_ref().unwrap().to_string();
-                let ident = trim_starting_raw_identifier(ident).to_upper_camel_case();
-                let ident = escape_rust_keyword(ident);
-                let mut ident = format_ident!("{}", &ident);
+                let field_ident = field.ident.as_ref().unwrap();
+                let name = trim_starting_raw_identifier(field_ident).to_upper_camel_case();
+                let mut ident = parse_derived_ident(&escape_rust_keyword(name), field_ident)
+                    .map_err(Error::Syn)?;
                 field
                     .attrs
                     .iter()
@@ -57,8 +60,7 @@ impl DeriveModel {
                     .try_for_each(|attr| {
                         attr.parse_nested_meta(|meta| {
                             if meta.path.is_ident("enum_name") {
-                                ident = syn::parse_str(&meta.value()?.parse::<LitStr>()?.value())
-                                    .unwrap();
+                                ident = parse_enum_name(&meta.value()?.parse::<LitStr>()?)?;
                             } else {
                                 // Reads the value expression to advance the parse stream.
                                 // Some parameters, such as `primary_key`, do not have any value,

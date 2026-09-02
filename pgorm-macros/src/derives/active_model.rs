@@ -1,9 +1,10 @@
 use super::util::{
-    escape_rust_keyword, field_not_ignored, format_field_ident, trim_starting_raw_identifier,
+    escape_rust_keyword, field_not_ignored, format_field_ident, parse_derived_ident,
+    parse_enum_name, trim_starting_raw_identifier,
 };
 use heck::ToUpperCamelCase;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, quote_spanned};
+use quote::{quote, quote_spanned};
 use syn::{Data, DataStruct, Expr, Field, Fields, LitStr, Type, punctuated::IntoIter};
 
 /// Method to derive an [ActiveModel](pgorm::ActiveModel)
@@ -40,10 +41,9 @@ fn derive_active_model(all_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
     let name: Vec<Ident> = fields
         .clone()
         .map(|field| {
-            let ident = field.ident.as_ref().unwrap().to_string();
-            let ident = trim_starting_raw_identifier(ident).to_upper_camel_case();
-            let ident = escape_rust_keyword(ident);
-            let mut ident = format_ident!("{}", &ident);
+            let field_ident = field.ident.as_ref().unwrap();
+            let name = trim_starting_raw_identifier(field_ident).to_upper_camel_case();
+            let mut ident = parse_derived_ident(&escape_rust_keyword(name), field_ident)?;
             field
                 .attrs
                 .iter()
@@ -52,7 +52,7 @@ fn derive_active_model(all_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
                     attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("enum_name") {
                             let litstr: LitStr = meta.value()?.parse()?;
-                            ident = syn::parse_str(&litstr.value()).unwrap();
+                            ident = parse_enum_name(&litstr)?;
                         } else {
                             // Reads the value expression to advance the parse stream.
                             // Some parameters, such as `primary_key`, do not have any value,

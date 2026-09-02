@@ -1,4 +1,5 @@
 use heck::ToUpperCamelCase;
+use proc_macro2::Span;
 use quote::format_ident;
 use syn::{Field, Ident, Meta, punctuated::Punctuated, token::Comma};
 
@@ -41,7 +42,48 @@ where
         .to_string()
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.casing]
+/// Turn a name derived from `field` into an identifier, naming the field and the
+/// derived spelling when the derivation produced something unusable — case
+/// conversion drops non-alphanumerics, so `__` derives `""` and `_1` derives `"1"`.
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1]
+pub(crate) fn parse_derived_ident(derived: &str, field: &Ident) -> syn::Result<Ident> {
+    syn::parse_str::<Ident>(derived).map_err(|_| {
+        syn::Error::new(
+            field.span(),
+            format!(
+                "field `{field}` derives the identifier {derived:?}, which is not a valid Rust identifier"
+            ),
+        )
+    })
+}
+
+/// The identifier an `enum_name = "..."` attribute names, reported at the literal
+/// when it does not spell one.
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1]
+pub(crate) fn parse_enum_name(litstr: &syn::LitStr) -> syn::Result<Ident> {
+    syn::parse_str::<Ident>(&litstr.value()).map_err(|_| {
+        syn::Error::new(
+            litstr.span(),
+            format!(
+                "`enum_name` must be a valid Rust identifier, found {:?}",
+                litstr.value()
+            ),
+        )
+    })
+}
+
+/// The `Column` variant identifier for a model field, from its UpperCamelCase name.
+///
+/// Validity is judged on the keyword-escaped spelling because the final variant
+/// name is escaped downstream (`SELF` -> `Self` -> `Self_`); the identifier
+/// returned keeps the unescaped spelling that `rename_all` converts.
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1]
+pub(crate) fn column_variant_ident(camel_name: &str, field: &Ident) -> syn::Result<Ident> {
+    parse_derived_ident(&escape_rust_keyword(camel_name), field)?;
+    Ok(Ident::new(camel_name, Span::call_site()))
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 pub(crate) fn escape_rust_keyword<T>(string: T) -> String
 where
     T: ToString,

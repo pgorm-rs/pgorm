@@ -1,0 +1,5 @@
+error: Invalid attribute: expected `column_type` or `array_type`
+ --> tests/compile-fail/value_type_unknown_attribute.rs:4:9
+  |
+4 | #[pgorm(no_such_key = "not read by this derive")]
+  |         ^^^^^^^^^^^
