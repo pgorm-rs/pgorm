@@ -342,6 +342,20 @@ children (
                     )
                 }
             }
+
+            {
+                id sql.empty-select-list
+                title "Fail loudly on an empty select list instead of rendering invalid SQL"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-02T11:33:17.377368Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by verify.query: select_only() (or any statement whose projection list ends up empty) renders `SELECT  FROM \"cake\"` — syntactically invalid, fails only at execution. The rule text is accurate (\"clears the entire select list\") so no spec lie; this is an ergonomics fix. Options: panic at build time with a clear message (matches the builder's existing panic conventions, e.g. the mixing panic), or leave a documented footgun. Pinned in tests/query_build_tests.rs. Touches pgorm-query's builder; query.build.modifiers and possibly sql.render.select-order bump if behavior changes."
+                    }
+                )
+            }
         )
     }
 
@@ -512,6 +526,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id orm.try-insert-conflicted
+                title "TryInsert conflict reporting: exec_without_returning says Inserted(0), with_returning leaks RecordNotFound"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-02T11:33:00.357486Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by verify.exec: only TryInsert::exec produces TryInsertResult::Conflicted. exec_without_returning returns Ok(0) from Insert's path so a skipped conflict reports Inserted(0); exec_with_returning propagates RecordNotFound instead of mapping to Conflicted. All three behaviors pinned in tests/returning_tests.rs (try_insert_result_variants). Fix = map the empty/not-found outcomes to Conflicted consistently; exec.crud.try-insert bumps and the pinning test flips from documenting the asymmetry to asserting the fix."
                     }
                 )
             }
@@ -736,6 +764,20 @@ children (
                                 text "Shape validated by live spike (see infra.tx-review errata): async fn transaction<'s, F, T, E>(conn: &'s mut DatabaseConnection, f: F) -> Result<T, TransactionError<E>> where F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E> — move the &'s mut borrow into begin (no reborrow) so the closure sees the concrete DatabaseTransaction<'s>. Use explicit rollback() internally on the error path (dep: infra.tx.rollback) instead of relying on Drop, so the rollback is awaited and its error surfaces. Retry helper takes AsyncFnMut + TransactionOptions and retries on SQLSTATE 40001."
                             }
                         )
+                    }
+                )
+            }
+
+            {
+                id infra.schema-index-qualify
+                title "Schema-qualify create_index_from_entity (index DDL drops the schema of qualified tables)"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-02T11:32:37.723612Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by verify.misc: create_index_from_entity calls .table(entity) (bare iden) while create_table_from_entity uses entity.table_ref(), so a schema_name=\"public\" entity renders CREATE TABLE \"public\".\"widget\" but ON \"widget\" for its indexes (src/schema/entity.rs:145). Pinned in tests/schema_gen_tests.rs. Fixing the behavior means bumping schema.from-entity.index and updating the pinning assertions."
                     }
                 )
             }
@@ -972,6 +1014,20 @@ children (
                     }
                 )
             }
+
+            {
+                id decide.schema-comments
+                title "Entity and column comments: render COMMENT ON statements or drop the carried data"
+                deps (infra.schema-index-qualify)
+                log (
+                    {
+                        at 2026-09-02T11:32:45.320829Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by verify.misc: the schema projection stores the entity comment (get_comment) and ColumnSpec::Comment as the rule describes, but the Postgres builder's column_comment is an empty function and the table comment is never emitted — no comment reaches the database. Options: emit COMMENT ON TABLE/COLUMN statements (schema-gen grows a second statement stream) or delete the carried data (delete-don't-deprecate). Pinned in tests/schema_gen_tests.rs; schema.from-entity bumps either way. Deps on infra.schema-index-qualify only for the shared file footprint (src/schema/entity.rs, schema_gen_tests.rs)."
+                    }
+                )
+            }
         )
     }
 
@@ -1071,6 +1127,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id polish.error-dead-code
+                title "Remove or wire the unreachable error surface: UpdateGetPrimaryKey, Conn/Exec variants, dead helpers"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-02T11:32:53.703755Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by verify.misc and verify.exec: DbErr::UpdateGetPrimaryKey is unreachable (Update::one's prepare_filters panics \"PrimaryKey is not set\" before find_updated_model_by_id could report it); DbErr::Conn and DbErr::Exec plus the conn_err/exec_err/json_err helpers have no production call sites (#[allow(dead_code)]). Same shape as the removed ConnAcquireErr. Options per item: delete, or make reachable (e.g. prepare_filters returning Err(UpdateGetPrimaryKey) instead of panicking — an API improvement worth considering while there). error.model is at +1; this bumps it again. Pinned in tests/error_model_tests.rs and noted in tests/returning_tests.rs."
                     }
                 )
             }

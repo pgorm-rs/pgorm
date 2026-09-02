@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-02T00:45:23.577997Z
+last_sync_at 2026-09-02T10:37:35.415375Z
 
 rule_versions (
     {id codegen.entity, version 0}
@@ -22,7 +22,7 @@ rule_versions (
     {id codegen.entity.serde, version 0}
     {id codegen.entity.serde.derives, version 0}
     {id codegen.entity.serde.skip, version 0}
-    {id codegen.entity.transform, version 0}
+    {id codegen.entity.transform, version 1}
     {id codegen.entity.transform.conjunct, version 0}
     {id codegen.entity.transform.inverse, version 0}
     {id codegen.entity.types, version 1}
@@ -37,8 +37,6 @@ rule_versions (
     {id conn.pool.no-conn-trait, version 0}
     {id conn.pool.recycle, version 0}
     {id conn.pool.statement-cache, version 0}
-    {id conn.statement, version 0}
-    {id conn.statement.disabled-types, version 0}
     {id conn.tx, version 1}
     {id conn.tx.closure, version 0}
     {id conn.tx.guard, version 1}
@@ -49,10 +47,10 @@ rule_versions (
     {id entity.active-model.from-sugar, version 0}
     {id entity.active-model.hooks, version 0}
     {id entity.active-model.into, version 0}
-    {id entity.active-model.json, version 0}
+    {id entity.active-model.json, version 1}
     {id entity.active-model.persistence, version 0}
     {id entity.active-model.save, version 0}
-    {id entity.relation, version 0}
+    {id entity.relation, version 1}
     {id entity.relation.builder, version 0}
     {id entity.relation.def, version 0}
     {id entity.relation.fk, version 0}
@@ -68,8 +66,8 @@ rule_versions (
     {id entity.traits.from-query-result, version 0}
     {id entity.traits.model, version 0}
     {id entity.traits.primary-key, version 0}
-    {id error.model, version 0}
-    {id error.model.runtime, version 0}
+    {id error.model, version 1}
+    {id error.model.runtime, version 1}
     {id error.model.sql-class, version 2}
     {id exec.crud, version 0}
     {id exec.crud.consolidate, version 0}
@@ -161,7 +159,7 @@ rule_versions (
     {id sql.ast.case, version 0}
     {id sql.ast.condition, version 0}
     {id sql.ast.condition.flattening, version 0}
-    {id sql.ast.condition.holder, version 0}
+    {id sql.ast.condition.holder, version 1}
     {id sql.ast.delete, version 0}
     {id sql.ast.expr, version 0}
     {id sql.ast.expr.in, version 0}
@@ -182,7 +180,7 @@ rule_versions (
     {id sql.ast.window-statement, version 0}
     {id sql.ast.with, version 0}
     {id sql.ast.with.recursive, version 0}
-    {id sql.ddl, version 0}
+    {id sql.ddl, version 1}
     {id sql.ddl.alter-table, version 0}
     {id sql.ddl.column-def, version 0}
     {id sql.ddl.column-types, version 1}
@@ -247,6 +245,7 @@ rule_versions (
 )
 
 derived_priorities (
+    {id decide.statement, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id decide.turso, priority 0, derived_at 2026-09-02T00:45:23.577997Z}
     {id infra.sql-err, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
     {id infra.tx-review, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
@@ -258,7 +257,21 @@ derived_priorities (
     {id infra.tx.tests, priority 2, derived_at 2026-09-01T22:48:19.179922Z}
     {id orm.binding-types, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
     {id orm.value-decode, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
+    {id polish.conn-acquire, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id polish.gates, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
+    {id polish.instructions, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
+    {id polish.pool-tests, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id polish.sea-bae, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id polish.warnings, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id repair.doctests, priority 2, derived_at 2026-09-01T22:48:19.179922Z}
+    {id verify.codegen, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.conn, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.entity, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.exec, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.macros, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.misc, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.query, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id verify.sql, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
 )
 
 assertions (
@@ -274,7 +287,6 @@ assertions (
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
-    {id polish.claude-md, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:24:10.125417Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}
     {id polish.instructions, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:25:30.26102Z}
     {id polish.pool-tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:18:45.917955Z}
@@ -350,6 +362,32 @@ impl_evidence (
         {impl_name main, rule codegen.entity.types}
         {impl_name main, rule codegen.entity.types.datetime}
         {impl_name main, rule codegen.entity.types.unsupported}
+    ), rule_versions_seen (
+        {id codegen.entity, version 0}
+        {id codegen.entity.compact, version 0}
+        {id codegen.entity.compact.attrs, version 0}
+        {id codegen.entity.compact.model, version 0}
+        {id codegen.entity.context, version 0}
+        {id codegen.entity.enums, version 0}
+        {id codegen.entity.expanded, version 0}
+        {id codegen.entity.expanded.blocks, version 0}
+        {id codegen.entity.files, version 0}
+        {id codegen.entity.imports, version 0}
+        {id codegen.entity.keywords, version 0}
+        {id codegen.entity.pk, version 0}
+        {id codegen.entity.relations, version 0}
+        {id codegen.entity.relations.related, version 0}
+        {id codegen.entity.relations.via, version 0}
+        {id codegen.entity.seaography, version 0}
+        {id codegen.entity.serde, version 0}
+        {id codegen.entity.serde.derives, version 0}
+        {id codegen.entity.serde.skip, version 0}
+        {id codegen.entity.transform, version 1}
+        {id codegen.entity.transform.conjunct, version 0}
+        {id codegen.entity.transform.inverse, version 0}
+        {id codegen.entity.types, version 1}
+        {id codegen.entity.types.datetime, version 0}
+        {id codegen.entity.types.unsupported, version 0}
     )}
     {id codegen.macros, covered_rules (
         macros.derive
@@ -547,6 +585,32 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
+    ), rule_versions_seen (
+        {id entity.active-model, version 0}
+        {id entity.active-model.active-value, version 0}
+        {id entity.active-model.active-value.ops, version 0}
+        {id entity.active-model.from-sugar, version 0}
+        {id entity.active-model.hooks, version 0}
+        {id entity.active-model.into, version 0}
+        {id entity.active-model.json, version 1}
+        {id entity.active-model.persistence, version 0}
+        {id entity.active-model.save, version 0}
+        {id entity.relation, version 1}
+        {id entity.relation.builder, version 0}
+        {id entity.relation.def, version 0}
+        {id entity.relation.fk, version 0}
+        {id entity.relation.linked, version 0}
+        {id entity.traits, version 0}
+        {id entity.traits.active-enum, version 0}
+        {id entity.traits.active-enum.limits, version 0}
+        {id entity.traits.column, version 0}
+        {id entity.traits.column-def, version 0}
+        {id entity.traits.column.enum-cast, version 0}
+        {id entity.traits.crud, version 0}
+        {id entity.traits.entity-name, version 0}
+        {id entity.traits.from-query-result, version 0}
+        {id entity.traits.model, version 0}
+        {id entity.traits.primary-key, version 0}
     )}
     {id orm.exec, covered_rules (
         exec.crud
@@ -718,6 +782,34 @@ impl_evidence (
         {impl_name main, rule sql.ast.window-statement}
         {impl_name main, rule sql.ast.with}
         {impl_name main, rule sql.ast.with.recursive}
+    ), rule_versions_seen (
+        {id sql.ast, version 0}
+        {id sql.ast.build, version 0}
+        {id sql.ast.case, version 0}
+        {id sql.ast.condition, version 0}
+        {id sql.ast.condition.flattening, version 0}
+        {id sql.ast.condition.holder, version 1}
+        {id sql.ast.delete, version 0}
+        {id sql.ast.expr, version 0}
+        {id sql.ast.expr.in, version 0}
+        {id sql.ast.expr.operators, version 0}
+        {id sql.ast.func, version 0}
+        {id sql.ast.insert, version 0}
+        {id sql.ast.insert.arity, version 0}
+        {id sql.ast.keywords, version 0}
+        {id sql.ast.on-conflict, version 0}
+        {id sql.ast.order, version 0}
+        {id sql.ast.returning, version 0}
+        {id sql.ast.select, version 0}
+        {id sql.ast.select.from, version 0}
+        {id sql.ast.select.join, version 0}
+        {id sql.ast.select.projection, version 0}
+        {id sql.ast.select.union, version 0}
+        {id sql.ast.update, version 0}
+        {id sql.ast.window-statement, version 0}
+        {id sql.ast.with, version 0}
+        {id sql.ast.with.recursive, version 0}
+        {id sql.ddl, version 1}
     )}
     {id sql.ddl, covered_rules (
         sql.ddl
@@ -747,6 +839,21 @@ impl_evidence (
         {impl_name main, rule sql.ddl.panics}
         {impl_name main, rule sql.ddl.type-alter-drop}
         {impl_name main, rule sql.ddl.type-enum}
+    ), rule_versions_seen (
+        {id sql.ast.condition.holder, version 1}
+        {id sql.ddl, version 1}
+        {id sql.ddl.alter-table, version 0}
+        {id sql.ddl.column-def, version 0}
+        {id sql.ddl.column-types, version 1}
+        {id sql.ddl.create-table, version 0}
+        {id sql.ddl.drop-rename-truncate, version 0}
+        {id sql.ddl.extension, version 0}
+        {id sql.ddl.foreign-key, version 0}
+        {id sql.ddl.index-create, version 0}
+        {id sql.ddl.index-drop, version 0}
+        {id sql.ddl.panics, version 0}
+        {id sql.ddl.type-alter-drop, version 0}
+        {id sql.ddl.type-enum, version 0}
     )}
     {id sql.render, covered_rules (
         sql.render
