@@ -1,0 +1,8 @@
+error: PostgreSQL rejected this SQL: syntax error at or near "cake"
+
+         SELECT id FORM cake
+                        ^
+ --> tests/compile-fail/syntax_error.rs:4:26
+  |
+4 | const QUERY: &str = sql!("SELECT id FORM cake");
+  |                          ^^^^^^^^^^^^^^^^^^^^^

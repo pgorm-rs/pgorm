@@ -1925,6 +1925,13 @@ children (
                         kind @note
                         text "The original README aspiration, made real: a macro (working name sql!) that runs libpg_query at compile time over a SQL string literal, so a syntactically invalid raw query is a compile error with the parser's position info spanned onto the literal — the unrepresentable-states principle extended to the raw-SQL escape hatch. Target call sites: SelectorRaw::from_statement, ConnectionTrait::query_raw/execute_raw/batch_execute, migration bodies. Proc-macro crates can't export from pgorm-macros without taxing every build with the C dependency — operator waived the tax, but a sibling crate (pgorm-sql-macro or a feature) is still the cleaner shape; decide at start. Honest ceiling: syntax only — unknown columns/tables still pass; document that the macro validates grammar, not schema. Multi-statement literals validated via pg_query split+parse. New spec rules under a macros. or sql. prefix; deps on pgparse.oracle for the version-pin decision and dependency plumbing."
                     }
+
+                    {
+                        at 2026-09-02T16:54:19.194709Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

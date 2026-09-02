@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/compile-fail/trailing_arguments.rs:4:61
+  |
+4 | const QUERY: &str = sql!("SELECT id FROM cake WHERE id = $1", 1);
+  |                                                             ^

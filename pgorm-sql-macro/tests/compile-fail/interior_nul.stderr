@@ -1,0 +1,5 @@
+error: PostgreSQL rejected this SQL: Invalid statement format: nul byte found in provided data at position: 19
+ --> tests/compile-fail/interior_nul.rs:5:26
+  |
+5 | const QUERY: &str = sql!("SELECT id FROM cake\0");
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^

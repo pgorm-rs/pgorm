@@ -1,0 +1,28 @@
+[package]
+name = "pgorm-sql-macro"
+version = "0.1.0"
+authors = []
+edition = "2024"
+description = "Compile-time PostgreSQL grammar validation for raw SQL string literals"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/pgorm-rs/pgorm"
+documentation = "https://docs.rs/pgorm"
+repository = "https://github.com/pgorm-rs/pgorm"
+categories = ["database"]
+keywords = ["postgres", "sql", "macro"]
+rust-version = "1.85"
+
+[lib]
+name = "pgorm_sql_macro"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+pg_query = "6.2.0"
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "printing"] }
+
+[dev-dependencies]
+pgorm-sql-macro = { path = "." }
+trybuild = "1.0"

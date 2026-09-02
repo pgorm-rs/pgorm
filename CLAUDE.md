@@ -29,6 +29,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 - `pgorm-migration` - Migration runner
 - `pgorm-pool` - Database connection pool (vendored deadpool-postgres fork)
 - `pgorm-query` - SQL query builder (fork of sea-query, PostgreSQL-only), with its own `pgorm-query-attr` and `pgorm-query-derive` members
+- `pgorm-sql-macro` - The `sql!` macro: a raw SQL string literal held to the real PostgreSQL grammar (libpg_query) at compile time. Re-exported as `pgorm::sql` behind the off-by-default `sql-macro` feature, so only builds that use it compile the C dependency
 
 There is no CLI crate: the inherited `pgorm-cli` was retired (it targeted sqlx/sea-schema and a migration surface this fork dropped). Entity generation is available as a library through `pgorm-codegen`; a starter migration-crate template lives at `pgorm-migration/template/migration/`.
 

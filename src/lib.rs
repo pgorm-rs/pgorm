@@ -49,6 +49,27 @@ pub use pgorm_macros::{
 #[cfg(feature = "macros")]
 pub use tokio_postgres::row::RowIndex;
 
+/// Hold a raw SQL string literal to the PostgreSQL grammar at compile time,
+/// expanding to the literal unchanged.
+///
+/// Available under the off-by-default `sql-macro` feature, which pulls in
+/// libpg_query — the PostgreSQL server's own parser — as a build-time
+/// dependency. The check is syntax only: unknown tables and columns pass.
+///
+/// ```
+/// # use pgorm::sql;
+/// const BY_ID: &str = sql!(r#"SELECT "id", "name" FROM "cake" WHERE "id" = $1"#);
+/// ```
+///
+/// The escape hatches that take SQL as text are its call sites:
+/// [`SelectorRaw::from_statement`](crate::SelectorRaw::from_statement),
+/// [`ConnectionTrait::query_raw`](crate::ConnectionTrait::query_raw),
+/// [`ConnectionTrait::execute_raw`](crate::ConnectionTrait::execute_raw), and
+/// [`ConnectionTrait::batch_execute`](crate::ConnectionTrait::batch_execute).
+// [spec:pgorm:def:macros.sql]
+#[cfg(feature = "sql-macro")]
+pub use pgorm_sql_macro::sql;
+
 pub use pgorm_query;
 pub use pgorm_query::Iden;
 

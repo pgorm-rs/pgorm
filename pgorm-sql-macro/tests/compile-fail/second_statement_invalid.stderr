@@ -1,0 +1,9 @@
+error: PostgreSQL rejected this SQL: syntax error at or near "WHERE"
+
+              SELECT id FROM WHERE cake;
+                             ^
+ --> tests/compile-fail/second_statement_invalid.rs:5:5
+  |
+5 | /     "SELECT id FROM cake;
+6 | |      SELECT id FROM WHERE cake;"
+  | |________________________________^

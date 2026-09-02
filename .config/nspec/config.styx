@@ -13,6 +13,7 @@ specs ({
             pgorm-query/src/**/*.rs
             pgorm-query/pgorm-query-attr/src/**/*.rs
             pgorm-query/pgorm-query-derive/src/**/*.rs
+            pgorm-sql-macro/src/**/*.rs
         ),
         test_include (
             tests/**/*.rs
@@ -23,6 +24,7 @@ specs ({
             pgorm-query/tests/**/*.rs
             pgorm-query/pgorm-query-attr/tests/**/*.rs
             pgorm-query/pgorm-query-derive/tests/**/*.rs
+            pgorm-sql-macro/tests/**/*.rs
         ),
         exclude (
             target/**

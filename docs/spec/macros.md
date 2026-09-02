@@ -2,10 +2,10 @@
 
 This spec covers the procedural macro suite: the `pgorm-macros` crate (entity/model
 derives, active enums, relations, partial models, the vendored strum `EnumIter`, and the
-`#[pgorm_macros::test]` harness attribute), plus the two pgorm-query proc-macro crates
-(`pgorm-query-derive` for `Iden`/`IdenStatic`, `pgorm-query-attr` for `#[enum_def]`).
-Rules are maintenance-scope: they describe what the macros generate and reject today,
-including known limitations.
+`#[pgorm_macros::test]` harness attribute), the two pgorm-query proc-macro crates
+(`pgorm-query-derive` for `Iden`/`IdenStatic`, `pgorm-query-attr` for `#[enum_def]`), and
+`pgorm-sql-macro` (the compile-time-checked `sql!` literal). Rules are maintenance-scope:
+they describe what the macros generate and reject today, including known limitations.
 
 ## The macro suite
 
@@ -376,3 +376,73 @@ including known limitations.
 > test writer and drives the body through `crate::block_on!`. Caller attributes are
 > passed through to the generated fn verbatim. The expansion adds no cfg gating of its
 > own, so wrapped tests compile unconditionally.
+
+## Compile-time SQL validation
+
+> [spec:pgorm:def:macros.sql]
+> `pgorm-sql-macro` is a proc-macro crate exporting exactly one function-like macro,
+> `sql!`. It takes one string literal and nothing else. While the calling crate is being
+> compiled, the literal's text is handed to `pg_query::parse` — the Rust binding to
+> libpg_query, the PostgreSQL server's own parser, pinned to the same `6.2.0` the render
+> oracle uses and for the same reason (`[spec:pgorm:req:sql.render.oracle]`). A literal
+> the grammar accepts expands to itself, byte for byte, as a `&'static str` usable in
+> const position; there is no wrapper type, no runtime check and no allocation, so the
+> macro is invisible in the generated code.
+>
+> The macro lives in its own crate rather than in `pgorm-macros` because libpg_query is a
+> C dependency: keeping it out of the crate every entity derive already pulls in means
+> only builds that reach for `sql!` compile it. The root crate re-exports it as
+> `pgorm::sql` behind the off-by-default `sql-macro` feature. Its call sites are the
+> escape hatches that take SQL as text — `SelectorRaw::from_statement`,
+> `ConnectionTrait::query_raw` / `execute_raw` / `batch_execute`, and migration bodies.
+
+> [spec:pgorm:req:macros.sql.reject]
+> `sql!` MUST refuse, at compile time, both an input that is not a single string literal
+> and a literal the PostgreSQL grammar rejects. It MUST NOT panic on any input: a
+> proc-macro panic surfaces as an unattributed compiler abort rather than a diagnostic
+> the caller can act on, which is the same objection `[dec:pgorm:no-panic]` raises
+> against panicking on a caller's mistake at runtime.
+>
+> Non-literal input is refused by `syn`'s own parse: bare tokens and non-string literals
+> give `expected string literal` spanned at the offending token, and a literal followed by
+> anything else gives `unexpected token` spanned at the trailing argument. The macro
+> deliberately takes no bound parameters; `$1` placeholders are written in the SQL and
+> their values supplied at the call site.
+>
+> A grammar rejection becomes `syn::Error::new(literal.span(), ..)` whose message is
+> `PostgreSQL rejected this SQL: ` followed by the parser's own diagnostic, unwrapped from
+> the `pg_query::Error` variant that would otherwise prefix it with a stage name. Input
+> the parser cannot even be handed — a literal carrying an interior NUL byte, which fails
+> the `CString` conversion — takes the same path and reports the conversion failure, so
+> no input reaches an abort.
+
+> [spec:pgorm:sem:macros.sql.script]
+> A literal holding a `;`-separated script is validated whole: a single `pg_query::parse`
+> call walks every statement in the string and reports the first one the grammar refuses,
+> so a well-formed opening statement does not excuse a malformed later one. No separate
+> split pass is involved — `pg_query::split_with_parser` rejects exactly what `parse`
+> rejects, so a split-then-parse pipeline would carry a stage that can never fire.
+>
+> A literal that yields no statements at all — empty, whitespace-only, comment-only, or a
+> bare `;` — is accepted, because PostgreSQL accepts it: the server answers an empty query
+> string with an empty-query response. `sql!` reports on the grammar and nothing else, so
+> it does not add a "must contain a statement" rule of its own.
+
+> [spec:pgorm:req:macros.sql.ceiling]
+> Two limits are part of the contract and MUST be stated on the macro rather than implied
+> away.
+>
+> The check is syntax only. libpg_query carries no catalog, so unknown tables, unknown
+> columns and misapplied type modifiers (`money(12, 2)`) all pass — the same ceiling the
+> render oracle declares. `sql!` rules out typos in SQL, not mistakes about the schema: a
+> literal it accepts can still fail against a live server, and the integration suite
+> remains the semantic oracle.
+>
+> The error spans the whole literal, not the offending byte inside it. Narrowing to a
+> sub-literal span needs `proc_macro::Literal::subspan`, which is nightly-only —
+> `proc-macro2` compiles its call away and returns `None` on stable — so the position
+> rides in the message instead: the offending line is reprinted with a caret under the
+> column the parser named. libpg_query surfaces only the message and not a cursor offset,
+> so that column is recovered by locating the token the message quotes, using the same
+> last-occurrence heuristic as the render oracle; a message naming no token, such as
+> `syntax error at end of input`, gets no caret.
