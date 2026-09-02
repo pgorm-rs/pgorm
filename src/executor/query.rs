@@ -224,10 +224,12 @@ impl TryGetable for Decimal {
 }
 
 use pgorm_query::{IpNetwork, MacAddress, Values, Vector};
+#[cfg(feature = "with-json")]
+use tokio_postgres::types::Json;
 use tokio_postgres::{
     Row,
     row::RowIndex,
-    types::{FromSql, Json, Oid, Type, WasNull},
+    types::{FromSql, Oid, Type, WasNull},
 };
 
 #[allow(unused_macros)]
