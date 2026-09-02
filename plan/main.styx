@@ -1768,6 +1768,13 @@ children (
                         kind @decision
                         text "Reshaped by the pgparse decision (operator: WBS all five uses, tax waived): instead of a string-level strip_prefix guard, use pg_query to parse the raw statement — verify it is a single SELECT (typed DbErr otherwise, naming what it actually was) and wrap for pagination from knowledge of the real statement rather than byte surgery at [6..]. This handles WITH ... CTEs correctly, which the prefix approach cannot. The offset-multiplication overflow fix from the original note stands unchanged. Now deps on pgparse.oracle for the pg_query plumbing. exec.paginator.raw bumps accordingly."
                     }
+
+                    {
+                        at 2026-09-02T19:44:43.115382Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

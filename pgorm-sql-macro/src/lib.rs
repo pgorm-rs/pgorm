@@ -2,7 +2,7 @@
 //!
 //! The crate is a sibling of `pgorm-macros` rather than another macro inside it
 //! because validation links libpg_query, the PostgreSQL server's own parser, as
-//! a C dependency: only builds that reach for [`sql!`] should pay to compile it.
+//! a C dependency, and the entity derives have no use for it.
 #![warn(missing_docs)]
 #![deny(
     clippy::expect_used,
@@ -46,7 +46,7 @@ use syn::{Error, LitStr, parse_macro_input};
 /// The check is syntax only. libpg_query carries no catalog, so a well-formed
 /// statement against tables and columns that do not exist passes happily — this
 /// rules out typos in SQL, not mistakes about the schema.
-// [spec:pgorm:def:macros.sql]
+// [spec:pgorm:def:macros.sql+1]
 // [spec:pgorm:req:macros.sql.reject]    non-literal input is `syn`'s own refusal
 #[proc_macro]
 pub fn sql(input: TokenStream) -> TokenStream {

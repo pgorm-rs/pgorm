@@ -52,9 +52,11 @@ pub use tokio_postgres::row::RowIndex;
 /// Hold a raw SQL string literal to the PostgreSQL grammar at compile time,
 /// expanding to the literal unchanged.
 ///
-/// Available under the off-by-default `sql-macro` feature, which pulls in
-/// libpg_query — the PostgreSQL server's own parser — as a build-time
-/// dependency. The check is syntax only: unknown tables and columns pass.
+/// Available under the off-by-default `sql-macro` feature, which brings the
+/// macro into scope. libpg_query — the PostgreSQL server's own parser, which
+/// performs the check — is compiled either way, since `SelectorRaw`
+/// pagination parses raw statements with it at runtime. The check is syntax
+/// only: unknown tables and columns pass.
 ///
 /// ```
 /// # use pgorm::sql;
@@ -66,7 +68,7 @@ pub use tokio_postgres::row::RowIndex;
 /// [`ConnectionTrait::query_raw`](crate::ConnectionTrait::query_raw),
 /// [`ConnectionTrait::execute_raw`](crate::ConnectionTrait::execute_raw), and
 /// [`ConnectionTrait::batch_execute`](crate::ConnectionTrait::batch_execute).
-// [spec:pgorm:def:macros.sql]
+// [spec:pgorm:def:macros.sql+1]
 #[cfg(feature = "sql-macro")]
 pub use pgorm_sql_macro::sql;
 

@@ -186,9 +186,14 @@ including the remaining gaps in parameter binding.
 
 ## Offset pagination (`exec.paginator`)
 
-> [spec:pgorm:def:exec.paginator]
-> `Paginator<'db, C, S>` holds a `SelectStatement`, a zero-based current
-> `page`, a `page_size`, a borrowed connection, and a phantom selector.
+> [spec:pgorm:def:exec.paginator+1]
+> `Paginator<'db, C, S>` holds either the `SelectStatement` to page over
+> or the report explaining why the source could not be turned into one,
+> plus a zero-based current `page`, a `page_size`, a borrowed connection,
+> and a phantom selector. Carrying the failure rather than a stand-in
+> statement is what lets `paginate` — whose signature returns no `Result`
+> — accept a source it cannot page over without panicking and without
+> inventing SQL to send in its place.
 > `ItemsAndPagesNumber` carries `number_of_items` and `number_of_pages`.
 > `PaginatorTrait::paginate(db, page_size)` constructs a paginator and is
 > implemented for `Selector<S>`, `SelectorRaw<S>`, `Select<E>`, and
@@ -202,13 +207,17 @@ including the remaining gaps in parameter binding.
 > `paginate` implementations assert this and panic with "page_size
 > should not be zero"; a zero page size is never a recoverable `DbErr`.
 
-> [spec:pgorm:sem:exec.paginator.fetch]
+> [spec:pgorm:sem:exec.paginator.fetch+1]
 > `fetch_page(page)` executes a clone of the query with
 > `LIMIT page_size OFFSET page_size * page`; pages are zero-indexed and
-> the paginator's own cursor is not consulted or advanced. Rows are
-> decoded through the selector, aborting on the first decode error.
-> `fetch()` is `fetch_page(cur_page())`; `next()` increments the page
-> counter without fetching; `cur_page()` reports it, starting at 0.
+> the paginator's own cursor is not consulted or advanced. The offset is
+> computed with checked multiplication: a `page` whose offset would not
+> fit a `u64` is a `DbErr::Query`, not a debug-build panic and not a
+> release-build wrap to a small offset that would silently serve the
+> wrong rows. Rows are decoded through the selector, aborting on the
+> first decode error. `fetch()` is `fetch_page(cur_page())`; `next()`
+> increments the page counter without fetching; `cur_page()` reports it,
+> starting at 0.
 
 > [spec:pgorm:sem:exec.paginator.count]
 > `num_items` counts by wrapping the paginator's query — with limit,
@@ -231,12 +240,36 @@ including the remaining gaps in parameter binding.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw]
-> Paginating a `SelectorRaw` rewrites the raw statement so limit and
-> offset can be appended: the SQL is trimmed and its first six
-> characters (the `SELECT` keyword) sliced off, and the remainder is
-> embedded as a custom expression (`Expr::cust_with_values` when bind
-> values are present, `Expr::cust` otherwise) inside a fresh
-> `SelectStatement`. Consequently only raw statements that begin with a
-> `SELECT` keyword (after leading whitespace) survive this
-> transformation; no validation is performed on the sliced prefix.
+> [spec:pgorm:sem:exec.paginator.raw+1]
+> Paginating a `SelectorRaw` MUST decide what the raw statement is by
+> parsing it with libpg_query — the PostgreSQL server's own parser, the
+> same `pg_query` 6.2.0 the render oracle and `sql!` use
+> (`[spec:pgorm:req:sql.render.oracle]`, `[spec:pgorm:def:macros.sql+1]`)
+> — and MUST NOT decide it by inspecting the statement's text. The
+> statement is accepted only when it parses, holds exactly one statement,
+> and that statement is a `SelectStmt` carrying no `INTO` clause. A
+> `WITH ... SELECT` therefore qualifies: PostgreSQL hangs the `WITH`
+> clause off the `SelectStmt` itself rather than making it a statement of
+> its own, so a CTE pages like any other `SELECT`. `VALUES (…), (…)` and
+> set operations qualify for the same reason — both parse as a
+> `SelectStmt`.
+>
+> An accepted statement is taken at the extent the parser reports for it,
+> which excludes any terminating `;` that a subquery position would
+> refuse, and is wrapped whole as
+> `SELECT * FROM (<statement>) AS "sub_statement"` — a custom expression
+> (`Expr::cust_with_values` when bind values are present, `Expr::cust`
+> otherwise) inside a fresh `SelectStatement`. Wrapping rather than
+> splicing means `LIMIT` and `OFFSET` land outside the caller's own
+> clauses instead of colliding with them, so a raw statement that already
+> carries `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will
+> not reorder rows a subquery sorted, so the caller's `ORDER BY` still
+> governs page boundaries.
+>
+> Everything else — text the grammar rejects, a `;`-separated script, an
+> `INSERT`/`UPDATE`/`DELETE`/DDL statement, a `SELECT ... INTO` — is
+> neither a panic nor mangled SQL sent to the server. `paginate` records
+> the reason, and every reader that can report it (`fetch_page`, and
+> `num_items` with the page counts derived from it) returns it as a
+> `DbErr::Query` naming what the statement actually parsed as, using
+> PostgreSQL's own node name for anything it has no SQL keyword for.

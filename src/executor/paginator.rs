@@ -4,8 +4,13 @@ use crate::{
 };
 use async_stream::stream;
 use futures::Stream;
-use pgorm_query::{Alias, Expr, QueryBuilder, SelectStatement};
-use std::{marker::PhantomData, pin::Pin};
+use pg_query::{NodeEnum, protobuf::RawStmt};
+use pgorm_query::{Alias, Expr, QueryBuilder, SelectStatement, Value};
+use std::{
+    fmt::{self, Write as _},
+    marker::PhantomData,
+    pin::Pin,
+};
 use tokio_postgres::types::ToSql;
 
 use super::{QueryResult, ValueHolder, select::ensure_select_list};
@@ -14,14 +19,14 @@ use super::{QueryResult, ValueHolder, select::ensure_select_list};
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
 
 /// Defined a structure to handle pagination of a result from a query operation on a Model
-// [spec:pgorm:def:exec.paginator]
+// [spec:pgorm:def:exec.paginator+1]
 #[derive(Clone, Debug)]
 pub struct Paginator<'db, C, S>
 where
     C: ConnectionTrait,
     S: SelectorTrait + 'db,
 {
-    pub(crate) query: SelectStatement,
+    pub(crate) query: Result<SelectStatement, String>,
     pub(crate) page: u64,
     pub(crate) page_size: u64,
     pub(crate) db: &'db C,
@@ -44,16 +49,28 @@ where
     C: ConnectionTrait,
     S: SelectorTrait + 'db,
 {
-    /// Fetch a specific page; page index starts from zero
-    // [spec:pgorm:sem:exec.paginator.fetch]
-    pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
-        ensure_select_list(&self.query)?;
+    /// The statement to page over, or the reason there is none to page over.
+    // [spec:pgorm:sem:exec.paginator.raw+1]
+    fn query(&self) -> Result<&SelectStatement, DbErr> {
         let query = self
             .query
-            .clone()
-            .limit(self.page_size)
-            .offset(self.page_size * page)
-            .to_owned();
+            .as_ref()
+            .map_err(|report| DbErr::Query(RuntimeErr::Internal(report.clone())))?;
+        ensure_select_list(query)?;
+        Ok(query)
+    }
+
+    /// Fetch a specific page; page index starts from zero
+    // [spec:pgorm:sem:exec.paginator.fetch+1]
+    pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
+        let offset = self.page_size.checked_mul(page).ok_or_else(|| {
+            DbErr::Query(RuntimeErr::Internal(format!(
+                "page {page} at page size {} is past the largest representable offset",
+                self.page_size
+            )))
+        })?;
+        let mut query = self.query()?.clone();
+        query.limit(self.page_size).offset(offset);
         let (stmt, values) = query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
@@ -70,7 +87,7 @@ where
     }
 
     /// Fetch the current page
-    // [spec:pgorm:sem:exec.paginator.fetch]
+    // [spec:pgorm:sem:exec.paginator.fetch+1]
     pub async fn fetch(&self) -> Result<Vec<S::Item>, DbErr> {
         self.fetch_page(self.page).await
     }
@@ -78,18 +95,11 @@ where
     /// Get the total number of items
     // [spec:pgorm:sem:exec.paginator.count]
     pub async fn num_items(&self) -> Result<u64, DbErr> {
-        ensure_select_list(&self.query)?;
+        let mut counted = self.query()?.clone();
+        counted.reset_limit().reset_offset().clear_order_by();
         let stmt = SelectStatement::new()
             .expr(Expr::cust("COUNT(*) AS num_items"))
-            .from_subquery(
-                self.query
-                    .clone()
-                    .reset_limit()
-                    .reset_offset()
-                    .clear_order_by()
-                    .to_owned(),
-                Alias::new("sub_query"),
-            )
+            .from_subquery(counted, Alias::new("sub_query"))
             .to_owned();
         let (stmt, values) = stmt.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
@@ -200,7 +210,7 @@ where
 
 #[async_trait::async_trait]
 /// A Trait for any type that can paginate results
-// [spec:pgorm:def:exec.paginator]
+// [spec:pgorm:def:exec.paginator+1]
 pub trait PaginatorTrait<'db, C>
 where
     C: ConnectionTrait,
@@ -231,7 +241,7 @@ where
     fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
         assert!(page_size != 0, "page_size should not be zero");
         Paginator {
-            query: self.query,
+            query: Ok(self.query),
             page: 0,
             page_size,
             db,
@@ -247,24 +257,125 @@ where
 {
     type Selector = S;
     // [spec:pgorm:req:exec.paginator.page-size]
-    // [spec:pgorm:sem:exec.paginator.raw]
+    // [spec:pgorm:sem:exec.paginator.raw+1]
     fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
         assert!(page_size != 0, "page_size should not be zero");
-        let sql = self.stmt.trim()[6..].trim();
-        let mut query = SelectStatement::new();
-        query.expr(if !self.values.0.is_empty() {
-            Expr::cust_with_values(sql, self.values.0)
-        } else {
-            Expr::cust(sql)
-        });
-
         Paginator {
-            query,
+            query: wrap_raw_select(&self.stmt, self.values.0),
             page: 0,
             page_size,
             db,
             selector: PhantomData,
         }
+    }
+}
+
+/// The alias the caller's own statement is paged over as.
+const RAW_SUBQUERY_ALIAS: &str = "sub_statement";
+
+/// Wrap a caller's raw statement as `SELECT * FROM (<statement>) AS "sub_statement"`,
+/// the shape `LIMIT` and `OFFSET` append to whatever clauses the statement carries
+/// of its own, or report why it cannot be paged over at all.
+// [spec:pgorm:sem:exec.paginator.raw+1]
+fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, String> {
+    let select = single_select(stmt)?;
+    let sql = format!(r#"* FROM ({select}) AS "{RAW_SUBQUERY_ALIAS}""#);
+
+    let mut query = SelectStatement::new();
+    query.expr(if values.is_empty() {
+        Expr::cust(sql)
+    } else {
+        Expr::cust_with_values(sql, values)
+    });
+    Ok(query)
+}
+
+/// The one row-returning `SELECT` in `stmt`, at the extent libpg_query reports
+/// for it — which excludes any terminating `;` a subquery position would refuse.
+///
+/// A `WITH ... SELECT` qualifies: PostgreSQL hangs the `WITH` clause off the
+/// `SelectStmt` itself rather than making it a statement of its own.
+// [spec:pgorm:sem:exec.paginator.raw+1]
+fn single_select(stmt: &str) -> Result<&str, String> {
+    let parsed = pg_query::parse(stmt).map_err(|error| {
+        format!(
+            "cannot paginate a raw statement PostgreSQL rejects: {}",
+            parser_message(&error)
+        )
+    })?;
+
+    let [raw] = parsed.protobuf.stmts.as_slice() else {
+        return Err(format!(
+            "cannot paginate a raw statement holding {} statements; pagination needs exactly one SELECT",
+            parsed.protobuf.stmts.len()
+        ));
+    };
+
+    let node = raw
+        .stmt
+        .as_ref()
+        .and_then(|node| node.node.as_ref())
+        .ok_or_else(|| "cannot paginate a raw statement that parsed to nothing".to_owned())?;
+
+    match node {
+        NodeEnum::SelectStmt(select) if select.into_clause.is_some() => Err(
+            "cannot paginate a raw SELECT ... INTO; it creates a table rather than returning rows"
+                .to_owned(),
+        ),
+        NodeEnum::SelectStmt(_) => extent(stmt, raw),
+        other => Err(format!(
+            "cannot paginate a raw statement that parses as {}; pagination needs a SELECT",
+            node_name(other)
+        )),
+    }
+}
+
+/// The slice of `sql` that `raw` covers. `stmt_len` is zero for a statement
+/// running to the end of the input with nothing terminating it.
+fn extent<'sql>(sql: &'sql str, raw: &RawStmt) -> Result<&'sql str, String> {
+    let start = usize::try_from(raw.stmt_location).unwrap_or(0);
+    let end = match usize::try_from(raw.stmt_len) {
+        Ok(0) | Err(_) => sql.len(),
+        Ok(len) => start.saturating_add(len),
+    };
+
+    sql.get(start..end)
+        .ok_or_else(|| "cannot paginate a raw statement PostgreSQL located outside it".to_owned())
+}
+
+/// PostgreSQL's own name for a parse node — `InsertStmt`, `VariableSetStmt` —
+/// read off the head of its `Debug` form without rendering the tree beneath it.
+fn node_name(node: &NodeEnum) -> String {
+    let mut name = Head(String::new());
+    let _ = write!(name, "{node:?}");
+    name.0
+}
+
+/// A sink that keeps what a formatter writes before the first `(` and then stops
+/// it, so a node's name costs nothing but the name.
+struct Head(String);
+
+impl fmt::Write for Head {
+    fn write_str(&mut self, chunk: &str) -> fmt::Result {
+        match chunk.split_once('(') {
+            Some((head, _)) => {
+                self.0.push_str(head);
+                Err(fmt::Error)
+            }
+            None => {
+                self.0.push_str(chunk);
+                Ok(())
+            }
+        }
+    }
+}
+
+/// The parser's own diagnostic, unwrapped from the `pg_query` error variant that
+/// would otherwise prefix it with a stage name.
+fn parser_message(error: &pg_query::Error) -> String {
+    match error {
+        pg_query::Error::Parse(message) => message.clone(),
+        other => other.to_string(),
     }
 }
 

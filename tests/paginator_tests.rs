@@ -41,9 +41,9 @@ fn names(models: &[bakery::Model]) -> Vec<&str> {
 
 const RAW_ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDER BY "id" ASC"#;
 
-// [spec:pgorm:def:exec.paginator/test]    paginate is reachable from every
+// [spec:pgorm:def:exec.paginator+1/test]    paginate is reachable from every
 // selector shape, and `count` is `paginate(db, 1).num_items()`
-// [spec:pgorm:sem:exec.paginator.fetch/test]    zero-indexed pages, an
+// [spec:pgorm:sem:exec.paginator.fetch+1/test]    zero-indexed pages, an
 // independent page cursor, and `next` advancing without fetching
 #[pgorm_macros::test]
 async fn paginator_fetch_page() -> Result<(), DbErr> {
@@ -110,6 +110,20 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
 
     // `count` is defined as `paginate(db, 1).num_items()`.
     assert_eq!(Bakery::find().count(&db).await?, 7);
+
+    // A page whose offset would not fit a `u64` is refused before any SQL is
+    // built, rather than wrapping to a small offset or panicking on overflow.
+    let overflowing = Bakery::find().paginate(&db, u64::MAX).fetch_page(2).await;
+    assert!(
+        matches!(&overflowing, Err(DbErr::Query(_))),
+        "unexpected result: {overflowing:?}"
+    );
+    assert!(
+        overflowing
+            .unwrap_err()
+            .to_string()
+            .contains("largest representable offset")
+    );
 
     drop(db);
     ctx.delete().await;
@@ -275,8 +289,8 @@ async fn paginator_rejects_zero_page_size() -> Result<(), DbErr> {
 
 // [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
-// [spec:pgorm:sem:exec.paginator.raw/test]    the raw statement is re-embedded
-// as a custom expression after its `SELECT` keyword is sliced off
+// [spec:pgorm:sem:exec.paginator.raw+1/test]    a parsed single `SELECT` is
+// wrapped whole as a subquery, so its own clauses survive paging
 #[pgorm_macros::test]
 async fn paginator_raw() -> Result<(), DbErr> {
     let ctx = TestContext::new("paginator_tests_raw").await;
@@ -284,7 +298,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
     let db = ctx.db.get().await?;
     seed(&db).await?;
 
-    // No bind values: the remainder is embedded with `Expr::cust`.
+    // No bind values: the statement is wrapped with `Expr::cust`.
     let mut paginator = Bakery::find()
         .from_raw_sql(RAW_ALL.to_owned(), Values(Vec::new()))
         .paginate(&db, 3);
@@ -298,7 +312,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
     assert_eq!(paginator.num_pages().await?, 3);
     assert_eq!(paginator.fetch_and_next().await?.map(|p| p.len()), Some(3));
 
-    // With bind values: the remainder is embedded with `Expr::cust_with_values`
+    // With bind values: the statement is wrapped with `Expr::cust_with_values`
     // and the `$1` marker keeps its value.
     let filtered = Bakery::find()
         .from_raw_sql(
@@ -315,27 +329,95 @@ async fn paginator_raw() -> Result<(), DbErr> {
     );
     assert_eq!(names(&filtered.fetch_page(1).await?), ["Golf Bakery"]);
 
-    // Leading whitespace is trimmed before the keyword is sliced.
-    let padded = Bakery::find()
-        .from_raw_sql(format!("   {RAW_ALL}"), Values(Vec::new()))
-        .paginate(&db, 3);
-    assert_eq!(padded.num_items().await?, 7);
-
-    // No validation is performed on the sliced prefix: a statement that does
-    // not begin with `SELECT` is mangled into invalid SQL rather than rejected.
-    let mangled = Bakery::find()
+    // A `WITH ... SELECT` is one `SelectStmt` to the parser, so a CTE pages
+    // like any other statement — the case byte-slicing off a `SELECT` keyword
+    // could never handle.
+    let cte = Bakery::find()
         .from_raw_sql(
-            r#"WITH t AS (SELECT "id", "name", "profit_margin" FROM "bakery") SELECT * FROM t"#
-                .to_owned(),
+            format!(r#"WITH t AS ({RAW_ALL}) SELECT * FROM t ORDER BY "id" ASC"#),
             Values(Vec::new()),
         )
-        .paginate(&db, 3)
-        .fetch_page(0)
-        .await;
-    assert!(
-        matches!(mangled, Err(DbErr::Postgres(_))),
-        "unexpected result: {mangled:?}"
+        .paginate(&db, 3);
+    assert_eq!(cte.num_items().await?, 7);
+    assert_eq!(cte.num_pages().await?, 3);
+    assert_eq!(
+        names(&cte.fetch_page(1).await?),
+        ["Delta Bakery", "Echo Bakery", "Foxtrot Bakery"]
     );
+    assert_eq!(names(&cte.fetch_page(2).await?), ["Golf Bakery"]);
+
+    // The statement is taken at the extent the parser reports, so leading
+    // whitespace, a leading comment and a terminating `;` all page fine.
+    let decorated = Bakery::find()
+        .from_raw_sql(format!("  -- the lot\n  {RAW_ALL} ; "), Values(Vec::new()))
+        .paginate(&db, 3);
+    assert_eq!(decorated.num_items().await?, 7);
+    assert_eq!(names(&decorated.fetch_page(2).await?), ["Golf Bakery"]);
+
+    // Wrapping puts `LIMIT`/`OFFSET` outside the caller's own clauses instead
+    // of colliding with them, so a statement that already limits still pages.
+    let capped = Bakery::find()
+        .from_raw_sql(format!(r#"{RAW_ALL} LIMIT 4"#), Values(Vec::new()))
+        .paginate(&db, 3);
+    assert_eq!(capped.num_items().await?, 4);
+    assert_eq!(names(&capped.fetch_page(1).await?), ["Delta Bakery"]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.paginator.raw+1/test]    anything that is not one
+// row-returning `SELECT` is a `DbErr::Query` naming what it parsed as
+#[pgorm_macros::test]
+async fn paginator_raw_rejects_non_select() -> Result<(), DbErr> {
+    let ctx = TestContext::new("paginator_tests_raw_rejects").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    // Statements too short to hold a keyword, scripts, DML, DDL and a
+    // row-returning-looking `SELECT ... INTO`, each named for what it is.
+    let cases = [
+        ("", "holding 0 statements"),
+        ("   ", "holding 0 statements"),
+        ("SEL", "PostgreSQL rejects"),
+        ("SELECT 1; SELECT 2", "holding 2 statements"),
+        (
+            r#"INSERT INTO "bakery" ("name") VALUES ('x')"#,
+            "InsertStmt",
+        ),
+        (r#"UPDATE "bakery" SET "name" = 'x'"#, "UpdateStmt"),
+        (r#"DELETE FROM "bakery""#, "DeleteStmt"),
+        (r#"CREATE TABLE "t" ("a" int)"#, "CreateStmt"),
+        (r#"SELECT * INTO "t" FROM "bakery""#, "SELECT ... INTO"),
+    ];
+
+    for (stmt, expected) in cases {
+        let paginator = Bakery::find()
+            .from_raw_sql(stmt.to_owned(), Values(Vec::new()))
+            .paginate(&db, 3);
+
+        for reported in [
+            paginator.fetch_page(0).await.err(),
+            paginator.num_items().await.err(),
+            paginator.num_pages().await.err(),
+        ] {
+            let reported = reported.unwrap_or_else(|| panic!("{stmt:?} was not refused"));
+            assert!(
+                matches!(reported, DbErr::Query(_)),
+                "{stmt:?}: unexpected error: {reported:?}"
+            );
+            assert!(
+                reported.to_string().contains(expected),
+                "{stmt:?}: {reported} does not name {expected:?}"
+            );
+        }
+    }
+
+    // Refusal is the paginator's, not the server's: the table is untouched.
+    assert_eq!(Bakery::find().count(&db).await?, 7);
 
     drop(db);
     ctx.delete().await;

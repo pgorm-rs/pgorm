@@ -29,7 +29,7 @@ const SCHEMA: &str = sql!(
      INSERT INTO cake (id, name) VALUES (1, 'Chocolate'), (2, 'Lemon');"
 );
 
-// [spec:pgorm:def:macros.sql/test]    the literal reaches the server unchanged
+// [spec:pgorm:def:macros.sql+1/test]    the literal reaches the server unchanged
 // [spec:pgorm:sem:macros.sql.script/test]    a validated script through `batch_execute`
 #[pgorm_macros::test]
 async fn checked_literal_drives_selector_raw() -> Result<(), DbErr> {
@@ -56,7 +56,7 @@ async fn checked_literal_drives_selector_raw() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:macros.sql/test]    the same literal bound as a prepared statement
+// [spec:pgorm:def:macros.sql+1/test]    the same literal bound as a prepared statement
 #[pgorm_macros::test]
 async fn checked_literal_drives_query_raw() -> Result<(), DbErr> {
     let ctx = TestContext::new("sql_macro_query_raw").await;

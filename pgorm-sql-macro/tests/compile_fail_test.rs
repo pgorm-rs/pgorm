@@ -7,7 +7,7 @@
 //! are part of this test.
 
 // [spec:pgorm:req:macros.sql.reject/test]    grammar rejections and non-literal input
-// [spec:pgorm:def:macros.sql/test]    valid SQL compiles and keeps its text
+// [spec:pgorm:def:macros.sql+1/test]    valid SQL compiles and keeps its text
 // [spec:pgorm:req:macros.sql.ceiling/test]    unknown tables pass; the span is the whole literal
 #[test]
 fn compile_fail_tests() {

@@ -337,6 +337,7 @@ assertions (
     {id nopanic.insert-uniform, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:29:43.439383Z}
     {id nopanic.loader, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:48:35.194948Z}
     {id nopanic.macro-spans, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:03:59.296253Z}
+    {id nopanic.paginator-raw, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:44:43.115382Z}
     {id nopanic.value-accessors, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:11:30.878873Z}
     {id nopanic.value-tuple, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:46:15.258382Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}

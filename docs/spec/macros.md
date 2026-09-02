@@ -395,7 +395,7 @@ they describe what the macros generate and reject today, including known limitat
 
 ## Compile-time SQL validation
 
-> [spec:pgorm:def:macros.sql]
+> [spec:pgorm:def:macros.sql+1]
 > `pgorm-sql-macro` is a proc-macro crate exporting exactly one function-like macro,
 > `sql!`. It takes one string literal and nothing else. While the calling crate is being
 > compiled, the literal's text is handed to `pg_query::parse` — the Rust binding to
@@ -405,10 +405,12 @@ they describe what the macros generate and reject today, including known limitat
 > const position; there is no wrapper type, no runtime check and no allocation, so the
 > macro is invisible in the generated code.
 >
-> The macro lives in its own crate rather than in `pgorm-macros` because libpg_query is a
-> C dependency: keeping it out of the crate every entity derive already pulls in means
-> only builds that reach for `sql!` compile it. The root crate re-exports it as
-> `pgorm::sql` behind the off-by-default `sql-macro` feature. Its call sites are the
+> The macro lives in its own crate rather than in `pgorm-macros` because a proc macro is
+> the wrong place for a C dependency the entity derives have no use for. The root crate
+> re-exports it as `pgorm::sql` behind the off-by-default `sql-macro` feature. That
+> feature no longer decides whether libpg_query is compiled — `pg_query` is a plain
+> dependency of `pgorm` itself, because `[spec:pgorm:sem:exec.paginator.raw+1]` parses
+> raw statements at runtime — only whether the macro is in scope. Its call sites are the
 > escape hatches that take SQL as text — `SelectorRaw::from_statement`,
 > `ConnectionTrait::query_raw` / `execute_raw` / `batch_execute`, and migration bodies.
 
