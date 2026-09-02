@@ -67,3 +67,6 @@ pub use rust_decimal::Decimal;
 
 #[cfg(feature = "with-uuid")]
 pub use uuid::Uuid;
+
+// [spec:pgorm:def:exec.decode.types+1]
+pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};

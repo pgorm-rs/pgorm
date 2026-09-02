@@ -468,6 +468,14 @@ children (
                 id orm.value-decode
                 title "Decode path and re-exports for Vector, IpNetwork and MacAddress"
                 kind @feat
+                log (
+                    {
+                        at 2026-09-02T00:11:29.672668Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

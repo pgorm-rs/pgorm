@@ -145,7 +145,7 @@ impl<T: TryGetable> TryGetable for Option<T> {
     }
 }
 
-// [spec:pgorm:def:exec.decode.types]
+// [spec:pgorm:def:exec.decode.types+1]
 macro_rules! try_getable_all {
     ( $type: ty ) => {
         impl TryGetable for $type {
@@ -223,11 +223,11 @@ impl TryGetable for Decimal {
     }
 }
 
-use pgorm_query::Values;
+use pgorm_query::{IpNetwork, MacAddress, Values, Vector};
 use tokio_postgres::{
     Row,
     row::RowIndex,
-    types::{Json, Oid, WasNull},
+    types::{FromSql, Json, Oid, Type, WasNull},
 };
 
 #[allow(unused_macros)]
@@ -264,6 +264,74 @@ try_getable_uuid!(uuid::fmt::Simple, uuid::Uuid::simple);
 #[cfg(feature = "with-uuid")]
 try_getable_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 
+/// `ipnetwork::IpNetwork` ships no `FromSql` impl and the orphan rule forbids
+/// writing one for it here, so decoding routes through a local newtype that
+/// reads the wire format with `postgres_protocol` and rebuilds the network.
+// [spec:pgorm:def:exec.decode.types+1]
+#[derive(Debug)]
+struct InetSql(IpNetwork);
+
+// [spec:pgorm:def:exec.decode.types+1]
+impl<'a> FromSql<'a> for InetSql {
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let inet = postgres_protocol::types::inet_from_sql(raw)?;
+        Ok(Self(IpNetwork::new(inet.addr(), inet.netmask())?))
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        *ty == Type::INET || *ty == Type::CIDR
+    }
+}
+
+/// The `mac_address::MacAddress` counterpart of [`InetSql`].
+// [spec:pgorm:def:exec.decode.types+1]
+#[derive(Debug)]
+struct MacAddrSql(MacAddress);
+
+// [spec:pgorm:def:exec.decode.types+1]
+impl<'a> FromSql<'a> for MacAddrSql {
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let bytes = postgres_protocol::types::macaddr_from_sql(raw)?;
+        Ok(Self(MacAddress::new(bytes)))
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        *ty == Type::MACADDR
+    }
+}
+
+// [spec:pgorm:def:exec.decode.types+1]
+impl TryGetable for IpNetwork {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        let result: InetSql = res.row.try_get(idx).map_err(TryGetError::postgres)?;
+        Ok(result.0)
+    }
+}
+
+// [spec:pgorm:def:exec.decode.types+1]
+impl TryGetable for MacAddress {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        let result: MacAddrSql = res.row.try_get(idx).map_err(TryGetError::postgres)?;
+        Ok(result.0)
+    }
+}
+
+// [spec:pgorm:def:exec.decode.types+1]
+impl TryGetable for Vector {
+    fn try_get_by<I: RowIndex + std::fmt::Display>(
+        res: &QueryResult,
+        idx: I,
+    ) -> Result<Self, TryGetError> {
+        res.row.try_get(idx).map_err(TryGetError::postgres)
+    }
+}
+
 // [spec:pgorm:sem:exec.decode.u32-oid]
 impl TryGetable for u32 {
     #[allow(unused_variables)]
@@ -282,7 +350,7 @@ fn err_null_idx_col<I: RowIndex + std::fmt::Display>(idx: I) -> TryGetError {
     TryGetError::Null("TODO".into()) //format!("{idx:?}"))
 }
 
-// [spec:pgorm:def:exec.decode.array]
+// [spec:pgorm:def:exec.decode.array+1]
 #[cfg(feature = "postgres-array")]
 mod postgres_array {
     use super::*;
@@ -638,7 +706,7 @@ where
 
 // TryFromU64 //
 /// Try to convert a type to a u64
-// [spec:pgorm:def:exec.decode.from-u64]
+// [spec:pgorm:def:exec.decode.from-u64+1]
 pub trait TryFromU64: Sized {
     /// The method to convert the type to a u64
     fn try_from_u64(n: u64) -> Result<Self, DbErr>;
@@ -769,6 +837,38 @@ mod tests {
         let try_get_error = TryGetError::Null("column".to_owned());
         let expected = "A null value was encountered while decoding column".to_owned();
         assert_eq!(DbErr::from(try_get_error), DbErr::Type(expected));
+    }
+
+    // [spec:pgorm:def:exec.decode.types+1/test]
+    #[test]
+    fn decodes_inet_wire_format() {
+        let v4 = InetSql::from_sql(&Type::INET, &[2, 24, 0, 4, 10, 0, 0, 1]).unwrap();
+        assert_eq!(v4.0, "10.0.0.1/24".parse::<IpNetwork>().unwrap());
+
+        let v6 = InetSql::from_sql(
+            &Type::INET,
+            &[
+                3, 128, 0, 16, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+            ],
+        )
+        .unwrap();
+        assert_eq!(v6.0, "2001:db8::5/128".parse::<IpNetwork>().unwrap());
+
+        assert!(InetSql::from_sql(&Type::INET, &[9, 24, 0, 4, 10, 0, 0, 1]).is_err());
+        assert!(<InetSql as FromSql>::accepts(&Type::INET));
+        assert!(<InetSql as FromSql>::accepts(&Type::CIDR));
+        assert!(!<InetSql as FromSql>::accepts(&Type::MACADDR));
+    }
+
+    // [spec:pgorm:def:exec.decode.types+1/test]
+    #[test]
+    fn decodes_macaddr_wire_format() {
+        let mac = MacAddrSql::from_sql(&Type::MACADDR, &[0, 0x11, 0x22, 0x33, 0x44, 0x55]).unwrap();
+        assert_eq!(mac.0, "00:11:22:33:44:55".parse::<MacAddress>().unwrap());
+
+        assert!(MacAddrSql::from_sql(&Type::MACADDR, &[0, 0x11, 0x22]).is_err());
+        assert!(<MacAddrSql as FromSql>::accepts(&Type::MACADDR));
+        assert!(!<MacAddrSql as FromSql>::accepts(&Type::MACADDR8));
     }
 
     #[test]

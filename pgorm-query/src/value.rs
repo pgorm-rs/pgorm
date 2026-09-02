@@ -11,11 +11,13 @@ use rust_decimal::Decimal;
 
 use uuid::Uuid;
 
-use ipnetwork::IpNetwork;
+pub use ipnetwork::IpNetwork;
 
 use std::net::IpAddr;
 
-use mac_address::MacAddress;
+pub use mac_address::MacAddress;
+
+pub use pgvector::Vector;
 
 use crate::{ColumnType, QueryBuilder, StringLen};
 

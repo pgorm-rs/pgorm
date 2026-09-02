@@ -46,7 +46,7 @@ These rules capture what the code does today, including known gaps.
 > the index formatting is commented out. This is a known limitation of
 > the current behavior, not a contract to preserve.
 
-> [spec:pgorm:def:exec.decode.types]
+> [spec:pgorm:def:exec.decode.types+1]
 > The scalar Rust types implementing `TryGetable` by direct delegation to
 > `Row::try_get` (and therefore accepting exactly the Postgres types
 > tokio-postgres's `FromSql` accepts for them) are: `bool`, `i8`, `i16`,
@@ -55,12 +55,32 @@ These rules capture what the code does today, including known gaps.
 > Feature-gated additions: `serde_json::Value` (`with-json`);
 > `chrono::NaiveDate`, `NaiveTime`, `NaiveDateTime`,
 > `DateTime<FixedOffset>`, `DateTime<Utc>`, `DateTime<Local>`
-> (`with-chrono`); `time::Date`, `time::Time`, `time::PrimitiveDateTime`,
-> `time::OffsetDateTime` (`with-time`); `rust_decimal::Decimal`
-> (`with-rust_decimal`); `bigdecimal::BigDecimal` (`with-bigdecimal`).
+> (`with-chrono`); `rust_decimal::Decimal` (`with-rust_decimal`).
+> There is no time-crate or bigdecimal support: chrono is the only
+> datetime path and `Decimal` the only arbitrary-precision numeric.
 > With `with-uuid`, `uuid::Uuid` and its format wrappers
 > (`uuid::fmt::Braced`, `Hyphenated`, `Simple`, `Urn`) decode by first
 > reading a `uuid::Uuid` and then converting.
+>
+> The three Postgres-specific payload types behind `Value::Vector`,
+> `Value::IpNetwork` and `Value::MacAddress` also implement `TryGetable`,
+> unconditionally (they are not feature-gated). `pgvector::Vector`
+> delegates straight to `Row::try_get`, using the `FromSql` impl pgvector
+> provides under its `postgres` feature (enabled by `pgorm-query`), which
+> accepts any type named `vector`. `ipnetwork::IpNetwork` and
+> `mac_address::MacAddress` ship no `FromSql` impl and the orphan rule
+> forbids writing one for them, so each decodes through a private local
+> newtype — `InetSql` and `MacAddrSql` — that implements `FromSql` over
+> `postgres_protocol::types::inet_from_sql` and
+> `postgres_protocol::types::macaddr_from_sql` respectively and is
+> unwrapped by the `TryGetable` impl. `InetSql` accepts `INET` and `CIDR`;
+> `MacAddrSql` accepts `MACADDR` only, so the 8-byte `MACADDR8` is
+> rejected. All three are re-exported from `pgorm_query` (and hence
+> `pgorm::entity::prelude`) as `Vector`, `IpNetwork` and `MacAddress`, so
+> callers need not depend on the payload crates directly.
+>
+> None of the three has a `Vec<T>` array impl: `exec.decode.array` does
+> not cover them.
 
 > [spec:pgorm:sem:exec.decode.u32-oid]
 > `u32` implements `TryGetable` by decoding a `tokio_postgres::types::Oid`,
@@ -69,14 +89,19 @@ These rules capture what the code does today, including known gaps.
 > integer widths implement `TryGetable`; `u8`, `u16`, and `u64` cannot be
 > decoded from a row.
 
-> [spec:pgorm:def:exec.decode.array]
+> [spec:pgorm:def:exec.decode.array+1]
 > Under the `postgres-array` feature, `Vec<T>` implements `TryGetable` by
-> direct array delegation for the same scalar set as
-> `exec.decode.types` (`bool`, `i8`, `i16`, `i32`, `i64`, `f32`, `f64`,
-> `String`, plus the feature-gated json/chrono/time/decimal types and the
-> uuid format wrappers, which decode as `Vec<uuid::Uuid>` then convert
-> element-wise). `Vec<u32>` decodes as `Vec<Oid>` per
-> `exec.decode.u32-oid`.
+> direct array delegation for a subset of the `exec.decode.types` scalars:
+> `bool`, `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `String`, plus the
+> feature-gated json/chrono/decimal types and the uuid format
+> wrappers, which decode as `Vec<uuid::Uuid>` then convert element-wise.
+> `Vec<u32>` decodes as `Vec<Oid>` per `exec.decode.u32-oid`. The subset
+> is proper: `Vec<u8>` is bytes rather than an array, and
+> `pgvector::Vector`, `ipnetwork::IpNetwork` and
+> `mac_address::MacAddress` have no `Vec<T>` impl at all — the array
+> macros delegate to `Row::try_get` for `Vec<$type>`, which the two
+> newtype-decoded types cannot satisfy without a separate unwrapping
+> macro.
 
 > [spec:pgorm:def:exec.decode.many]
 > `TryGetableMany` extracts tuples from a row: `try_get_many` takes a
@@ -108,13 +133,13 @@ These rules capture what the code does today, including known gaps.
 > each element of a JSON array and fails with
 > `DbErr::Json("Value is not an Array")` for any non-array value.
 
-> [spec:pgorm:def:exec.decode.from-u64]
+> [spec:pgorm:def:exec.decode.from-u64+1]
 > `TryFromU64` converts a `u64` (e.g. a rows-affected-derived id) into a
 > primary-key value type. Numeric impls (`i8`, `i16`, `i32`, `i64`, `u8`,
 > `u16`, `u32`, `u64`) use checked `TryInto`, failing with
 > `DbErr::TryIntoErr` on overflow. `String` converts via `to_string`.
 > Every other implementor — `bool`, `f32`, `f64`, `Vec<u8>`,
-> `serde_json::Value`, the chrono and time types, `Decimal`,
+> `serde_json::Value`, the chrono types, `Decimal`,
 > `uuid::Uuid`, and tuples of arity 2 through 12 — unconditionally
 > returns `DbErr::ConvertFromU64`.
 
