@@ -1954,6 +1954,13 @@ children (
                         kind @note
                         text "Oracle correction: money(12, 2) PARSES under the real grammar — typmod validity is resolved semantically, not syntactically, so the deletion rationale for Money(Some((p,s))) shifts from \"invalid SQL\" to \"arguments Postgres will reject at execution and that the type lyingly accepts\". Deletion stands. Likewise \"db\".\"schema\".\"table\" parses but fails at execution (cross-database reference) — the DatabaseSchemaTable removal rationale is semantic too. The oracle cannot police these; the live-PG suite and the type system are the guards. See oracle_records_parse_valid_defects in oracle_pins.rs."
                     }
+
+                    {
+                        at 2026-09-02T19:54:34.90234Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope updates from landed work: DatabaseSchemaTable is DONE (deleted by tableref-split — strike it). The auto_increment/serial-family redesign is CONFIRMED in this node's scope per tableref-split's analysis (ColumnSpec::AutoIncrement wires through codegen, the derives and PrimaryKeyTrait::auto_increment() — a serial-family constructor redesign reaches all of them; assess whether to do the full replacement or keep the flag and only delete the unimplemented render arm, reporting the call). Also remember: this node's landing ends the standing function-density bypass for query_builder.rs."
+                    }
                 )
             }
 
@@ -2015,6 +2022,46 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: build_any/to_string_any/build_collect_any (~29 sites across schema.rs, table/*, index/*, foreign_key/*, query/*) are sea-query multi-backend vestige — every call passes the single unit-struct QueryBuilder, which carries no state. Collapse to one method per statement and drop the QueryBuilder argument workspace-wide (pgorm-query + root crate + migration call sites + tests). Purely mechanical but the widest churn in the campaign — hence last, deps on tableref-split and mysql-purge. Bumps sql.ast.build, sql.ddl and every rule naming build_any. M."
+                    }
+                )
+            }
+
+            {
+                id unrep.over-function
+                title "OVER attaches only to function calls: narrow the four expr_window constructors"
+                log (
+                    {
+                        at 2026-09-02T19:53:43.21024Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From bug.window-position's grammar probe: PG accepts OVER only after func_application — COUNT(x)/my_func(x) parse; bare columns, arithmetic, CASE and CAST are rejected at OVER. The renderer is correct; the four expr_window* constructors' T: Into<SimpleExpr> signatures admit the invalid state. Narrow to FunctionCall (breaking). Pinned by oracle_pins_over_on_a_bare_expression in oracle_pins.rs — flip when fixed. sql.render.window+1 and sql.ast.window-statement+1 state the gap and name this follow-up."
+                    }
+                )
+            }
+
+            {
+                id unrep.ddl-empty-builders
+                title "DDL builders cannot render empty: alter without options, create without columns"
+                log (
+                    {
+                        at 2026-09-02T19:53:59.453825Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From tableref-split's judgment call: \"No alter option found\" (query_builder panic on a zero-option TableAlterStatement) needs a typestate builder — Table::alter() cannot return a renderable empty statement, option-adders transition the state — and the same statement-built-empty defect afflicts TableCreateStatement (no columns) and IndexCreateStatement (no columns). One node for the DDL-builder family; ~36 call sites for alter alone. sql.ddl.alter-table pins the current panic. Follows the CTE-builders precedent (complete constructors, WithClause non-empty pattern)."
+                    }
+                )
+            }
+
+            {
+                id unrep.dml-target
+                title "DML targets are a name with optional alias; subqueries stay unconstructible there"
+                deps (unrep.tableref-split)
+                log (
+                    {
+                        at 2026-09-02T19:54:17.646314Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From tableref-split's residual: insert into_table / update.table / delete from_table take IntoFromItem, so INSERT INTO (SELECT ...) AS x remains constructible — PG's DML target is a name with optional alias, a third position. The split's unify directive argued against a third top-level type; the honest fix identified: make FromItem::Table's payload a named struct (name + optional alias) and let DML targets take exactly that type. Deps on tableref-split (same types)."
                     }
                 )
             }
