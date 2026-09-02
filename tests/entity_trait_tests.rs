@@ -12,7 +12,7 @@ use pgorm::{
     entity::prelude::*,
 };
 use pgorm_query::{
-    Alias, Expr, IntoIden, QueryBuilder, TableRef, TryFromValueTuple, ValueTuple, ValueTupleErr,
+    Alias, Expr, IntoIden, QueryBuilder, TableName, TryFromValueTuple, ValueTuple, ValueTupleErr,
     ValueTupleShape,
 };
 use pretty_assertions::assert_eq;
@@ -328,9 +328,9 @@ fn entity_trait_family() {
     assert_eq!(entity.as_str(), copied.as_str());
 }
 
-// [spec:pgorm:req:entity.traits.entity-name/test]    `table_name` is the only
+// [spec:pgorm:req:entity.traits.entity-name+1/test]    `table_name` is the only
 // required method; `schema_name` and `comment` default to `None` and
-// `module_name` to `table_name()`; `table_ref` yields a bare `TableRef::Table`
+// `module_name` to `table_name()`; `table_ref` yields a bare `TableName::Table`
 // without a schema and a `SchemaTable` with one, and every statement that names
 // the table is qualified as a result
 #[test]
@@ -343,7 +343,7 @@ fn entity_name_defaults_and_table_ref() {
 
     // Without a schema, `table_ref` is a bare table reference.
     assert!(
-        matches!(item::Entity.table_ref(), TableRef::Table(iden) if iden.to_string() == "item")
+        matches!(item::Entity.table_ref(), TableName::Table(iden) if iden.to_string() == "item")
     );
 
     // With one, it is schema-qualified — note both entities share `table_name`.
@@ -351,7 +351,7 @@ fn entity_name_defaults_and_table_ref() {
     assert_eq!(scoped_item::Entity.schema_name(), Some("warehouse"));
     assert!(matches!(
         scoped_item::Entity.table_ref(),
-        TableRef::SchemaTable(schema, table)
+        TableName::SchemaTable(schema, table)
             if schema.to_string() == "warehouse" && table.to_string() == "item"
     ));
 

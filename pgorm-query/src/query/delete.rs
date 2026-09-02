@@ -32,7 +32,7 @@ use inherent::inherent;
 // [spec:pgorm:def:sql.ast.delete]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
-    pub(crate) table: Option<Box<TableRef>>,
+    pub(crate) table: Option<Box<FromItem>>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) orders: Vec<OrderExpr>,
     pub(crate) limit: Option<Value>,
@@ -65,9 +65,9 @@ impl DeleteStatement {
     #[allow(clippy::wrong_self_convention)]
     pub fn from_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoFromItem,
     {
-        self.table = Some(Box::new(tbl_ref.into_table_ref()));
+        self.table = Some(Box::new(tbl_ref.into_from_item()));
         self
     }
 

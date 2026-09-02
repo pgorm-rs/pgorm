@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, CommentTable, Iden, Index, IndexCreateStatement, SeaRc,
+    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, SeaRc,
     TableCreateStatement,
     extension::{Type, TypeCreateStatement},
 };
@@ -210,14 +210,12 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+1]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+2]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
 {
-    let Ok(table) = CommentTable::try_from(entity.table_ref()) else {
-        return Vec::new();
-    };
+    let table = entity.table_ref();
 
     let mut vec = Vec::new();
     if let Some(comment) = entity.comment() {
@@ -231,7 +229,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+1]
+// [spec:pgorm:sem:schema.from-entity+2]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -266,7 +264,7 @@ where
     stmt.table(entity.table_ref()).take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+1]    column + primary-key projection
+// [spec:pgorm:sem:schema.from-entity+2]    column + primary-key projection
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,

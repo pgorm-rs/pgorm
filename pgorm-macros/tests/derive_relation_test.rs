@@ -128,8 +128,8 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     // `Entity::belongs_to(target)` => HasOne, not the owner.
     assert_eq!(def.rel_type, RelationType::HasOne);
     assert!(!def.is_owner);
-    assert_eq!(def.from_tbl, fruit::Entity.table_ref());
-    assert_eq!(def.to_tbl, cake::Entity.table_ref());
+    assert_eq!(def.from_tbl, fruit::Entity.table_ref().into());
+    assert_eq!(def.to_tbl, cake::Entity.table_ref().into());
     assert_eq!(
         cols(&def.columns.from_identity()),
         vec!["cake_id".to_owned()]
@@ -172,8 +172,8 @@ fn has_many_and_has_one_reverse_the_target() {
     assert_eq!(many.rel_type, RelationType::HasMany);
     assert!(many.is_owner);
     // Reversed: the def reads from cake to fruit.
-    assert_eq!(many.from_tbl, cake::Entity.table_ref());
-    assert_eq!(many.to_tbl, fruit::Entity.table_ref());
+    assert_eq!(many.from_tbl, cake::Entity.table_ref().into());
+    assert_eq!(many.to_tbl, fruit::Entity.table_ref().into());
     assert_eq!(cols(&many.columns.from_identity()), vec!["id".to_owned()]);
     assert_eq!(
         cols(&many.columns.to_identity()),
@@ -194,7 +194,7 @@ fn the_entity_identifier_is_overridable() {
     let def = entity_override::AltRelation::Fruit.def();
     // The relation was built from `Renamed` (= cake::Entity), not from an
     // `Entity` in scope — there is none.
-    assert_eq!(def.from_tbl, cake::Entity.table_ref());
-    assert_eq!(def.to_tbl, fruit::Entity.table_ref());
+    assert_eq!(def.from_tbl, cake::Entity.table_ref().into());
+    assert_eq!(def.to_tbl, fruit::Entity.table_ref().into());
     assert_eq!(def.rel_type, RelationType::HasOne);
 }

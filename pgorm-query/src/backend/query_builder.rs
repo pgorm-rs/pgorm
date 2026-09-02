@@ -125,7 +125,7 @@ impl QueryBuilder {
 
         if let Some(table) = &insert.table {
             write!(sql, " INTO ").unwrap();
-            self.prepare_table_ref(table, sql);
+            self.prepare_from_item(table, sql);
         }
 
         if let (Some(num_rows), true, true) = (
@@ -223,11 +223,11 @@ impl QueryBuilder {
 
         if !select.from.is_empty() {
             write!(sql, " FROM ").unwrap();
-            select.from.iter().fold(true, |first, table_ref| {
+            select.from.iter().fold(true, |first, from_item| {
                 if !first {
                     write!(sql, ", ").unwrap()
                 }
-                self.prepare_table_ref(table_ref, sql);
+                self.prepare_from_item(from_item, sql);
                 false
             });
             self.prepare_index_hints(select, sql);
@@ -314,7 +314,7 @@ impl QueryBuilder {
         write!(sql, "UPDATE ").unwrap();
 
         if let Some(table) = &update.table {
-            self.prepare_table_ref(table, sql);
+            self.prepare_from_item(table, sql);
         }
 
         write!(sql, " SET ").unwrap();
@@ -374,7 +374,7 @@ impl QueryBuilder {
 
         if let Some(table) = &delete.table {
             write!(sql, "FROM ").unwrap();
-            self.prepare_table_ref(table, sql);
+            self.prepare_from_item(table, sql);
         }
 
         self.prepare_output(&delete.returning, sql);
@@ -411,7 +411,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
-    // [spec:pgorm:req:sql.render.subquery] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.subquery+1] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr]
     fn prepare_simple_expr_common(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
@@ -559,11 +559,11 @@ impl QueryBuilder {
         .unwrap();
         if !lock.tables.is_empty() {
             write!(sql, " OF ").unwrap();
-            lock.tables.iter().fold(true, |first, table_ref| {
+            lock.tables.iter().fold(true, |first, from_item| {
                 if !first {
                     write!(sql, ", ").unwrap();
                 }
-                self.prepare_table_ref(table_ref, sql);
+                self.prepare_from_item(from_item, sql);
                 false
             });
         }
@@ -602,44 +602,50 @@ impl QueryBuilder {
     fn prepare_join_expr(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
         self.prepare_join_type(&join_expr.join, sql);
         write!(sql, " ").unwrap();
-        self.prepare_join_table_ref(join_expr, sql);
+        self.prepare_join_from_item(join_expr, sql);
         if let Some(on) = &join_expr.on {
             self.prepare_join_on(on, sql);
         }
     }
 
-    fn prepare_join_table_ref(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
+    fn prepare_join_from_item(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
         if join_expr.lateral {
             write!(sql, "LATERAL ").unwrap();
         }
-        self.prepare_table_ref(&join_expr.table, sql);
+        self.prepare_from_item(&join_expr.table, sql);
     }
 
-    /// Translate [`TableRef`] into SQL statement.
-    // [spec:pgorm:req:sql.render.subquery] (value-bearing table refs carry mandatory aliases)
-    fn prepare_table_ref(&self, table_ref: &TableRef, sql: &mut dyn SqlWriter) {
-        match table_ref {
-            TableRef::SubQuery(query, alias) => {
+    /// Translate [`FromItem`] into SQL statement.
+    // [spec:pgorm:req:sql.render.subquery+1] (value-bearing from items carry mandatory aliases)
+    fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
+        match from_item {
+            FromItem::Table(name, alias) => {
+                self.prepare_table_name(name, sql);
+                if let Some(alias) = alias {
+                    write!(sql, " AS ").unwrap();
+                    alias.prepare(sql.as_writer(), self.quote());
+                }
+            }
+            FromItem::SubQuery(query, alias) => {
                 write!(sql, "(").unwrap();
                 self.prepare_select_statement(query, sql);
                 write!(sql, ")").unwrap();
                 write!(sql, " AS ").unwrap();
                 alias.prepare(sql.as_writer(), self.quote());
             }
-            TableRef::ValuesList(values, alias) => {
+            FromItem::ValuesList(values, alias) => {
                 write!(sql, "(").unwrap();
                 self.prepare_values_list(values, sql);
                 write!(sql, ")").unwrap();
                 write!(sql, " AS ").unwrap();
                 alias.prepare(sql.as_writer(), self.quote());
             }
-            TableRef::FunctionCall(func, alias) => {
+            FromItem::FunctionCall(func, alias) => {
                 self.prepare_function_name(&func.func, sql);
                 self.prepare_function_arguments(func, sql);
                 write!(sql, " AS ").unwrap();
                 alias.prepare(sql.as_writer(), self.quote());
             }
-            _ => self.prepare_table_ref_iden(table_ref, sql),
         }
     }
 
@@ -1495,7 +1501,7 @@ impl QueryBuilder {
 
     // COMMON
     // START: impl that ought not be here
-    // [spec:pgorm:sem:sql.ddl.panics]
+    // [spec:pgorm:sem:sql.ddl.panics+1]
     // [spec:pgorm:def:sql.render.ddl.types+1] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match &column_type {
@@ -1651,7 +1657,7 @@ impl QueryBuilder {
         };
         write!(sql, "ALTER TABLE ").unwrap();
         if let Some(table) = &alter.table {
-            self.prepare_table_ref_table_stmt(table, sql);
+            self.prepare_table_name(table, sql);
             write!(sql, " ").unwrap();
         }
 
@@ -1772,7 +1778,7 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
     pub(crate) fn prepare_table_rename_statement(
         &self,
         rename: &TableRenameStatement,
@@ -1780,16 +1786,16 @@ impl QueryBuilder {
     ) {
         write!(sql, "ALTER TABLE ").unwrap();
         if let Some(from_name) = &rename.from_name {
-            self.prepare_table_ref_table_stmt(from_name, sql);
+            self.prepare_table_name(from_name, sql);
         }
         write!(sql, " RENAME TO ").unwrap();
         if let Some(to_name) = &rename.to_name {
-            self.prepare_table_ref_table_stmt(to_name, sql);
+            self.prepare_table_name(to_name, sql);
         }
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+2]
+    // [spec:pgorm:req:sql.ddl.create-table+3]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1799,8 +1805,8 @@ impl QueryBuilder {
 
         self.prepare_create_table_if_not_exists(create, sql);
 
-        if let Some(table_ref) = &create.table {
-            self.prepare_table_ref_table_stmt(table_ref, sql);
+        if let Some(table_name) = &create.table {
+            self.prepare_table_name(table_name, sql);
         }
 
         write!(sql, " ( ").unwrap();
@@ -1847,21 +1853,6 @@ impl QueryBuilder {
         }
     }
 
-    /// Translate [`TableRef`] into SQL statement.
-    // [spec:pgorm:sem:sql.ddl.panics]
-    pub(crate) fn prepare_table_ref_table_stmt(
-        &self,
-        table_ref: &TableRef,
-        sql: &mut dyn SqlWriter,
-    ) {
-        match table_ref {
-            TableRef::Table(_)
-            | TableRef::SchemaTable(_, _)
-            | TableRef::DatabaseSchemaTable(_, _, _) => self.prepare_table_ref_iden(table_ref, sql),
-            _ => panic!("Not supported"),
-        }
-    }
-
     /// Translate [`ColumnSpec`] into SQL statement.
     fn prepare_column_spec(&self, column_spec: &ColumnSpec, sql: &mut dyn SqlWriter) {
         match column_spec {
@@ -1886,7 +1877,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`CommentStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.comment]
+    // [spec:pgorm:req:sql.ddl.comment+1]
     pub(crate) fn prepare_comment_statement(
         &self,
         statement: &CommentStatement,
@@ -1896,11 +1887,11 @@ impl QueryBuilder {
         match &statement.target {
             CommentTarget::Table(table) => {
                 write!(sql, "TABLE ").unwrap();
-                self.prepare_comment_table(table, sql);
+                self.prepare_table_name(table, sql);
             }
             CommentTarget::Column(table, column) => {
                 write!(sql, "COLUMN ").unwrap();
-                self.prepare_comment_table(table, sql);
+                self.prepare_table_name(table, sql);
                 write!(sql, ".").unwrap();
                 column.prepare(sql.as_writer(), self.quote());
             }
@@ -1909,27 +1900,8 @@ impl QueryBuilder {
         self.prepare_comment_text(&statement.comment, sql);
     }
 
-    /// Translate [`CommentTable`] into SQL statement.
-    fn prepare_comment_table(&self, table: &CommentTable, sql: &mut dyn SqlWriter) {
-        match table {
-            CommentTable::Table(table) => table.prepare(sql.as_writer(), self.quote()),
-            CommentTable::SchemaTable(schema, table) => {
-                schema.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
-            }
-            CommentTable::DatabaseSchemaTable(database, schema, table) => {
-                database.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                schema.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
-            }
-        }
-    }
-
     /// Write comment text as a standard-conforming string literal.
-    // [spec:pgorm:req:sql.ddl.comment]
+    // [spec:pgorm:req:sql.ddl.comment+1]
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
         write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
     }
@@ -1961,7 +1933,7 @@ impl QueryBuilder {
     // }
 
     /// Translate [`TableDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
     pub(crate) fn prepare_table_drop_statement(
         &self,
         drop: &TableDropStatement,
@@ -1977,7 +1949,7 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            self.prepare_table_ref_table_stmt(table, sql);
+            self.prepare_table_name(table, sql);
             false
         });
 
@@ -2008,7 +1980,7 @@ impl QueryBuilder {
         write!(sql, "TRUNCATE TABLE ").unwrap();
 
         if let Some(table) = &truncate.table {
-            self.prepare_table_ref_table_stmt(table, sql);
+            self.prepare_table_name(table, sql);
         }
     }
 
@@ -2074,7 +2046,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+1]
+    // [spec:pgorm:req:sql.ddl.index-create+2]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -2099,7 +2071,7 @@ impl QueryBuilder {
 
         write!(sql, " ON ").unwrap();
         if let Some(table) = &create.table {
-            self.prepare_table_ref_index_stmt(table, sql);
+            self.prepare_table_name(table, sql);
         }
 
         self.prepare_index_type(&create.index_type, sql);
@@ -2111,16 +2083,7 @@ impl QueryBuilder {
         }
     }
 
-    fn prepare_table_ref_index_stmt(&self, table_ref: &TableRef, sql: &mut dyn SqlWriter) {
-        match table_ref {
-            TableRef::Table(_) | TableRef::SchemaTable(_, _) => {
-                self.prepare_table_ref_iden(table_ref, sql)
-            }
-            _ => panic!("Not supported"),
-        }
-    }
-
-    // [spec:pgorm:req:sql.ddl.index-drop]
+    // [spec:pgorm:req:sql.ddl.index-drop+1]
     pub(crate) fn prepare_index_drop_statement(
         &self,
         drop: &IndexDropStatement,
@@ -2132,15 +2095,9 @@ impl QueryBuilder {
             write!(sql, "IF EXISTS ").unwrap();
         }
 
-        if let Some(table) = &drop.table {
-            match table {
-                TableRef::Table(_) => {}
-                TableRef::SchemaTable(schema, _) => {
-                    schema.prepare(sql.as_writer(), self.quote());
-                    write!(sql, ".").unwrap();
-                }
-                _ => panic!("Not supported"),
-            }
+        if let Some(schema) = drop.table.as_ref().and_then(TableName::schema) {
+            schema.prepare(sql.as_writer(), self.quote());
+            write!(sql, ".").unwrap();
         }
         if let Some(name) = &drop.index.name {
             name.prepare(sql.as_writer(), self.quote());
@@ -2203,7 +2160,7 @@ impl QueryBuilder {
         if mode == Mode::Alter {
             write!(sql, "ALTER TABLE ").unwrap();
             if let Some(table) = &drop.table {
-                self.prepare_table_ref_fk_stmt(table, sql);
+                self.prepare_table_name(table, sql);
             }
             write!(sql, " ").unwrap();
         }
@@ -2214,7 +2171,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key]
+    // [spec:pgorm:req:sql.ddl.foreign-key+1]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2224,7 +2181,7 @@ impl QueryBuilder {
         if mode == Mode::Alter {
             write!(sql, "ALTER TABLE ").unwrap();
             if let Some(table) = &create.foreign_key.table {
-                self.prepare_table_ref_fk_stmt(table, sql);
+                self.prepare_table_name(table, sql);
             }
             write!(sql, " ").unwrap();
         }
@@ -2251,7 +2208,7 @@ impl QueryBuilder {
 
         write!(sql, " REFERENCES ").unwrap();
         if let Some(ref_table) = &create.foreign_key.ref_table {
-            self.prepare_table_ref_fk_stmt(ref_table, sql);
+            self.prepare_table_name(ref_table, sql);
         }
         write!(sql, " ").unwrap();
 
@@ -2277,15 +2234,6 @@ impl QueryBuilder {
         if let Some(foreign_key_action) = &create.foreign_key.on_update {
             write!(sql, " ON UPDATE ").unwrap();
             self.prepare_foreign_key_action(foreign_key_action, sql);
-        }
-    }
-
-    fn prepare_table_ref_fk_stmt(&self, table_ref: &TableRef, sql: &mut dyn SqlWriter) {
-        match table_ref {
-            TableRef::Table(_)
-            | TableRef::SchemaTable(_, _)
-            | TableRef::DatabaseSchemaTable(_, _, _) => self.prepare_table_ref_iden(table_ref, sql),
-            _ => panic!("Not supported"),
         }
     }
 
@@ -2374,50 +2322,15 @@ impl QueryBuilder {
         output
     }
 
-    // TABLE REF
-    /// Translate [`TableRef`] that without values into SQL statement.
-    fn prepare_table_ref_iden(&self, table_ref: &TableRef, sql: &mut dyn SqlWriter) {
-        match table_ref {
-            TableRef::Table(iden) => {
-                iden.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::SchemaTable(schema, table) => {
+    // TABLE NAME
+    /// Translate [`TableName`] into SQL statement.
+    fn prepare_table_name(&self, name: &TableName, sql: &mut dyn SqlWriter) {
+        match name {
+            TableName::Table(table) => table.prepare(sql.as_writer(), self.quote()),
+            TableName::SchemaTable(schema, table) => {
                 schema.prepare(sql.as_writer(), self.quote());
                 write!(sql, ".").unwrap();
                 table.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::DatabaseSchemaTable(database, schema, table) => {
-                database.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                schema.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::TableAlias(iden, alias) => {
-                iden.prepare(sql.as_writer(), self.quote());
-                write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::SchemaTableAlias(schema, table, alias) => {
-                schema.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
-                write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::DatabaseSchemaTableAlias(database, schema, table, alias) => {
-                database.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                schema.prepare(sql.as_writer(), self.quote());
-                write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
-                write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
-            }
-            TableRef::SubQuery(_, _)
-            | TableRef::ValuesList(_, _)
-            | TableRef::FunctionCall(_, _) => {
-                panic!("TableRef with values is not support")
             }
         }
     }

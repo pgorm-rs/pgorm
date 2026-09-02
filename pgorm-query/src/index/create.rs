@@ -100,10 +100,10 @@ use super::common::*;
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+1]
+// [spec:pgorm:req:sql.ddl.index-create+2]
 #[derive(Default, Debug, Clone)]
 pub struct IndexCreateStatement {
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
     pub(crate) index: TableIndex,
     pub(crate) kind: IndexKind,
     pub(crate) nulls_not_distinct: bool,
@@ -121,7 +121,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+1]
+// [spec:pgorm:req:sql.ddl.index-create+2]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -134,7 +134,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+1]
+// [spec:pgorm:req:sql.ddl.index-create+2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -186,9 +186,9 @@ impl IndexCreateStatement {
     /// Set target table
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 

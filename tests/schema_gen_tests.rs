@@ -203,7 +203,7 @@ fn flags(col: &ColumnDef) -> Flags {
     flags
 }
 
-// [spec:pgorm:sem:schema.from-entity+1/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
+// [spec:pgorm:sem:schema.from-entity+2/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
 #[test]
 fn create_table_from_entity_projects_columns() {
     let schema = Schema::new();
@@ -306,7 +306,7 @@ fn create_table_from_entity_projects_columns() {
     assert!(!widget::Relation::Factory.def().is_owner);
 }
 
-// [spec:pgorm:sem:schema.from-entity+1/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
+// [spec:pgorm:sem:schema.from-entity+2/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
 #[test]
 fn create_table_composite_key_emits_index() {
     let schema = Schema::new();
@@ -332,7 +332,7 @@ fn create_table_composite_key_emits_index() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+1/test]    the entity comment first, then the commented
+// [spec:pgorm:sem:schema.from-entity+2/test]    the entity comment first, then the commented
 // columns in Column order, targeting entity.table_ref() with the text quoted
 #[test]
 fn create_comments_from_entity_emits_statements() {
@@ -499,7 +499,7 @@ fn create_enum_from_active_enum_errs_non_enum() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+1/test]    the projected DDL is accepted by Postgres and enforces what it declares
+// [spec:pgorm:sem:schema.from-entity+2/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
 // [spec:pgorm:sem:schema.from-entity.enum+1/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
@@ -643,7 +643,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:schema.from-entity+1/test]    the comment statements execute, and only they
+// [spec:pgorm:sem:schema.from-entity+2/test]    the comment statements execute, and only they
 // attach anything: the text arrives in pg_description exactly as declared
 #[pgorm_macros::test]
 async fn entity_comments_land_in_pg_description() -> Result<(), DbErr> {

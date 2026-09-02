@@ -22,7 +22,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, TableForeignKey, types::*};
 #[derive(Default, Debug, Clone)]
 pub struct ForeignKeyDropStatement {
     pub(crate) foreign_key: TableForeignKey,
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
 }
 
 impl ForeignKeyDropStatement {
@@ -43,9 +43,9 @@ impl ForeignKeyDropStatement {
     /// Set key table and referencing table
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 }

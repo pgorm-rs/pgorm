@@ -99,7 +99,7 @@ impl ForeignKeyCreateStatement {
     /// Set key table and columns
     pub fn from<T, C>(&mut self, table: T, columns: C) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
         C: IdenList,
     {
         self.foreign_key.from_tbl(table);
@@ -112,7 +112,7 @@ impl ForeignKeyCreateStatement {
     /// Set referencing table and columns
     pub fn to<T, C>(&mut self, table: T, columns: C) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
         C: IdenList,
     {
         self.foreign_key.to_tbl(table);
@@ -125,7 +125,7 @@ impl ForeignKeyCreateStatement {
     /// Set key table
     pub fn from_tbl<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
         self.foreign_key.from_tbl(table);
         self
@@ -134,7 +134,7 @@ impl ForeignKeyCreateStatement {
     /// Set referencing table
     pub fn to_tbl<R>(&mut self, ref_table: R) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoTableName,
     {
         self.foreign_key.to_tbl(ref_table);
         self

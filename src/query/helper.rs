@@ -3,8 +3,8 @@ use crate::{
     PrimaryKeyToColumn, RelationDef,
 };
 use pgorm_query::{
-    Alias, ConditionType, Expr, Iden, IntoCondition, IntoIden, LockBehavior, LockType,
-    NullOrdering, SeaRc, SelectExpr, SelectStatement, SimpleExpr, TableRef,
+    Alias, ConditionType, Expr, FromItem, Iden, IntoCondition, IntoIden, LockBehavior, LockType,
+    NullOrdering, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
 };
 pub use pgorm_query::{
     Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
@@ -868,17 +868,11 @@ pub trait QueryFilter: Sized {
     }
 }
 
-// [spec:pgorm:sem:query.build.join+1]
+// [spec:pgorm:sem:query.build.join+2]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
-    let from_tbl = match unpack_table_alias(&rel.from_tbl) {
-        Some(alias) => alias,
-        None => unpack_table_ref(&rel.from_tbl),
-    };
-    let to_tbl = match unpack_table_alias(&rel.to_tbl) {
-        Some(alias) => alias,
-        None => unpack_table_ref(&rel.to_tbl),
-    };
+    let from_tbl = SeaRc::clone(rel.from_tbl.qualifier());
+    let to_tbl = SeaRc::clone(rel.to_tbl.qualifier());
     let mut condition = match rel.condition_type {
         ConditionType::All => Condition::all(),
         ConditionType::Any => Condition::any(),
@@ -896,7 +890,7 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     condition
 }
 
-// [spec:pgorm:sem:query.build.join+1]
+// [spec:pgorm:sem:query.build.join+2]
 pub(crate) fn join_tbl_on_condition(
     from_tbl: SeaRc<dyn Iden>,
     to_tbl: SeaRc<dyn Iden>,
@@ -912,30 +906,13 @@ pub(crate) fn join_tbl_on_condition(
     cond
 }
 
-pub(crate) fn unpack_table_ref(table_ref: &TableRef) -> DynIden {
-    match table_ref {
-        TableRef::Table(tbl)
-        | TableRef::SchemaTable(_, tbl)
-        | TableRef::DatabaseSchemaTable(_, _, tbl)
-        | TableRef::TableAlias(tbl, _)
-        | TableRef::SchemaTableAlias(_, tbl, _)
-        | TableRef::DatabaseSchemaTableAlias(_, _, tbl, _)
-        | TableRef::SubQuery(_, tbl)
-        | TableRef::ValuesList(_, tbl)
-        | TableRef::FunctionCall(_, tbl) => SeaRc::clone(tbl),
-    }
-}
-
-pub(crate) fn unpack_table_alias(table_ref: &TableRef) -> Option<DynIden> {
-    match table_ref {
-        TableRef::Table(_)
-        | TableRef::SchemaTable(_, _)
-        | TableRef::DatabaseSchemaTable(_, _, _)
-        | TableRef::SubQuery(_, _)
-        | TableRef::ValuesList(_, _) => None,
-        TableRef::TableAlias(_, alias)
-        | TableRef::SchemaTableAlias(_, _, alias)
-        | TableRef::DatabaseSchemaTableAlias(_, _, _, alias)
-        | TableRef::FunctionCall(_, alias) => Some(SeaRc::clone(alias)),
+/// The identifier a [`FromItem`] contributes to a foreign key or a join: the
+/// table it names, or the alias the value-producing forms are bound to.
+pub(crate) fn unpack_table_ref(from_item: &FromItem) -> DynIden {
+    match from_item {
+        FromItem::Table(name, _) => SeaRc::clone(name.table()),
+        FromItem::SubQuery(_, alias)
+        | FromItem::ValuesList(_, alias)
+        | FromItem::FunctionCall(_, alias) => SeaRc::clone(alias),
     }
 }

@@ -137,18 +137,18 @@ is what `EntityTrait::find()` produces.
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
-> [spec:pgorm:sem:query.build.join+1]
+> [spec:pgorm:sem:query.build.join+2]
 > `QuerySelect::join(join_type, rel)` joins `rel.to_tbl`;
 > `join_rev` joins `rel.from_tbl`; `join_as` / `join_as_rev` first re-alias
 > the joined table with a caller-supplied identifier. The ON condition is
-> computed by `join_condition(rel)`: each side's identifier is the table alias
-> if the `TableRef` carries one, otherwise the bare table identifier; each
-> `(from, to)` pair of `rel.columns` becomes one `from.col = to.col` equality
-> under `Condition::all()` or
+> computed by `join_condition(rel)`: each side's identifier is
+> `FromItem::qualifier()` — the bound alias if there is one, otherwise the bare
+> table identifier; each `(from, to)` pair of `rel.columns` becomes one
+> `from.col = to.col` equality under `Condition::all()` or
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+2]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+3]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -368,13 +368,13 @@ what makes it total over partially-set models.
 > (e.g. filtered out by the caller's `Select`) are silently dropped, and
 > shared targets are cloned per referencing input.
 
-> [spec:pgorm:req:query.loader.table-ref-limitation+1]
-> Loader key predicates can only qualify columns for `TableRef::Table` and
-> `TableRef::SchemaTable` relation targets: `table_column` matches exactly
-> those two variants and MUST return `Err(DbErr::Query)` for every other
-> variant (aliased, database-qualified, subquery, values-list or
-> function-call table refs), naming the key column it could not qualify and
-> the offending table reference. `prepare_condition` propagates that error,
-> so the load aborts with an `Err` and not a panic. Entities whose relations
-> resolve to such table refs still cannot be loaded through `LoaderTrait`;
-> the limitation is unchanged, only its reporting.
+> [spec:pgorm:req:query.loader.table-ref-limitation+2]
+> Loader key predicates can only qualify columns for an unaliased
+> `FromItem::Table` relation target: `table_column` matches exactly that
+> shape, over either `TableName` form, and MUST return `Err(DbErr::Query)`
+> for every other from item (an aliased table, a subquery, a values list or
+> a function call), naming the key column it could not qualify and the
+> offending from item. `prepare_condition` propagates that error, so the load
+> aborts with an `Err` and not a panic. Entities whose relations resolve to
+> such from items still cannot be loaded through `LoaderTrait`; the
+> limitation is unchanged, only its reporting.

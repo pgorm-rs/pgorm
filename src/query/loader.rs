@@ -3,7 +3,9 @@ use crate::{
     Related, RelationType, Select, error::*,
 };
 use async_trait::async_trait;
-use pgorm_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
+use pgorm_query::{
+    ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, SimpleExpr, TableName, ValueTuple,
+};
 use std::{collections::HashMap, str::FromStr};
 
 /// Entity, or a `Select<Entity>`; to be used as parameters in [`LoaderTrait`]
@@ -263,11 +265,11 @@ where
                 return Err(query_err("Relation to is not HasOne"));
             }
 
-            if !cmp_table_ref(&via_rel.to_tbl, &via.table_ref()) {
+            let via_tbl = FromItem::from(via.table_ref());
+            if !cmp_table_ref(&via_rel.to_tbl, &via_tbl) {
                 return Err(query_err(format!(
-                    "The given via Entity is incorrect: expected: {:?}, given: {:?}",
+                    "The given via Entity is incorrect: expected: {:?}, given: {via_tbl:?}",
                     via_rel.to_tbl,
-                    via.table_ref()
                 )));
             }
 
@@ -333,7 +335,7 @@ where
     }
 }
 
-fn cmp_table_ref(left: &TableRef, right: &TableRef) -> bool {
+fn cmp_table_ref(left: &FromItem, right: &FromItem) -> bool {
     // not ideal; but
     format!("{left:?}") == format!("{right:?}")
 }
@@ -411,7 +413,7 @@ where
 
 // [spec:pgorm:sem:query.loader.batching+2]
 fn prepare_condition(
-    table: &TableRef,
+    table: &FromItem,
     col: &Identity,
     keys: &[ValueTuple],
 ) -> Result<Condition, DbErr> {
@@ -447,14 +449,16 @@ fn prepare_condition(
     })
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation+1]
-fn table_column(tbl: &TableRef, col: &DynIden) -> Result<ColumnRef, DbErr> {
+// [spec:pgorm:req:query.loader.table-ref-limitation+2]
+fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, DbErr> {
     match tbl.to_owned() {
-        TableRef::Table(tbl) => Ok((tbl, col.clone()).into_column_ref()),
-        TableRef::SchemaTable(sch, tbl) => Ok((sch, tbl, col.clone()).into_column_ref()),
+        FromItem::Table(TableName::Table(tbl), None) => Ok((tbl, col.clone()).into_column_ref()),
+        FromItem::Table(TableName::SchemaTable(sch, tbl), None) => {
+            Ok((sch, tbl, col.clone()).into_column_ref())
+        }
         val => Err(query_err(format!(
             "Loader cannot qualify key column `{}` against table reference {val:?}: only \
-             `TableRef::Table` and `TableRef::SchemaTable` relation targets are supported",
+             unaliased `FromItem::Table` relation targets are supported",
             col.to_string(),
         ))),
     }

@@ -52,115 +52,134 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref/test]    `IntoTableRef` maps iden / 2-tuple / 3-tuple
+// [spec:pgorm:def:sql.types.table-ref+1/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
-fn into_table_ref_maps_the_plain_forms() {
+fn into_table_name_maps_the_two_forms() {
     assert_eq!(
-        Glyph::Table.into_table_ref(),
-        TableRef::Table(Glyph::Table.into_iden())
+        Glyph::Table.into_table_name(),
+        TableName::Table(Glyph::Table.into_iden())
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table).into_table_ref(),
-        TableRef::SchemaTable(Alias::new("schema").into_iden(), Glyph::Table.into_iden())
-    );
-    assert_eq!(
-        (Alias::new("db"), Alias::new("schema"), Glyph::Table).into_table_ref(),
-        TableRef::DatabaseSchemaTable(
-            Alias::new("db").into_iden(),
-            Alias::new("schema").into_iden(),
-            Glyph::Table.into_iden()
-        )
+        (Alias::new("schema"), Glyph::Table).into_table_name(),
+        TableName::SchemaTable(Alias::new("schema").into_iden(), Glyph::Table.into_iden())
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref/test]    `alias` upgrades a plain form and replaces an
-// existing alias
+// [spec:pgorm:def:sql.types.table-ref+1/test]    `IntoFromItem` maps the same spellings to an
+// unaliased named item, and a `TableName` converts infallibly
 #[test]
-fn table_ref_alias_adds_or_replaces() {
+fn into_from_item_maps_the_named_forms() {
     assert_eq!(
-        Glyph::Table.into_table_ref().alias(Alias::new("g")),
-        TableRef::TableAlias(Glyph::Table.into_iden(), Alias::new("g").into_iden())
+        Glyph::Table.into_from_item(),
+        FromItem::Table(TableName::Table(Glyph::Table.into_iden()), None)
+    );
+    assert_eq!(
+        (Alias::new("schema"), Glyph::Table).into_from_item(),
+        FromItem::Table(
+            TableName::SchemaTable(Alias::new("schema").into_iden(), Glyph::Table.into_iden()),
+            None
+        )
+    );
+    assert_eq!(
+        FromItem::from((Alias::new("schema"), Glyph::Table).into_table_name()),
+        (Alias::new("schema"), Glyph::Table).into_from_item()
+    );
+}
+
+// [spec:pgorm:def:sql.types.table-ref+1/test]    `alias` binds an alias and replaces an existing
+// one, on the named form and on the value-producing forms alike
+#[test]
+fn from_item_alias_adds_or_replaces() {
+    assert_eq!(
+        Glyph::Table.into_from_item().alias(Alias::new("g")),
+        FromItem::Table(
+            TableName::Table(Glyph::Table.into_iden()),
+            Some(Alias::new("g").into_iden())
+        )
     );
     assert_eq!(
         Glyph::Table
-            .into_table_ref()
+            .into_from_item()
             .alias(Alias::new("g"))
             .alias(Alias::new("h")),
-        TableRef::TableAlias(Glyph::Table.into_iden(), Alias::new("h").into_iden())
+        FromItem::Table(
+            TableName::Table(Glyph::Table.into_iden()),
+            Some(Alias::new("h").into_iden())
+        )
     );
     assert_eq!(
         (Alias::new("schema"), Glyph::Table)
-            .into_table_ref()
+            .into_from_item()
             .alias(Alias::new("g")),
-        TableRef::SchemaTableAlias(
-            Alias::new("schema").into_iden(),
-            Glyph::Table.into_iden(),
-            Alias::new("g").into_iden()
+        FromItem::Table(
+            TableName::SchemaTable(Alias::new("schema").into_iden(), Glyph::Table.into_iden()),
+            Some(Alias::new("g").into_iden())
         )
     );
     assert_eq!(
-        (Alias::new("db"), Alias::new("schema"), Glyph::Table)
-            .into_table_ref()
-            .alias(Alias::new("g")),
-        TableRef::DatabaseSchemaTableAlias(
-            Alias::new("db").into_iden(),
-            Alias::new("schema").into_iden(),
-            Glyph::Table.into_iden(),
-            Alias::new("g").into_iden()
-        )
+        FromItem::ValuesList(vec![], Alias::new("v").into_iden()).alias(Alias::new("w")),
+        FromItem::ValuesList(vec![], Alias::new("w").into_iden())
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref/test]    the six identifier forms render as dotted,
-// quoted parts with an optional alias
+// [spec:pgorm:def:sql.types.table-ref+1/test]    a column of a from item is qualified by its
+// alias when it has one, otherwise by the table it names
 #[test]
-fn identifier_table_ref_forms_render() {
-    let rendered = |table_ref: TableRef| {
+fn from_item_qualifier_prefers_the_alias() {
+    let named = (Alias::new("schema"), Glyph::Table).into_from_item();
+    assert_eq!(named.qualifier().to_string(), "glyph");
+    assert_eq!(
+        named.clone().alias(Alias::new("g")).qualifier().to_string(),
+        "g"
+    );
+    assert_eq!(
+        named.table_name(),
+        Some(&(Alias::new("schema"), Glyph::Table).into_table_name())
+    );
+
+    let values = FromItem::ValuesList(vec![], Alias::new("v").into_iden());
+    assert_eq!(values.qualifier().to_string(), "v");
+    assert_eq!(values.table_name(), None);
+}
+
+// [spec:pgorm:def:sql.types.table-ref+1/test]    the named form renders as dotted, quoted parts
+// with an optional alias
+#[test]
+fn named_from_item_forms_render() {
+    let rendered = |from_item: FromItem| {
         Query::select()
             .column(Asterisk)
-            .from(table_ref)
+            .from(from_item)
             .to_string(QueryBuilder)
     };
 
     assert_eq!(
-        rendered(Glyph::Table.into_table_ref()),
+        rendered(Glyph::Table.into_from_item()),
         r#"SELECT * FROM "glyph""#
     );
     assert_eq!(
-        rendered((Alias::new("schema"), Glyph::Table).into_table_ref()),
+        rendered((Alias::new("schema"), Glyph::Table).into_from_item()),
         r#"SELECT * FROM "schema"."glyph""#
     );
     assert_eq!(
-        rendered((Alias::new("db"), Alias::new("schema"), Glyph::Table).into_table_ref()),
-        r#"SELECT * FROM "db"."schema"."glyph""#
-    );
-    assert_eq!(
-        rendered(Glyph::Table.into_table_ref().alias(Alias::new("g"))),
+        rendered(Glyph::Table.into_from_item().alias(Alias::new("g"))),
         r#"SELECT * FROM "glyph" AS "g""#
     );
     assert_eq!(
         rendered(
             (Alias::new("schema"), Glyph::Table)
-                .into_table_ref()
+                .into_from_item()
                 .alias(Alias::new("g"))
         ),
         r#"SELECT * FROM "schema"."glyph" AS "g""#
     );
-    assert_eq!(
-        rendered(
-            (Alias::new("db"), Alias::new("schema"), Glyph::Table)
-                .into_table_ref()
-                .alias(Alias::new("g"))
-        ),
-        r#"SELECT * FROM "db"."schema"."glyph" AS "g""#
-    );
 }
 
-// [spec:pgorm:def:sql.types.table-ref/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+1/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
-fn value_producing_table_ref_forms_render() {
-    let sub_query = TableRef::SubQuery(
+fn value_producing_from_item_forms_render() {
+    let sub_query = FromItem::SubQuery(
         Query::select().column(Glyph::Id).from(Glyph::Table).take(),
         Alias::new("sub").into_iden(),
     );
@@ -172,7 +191,7 @@ fn value_producing_table_ref_forms_render() {
         r#"SELECT * FROM (SELECT "id" FROM "glyph") AS "sub""#
     );
 
-    let values_list = TableRef::ValuesList(
+    let values_list = FromItem::ValuesList(
         vec![
             (1i32, "a").into_value_tuple(),
             (2i32, "b").into_value_tuple(),
@@ -187,7 +206,7 @@ fn value_producing_table_ref_forms_render() {
         r#"SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS "v""#
     );
 
-    let function_call = TableRef::FunctionCall(
+    let function_call = FromItem::FunctionCall(
         Func::cust(Alias::new("generate_series")).arg(1i32),
         Alias::new("f").into_iden(),
     );

@@ -39,7 +39,7 @@ pub(crate) enum InsertValueSource {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
     pub(crate) replace: bool,
-    pub(crate) table: Option<Box<TableRef>>,
+    pub(crate) table: Option<Box<FromItem>>,
     pub(crate) columns: Vec<DynIden>,
     pub(crate) source: Option<InsertValueSource>,
     pub(crate) on_conflict: Option<OnConflict>,
@@ -60,9 +60,9 @@ impl InsertStatement {
     /// See [`InsertStatement::values`]
     pub fn into_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoFromItem,
     {
-        self.table = Some(Box::new(tbl_ref.into_table_ref()));
+        self.table = Some(Box::new(tbl_ref.into_from_item()));
         self
     }
 

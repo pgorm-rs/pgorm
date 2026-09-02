@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+2/test]
+// [spec:pgorm:req:sql.ddl.create-table+3/test]
 // [spec:pgorm:req:sql.ddl.column-def+1/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+1/test]
@@ -339,7 +339,7 @@ fn create_15() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -535,7 +535,7 @@ fn alter_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
 #[test]
 fn rename_1() {
     assert_eq!(
@@ -618,7 +618,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+2/test]
+// [spec:pgorm:req:sql.ddl.create-table+3/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: &mut IndexCreateStatement| {

@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.comment/test]    both targets render, at every level of qualification
+// [spec:pgorm:req:sql.ddl.comment+1/test]    both targets render, at every level of qualification
 #[test]
 fn comment_statements_render_their_targets() {
     assert_eq!(
@@ -13,15 +13,6 @@ fn comment_statements_render_their_targets() {
             .to_string(QueryBuilder),
         r#"COMMENT ON TABLE "public"."glyph" IS 'qualified'"#
     );
-    assert_eq!(
-        Comment::on_table(
-            (Alias::new("db"), Alias::new("public"), Glyph::Table),
-            "fully qualified"
-        )
-        .to_string(QueryBuilder),
-        r#"COMMENT ON TABLE "db"."public"."glyph" IS 'fully qualified'"#
-    );
-
     assert_eq!(
         Comment::on_column(Glyph::Table, Glyph::Aspect, "the ratio").to_string(QueryBuilder),
         r#"COMMENT ON COLUMN "glyph"."aspect" IS 'the ratio'"#
@@ -40,7 +31,7 @@ fn comment_statements_render_their_targets() {
     let statement = Comment::on_column(Glyph::Table, Glyph::Aspect, "it's fine");
     assert_eq!(statement.get_comment(), "it's fine");
     match statement.get_target() {
-        CommentTarget::Column(CommentTable::Table(table), column) => {
+        CommentTarget::Column(TableName::Table(table), column) => {
             assert_eq!(table.to_string(), "glyph");
             assert_eq!(column.to_string(), "aspect");
         }
@@ -48,7 +39,7 @@ fn comment_statements_render_their_targets() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.comment/test]    comment text is a standard-conforming string literal:
+// [spec:pgorm:req:sql.ddl.comment+1/test]    comment text is a standard-conforming string literal:
 // only the single quote is escaped, by doubling
 #[test]
 fn comment_text_is_a_quoted_literal() {
@@ -82,47 +73,25 @@ fn comment_text_is_a_quoted_literal() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.comment/test]    a TableRef converts by dropping its alias, and the
-// forms that name no table are rejected rather than panicking
+// [spec:pgorm:req:sql.ddl.comment+1/test]    one `TableName` value serves a comment target and a
+// DDL target, so a comment cannot name a table the DDL beside it could not
 #[test]
-fn comment_table_from_table_ref() {
-    assert_eq!(
-        CommentTable::try_from(Glyph::Table.into_table_ref()),
-        Ok(CommentTable::Table(Glyph::Table.into_iden()))
-    );
-    assert_eq!(
-        CommentTable::try_from(Glyph::Table.into_table_ref().alias(Alias::new("g"))),
-        Ok(CommentTable::Table(Glyph::Table.into_iden())),
-        "an alias is a query-scope name; the comment lands on the table"
-    );
+fn comment_and_ddl_share_one_table_name() {
+    let name = (Alias::new("public"), Glyph::Table).into_table_name();
 
-    let qualified = (Alias::new("public"), Glyph::Table).into_table_ref();
     assert_eq!(
-        CommentTable::try_from(qualified.clone().alias(Alias::new("g"))),
-        CommentTable::try_from(qualified)
+        Comment::on_table(name.clone(), "shared").to_string(QueryBuilder),
+        r#"COMMENT ON TABLE "public"."glyph" IS 'shared'"#
     );
     assert_eq!(
-        CommentTable::try_from(
-            (Alias::new("db"), Alias::new("public"), Glyph::Table).into_table_ref()
-        ),
-        Ok(CommentTable::DatabaseSchemaTable(
-            Alias::new("db").into_iden(),
-            Alias::new("public").into_iden(),
-            Glyph::Table.into_iden()
-        ))
+        Table::truncate()
+            .table(name.clone())
+            .to_string(QueryBuilder),
+        r#"TRUNCATE TABLE "public"."glyph""#
     );
-
-    for unnamed in [
-        TableRef::SubQuery(
-            Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-            Alias::new("q").into_iden(),
-        ),
-        TableRef::ValuesList(vec![], Alias::new("v").into_iden()),
-    ] {
-        assert_eq!(CommentTable::try_from(unnamed), Err(UnnamedTableRef));
-    }
     assert_eq!(
-        UnnamedTableRef.to_string(),
-        "table reference does not name a table"
+        name.schema().map(|s| s.to_string()).as_deref(),
+        Some("public")
     );
+    assert_eq!(name.table().to_string(), "glyph");
 }

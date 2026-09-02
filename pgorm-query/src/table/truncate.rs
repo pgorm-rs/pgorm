@@ -18,7 +18,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// ```
 #[derive(Default, Debug, Clone)]
 pub struct TableTruncateStatement {
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
 }
 
 impl TableTruncateStatement {
@@ -30,9 +30,9 @@ impl TableTruncateStatement {
     /// Set table name
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 

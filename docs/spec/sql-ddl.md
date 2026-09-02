@@ -33,9 +33,9 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+2]
+> [spec:pgorm:req:sql.ddl.create-table+3]
 > `TableCreateStatement` composes a table name (`table()`, any
-> `IntoTableRef`), ordered `ColumnDef`s (`col()`, which stamps the table ref
+> `IntoTableName`), ordered `ColumnDef`s (`col()`, which stamps the table ref
 > onto each column), table-level indexes (`index()` and `primary_key()` — the
 > latter takes an `IndexCreateStatement` and forces its kind to
 > `IndexKind::PrimaryKey`, the one position in which that kind is spelled),
@@ -49,7 +49,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
 > ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+1]`) and `NULLS NOT
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+2]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis the
@@ -121,8 +121,8 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > specs are ignored in modify. An alter statement with zero options panics
 > with `No alter option found`.
 
-> [spec:pgorm:req:sql.ddl.drop-rename-truncate]
-> `TableDropStatement` accumulates multiple table refs and MUST render
+> [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
+> `TableDropStatement` accumulates multiple `TableName`s and MUST render
 > `DROP TABLE [IF EXISTS ]"t1", "t2"[ RESTRICT][ CASCADE]` (`restrict()` and
 > `cascade()` append `TableDropOpt`s in call order). `TableRenameStatement`
 > MUST render `ALTER TABLE <from> RENAME TO <to>`. `TableTruncateStatement`
@@ -131,23 +131,21 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Comments
 
-> [spec:pgorm:req:sql.ddl.comment]
+> [spec:pgorm:req:sql.ddl.comment+1]
 > A comment is a statement of its own on Postgres, not a clause of `CREATE
 > TABLE`, so `CommentStatement` is built separately from the DDL creating the
 > object it describes. `Comment::on_table(table, text)` and
 > `Comment::on_column(table, column, text)` are the only constructors and both
 > take target and text up front, so every `CommentStatement` denotes a
 > complete statement and no build path can fail or panic. The target table is
-> a `CommentTable` — `Table`, `SchemaTable` or `DatabaseSchemaTable`, i.e. the
-> subset of `TableRef` that names a table — reachable through
-> `IntoCommentTable` from an iden, a `(schema, table)` or a
-> `(database, schema, table)` tuple, or from a `TableRef` through `TryFrom`,
-> which drops a trailing alias and rejects the subquery, values-list and
-> function-call forms with `UnnamedTableRef` rather than panicking.
+> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+1]`) — the same type
+> every other DDL statement targets, reached through `IntoTableName` from an
+> iden or a `(schema, table)` tuple — so a comment can only name a table the
+> DDL beside it could also name, and there is no conversion to fail.
 >
 > Rendering MUST emit `COMMENT ON TABLE <table> IS '<text>'` or
-> `COMMENT ON COLUMN <table>.<column> IS '<text>'`, where the table, schema,
-> database and column names render through `Iden::prepare` (double-quoted,
+> `COMMENT ON COLUMN <table>.<column> IS '<text>'`, where the table, schema
+> and column names render through `Iden::prepare` (double-quoted,
 > embedded quotes doubled) and the text renders as a standard-conforming
 > string literal: wrapped in single quotes with every embedded single quote
 > doubled and nothing else altered — backslashes are literal, so no `E''`
@@ -158,7 +156,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+1]
+> [spec:pgorm:req:sql.ddl.index-create+2]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
 > `index_type` and `if_not_exists` flags. `IndexKind` is the closed set
@@ -177,7 +175,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+2]`.
+> `[spec:pgorm:req:sql.ddl.create-table+3]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
@@ -189,19 +187,18 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > when the kind is `Unique`; on any other kind it is carried but not spelled.
 >
 > There is no support for partial indexes (`WHERE`), `INCLUDE` columns,
-> expression columns or operator classes in the current builder. Index table
-> refs are limited to `Table` and `SchemaTable`; other `TableRef` forms panic
-> with `Not supported`.
+> expression columns or operator classes in the current builder. The index
+> target is a `TableName`, so both of its forms render and no other shape is
+> constructible.
 
-> [spec:pgorm:req:sql.ddl.index-drop]
+> [spec:pgorm:req:sql.ddl.index-drop+1]
 > `IndexDropStatement` MUST render `DROP INDEX [IF EXISTS ]["schema".]"name"`.
-> Only the schema portion of a `SchemaTable` ref is used (indexes are
-> schema-scoped in Postgres); a plain `Table` ref contributes nothing, and
-> any other ref form panics with `Not supported`.
+> Only the schema portion of the target `TableName` is used (indexes are
+> schema-scoped in Postgres); a plain `Table` name contributes nothing.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key]
+> [spec:pgorm:req:sql.ddl.foreign-key+1]
 > `TableForeignKey` holds an optional constraint name, the owning and
 > referenced table refs, parallel column/ref-column lists, and optional
 > `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
@@ -216,8 +213,8 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > without the `ALTER TABLE`/`ADD` prefix, and inside `ALTER TABLE` options
 > only the `ALTER TABLE` prefix is dropped. `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`. Foreign-key table
-> refs accept `Table`, `SchemaTable` and `DatabaseSchemaTable`; other forms
-> panic with `Not supported`.
+> targets are `TableName`s, so both forms render and no other shape is
+> constructible.
 
 ## Enum types
 
@@ -262,14 +259,19 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Panics and unsupported forms
 
-> [spec:pgorm:sem:sql.ddl.panics]
-> DDL building is panic-based rather than error-based at its edges:
+> [spec:pgorm:sem:sql.ddl.panics+1]
+> DDL building is panic-based rather than error-based at its remaining edges:
 > `auto_increment()` on a column whose type is not
 > `SmallInteger`/`Integer`/`BigInteger` panics with `... doesn't support auto
 > increment` at render time; `ColumnType::Year` panics with `Year is not
 > available in Postgres.`; an empty `TableAlterStatement` panics with `No
-> alter option found`. Table statements (`create`/`alter`/`rename`/`drop`/
-> `truncate`) accept only `Table`, `SchemaTable` and `DatabaseSchemaTable`
-> refs — alias-carrying, subquery, values-list and function-call `TableRef`
-> forms panic with `Not supported`, as do unsupported ref forms in index and
-> foreign-key positions. There is no `Result`-returning DDL build path.
+> alter option found`. There is no `Result`-returning DDL build path.
+>
+> Table reference shape is no longer among them, and MUST NOT return to
+> them. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
+> and foreign-key targets and comment targets take a `TableName`
+> (`[spec:pgorm:def:sql.types.table-ref+1]`), which has no form the renderer
+> could refuse. The five `Not supported` panics and the `TableRef with values
+> is not support` panic that guarded these positions are gone, and a caller
+> cannot reintroduce them: an aliased, subquery, values-list or function-call
+> reference is a `FromItem` and does not typecheck as a DDL target.

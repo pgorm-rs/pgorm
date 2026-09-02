@@ -8,7 +8,7 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+1]
+> [spec:pgorm:sem:schema.from-entity+2]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
@@ -27,14 +27,15 @@ executes SQL.
 >
 > Comments ride on the create statement (`get_comment()`,
 > `ColumnSpec::Comment`) but are inert there — executing it attaches nothing
-> (`[spec:pgorm:req:sql.ddl.create-table+2]`). They are a second statement
+> (`[spec:pgorm:req:sql.ddl.create-table+3]`). They are a second statement
 > stream instead: `Schema::create_comments_from_entity::<E>()` returns the
 > `COMMENT ON` statements for the same entity — the entity comment first when
 > `E::comment()` is set, then one per column whose `ColumnDef` carries a
 > comment, in `E::Column` order — each targeting `entity.table_ref()`, so a
 > comment lands on the same qualified name the table projection uses. The Vec
-> is empty when no comment is declared, and an entity whose `table_ref()` names
-> no table produces none rather than panicking.
+> is empty when no comment is declared. `table_ref()` is a `TableName`, which
+> always names a table, so the comment target needs no conversion and the
+> stream has no failure mode.
 
 ## Secondary indexes
 

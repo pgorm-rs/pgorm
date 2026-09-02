@@ -228,16 +228,35 @@ including panic semantics and quirks inherited from sea-query.
 > 2-tuple to `TableColumn`, a 3-tuple to `SchemaTableColumn`, the `Asterisk`
 > unit type to `Asterisk`, and `(iden, Asterisk)` to `TableAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref]
-> `TableRef` has nine forms: `Table`, `SchemaTable`, `DatabaseSchemaTable`,
-> the three alias-carrying counterparts (`TableAlias`, `SchemaTableAlias`,
-> `DatabaseSchemaTableAlias`), and three value-producing forms —
+> [spec:pgorm:def:sql.types.table-ref+1]
+> Table references are split by position, so that a reference which names no
+> table cannot reach a statement that needs one.
+>
+> `TableName` is the DDL-position reference and has exactly two forms:
+> `Table(DynIden)` and `SchemaTable(DynIden, DynIden)`. There is no
+> database-qualified form — Postgres rejects a cross-database reference at
+> execution, so the shape is not offered. `IntoTableName` maps a bare iden to
+> `Table` and a 2-tuple to `SchemaTable`, and accepts a `TableName`
+> unchanged. `TableName::table()` returns the table iden;
+> `TableName::schema()` returns the schema iden when the name carries one.
+>
+> `FromItem` is the query-position reference: `Table(TableName,
+> Option<DynIden>)` — a name with an alias bound beside it rather than folded
+> into the variant — plus the three value-producing forms
 > `SubQuery(SelectStatement, alias)`, `ValuesList(Vec<ValueTuple>, alias)` and
-> `FunctionCall(FunctionCall, alias)`. `IntoTableRef` maps a bare iden to
-> `Table`, a 2-tuple to `SchemaTable` and a 3-tuple to
-> `DatabaseSchemaTable`. `TableRef::alias(a)` adds or replaces the alias,
-> upgrading plain forms to their alias-carrying counterparts and replacing the
-> alias on forms that already carry one.
+> `FunctionCall(FunctionCall, alias)`, each carrying a mandatory alias.
+> `IntoFromItem` maps a bare iden and a 2-tuple to the unaliased named form,
+> and accepts a `TableName` or a `FromItem` unchanged; `From<TableName> for
+> FromItem` is the same widening as a value conversion. `FromItem::alias(a)`
+> binds or replaces the alias on any form. `FromItem::table_name()` returns
+> the name for the named form and `None` for the value-producing forms;
+> `FromItem::qualifier()` returns the identifier a column of the item is
+> qualified by — the bound alias when there is one, otherwise the table iden.
+>
+> Because every DDL target takes `TableName` and every query position takes
+> `FromItem`, an alias, subquery, values list or function call in a DDL
+> position is a type error rather than a render-time panic
+> (`[spec:pgorm:sem:sql.ddl.panics+1]`).
 
 > [spec:pgorm:def:sql.types.opers]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary

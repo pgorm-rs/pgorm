@@ -1275,7 +1275,7 @@ pub async fn consolidate_composite_key() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.join+1/test]    a composite relation constrains
+// [spec:pgorm:sem:query.build.join+2/test]    a composite relation constrains
 // the join on every declared pair: against rows where each column alone is
 // ambiguous, the join still matches exactly one parent per child
 #[pgorm_macros::test]
@@ -1402,8 +1402,8 @@ fn relation_trait_and_ownership_direction() {
     let def = baker::Relation::Bakery.def();
     assert_eq!(def.rel_type, RelationType::HasOne);
     assert!(!def.is_owner, "belongs_to is the non-owning side");
-    assert_eq!(def.from_tbl, baker::Entity.table_ref());
-    assert_eq!(def.to_tbl, bakery::Entity.table_ref());
+    assert_eq!(def.from_tbl, baker::Entity.table_ref().into());
+    assert_eq!(def.to_tbl, bakery::Entity.table_ref().into());
 
     // `belongs_to` starts a HasOne builder with `is_owner = false`, whatever the
     // columns end up being.
@@ -1473,7 +1473,7 @@ fn relation_trait_and_ownership_direction() {
     );
 }
 
-// [spec:pgorm:def:entity.relation.def+2/test]    the `RelationDef` record and its
+// [spec:pgorm:def:entity.relation.def+3/test]    the `RelationDef` record and its
 // combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
 // keeps everything else; `from_alias` re-points the source table; `on_condition`
 // replaces any existing custom condition; `condition_type` picks AND vs OR.
@@ -1481,7 +1481,7 @@ fn relation_trait_and_ownership_direction() {
 #[test]
 fn relation_def_record_and_combinators() {
     use pgorm::{Identity, IntoIdentity, RelationType};
-    use pgorm_query::{Alias, ConditionType, IntoCondition, QueryBuilder, TableRef};
+    use pgorm_query::{Alias, ConditionType, FromItem, IntoCondition, QueryBuilder, TableName};
 
     // Start from a definition carrying every optional attribute.
     let def: RelationDef = RelationDef::from(
@@ -1493,8 +1493,8 @@ fn relation_def_record_and_combinators() {
             .condition_type(ConditionType::Any),
     );
     assert_eq!(def.rel_type, RelationType::HasOne);
-    assert_eq!(def.from_tbl, baker::Entity.table_ref());
-    assert_eq!(def.to_tbl, bakery::Entity.table_ref());
+    assert_eq!(def.from_tbl, baker::Entity.table_ref().into());
+    assert_eq!(def.to_tbl, bakery::Entity.table_ref().into());
     assert_eq!(ident(&def.columns.from_identity()), "bakery_id");
     assert_eq!(ident(&def.columns.to_identity()), "id");
     assert!(!def.is_owner);
@@ -1507,8 +1507,8 @@ fn relation_def_record_and_combinators() {
     // `rev()` swaps the tables and the columns, negates `is_owner`, drops the
     // fk name, and keeps rel_type / actions / condition_type.
     let rev = def.rev();
-    assert_eq!(rev.from_tbl, bakery::Entity.table_ref());
-    assert_eq!(rev.to_tbl, baker::Entity.table_ref());
+    assert_eq!(rev.from_tbl, bakery::Entity.table_ref().into());
+    assert_eq!(rev.to_tbl, baker::Entity.table_ref().into());
     assert_eq!(ident(&rev.columns.from_identity()), "id");
     assert_eq!(ident(&rev.columns.to_identity()), "bakery_id");
     assert!(rev.is_owner, "rev() negates is_owner");
@@ -1519,7 +1519,7 @@ fn relation_def_record_and_combinators() {
     assert_eq!(rev.condition_type, ConditionType::Any);
     // Reversing twice is the identity on tables, columns and ownership.
     let round = rev.rev();
-    assert_eq!(round.from_tbl, baker::Entity.table_ref());
+    assert_eq!(round.from_tbl, baker::Entity.table_ref().into());
     assert_eq!(ident(&round.columns.from_identity()), "bakery_id");
     assert!(!round.is_owner);
 
@@ -1528,7 +1528,7 @@ fn relation_def_record_and_combinators() {
     let aliased = baker::Relation::Bakery.def().from_alias(Alias::new("b2"));
     assert!(matches!(
         &aliased.from_tbl,
-        TableRef::TableAlias(table, alias)
+        FromItem::Table(TableName::Table(table), Some(alias))
             if table.to_string() == "baker" && alias.to_string() == "b2"
     ));
     // Joining through the re-pointed definition qualifies the source side of
@@ -1717,7 +1717,7 @@ fn relation_builder_accumulates_a_definition() {
     assert_eq!(full.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:def:entity.relation.def+2/test]    a set of join columns is a
+// [spec:pgorm:def:entity.relation.def+3/test]    a set of join columns is a
 // list of pairs, so both sides always name the same number of columns however
 // the definition is built, reversed or extended
 #[test]
@@ -1753,7 +1753,7 @@ fn column_pairs_keep_the_two_sides_equal() {
     balanced(&composite.rev().columns);
 }
 
-// [spec:pgorm:req:entity.relation.fk+1/test]    `From<RelationDef>` for both
+// [spec:pgorm:req:entity.relation.fk+2/test]    `From<RelationDef>` for both
 // `ForeignKeyCreateStatement` and `TableForeignKey` maps every column pair,
 // applies the `on_delete` / `on_update` actions, takes the constraint name from
 // `fk_name` when set and otherwise derives `fk-{from_table}-{from_cols}`, and
@@ -1761,8 +1761,8 @@ fn column_pairs_keep_the_two_sides_equal() {
 #[test]
 fn relation_def_converts_to_foreign_key_forms() {
     use pgorm_query::{
-        Alias, ConditionType, ForeignKeyCreateStatement, IntoIden, QueryBuilder,
-        SchemaStatementBuilder, TableAlterStatement, TableForeignKey, TableRef,
+        Alias, ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder,
+        SchemaStatementBuilder, TableAlterStatement, TableForeignKey, TableName,
     };
 
     let alter = |fk: &mut TableForeignKey| {
@@ -1840,17 +1840,23 @@ fn relation_def_converts_to_foreign_key_forms() {
         .join(" ")
     );
 
-    // Schema information is reduced away: a schema-qualified `TableRef` becomes
+    // Schema information is reduced away: a schema-qualified `FromItem` becomes
     // a bare table on both sides, and the derived name uses the bare name too.
     let qualified = RelationDef {
         rel_type: RelationType::HasOne,
-        from_tbl: TableRef::SchemaTable(
-            Alias::new("warehouse").into_iden(),
-            Alias::new("child").into_iden(),
+        from_tbl: FromItem::Table(
+            TableName::SchemaTable(
+                Alias::new("warehouse").into_iden(),
+                Alias::new("child").into_iden(),
+            ),
+            None,
         ),
-        to_tbl: TableRef::SchemaTable(
-            Alias::new("warehouse").into_iden(),
-            Alias::new("parent").into_iden(),
+        to_tbl: FromItem::Table(
+            TableName::SchemaTable(
+                Alias::new("warehouse").into_iden(),
+                Alias::new("parent").into_iden(),
+            ),
+            None,
         ),
         columns: ColumnPairs::new(Alias::new("parent_id"), Alias::new("id")),
         is_owner: false,

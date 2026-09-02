@@ -29,7 +29,7 @@ use inherent::inherent;
 // [spec:pgorm:req:sql.ddl.alter-table]
 #[derive(Default, Debug, Clone)]
 pub struct TableAlterStatement {
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
     pub(crate) options: Vec<TableAlterOption>,
 }
 
@@ -62,9 +62,9 @@ impl TableAlterStatement {
     /// Set table name
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 

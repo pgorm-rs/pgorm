@@ -93,8 +93,9 @@ macros = ["pgorm-macros/derive"]
 # Off by default: brings `sql!` into scope. libpg_query is compiled either way,
 # since `pg_query` is a plain dependency for `SelectorRaw` pagination.
 sql-macro = ["dep:pgorm-sql-macro"]
-# Off by default: fingerprinting links libpg_query at runtime, so only builds
-# that want query identities in their metrics pay to compile it.
+# Off by default: fingerprinting costs a parse per statement, so only builds
+# that want query identities in their metrics pay for it. libpg_query itself is
+# linked either way (see `pg_query` above).
 metrics-fingerprint = []
 with-json = ["serde_json", "chrono?/serde", "uuid?/serde"]
 with-chrono = ["chrono"]

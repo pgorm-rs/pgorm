@@ -56,7 +56,7 @@ fn oracle_pins_over_on_a_bare_expression() {
 // Fixed by plan node `unrep.mysql-purge`: `TableOpt::Engine`, `Collate` and
 // `CharacterSet` are MySQL-era table options with no PostgreSQL spelling.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+2/test]
+// [spec:pgorm:req:sql.ddl.create-table+3/test]
 #[test]
 fn oracle_pins_mysql_table_options() {
     let table = || {
@@ -180,7 +180,7 @@ fn oracle_pins_alter_table_multi_action() {
 // table reference as the source, but PostgreSQL's RENAME TO takes a bare name —
 // the new table stays in the schema it is already in.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
 #[test]
 fn oracle_pins_table_rename_qualified_target() {
     let sql = Table::rename()
@@ -307,12 +307,13 @@ fn oracle_pins_escape_outside_like() {
     );
 }
 
-// The oracle's ceiling, recorded rather than pinned: these three renders are
+// The oracle's ceiling, recorded rather than pinned: these renders are
 // grammatical, so no parser can catch them. `money(12, 2)` is rejected only when
 // the type modifier is resolved (`unrep.mysql-purge` deletes `money_len`); an
 // empty select list is valid PostgreSQL and was closed as an ORM-layer error by
-// `sql.empty-select-list`; a cross-database reference parses and fails in
-// analysis (`unrep.tableref-split`).
+// `sql.empty-select-list`. The third member of this family, a cross-database
+// reference, is closed by the type system instead: `TableName` has no
+// database-qualified form to render.
 // [spec:pgorm:req:sql.render.oracle/test]
 #[test]
 fn oracle_records_parse_valid_defects() {
@@ -321,16 +322,10 @@ fn oracle_records_parse_valid_defects() {
         .col(ColumnDef::new(Glyph::Aspect).money_len(12, 2))
         .to_string(QueryBuilder);
     let empty_select_list = Query::select().from(Glyph::Table).to_string(QueryBuilder);
-    let cross_database = Query::select()
-        .column(Glyph::Id)
-        .from((Alias::new("db"), Alias::new("public"), Glyph::Table))
-        .to_string(QueryBuilder);
 
     assert!(money.contains("money(12, 2)"));
     assert_eq!(empty_select_list, r#"SELECT  FROM "glyph""#);
-    assert!(cross_database.contains(r#""db"."public"."glyph""#));
 
     assert_parses(&money);
     assert_parses(&empty_select_list);
-    assert_parses(&cross_database);
 }

@@ -49,10 +49,10 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+2]
+// [spec:pgorm:req:sql.ddl.create-table+3]
 #[derive(Default, Debug, Clone)]
 pub struct TableCreateStatement {
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
     pub(crate) columns: Vec<ColumnDef>,
     pub(crate) options: Vec<TableOpt>,
     pub(crate) partitions: Vec<TablePartition>,
@@ -91,9 +91,9 @@ impl TableCreateStatement {
     /// Set table name
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 
@@ -223,7 +223,7 @@ impl TableCreateStatement {
         self
     }
 
-    pub fn get_table_name(&self) -> Option<&TableRef> {
+    pub fn get_table_name(&self) -> Option<&TableName> {
         self.table.as_ref()
     }
 

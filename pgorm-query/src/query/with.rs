@@ -1,6 +1,6 @@
 use crate::{
-    ColumnRef, DynIden, IntoIden, QueryStatementBuilder, QueryStatementWriter, SelectExpr,
-    SelectStatement, SimpleExpr, SqlWriter, SubQueryStatement, TableRef, Values,
+    ColumnRef, DynIden, FromItem, IntoIden, QueryStatementBuilder, QueryStatementWriter,
+    SelectExpr, SelectStatement, SimpleExpr, SqlWriter, SubQueryStatement, Values,
     {Alias, QueryBuilder},
 };
 use inherent::inherent;
@@ -100,16 +100,11 @@ impl CommonTableExpression {
         })
     }
 
-    fn derived_table_name(from: &TableRef) -> Option<DynIden> {
-        let iden = match from {
-            TableRef::Table(iden)
-            | TableRef::SchemaTable(_, iden)
-            | TableRef::DatabaseSchemaTable(_, _, iden)
-            | TableRef::TableAlias(_, iden)
-            | TableRef::SchemaTableAlias(_, _, iden)
-            | TableRef::DatabaseSchemaTableAlias(_, _, _, iden) => iden,
-            _ => return None,
+    fn derived_table_name(from: &FromItem) -> Option<DynIden> {
+        let FromItem::Table(name, alias) = from else {
+            return None;
         };
+        let iden = alias.as_ref().unwrap_or_else(|| name.table());
 
         Some(Alias::new(format!("cte_{}", iden.to_string())).into_iden())
     }

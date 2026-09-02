@@ -4,7 +4,7 @@ use crate::{
     QueryFilter, Related, RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany,
     UpdateOne,
 };
-use pgorm_query::{Alias, Iden, IntoIden, IntoTableRef, IntoValueTuple, TableRef};
+use pgorm_query::{Alias, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
 use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
@@ -16,7 +16,7 @@ pub trait IdenStatic: Iden + Copy + Debug + 'static {
 }
 
 /// A Trait for mapping an Entity to a database table
-// [spec:pgorm:req:entity.traits.entity-name]
+// [spec:pgorm:req:entity.traits.entity-name+1]
 pub trait EntityName: IdenStatic + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {
@@ -36,11 +36,11 @@ pub trait EntityName: IdenStatic + Default {
         self.table_name()
     }
 
-    /// Get the [TableRef] from invoking the `self.schema_name()`
-    fn table_ref(&self) -> TableRef {
+    /// Get the [TableName] from invoking the `self.schema_name()`
+    fn table_ref(&self) -> TableName {
         match self.schema_name() {
-            Some(schema) => (Alias::new(schema).into_iden(), self.into_iden()).into_table_ref(),
-            None => self.into_table_ref(),
+            Some(schema) => (Alias::new(schema).into_iden(), self.into_iden()).into_table_name(),
+            None => self.into_table_name(),
         }
     }
 }

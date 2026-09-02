@@ -43,7 +43,7 @@ fn select_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from/test]
+// [spec:pgorm:req:sql.ast.select.from+1/test]
 #[test]
 fn select_4() {
     assert_eq!(
@@ -781,7 +781,7 @@ fn select_48a() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords/test]    `Asterisk` as a bare projection
+// [spec:pgorm:def:sql.ast.keywords+1/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -792,7 +792,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
-// [spec:pgorm:def:sql.ast.keywords/test]    `(Table, Asterisk)` renders `"table".*`
+// [spec:pgorm:def:sql.ast.keywords+1/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -1087,8 +1087,8 @@ fn select_61() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from/test]
-// [spec:pgorm:req:sql.render.subquery/test]
+// [spec:pgorm:req:sql.ast.select.from+1/test]
+// [spec:pgorm:req:sql.render.subquery+1/test]
 #[test]
 fn select_62() {
     let select = SelectStatement::new()
@@ -2185,7 +2185,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords/test]    the bare-keyword expressions and their constructors
+// [spec:pgorm:def:sql.ast.keywords+1/test]    the bare-keyword expressions and their constructors
 #[test]
 fn keywords_1() {
     assert_eq!(
@@ -2200,7 +2200,7 @@ fn keywords_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords/test]    `Alias` wraps an arbitrary string as an identifier,
+// [spec:pgorm:def:sql.ast.keywords+1/test]    `Alias` wraps an arbitrary string as an identifier,
 // `NullAlias` is the empty identifier
 #[test]
 fn keywords_2() {
@@ -2622,7 +2622,7 @@ fn locking_2() {
             .from(Char::Table)
             .lock_with_tables(
                 LockType::Update,
-                [Glyph::Table.into_table_ref(), Char::Table.into_table_ref()]
+                [Glyph::Table.into_from_item(), Char::Table.into_from_item()]
             )
             .to_string(QueryBuilder),
         r#"SELECT "id" FROM "glyph", "character" FOR UPDATE OF "glyph", "character""#

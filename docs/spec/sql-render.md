@@ -321,17 +321,19 @@ an ideal Postgres renderer would emit.
 > (`$1PRECEDING`, `$1FOLLOWING`) — a known limitation of the current frame
 > renderer, and the one window render PostgreSQL still rejects.
 
-> [spec:pgorm:req:sql.render.subquery]
+> [spec:pgorm:req:sql.render.subquery+1]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
 > `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
 > A `SimpleExpr::Tuple` renders `(e1, e2, …)`; `SimpleExpr::Values` renders
-> `(v1, v2, …)` with each element parameterized. As a table reference,
-> `TableRef::SubQuery` renders `(SELECT …) AS "alias"`, `TableRef::ValuesList`
-> renders `(VALUES (…), (…)) AS "alias"`, and `TableRef::FunctionCall` renders
-> `func(args) AS "alias"`; all three forms carry mandatory aliases. Contexts
-> that require a plain identifier reference (`prepare_table_ref_iden`, DDL
-> statements, index/foreign-key targets) panic on value-bearing table refs
-> ("Not supported" / "TableRef with values is not support").
+> `(v1, v2, …)` with each element parameterized. As a FROM item,
+> `FromItem::SubQuery` renders `(SELECT …) AS "alias"`, `FromItem::ValuesList`
+> renders `(VALUES (…), (…)) AS "alias"`, and `FromItem::FunctionCall` renders
+> `func(args) AS "alias"`; all three forms carry mandatory aliases, and
+> `FromItem::Table` renders its `TableName` followed by ` AS "alias"` when an
+> alias is bound. Contexts that require a plain identifier reference — DDL
+> statements, index and foreign-key targets — take a `TableName` instead, so
+> a value-bearing reference never reaches them
+> (`[spec:pgorm:sem:sql.ddl.panics+1]`).
 
 ## CTEs
 

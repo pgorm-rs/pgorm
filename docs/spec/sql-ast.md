@@ -82,14 +82,14 @@ today, including panicking edges and deliberate failsafes.
 > `cond_having`); both feed the HAVING `ConditionHolder` with the semantics of
 > `sql.ast.condition.holder`.
 
-> [spec:pgorm:req:sql.ast.select.from]
+> [spec:pgorm:req:sql.ast.select.from+1]
 > FROM clauses MUST accumulate: calling `from` repeatedly produces multiple
 > comma-separated FROM items (the "old-school join" form), and `from_clear`
 > MUST remove all of them. The FROM item variants are: plain tables (with
-> optional schema and database qualification via tuples), `from_as` (aliased
-> table), `from_subquery` (`TableRef::SubQuery` with mandatory alias),
-> `from_function` (`TableRef::FunctionCall` with alias), and `from_values`
-> (`TableRef::ValuesList` rendering `(VALUES (..), (..)) AS "alias"`).
+> optional schema qualification via a 2-tuple), `from_as` (aliased
+> table), `from_subquery` (`FromItem::SubQuery` with mandatory alias),
+> `from_function` (`FromItem::FunctionCall` with alias), and `from_values`
+> (`FromItem::ValuesList` rendering `(VALUES (..), (..)) AS "alias"`).
 >
 > `from_values` MUST panic when given an empty tuple list (`assert!` on the
 > collected rows); there is no non-panicking variant.
@@ -240,7 +240,7 @@ today, including panicking edges and deliberate failsafes.
 > `in_subquery`/`not_in_subquery` MUST build `IN (SELECT ...)` /
 > `NOT IN (SELECT ...)` from a `SelectStatement`.
 
-> [spec:pgorm:def:sql.ast.keywords]
+> [spec:pgorm:def:sql.ast.keywords+1]
 > `Keyword` represents bare SQL keywords usable as expressions: `Null`,
 > `CurrentDate`, `CurrentTime`, `CurrentTimestamp`, and `Custom(DynIden)`;
 > `Expr::current_date()`, `Expr::current_time()`, `Expr::current_timestamp()`,
@@ -249,8 +249,9 @@ today, including panicking edges and deliberate failsafes.
 > identifier, and `Asterisk` expresses `*` — as a bare projection or
 > table-qualified via `(Table, Asterisk)` rendering `"table".*`. `ColumnRef`
 > spans `Column`, `TableColumn`, `SchemaTableColumn`, `Asterisk`, and
-> `TableAsterisk`; `TableRef` spans plain/schema/database-qualified tables,
-> their aliased forms, `SubQuery`, `ValuesList`, and `FunctionCall`.
+> `TableAsterisk`; `TableName` spans plain and schema-qualified tables, and
+> `FromItem` spans a `TableName` with an optional alias, `SubQuery`,
+> `ValuesList`, and `FunctionCall`.
 
 ## INSERT statements
 

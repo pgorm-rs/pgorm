@@ -5,7 +5,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     Error,
-    util::{escape_rust_keyword, safe_ident, unpack_table_ref},
+    util::{escape_rust_keyword, safe_ident},
 };
 
 #[derive(Clone, Debug)]
@@ -240,14 +240,14 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+2]
+// [spec:pgorm:sem:codegen.entity.transform+3]
 impl TryFrom<&TableForeignKey> for Relation {
     type Error = Error;
 
     fn try_from(tbl_fk: &TableForeignKey) -> Result<Self, Self::Error> {
         let columns = tbl_fk.get_columns();
         let ref_table = match tbl_fk.get_ref_table() {
-            Some(table_ref) => unpack_table_ref(table_ref),
+            Some(table_ref) => table_ref.table().to_string(),
             None => {
                 let context = match columns.as_slice() {
                     [] => "foreign key".to_owned(),

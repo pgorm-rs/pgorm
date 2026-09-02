@@ -31,7 +31,7 @@ use inherent::inherent;
 // [spec:pgorm:req:sql.ast.update]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
-    pub(crate) table: Option<Box<TableRef>>,
+    pub(crate) table: Option<Box<FromItem>>,
     pub(crate) values: Vec<(DynIden, Box<SimpleExpr>)>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) orders: Vec<OrderExpr>,
@@ -53,9 +53,9 @@ impl UpdateStatement {
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoFromItem,
     {
-        self.table = Some(Box::new(tbl_ref.into_table_ref()));
+        self.table = Some(Box::new(tbl_ref.into_from_item()));
         self
     }
 

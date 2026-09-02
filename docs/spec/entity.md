@@ -22,13 +22,15 @@ explicit limitations.
 > `src/entity/prelude.rs` (`DeriveEntityModel`, `DeriveActiveModel`, `DerivePrimaryKey`,
 > `DeriveRelation`, and friends), but every trait can be implemented by hand.
 
-> [spec:pgorm:req:entity.traits.entity-name]
+> [spec:pgorm:req:entity.traits.entity-name+1]
 > `EntityName::table_name` is the only required method and MUST return the table's SQL
 > name. `schema_name` and `comment` default to `None`; `module_name` defaults to
-> `table_name()`. `table_ref` MUST produce a schema-qualified `TableRef`
-> (`(Alias::new(schema), entity)`) when `schema_name` returns `Some`, and a bare table
-> reference otherwise (`src/entity/base_entity.rs`). All generated SQL that names the
-> table goes through `table_ref`, so a `Some` schema name qualifies every statement.
+> `table_name()`. `table_ref` MUST produce a schema-qualified `TableName`
+> (`(Alias::new(schema), entity)`) when `schema_name` returns `Some`, and a bare
+> `TableName::Table` otherwise (`src/entity/base_entity.rs`). It is the DDL-position
+> type, so schema projection targets take it directly; query positions widen it to a
+> `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
+> through `table_ref`, so a `Some` schema name qualifies every statement.
 
 > [spec:pgorm:req:entity.traits.crud+1]
 > `EntityTrait` provides the static CRUD surface (`src/entity/base_entity.rs`):
@@ -266,9 +268,10 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+2]
+> [spec:pgorm:def:entity.relation.def+3]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
-> `rel_type`, `from_tbl` / `to_tbl` (`TableRef`), `columns` (`ColumnPairs`),
+> `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
+> query and may be re-aliased), `columns` (`ColumnPairs`),
 > `is_owner`, optional `on_delete` /
 > `on_update` foreign-key actions (`pgorm_query::ForeignKeyAction`), an optional
 > boxed `on_condition` closure receiving the left and right join idens, an optional
@@ -332,7 +335,7 @@ explicit limitations.
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
 
-> [spec:pgorm:req:entity.relation.fk+1]
+> [spec:pgorm:req:entity.relation.fk+2]
 > A `RelationDef` converts into DDL foreign-key forms via
 > `From<RelationDef> for ForeignKeyCreateStatement` and `for TableForeignKey`
 > (`src/entity/relation.rs`). The conversion maps every pair in `columns` to a
@@ -340,5 +343,5 @@ explicit limitations.
 > applies `on_delete` and `on_update` actions when present, and names the
 > constraint from `fk_name` when set; otherwise the name MUST be derived as
 > `fk-{from_table}-{from_cols joined with '-'}`. Both conversions unpack the table
-> references to bare tables (schema information from `TableRef` variants is reduced
-> via `unpack_table_ref`).
+> references to bare tables (the schema of a `FromItem`'s `TableName`, and any bound
+> alias, are reduced away by `unpack_table_ref`).

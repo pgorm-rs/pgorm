@@ -30,12 +30,11 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+2]
+> [spec:pgorm:sem:codegen.entity.transform+3]
 > `EntityTransformer::transform` builds one `Entity` per input
-> `TableCreateStatement`. The table name is unpacked from any `TableRef`
-> variant carrying a table iden (`Table`, `SchemaTable`,
-> `DatabaseSchemaTable`, and their alias forms); a statement with no table
-> name yields `Error::TransformError("Table name should not be empty")`.
+> `TableCreateStatement`. The table name is unpacked from either `TableName`
+> form (`Table` and `SchemaTable`, the schema discarded); a statement with no
+> table name yields `Error::TransformError("Table name should not be empty")`.
 >
 > Per column: `auto_increment` and `not_null` come from the presence of the
 > matching `ColumnSpec` on the column definition; a column with no

@@ -1885,6 +1885,13 @@ children (
                         kind @note
                         text "Audit: the crate's highest-leverage unrepresentable change. TableRef spans two disjoint uses; DDL-position code has five wildcard panics for query-position variants (query_builder.rs:1938, :2153, :2176, :2351, :2483). Split into TableRef (DDL/name-only: Table, SchemaTable, DatabaseSchemaTable — and consider dropping DatabaseSchemaTable entirely: PG rejects cross-database refs, see mysql-purge) and FromItem (query position wrapping alias/subquery/values/function forms). The five panics delete themselves, compiler-enforced. Note the just-landed CommentTable in pgorm-query/src/comment.rs is a mini version of this pattern — unify with it. Fold in query_builder.rs:1727 \"No alter option found\" (non-empty options) and the auto_increment unimplemented at :1582 (serial-family constructors replacing the orthogonal flag) if the touch is natural. Bumps sql.types.table-ref, sql.ddl.panics, several DDL rules. M/L, breaking."
                     }
+
+                    {
+                        at 2026-09-02T19:47:05.432653Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

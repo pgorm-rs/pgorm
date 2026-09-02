@@ -21,7 +21,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// ```
 #[derive(Default, Debug, Clone)]
 pub struct TableDropStatement {
-    pub(crate) tables: Vec<TableRef>,
+    pub(crate) tables: Vec<TableName>,
     pub(crate) options: Vec<TableDropOpt>,
     pub(crate) if_exists: bool,
 }
@@ -42,9 +42,9 @@ impl TableDropStatement {
     /// Set table name
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.tables.push(table.into_table_ref());
+        self.tables.push(table.into_table_name());
         self
     }
 

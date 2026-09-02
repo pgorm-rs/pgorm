@@ -4,7 +4,7 @@ use crate::{expr::*, types::*};
 // [spec:pgorm:req:sql.ddl.column-def+1]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
-    pub(crate) table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
     pub(crate) name: DynIden,
     pub(crate) types: Option<ColumnType>,
     pub(crate) spec: Vec<ColumnSpec>,

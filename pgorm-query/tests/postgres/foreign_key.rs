@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.foreign-key/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+1/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -40,7 +40,7 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.foreign-key/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+1/test]
 #[test]
 fn drop_1() {
     assert_eq!(

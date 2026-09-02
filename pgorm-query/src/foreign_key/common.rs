@@ -1,12 +1,12 @@
 use crate::types::*;
 
 /// Specification of a foreign key
-// [spec:pgorm:req:sql.ddl.foreign-key]
+// [spec:pgorm:req:sql.ddl.foreign-key+1]
 #[derive(Default, Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<DynIden>,
-    pub(crate) table: Option<TableRef>,
-    pub(crate) ref_table: Option<TableRef>,
+    pub(crate) table: Option<TableName>,
+    pub(crate) ref_table: Option<TableName>,
     pub(crate) columns: Vec<DynIden>,
     pub(crate) ref_columns: Vec<DynIden>,
     pub(crate) on_delete: Option<ForeignKeyAction>,
@@ -41,18 +41,18 @@ impl TableForeignKey {
     /// Set key table
     pub fn from_tbl<T>(&mut self, table: T) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoTableName,
     {
-        self.table = Some(table.into_table_ref());
+        self.table = Some(table.into_table_name());
         self
     }
 
     /// Set referencing table
     pub fn to_tbl<R>(&mut self, ref_table: R) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoTableName,
     {
-        self.ref_table = Some(ref_table.into_table_ref());
+        self.ref_table = Some(ref_table.into_table_name());
         self
     }
 
@@ -86,7 +86,7 @@ impl TableForeignKey {
         self
     }
 
-    pub fn get_ref_table(&self) -> Option<&TableRef> {
+    pub fn get_ref_table(&self) -> Option<&TableName> {
         self.ref_table.as_ref()
     }
 

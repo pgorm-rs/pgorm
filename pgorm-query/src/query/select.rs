@@ -36,7 +36,7 @@ use inherent::inherent;
 pub struct SelectStatement {
     pub(crate) distinct: Option<SelectDistinct>,
     pub(crate) selects: Vec<SelectExpr>,
-    pub(crate) from: Vec<TableRef>,
+    pub(crate) from: Vec<FromItem>,
     pub(crate) join: Vec<JoinExpr>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) groups: Vec<SimpleExpr>,
@@ -80,7 +80,7 @@ pub struct SelectExpr {
 #[derive(Debug, Clone, PartialEq)]
 pub struct JoinExpr {
     pub join: JoinType,
-    pub table: Box<TableRef>,
+    pub table: Box<FromItem>,
     pub on: Option<JoinOn>,
     pub lateral: bool,
 }
@@ -107,7 +107,7 @@ pub enum LockBehavior {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LockClause {
     pub(crate) r#type: LockType,
-    pub(crate) tables: Vec<TableRef>,
+    pub(crate) tables: Vec<FromItem>,
     pub(crate) behavior: Option<LockBehavior>,
 }
 
@@ -722,20 +722,6 @@ impl SelectStatement {
     /// );
     /// ```
     ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::select()
-    ///     .column(Char::FontSize)
-    ///     .from((Alias::new("database"), Char::Table, Glyph::Table))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "font_size" FROM "database"."character"."glyph""#
-    /// );
-    /// ```
-    ///
     /// If you specify `from` multiple times, the resulting query will have multiple from clauses.
     /// You can perform an 'old-school' join this way.
     ///
@@ -754,12 +740,12 @@ impl SelectStatement {
     ///     r#"SELECT * FROM "character", "font" WHERE "font"."id" = "character"."font_id""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from]
+    // [spec:pgorm:req:sql.ast.select.from+1]
     pub fn from<R>(&mut self, tbl_ref: R) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
     {
-        self.from_from(tbl_ref.into_table_ref())
+        self.from_from(tbl_ref.into_from_item())
     }
 
     /// Shorthand for selecting from a constant value list.
@@ -778,7 +764,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from]
+    // [spec:pgorm:req:sql.ast.select.from+1]
     pub fn from_values<I, V, A>(&mut self, value_tuples: I, alias: A) -> &mut Self
     where
         I: IntoIterator<Item = V>,
@@ -790,7 +776,7 @@ impl SelectStatement {
             .map(|vt| vt.into_value_tuple())
             .collect();
         assert!(!value_tuples.is_empty());
-        self.from_from(TableRef::ValuesList(value_tuples, alias.into_iden()))
+        self.from_from(FromItem::ValuesList(value_tuples, alias.into_iden()))
     }
 
     /// From table with alias.
@@ -830,10 +816,10 @@ impl SelectStatement {
     /// ```
     pub fn from_as<R, A>(&mut self, tbl_ref: R, alias: A) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         A: IntoIden,
     {
-        self.from_from(tbl_ref.into_table_ref().alias(alias.into_iden()))
+        self.from_from(tbl_ref.into_from_item().alias(alias.into_iden()))
     }
 
     /// From sub-query.
@@ -863,7 +849,7 @@ impl SelectStatement {
     where
         T: IntoIden,
     {
-        self.from_from(TableRef::SubQuery(query, alias.into_iden()))
+        self.from_from(FromItem::SubQuery(query, alias.into_iden()))
     }
 
     /// From function call.
@@ -887,7 +873,7 @@ impl SelectStatement {
     where
         T: IntoIden,
     {
-        self.from_from(TableRef::FunctionCall(func, alias.into_iden()))
+        self.from_from(FromItem::FunctionCall(func, alias.into_iden()))
     }
 
     /// Clears all current from clauses.
@@ -915,7 +901,7 @@ impl SelectStatement {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn from_from(&mut self, select: TableRef) -> &mut Self {
+    fn from_from(&mut self, select: FromItem) -> &mut Self {
         self.from.push(select);
         self
     }
@@ -960,7 +946,7 @@ impl SelectStatement {
     /// ```
     pub fn cross_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join(JoinType::CrossJoin, tbl_ref, condition)
@@ -1006,7 +992,7 @@ impl SelectStatement {
     /// ```
     pub fn left_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join(JoinType::LeftJoin, tbl_ref, condition)
@@ -1052,7 +1038,7 @@ impl SelectStatement {
     /// ```
     pub fn right_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join(JoinType::RightJoin, tbl_ref, condition)
@@ -1098,7 +1084,7 @@ impl SelectStatement {
     /// ```
     pub fn inner_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join(JoinType::InnerJoin, tbl_ref, condition)
@@ -1144,7 +1130,7 @@ impl SelectStatement {
     /// ```
     pub fn full_outer_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join(JoinType::FullOuterJoin, tbl_ref, condition)
@@ -1192,12 +1178,12 @@ impl SelectStatement {
     // [spec:pgorm:req:sql.ast.select.join]
     pub fn join<R, C>(&mut self, join: JoinType, tbl_ref: R, condition: C) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         C: IntoCondition,
     {
         self.join_join(
             join,
-            tbl_ref.into_table_ref(),
+            tbl_ref.into_from_item(),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1255,13 +1241,13 @@ impl SelectStatement {
         condition: C,
     ) -> &mut Self
     where
-        R: IntoTableRef,
+        R: IntoFromItem,
         A: IntoIden,
         C: IntoCondition,
     {
         self.join_join(
             join,
-            tbl_ref.into_table_ref().alias(alias.into_iden()),
+            tbl_ref.into_from_item().alias(alias.into_iden()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1323,7 +1309,7 @@ impl SelectStatement {
     {
         self.join_join(
             join,
-            TableRef::SubQuery(query, alias.into_iden()),
+            FromItem::SubQuery(query, alias.into_iden()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1386,7 +1372,7 @@ impl SelectStatement {
     {
         self.join_join(
             join,
-            TableRef::SubQuery(query, alias.into_iden()),
+            FromItem::SubQuery(query, alias.into_iden()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1397,7 +1383,7 @@ impl SelectStatement {
     fn join_join(
         &mut self,
         join: JoinType,
-        table: TableRef,
+        table: FromItem,
         on: JoinOn,
         lateral: bool,
     ) -> &mut Self {
@@ -1687,12 +1673,12 @@ impl SelectStatement {
     /// ```
     pub fn lock_with_tables<T, I>(&mut self, r#type: LockType, tables: I) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoFromItem,
         I: IntoIterator<Item = T>,
     {
         self.lock = Some(LockClause {
             r#type,
-            tables: tables.into_iter().map(|t| t.into_table_ref()).collect(),
+            tables: tables.into_iter().map(|t| t.into_from_item()).collect(),
             behavior: None,
         });
         self
@@ -1752,12 +1738,12 @@ impl SelectStatement {
         behavior: LockBehavior,
     ) -> &mut Self
     where
-        T: IntoTableRef,
+        T: IntoFromItem,
         I: IntoIterator<Item = T>,
     {
         self.lock = Some(LockClause {
             r#type,
-            tables: tables.into_iter().map(|t| t.into_table_ref()).collect(),
+            tables: tables.into_iter().map(|t| t.into_from_item()).collect(),
             behavior: Some(behavior),
         });
         self

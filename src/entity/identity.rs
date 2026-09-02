@@ -3,7 +3,7 @@ use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SeaRc, Value, 
 use std::fmt;
 
 /// List of column identifier
-// [spec:pgorm:def:entity.relation.def+2]
+// [spec:pgorm:def:entity.relation.def+3]
 #[derive(Debug, Clone)]
 pub enum Identity {
     /// Column identifier consists of 1 column
@@ -60,7 +60,7 @@ impl Iden for Identity {
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+2]
+// [spec:pgorm:def:entity.relation.def+3]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (DynIden, DynIden),
@@ -156,7 +156,7 @@ impl IntoIterator for ColumnPairs {
 }
 
 /// Performs a conversion into an [Identity]
-// [spec:pgorm:def:entity.relation.def+2]
+// [spec:pgorm:def:entity.relation.def+3]
 pub trait IntoIdentity {
     /// The shape a boundary value must have to line up with this identity: a
     /// tuple of [`Value`] of the same length, so the arity of a column set and
@@ -176,7 +176,7 @@ pub trait IntoIdentity {
 /// The exception is `K = ValueTuple`, the shape of a runtime-built
 /// [`Identity`], which accepts any tuple and leaves the arity to be checked
 /// when the query runs.
-// [spec:pgorm:def:entity.relation.def+2]
+// [spec:pgorm:def:entity.relation.def+3]
 pub trait IntoBoundary<K>: IntoValueTuple {}
 
 /// Check the [Identity] of an Entity

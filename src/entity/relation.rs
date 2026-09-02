@@ -1,8 +1,8 @@
 use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_ref};
 use core::marker::PhantomData;
 use pgorm_query::{
-    Alias, Condition, ConditionType, DynIden, ForeignKeyCreateStatement, IntoIden, JoinType, SeaRc,
-    TableForeignKey, TableRef,
+    Alias, Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden,
+    JoinType, SeaRc, TableForeignKey,
 };
 use std::fmt::Debug;
 
@@ -47,14 +47,14 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+2]
+// [spec:pgorm:def:entity.relation.def+3]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
     /// Reference from another Entity
-    pub from_tbl: TableRef,
+    pub from_tbl: FromItem,
     /// Reference to another ENtity
-    pub to_tbl: TableRef,
+    pub to_tbl: FromItem,
     /// The columns joined, as `(from, to)` pairs
     pub columns: ColumnPairs,
     /// Defines the owner of the Relation
@@ -129,8 +129,8 @@ where
 {
     entities: PhantomData<(E, R)>,
     rel_type: RelationType,
-    from_tbl: TableRef,
-    to_tbl: TableRef,
+    from_tbl: FromItem,
+    to_tbl: FromItem,
     columns: C,
     is_owner: bool,
     on_delete: Option<ForeignKeyAction>,
@@ -316,8 +316,8 @@ where
         Self {
             entities: PhantomData,
             rel_type,
-            from_tbl: from.table_ref(),
-            to_tbl: to.table_ref(),
+            from_tbl: from.table_ref().into(),
+            to_tbl: to.table_ref().into(),
             columns: NoColumns,
             is_owner,
             on_delete: None,
@@ -472,7 +472,7 @@ macro_rules! set_foreign_key_stmt {
     };
 }
 
-// [spec:pgorm:req:entity.relation.fk+1]
+// [spec:pgorm:req:entity.relation.fk+2]
 impl From<RelationDef> for ForeignKeyCreateStatement {
     fn from(relation: RelationDef) -> Self {
         let mut foreign_key_stmt = Self::new();
@@ -486,13 +486,13 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{Alias, IntoIden, QueryBuilder, TableAlterStatement, TableRef, ConditionType};
+/// use pgorm_query::{Alias, ConditionType, FromItem, IntoIden, QueryBuilder, TableAlterStatement, TableName};
 /// use pgorm::{ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
 ///     rel_type: RelationType::HasOne,
-///     from_tbl: TableRef::Table(Alias::new("foo").into_iden()),
-///     to_tbl: TableRef::Table(Alias::new("bar").into_iden()),
+///     from_tbl: FromItem::Table(TableName::Table(Alias::new("foo").into_iden()), None),
+///     to_tbl: FromItem::Table(TableName::Table(Alias::new("bar").into_iden()), None),
 ///     columns: ColumnPairs::new(Alias::new("bar_id"), Alias::new("bar_id")),
 ///     is_owner: false,
 ///     on_delete: None,
@@ -503,14 +503,14 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 /// };
 ///
 /// let mut alter_table = TableAlterStatement::new()
-///     .table(TableRef::Table(Alias::new("foo").into_iden()))
+///     .table(TableName::Table(Alias::new("foo").into_iden()))
 ///     .add_foreign_key(&mut relation.into()).take();
 /// assert_eq!(
 ///     alter_table.to_string(QueryBuilder),
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```
-// [spec:pgorm:req:entity.relation.fk+1]
+// [spec:pgorm:req:entity.relation.fk+2]
 impl From<RelationDef> for TableForeignKey {
     fn from(relation: RelationDef) -> Self {
         let mut foreign_key = Self::new();

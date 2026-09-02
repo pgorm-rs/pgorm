@@ -299,7 +299,7 @@ pub async fn insert_cake_baker(
 }
 
 // A fixture purpose-built for the loader's key-mapping edge cases: it lives in
-// an explicit schema (exercising the `TableRef::SchemaTable` arm of the key
+// an explicit schema (exercising the `TableName::SchemaTable` arm of the key
 // predicate), and `owner_id` is deliberately not unique, so a relation declared
 // `HasOne` over it can match several rows for one key.
 mod ledger {
@@ -647,8 +647,8 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
 // rows into a map keyed on the relation's to side in result order, so when a relation
 // declared `HasOne` matches several rows for one key the last row wins, an
 // unmatched input gets `None`, and inputs sharing a key each get a clone
-// [spec:pgorm:req:query.loader.table-ref-limitation+1/test]    the supported
-// `TableRef::SchemaTable` target: its key column is qualified and the load runs
+// [spec:pgorm:req:query.loader.table-ref-limitation+2/test]    the supported
+// `TableName::SchemaTable` target: its key column is qualified and the load runs
 #[pgorm_macros::test]
 async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_last_row_wins").await;
@@ -677,12 +677,12 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation+1/test]    a relation whose
-// target resolves to any other `TableRef` variant — an aliased table here —
-// cannot have its key column qualified, so the load returns an `Err` naming the
-// column and the offending table reference
+// [spec:pgorm:req:query.loader.table-ref-limitation+2/test]    a relation whose
+// target resolves to any other from item — an aliased table here — cannot have
+// its key column qualified, so the load returns an `Err` naming the column and
+// the offending from item
 #[pgorm_macros::test]
-async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
+async fn loader_errors_on_aliased_from_item() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_table_ref_limit").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -700,13 +700,13 @@ async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
 
     let message = internal_message(
         customers.load_one(ledger::Entity, db).await,
-        "an aliased TableRef must abort the load",
+        "an aliased from item must abort the load",
     );
     assert!(
         message.starts_with("Loader cannot qualify key column `owner_id`"),
         "{message}"
     );
-    assert!(message.contains("SchemaTableAlias"), "{message}");
+    assert!(message.contains("SchemaTable"), "{message}");
     assert!(message.contains("ledger"), "{message}");
 
     drop(conn);

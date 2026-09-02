@@ -93,14 +93,17 @@ fn the_single_backend_renders_every_statement_kind() {
     );
 }
 
-// [spec:pgorm:def:sql.render/test]    rendering is infallible by construction: an AST shape the
-// renderer does not support aborts with a panic instead of returning an error
+// [spec:pgorm:def:sql.render/test]    rendering is infallible by construction: a DDL target is a
+// `TableName`, which has no shape the renderer would have to refuse
 #[test]
-#[should_panic(expected = "Not supported")]
-fn unsupported_ast_shapes_panic_rather_than_erroring() {
-    Table::truncate()
-        .table(Glyph::Table.into_table_ref().alias(Alias::new("g")))
-        .to_string(QueryBuilder);
+fn ddl_targets_have_no_unrenderable_shape() {
+    for name in [
+        Glyph::Table.into_table_name(),
+        (Alias::new("public"), Glyph::Table).into_table_name(),
+    ] {
+        let sql = Table::truncate().table(name).to_string(QueryBuilder);
+        assert!(sql.starts_with("TRUNCATE TABLE "), "{sql}");
+    }
 }
 
 // [spec:pgorm:def:sql.render.writer+1/test]    `String` is the inline-rendering sink: `push_param`

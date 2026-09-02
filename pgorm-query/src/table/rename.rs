@@ -20,8 +20,8 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// ```
 #[derive(Default, Debug, Clone)]
 pub struct TableRenameStatement {
-    pub(crate) from_name: Option<TableRef>,
-    pub(crate) to_name: Option<TableRef>,
+    pub(crate) from_name: Option<TableName>,
+    pub(crate) to_name: Option<TableName>,
 }
 
 impl TableRenameStatement {
@@ -33,11 +33,11 @@ impl TableRenameStatement {
     /// Set old and new table name
     pub fn table<T, R>(&mut self, from_name: T, to_name: R) -> &mut Self
     where
-        T: IntoTableRef,
-        R: IntoTableRef,
+        T: IntoTableName,
+        R: IntoTableName,
     {
-        self.from_name = Some(from_name.into_table_ref());
-        self.to_name = Some(to_name.into_table_ref());
+        self.from_name = Some(from_name.into_table_name());
+        self.to_name = Some(to_name.into_table_name());
         self
     }
 
