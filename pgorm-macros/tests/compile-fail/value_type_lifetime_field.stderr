@@ -1,32 +1,32 @@
 error[E0277]: the trait bound `&'static str: TryGetable` is not satisfied
  --> tests/compile-fail/value_type_lifetime_field.rs:6:14
   |
-6 | struct MyStr(&'static str);
-  |              ^^^^^^^^^^^^ the trait `TryGetableFromJson` is not implemented for `&'static str`
-  |
+  6 | struct MyStr(&'static str);
+    |              ^^^^^^^^^^^^ the trait `TryGetableFromJson` is not implemented for `&'static str`
+    |
 help: the trait `TryGetable` is implemented for `std::string::String`
- --> $WORKSPACE/src/executor/query.rs
-  |
-  |         impl TryGetable for $type {
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   --> $WORKSPACE/src/executor/query.rs
+    |
+    |         impl TryGetable for $type {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  | try_getable_all!(String);
-  | ------------------------ in this macro invocation
-  = note: required for `&'static str` to implement `TryGetable`
-  = note: this error originates in the macro `try_getable_all` (in Nightly builds, run with -Z macro-backtrace for more info)
+    | try_getable_all!(String);
+    | ------------------------ in this macro invocation
+    = note: required for `&'static str` to implement `TryGetable`
+    = note: this error originates in the macro `try_getable_all` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `&'static str: ValueType` is not satisfied
  --> tests/compile-fail/value_type_lifetime_field.rs:6:14
   |
-6 | struct MyStr(&'static str);
-  |              ^^^^^^^^^^^^ the trait `ValueType` is not implemented for `&'static str`
-  |
+  6 | struct MyStr(&'static str);
+    |              ^^^^^^^^^^^^ the trait `ValueType` is not implemented for `&'static str`
+    |
 help: the trait `ValueType` is implemented for `std::string::String`
- --> $WORKSPACE/pgorm-query/src/value.rs
-  |
-  |         impl ValueType for $type {
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^
+   --> $WORKSPACE/pgorm-query/src/value.rs
+    |
+    |         impl ValueType for $type {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  | type_to_box_value!(String, String, String(StringLen::None));
-  | ----------------------------------------------------------- in this macro invocation
-  = note: this error originates in the macro `type_to_box_value` (in Nightly builds, run with -Z macro-backtrace for more info)
+    | type_to_box_value!(String, String, String(StringLen::None));
+    | ----------------------------------------------------------- in this macro invocation
+    = note: this error originates in the macro `type_to_box_value` (in Nightly builds, run with -Z macro-backtrace for more info)
