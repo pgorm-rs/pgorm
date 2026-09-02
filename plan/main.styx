@@ -1356,6 +1356,20 @@ children (
                         kind @note
                         text "Audit: src/query/helper.rs:893-894 zips from_col/to_col Identity iterators; zip truncates to the shorter side, emitting an under-constrained join — wrong rows, silently. Same def in DDL (relation.rs:422-433) iterates independently and PG rejects with 42804. Remedy is the structural fix: replace the two Identity fields with a ColumnPairs newtype (non-empty Vec of (DynIden, DynIden) pairs) so unbalanced arity cannot exist. Readers to update: loader.rs, schema/entity.rs, link.rs; DeriveRelation output changes shape but not behavior. Bumps entity.relation.def and query.build.join. Also worthwhile while in the struct: is_owner+rel_type collapse into one closed enum (contradiction currently renders a correct join with a backwards FK). Deps on decide.schema-comments only for the schema/entity.rs footprint."
                     }
+
+                    {
+                        at 2026-09-02T19:11:36.703806Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+
+                    {
+                        at 2026-09-02T19:11:55.989469Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The audit's suggested is_owner+rel_type collapse is REJECTED on the implementing agent's analysis, accepted by the lead: all four combinations are reachable and meaningful (rel_type is cardinality, is_owner is FK direction; rev() legitimately yields HasMany with is_owner=false by negating one axis). Collapsing would rename a genuine product type without closing an illegal state. The deferred consequence in [dec:pgorm:invalid-states-unrepresentable] does not apply here."
+                    }
                 )
             }
 
@@ -1530,6 +1544,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator directive: agents must not mass create/drop against the shared server, and the primary flake mechanism is now understood to be CROSS-WORKTREE collision — concurrent agents run the same test binaries, per-test database names derive solely from the test fn name, so two runs share one database and one's DROP ... WITH (FORCE) kills the other's connections (57P01) or races its CREATE. The fix is worktree/process-unique database names (suffix a short hash of the checkout path or pid into TestContext's derivation) plus propagating the CREATE result. Campaign protocol adjusted: agents run scoped DB tests only; the lead runs the full suite serially at integration."
+                    }
+
+                    {
+                        at 2026-09-02T19:15:03.593799Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -1718,6 +1739,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit consensus (root auditor + design auditor agree): the \"columns mismatch\" panic at src/query/insert.rs:139 — trivially reachable via insert_many over models with differing NotSet fields — becomes a recorded error surfaced as DbErr at the already-fallible exec* boundary, mirroring the TryInsert empty-failsafe pattern. The type-level ColumnSet witness was assessed L-for-the-benefit and rejected; the mistake is loud and immediate once typed. Bumps query.build.insert.uniform-columns (named in both decisions' scope) and flips the should_panic pin in query_build_tests. Deps on bug.insert-empty-model (same files)."
+                    }
+
+                    {
+                        at 2026-09-02T19:29:43.439383Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
