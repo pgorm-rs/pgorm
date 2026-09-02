@@ -4,9 +4,11 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DatabaseTransaction, TransactionTrait, entity::prelude::*,
+    ActiveValue::Set, DatabaseConnection, DatabaseTransaction, IsolationLevel, TransactionOptions,
+    TransactionTrait, entity::prelude::*,
 };
 use pretty_assertions::assert_eq;
+use tokio_postgres::error::SqlState;
 
 async fn insert_bakery<C>(db: &C, name: &str, profit_margin: f64) -> Result<(), DbErr>
 where
@@ -211,6 +213,70 @@ pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
     txn.rollback().await.unwrap();
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.tx+1/test]    read-only access mode is enforced by the server
+#[pgorm_macros::test]
+pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_read_only_txconfig").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    let txn = db
+        .begin_with(TransactionOptions {
+            read_only: true,
+            ..Default::default()
+        })
+        .await?;
+
+    let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
+        .await
+        .expect_err("INSERT must be rejected in a read-only transaction");
+
+    match &err {
+        DbErr::Postgres(e) => assert_eq!(
+            e.as_db_error().map(|e| e.code()),
+            Some(&SqlState::READ_ONLY_SQL_TRANSACTION),
+        ),
+        other => panic!("expected DbErr::Postgres, got {other:?}"),
+    }
+
+    txn.rollback().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.tx+1/test]    a configured isolation level still commits
+#[pgorm_macros::test]
+pub async fn transaction_serializable_txconfig() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_serializable_txconfig").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    let txn = db
+        .begin_with(TransactionOptions {
+            isolation_level: Some(IsolationLevel::Serializable),
+            ..Default::default()
+        })
+        .await?;
+
+    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+
+    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
+
+    txn.commit().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
 
     drop(db);
     ctx.delete().await;

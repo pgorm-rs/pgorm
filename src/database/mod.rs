@@ -6,7 +6,7 @@ mod db_connection;
 pub use connection::*;
 pub use db_connection::*;
 use futures::FutureExt as _;
-pub use tokio_postgres::Config;
+pub use tokio_postgres::{Config, IsolationLevel};
 
 use pgorm_pool::{ClientWrapper, Manager, ManagerConfig, Pool, PoolBuilder, RecyclingMethod};
 use std::{

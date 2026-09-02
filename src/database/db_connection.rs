@@ -4,7 +4,7 @@ use crate::{ConnectionTrait, TransactionTrait, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
-    RowStream, ToStatement,
+    IsolationLevel, RowStream, ToStatement,
     types::{BorrowToSql, ToSql},
 };
 
@@ -60,23 +60,47 @@ impl DatabasePool {
 #[derive(Debug)]
 pub struct DatabaseConnection(pub(crate) Object);
 
+/// Isolation level, access mode, and deferrability for a transaction opened
+/// with [`DatabaseConnection::begin_with`]. The default leaves every option
+/// unset, which is equivalent to [`TransactionTrait::begin`].
+// [spec:pgorm:req:conn.tx+1]    transaction configuration
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TransactionOptions {
+    /// Isolation level; `None` inherits the session default.
+    pub isolation_level: Option<IsolationLevel>,
+    /// Open the transaction `READ ONLY`.
+    pub read_only: bool,
+    /// Open the transaction `DEFERRABLE`.
+    pub deferrable: bool,
+}
+
 impl DatabaseConnection {
-    async fn begin_with_config(
+    /// Execute SQL `BEGIN` with the given isolation level, access mode, and
+    /// deferrability.
+    ///
+    /// This is an inherent method rather than a [`TransactionTrait`] one
+    /// because a nested transaction is a savepoint, and `SAVEPOINT` takes none
+    /// of these options.
+    // [spec:pgorm:req:conn.tx+1]    configured BEGIN on the pooled client
+    pub async fn begin_with(
         &mut self,
-        read_only: bool,
-        isolation_level: Option<tokio_postgres::IsolationLevel>,
+        opts: TransactionOptions,
     ) -> Result<DatabaseTransaction<'_>, DbErr> {
-        let mut t = self.0.build_transaction();
+        let mut builder = self.0.build_transaction();
 
-        if let Some(l) = isolation_level {
-            t = t.isolation_level(l);
+        if let Some(level) = opts.isolation_level {
+            builder = builder.isolation_level(level);
         }
 
-        if read_only {
-            t = t.read_only(true);
+        if opts.read_only {
+            builder = builder.read_only(true);
         }
 
-        Ok(DatabaseTransaction(Some(t.start().await?)))
+        if opts.deferrable {
+            builder = builder.deferrable(true);
+        }
+
+        Ok(DatabaseTransaction(Some(builder.start().await?)))
     }
 }
 
@@ -345,7 +369,7 @@ impl TransactionTrait for DatabaseTransaction<'_> {
     }
 }
 
-// [spec:pgorm:req:conn.tx]    BEGIN on the pooled client
+// [spec:pgorm:req:conn.tx+1]    BEGIN on the pooled client
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {

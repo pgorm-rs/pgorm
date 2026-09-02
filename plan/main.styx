@@ -608,6 +608,15 @@ children (
                         id infra.tx.config
                         title "TransactionOptions + DatabaseConnection::begin_with; delete dead begin_with_config and closure-API stubs"
                         kind @feat
+                        sealed true
+                        log (
+                            {
+                                at 2026-09-02T00:07:16.012439Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
+                            }
+                        )
                     }
 
                     {

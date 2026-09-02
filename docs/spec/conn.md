@@ -132,16 +132,30 @@ under **Statement seam** below.)
 
 ## Transactions
 
-> [spec:pgorm:req:conn.tx]
+> [spec:pgorm:req:conn.tx+1]
 > `TransactionTrait::begin(&mut self)` MUST return a `DatabaseTransaction<'_>`
 > borrowing the parent exclusively, so no other statement can run on the
 > connection while the transaction handle is alive. `DatabaseConnection::begin`
 > issues `BEGIN` on the pooled client; `DatabaseTransaction::begin` creates a
 > nested transaction, which `tokio_postgres` implements as a savepoint. Both
-> transaction levels share the connection's statement cache. Isolation level
-> and read-only configuration exist only on a private
-> `DatabaseConnection::begin_with_config` helper and are not reachable through
-> the public trait.
+> transaction levels share the connection's statement cache.
+>
+> `DatabaseConnection::begin_with(opts: TransactionOptions)` is the configured
+> counterpart, issuing `BEGIN` through `pgorm_pool`'s `TransactionBuilder`.
+> `TransactionOptions` is a `Debug + Clone + Copy + Default` struct of exactly
+> three public fields — `isolation_level: Option<IsolationLevel>`, `read_only:
+> bool`, `deferrable: bool` — and each is forwarded to the builder only when
+> set, so `TransactionOptions::default()` produces the same plain `BEGIN` as
+> `begin` and unset options inherit the session defaults rather than being
+> pinned to `READ WRITE` / `NOT DEFERRABLE`. `IsolationLevel` is
+> `tokio_postgres::IsolationLevel`, re-exported from `pgorm`.
+>
+> `begin_with` is an inherent method on `DatabaseConnection`, deliberately NOT
+> on `TransactionTrait`: the trait's other implementor is
+> `DatabaseTransaction`, whose `begin` is a savepoint, and `SAVEPOINT` accepts
+> no isolation level, access mode, or deferrability. Putting the configured
+> form on the trait would require the savepoint implementation to ignore or
+> reject its argument, so it is offered only where PostgreSQL honours it.
 
 > [spec:pgorm:sem:conn.tx.guard+1]
 > `DatabaseTransaction` wraps `Option<pgorm_pool::Transaction>` as a
