@@ -1135,6 +1135,14 @@ children (
                 id verify.misc
                 title "Verify error-model, metric-layer and schema-gen rules (8 rules)"
                 deps (polish.conn-acquire)
+                log (
+                    {
+                        at 2026-09-02T09:44:38.013192Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
         log (
