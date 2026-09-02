@@ -36,7 +36,7 @@ impl IndexDropStatement {
     /// Set index name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: Into<String>,
+        T: IntoIden,
     {
         self.index.name(name);
         self

@@ -1750,7 +1750,7 @@ impl QueryBuilder {
                 }
                 TableAlterOption::DropForeignKey(name) => {
                     let mut foreign_key = TableForeignKey::new();
-                    foreign_key.name(name.to_string());
+                    foreign_key.name(name.clone());
                     let drop = ForeignKeyDropStatement {
                         foreign_key,
                         table: None,
@@ -2056,14 +2056,9 @@ impl QueryBuilder {
         sql: &mut dyn SqlWriter,
     ) {
         if let Some(name) = &create.index.name {
-            write!(
-                sql,
-                "CONSTRAINT {}{}{} ",
-                self.quote().left(),
-                name,
-                self.quote().right()
-            )
-            .unwrap();
+            write!(sql, "CONSTRAINT ").unwrap();
+            name.prepare(sql.as_writer(), self.quote());
+            write!(sql, " ").unwrap();
         }
 
         self.prepare_index_prefix(create, sql);
@@ -2090,14 +2085,7 @@ impl QueryBuilder {
         }
 
         if let Some(name) = &create.index.name {
-            write!(
-                sql,
-                "{}{}{}",
-                self.quote().left(),
-                name,
-                self.quote().right()
-            )
-            .unwrap();
+            name.prepare(sql.as_writer(), self.quote());
         }
 
         write!(sql, " ON ").unwrap();
@@ -2146,14 +2134,7 @@ impl QueryBuilder {
             }
         }
         if let Some(name) = &drop.index.name {
-            write!(
-                sql,
-                "{}{}{}",
-                self.quote().left(),
-                name,
-                self.quote().right()
-            )
-            .unwrap();
+            name.prepare(sql.as_writer(), self.quote());
         }
     }
 
@@ -2229,14 +2210,7 @@ impl QueryBuilder {
 
         write!(sql, "DROP CONSTRAINT ").unwrap();
         if let Some(name) = &drop.foreign_key.name {
-            write!(
-                sql,
-                "{}{}{}",
-                self.quote().left(),
-                name,
-                self.quote().right()
-            )
-            .unwrap();
+            name.prepare(sql.as_writer(), self.quote());
         }
     }
 
@@ -2261,14 +2235,8 @@ impl QueryBuilder {
 
         if let Some(name) = &create.foreign_key.name {
             write!(sql, "CONSTRAINT ").unwrap();
-            write!(
-                sql,
-                "{}{}{} ",
-                self.quote().left(),
-                name,
-                self.quote().right()
-            )
-            .unwrap();
+            name.prepare(sql.as_writer(), self.quote());
+            write!(sql, " ").unwrap();
         }
 
         write!(sql, "FOREIGN KEY (").unwrap();

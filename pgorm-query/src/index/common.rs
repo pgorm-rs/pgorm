@@ -3,7 +3,7 @@ use crate::types::*;
 /// Specification of a table index
 #[derive(Default, Debug, Clone)]
 pub struct TableIndex {
-    pub(crate) name: Option<String>,
+    pub(crate) name: Option<DynIden>,
     pub(crate) columns: Vec<IndexColumn>,
 }
 
@@ -91,9 +91,9 @@ impl TableIndex {
     /// Set index name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: Into<String>,
+        T: IntoIden,
     {
-        self.name = Some(name.into());
+        self.name = Some(name.into_iden());
         self
     }
 

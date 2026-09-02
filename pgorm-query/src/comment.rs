@@ -15,7 +15,7 @@ use inherent::inherent;
 use crate::{DynIden, IntoIden, QueryBuilder, SchemaStatementBuilder, TableRef};
 
 /// Helper for constructing any comment statement
-// [spec:pgorm:req:sql.ddl+2]
+// [spec:pgorm:req:sql.ddl+3]
 // [spec:pgorm:req:sql.ddl.comment]
 #[derive(Debug)]
 pub struct Comment;
@@ -201,7 +201,7 @@ impl TryFrom<TableRef> for CommentTable {
     }
 }
 
-// [spec:pgorm:req:sql.ddl+2]
+// [spec:pgorm:req:sql.ddl+3]
 #[inherent]
 impl SchemaStatementBuilder for CommentStatement {
     pub fn build(&self, schema_builder: QueryBuilder) -> String {

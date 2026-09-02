@@ -10,7 +10,7 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including panics and leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+2]
+> [spec:pgorm:req:sql.ddl+3]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`truncate`), `Index` (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
@@ -19,11 +19,14 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > implement `SchemaStatementBuilder` (`build`, `build_any`, `to_string`), all
 > of which delegate to the corresponding `prepare_*` method on the single
 > Postgres `QueryBuilder`; type and extension statements provide equivalent
-> `build_ref`/`build_collect`/`to_string` inherent methods. Identifiers that
-> render through `Iden::prepare` (table, column and type names) MUST render
-> double-quoted (quote character `"`, embedded quotes doubled); index and
-> constraint names are written raw between quote characters, without
-> doubling. `TableStatement` is an enum wrapper carrying its own
+> `build_ref`/`build_collect`/`to_string` inherent methods. Every identifier a
+> DDL statement renders — table, column and type names, and index, constraint
+> and foreign-key names alike — MUST go through `Iden::prepare` and so render
+> double-quoted (quote character `"`, embedded quotes doubled); no identifier
+> is interpolated raw between quote characters. Index and constraint names are
+> held as `DynIden` and accepted as `IntoIden`, so a `&str` or `String` name
+> escapes through `Alias` like any other identifier. `TableStatement` is an
+> enum wrapper carrying its own
 > `build`/`build_any`/`to_string` dispatch methods; `IndexStatement`,
 > `ForeignKeyStatement` and `SchemaStatement` are plain wrapper enums whose
 > variants render through the same builders.

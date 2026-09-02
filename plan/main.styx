@@ -1440,6 +1440,13 @@ children (
                         kind @note
                         text "Audit: six sites write a raw String between quote characters with no embedded-quote doubling — query_builder.rs:2089-2097 (CONSTRAINT), :2123-2131 (CREATE INDEX), :2179-2187 (DROP INDEX), :2262-2269 and :2294-2302 (FK names). Backing field is name: Option<String> in pgorm-query/src/index/common.rs:6. Converting to DynIden routes through Iden::prepare's escaping (types.rs:17-25) and closes an identifier-injection hole. Note verify.sql's tests pinned the no-doubling behavior on the ddl rule (sql.ddl+1) — that clause flips and re-bumps. Security-motivated; worth doing regardless of API cost."
                     }
+
+                    {
+                        at 2026-09-02T19:00:40.269307Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

@@ -4,7 +4,7 @@ use crate::types::*;
 // [spec:pgorm:req:sql.ddl.foreign-key]
 #[derive(Default, Debug, Clone)]
 pub struct TableForeignKey {
-    pub(crate) name: Option<String>,
+    pub(crate) name: Option<DynIden>,
     pub(crate) table: Option<TableRef>,
     pub(crate) ref_table: Option<TableRef>,
     pub(crate) columns: Vec<DynIden>,
@@ -32,9 +32,9 @@ impl TableForeignKey {
     /// Set foreign key name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: Into<String>,
+        T: IntoIden,
     {
-        self.name = Some(name.into());
+        self.name = Some(name.into_iden());
         self
     }
 

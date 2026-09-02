@@ -311,6 +311,7 @@ derived_priorities (
 assertions (
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
+    {id bug.ident-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:00:40.269307Z}
     {id bug.insert-empty-model, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:55:49.663561Z}
     {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
     {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}

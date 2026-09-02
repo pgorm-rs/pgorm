@@ -443,7 +443,7 @@ macro_rules! set_foreign_key_stmt {
             let from_tbl = unpack_table_ref(&$relation.from_tbl);
             format!("fk-{}-{}", from_tbl.to_string(), from_cols.join("-"))
         };
-        $foreign_key.name(&name);
+        $foreign_key.name(name);
     };
 }
 

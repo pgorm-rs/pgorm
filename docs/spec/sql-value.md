@@ -199,7 +199,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types]
+> [spec:pgorm:def:sql.types+1]
 > `Iden` is the identifier trait (bounded `Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
 > which doubles any embedded quote character — and `prepare`, which writes the
@@ -213,8 +213,10 @@ including panic semantics and quirks inherited from sea-query.
 > equality compares the trait-object vtable pointer and the unquoted string,
 > so two idens are equal only when they are the same concrete type rendering
 > the same text. `IntoIden` converts any `Iden + 'static` (or an existing
-> `DynIden`) into a `DynIden`; `IdenList` is implemented for a single iden and
-> for 2- and 3-tuples, yielding `DynIden`s in order.
+> `DynIden`) into a `DynIden`, and also accepts `&str` and `String`, wrapping
+> them in `Alias` so a string-spelled identifier escapes like any other;
+> `IdenList` is implemented for a single iden and for 2- and 3-tuples,
+> yielding `DynIden`s in order.
 >
 > `Alias` wraps an arbitrary `String` as an identifier; `NullAlias` renders as
 > the empty string.

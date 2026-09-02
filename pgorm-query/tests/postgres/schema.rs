@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_query_eq};
 use pgorm_query::extension::{Extension, Type};
 
-// [spec:pgorm:req:sql.ddl+2/test]    the whole DDL surface is reachable through the six
+// [spec:pgorm:req:sql.ddl+3/test]    the whole DDL surface is reachable through the six
 // entry-point helpers
 #[test]
 fn every_ddl_entry_point_is_reachable() {
@@ -116,7 +116,7 @@ fn every_ddl_entry_point_is_reachable() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+2/test]    table, index, foreign-key and comment statements implement
+// [spec:pgorm:req:sql.ddl+3/test]    table, index, foreign-key and comment statements implement
 // `SchemaStatementBuilder`, whose `build` / `build_any` / `to_string` all delegate to the same
 // `prepare_*` method on the single Postgres `QueryBuilder`
 #[test]
@@ -174,7 +174,7 @@ fn schema_statement_builder_trio_agrees() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+2/test]    `TableStatement` is an enum wrapper dispatching to the same
+// [spec:pgorm:req:sql.ddl+3/test]    `TableStatement` is an enum wrapper dispatching to the same
 // builders
 #[test]
 fn table_statement_wrapper_dispatches() {
@@ -255,7 +255,7 @@ fn table_statement_wrapper_dispatches() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+2/test]    identifiers render double-quoted, with embedded quotes doubled
+// [spec:pgorm:req:sql.ddl+3/test]    identifiers render double-quoted, with embedded quotes doubled
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(
@@ -280,5 +280,53 @@ fn ddl_identifiers_are_double_quoted() {
             .to(Font::Table, Font::Id)
             .to_string(QueryBuilder),
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
+    );
+}
+
+// [spec:pgorm:req:sql.ddl+3/test]    index and constraint names are idens, so an embedded
+// quote is doubled at every site that writes one
+#[test]
+fn ddl_index_and_constraint_names_escape_quotes() {
+    assert_eq!(
+        Table::create()
+            .table(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer())
+            .index(Index::create().name(r#"i"dx"#).unique().col(Glyph::Id))
+            .to_string(QueryBuilder),
+        r#"CREATE TABLE "glyph" ( "id" integer, CONSTRAINT "i""dx" UNIQUE ("id") )"#
+    );
+    assert_eq!(
+        Index::create()
+            .name(r#"i"dx"#)
+            .table(Glyph::Table)
+            .col(Glyph::Id)
+            .to_string(QueryBuilder),
+        r#"CREATE INDEX "i""dx" ON "glyph" ("id")"#
+    );
+    assert_eq!(
+        Index::drop().name(r#"i"dx"#).to_string(QueryBuilder),
+        r#"DROP INDEX "i""dx""#
+    );
+    assert_eq!(
+        ForeignKey::create()
+            .name(r#"f"k"#)
+            .from(Char::Table, Char::FontId)
+            .to(Font::Table, Font::Id)
+            .to_string(QueryBuilder),
+        r#"ALTER TABLE "character" ADD CONSTRAINT "f""k" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
+    );
+    assert_eq!(
+        ForeignKey::drop()
+            .name(r#"f"k"#)
+            .table(Char::Table)
+            .to_string(QueryBuilder),
+        r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
+    );
+    assert_eq!(
+        Table::alter()
+            .table(Char::Table)
+            .drop_foreign_key(Alias::new(r#"f"k"#))
+            .to_string(QueryBuilder),
+        r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
     );
 }
