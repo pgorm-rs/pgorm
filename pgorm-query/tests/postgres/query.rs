@@ -780,6 +780,7 @@ fn select_48a() {
     );
 }
 
+// [spec:pgorm:def:sql.ast.keywords/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -790,6 +791,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
+// [spec:pgorm:def:sql.ast.keywords/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -2185,5 +2187,460 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
             .build(QueryBuilder)
             .0,
         r#"SELECT CAST("size_w" AS text)"#
+    );
+}
+
+// [spec:pgorm:def:sql.ast.keywords/test]    the bare-keyword expressions and their constructors
+#[test]
+fn keywords_1() {
+    assert_eq!(
+        Query::select()
+            .expr(Expr::current_date())
+            .expr(Expr::current_time())
+            .expr(Expr::current_timestamp())
+            .expr(Expr::custom_keyword(Alias::new("DEFAULT")))
+            .expr(Keyword::Null)
+            .to_string(QueryBuilder),
+        "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DEFAULT, NULL"
+    );
+}
+
+// [spec:pgorm:def:sql.ast.keywords/test]    `Alias` wraps an arbitrary string as an identifier,
+// `NullAlias` is the empty identifier
+#[test]
+fn keywords_2() {
+    assert_eq!(
+        Query::select()
+            .expr_as(Expr::col(Glyph::Id), Alias::new("an alias"))
+            .expr_as(Expr::col(Glyph::Aspect), NullAlias::new())
+            .from(Glyph::Table)
+            .to_string(QueryBuilder),
+        r#"SELECT "id" AS "an alias", "aspect" AS "" FROM "glyph""#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    the holder's three states: `Empty` emits no
+// clause, the chain style builds `Chain`, the `cond_where` style builds `Condition`
+#[test]
+fn condition_holder_1() {
+    // Empty.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph""#
+    );
+
+    // Chain: links accumulate in call order and are joined with their own operator.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(1)))
+            .and_or_where(LogicalChainOper::Or(Expr::col(Glyph::Aspect).eq(2)))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 OR "aspect" = 2"#
+    );
+
+    // Condition.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    a chain operator added to a holder already in
+// `Condition` state panics
+#[test]
+#[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
+fn condition_holder_2() {
+    Query::select()
+        .column(Glyph::Id)
+        .from(Glyph::Table)
+        .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+        .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(2)));
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    ... and a condition added to a holder already
+// in `Chain` state panics too
+#[test]
+#[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
+fn condition_holder_3() {
+    Query::select()
+        .column(Glyph::Id)
+        .from(Glyph::Table)
+        .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(1)))
+        .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)));
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    HAVING is backed by the same holder, with the
+// same conjoining semantics
+#[test]
+fn condition_holder_3a() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Aspect)
+            .from(Glyph::Table)
+            .group_by_col(Glyph::Aspect)
+            .cond_having(Cond::all().add(Expr::col(Glyph::Aspect).gt(1)))
+            .and_having(Expr::col(Glyph::Aspect).lt(9))
+            .cond_having(any![
+                Expr::col(Glyph::Aspect).eq(3),
+                Expr::col(Glyph::Aspect).eq(5)
+            ])
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "aspect" FROM "glyph" GROUP BY "aspect""#,
+            r#"HAVING "aspect" > 1 AND "aspect" < 9"#,
+            r#"AND ("aspect" = 3 OR "aspect" = 5)"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    repeated `cond_where` conjoins: two
+// non-negated `All` sets are appended flat, in call order
+#[test]
+fn condition_holder_4() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .cond_where(
+                Cond::all()
+                    .add(Expr::col(Glyph::Aspect).eq(1))
+                    .add(Expr::col(Glyph::Aspect).eq(2))
+            )
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND "aspect" = 2 AND "aspect" = 3"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.condition.holder/test]    anything else is combined under a fresh
+// `Condition::all()`
+#[test]
+fn condition_holder_5() {
+    // Current is a non-negated `All`, the addition is an `Any`: the addition is
+    // nested inside the existing set.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .cond_where(
+                Cond::any()
+                    .add(Expr::col(Glyph::Aspect).eq(2))
+                    .add(Expr::col(Glyph::Aspect).eq(3))
+            )
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND ("aspect" = 2 OR "aspect" = 3)"#
+    );
+
+    // Current is an `Any`: both sides go under a fresh conjunction, call order kept.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .cond_where(
+                Cond::any()
+                    .add(Expr::col(Glyph::Aspect).eq(1))
+                    .add(Expr::col(Glyph::Aspect).eq(2))
+            )
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE ("aspect" = 1 OR "aspect" = 2) AND "aspect" = 3"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive/test]    a with-clause with no CTE is refused at render
+// time
+#[test]
+#[should_panic(expected = "Cannot build a with query that has no common table expression!")]
+fn with_recursive_1() {
+    WithClause::new()
+        .to_owned()
+        .query(Query::select().column(Glyph::Id).from(Glyph::Table).take())
+        .to_string(QueryBuilder);
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive/test]    a recursive with-clause holding more than one
+// CTE is refused too
+#[test]
+#[should_panic(expected = "Cannot build a recursive query with more than one common table!")]
+fn with_recursive_2() {
+    let cte = |name: &str| {
+        CommonTableExpression::new()
+            .table_name(Alias::new(name))
+            .query(Query::select().column(Glyph::Id).from(Glyph::Table).take())
+            .to_owned()
+    };
+
+    WithClause::new()
+        .recursive(true)
+        .cte(cte("one"))
+        .cte(cte("two"))
+        .to_owned()
+        .query(
+            Query::select()
+                .column(Glyph::Id)
+                .from(Alias::new("one"))
+                .take(),
+        )
+        .to_string(QueryBuilder);
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive/test]    `recursive` renders `WITH RECURSIVE` and emits
+// the optional SEARCH and CYCLE clauses
+#[test]
+fn with_recursive_3() {
+    let mut base = Query::select()
+        .column(Glyph::Id)
+        .expr(1i32)
+        .from(Glyph::Table)
+        .take();
+    let step = Query::select()
+        .column(Glyph::Id)
+        .expr(Expr::col(Alias::new("depth")).add(1i32))
+        .from(Glyph::Table)
+        .inner_join(
+            Alias::new("cte"),
+            Expr::col((Alias::new("cte"), Glyph::Id)).equals((Glyph::Table, Glyph::Id)),
+        )
+        .take();
+    let cte = CommonTableExpression::new()
+        .table_name(Alias::new("cte"))
+        .column(Glyph::Id)
+        .column(Alias::new("depth"))
+        .query(base.union(UnionType::All, step).take())
+        .to_owned();
+
+    let search = Search::new_from_order_and_expr(
+        SearchOrder::BREADTH,
+        SelectExpr {
+            expr: SimpleExpr::Column(ColumnRef::Column(Alias::new("depth").into_iden())),
+            alias: Some(Alias::new("ordercol").into_iden()),
+            window: None,
+        },
+    );
+    let cycle = Cycle::new_from_expr_set_using(
+        Expr::col(Glyph::Id),
+        Alias::new("looped"),
+        Alias::new("path"),
+    );
+
+    let with_clause = WithClause::new()
+        .recursive(true)
+        .cte(cte.clone())
+        .search(search.clone())
+        .cycle(cycle.clone())
+        .to_owned();
+
+    assert_eq!(
+        Query::select()
+            .column(Asterisk)
+            .from(Alias::new("cte"))
+            .take()
+            .with(with_clause)
+            .to_string(QueryBuilder),
+        [
+            r#"WITH RECURSIVE "cte" ("id", "depth") AS"#,
+            r#"(SELECT "id", 1 FROM "glyph""#,
+            r#"UNION ALL (SELECT "id", "depth" + 1 FROM "glyph""#,
+            r#"INNER JOIN "cte" ON "cte"."id" = "glyph"."id"))"#,
+            r#"SEARCH BREADTH FIRST BY "depth" SET "ordercol""#,
+            r#"CYCLE "id" SET "looped" USING "path""#,
+            r#"SELECT * FROM "cte""#,
+        ]
+        .join(" ")
+    );
+
+    // The same SEARCH / CYCLE settings are ignored when the clause is not recursive.
+    let non_recursive = WithClause::new()
+        .cte(cte)
+        .search(search)
+        .cycle(cycle)
+        .to_owned();
+
+    assert_eq!(
+        Query::select()
+            .column(Asterisk)
+            .from(Alias::new("cte"))
+            .take()
+            .with(non_recursive)
+            .to_string(QueryBuilder),
+        [
+            r#"WITH "cte" ("id", "depth") AS"#,
+            r#"(SELECT "id", 1 FROM "glyph""#,
+            r#"UNION ALL (SELECT "id", "depth" + 1 FROM "glyph""#,
+            r#"INNER JOIN "cte" ON "cte"."id" = "glyph"."id"))"#,
+            r#"SELECT * FROM "cte""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive/test]    `Search` demands an aliased expression
+#[test]
+#[should_panic]
+fn with_recursive_4() {
+    Search::new_from_order_and_expr(SearchOrder::DEPTH, Expr::col(Glyph::Id));
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive/test]    ... through the setter as well
+#[test]
+#[should_panic]
+fn with_recursive_5() {
+    Search::new()
+        .order(SearchOrder::DEPTH)
+        .expr(Expr::col(Glyph::Id));
+}
+
+// [spec:pgorm:sem:sql.render.empty-in/test]    an empty `IN` is rewritten to the always-false
+// comparison of two string values
+#[test]
+fn empty_in_1() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_in(Vec::<i32>::new()))
+            .build(QueryBuilder),
+        (
+            r#"SELECT "id" FROM "glyph" WHERE $1 = $2"#.to_owned(),
+            Values(vec!["a".into(), "b".into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_in(Vec::<i32>::new()))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE 'a' = 'b'"#
+    );
+}
+
+// [spec:pgorm:sem:sql.render.empty-in/test]    an empty `NOT IN` renders the *same* always-false
+// expression — the current limitation
+#[test]
+fn empty_in_2() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_not_in(Vec::<i32>::new()))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE 'a' = 'b'"#
+    );
+
+    // A non-empty list is unaffected.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_not_in([1, 2]))
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" NOT IN (1, 2)"#
+    );
+}
+
+// [spec:pgorm:sem:sql.render.locking/test]    the four lock types
+#[test]
+fn locking_1() {
+    let locked = |lock: LockType| {
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock(lock)
+            .to_string(QueryBuilder)
+    };
+
+    assert_eq!(
+        locked(LockType::Update),
+        r#"SELECT "id" FROM "glyph" FOR UPDATE"#
+    );
+    assert_eq!(
+        locked(LockType::NoKeyUpdate),
+        r#"SELECT "id" FROM "glyph" FOR NO KEY UPDATE"#
+    );
+    assert_eq!(
+        locked(LockType::Share),
+        r#"SELECT "id" FROM "glyph" FOR SHARE"#
+    );
+    assert_eq!(
+        locked(LockType::KeyShare),
+        r#"SELECT "id" FROM "glyph" FOR KEY SHARE"#
+    );
+
+    // The named shorthands.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock_exclusive()
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" FOR UPDATE"#
+    );
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock_shared()
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" FOR SHARE"#
+    );
+}
+
+// [spec:pgorm:sem:sql.render.locking/test]    ` OF ` names the locked tables, comma-separated
+// and quoted, and the behaviour follows
+#[test]
+fn locking_2() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .from(Char::Table)
+            .lock_with_tables(
+                LockType::Update,
+                [Glyph::Table.into_table_ref(), Char::Table.into_table_ref()]
+            )
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph", "character" FOR UPDATE OF "glyph", "character""#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" FOR UPDATE NOWAIT"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock_with_tables_behavior(LockType::Share, [Glyph::Table], LockBehavior::SkipLocked)
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" FOR SHARE OF "glyph" SKIP LOCKED"#
+    );
+
+    // The clause is overwritten wholesale — the last call wins.
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
+            .lock_shared()
+            .to_string(QueryBuilder),
+        r#"SELECT "id" FROM "glyph" FOR SHARE"#
     );
 }

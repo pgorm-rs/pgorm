@@ -1023,6 +1023,14 @@ children (
             {
                 id verify.sql
                 title "Verify pgorm-query rules: ast, render, ddl, token, types, value (21 rules)"
+                log (
+                    {
+                        at 2026-09-02T01:45:02.009226Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

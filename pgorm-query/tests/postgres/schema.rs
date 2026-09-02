@@ -1,0 +1,269 @@
+use super::*;
+use pgorm_query::extension::{Extension, Type};
+use pretty_assertions::assert_eq;
+
+// [spec:pgorm:req:sql.ddl/test]    the whole DDL surface is reachable through the five
+// entry-point helpers
+#[test]
+fn every_ddl_entry_point_is_reachable() {
+    assert!(
+        Table::create()
+            .table(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer())
+            .to_string(QueryBuilder)
+            .starts_with("CREATE TABLE")
+    );
+    assert!(
+        Table::alter()
+            .table(Glyph::Table)
+            .drop_column(Glyph::Id)
+            .to_string(QueryBuilder)
+            .starts_with("ALTER TABLE")
+    );
+    assert!(
+        Table::drop()
+            .table(Glyph::Table)
+            .to_string(QueryBuilder)
+            .starts_with("DROP TABLE")
+    );
+    assert!(
+        Table::rename()
+            .table(Glyph::Table, Alias::new("g"))
+            .to_string(QueryBuilder)
+            .starts_with("ALTER TABLE")
+    );
+    assert!(
+        Table::truncate()
+            .table(Glyph::Table)
+            .to_string(QueryBuilder)
+            .starts_with("TRUNCATE TABLE")
+    );
+
+    assert!(
+        Index::create()
+            .name("idx")
+            .table(Glyph::Table)
+            .col(Glyph::Id)
+            .to_string(QueryBuilder)
+            .starts_with("CREATE INDEX")
+    );
+    assert!(
+        Index::drop()
+            .name("idx")
+            .to_string(QueryBuilder)
+            .starts_with("DROP INDEX")
+    );
+
+    assert!(
+        ForeignKey::create()
+            .name("fk")
+            .from(Char::Table, Char::FontId)
+            .to(Font::Table, Font::Id)
+            .to_string(QueryBuilder)
+            .starts_with("ALTER TABLE")
+    );
+    assert!(
+        ForeignKey::drop()
+            .name("fk")
+            .table(Char::Table)
+            .to_string(QueryBuilder)
+            .starts_with("ALTER TABLE")
+    );
+
+    assert!(
+        Type::create()
+            .as_enum(Alias::new("tea"))
+            .values([Alias::new("green")])
+            .to_string(QueryBuilder)
+            .starts_with("CREATE TYPE")
+    );
+    assert!(
+        Type::alter()
+            .name(Alias::new("tea"))
+            .add_value(Alias::new("black"))
+            .to_string(QueryBuilder)
+            .starts_with("ALTER TYPE")
+    );
+    assert!(
+        Type::drop()
+            .name(Alias::new("tea"))
+            .to_string(QueryBuilder)
+            .starts_with("DROP TYPE")
+    );
+
+    assert!(
+        Extension::create()
+            .name("ltree")
+            .to_string(QueryBuilder)
+            .starts_with("CREATE EXTENSION")
+    );
+    assert!(
+        Extension::drop()
+            .name("ltree")
+            .to_string(QueryBuilder)
+            .starts_with("DROP EXTENSION")
+    );
+}
+
+// [spec:pgorm:req:sql.ddl/test]    table, index and foreign-key statements implement
+// `SchemaStatementBuilder`, whose `build` / `build_any` / `to_string` all delegate to the same
+// `prepare_*` method on the single Postgres `QueryBuilder`
+#[test]
+fn schema_statement_builder_trio_agrees() {
+    fn assert_trio<S: SchemaStatementBuilder>(statement: &S, expected: &str) {
+        assert_eq!(statement.build(QueryBuilder), expected);
+        assert_eq!(statement.build_any(&QueryBuilder), expected);
+        assert_eq!(
+            SchemaStatementBuilder::to_string(statement, QueryBuilder),
+            expected
+        );
+    }
+
+    assert_trio(
+        Table::create()
+            .table(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer()),
+        r#"CREATE TABLE "glyph" ( "id" integer )"#,
+    );
+    assert_trio(
+        Table::alter().table(Glyph::Table).drop_column(Glyph::Id),
+        r#"ALTER TABLE "glyph" DROP COLUMN "id""#,
+    );
+    assert_trio(Table::drop().table(Glyph::Table), r#"DROP TABLE "glyph""#);
+    assert_trio(
+        Table::rename().table(Glyph::Table, Alias::new("g")),
+        r#"ALTER TABLE "glyph" RENAME TO "g""#,
+    );
+    assert_trio(
+        Table::truncate().table(Glyph::Table),
+        r#"TRUNCATE TABLE "glyph""#,
+    );
+    assert_trio(
+        Index::create()
+            .name("idx")
+            .table(Glyph::Table)
+            .col(Glyph::Id),
+        r#"CREATE INDEX "idx" ON "glyph" ("id")"#,
+    );
+    assert_trio(Index::drop().name("idx"), r#"DROP INDEX "idx""#);
+    assert_trio(
+        ForeignKey::create()
+            .name("fk")
+            .from(Char::Table, Char::FontId)
+            .to(Font::Table, Font::Id),
+        r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
+    );
+    assert_trio(
+        ForeignKey::drop().name("fk").table(Char::Table),
+        r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#,
+    );
+}
+
+// [spec:pgorm:req:sql.ddl/test]    `TableStatement` is an enum wrapper dispatching to the same
+// builders
+#[test]
+fn table_statement_wrapper_dispatches() {
+    let statements = [
+        TableStatement::Create(
+            Table::create()
+                .table(Glyph::Table)
+                .col(ColumnDef::new(Glyph::Id).integer())
+                .to_owned(),
+        ),
+        TableStatement::Alter(
+            Table::alter()
+                .table(Glyph::Table)
+                .drop_column(Glyph::Id)
+                .to_owned(),
+        ),
+        TableStatement::Drop(Table::drop().table(Glyph::Table).to_owned()),
+        TableStatement::Rename(
+            Table::rename()
+                .table(Glyph::Table, Alias::new("g"))
+                .to_owned(),
+        ),
+        TableStatement::Truncate(Table::truncate().table(Glyph::Table).to_owned()),
+    ];
+
+    let expected = [
+        r#"CREATE TABLE "glyph" ( "id" integer )"#,
+        r#"ALTER TABLE "glyph" DROP COLUMN "id""#,
+        r#"DROP TABLE "glyph""#,
+        r#"ALTER TABLE "glyph" RENAME TO "g""#,
+        r#"TRUNCATE TABLE "glyph""#,
+    ];
+
+    for (statement, expected) in statements.iter().zip(expected) {
+        assert_eq!(statement.build(QueryBuilder), expected);
+        assert_eq!(statement.build_any(&QueryBuilder), expected);
+        assert_eq!(statement.to_string(QueryBuilder), expected);
+    }
+
+    // `IndexStatement`, `ForeignKeyStatement` and `SchemaStatement` wrap the same
+    // builders; the wrapped statement renders exactly as it does on its own.
+    let schema_statements = [
+        SchemaStatement::TableStatement(TableStatement::Drop(
+            Table::drop().table(Glyph::Table).to_owned(),
+        )),
+        SchemaStatement::IndexStatement(IndexStatement::Drop(Index::drop().name("idx").to_owned())),
+        SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Drop(
+            ForeignKey::drop().name("fk").table(Char::Table).to_owned(),
+        )),
+    ];
+
+    let rendered: Vec<String> = schema_statements
+        .iter()
+        .map(|statement| match statement {
+            SchemaStatement::TableStatement(inner) => inner.to_string(QueryBuilder),
+            SchemaStatement::IndexStatement(IndexStatement::Create(inner)) => {
+                inner.to_string(QueryBuilder)
+            }
+            SchemaStatement::IndexStatement(IndexStatement::Drop(inner)) => {
+                inner.to_string(QueryBuilder)
+            }
+            SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Create(inner)) => {
+                inner.to_string(QueryBuilder)
+            }
+            SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Drop(inner)) => {
+                inner.to_string(QueryBuilder)
+            }
+        })
+        .collect();
+
+    assert_eq!(
+        rendered,
+        vec![
+            r#"DROP TABLE "glyph""#.to_owned(),
+            r#"DROP INDEX "idx""#.to_owned(),
+            r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#.to_owned(),
+        ]
+    );
+}
+
+// [spec:pgorm:req:sql.ddl/test]    identifiers render double-quoted, with embedded quotes doubled
+#[test]
+fn ddl_identifiers_are_double_quoted() {
+    assert_eq!(
+        Table::create()
+            .table(Alias::new(r#"he"llo"#))
+            .col(ColumnDef::new(Alias::new(r#"wor"ld"#)).integer())
+            .to_string(QueryBuilder),
+        r#"CREATE TABLE "he""llo" ( "wor""ld" integer )"#
+    );
+    assert_eq!(
+        Index::create()
+            .name("idx")
+            .table((Alias::new("schema"), Glyph::Table))
+            .col(Glyph::Id)
+            .to_string(QueryBuilder),
+        r#"CREATE INDEX "idx" ON "schema"."glyph" ("id")"#
+    );
+    assert_eq!(
+        ForeignKey::create()
+            .name("fk")
+            .from(Char::Table, Char::FontId)
+            .to(Font::Table, Font::Id)
+            .to_string(QueryBuilder),
+        r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
+    );
+}
