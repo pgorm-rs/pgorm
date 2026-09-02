@@ -27,6 +27,8 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:exec.crud.insert/test]    zero rows affected on the
+// client-supplied-key path fails with RecordNotInserted
 pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-001".to_owned(),
@@ -110,6 +112,10 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
+// [spec:pgorm:sem:exec.crud.insert/test]    the client-supplied primary-key
+// path: `last_insert_id` is reconstructed from the cached `ValueTuple`
+// [spec:pgorm:sem:exec.crud.update/test]    `UpdateOne::exec` returns the model
+// built from the full-column RETURNING, including a column set back to NULL
 pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
     let repository = repository::Model {
         id: "unique-id-002".to_owned(),

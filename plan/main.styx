@@ -1038,6 +1038,14 @@ children (
             {
                 id verify.exec
                 title "Verify executor rules: crud, decode, cursor, paginator (29 rules)"
+                log (
+                    {
+                        at 2026-09-02T01:42:34.685178Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

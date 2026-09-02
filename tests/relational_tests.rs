@@ -467,6 +467,11 @@ pub async fn having() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:def:exec.crud/test]    `SelectTwoModel` decoding `(M, Option<N>)`
+// through the `SelectA` / `SelectB` column prefixes
+// [spec:pgorm:sem:exec.crud.consolidate/test]    `SelectTwoMany::all` grouping
+// on a unary primary key: children in row order, one entry per left key, and an
+// empty `Vec` for a left row with no right model
 #[pgorm_macros::test]
 pub async fn related() -> Result<(), DbErr> {
     use pgorm::{SelectA, SelectB};
@@ -1063,6 +1068,200 @@ pub async fn linked() -> Result<(), DbErr> {
             ),
         ]
     );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+mod composite_parent {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "composite_parent")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub region: i32,
+        #[pgorm(primary_key, auto_increment = false)]
+        pub code: i32,
+        pub name: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter)]
+    pub enum Relation {
+        Child,
+    }
+
+    impl RelationTrait for Relation {
+        fn def(&self) -> RelationDef {
+            match self {
+                Self::Child => Entity::has_many(super::composite_child::Entity)
+                    .from((Column::Region, Column::Code))
+                    .to((
+                        super::composite_child::Column::ParentRegion,
+                        super::composite_child::Column::ParentCode,
+                    ))
+                    .into(),
+            }
+        }
+    }
+
+    impl Related<super::composite_child::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Child.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+mod composite_child {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "composite_child")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub parent_region: i32,
+        pub parent_code: i32,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter)]
+    pub enum Relation {
+        Parent,
+    }
+
+    impl RelationTrait for Relation {
+        fn def(&self) -> RelationDef {
+            match self {
+                Self::Parent => Entity::belongs_to(super::composite_parent::Entity)
+                    .from((Column::ParentRegion, Column::ParentCode))
+                    .to((
+                        super::composite_parent::Column::Region,
+                        super::composite_parent::Column::Code,
+                    ))
+                    .into(),
+            }
+        }
+    }
+
+    impl Related<super::composite_parent::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Parent.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:exec.crud.consolidate/test]    grouping by a composite
+// (pair-arity) left primary key, in row order, with a childless parent still
+// producing an entry
+#[pgorm_macros::test]
+pub async fn consolidate_composite_key() -> Result<(), DbErr> {
+    use pgorm::{QueryOrder, Schema};
+
+    let ctx = TestContext::new("test_consolidate_composite_key").await;
+    let db = ctx.db.get().await?;
+
+    let schema = Schema::new();
+    create_table_without_asserts(
+        &db,
+        &schema.create_table_from_entity(composite_parent::Entity),
+    )
+    .await?;
+    create_table_without_asserts(
+        &db,
+        &schema.create_table_from_entity(composite_child::Entity),
+    )
+    .await?;
+
+    // Two parents share a `region`, two share a `code`: only the pair
+    // distinguishes them.
+    let parents = [(1, 1, "one-one"), (1, 2, "one-two"), (2, 1, "two-one")];
+    for (region, code, name) in parents {
+        composite_parent::ActiveModel {
+            region: Set(region),
+            code: Set(code),
+            name: Set(name.to_owned()),
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    let children = [
+        (1, 1, 1, "a"),
+        (2, 1, 2, "b"),
+        (3, 2, 1, "c"),
+        (4, 1, 1, "d"),
+    ];
+    for (id, parent_region, parent_code, label) in children {
+        composite_child::ActiveModel {
+            id: Set(id),
+            parent_region: Set(parent_region),
+            parent_code: Set(parent_code),
+            label: Set(label.to_owned()),
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    let child =
+        |id: i32, parent_region: i32, parent_code: i32, label: &str| composite_child::Model {
+            id,
+            parent_region,
+            parent_code,
+            label: label.to_owned(),
+        };
+    let parent = |region: i32, code: i32, name: &str| composite_parent::Model {
+        region,
+        code,
+        name: name.to_owned(),
+    };
+
+    let consolidated = composite_parent::Entity::find()
+        .find_with_related(composite_child::Entity)
+        .order_by_asc(composite_parent::Column::Region)
+        .order_by_asc(composite_parent::Column::Code)
+        .order_by_asc(composite_child::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        consolidated,
+        [
+            (
+                parent(1, 1, "one-one"),
+                vec![child(1, 1, 1, "a"), child(4, 1, 1, "d")],
+            ),
+            (parent(1, 2, "one-two"), vec![child(2, 1, 2, "b")]),
+            (parent(2, 1, "two-one"), vec![child(3, 2, 1, "c")]),
+        ]
+    );
+
+    // A parent with no children still yields exactly one entry, with an empty
+    // child vector.
+    composite_parent::ActiveModel {
+        region: Set(3),
+        code: Set(3),
+        name: Set("lonely".to_owned()),
+    }
+    .insert(&db)
+    .await?;
+
+    let consolidated = composite_parent::Entity::find()
+        .find_with_related(composite_child::Entity)
+        .order_by_asc(composite_parent::Column::Region)
+        .order_by_asc(composite_parent::Column::Code)
+        .order_by_asc(composite_child::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(consolidated.len(), 4);
+    assert_eq!(consolidated[3], (parent(3, 3, "lonely"), vec![]));
 
     drop(db);
     ctx.delete().await;

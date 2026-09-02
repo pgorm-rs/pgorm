@@ -4,10 +4,12 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::entity::*;
-pub use pgorm::{ActiveValue::Set, ConnectionTrait, DbErr, QueryFilter, QuerySelect};
+pub use pgorm::{ActiveValue::Set, ConnectionTrait, DbErr, QueryFilter, QueryOrder, QuerySelect};
 
 // Run the test locally:
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_tests
+// [spec:pgorm:sem:exec.crud.select/test]    `one` fails with RecordNotFound on
+// zero rows where `one_opt` reports `None` — pgorm's deliberate difference
 #[pgorm_macros::test]
 pub async fn find_one_with_no_result() {
     let ctx = TestContext::new("find_one_with_no_result").await;
@@ -49,6 +51,7 @@ pub async fn find_one_with_result() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:exec.crud.select/test]    the same split on a filtered select
 #[pgorm_macros::test]
 pub async fn find_by_id_with_no_result() {
     let ctx = TestContext::new("find_by_id_with_no_result").await;
@@ -106,6 +109,7 @@ pub async fn find_all_with_no_result() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:exec.crud.select/test]    `all` decodes every returned row
 #[pgorm_macros::test]
 pub async fn find_all_with_result() {
     let ctx = TestContext::new("find_all_with_result").await;
@@ -210,6 +214,8 @@ pub async fn find_all_filter_with_results() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:exec.crud.select/test]    `all` aborts on the first decode
+// error instead of yielding a partial result set
 #[pgorm_macros::test]
 pub async fn select_only_exclude_option_fields() {
     let ctx = TestContext::new("select_only_exclude_option_fields").await;
@@ -264,4 +270,105 @@ pub async fn select_only_exclude_option_fields() {
 
     drop(db);
     ctx.delete().await;
+}
+
+// [spec:pgorm:sem:exec.crud.select/test]    `SelectorRaw::one` / `one_opt`
+// execute the statement exactly as written, with no `LIMIT` injected
+// [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` and
+// `SelectorRaw::into_model` re-targeting the decoded type
+#[pgorm_macros::test]
+pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
+    use pgorm::FromQueryResult;
+    use pgorm_query::{Value, Values};
+
+    let ctx = TestContext::new("raw_selector_one_semantics").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    for (name, margin) in [("SeaSide Bakery", 10.4), ("Top Bakery", 15.0)] {
+        bakery::ActiveModel {
+            name: Set(name.to_owned()),
+            profit_margin: Set(margin),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    const ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDER BY "id" ASC"#;
+
+    // Zero rows: `one` fails, `one_opt` reports `None`.
+    let missing = || {
+        Bakery::find().from_raw_sql(
+            format!(r#"{ALL} OFFSET $1"#),
+            Values(vec![Value::BigInt(Some(99))]),
+        )
+    };
+    assert!(matches!(
+        missing().one(&db).await,
+        Err(DbErr::RecordNotFound)
+    ));
+    assert_eq!(missing().one_opt(&db).await?, None);
+
+    // No `LIMIT` is injected, so a raw statement matching two rows reaches
+    // `query_opt` with both of them and the driver rejects the row count...
+    let unlimited = Bakery::find()
+        .from_raw_sql(ALL.to_owned(), Values(Vec::new()))
+        .one(&db)
+        .await;
+    match unlimited {
+        Err(DbErr::Postgres(err)) => assert_eq!(
+            err.to_string(),
+            "query returned an unexpected number of rows"
+        ),
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    // ... whereas `Selector::one` sets `LIMIT 1` on the same select first, so
+    // the identical query returns the first row.
+    let limited = Bakery::find()
+        .order_by_asc(bakery::Column::Id)
+        .one(&db)
+        .await?;
+    assert_eq!(limited.name, "SeaSide Bakery");
+
+    // A raw statement is otherwise run exactly as written.
+    assert_eq!(
+        Bakery::find()
+            .from_raw_sql(format!("{ALL} LIMIT 1"), Values(Vec::new()))
+            .one(&db)
+            .await?
+            .name,
+        "SeaSide Bakery"
+    );
+    assert_eq!(
+        Bakery::find()
+            .from_raw_sql(format!("{ALL} LIMIT 2"), Values(Vec::new()))
+            .all(&db)
+            .await?
+            .len(),
+        2
+    );
+
+    // `SelectorRaw::into_model` re-targets the decoded type.
+    #[derive(Debug, PartialEq, FromQueryResult)]
+    struct BakeryName {
+        name: String,
+    }
+
+    assert_eq!(
+        Bakery::find()
+            .from_raw_sql(format!("{ALL} LIMIT 1"), Values(Vec::new()))
+            .into_model::<BakeryName>()
+            .one(&db)
+            .await?,
+        BakeryName {
+            name: "SeaSide Bakery".to_owned()
+        }
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
 }

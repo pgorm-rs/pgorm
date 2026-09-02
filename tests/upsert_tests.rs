@@ -22,6 +22,8 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:exec.crud.insert/test]    `last_insert_id` read from the last
+// RETURNING row of a batch, and RecordNotInserted when nothing is written
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 

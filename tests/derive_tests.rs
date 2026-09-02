@@ -77,6 +77,9 @@ where
     SelectorRaw::<SelectModel<M>>::from_statement::<M>(sql.to_owned(), Values(Vec::new()))
 }
 
+// [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding
+// through `SelectModel`, i.e. `SelectorTrait::from_raw_query_result` with an
+// empty prefix
 #[pgorm_macros::test]
 async fn from_query_result_derive() -> Result<(), DbErr> {
     let ctx = TestContext::new("derive_tests_from_query_result").await;

@@ -18,6 +18,8 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:exec.crud.delete/test]    `DeleteMany::exec` reports rows
+// affected, and deleting zero rows is `Ok(0)` rather than an error
 pub async fn create_and_delete_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
     let log1 = applog::Model {
         id: 1,

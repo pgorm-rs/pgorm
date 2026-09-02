@@ -25,6 +25,10 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:def:exec.crud/test]    `into_values` decoding through
+// `SelectGetableValue` and `into_tuple` through `SelectGetableTuple`
+// [spec:pgorm:sem:exec.crud.update/test]    `UpdateOne::exec` returns the
+// updated model, and surfaces RecordNotFound when the filter matches nothing
 pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
     use common::features::byte_primary_key::*;
 

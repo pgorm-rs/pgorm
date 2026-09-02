@@ -24,6 +24,8 @@ async fn main() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:exec.crud.try-insert/test]    `TryInsert::exec` reporting
+// Inserted, Conflicted and Empty
 pub async fn test(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
         name: Set("SeaSide Bakery".to_owned()),

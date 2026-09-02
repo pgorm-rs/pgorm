@@ -22,6 +22,8 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:def:exec.decode.json/test]    a `TryGetableFromJson` type decoded
+// through the blanket `TryGetable` impl, both bare and behind an `Option`
 pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> {
     use json_struct::*;
 

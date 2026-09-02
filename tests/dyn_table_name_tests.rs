@@ -24,6 +24,10 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:exec.crud.update/test]    `UpdateMany::exec` returns
+// `UpdateResult { rows_affected }`
+// [spec:pgorm:sem:exec.crud.delete/test]    `DeleteMany::exec` returns
+// `DeleteResult { rows_affected }`
 pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), DbErr> {
     use dyn_table_name_lazy_static::*;
 
