@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, time::Duration};
+use std::{collections::HashMap, env, sync::Once, time::Duration};
 
 use futures::future;
 use serde::{Deserialize, Serialize};
@@ -6,38 +6,28 @@ use tokio_postgres::{IsolationLevel, types::Type};
 
 use pgorm_pool::{ManagerConfig, Pool, RecyclingMethod};
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    #[serde(default)]
-    pg: pgorm_pool::Config,
+static DOTENV: Once = Once::new();
+
+fn base_url() -> String {
+    DOTENV.call_once(|| {
+        dotenvy::from_filename(".env.local").ok();
+        dotenvy::from_filename(".env").ok();
+    });
+    env::var("DATABASE_URL").expect(
+        "environment variable 'DATABASE_URL' not set; it must hold a PostgreSQL server URL \
+         without a database path, e.g. postgres://postgres:postgres@127.0.0.1:5432",
+    )
 }
 
-impl Config {
-    pub fn from_env() -> Self {
-        let cfg = config::Config::builder()
-            .add_source(config::Environment::default().separator("__"))
-            .build()
-            .unwrap();
-
-        let mut cfg = cfg.try_deserialize::<Self>().unwrap();
-        cfg.pg.dbname.get_or_insert("deadpool".to_string());
-        cfg
-    }
-
-    pub fn from_env_with_prefix(prefix: &str) -> Self {
-        let cfg = config::Config::builder()
-            .add_source(config::Environment::with_prefix(prefix).separator("__"))
-            .build()
-            .unwrap();
-        let mut cfg = cfg.try_deserialize::<Self>().unwrap();
-        cfg.pg.dbname.get_or_insert("deadpool".to_string());
-        cfg
+fn test_config() -> pgorm_pool::Config {
+    pgorm_pool::Config {
+        url: Some(format!("{}/postgres", base_url())),
+        ..Default::default()
     }
 }
 
 fn create_pool() -> Pool {
-    let cfg = Config::from_env();
-    cfg.pg.create_pool(tokio_postgres::NoTls).unwrap()
+    test_config().create_pool(tokio_postgres::NoTls).unwrap()
 }
 
 #[tokio::test]
@@ -160,13 +150,13 @@ async fn recycling_methods() {
         RecyclingMethod::Clean,
         RecyclingMethod::Custom("DISCARD ALL;".to_string()),
     ];
-    let mut cfg = Config::from_env();
+    let mut cfg = test_config();
     for recycling_method in recycling_methods {
-        cfg.pg.manager = Some(ManagerConfig {
+        cfg.manager = Some(ManagerConfig {
             recycling_method,
             tag: Default::default(),
         });
-        let pool = cfg.pg.create_pool(tokio_postgres::NoTls).unwrap();
+        let pool = cfg.create_pool(tokio_postgres::NoTls).unwrap();
         for _ in 0usize..20usize {
             let client = pool.get().await.unwrap();
             let rows = client.query("SELECT 1 + 2", &[]).await.unwrap();
@@ -208,6 +198,22 @@ async fn statement_caches_clear() {
     pool.manager().statement_caches.clear();
     assert!(client0.statement_cache.size() == 0);
     assert!(client1.statement_cache.size() == 0);
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct EnvConfig {
+    #[serde(default)]
+    pg: pgorm_pool::Config,
+}
+
+impl EnvConfig {
+    pub fn from_env_with_prefix(prefix: &str) -> Self {
+        let cfg = config::Config::builder()
+            .add_source(config::Environment::with_prefix(prefix).separator("__"))
+            .build()
+            .unwrap();
+        cfg.try_deserialize::<Self>().unwrap()
+    }
 }
 
 struct Env {
@@ -255,7 +261,7 @@ fn config_from_env() {
     env.set("ENV_TEST__PG__POOL__TIMEOUTS__CREATE__NANOS", "0");
     env.set("ENV_TEST__PG__POOL__TIMEOUTS__RECYCLE__SECS", "3");
     env.set("ENV_TEST__PG__POOL__TIMEOUTS__RECYCLE__NANOS", "0");
-    let cfg = Config::from_env_with_prefix("ENV_TEST");
+    let cfg = EnvConfig::from_env_with_prefix("ENV_TEST");
     // `tokio_postgres::Config` does not provide any read access to its
     // internals, so we can only check if the environment was actually read
     // correctly.

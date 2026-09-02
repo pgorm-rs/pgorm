@@ -987,6 +987,14 @@ children (
                 id polish.pool-tests
                 title "Wire the 11 pgorm-pool socket tests to the DATABASE_URL harness"
                 kind @test
+                log (
+                    {
+                        at 2026-09-02T01:18:45.917955Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }
