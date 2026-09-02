@@ -2065,6 +2065,13 @@ children (
                         kind @note
                         text "pg_query::fingerprint gives stable constants-normalized query identities (the shape pg_stat_statements thinks in) and normalize gives the $n-parameterized text. Wire into the opt-in metrics layer: the instrumented wrappers tag statement hooks with the fingerprint so a MetricsCollector can aggregate by query shape instead of raw SQL text. Design questions at start: where the fingerprint is computed (per-call vs memoized by statement text — a small cache matters since the hot path repeats statements), and whether MetricsCollector grows a parameter (breaking the trait — it has no default methods by design, metric.layer.collector bumps) or the fingerprint rides in an existing argument. Runtime dependency on pg_query gated behind a feature on pgorm even with the tax waived — the metrics layer's whole design is unwrapped-code-pays-nothing (metric.layer rule). Deps on pgparse.oracle for plumbing/version pin."
                     }
+
+                    {
+                        at 2026-09-02T19:06:32.153992Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

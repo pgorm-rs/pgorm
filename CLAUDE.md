@@ -76,6 +76,8 @@ let conn = pool.get().await?; // records connection acquisition
 
 `NoOpMetrics` and `LoggingMetrics` ship in-tree. Custom backends implement the `MetricsCollector` trait (async, `Clone + Send + Sync + 'static`, seven hooks, no defaults) rather than hand-rolling a wrapper.
 
+The two query hooks take a `QueryContext<'_>` — `operation()`, `sql()`, and `fingerprint()` — instead of a bare operation name. `fingerprint()` is libpg_query's constants-normalized query identity and requires the off-by-default `metrics-fingerprint` feature; without it pgorm takes no `pg_query` dependency and the answer is always `None`.
+
 Note that `begin()` on an `InstrumentedConnection` returns a plain `DatabaseTransaction` — wrap it in `InstrumentedTransaction::new` to keep per-statement metrics inside the transaction.
 
 #### PostgreSQL Native Observability

@@ -101,10 +101,28 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Statement execution surface
 
-> [spec:pgorm:def:conn.pool.conn-trait+2]
+> [spec:pgorm:def:conn.sql-text]
+> `SqlText` answers `fn sql_text(&self) -> Option<&str>` for a statement.
+> `ToStatement` is sealed by tokio-postgres and admits exactly three types: a
+> `str` and a `String` are the SQL, and answer with themselves; a prepared
+> `Statement` answers `None`, because tokio-postgres retains its server-side
+> name, parameter types, and result columns but not the text it was prepared
+> from. Nothing reconstructs that text; the absence is reported rather than
+> papered over.
+>
+> The trait exists so that code generic over `T: ToStatement` can look at the
+> SQL at all — `metric.fingerprint` is the only caller in tree — and
+> `ConnectionTrait`'s six generic methods therefore carry it as a bound
+> alongside `ToStatement`. Since `SqlText` is implemented for every type
+> `ToStatement` admits, the added bound rejects no call site that compiled
+> without it.
+
+> [spec:pgorm:def:conn.pool.conn-trait+3]
 > `ConnectionTrait` is the uniform statement-execution surface over
 > connections and transactions. It defines seven async methods. Six are
-> generic over `T: ?Sized + ToStatement + Send + Sync` with parameter binding
+> generic over `T: ?Sized + ToStatement + SqlText + Send + Sync` — the second
+> bound is `conn.sql-text`, which keeps the statement's own text reachable from
+> a wrapper — with parameter binding
 > (no string interpolation): `execute(stmt, params) -> u64` (affected-row
 > count), `execute_raw(stmt, params)` taking an `ExactSizeIterator` of
 > `BorrowToSql` values instead of a `&[&dyn ToSql]` slice, `query_one ->

@@ -6,10 +6,10 @@ pub use common::{TestContext, setup::*};
 
 use async_trait::async_trait;
 use pgorm::{
-    ConnectionTrait, DbErr,
+    ConnectionTrait, DbErr, SqlText,
     metric::{
         InstrumentedConnection, InstrumentedPool, InstrumentedTransaction, LoggingMetrics,
-        MetricsCollector, NoOpMetrics,
+        MetricsCollector, NoOpMetrics, QueryContext,
     },
 };
 use pretty_assertions::assert_eq;
@@ -18,6 +18,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+use tokio_postgres::{Statement, ToStatement};
 use tracing::{
     Event, Level, Subscriber,
     field::{Field, Visit},
@@ -32,11 +33,45 @@ use tracing_subscriber::{
 #[derive(Clone, Debug, Default)]
 struct RecordingMetrics {
     events: Arc<Mutex<Vec<String>>>,
+    queries: Arc<Mutex<Vec<RecordedQuery>>>,
+}
+
+/// What a query hook's [`QueryContext`] said, copied out of the borrowed view.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RecordedQuery {
+    operation: String,
+    sql: Option<String>,
+    fingerprint: Option<String>,
+}
+
+impl RecordedQuery {
+    fn of(query: QueryContext<'_>) -> Self {
+        Self {
+            operation: query.operation().to_owned(),
+            sql: query.sql().map(str::to_owned),
+            fingerprint: query.fingerprint().map(|print| print.to_string()),
+        }
+    }
 }
 
 impl RecordingMetrics {
     fn push(&self, event: String) {
         self.events.lock().unwrap().push(event);
+    }
+
+    fn record(&self, query: QueryContext<'_>) {
+        self.queries.lock().unwrap().push(RecordedQuery::of(query));
+    }
+
+    fn queries(&self) -> Vec<RecordedQuery> {
+        self.queries.lock().unwrap().clone()
+    }
+
+    fn fingerprint_of(&self, sql: &str) -> Option<String> {
+        self.queries()
+            .into_iter()
+            .find(|query| query.sql.as_deref() == Some(sql))
+            .and_then(|query| query.fingerprint)
     }
 
     fn events(&self) -> Vec<String> {
@@ -53,12 +88,24 @@ impl RecordingMetrics {
 
 #[async_trait]
 impl MetricsCollector for RecordingMetrics {
-    async fn record_query_success(&self, operation: &str, _duration: Duration, rows: Option<u64>) {
-        self.push(format!("query_success:{operation}:{rows:?}"));
+    async fn record_query_success(
+        &self,
+        query: QueryContext<'_>,
+        _duration: Duration,
+        rows: Option<u64>,
+    ) {
+        self.push(format!("query_success:{}:{rows:?}", query.operation()));
+        self.record(query);
     }
 
-    async fn record_query_error(&self, operation: &str, _duration: Duration, _error: &DbErr) {
-        self.push(format!("query_error:{operation}"));
+    async fn record_query_error(
+        &self,
+        query: QueryContext<'_>,
+        _duration: Duration,
+        _error: &DbErr,
+    ) {
+        self.push(format!("query_error:{}", query.operation()));
+        self.record(query);
     }
 
     async fn record_connection_acquired(&self, _duration: Duration) {
@@ -82,7 +129,7 @@ impl MetricsCollector for RecordingMetrics {
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx+1/test]    begin_instrumented + explicit rollback
+// [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + explicit rollback
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_rollback() -> Result<(), DbErr> {
     let ctx = TestContext::new("metric_layer_rollback_metrictx").await;
@@ -120,7 +167,7 @@ pub async fn instrumented_begin_and_rollback() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+1/test]    begin_instrumented + commit
+// [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + commit
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_commit() -> Result<(), DbErr> {
     let ctx = TestContext::new("metric_layer_commit_metrictx").await;
@@ -148,7 +195,57 @@ pub async fn instrumented_begin_and_commit() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:metric.layer.delegate+2/test]    batch_execute reports a rowless success
+// [spec:pgorm:req:metric.layer.delegate+3/test]    query_opt's Some/None row counts
+#[pgorm_macros::test]
+pub async fn query_opt_reports_one_row_or_zero() -> Result<(), DbErr> {
+    let ctx = TestContext::new("metric_layer_query_opt_metricopt").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let mut conn = pool.get().await?;
+    conn.batch_execute("CREATE TABLE widget (id int primary key)")
+        .await?;
+    conn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+        .await?;
+
+    let hit = conn.query_opt("SELECT id FROM widget WHERE id = 1", &[]);
+    assert!(hit.await?.is_some());
+    let miss = conn.query_opt("SELECT id FROM widget WHERE id = 2", &[]);
+    assert!(miss.await?.is_none());
+
+    let txn = conn.begin_instrumented().await?;
+    assert!(
+        txn.query_opt("SELECT id FROM widget WHERE id = 1", &[])
+            .await?
+            .is_some()
+    );
+    assert!(
+        txn.query_opt("SELECT id FROM widget WHERE id = 2", &[])
+            .await?
+            .is_none()
+    );
+    txn.commit().await?;
+
+    assert_eq!(
+        metrics.count("query_success:query_opt:Some(1)"),
+        2,
+        "a row found is one row through either wrapper: {:?}",
+        metrics.events()
+    );
+    assert_eq!(
+        metrics.count("query_success:query_opt:Some(0)"),
+        2,
+        "no row found is zero rows, not an absent count: {:?}",
+        metrics.events()
+    );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:metric.layer.delegate+3/test]    batch_execute reports a rowless success
 #[pgorm_macros::test]
 pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
     let ctx = TestContext::new("metric_layer_batch_execute_txbatch").await;
@@ -190,7 +287,7 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+1/test]    dropping an instrumented transaction records nothing
+// [spec:pgorm:sem:metric.layer.tx+2/test]    dropping an instrumented transaction records nothing
 #[pgorm_macros::test]
 pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), DbErr> {
     let ctx = TestContext::new("metric_layer_drop_metrictx").await;
@@ -256,11 +353,10 @@ where
 async fn drive_all_hooks<M: MetricsCollector>(metrics: &M) {
     let elapsed = Duration::from_millis(1);
     let error = DbErr::Custom("boom".to_owned());
+    let query = QueryContext::new("execute", Some("SELECT 1"));
 
-    metrics
-        .record_query_success("execute", elapsed, Some(3))
-        .await;
-    metrics.record_query_error("execute", elapsed, &error).await;
+    metrics.record_query_success(query, elapsed, Some(3)).await;
+    metrics.record_query_error(query, elapsed, &error).await;
     metrics.record_connection_acquired(elapsed).await;
     metrics.record_connection_error(elapsed, &error).await;
     metrics.record_transaction_begin(elapsed).await;
@@ -268,7 +364,7 @@ async fn drive_all_hooks<M: MetricsCollector>(metrics: &M) {
     metrics.record_transaction_rollback(elapsed).await;
 }
 
-// [spec:pgorm:def:metric.layer.collector/test]    seven hook points, all required of an implementor
+// [spec:pgorm:def:metric.layer.collector+1/test]    seven hook points, all required of an implementor
 #[pgorm_macros::test]
 pub async fn collector_defines_seven_async_hooks() {
     let metrics = RecordingMetrics::default();
@@ -289,7 +385,7 @@ pub async fn collector_defines_seven_async_hooks() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector/test]    NoOpMetrics observes nothing at all
+// [spec:pgorm:def:metric.layer.collector+1/test]    NoOpMetrics observes nothing at all
 #[pgorm_macros::test]
 pub async fn noop_metrics_hooks_do_nothing() {
     let captured = CapturedEvents::default();
@@ -308,7 +404,7 @@ pub async fn noop_metrics_hooks_do_nothing() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector/test]    LoggingMetrics' tracing levels per hook
+// [spec:pgorm:def:metric.layer.collector+1/test]    LoggingMetrics' tracing levels per hook
 #[pgorm_macros::test]
 pub async fn logging_metrics_emits_expected_levels() {
     let captured = CapturedEvents::default();
@@ -319,7 +415,11 @@ pub async fn logging_metrics_emits_expected_levels() {
     drive_all_hooks(&LoggingMetrics).await;
     // A success with no row count takes the other branch of the same hook.
     LoggingMetrics
-        .record_query_success("query_raw", Duration::from_millis(1), None)
+        .record_query_success(
+            QueryContext::new("query_raw", None),
+            Duration::from_millis(1),
+            None,
+        )
         .await;
     let events = captured.taken();
 
@@ -345,7 +445,7 @@ pub async fn logging_metrics_emits_expected_levels() {
     assert!(!events[7].1.contains("rows"), "{:?}", events[7]);
 }
 
-// [spec:pgorm:def:metric.layer/test]    three wrappers, their inner()/metrics() accessors, and the pool's tag()/status()
+// [spec:pgorm:def:metric.layer+1/test]    three wrappers, their inner()/metrics() accessors, and the pool's tag()/status()
 #[pgorm_macros::test]
 pub async fn wrappers_expose_inner_and_metrics() -> Result<(), DbErr> {
     fn assert_collector_bounds<M: MetricsCollector>() {
@@ -404,6 +504,210 @@ pub async fn wrappers_expose_inner_and_metrics() -> Result<(), DbErr> {
     txn.commit().await?;
 
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 2);
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:def:conn.sql-text/test]    what each statement form answers
+#[pgorm_macros::test]
+pub async fn sql_text_answers_with_the_statement_text() {
+    let owned = "SELECT id FROM widget WHERE id = $1".to_owned();
+
+    assert_eq!("SELECT 1".sql_text(), Some("SELECT 1"));
+    assert_eq!(owned.sql_text(), Some(owned.as_str()));
+
+    // The bound `ConnectionTrait` puts on its statement, satisfied by every
+    // type `ToStatement` admits — a prepared `Statement` included, which
+    // answers `None` and has no constructor to exercise it through.
+    fn assert_statement_bound<T: ?Sized + ToStatement + SqlText + Send + Sync>() {}
+    assert_statement_bound::<str>();
+    assert_statement_bound::<String>();
+    assert_statement_bound::<Statement>();
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    the hooks see the statement they report on
+#[pgorm_macros::test]
+pub async fn query_context_carries_statement_text() -> Result<(), DbErr> {
+    let ctx = TestContext::new("metric_layer_context_metricctx").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let conn = pool.get().await?;
+    conn.batch_execute("CREATE TABLE widget (id int primary key)")
+        .await?;
+    conn.execute("INSERT INTO widget (id) VALUES ($1)", &[&1i32])
+        .await?;
+    let failed = conn
+        .query_one("SELECT id FROM widget WHERE id = $1", &[&404i32])
+        .await
+        .expect_err("no row matches");
+    assert!(matches!(failed, DbErr::Postgres(_)));
+
+    let recorded: Vec<(String, Option<String>)> = metrics
+        .queries()
+        .into_iter()
+        .map(|query| (query.operation, query.sql))
+        .collect();
+    assert_eq!(
+        recorded,
+        vec![
+            (
+                "batch_execute".to_owned(),
+                Some("CREATE TABLE widget (id int primary key)".to_owned())
+            ),
+            (
+                "execute".to_owned(),
+                Some("INSERT INTO widget (id) VALUES ($1)".to_owned())
+            ),
+            (
+                "query_one".to_owned(),
+                Some("SELECT id FROM widget WHERE id = $1".to_owned())
+            ),
+        ],
+        "success and failure hooks alike name the statement"
+    );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    libpg_query's canonical hex rendering
+#[cfg(feature = "metrics-fingerprint")]
+#[pgorm_macros::test]
+pub async fn fingerprint_renders_libpg_query_hex() {
+    let query = QueryContext::new(
+        "query_all",
+        Some("SELECT * FROM contacts WHERE name='Paul'"),
+    );
+    // Named through its public path: both types live in `pgorm::metric`,
+    // whatever module inside the crate defines them.
+    let fingerprint: pgorm::metric::QueryFingerprint =
+        query.fingerprint().expect("the statement parses");
+
+    assert_eq!(
+        fingerprint.to_string(),
+        "0e2581a461ece536",
+        "the 16-character zero-padded hex libpg_query itself reports"
+    );
+    assert_eq!(
+        format!("{:016x}", fingerprint.value()),
+        fingerprint.to_string(),
+        "value() and Display are two views of one number"
+    );
+    assert_eq!(
+        query.fingerprint(),
+        Some(fingerprint),
+        "a second look at the same statement answers from the memo"
+    );
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    constants are normalized away
+#[cfg(feature = "metrics-fingerprint")]
+#[pgorm_macros::test]
+pub async fn fingerprint_ignores_literal_values() {
+    let one = QueryContext::new("query_all", Some("SELECT id FROM widget WHERE id = 1"));
+    let other = QueryContext::new("query_all", Some("SELECT id FROM widget WHERE id = 4242"));
+    let spaced = QueryContext::new("execute", Some("SELECT id  FROM widget\n WHERE id = 7"));
+
+    assert!(one.fingerprint().is_some(), "the statement parses");
+    assert_eq!(
+        one.fingerprint(),
+        other.fingerprint(),
+        "only the literal differs, so the shape is the same query"
+    );
+    assert_eq!(
+        one.fingerprint(),
+        spaced.fingerprint(),
+        "a parse-tree hash is blind to whitespace and to the reporting operation"
+    );
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    different shapes stay apart
+#[cfg(feature = "metrics-fingerprint")]
+#[pgorm_macros::test]
+pub async fn distinct_shapes_get_distinct_fingerprints() {
+    let select = QueryContext::new("query_all", Some("SELECT id FROM widget WHERE id = 1"));
+    let column = QueryContext::new("query_all", Some("SELECT name FROM widget WHERE id = 1"));
+    let table = QueryContext::new("query_all", Some("SELECT id FROM gadget WHERE id = 1"));
+    let insert = QueryContext::new("execute", Some("INSERT INTO widget (id) VALUES (1)"));
+
+    let prints = [select, column, table, insert].map(|query| {
+        query
+            .fingerprint()
+            .expect("every one of these statements parses")
+    });
+
+    let mut distinct = prints.to_vec();
+    distinct.sort_unstable();
+    distinct.dedup();
+    assert_eq!(
+        distinct.len(),
+        prints.len(),
+        "a different column, table, or verb is a different query: {prints:?}"
+    );
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    unidentifiable is not an error
+#[cfg(feature = "metrics-fingerprint")]
+#[pgorm_macros::test]
+pub async fn unparseable_sql_has_no_fingerprint() {
+    let broken = QueryContext::new("batch_execute", Some("SELECT FROM WHERE (("));
+    let empty = QueryContext::new("execute", Some(""));
+    let prepared = QueryContext::new("execute", None);
+
+    assert_eq!(
+        broken.fingerprint(),
+        None,
+        "text the grammar rejects has no identity, and asking is not an error"
+    );
+    assert_eq!(
+        broken.sql(),
+        Some("SELECT FROM WHERE (("),
+        "the text is still reported; only its identity is missing"
+    );
+    assert_eq!(
+        prepared.fingerprint(),
+        None,
+        "nor does a statement whose text the driver no longer holds"
+    );
+    assert!(
+        empty.fingerprint().is_some(),
+        "an empty statement is an empty parse, not a rejected one"
+    );
+}
+
+// [spec:pgorm:req:metric.fingerprint/test]    fingerprints reach the collector through the wrappers
+#[cfg(feature = "metrics-fingerprint")]
+#[pgorm_macros::test]
+pub async fn instrumented_wrapper_reports_fingerprints() -> Result<(), DbErr> {
+    let ctx = TestContext::new("metric_layer_fingerprint_metricfp").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let conn = pool.get().await?;
+    conn.batch_execute("CREATE TABLE widget (id int primary key)")
+        .await?;
+    conn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+        .await?;
+    conn.execute("INSERT INTO widget (id) VALUES (2)", &[])
+        .await?;
+    conn.query_all("SELECT id FROM widget", &[]).await?;
+
+    let first = metrics.fingerprint_of("INSERT INTO widget (id) VALUES (1)");
+    let second = metrics.fingerprint_of("INSERT INTO widget (id) VALUES (2)");
+    let select = metrics.fingerprint_of("SELECT id FROM widget");
+
+    assert!(first.is_some(), "{:?}", metrics.queries());
+    assert_eq!(
+        first, second,
+        "two inserts differing only in their value are one query shape"
+    );
+    assert_ne!(first, select, "the select is not that shape");
 
     drop(conn);
     ctx.delete().await;

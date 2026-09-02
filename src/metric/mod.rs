@@ -1,22 +1,83 @@
+mod fingerprint;
+
+pub use fingerprint::{QueryContext, QueryFingerprint};
+
 use crate::{
-    ConnectionTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DbErr, TransactionTrait,
+    ConnectionTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DbErr, SqlText,
+    TransactionTrait,
 };
 use async_trait::async_trait;
+use fingerprint::FingerprintSuffix;
 use std::time::{Duration, Instant};
 use tokio_postgres::{
     Row, RowStream, ToStatement,
     types::{BorrowToSql, ToSql},
 };
 
+/// The body every instrumented `ConnectionTrait` method shares: build the
+/// context, time the awaited delegation, report the outcome under the hook it
+/// selects, and hand back the wrapped value's own result untouched.
+///
+/// What actually differs between the fourteen methods is three things — the
+/// operation name, where the SQL text comes from, and how a row count is read
+/// out of the `Ok` payload — so those are the parameters and the rest is
+/// written once. `$rows` is evaluated against the payload by reference.
+// [spec:pgorm:req:metric.layer.delegate+3]    the timing and reporting body
+macro_rules! report {
+    ($self:ident, $operation:literal, $sql:expr, $call:expr, $ok:pat => $rows:expr) => {{
+        let query = QueryContext::new($operation, $sql);
+        let start = Instant::now();
+        let result = $call;
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok($ok) => {
+                $self
+                    .metrics
+                    .record_query_success(query, elapsed, $rows)
+                    .await;
+            }
+            Err(error) => {
+                $self
+                    .metrics
+                    .record_query_error(query, elapsed, error)
+                    .await;
+            }
+        }
+
+        result
+    }};
+}
+
+/// The transaction behind an [`InstrumentedTransaction`] that has not been
+/// consumed.
+///
+/// `commit` and `rollback` take it by value and leave `None` behind; both
+/// consume the handle, so a statement method finding `None` is a bug in this
+/// module rather than anything a caller can provoke.
+macro_rules! open_transaction {
+    ($self:ident) => {
+        match &$self.transaction {
+            Some(transaction) => transaction,
+            None => unreachable!("Transaction already consumed"),
+        }
+    };
+}
+
 /// Trait for collecting database metrics
-// [spec:pgorm:def:metric.layer.collector]
+// [spec:pgorm:def:metric.layer.collector+1]
 #[async_trait]
 pub trait MetricsCollector: Clone + Send + Sync + 'static {
     /// Record a successful database operation
-    async fn record_query_success(&self, operation: &str, duration: Duration, rows: Option<u64>);
+    async fn record_query_success(
+        &self,
+        query: QueryContext<'_>,
+        duration: Duration,
+        rows: Option<u64>,
+    );
 
     /// Record a failed database operation
-    async fn record_query_error(&self, operation: &str, duration: Duration, error: &DbErr);
+    async fn record_query_error(&self, query: QueryContext<'_>, duration: Duration, error: &DbErr);
 
     /// Record connection acquisition
     async fn record_connection_acquired(&self, duration: Duration);
@@ -42,12 +103,18 @@ pub struct NoOpMetrics;
 impl MetricsCollector for NoOpMetrics {
     async fn record_query_success(
         &self,
-        _operation: &str,
+        _query: QueryContext<'_>,
         _duration: Duration,
         _rows: Option<u64>,
     ) {
     }
-    async fn record_query_error(&self, _operation: &str, _duration: Duration, _error: &DbErr) {}
+    async fn record_query_error(
+        &self,
+        _query: QueryContext<'_>,
+        _duration: Duration,
+        _error: &DbErr,
+    ) {
+    }
     async fn record_connection_acquired(&self, _duration: Duration) {}
     async fn record_connection_error(&self, _duration: Duration, _error: &DbErr) {}
     async fn record_transaction_begin(&self, _duration: Duration) {}
@@ -59,28 +126,41 @@ impl MetricsCollector for NoOpMetrics {
 #[derive(Clone, Debug)]
 pub struct LoggingMetrics;
 
-// [spec:pgorm:def:metric.layer.collector]    LoggingMetrics tracing levels
+// [spec:pgorm:def:metric.layer.collector+1]    LoggingMetrics tracing levels
 #[async_trait]
 impl MetricsCollector for LoggingMetrics {
-    async fn record_query_success(&self, operation: &str, duration: Duration, rows: Option<u64>) {
+    async fn record_query_success(
+        &self,
+        query: QueryContext<'_>,
+        duration: Duration,
+        rows: Option<u64>,
+    ) {
+        let fingerprint = FingerprintSuffix(query.fingerprint());
         if let Some(rows) = rows {
             tracing::debug!(
-                "Query {} succeeded in {:?}, {} rows",
-                operation,
+                "Query {} succeeded in {:?}, {} rows{}",
+                query.operation(),
                 duration,
-                rows
+                rows,
+                fingerprint
             );
         } else {
-            tracing::debug!("Query {} succeeded in {:?}", operation, duration);
+            tracing::debug!(
+                "Query {} succeeded in {:?}{}",
+                query.operation(),
+                duration,
+                fingerprint
+            );
         }
     }
 
-    async fn record_query_error(&self, operation: &str, duration: Duration, error: &DbErr) {
+    async fn record_query_error(&self, query: QueryContext<'_>, duration: Duration, error: &DbErr) {
         tracing::warn!(
-            "Query {} failed after {:?}: {:?}",
-            operation,
+            "Query {} failed after {:?}: {:?}{}",
+            query.operation(),
             duration,
-            error
+            error,
+            FingerprintSuffix(query.fingerprint())
         );
     }
 
@@ -106,7 +186,7 @@ impl MetricsCollector for LoggingMetrics {
 }
 
 /// A connection pool wrapper that produces instrumented connections
-// [spec:pgorm:def:metric.layer]    pool wrapper
+// [spec:pgorm:def:metric.layer+1]    pool wrapper
 #[derive(Debug, Clone)]
 pub struct InstrumentedPool<M: MetricsCollector> {
     pool: DatabasePool,
@@ -159,7 +239,7 @@ impl<M: MetricsCollector> InstrumentedPool<M> {
 }
 
 /// A connection wrapper that instruments all database operations
-// [spec:pgorm:def:metric.layer]    connection wrapper
+// [spec:pgorm:def:metric.layer+1]    connection wrapper
 #[derive(Debug)]
 pub struct InstrumentedConnection<M: MetricsCollector> {
     connection: DatabaseConnection,
@@ -191,9 +271,10 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     /// [`InstrumentedTransaction`] sharing a clone of the collector, so
     /// statements issued inside the transaction stay instrumented without the
     /// caller wrapping the handle by hand.
-    // [spec:pgorm:sem:metric.layer.tx+1]    instrumented begin
+    // [spec:pgorm:sem:metric.layer.tx+2]    instrumented begin
     pub async fn begin_instrumented(&mut self) -> Result<InstrumentedTransaction<'_, M>, DbErr> {
         let metrics = self.metrics.clone();
+        let query = QueryContext::new("begin", None);
         let start = Instant::now();
         let result = self.connection.begin().await;
         let elapsed = start.elapsed();
@@ -203,7 +284,7 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
                 metrics.record_transaction_begin(elapsed).await;
             }
             Err(e) => {
-                metrics.record_query_error("begin", elapsed, e).await;
+                metrics.record_query_error(query, elapsed, e).await;
             }
         }
 
@@ -211,56 +292,26 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate+2]
+// [spec:pgorm:req:metric.layer.delegate+3]
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = self.connection.execute(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("execute", elapsed, Some(*rows))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics.record_query_error("execute", elapsed, e).await;
-            }
-        }
-
-        result
+        report!(self, "execute", statement.sql_text(),
+            self.connection.execute(statement, params).await, rows => Some(*rows))
     }
 
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        let start = Instant::now();
-        let result = self.connection.execute_raw(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("execute_raw", elapsed, Some(*rows))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("execute_raw", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "execute_raw", statement.sql_text(),
+            self.connection.execute_raw(statement, params).await, rows => Some(*rows))
     }
 
     async fn query_one<T>(
@@ -269,26 +320,10 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = self.connection.query_one(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(_) => {
-                self.metrics
-                    .record_query_success("query_one", elapsed, Some(1))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_one", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_one", statement.sql_text(),
+            self.connection.query_one(statement, params).await, _ => Some(1))
     }
 
     async fn query_opt<T>(
@@ -297,31 +332,10 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = self.connection.query_opt(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(Some(_)) => {
-                self.metrics
-                    .record_query_success("query_opt", elapsed, Some(1))
-                    .await;
-            }
-            Ok(None) => {
-                self.metrics
-                    .record_query_success("query_opt", elapsed, Some(0))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_opt", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_opt", statement.sql_text(),
+            self.connection.query_opt(statement, params).await, row => Some(if row.is_some() { 1 } else { 0 }))
     }
 
     async fn query_all<T>(
@@ -330,80 +344,32 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = self.connection.query_all(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("query_all", elapsed, Some(rows.len() as u64))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_all", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_all", statement.sql_text(),
+            self.connection.query_all(statement, params).await, rows => Some(rows.len() as u64))
     }
 
     // [spec:pgorm:sem:exec.stream.decode]    row count unknown at stream creation
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        let start = Instant::now();
-        let result = self.connection.query_raw(statement, params).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(_) => {
-                self.metrics
-                    .record_query_success("query_raw", elapsed, None)
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_raw", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_raw", statement.sql_text(),
+            self.connection.query_raw(statement, params).await, _ => None)
     }
 
     async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
-        let start = Instant::now();
-        let result = self.connection.batch_execute(sql).await;
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(()) => {
-                self.metrics
-                    .record_query_success("batch_execute", elapsed, None)
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("batch_execute", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "batch_execute", Some(sql),
+            self.connection.batch_execute(sql).await, () => None)
     }
 }
 
 /// A transaction wrapper that instruments transaction operations
-// [spec:pgorm:sem:metric.layer.tx+1]    commit + rollback reporting, no-op drop
+// [spec:pgorm:sem:metric.layer.tx+2]    commit + rollback reporting, no-op drop
 #[derive(Debug)]
 pub struct InstrumentedTransaction<'a, M: MetricsCollector> {
     transaction: Option<DatabaseTransaction<'a>>,
@@ -449,6 +415,7 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
     /// nothing; this is the only path that reports a rollback the caller asked
     /// for rather than one Postgres forced by a failed commit.
     pub async fn rollback(mut self) -> Result<(), DbErr> {
+        let query = QueryContext::new("rollback", None);
         let start = Instant::now();
         let metrics = self.metrics.clone();
 
@@ -457,7 +424,7 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
             let elapsed = start.elapsed();
 
             if let Err(e) = &result {
-                metrics.record_query_error("rollback", elapsed, e).await;
+                metrics.record_query_error(query, elapsed, e).await;
             }
             metrics.record_transaction_rollback(elapsed).await;
 
@@ -478,64 +445,26 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate+2]    statements inside a transaction
+// [spec:pgorm:req:metric.layer.delegate+3]    statements inside a transaction
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.execute(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("execute", elapsed, Some(*rows))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics.record_query_error("execute", elapsed, e).await;
-            }
-        }
-
-        result
+        report!(self, "execute", statement.sql_text(),
+            open_transaction!(self).execute(statement, params).await, rows => Some(*rows))
     }
 
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.execute_raw(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("execute_raw", elapsed, Some(*rows))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("execute_raw", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "execute_raw", statement.sql_text(),
+            open_transaction!(self).execute_raw(statement, params).await, rows => Some(*rows))
     }
 
     async fn query_one<T>(
@@ -544,30 +473,10 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.query_one(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(_) => {
-                self.metrics
-                    .record_query_success("query_one", elapsed, Some(1))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_one", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_one", statement.sql_text(),
+            open_transaction!(self).query_one(statement, params).await, _ => Some(1))
     }
 
     async fn query_opt<T>(
@@ -576,35 +485,10 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.query_opt(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(Some(_)) => {
-                self.metrics
-                    .record_query_success("query_opt", elapsed, Some(1))
-                    .await;
-            }
-            Ok(None) => {
-                self.metrics
-                    .record_query_success("query_opt", elapsed, Some(0))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_opt", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_opt", statement.sql_text(),
+            open_transaction!(self).query_opt(statement, params).await, row => Some(if row.is_some() { 1 } else { 0 }))
     }
 
     async fn query_all<T>(
@@ -613,94 +497,35 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.query_all(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(rows) => {
-                self.metrics
-                    .record_query_success("query_all", elapsed, Some(rows.len() as u64))
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_all", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_all", statement.sql_text(),
+            open_transaction!(self).query_all(statement, params).await, rows => Some(rows.len() as u64))
     }
 
     // [spec:pgorm:sem:exec.stream.decode]    row count unknown at stream creation
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
     where
-        T: ?Sized + ToStatement + Send + Sync,
+        T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.query_raw(statement, params).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(_) => {
-                self.metrics
-                    .record_query_success("query_raw", elapsed, None)
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("query_raw", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "query_raw", statement.sql_text(),
+            open_transaction!(self).query_raw(statement, params).await, _ => None)
     }
 
     async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
-        let start = Instant::now();
-        let result = if let Some(transaction) = &self.transaction {
-            transaction.batch_execute(sql).await
-        } else {
-            unreachable!("Transaction already consumed")
-        };
-        let elapsed = start.elapsed();
-
-        match &result {
-            Ok(()) => {
-                self.metrics
-                    .record_query_success("batch_execute", elapsed, None)
-                    .await;
-            }
-            Err(e) => {
-                self.metrics
-                    .record_query_error("batch_execute", elapsed, e)
-                    .await;
-            }
-        }
-
-        result
+        report!(self, "batch_execute", Some(sql),
+            open_transaction!(self).batch_execute(sql).await, () => None)
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx+1]    timed begin, uninstrumented handle
+// [spec:pgorm:sem:metric.layer.tx+2]    timed begin, uninstrumented handle
 #[async_trait]
 impl<M: MetricsCollector> TransactionTrait for InstrumentedConnection<M> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
+        let query = QueryContext::new("begin", None);
         let start = Instant::now();
         let result = self.connection.begin().await;
         let elapsed = start.elapsed();
@@ -710,7 +535,7 @@ impl<M: MetricsCollector> TransactionTrait for InstrumentedConnection<M> {
                 self.metrics.record_transaction_begin(elapsed).await;
             }
             Err(e) => {
-                self.metrics.record_query_error("begin", elapsed, e).await;
+                self.metrics.record_query_error(query, elapsed, e).await;
             }
         }
 

@@ -70,8 +70,8 @@ println!("Pool: {}", tag);
 ```rust
 #[async_trait]
 pub trait MetricsCollector: Clone + Send + Sync + 'static {
-    async fn record_query_success(&self, operation: &str, duration: Duration, rows: Option<u64>);
-    async fn record_query_error(&self, operation: &str, duration: Duration, error: &DbErr);
+    async fn record_query_success(&self, query: QueryContext<'_>, duration: Duration, rows: Option<u64>);
+    async fn record_query_error(&self, query: QueryContext<'_>, duration: Duration, error: &DbErr);
     async fn record_connection_acquired(&self, duration: Duration);
     async fn record_connection_error(&self, duration: Duration, error: &DbErr);
     async fn record_transaction_begin(&self, duration: Duration);
@@ -83,7 +83,46 @@ pub trait MetricsCollector: Clone + Send + Sync + 'static {
 Two implementations ship in-tree:
 
 - `NoOpMetrics` — every hook is an empty body.
-- `LoggingMetrics` — emits `tracing` events: `debug` for query success, connection acquired, transaction begin, and commit; `warn` for query errors and rollbacks; `error` for connection failures.
+- `LoggingMetrics` — emits `tracing` events: `debug` for query success, connection acquired, transaction begin, and commit; `warn` for query errors and rollbacks; `error` for connection failures. Its query messages carry the fingerprint as a ` [<hex>]` suffix when the statement has one.
+
+The two query hooks take a `QueryContext<'_>` rather than a bare operation name. It is a borrowed view of the statement being reported, valid for the length of the call:
+
+```rust
+query.operation()   // -> &str,                     "execute", "query_all", ...
+query.sql()         // -> Option<&str>,             the statement text
+query.fingerprint() // -> Option<QueryFingerprint>, its identity
+```
+
+Anything you keep past the hook has to be copied out.
+
+### Query Fingerprints
+
+`query.fingerprint()` is libpg_query's constants-normalized parse-tree hash — the same notion of "same query" `pg_stat_statements` aggregates by. Two statements differing only in their literals share a fingerprint; two differing in shape do not:
+
+```text
+SELECT id FROM widget WHERE id = 1     -> 394a2f90c244bffe
+SELECT id FROM widget WHERE id = 4242  -> 394a2f90c244bffe
+SELECT name FROM widget WHERE id = 1   -> f7678147685fe197
+```
+
+`QueryFingerprint` renders through `Display` as libpg_query's canonical 16-character zero-padded hex, and `value()` hands back the same number as a `u64` — the cheaper key for a `HashMap` of counters.
+
+It is **off by default**, behind the `metrics-fingerprint` feature:
+
+```toml
+[dependencies]
+pgorm = { version = "0.1", features = ["metrics-fingerprint"] }
+```
+
+Without the feature pgorm pulls in no parser and `fingerprint()` is always `None`. The types and hook signatures are the same either way, so a collector compiles against both builds; enabling the feature changes an answer, not an API.
+
+`fingerprint()` returns an `Option` and never fails a query. `None` means one of three things, and does not say which:
+
+- the feature is off;
+- the statement carries no text — you passed an already-prepared `tokio_postgres::Statement`, which keeps its server-side name but not the SQL it came from;
+- libpg_query would not parse the text. Raw SQL your server accepts can still be text this parser rejects. The statement executes and is reported as usual; only its identity is missing.
+
+Fingerprints are computed when you ask, not when the context is built, so a collector that ignores them costs nothing. Because computing one is a parse, answers are memoized process-wide by statement text — rejections included — in an `RwLock<HashMap>` capped at 1024 distinct texts. Past the cap the memo stops admitting new entries rather than evicting, so a query whose text is rebuilt per call (an `IN` list sized by its input, a generated migration script) is re-parsed rather than retained forever. Statement *shapes* are a fixed set well under the cap; per-call text is the thing worth not keeping.
 
 ### Wrapping a Pool
 
@@ -112,19 +151,21 @@ Because `get()` clones the collector for every connection, keep collectors cheap
 
 `InstrumentedConnection<M>` and `InstrumentedTransaction<'_, M>` both implement `ConnectionTrait`, delegating each call to the wrapped value and returning its result unchanged. On success:
 
-| Operation      | `operation` string | `rows` reported      |
-| -------------- | ------------------ | -------------------- |
-| `execute`      | `"execute"`        | affected-row count   |
-| `execute_raw`  | `"execute_raw"`    | affected-row count   |
-| `query_one`    | `"query_one"`      | `Some(1)`            |
-| `query_opt`    | `"query_opt"`      | `Some(1)` / `Some(0)` |
-| `query_all`    | `"query_all"`      | `Some(rows.len())`   |
+| Operation      | `query.operation()` | `rows` reported      |
+| -------------- | ------------------- | -------------------- |
+| `execute`      | `"execute"`         | affected-row count   |
+| `execute_raw`  | `"execute_raw"`     | affected-row count   |
+| `query_one`    | `"query_one"`       | `Some(1)`            |
+| `query_opt`    | `"query_opt"`       | `Some(1)` / `Some(0)` |
+| `query_all`    | `"query_all"`       | `Some(rows.len())`   |
 
-On failure the same operation string goes to `record_query_error`, and the `DbErr` is propagated unchanged.
+`query.sql()` is the statement itself in each of these — the `&str` or `&String` you passed, or the whole script in the case of `batch_execute`.
+
+On failure the same context goes to `record_query_error`, and the `DbErr` is propagated unchanged.
 
 ### Transactions
 
-`TransactionTrait::begin` on `InstrumentedConnection` times the `BEGIN` and reports `record_transaction_begin` on success. A *failed* begin is reported through `record_query_error("begin", ..)`, not a dedicated hook.
+`TransactionTrait::begin` on `InstrumentedConnection` times the `BEGIN` and reports `record_transaction_begin` on success. A *failed* begin is reported through `record_query_error`, with a context whose `operation()` is `"begin"` and whose `sql()` is `None` — not through a dedicated hook.
 
 Begin returns a plain `DatabaseTransaction` — it is **not** auto-instrumented. To keep per-statement metrics inside the transaction, wrap it yourself:
 
@@ -157,7 +198,7 @@ Implement the trait for your own type. All seven hooks are required, so a collec
 ```rust
 use async_trait::async_trait;
 use pgorm::DbErr;
-use pgorm::metric::{InstrumentedPool, MetricsCollector};
+use pgorm::metric::{InstrumentedPool, MetricsCollector, QueryContext};
 use prometheus::{Counter, Histogram};
 use std::time::Duration;
 
@@ -180,12 +221,12 @@ impl PrometheusMetrics {
 
 #[async_trait]
 impl MetricsCollector for PrometheusMetrics {
-    async fn record_query_success(&self, _operation: &str, duration: Duration, _rows: Option<u64>) {
+    async fn record_query_success(&self, _query: QueryContext<'_>, duration: Duration, _rows: Option<u64>) {
         self.queries.inc();
         self.query_duration.observe(duration.as_secs_f64());
     }
 
-    async fn record_query_error(&self, _operation: &str, duration: Duration, _error: &DbErr) {
+    async fn record_query_error(&self, _query: QueryContext<'_>, duration: Duration, _error: &DbErr) {
         self.queries.inc();
         self.query_duration.observe(duration.as_secs_f64());
     }
@@ -203,13 +244,15 @@ impl MetricsCollector for PrometheusMetrics {
 let instrumented = InstrumentedPool::new(pool, PrometheusMetrics::new());
 ```
 
-The `operation` argument is the natural label dimension: it partitions the five `ConnectionTrait` methods (plus `"begin"` on a failed begin) without any extra plumbing.
+`query.operation()` is the natural label dimension: it partitions the seven `ConnectionTrait` methods (plus `"begin"` and `"rollback"` on a failed transaction round trip) without any extra plumbing. Label by `query.fingerprint()` only where the backend tolerates the cardinality — one series per query shape is far more than one per method, and a statement with no fingerprint has to fall into a bucket of its own.
 
 ### Cost
 
 - **Not wrapping is free.** `DatabasePool`, `DatabaseConnection`, and `DatabaseTransaction` contain no metrics code, so an application that never constructs a wrapper is unaffected.
 - **Static dispatch.** The collector is a generic parameter, not a trait object — no vtable lookup, and swapping implementations is a type change.
 - **What wrapping does cost**, on every operation and regardless of collector: two clock reads (`Instant::now()` plus `elapsed()`) and one boxed future per hook call, since `#[async_trait]` boxes each hook's future. `NoOpMetrics` elides the reporting work, not the timing or the box.
+- **Building a `QueryContext` costs nothing** beyond copying two borrowed fields — no parse, no allocation. The parse happens only if a collector calls `fingerprint()`, and then only the first time that statement text is seen.
+- **Not enabling `metrics-fingerprint` is free.** pgorm takes no dependency on `pg_query`, so nothing links libpg_query and nothing is compiled for it.
 
 ## Production Deployment Tips
 
@@ -276,6 +319,7 @@ async fn check_pool_health(pool: &DatabasePool) -> Result<(), &'static str> {
 - **Development**: `LoggingMetrics` plus `log_statement = 'all'` for debugging
 - **Staging**: `LoggingMetrics`, or a custom collector at coarse granularity
 - **Production**: pg_stat_statements + a custom collector wired to your metrics backend
+- **Correlating the two**: `metrics-fingerprint` on, aggregating by `query.fingerprint()` — the same query identity pg_stat_statements groups by, so an application-side timing lines up with a server-side one
 - **High-throughput**: PostgreSQL logging only, leaving pools unwrapped
 
 Remember: the database itself is usually the best source of truth for query metrics. Application-level metrics should supplement, not replace, PostgreSQL's built-in observability.
