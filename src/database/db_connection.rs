@@ -17,7 +17,7 @@ pub struct DatabasePool(pub(crate) Pool);
 
 /// A set of [`DatabasePool`]s keyed by their tags, as built by
 /// [`connect_multi_with_builder`](crate::connect_multi_with_builder).
-// [spec:pgorm:sem:conn.pool.multi]    tag-keyed accessor surface
+// [spec:pgorm:sem:conn.pool.multi+1]    tag-keyed accessor surface
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabaseMultiPool(pub(crate) BTreeMap<Arc<String>, DatabasePool>);

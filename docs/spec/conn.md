@@ -7,18 +7,25 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Pool construction and access
 
-> [spec:pgorm:req:conn.pool]
+> [spec:pgorm:req:conn.pool+1]
 > `connect(config: tokio_postgres::Config) -> DatabasePool` MUST construct a
 > deadpool-backed pool wrapping `pgorm_pool::Pool`: a `Manager` built from the
 > given config with `NoTls`, `RecyclingMethod::Fast`, and no tag, combined with
-> the default deadpool pool configuration. `connect_with_builder` MUST apply the
-> caller's closure to the `PoolBuilder` before building, allowing pool sizing
-> and timeout customization.
+> the default deadpool pool configuration. Its signature is infallible by
+> design, not by omission: `config` shapes the `Manager` and no caller input
+> reaches the pool builder, so the only way the build can fail is if pgorm's own
+> defaults are invalid. That is an internal invariant and MUST panic.
 >
-> Both constructors `unwrap()` the builder result: pool construction failure is
-> a panic, not a `DbErr`. TLS connections are not supported through these
-> entry points (`NoTls` is hard-coded); a custom-TLS pool requires assembling a
-> `pgorm_pool::Manager` directly.
+> `connect_with_builder(config, build)` MUST apply the caller's closure to the
+> `PoolBuilder` before building, allowing pool sizing and timeout customization,
+> and MUST return `Result<DatabasePool, DbErr>`. Because the closure is caller
+> input, a builder shaped into an unbuildable pool — deadpool rejects timeouts
+> configured without a runtime — MUST surface as `DbErr::Custom` carrying the
+> builder's message, never as a panic.
+>
+> TLS connections are not supported through these entry points (`NoTls` is
+> hard-coded); a custom-TLS pool requires assembling a `pgorm_pool::Manager`
+> directly.
 
 > [spec:pgorm:sem:conn.pool.get]
 > `DatabasePool::get()` asynchronously acquires a pooled connection and wraps
@@ -37,20 +44,24 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > breaks transactional reasoning, so the pool-as-connection pattern inherited
 > from SeaORM was removed.
 
-> [spec:pgorm:sem:conn.pool.multi]
+> [spec:pgorm:sem:conn.pool.multi+1]
 > `connect_multi_with_builder(config, builders)` builds one pool per entry of a
 > `BTreeMap<String, builder-fn>`: each pool clones the shared
 > `tokio_postgres::Config`, is tagged with its map key, and uses
-> `RecyclingMethod::Fast`; the result is a `BTreeMap<Arc<String>, DatabasePool>`
-> keyed by tag. `DatabaseMultiPool` wraps the same map shape and offers
+> `RecyclingMethod::Fast`; the result is a
+> `Result<BTreeMap<Arc<String>, DatabasePool>, DbErr>` keyed by tag. Every
+> builder is caller input, so construction is fallible on the same terms as
+> `connect_with_builder` (`conn.pool`): the first entry whose builder cannot
+> produce a pool aborts the whole construction with `DbErr::Custom` and no map
+> is returned. `DatabaseMultiPool` wraps the same map shape and offers
 > `get(key) -> Option<DatabasePool>` (a cheap clone of the refcounted pool) and
 > `status()` returning per-tag `deadpool::Status`.
 >
 > Selection is explicit by tag key only — there is no round-robin, load
 > balancing, or fallback across pools. `DatabaseMultiPool` currently has no
 > public constructor (its field is crate-private and
-> `connect_multi_with_builder` returns the raw `BTreeMap`), so outside the
-> crate it is effectively read-only API surface.
+> `connect_multi_with_builder` returns the raw `BTreeMap` on success), so
+> outside the crate it is effectively read-only API surface.
 
 ## Connection lifecycle in pgorm-pool
 

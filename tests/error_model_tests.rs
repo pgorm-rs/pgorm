@@ -226,7 +226,7 @@ async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
             .max_size(1)
             .wait_timeout(Some(Duration::from_millis(100)))
             .runtime(Runtime::Tokio1)
-    });
+    })?;
 
     let held = pool.get().await?;
     let err = pool

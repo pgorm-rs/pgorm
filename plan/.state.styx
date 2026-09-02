@@ -323,6 +323,7 @@ assertions (
     {id infra.tx.metric-tx, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:08:31.330198Z}
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
+    {id nopanic.connect-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:44:54.028454Z}
     {id nopanic.delete-one, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:41:53.878346Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
@@ -626,6 +627,32 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
+    ), rule_versions_seen (
+        {id entity.active-model, version 0}
+        {id entity.active-model.active-value, version 0}
+        {id entity.active-model.active-value.ops, version 0}
+        {id entity.active-model.from-sugar, version 0}
+        {id entity.active-model.hooks, version 0}
+        {id entity.active-model.into, version 0}
+        {id entity.active-model.json, version 1}
+        {id entity.active-model.persistence, version 0}
+        {id entity.active-model.save, version 0}
+        {id entity.relation, version 1}
+        {id entity.relation.builder, version 0}
+        {id entity.relation.def, version 0}
+        {id entity.relation.fk, version 0}
+        {id entity.relation.linked, version 0}
+        {id entity.traits, version 0}
+        {id entity.traits.active-enum, version 0}
+        {id entity.traits.active-enum.limits, version 0}
+        {id entity.traits.column, version 0}
+        {id entity.traits.column-def, version 0}
+        {id entity.traits.column.enum-cast, version 0}
+        {id entity.traits.crud, version 0}
+        {id entity.traits.entity-name, version 0}
+        {id entity.traits.from-query-result, version 0}
+        {id entity.traits.model, version 0}
+        {id entity.traits.primary-key, version 0}
     )}
     {id orm.exec, covered_rules (
         exec.crud

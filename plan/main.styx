@@ -1493,6 +1493,13 @@ children (
                         kind @note
                         text "Audit (both sides argued): plain connect (src/database/mod.rs:24) can only fail on pgorm's own defaults — the deliberate-infallibility argument holds; keep it, reframe the expect as an internal invariant. connect_with_builder (:49) and connect_multi_with_builder (:77) take CALLER CLOSURES over PoolBuilder — caller input under the ban, and pool sizing comes from env/config in practice; failure is process death at startup. Convert both to Result<_, DbErr>. Bumps conn.pool and conn.pool.multi (both currently pin the panic in prose). verify.conn's pool_config_tests pin the panic via catch_unwind — flips to assert Err."
                     }
+
+                    {
+                        at 2026-09-02T15:44:54.028454Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

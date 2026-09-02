@@ -236,7 +236,7 @@ pub async fn transaction_drop_rollback_survives_handback() -> Result<(), DbErr> 
     // connection the dropped transaction queued its ROLLBACK on.
     let pool = pgorm::connect_with_builder(common::setup::config(&base_url, DB_NAME), |builder| {
         builder.max_size(1)
-    });
+    })?;
 
     let mut db = pool.get().await?;
     let pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);
