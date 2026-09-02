@@ -66,11 +66,8 @@ impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
             Self::CakeFilling => Entity::belongs_to(super::cake_filling::Entity)
-                .from((Column::CakeId, Column::FillingId))
-                .to((
-                    super::cake_filling::Column::CakeId,
-                    super::cake_filling::Column::FillingId,
-                ))
+                .columns(Column::CakeId, super::cake_filling::Column::CakeId)
+                .and_columns(Column::FillingId, super::cake_filling::Column::FillingId)
                 .into(),
         }
     }

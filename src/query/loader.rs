@@ -128,7 +128,7 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.regroup+1]
+    // [spec:pgorm:sem:query.loader.regroup+2]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -150,12 +150,15 @@ where
             return Ok(Vec::new());
         }
 
+        let from_col = rel_def.columns.from_identity();
+        let to_col = rel_def.columns.to_identity();
+
         let keys: Vec<ValueTuple> = self
             .iter()
-            .map(|model: &M| extract_key(&rel_def.from_col, model))
+            .map(|model: &M| extract_key(&from_col, model))
             .collect::<Result<_, DbErr>>()?;
 
-        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
+        let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
         let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
@@ -163,7 +166,7 @@ where
 
         let mut hashmap: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
         for value in data {
-            let key = extract_key(&rel_def.to_col, &value)?;
+            let key = extract_key(&to_col, &value)?;
             hashmap.insert(key, value);
         }
 
@@ -173,7 +176,7 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.regroup+1]
+    // [spec:pgorm:sem:query.loader.regroup+2]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -196,12 +199,15 @@ where
             return Ok(Vec::new());
         }
 
+        let from_col = rel_def.columns.from_identity();
+        let to_col = rel_def.columns.to_identity();
+
         let keys: Vec<ValueTuple> = self
             .iter()
-            .map(|model: &M| extract_key(&rel_def.from_col, model))
+            .map(|model: &M| extract_key(&from_col, model))
             .collect::<Result<_, DbErr>>()?;
 
-        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
+        let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
         let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
@@ -215,11 +221,11 @@ where
                 });
 
         for value in data {
-            let key = extract_key(&rel_def.to_col, &value)?;
+            let key = extract_key(&to_col, &value)?;
 
-            let vec = hashmap.get_mut(&key).ok_or_else(|| {
-                unmatched_key_err(&key, &keys, &rel_def.from_col, &rel_def.to_col)
-            })?;
+            let vec = hashmap
+                .get_mut(&key)
+                .ok_or_else(|| unmatched_key_err(&key, &keys, &from_col, &to_col))?;
 
             vec.push(value);
         }
@@ -232,7 +238,7 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.many-to-many]
+    // [spec:pgorm:sem:query.loader.many-to-many+1]
     async fn load_many_to_many<R, S, V, C>(
         &self,
         stmt: S,
@@ -269,35 +275,40 @@ where
                 return Ok(Vec::new());
             }
 
+            let via_from_col = via_rel.columns.from_identity();
+            let via_to_col = via_rel.columns.to_identity();
+            let from_col = rel_def.columns.from_identity();
+            let to_col = rel_def.columns.to_identity();
+
             let pkeys: Vec<ValueTuple> = self
                 .iter()
-                .map(|model: &M| extract_key(&via_rel.from_col, model))
+                .map(|model: &M| extract_key(&via_from_col, model))
                 .collect::<Result<_, DbErr>>()?;
 
             // Map of M::PK -> Vec<R::PK>
             let mut keymap: HashMap<ValueTuple, Vec<ValueTuple>> = Default::default();
 
             let keys: Vec<ValueTuple> = {
-                let condition = prepare_condition(&via_rel.to_tbl, &via_rel.to_col, &pkeys)?;
+                let condition = prepare_condition(&via_rel.to_tbl, &via_to_col, &pkeys)?;
                 let stmt = V::find().filter(condition);
                 let data = stmt.all(db).await?;
                 for model in data {
-                    let pk = extract_key(&via_rel.to_col, &model)?;
-                    let fk = extract_key(&rel_def.from_col, &model)?;
+                    let pk = extract_key(&via_to_col, &model)?;
+                    let fk = extract_key(&from_col, &model)?;
                     keymap.entry(pk).or_default().push(fk);
                 }
 
                 keymap.values().flatten().cloned().collect()
             };
 
-            let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
+            let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
             let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
             // Map of R::PK -> R::Model
             let mut data: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
             for model in stmt.all(db).await? {
-                let key = extract_key(&rel_def.to_col, &model)?;
+                let key = extract_key(&to_col, &model)?;
                 data.insert(key, model);
             }
 
@@ -336,7 +347,7 @@ fn identity_columns(identity: &Identity) -> String {
         .join(", ")
 }
 
-// [spec:pgorm:sem:query.loader.regroup+1]
+// [spec:pgorm:sem:query.loader.regroup+2]
 fn unmatched_key_err(
     key: &ValueTuple,
     input_keys: &[ValueTuple],
@@ -357,7 +368,7 @@ fn unmatched_key_err(
     ))
 }
 
-// [spec:pgorm:sem:query.loader.batching+1]
+// [spec:pgorm:sem:query.loader.batching+2]
 fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, DbErr>
 where
     Model: ModelTrait,
@@ -372,7 +383,7 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+1]
+// [spec:pgorm:sem:query.loader.batching+2]
 fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, DbErr>
 where
     Model: ModelTrait,
@@ -398,7 +409,7 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+1]
+// [spec:pgorm:sem:query.loader.batching+2]
 fn prepare_condition(
     table: &TableRef,
     col: &Identity,

@@ -3,7 +3,7 @@ use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SeaRc, Value, 
 use std::fmt;
 
 /// List of column identifier
-// [spec:pgorm:def:entity.relation.def+1]
+// [spec:pgorm:def:entity.relation.def+2]
 #[derive(Debug, Clone)]
 pub enum Identity {
     /// Column identifier consists of 1 column
@@ -54,8 +54,109 @@ impl Iden for Identity {
     }
 }
 
+/// The columns a relation joins on, held as `(from, to)` pairs so the two
+/// sides of the join cannot disagree in length.
+///
+/// The only constructor takes the first pair, and every extension takes a pair,
+/// so a set of join columns is non-empty and balanced by construction: there is
+/// no unbalanced value to build, pass around, or truncate.
+// [spec:pgorm:def:entity.relation.def+2]
+#[derive(Debug, Clone)]
+pub struct ColumnPairs {
+    first: (DynIden, DynIden),
+    rest: Vec<(DynIden, DynIden)>,
+}
+
+impl ColumnPairs {
+    /// Start a set of join columns from its first `(from, to)` pair.
+    pub fn new<F, T>(from: F, to: T) -> Self
+    where
+        F: IntoIden,
+        T: IntoIden,
+    {
+        Self {
+            first: (from.into_iden(), to.into_iden()),
+            rest: Vec::new(),
+        }
+    }
+
+    /// Extend with a further pair, as a composite key requires.
+    #[must_use]
+    pub fn and<F, T>(mut self, from: F, to: T) -> Self
+    where
+        F: IntoIden,
+        T: IntoIden,
+    {
+        self.push(from, to);
+        self
+    }
+
+    /// Append a pair in place.
+    pub fn push<F, T>(&mut self, from: F, to: T)
+    where
+        F: IntoIden,
+        T: IntoIden,
+    {
+        self.rest.push((from.into_iden(), to.into_iden()));
+    }
+
+    /// Iterate the pairs in declaration order.
+    pub fn iter(&self) -> impl Iterator<Item = &(DynIden, DynIden)> {
+        std::iter::once(&self.first).chain(self.rest.iter())
+    }
+
+    /// The number of pairs, which is at least one.
+    pub fn arity(&self) -> usize {
+        1 + self.rest.len()
+    }
+
+    /// Swap every pair, so the relation reads in the opposite direction.
+    #[must_use]
+    pub fn rev(self) -> Self {
+        Self {
+            first: (self.first.1, self.first.0),
+            rest: self.rest.into_iter().map(|(f, t)| (t, f)).collect(),
+        }
+    }
+
+    /// The `from` side of every pair, as an [`Identity`].
+    pub fn from_identity(&self) -> Identity {
+        self.side_identity(|pair| SeaRc::clone(&pair.0))
+    }
+
+    /// The `to` side of every pair, as an [`Identity`].
+    pub fn to_identity(&self) -> Identity {
+        self.side_identity(|pair| SeaRc::clone(&pair.1))
+    }
+
+    fn side_identity<F>(&self, col: F) -> Identity
+    where
+        F: Fn(&(DynIden, DynIden)) -> DynIden,
+    {
+        match self.rest.as_slice() {
+            [] => Identity::Unary(col(&self.first)),
+            [second] => Identity::Binary(col(&self.first), col(second)),
+            [second, third] => Identity::Ternary(col(&self.first), col(second), col(third)),
+            rest => Identity::Many(
+                std::iter::once(col(&self.first))
+                    .chain(rest.iter().map(col))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl IntoIterator for ColumnPairs {
+    type Item = (DynIden, DynIden);
+    type IntoIter = std::iter::Chain<std::iter::Once<Self::Item>, std::vec::IntoIter<Self::Item>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self.first).chain(self.rest)
+    }
+}
+
 /// Performs a conversion into an [Identity]
-// [spec:pgorm:def:entity.relation.def+1]
+// [spec:pgorm:def:entity.relation.def+2]
 pub trait IntoIdentity {
     /// The shape a boundary value must have to line up with this identity: a
     /// tuple of [`Value`] of the same length, so the arity of a column set and
@@ -75,7 +176,7 @@ pub trait IntoIdentity {
 /// The exception is `K = ValueTuple`, the shape of a runtime-built
 /// [`Identity`], which accepts any tuple and leaves the arity to be checked
 /// when the query runs.
-// [spec:pgorm:def:entity.relation.def+1]
+// [spec:pgorm:def:entity.relation.def+2]
 pub trait IntoBoundary<K>: IntoValueTuple {}
 
 /// Check the [Identity] of an Entity

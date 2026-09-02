@@ -150,18 +150,15 @@ async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model>
     }
 
     let rel: RelationDef = cakes_bakers::Entity::belongs_to(baker::Entity)
-        .from(cakes_bakers::Column::BakerId)
-        .to(baker::Column::Id)
+        .columns(cakes_bakers::Column::BakerId, baker::Column::Id)
         .into();
 
     let rel2: RelationDef = cakes_bakers::Entity::belongs_to(cake::Entity)
-        .from(cakes_bakers::Column::CakeId)
-        .to(cake::Column::Id)
+        .columns(cakes_bakers::Column::CakeId, cake::Column::Id)
         .into();
 
     let rel3: RelationDef = cake::Entity::has_many(lineitem::Entity)
-        .from(cake::Column::Id)
-        .to(lineitem::Column::CakeId)
+        .columns(cake::Column::Id, lineitem::Column::CakeId)
         .into();
 
     let select = cakes_bakers::Entity::find()

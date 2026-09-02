@@ -368,8 +368,7 @@ fn expanded_relation_trait_def_matches_variants_or_panics() {
             fn def(&self) -> RelationDef {
                 match self {
                     Self::Cake => Entity::belongs_to(super::cake::Entity)
-                        .from(Column::CakeId)
-                        .to(super::cake::Column::Id)
+                        .columns(Column::CakeId, super::cake::Column::Id)
                         .into(),
                 }
             }

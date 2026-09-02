@@ -51,7 +51,7 @@ async fn loader_load_one() -> Result<(), DbErr> {
 // [spec:pgorm:req:query.loader/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
-// [spec:pgorm:sem:query.loader.regroup+1/test]    a bucket per input key in
+// [spec:pgorm:sem:query.loader.regroup+2/test]    a bucket per input key in
 // result order, an empty `Vec` for an input nothing matched, and a clone of
 // the same model for two inputs sharing a key
 #[pgorm_macros::test]
@@ -155,7 +155,7 @@ async fn loader_load_many_multi() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:query.loader/test]    `load_many_to_many` across a junction,
 // from a bare entity and from a pre-filtered `Select<R>`
-// [spec:pgorm:sem:query.loader.many-to-many/test]    the junction is resolved
+// [spec:pgorm:sem:query.loader.many-to-many+1/test]    the junction is resolved
 // first and the targets second: a shared target is cloned into every
 // referencing input, and a foreign key whose target row the caller's `Select`
 // filtered away is silently dropped from that input's list
@@ -308,8 +308,7 @@ mod ledger {
 impl Related<ledger::Entity> for bakery::Entity {
     fn to() -> RelationDef {
         bakery::Entity::belongs_to(ledger::Entity)
-            .from(bakery::Column::Id)
-            .to(ledger::Column::OwnerId)
+            .columns(bakery::Column::Id, ledger::Column::OwnerId)
             .into()
     }
 }
@@ -319,8 +318,7 @@ impl Related<ledger::Entity> for bakery::Entity {
 impl Related<ledger::Entity> for cake::Entity {
     fn to() -> RelationDef {
         let mut def: RelationDef = cake::Entity::belongs_to(ledger::Entity)
-            .from(cake::Column::Id)
-            .to(ledger::Column::OwnerId)
+            .columns(cake::Column::Id, ledger::Column::OwnerId)
             .into();
         def.rel_type = RelationType::HasMany;
         def
@@ -336,8 +334,7 @@ impl Related<ledger::Entity> for cake::Entity {
 impl Related<ledger::Entity> for customer::Entity {
     fn to() -> RelationDef {
         let mut def: RelationDef = customer::Entity::belongs_to(ledger::Entity)
-            .from(customer::Column::Id)
-            .to(ledger::Column::OwnerId)
+            .columns(customer::Column::Id, ledger::Column::OwnerId)
             .into();
         def.to_tbl = def.to_tbl.alias(Alias::new("l"));
         def
@@ -349,10 +346,9 @@ impl Related<ledger::Entity> for customer::Entity {
 impl Related<ledger::Entity> for baker::Entity {
     fn to() -> RelationDef {
         let mut def: RelationDef = baker::Entity::belongs_to(ledger::Entity)
-            .from(baker::Column::Id)
-            .to(ledger::Column::OwnerId)
+            .columns(baker::Column::Id, ledger::Column::OwnerId)
             .into();
-        def.from_col = "no_such_column".into_identity();
+        def.columns = ColumnPairs::new(Alias::new("no_such_column"), ledger::Column::OwnerId);
         def
     }
 }
@@ -383,8 +379,7 @@ mod padded {
 impl Related<padded::Entity> for bakery::Entity {
     fn to() -> RelationDef {
         let mut def: RelationDef = bakery::Entity::belongs_to(padded::Entity)
-            .from(bakery::Column::Name)
-            .to(padded::Column::Code)
+            .columns(bakery::Column::Name, padded::Column::Code)
             .into();
         def.rel_type = RelationType::HasMany;
         def
@@ -396,8 +391,8 @@ impl Related<padded::Entity> for bakery::Entity {
 impl Related<cakes_bakers::Entity> for cakes_bakers::Entity {
     fn to() -> RelationDef {
         let mut def: RelationDef = cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
-            .from((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
-            .to((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
+            .columns(cakes_bakers::Column::CakeId, cakes_bakers::Column::CakeId)
+            .and_columns(cakes_bakers::Column::BakerId, cakes_bakers::Column::BakerId)
             .into();
         def.rel_type = RelationType::HasMany;
         def
@@ -548,15 +543,15 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+1/test]    keys are collected in input
-// order and become a single IN predicate on the relation's `to_col`: a
+// [spec:pgorm:sem:query.loader.batching+2/test]    keys are collected in input
+// order and become a single IN predicate on the relation's to side: a
 // composite key renders as a tuple `IN` list through `in_tuples` (the unary
 // `col IN (..)` form is what every other loader test here exercises). The
 // predicate is AND-ed onto the caller's `Select`, so a user filter composes
 // with it. The rule's note that duplicate keys are repeated rather than
 // deduplicated concerns the emitted SQL text, which is not observable through
 // this API.
-// [spec:pgorm:sem:query.loader.regroup+1/test]    two inputs sharing a key each
+// [spec:pgorm:sem:query.loader.regroup+2/test]    two inputs sharing a key each
 // receive their own clone of that key's bucket
 #[pgorm_macros::test]
 async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
@@ -620,8 +615,8 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+1/test]    `load_one` indexes the returned
-// rows into a map keyed on `to_col` in result order, so when a relation
+// [spec:pgorm:sem:query.loader.regroup+2/test]    `load_one` indexes the returned
+// rows into a map keyed on the relation's to side in result order, so when a relation
 // declared `HasOne` matches several rows for one key the last row wins, an
 // unmatched input gets `None`, and inputs sharing a key each get a clone
 // [spec:pgorm:req:query.loader.table-ref-limitation+1/test]    the supported
@@ -684,7 +679,7 @@ async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+1/test]    a relation naming a column
+// [spec:pgorm:sem:query.loader.batching+2/test]    a relation naming a column
 // its source model does not have is reported as an `Err` naming that column and
 // the model's table, not a panic
 #[pgorm_macros::test]
@@ -709,7 +704,7 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+1/test]    a returned row whose key is
+// [spec:pgorm:sem:query.loader.regroup+2/test]    a returned row whose key is
 // absent from the seeded map — here because `char(3)` pads it back out — is an
 // `Err` naming the unmatched key, a sample input key and both column lists,
 // rather than a panic

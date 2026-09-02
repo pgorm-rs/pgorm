@@ -1,7 +1,8 @@
 use crate::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, DbErr, Delete, DeleteMany, DeleteOne,
-    FromQueryResult, Insert, ModelTrait, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related,
-    RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany, UpdateOne,
+    FromQueryResult, Insert, ModelTrait, NoColumns, PrimaryKeyToColumn, PrimaryKeyTrait,
+    QueryFilter, Related, RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany,
+    UpdateOne,
 };
 use pgorm_query::{Alias, Iden, IntoIden, IntoTableRef, IntoValueTuple, TableRef};
 use std::fmt::Debug;
@@ -75,7 +76,7 @@ pub trait EntityTrait: EntityName {
     type PrimaryKey: PrimaryKeyTrait + PrimaryKeyToColumn<Column = Self::Column>;
 
     /// Check if the relation belongs to an Entity
-    fn belongs_to<R>(related: R) -> RelationBuilder<Self, R>
+    fn belongs_to<R>(related: R) -> RelationBuilder<Self, R, NoColumns>
     where
         R: EntityTrait,
     {

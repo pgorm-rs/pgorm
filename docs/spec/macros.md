@@ -255,20 +255,28 @@ they describe what the macros generate and reject today, including known limitat
 
 ## Relations
 
-> [spec:pgorm:syn:macros.derive.relation]
+> [spec:pgorm:syn:macros.derive.relation+1]
 > `DeriveRelation` applies to enums only. Each variant requires exactly one of
 > `belongs_to = "path::to::Entity"`, `has_one = "..."`, or `has_many = "..."` (checked
 > in that order; none present is the error "Missing one of 'has_one', 'has_many' or
 > 'belongs_to'"); the value is a string parsed as a token path. `belongs_to` variants
 > additionally require `from = "Column::X"` and `to = "Column::Y"` (errors "Missing
-> attribute 'from'"/"Missing attribute 'to'"); on `has_one`/`has_many` they are
-> optional. Further optional keys chain builder calls: `on_update`/`on_delete` (a
+> attribute 'from'"/"Missing attribute 'to'"); on `has_one`/`has_many` both are
+> optional, but the two MUST be given together or not at all — one without the
+> other raises the same missing-attribute error, since a column can only be added
+> to a relation paired with its counterpart. Both values are parsed as
+> expressions and a tuple on either side is taken apart per column, so a
+> composite key expands to `.columns(from0, to0).and_columns(from1, to1)...`.
+> Sides of unequal length are rejected at expansion, where the arity is still
+> known, with "'from' names N column(s) and 'to' names M; a relation joins its
+> columns in pairs". Further optional keys chain builder calls: `on_update`/`on_delete` (a
 > `ForeignKeyAction` variant name), `on_condition` (an expression wrapped in an
 > `IntoCondition` closure), `fk_name` (string), and `condition_type` (case-insensitive
 > `"all"` or `"any"`; anything else is "Condition type must be one of `all` or `any`").
 > Non-string literal values are rejected with "attribute must be a string". The
 > expansion is an `impl RelationTrait` whose `def()` matches each variant to
-> `Entity::belongs_to/has_one/has_many(target)` plus the chained modifiers and a
+> `Entity::belongs_to/has_one/has_many(target)` plus the paired column calls, the
+> chained modifiers and a
 > catch-all arm panicking "No RelationDef for {Relation}"; the entity identifier
 > defaults to `Entity`, overridable via container `#[pgorm(entity = Ident)]`.
 

@@ -5,7 +5,7 @@ use crate::{
 pub use pgorm_query::JoinType;
 use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
 
-// [spec:pgorm:sem:query.build.join]
+// [spec:pgorm:sem:query.build.join+1]
 // [spec:pgorm:sem:query.build.combine+1]
 impl<E> Select<E>
 where
@@ -83,8 +83,7 @@ where
             let mut condition = Condition::all().add(join_tbl_on_condition(
                 SeaRc::clone(&from_tbl),
                 SeaRc::clone(&to_tbl),
-                rel.from_col,
-                rel.to_col,
+                rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
                 condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));
@@ -129,8 +128,7 @@ where
             let mut condition = Condition::all().add(join_tbl_on_condition(
                 SeaRc::clone(&from_tbl),
                 SeaRc::clone(&to_tbl),
-                rel.from_col,
-                rel.to_col,
+                rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
                 condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));

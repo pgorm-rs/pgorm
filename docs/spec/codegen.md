@@ -377,7 +377,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Relations
 
-> [spec:pgorm:sem:codegen.entity.relations]
+> [spec:pgorm:sem:codegen.entity.relations+1]
 > `Relation` enum variants are named by the UpperCamelCase of the referenced
 > table, with two adjustments: a self-referencing relation is named
 > `SelfRef`, and a nonzero `num_suffix` is appended (`Fruit1`, `Fruit2`,
@@ -393,7 +393,11 @@ golden fixtures under `pgorm-codegen/tests/`.
 > `from`/`to`. In the expanded format the same information renders as
 > `RelationTrait::def()` match arms:
 > `Entity::has_many(super::fruit::Entity).into()` and
-> `Entity::belongs_to(...).from(...).to(...).into()`.
+> `Entity::belongs_to(...).columns(<src>, <ref>).into()`, with each further
+> column of a composite FK appended as `.and_columns(<src>, <ref>)`. A relation
+> whose constrained and referenced column lists differ in length is rejected by
+> `Relation::validate`, so no generated relation can name a column on one side
+> without its counterpart on the other.
 
 > [spec:pgorm:sem:codegen.entity.relations.related]
 > For each relation that is not self-referencing, has `num_suffix == 0`, and

@@ -95,24 +95,19 @@ impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
             Self::SelfRef1 => Entity::belongs_to(Entity)
-                .from(Column::SelfId1)
-                .to(Column::Id)
+                .columns(Column::SelfId1, Column::Id)
                 .into(),
             Self::SelfRef2 => Entity::belongs_to(Entity)
-                .from(Column::SelfId2)
-                .to(Column::Id)
+                .columns(Column::SelfId2, Column::Id)
                 .into(),
             Self::Fruit1 => Entity::belongs_to(super::fruit::Entity)
-                .from(Column::FruitId1)
-                .to(super::fruit::Column::Id)
+                .columns(Column::FruitId1, super::fruit::Column::Id)
                 .into(),
             Self::Fruit2 => Entity::belongs_to(super::fruit::Entity)
-                .from(Column::FruitId2)
-                .to(super::fruit::Column::Id)
+                .columns(Column::FruitId2, super::fruit::Column::Id)
                 .into(),
             Self::Cake => Entity::belongs_to(super::cake::Entity)
-                .from(Column::CakeId)
-                .to(super::cake::Column::Id)
+                .columns(Column::CakeId, super::cake::Column::Id)
                 .into(),
         }
     }

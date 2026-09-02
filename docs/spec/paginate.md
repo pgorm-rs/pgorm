@@ -15,7 +15,7 @@ including the remaining gaps in parameter binding.
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoIdentity::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+1]` — and defaults to
+> of `[spec:pgorm:def:entity.relation.def+2]` — and defaults to
 > `ValueTuple`. Cursors are created via `Select::cursor_by` (order columns
 > on the entity's table) and, for joined selects, `SelectTwo::cursor_by` /
 > `cursor_by_other` (order columns on the first or second entity

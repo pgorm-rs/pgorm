@@ -88,30 +88,27 @@ impl DeriveRelation {
                     Self::#variant_ident => #entity_ident::#relation_type(#related_to)
                 );
 
-                if attr.from.is_some() {
-                    let from =
-                        attr.from
-                            .as_ref()
-                            .map(Self::parse_lit_string)
-                            .ok_or_else(|| {
-                                syn::Error::new_spanned(variant, "Missing value for 'from'")
-                            })??;
-                    result = quote! { #result.from(#from) };
-                } else if attr.belongs_to.is_some() {
-                    return Err(syn::Error::new_spanned(variant, "Missing attribute 'from'"));
-                }
-
-                if attr.to.is_some() {
-                    let to = attr
-                        .to
-                        .as_ref()
-                        .map(Self::parse_lit_string)
-                        .ok_or_else(|| {
-                            syn::Error::new_spanned(variant, "Missing value for 'to'")
-                        })??;
-                    result = quote! { #result.to(#to) };
-                } else if attr.belongs_to.is_some() {
-                    return Err(syn::Error::new_spanned(variant, "Missing attribute 'to'"));
+                match (attr.from.as_ref(), attr.to.as_ref()) {
+                    (Some(from), Some(to)) => {
+                        let pairs = Self::column_pairs(variant, from, to)?;
+                        let mut pairs = pairs.into_iter();
+                        if let Some((from, to)) = pairs.next() {
+                            result = quote! { #result.columns(#from, #to) };
+                        }
+                        for (from, to) in pairs {
+                            result = quote! { #result.and_columns(#from, #to) };
+                        }
+                    }
+                    (None, Some(_)) => {
+                        return Err(syn::Error::new_spanned(variant, "Missing attribute 'from'"));
+                    }
+                    (Some(_), None) => {
+                        return Err(syn::Error::new_spanned(variant, "Missing attribute 'to'"));
+                    }
+                    (None, None) if attr.belongs_to.is_some() => {
+                        return Err(syn::Error::new_spanned(variant, "Missing attribute 'from'"));
+                    }
+                    (None, None) => {}
                 }
 
                 if attr.on_update.is_some() {
@@ -204,6 +201,53 @@ impl DeriveRelation {
         ))
     }
 
+    /// Pair the `from` and `to` attributes column by column.
+    ///
+    /// Both sides are parsed as expressions and a tuple on either side is taken
+    /// apart, so a composite key becomes one pair per column. Sides of unequal
+    /// length are rejected here, where the arity is still known: the builder
+    /// takes pairs, and a join that constrains fewer columns than the relation
+    /// declares has no way to be expressed.
+    fn column_pairs(
+        variant: &syn::Variant,
+        from: &syn::Lit,
+        to: &syn::Lit,
+    ) -> syn::Result<Vec<(syn::Expr, syn::Expr)>> {
+        let from = Self::parse_lit_expr(from)?;
+        let to = Self::parse_lit_expr(to)?;
+        let from = Self::split_tuple(from);
+        let to = Self::split_tuple(to);
+
+        if from.len() != to.len() {
+            return Err(syn::Error::new_spanned(
+                variant,
+                format!(
+                    "'from' names {} column(s) and 'to' names {}; a relation joins its columns in pairs",
+                    from.len(),
+                    to.len(),
+                ),
+            ));
+        }
+
+        Ok(from.into_iter().zip(to).collect())
+    }
+
+    fn split_tuple(expr: syn::Expr) -> Vec<syn::Expr> {
+        match expr {
+            syn::Expr::Tuple(tuple) => tuple.elems.into_iter().collect(),
+            expr => vec![expr],
+        }
+    }
+
+    fn parse_lit_expr(lit: &syn::Lit) -> syn::Result<syn::Expr> {
+        match lit {
+            syn::Lit::Str(lit_str) => lit_str
+                .parse()
+                .map_err(|_| syn::Error::new_spanned(lit, "attribute not valid")),
+            _ => Err(syn::Error::new_spanned(lit, "attribute must be a string")),
+        }
+    }
+
     fn parse_lit_string(lit: &syn::Lit) -> syn::Result<TokenStream> {
         match lit {
             syn::Lit::Str(lit_str) => lit_str
@@ -216,7 +260,7 @@ impl DeriveRelation {
 }
 
 /// Method to derive a Relation
-// [spec:pgorm:syn:macros.derive.relation]
+// [spec:pgorm:syn:macros.derive.relation+1]
 pub fn expand_derive_relation(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

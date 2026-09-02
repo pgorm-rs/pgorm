@@ -266,10 +266,10 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+1]
+> [spec:pgorm:def:entity.relation.def+2]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
-> `rel_type`, `from_tbl` / `to_tbl` (`TableRef`), `from_col` / `to_col`
-> (`Identity`, permitting composite keys), `is_owner`, optional `on_delete` /
+> `rel_type`, `from_tbl` / `to_tbl` (`TableRef`), `columns` (`ColumnPairs`),
+> `is_owner`, optional `on_delete` /
 > `on_update` foreign-key actions (`pgorm_query::ForeignKeyAction`), an optional
 > boxed `on_condition` closure receiving the left and right join idens, an optional
 > `fk_name`, and a `condition_type` (`All` = AND, `Any` = OR). `rev()` swaps the
@@ -277,6 +277,17 @@ explicit limitations.
 > remaining attributes. `from_alias(alias)` re-points `from_tbl` at a table alias for
 > self-join disambiguation; `on_condition(f)` replaces any existing custom condition;
 > `condition_type(t)` sets how the ON clauses combine.
+>
+> `ColumnPairs` (`src/entity/identity.rs`) is the column set a relation joins on,
+> held as a first `(from, to)` pair plus any further pairs. The two sides of a
+> relation are therefore one value, not two: the only constructor,
+> `ColumnPairs::new(from, to)`, takes a pair, `and(from, to)` / `push(from, to)`
+> extend by a pair, and `rev()` swaps within each pair. A set of join columns is
+> consequently non-empty and equal-sided by construction — the arities cannot
+> disagree, so no consumer has to reconcile them and none can silently drop a
+> column. `arity()` reports the number of pairs; `from_identity()` /
+> `to_identity()` project one side as an `Identity` for consumers that key on a
+> single side.
 >
 > `Identity` (`src/entity/identity.rs`) encodes column-set arity as
 > `Unary` / `Binary` / `Ternary` / `Many(Vec<DynIden>)`. `IntoIdentity` converts
@@ -293,17 +304,23 @@ explicit limitations.
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Identity` case is the only one left to check.
 
-> [spec:pgorm:req:entity.relation.builder]
-> `RelationBuilder<E, R>` (`src/entity/relation.rs`) accumulates a `RelationDef`.
-> The `belongs_to` path starts with no columns, and callers MUST supply both
-> `.from(col)` and `.to(col)` (any `IdentityOf` value, so tuples declare composite
-> foreign keys); converting a builder without them panics with
-> `Reference column is not set` / `Owner column is not set`. The `has_one` / `has_many`
-> path pre-fills both columns from the reversed related definition. Optional
+> [spec:pgorm:req:entity.relation.builder+1]
+> `RelationBuilder<E, R, C>` (`src/entity/relation.rs`) accumulates a
+> `RelationDef`, with `C` tracking whether the join columns have been supplied.
+> The `belongs_to` path starts at `C = NoColumns` and MUST be given a column pair
+> through `.columns(from, to)`, which takes one `E::Column` and one `R::Column`
+> and moves the builder to `C = ColumnPairs`; a composite key adds each further
+> pair with `.and_columns(from, to)`. Columns are therefore always supplied in
+> pairs, and the two sides of a relation can never be given different numbers of
+> columns. The `has_one` / `has_many` path starts at `C = ColumnPairs`, pre-filled
+> from the reversed related definition, where `.columns(from, to)` instead
+> replaces the pre-filled set with the given pair. Optional
 > attributes are set by `on_delete(action)`, `on_update(action)`, `on_condition(f)`,
-> `fk_name(name)`, and `condition_type(t)`; `condition_type` defaults to
-> `ConditionType::All`. The finished definition is obtained via
-> `From<RelationBuilder> for RelationDef`.
+> `fk_name(name)`, and `condition_type(t)` in either state; `condition_type`
+> defaults to `ConditionType::All`. The finished definition is obtained via
+> `From<RelationBuilder<E, R, ColumnPairs>> for RelationDef`; there is no such
+> conversion from `NoColumns`, so a relation missing its columns is a compile
+> error rather than a panic.
 
 > [spec:pgorm:req:entity.relation.linked]
 > `Linked` (`src/entity/link.rs`) expresses a multi-hop join: `link()` returns the
@@ -315,11 +332,12 @@ explicit limitations.
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
 
-> [spec:pgorm:req:entity.relation.fk]
+> [spec:pgorm:req:entity.relation.fk+1]
 > A `RelationDef` converts into DDL foreign-key forms via
 > `From<RelationDef> for ForeignKeyCreateStatement` and `for TableForeignKey`
-> (`src/entity/relation.rs`). The conversion maps every `from_col` / `to_col`
-> component, applies `on_delete` and `on_update` actions when present, and names the
+> (`src/entity/relation.rs`). The conversion maps every pair in `columns` to a
+> constrained column and its referenced column,
+> applies `on_delete` and `on_update` actions when present, and names the
 > constraint from `fk_name` when set; otherwise the name MUST be derived as
 > `fk-{from_table}-{from_cols joined with '-'}`. Both conversions unpack the table
 > references to bare tables (schema information from `TableRef` variants is reduced

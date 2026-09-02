@@ -2,7 +2,6 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ForeignKeyAction, TableForeignKey};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use syn::{punctuated::Punctuated, token::Comma};
 
 use crate::{
     Error,
@@ -31,6 +30,7 @@ pub struct Relation {
 
 impl Relation {
     // [spec:pgorm:sem:codegen.entity.keywords+1]
+    // [spec:pgorm:sem:codegen.entity.relations+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("relation to `{}`", self.ref_table);
         safe_ident(
@@ -41,10 +41,18 @@ impl Relation {
         for column in self.columns.iter().chain(self.ref_columns.iter()) {
             safe_ident(&context, &column.to_upper_camel_case())?;
         }
+        if self.columns.len() != self.ref_columns.len() {
+            return Err(Error::TransformError(format!(
+                "{context}: constrains {} column(s) against {} referenced column(s); a relation \
+                 joins its columns in pairs",
+                self.columns.len(),
+                self.ref_columns.len(),
+            )));
+        }
         Ok(())
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations]
+    // [spec:pgorm:sem:codegen.entity.relations+1]
     pub fn get_enum_name(&self) -> Ident {
         let name = if self.self_referencing {
             format_ident!("SelfRef")
@@ -84,34 +92,32 @@ impl Relation {
                 }
             }
             RelationType::BelongsTo => {
-                let map_src_column = |src_column: &Ident| {
-                    quote! { Column::#src_column }
-                };
-                let map_ref_column = |ref_column: &Ident| {
+                let mut def = quote! { Entity::#rel_type(#ref_entity) };
+                let mut pairs = self
+                    .get_column_camel_case()
+                    .into_iter()
+                    .zip(self.get_ref_column_camel_case());
+                let map_ref_column = |ref_column: Ident| {
                     if module_name.is_some() {
                         quote! { super::#module_name::Column::#ref_column }
                     } else {
                         quote! { Column::#ref_column }
                     }
                 };
-                let map_punctuated =
-                    |punctuated: Punctuated<TokenStream, Comma>| match punctuated.len() {
-                        0..=1 => quote! { #punctuated },
-                        _ => quote! { (#punctuated) },
-                    };
-                let (from, to) =
-                    self.get_src_ref_columns(map_src_column, map_ref_column, map_punctuated);
-                quote! {
-                    Entity::#rel_type(#ref_entity)
-                        .from(#from)
-                        .to(#to)
-                        .into()
+                if let Some((src_column, ref_column)) = pairs.next() {
+                    let ref_column = map_ref_column(ref_column);
+                    def = quote! { #def.columns(Column::#src_column, #ref_column) };
                 }
+                for (src_column, ref_column) in pairs {
+                    let ref_column = map_ref_column(ref_column);
+                    def = quote! { #def.and_columns(Column::#src_column, #ref_column) };
+                }
+                quote! { #def.into() }
             }
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations]
+    // [spec:pgorm:sem:codegen.entity.relations+1]
     pub fn get_attrs(&self) -> TokenStream {
         let rel_type = self.get_rel_type();
         let module_name = if let Some(module_name) = self.get_module_name() {
@@ -338,8 +344,7 @@ mod tests {
         let rel_defs = vec![
             "Entity::has_one(super::fruit::Entity).into()",
             "Entity::belongs_to(super::filling::Entity) \
-                .from(Column::FillingId) \
-                .to(super::filling::Column::Id) \
+                .columns(Column::FillingId, super::filling::Column::Id) \
                 .into()",
             "Entity::has_many(super::filling::Entity).into()",
         ];

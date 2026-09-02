@@ -59,8 +59,8 @@ impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
             Self::Parent => Entity::belongs_to(super::parent::Entity)
-                .from((Column::ParentId1, Column::ParentId2))
-                .to((super::parent::Column::Id1, super::parent::Column::Id2))
+                .columns(Column::ParentId1, super::parent::Column::Id1)
+                .and_columns(Column::ParentId2, super::parent::Column::Id2)
                 .into(),
         }
     }

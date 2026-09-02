@@ -68,8 +68,7 @@ impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
             Self::Vendor => Entity::belongs_to(super::vendor::Entity)
-                .from(Column::VendorId)
-                .to(super::vendor::Column::Id)
+                .columns(Column::VendorId, super::vendor::Column::Id)
                 .into(),
         }
     }

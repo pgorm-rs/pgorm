@@ -137,17 +137,20 @@ is what `EntityTrait::find()` produces.
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
-> [spec:pgorm:sem:query.build.join]
+> [spec:pgorm:sem:query.build.join+1]
 > `QuerySelect::join(join_type, rel)` joins `rel.to_tbl`;
 > `join_rev` joins `rel.from_tbl`; `join_as` / `join_as_rev` first re-alias
 > the joined table with a caller-supplied identifier. The ON condition is
 > computed by `join_condition(rel)`: each side's identifier is the table alias
-> if the `TableRef` carries one, otherwise the bare table identifier; the
-> `from_col`/`to_col` `Identity` values are zipped into pairwise
-> `from.col = to.col` equalities under `Condition::all()` or
+> if the `TableRef` carries one, otherwise the bare table identifier; each
+> `(from, to)` pair of `rel.columns` becomes one `from.col = to.col` equality
+> under `Condition::all()` or
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
-> in.
+> in. Because the columns are held as pairs
+> (`[spec:pgorm:def:entity.relation.def+2]`), the join MUST constrain every
+> column the relation declares: there are no two lists to reconcile and so no
+> way to emit an under-constrained join.
 >
 > The `Related`-driven helpers on `Select<E>` — `left_join`, `right_join`,
 > `inner_join` — call `join_join(type, E::to(), E::via())`: when a junction
@@ -296,16 +299,17 @@ what makes it total over partially-set models.
 > by `Debug` formatting). An empty input slice short-circuits to an empty
 > result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+1]
+> [spec:pgorm:sem:query.loader.batching+2]
 > Keys are collected in input order: for each input model, `extract_key`
-> builds a `ValueTuple` from the relation's `from_col` `Identity` (unary,
+> builds a `ValueTuple` from the from side of the relation's `columns`,
+> projected as an `Identity` (unary,
 > binary, ternary or many), resolving each column name back to the entity's
 > `Column` enum via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
 > return `Err(DbErr::Query)` naming the unresolved column and the model's
 > table rather than panicking, and the load aborts with that error. The
 > batch filter built by `prepare_condition` is a single IN predicate against
-> the relation's `to_col` on `to_tbl`: a unary key becomes
+> the to side of the relation's `columns` on `to_tbl`: a unary key becomes
 > `col IN (v1, v2, ...)` over the flattened values; composite keys become a
 > tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`;
 > `prepare_condition` is likewise fallible, propagating the qualification
@@ -317,9 +321,9 @@ what makes it total over partially-set models.
 > is AND-ed onto the caller-supplied `Select` via `QueryFilter::filter`, so
 > user filters and the key predicate compose.
 
-> [spec:pgorm:sem:query.loader.regroup+1]
-> Results are regrouped to input order by hashing on the extracted `to_col`
-> key of each returned row. `load_one` builds a `HashMap<ValueTuple, Model>`
+> [spec:pgorm:sem:query.loader.regroup+2]
+> Results are regrouped to input order by hashing on the to-side key extracted
+> from each returned row. `load_one` builds a `HashMap<ValueTuple, Model>`
 > — if several returned rows share a key, the last row wins — and yields, per
 > input key, `Some(model.clone())` or `None`; inputs sharing a key each
 > receive a clone of the same model. `load_many` seeds the map with an empty
@@ -333,15 +337,15 @@ what makes it total over partially-set models.
 > `char(n)` blank padding, a case-insensitive collation. `load_many` MUST
 > report that as `Err(DbErr::Query)` rather than panicking, and the message
 > MUST carry the unmatched key and a sample input key in `Debug` form (so both
-> value types are named) together with the `from_col` and `to_col` column
-> lists, making the asymmetry diagnosable from the error alone.
+> value types are named) together with both sides' column lists, making the
+> asymmetry diagnosable from the error alone.
 
-> [spec:pgorm:sem:query.loader.many-to-many]
+> [spec:pgorm:sem:query.loader.many-to-many+1]
 > `load_many_to_many` issues two queries. First the junction entity is loaded
-> with `V::find()` filtered on the via-relation's `to_col` against the input
+> with `V::find()` filtered on the via-relation's to side against the input
 > primary keys, building a key map from each input key to the list of target
 > foreign keys in junction-row order. Second, the target selector is filtered
-> on the target relation's `to_col` against all collected foreign keys (their
+> on the target relation's to side against all collected foreign keys (their
 > order is the flattening of a `HashMap`'s values, hence unspecified) and the
 > returned models are indexed by key, last row winning on duplicates. The
 > result maps each input key to its foreign-key list resolved against that

@@ -30,8 +30,7 @@ pub trait Linked {
             let mut condition = Condition::all().add(join_tbl_on_condition(
                 SeaRc::clone(&from_tbl),
                 SeaRc::clone(&to_tbl),
-                rel.from_col,
-                rel.to_col,
+                rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
                 condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));

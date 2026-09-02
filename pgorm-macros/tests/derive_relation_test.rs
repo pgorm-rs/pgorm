@@ -120,7 +120,7 @@ fn cols(id: &Identity) -> Vec<String> {
     }
 }
 
-// [spec:pgorm:syn:macros.derive.relation/test]    belongs_to + the mandatory from/to
+// [spec:pgorm:syn:macros.derive.relation+1/test]    belongs_to + the mandatory from/to
 #[test]
 fn belongs_to_builds_a_non_owning_relation_def() {
     let def = fruit::Relation::Cake.def();
@@ -130,8 +130,11 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     assert!(!def.is_owner);
     assert_eq!(def.from_tbl, fruit::Entity.table_ref());
     assert_eq!(def.to_tbl, cake::Entity.table_ref());
-    assert_eq!(cols(&def.from_col), vec!["cake_id".to_owned()]);
-    assert_eq!(cols(&def.to_col), vec!["id".to_owned()]);
+    assert_eq!(
+        cols(&def.columns.from_identity()),
+        vec!["cake_id".to_owned()]
+    );
+    assert_eq!(cols(&def.columns.to_identity()), vec!["id".to_owned()]);
 
     // Everything optional is left alone.
     assert!(def.on_update.is_none());
@@ -141,7 +144,7 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     assert_eq!(def.condition_type, ConditionType::All);
 }
 
-// [spec:pgorm:syn:macros.derive.relation/test]    the optional builder keys
+// [spec:pgorm:syn:macros.derive.relation+1/test]    the optional builder keys
 #[test]
 fn optional_keys_chain_onto_the_relation_builder() {
     let def = fruit::Relation::DecoratedCake.def();
@@ -162,7 +165,7 @@ fn optional_keys_chain_onto_the_relation_builder() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.relation/test]    has_many / has_one, where from and to are optional
+// [spec:pgorm:syn:macros.derive.relation+1/test]    has_many / has_one, where from and to are optional
 #[test]
 fn has_many_and_has_one_reverse_the_target() {
     let many = cake::Relation::Fruits.def();
@@ -171,18 +174,21 @@ fn has_many_and_has_one_reverse_the_target() {
     // Reversed: the def reads from cake to fruit.
     assert_eq!(many.from_tbl, cake::Entity.table_ref());
     assert_eq!(many.to_tbl, fruit::Entity.table_ref());
-    assert_eq!(cols(&many.from_col), vec!["id".to_owned()]);
-    assert_eq!(cols(&many.to_col), vec!["cake_id".to_owned()]);
+    assert_eq!(cols(&many.columns.from_identity()), vec!["id".to_owned()]);
+    assert_eq!(
+        cols(&many.columns.to_identity()),
+        vec!["cake_id".to_owned()]
+    );
 
     let one = cake::Relation::TopFruit.def();
     assert_eq!(one.rel_type, RelationType::HasOne);
     assert!(one.is_owner);
     // Explicit `from` / `to` are accepted here too and override the reversal.
-    assert_eq!(cols(&one.from_col), vec!["id".to_owned()]);
-    assert_eq!(cols(&one.to_col), vec!["cake_id".to_owned()]);
+    assert_eq!(cols(&one.columns.from_identity()), vec!["id".to_owned()]);
+    assert_eq!(cols(&one.columns.to_identity()), vec!["cake_id".to_owned()]);
 }
 
-// [spec:pgorm:syn:macros.derive.relation/test]    container-level entity override
+// [spec:pgorm:syn:macros.derive.relation+1/test]    container-level entity override
 #[test]
 fn the_entity_identifier_is_overridable() {
     let def = entity_override::AltRelation::Fruit.def();

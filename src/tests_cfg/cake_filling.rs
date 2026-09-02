@@ -57,12 +57,10 @@ impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
             Self::Cake => Entity::belongs_to(super::cake::Entity)
-                .from(Column::CakeId)
-                .to(super::cake::Column::Id)
+                .columns(Column::CakeId, super::cake::Column::Id)
                 .into(),
             Self::Filling => Entity::belongs_to(super::filling::Entity)
-                .from(Column::FillingId)
-                .to(super::filling::Column::Id)
+                .columns(Column::FillingId, super::filling::Column::Id)
                 .into(),
         }
     }

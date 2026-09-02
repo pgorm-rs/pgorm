@@ -1106,11 +1106,8 @@ mod composite_parent {
         fn def(&self) -> RelationDef {
             match self {
                 Self::Child => Entity::has_many(super::composite_child::Entity)
-                    .from((Column::Region, Column::Code))
-                    .to((
-                        super::composite_child::Column::ParentRegion,
-                        super::composite_child::Column::ParentCode,
-                    ))
+                    .columns(Column::Region, super::composite_child::Column::ParentRegion)
+                    .and_columns(Column::Code, super::composite_child::Column::ParentCode)
                     .into(),
             }
         }
@@ -1147,11 +1144,11 @@ mod composite_child {
         fn def(&self) -> RelationDef {
             match self {
                 Self::Parent => Entity::belongs_to(super::composite_parent::Entity)
-                    .from((Column::ParentRegion, Column::ParentCode))
-                    .to((
+                    .columns(
+                        Column::ParentRegion,
                         super::composite_parent::Column::Region,
-                        super::composite_parent::Column::Code,
-                    ))
+                    )
+                    .and_columns(Column::ParentCode, super::composite_parent::Column::Code)
                     .into(),
             }
         }
@@ -1278,6 +1275,96 @@ pub async fn consolidate_composite_key() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:query.build.join+1/test]    a composite relation constrains
+// the join on every declared pair: against rows where each column alone is
+// ambiguous, the join still matches exactly one parent per child
+#[pgorm_macros::test]
+pub async fn composite_join_constrains_both_columns() -> Result<(), DbErr> {
+    use pgorm::{QueryOrder, Schema};
+    use pgorm_query::QueryBuilder;
+
+    let ctx = TestContext::new("test_composite_join_both_columns").await;
+    let db = ctx.db.get().await?;
+
+    let schema = Schema::new();
+    create_table_without_asserts(
+        &db,
+        &schema.create_table_from_entity(composite_parent::Entity),
+    )
+    .await?;
+    create_table_without_asserts(
+        &db,
+        &schema.create_table_from_entity(composite_child::Entity),
+    )
+    .await?;
+
+    // Every parent shares its `region` with another and its `code` with
+    // another, so a join that dropped either column would match more than one.
+    for (region, code, name) in [(1, 1, "one-one"), (1, 2, "one-two"), (2, 1, "two-one")] {
+        composite_parent::ActiveModel {
+            region: Set(region),
+            code: Set(code),
+            name: Set(name.to_owned()),
+        }
+        .insert(&db)
+        .await?;
+    }
+    for (id, parent_region, parent_code, label) in [(1, 1, 1, "a"), (2, 1, 2, "b"), (3, 2, 1, "c")]
+    {
+        composite_child::ActiveModel {
+            id: Set(id),
+            parent_region: Set(parent_region),
+            parent_code: Set(parent_code),
+            label: Set(label.to_owned()),
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    let joined = composite_child::Entity::find().find_also_related(composite_parent::Entity);
+
+    // Both pairs are in the ON clause, ANDed.
+    assert!(
+        joined
+            .as_query()
+            .to_string(QueryBuilder)
+            .contains(r#"ON "composite_child"."parent_region" = "composite_parent"."region" AND "#)
+    );
+    assert!(
+        joined
+            .as_query()
+            .to_string(QueryBuilder)
+            .contains(r#""composite_child"."parent_code" = "composite_parent"."code""#)
+    );
+
+    let rows = joined
+        .order_by_asc(composite_child::Column::Id)
+        .all(&db)
+        .await?;
+
+    let names: Vec<Option<String>> = rows
+        .iter()
+        .map(|(_, parent)| parent.as_ref().map(|p| p.name.clone()))
+        .collect();
+
+    // One row per child — a join short of a column would repeat children — and
+    // each paired with the parent matching on both columns.
+    assert_eq!(rows.len(), 3);
+    assert_eq!(
+        names,
+        [
+            Some("one-one".to_owned()),
+            Some("one-two".to_owned()),
+            Some("two-one".to_owned()),
+        ]
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Relation definitions, builders, links and foreign keys
 // ---------------------------------------------------------------------------
@@ -1322,8 +1409,7 @@ fn relation_trait_and_ownership_direction() {
     // columns end up being.
     let built: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id),
+            .columns(baker::Column::BakeryId, bakery::Column::Id),
     );
     assert_eq!(built.rel_type, RelationType::HasOne);
     assert!(!built.is_owner);
@@ -1336,8 +1422,14 @@ fn relation_trait_and_ownership_direction() {
     assert!(owner.is_owner, "has_many is the owning side");
     assert_eq!(owner.from_tbl, reversed.from_tbl);
     assert_eq!(owner.to_tbl, reversed.to_tbl);
-    assert_eq!(ident(&owner.from_col), ident(&reversed.from_col));
-    assert_eq!(ident(&owner.to_col), ident(&reversed.to_col));
+    assert_eq!(
+        ident(&owner.columns.from_identity()),
+        ident(&reversed.columns.from_identity())
+    );
+    assert_eq!(
+        ident(&owner.columns.to_identity()),
+        ident(&reversed.columns.to_identity())
+    );
     // Note: `RelationBuilder::from_rel` takes only the tables and columns from
     // the reversed definition; the FK actions the related side declared
     // (`on_update = Cascade`, `on_delete = SetNull`) do NOT carry over.
@@ -1381,12 +1473,11 @@ fn relation_trait_and_ownership_direction() {
     );
 }
 
-// [spec:pgorm:def:entity.relation.def+1/test]    the `RelationDef` record and its
+// [spec:pgorm:def:entity.relation.def+2/test]    the `RelationDef` record and its
 // combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
 // keeps everything else; `from_alias` re-points the source table; `on_condition`
 // replaces any existing custom condition; `condition_type` picks AND vs OR.
-// Also `Identity`'s arity encoding and the `IntoIdentity` / `IdentityOf`
-// conversions
+// Also `Identity`'s arity encoding and the `IntoIdentity` conversions
 #[test]
 fn relation_def_record_and_combinators() {
     use pgorm::{Identity, IntoIdentity, RelationType};
@@ -1395,8 +1486,7 @@ fn relation_def_record_and_combinators() {
     // Start from a definition carrying every optional attribute.
     let def: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id)
+            .columns(baker::Column::BakeryId, bakery::Column::Id)
             .on_delete(pgorm_query::ForeignKeyAction::Cascade)
             .on_update(pgorm_query::ForeignKeyAction::Restrict)
             .fk_name("fk-custom")
@@ -1405,8 +1495,8 @@ fn relation_def_record_and_combinators() {
     assert_eq!(def.rel_type, RelationType::HasOne);
     assert_eq!(def.from_tbl, baker::Entity.table_ref());
     assert_eq!(def.to_tbl, bakery::Entity.table_ref());
-    assert_eq!(ident(&def.from_col), "bakery_id");
-    assert_eq!(ident(&def.to_col), "id");
+    assert_eq!(ident(&def.columns.from_identity()), "bakery_id");
+    assert_eq!(ident(&def.columns.to_identity()), "id");
     assert!(!def.is_owner);
     assert_eq!(action(&def.on_delete), "Some(Cascade)");
     assert_eq!(action(&def.on_update), "Some(Restrict)");
@@ -1419,8 +1509,8 @@ fn relation_def_record_and_combinators() {
     let rev = def.rev();
     assert_eq!(rev.from_tbl, bakery::Entity.table_ref());
     assert_eq!(rev.to_tbl, baker::Entity.table_ref());
-    assert_eq!(ident(&rev.from_col), "id");
-    assert_eq!(ident(&rev.to_col), "bakery_id");
+    assert_eq!(ident(&rev.columns.from_identity()), "id");
+    assert_eq!(ident(&rev.columns.to_identity()), "bakery_id");
     assert!(rev.is_owner, "rev() negates is_owner");
     assert_eq!(rev.fk_name, None, "rev() clears fk_name");
     assert_eq!(rev.rel_type, RelationType::HasOne);
@@ -1430,7 +1520,7 @@ fn relation_def_record_and_combinators() {
     // Reversing twice is the identity on tables, columns and ownership.
     let round = rev.rev();
     assert_eq!(round.from_tbl, baker::Entity.table_ref());
-    assert_eq!(ident(&round.from_col), "bakery_id");
+    assert_eq!(ident(&round.columns.from_identity()), "bakery_id");
     assert!(!round.is_owner);
 
     // `from_alias` re-points `from_tbl` at an alias, which is what makes a
@@ -1563,18 +1653,24 @@ fn relation_def_record_and_combinators() {
         .collect();
     assert_eq!(components, ["id", "name"]);
 
-    // `IdentityOf<E>` restricts a builder's columns to that entity's, which is
-    // how a composite foreign key is declared as a tuple.
+    // A composite foreign key is declared a pair at a time, and each side
+    // projects back out as an `Identity` of the matching arity.
     let composite: RelationDef = RelationDef::from(
         cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
-            .from((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
-            .to((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId)),
+            .columns(cakes_bakers::Column::CakeId, cakes_bakers::Column::CakeId)
+            .and_columns(cakes_bakers::Column::BakerId, cakes_bakers::Column::BakerId),
     );
-    assert!(matches!(composite.from_col, Identity::Binary(..)));
-    assert!(matches!(composite.to_col, Identity::Binary(..)));
+    assert!(matches!(
+        composite.columns.from_identity(),
+        Identity::Binary(..)
+    ));
+    assert!(matches!(
+        composite.columns.to_identity(),
+        Identity::Binary(..)
+    ));
 }
 
-// [spec:pgorm:req:entity.relation.builder/test]    the `belongs_to` path starts
+// [spec:pgorm:req:entity.relation.builder+1/test]    the `belongs_to` path starts
 // with no columns and both must be supplied; the `has_one` / `has_many` path
 // pre-fills them from the reversed related definition; the optional attributes
 // are settable; and `condition_type` defaults to `All`
@@ -1586,11 +1682,10 @@ fn relation_builder_accumulates_a_definition() {
     // A `belongs_to` builder with both columns converts cleanly.
     let def: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id),
+            .columns(baker::Column::BakeryId, bakery::Column::Id),
     );
-    assert!(matches!(def.from_col, Identity::Unary(_)));
-    assert!(matches!(def.to_col, Identity::Unary(_)));
+    assert!(matches!(def.columns.from_identity(), Identity::Unary(_)));
+    assert!(matches!(def.columns.to_identity(), Identity::Unary(_)));
     // Nothing optional was set, and `condition_type` defaults to All.
     assert_eq!(action(&def.on_delete), "None");
     assert_eq!(action(&def.on_update), "None");
@@ -1600,15 +1695,14 @@ fn relation_builder_accumulates_a_definition() {
 
     // The `has_many` path pre-fills both columns, so no `.from` / `.to` needed.
     let prefilled: RelationDef = bakery::Entity::has_many(baker::Entity).into();
-    assert_eq!(ident(&prefilled.from_col), "id");
-    assert_eq!(ident(&prefilled.to_col), "bakery_id");
+    assert_eq!(ident(&prefilled.columns.from_identity()), "id");
+    assert_eq!(ident(&prefilled.columns.to_identity()), "bakery_id");
     assert_eq!(prefilled.condition_type, ConditionType::All);
 
     // Every optional attribute is settable through the builder.
     let full: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id)
+            .columns(baker::Column::BakeryId, bakery::Column::Id)
             .on_delete(pgorm_query::ForeignKeyAction::SetNull)
             .on_update(pgorm_query::ForeignKeyAction::Cascade)
             .on_condition(|_l, _r| pgorm_query::Condition::all())
@@ -1623,25 +1717,43 @@ fn relation_builder_accumulates_a_definition() {
     assert_eq!(full.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:req:entity.relation.builder/test]    a `belongs_to` builder
-// missing `.from(..)` panics on conversion
+// [spec:pgorm:def:entity.relation.def+2/test]    a set of join columns is a
+// list of pairs, so both sides always name the same number of columns however
+// the definition is built, reversed or extended
 #[test]
-#[should_panic(expected = "Reference column is not set")]
-fn relation_builder_without_from_panics() {
-    let _: RelationDef =
-        RelationDef::from(baker::Entity::belongs_to(bakery::Entity).to(bakery::Column::Id));
+fn column_pairs_keep_the_two_sides_equal() {
+    use pgorm::ColumnPairs;
+    use pgorm_query::Alias;
+
+    let count = |identity: &Identity| identity.clone().into_iter().count();
+    let balanced = |columns: &ColumnPairs| {
+        assert_eq!(columns.arity(), count(&columns.from_identity()));
+        assert_eq!(columns.arity(), count(&columns.to_identity()));
+    };
+
+    // Hand-built, extended one pair at a time, up to the arity where `Identity`
+    // stops having a dedicated variant.
+    let mut columns = ColumnPairs::new(Alias::new("a1"), Alias::new("b1"));
+    for n in 2..=5 {
+        balanced(&columns);
+        columns = columns.and(Alias::new(format!("a{n}")), Alias::new(format!("b{n}")));
+    }
+    balanced(&columns);
+    balanced(&columns.clone().rev());
+
+    // ...and built through the builder, where the composite case is the one a
+    // zip of two independently-supplied column lists could truncate.
+    let composite: RelationDef = RelationDef::from(
+        cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
+            .columns(cakes_bakers::Column::CakeId, cakes_bakers::Column::CakeId)
+            .and_columns(cakes_bakers::Column::BakerId, cakes_bakers::Column::BakerId),
+    );
+    balanced(&composite.columns);
+    assert_eq!(composite.columns.arity(), 2);
+    balanced(&composite.rev().columns);
 }
 
-// [spec:pgorm:req:entity.relation.builder/test]    ...and one missing `.to(..)`
-// panics with the other message
-#[test]
-#[should_panic(expected = "Owner column is not set")]
-fn relation_builder_without_to_panics() {
-    let _: RelationDef =
-        RelationDef::from(baker::Entity::belongs_to(bakery::Entity).from(baker::Column::BakeryId));
-}
-
-// [spec:pgorm:req:entity.relation.fk/test]    `From<RelationDef>` for both
+// [spec:pgorm:req:entity.relation.fk+1/test]    `From<RelationDef>` for both
 // `ForeignKeyCreateStatement` and `TableForeignKey` maps every column pair,
 // applies the `on_delete` / `on_update` actions, takes the constraint name from
 // `fk_name` when set and otherwise derives `fk-{from_table}-{from_cols}`, and
@@ -1663,8 +1775,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     // With an explicit `fk_name`, that name is used verbatim.
     let named: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id)
+            .columns(baker::Column::BakeryId, bakery::Column::Id)
             .fk_name("fk-custom-name"),
     );
     let stmt: ForeignKeyCreateStatement = named.into();
@@ -1681,8 +1792,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     // FK actions are applied.
     let derived: RelationDef = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id)
+            .columns(baker::Column::BakeryId, bakery::Column::Id)
             .on_delete(pgorm_query::ForeignKeyAction::SetNull)
             .on_update(pgorm_query::ForeignKeyAction::Cascade),
     );
@@ -1701,8 +1811,8 @@ fn relation_def_converts_to_foreign_key_forms() {
     // columns with '-'.
     let composite: RelationDef = RelationDef::from(
         cakes_bakers::Entity::belongs_to(cakes_bakers::Entity)
-            .from((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId))
-            .to((cakes_bakers::Column::CakeId, cakes_bakers::Column::BakerId)),
+            .columns(cakes_bakers::Column::CakeId, cakes_bakers::Column::CakeId)
+            .and_columns(cakes_bakers::Column::BakerId, cakes_bakers::Column::BakerId),
     );
     let stmt: ForeignKeyCreateStatement = composite.into();
     assert_eq!(
@@ -1717,8 +1827,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     // The `TableForeignKey` conversion carries the same mapping.
     let mut fk: TableForeignKey = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
-            .from(baker::Column::BakeryId)
-            .to(bakery::Column::Id)
+            .columns(baker::Column::BakeryId, bakery::Column::Id)
             .on_delete(pgorm_query::ForeignKeyAction::Cascade),
     )
     .into();
@@ -1743,8 +1852,7 @@ fn relation_def_converts_to_foreign_key_forms() {
             Alias::new("warehouse").into_iden(),
             Alias::new("parent").into_iden(),
         ),
-        from_col: "parent_id".into_identity(),
-        to_col: "id".into_identity(),
+        columns: ColumnPairs::new(Alias::new("parent_id"), Alias::new("id")),
         is_owner: false,
         on_delete: None,
         on_update: None,
