@@ -1,5 +1,7 @@
+#![allow(non_camel_case_types)]
+
 use pgorm::{ActiveEnum, entity::prelude::StringLen};
-use pgorm_macros::{DeriveActiveEnum, EnumIter};
+use pgorm_macros::{DeriveActiveEnum, DeriveDisplay, EnumIter};
 
 #[derive(Debug, EnumIter, DeriveActiveEnum, Eq, PartialEq)]
 #[pgorm(
@@ -136,4 +138,116 @@ fn derive_active_enum_value_2() {
     assert_eq!(TestEnum2::HelloWorldTwo.to_value(), "helloWorldTwo");
 
     assert_eq!(TestEnum3::HelloWorld.to_value(), "hello_world");
+}
+
+/// `enum_name` is optional: it defaults to the UpperCamelCase of the enum ident.
+#[derive(Debug, EnumIter, DeriveActiveEnum, Eq, PartialEq)]
+#[pgorm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum tea_kind {
+    #[pgorm(string_value = "E")]
+    Everyday,
+}
+
+/// `num_value` selects the integer flavour for the whole enum.
+#[derive(Debug, EnumIter, DeriveActiveEnum, Eq, PartialEq)]
+#[pgorm(rs_type = "i32", db_type = "Integer")]
+pub enum Numbered {
+    #[pgorm(num_value = 1)]
+    One,
+    #[pgorm(num_value = 22)]
+    TwentyTwo,
+}
+
+/// A variant with no attribute falls back to its integer discriminant,
+/// including negative literals written with a unary minus.
+#[derive(Debug, EnumIter, DeriveActiveEnum, Eq, PartialEq)]
+#[pgorm(rs_type = "i32", db_type = "Integer")]
+pub enum Discriminants {
+    Below = -3,
+    Zero = 0,
+    Above = 9,
+}
+
+/// `display_value` is accepted by `DeriveActiveEnum` purely as a placeholder so
+/// that the companion `DeriveDisplay` can read it.
+#[derive(Debug, EnumIter, DeriveActiveEnum, DeriveDisplay, Eq, PartialEq)]
+#[pgorm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum Displayed {
+    #[pgorm(string_value = "S", display_value = "Small")]
+    Small,
+    #[pgorm(string_value = "L")]
+    Large,
+}
+
+// [spec:pgorm:syn:macros.derive.active-enum/test]    rename_all + per-variant rename + string_value
+#[test]
+fn container_and_variant_string_markers() {
+    // Covered exhaustively by `derive_active_enum_value` above; this asserts the
+    // container `enum_name` and its default.
+    assert_eq!(
+        pgorm::Iden::to_string(&*<TestEnum as ActiveEnum>::name()),
+        "test_enum"
+    );
+    assert_eq!(
+        pgorm::Iden::to_string(&*<tea_kind as ActiveEnum>::name()),
+        "TeaKind"
+    );
+    assert_eq!(
+        pgorm::Iden::to_string(&*<TestEnum2 as ActiveEnum>::name()),
+        "TestEnum2"
+    );
+}
+
+// [spec:pgorm:syn:macros.derive.active-enum/test]    db_type = "Enum" is a special spelling
+#[test]
+fn db_type_enum_expands_to_enum_column_type() {
+    use pgorm::pgorm_query::ColumnType;
+
+    let col = <TestEnum as ActiveEnum>::db_type();
+    assert_eq!(
+        col.get_column_type(),
+        &ColumnType::Enum {
+            name: <TestEnum as ActiveEnum>::name(),
+            variants: TestEnum::iden_values(),
+        }
+    );
+
+    // Any other spelling is parsed as a `ColumnType` expression verbatim.
+    assert_eq!(
+        <TestEnum2 as ActiveEnum>::db_type().get_column_type(),
+        &ColumnType::String(StringLen::None)
+    );
+    assert_eq!(
+        <Numbered as ActiveEnum>::db_type().get_column_type(),
+        &ColumnType::Integer
+    );
+}
+
+// [spec:pgorm:syn:macros.derive.active-enum/test]    num_value
+#[test]
+fn num_value_variants() {
+    assert_eq!(Numbered::One.to_value(), 1);
+    assert_eq!(Numbered::TwentyTwo.to_value(), 22);
+    assert_eq!(Numbered::try_from_value(&22), Ok(Numbered::TwentyTwo));
+    assert!(Numbered::try_from_value(&23).is_err());
+}
+
+// [spec:pgorm:syn:macros.derive.active-enum/test]    discriminant fallback, incl. unary minus
+#[test]
+fn variants_without_attributes_fall_back_to_their_discriminant() {
+    assert_eq!(Discriminants::Below.to_value(), -3);
+    assert_eq!(Discriminants::Zero.to_value(), 0);
+    assert_eq!(Discriminants::Above.to_value(), 9);
+    assert_eq!(Discriminants::try_from_value(&-3), Ok(Discriminants::Below));
+}
+
+// [spec:pgorm:syn:macros.derive.active-enum/test]    display_value is accepted as a placeholder
+#[test]
+fn display_value_is_accepted_as_placeholder() {
+    // It plays no part in the stored value...
+    assert_eq!(Displayed::Small.to_value(), "S");
+    assert_eq!(Displayed::Large.to_value(), "L");
+    // ...it only feeds the companion `DeriveDisplay`.
+    assert_eq!(Displayed::Small.to_string(), "Small");
+    assert_eq!(Displayed::Large.to_string(), "Large");
 }

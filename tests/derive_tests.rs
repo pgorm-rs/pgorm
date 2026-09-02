@@ -70,6 +70,21 @@ struct FromQueryAttributeTests {
     _bar: String,
 }
 
+// The column name is the *un-rawed* field identifier.
+#[derive(FromQueryResult)]
+struct RawIdentifierTest {
+    r#type: String,
+}
+
+// The skip flag is recomputed for every meta item in the list, so it only
+// survives if it is the last one. Here it is not, and the field is read from
+// the row like any other.
+#[derive(FromQueryResult)]
+struct SkipNotLastTest {
+    #[pgorm(skip, something_else)]
+    _foo: i32,
+}
+
 fn raw<M>(sql: &str) -> SelectorRaw<SelectModel<M>>
 where
     M: FromQueryResult,
@@ -80,6 +95,7 @@ where
 // [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding
 // through `SelectModel`, i.e. `SelectorTrait::from_raw_query_result` with an
 // empty prefix
+// [spec:pgorm:sem:macros.derive.from-query-result/test]    field-named reads, generics, and `skip`
 #[pgorm_macros::test]
 async fn from_query_result_derive() -> Result<(), DbErr> {
     let ctx = TestContext::new("derive_tests_from_query_result").await;
@@ -110,6 +126,19 @@ async fn from_query_result_derive() -> Result<(), DbErr> {
         .await?;
     assert_eq!(row._foo, 0);
     assert_eq!(row._bar, "three");
+
+    // The column is named after the un-rawed identifier: `type`, not `r#type`.
+    let row = raw::<RawIdentifierTest>(r#"SELECT 'four' AS "type""#)
+        .one(&db)
+        .await?;
+    assert_eq!(row.r#type, "four");
+
+    // `skip` was not the last meta item, so it was overwritten and the field is
+    // read from the row after all.
+    let row = raw::<SkipNotLastTest>(r#"SELECT 5 AS "_foo""#)
+        .one(&db)
+        .await?;
+    assert_eq!(row._foo, 5);
 
     drop(db);
     ctx.delete().await;

@@ -7,6 +7,9 @@ use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
+// [spec:pgorm:sem:macros.derive.from-query-result/test]    FromJsonQueryResult round-trips through the DB:
+// `From<T> for Value` serialises through serde_json, `ValueType` / `TryGetableFromJson` read it
+// back, and the `Option` column exercises the `Nullable` impl.
 #[pgorm_macros::test]
 async fn main() -> Result<(), DbErr> {
     let ctx = TestContext::new("json_struct_tests").await;

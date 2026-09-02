@@ -1,0 +1,423 @@
+//! Verification for `DeriveModel`, `DeriveActiveModel` (with
+//! `DeriveActiveModelBehavior` and `DeriveIntoActiveModel`), and
+//! `DeriveColumn` / `DeriveCustomColumn`.
+
+#![allow(dead_code)]
+
+use pgorm::entity::prelude::*;
+use pgorm::{
+    ActiveModelTrait, ActiveValue, FromQueryResult, IntoActiveModel, IntoActiveValue, TryIntoModel,
+    Value,
+};
+use std::str::FromStr;
+
+/// `table_iden` is on so that `Column::Table` exists as a column the generated
+/// `Model` / `ActiveModel` match arms deliberately do not cover — that is the
+/// only way to reach their catch-all arms.
+mod cake {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "cake", table_iden)]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub name: String,
+        #[pgorm(ignore)]
+        pub scratch: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The `entity` / `active_model` overrides. Neither `Entity` nor `ActiveModel`
+/// is in scope at this level — only the renamed re-exports — so if the derives
+/// ignored the attributes this module would not compile.
+mod overrides {
+    use pgorm::entity::prelude::*;
+
+    mod inner {
+        use pgorm::entity::prelude::*;
+
+        #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+        #[pgorm(table_name = "inner")]
+        pub struct Model {
+            #[pgorm(primary_key)]
+            pub id: i32,
+            pub name: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        impl ActiveModelBehavior for ActiveModel {}
+    }
+
+    pub use inner::ActiveModel as InnerActive;
+    pub use inner::Column as InnerColumn;
+    pub use inner::Entity as InnerEntity;
+
+    #[derive(Clone, Debug, PartialEq, DeriveModel)]
+    #[pgorm(entity = InnerEntity)]
+    pub struct AltModel {
+        pub id: i32,
+        pub name: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, DeriveIntoActiveModel)]
+    #[pgorm(active_model = InnerActive)]
+    pub struct NameOnly {
+        pub name: String,
+    }
+}
+
+/// `DeriveActiveModelBehavior` ignores the shape and identifier of its input;
+/// it always emits `impl ActiveModelBehavior for ActiveModel {}`.
+mod behavior_derive {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "behavior")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    // Applied to a completely unrelated unit struct, yet it is `ActiveModel`
+    // that ends up with the impl.
+    #[derive(pgorm::DeriveActiveModelBehavior)]
+    pub struct NothingLikeAnActiveModel;
+}
+
+/// A hand-rolled `DeriveColumn` enum, away from any entity, so the derive's own
+/// output is what is under test.
+#[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+pub enum PlainColumn {
+    Id,
+    FirstName,
+    #[pgorm(column_name = "lAsTnAmE")]
+    LastName,
+}
+
+/// `DeriveCustomColumn` is the same minus the `IdenStatic` impl, which the user
+/// writes — typically delegating to the generated `default_as_str`.
+#[derive(Copy, Clone, Debug, EnumIter, DeriveCustomColumn)]
+pub enum CustomColumn {
+    Id,
+    FirstName,
+}
+
+impl pgorm::IdenStatic for CustomColumn {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::FirstName => "SHOUTED",
+            _ => self.default_as_str(),
+        }
+    }
+}
+
+// [spec:pgorm:sem:macros.derive.model/test]    ModelTrait::get / set
+#[test]
+fn derive_model_get_and_set_walk_the_columns() {
+    let mut model = cake::Model {
+        id: 1,
+        name: "chiffon".to_owned(),
+        scratch: 42,
+    };
+
+    // `get` clones the field and converts it into a `Value`.
+    assert_eq!(model.get(cake::Column::Id), Value::Int(Some(1)));
+    assert_eq!(
+        model.get(cake::Column::Name),
+        Value::String(Some(Box::new("chiffon".to_owned())))
+    );
+
+    // `set` assigns `v.unwrap()`.
+    model.set(
+        cake::Column::Name,
+        Value::String(Some(Box::new("sponge".into()))),
+    );
+    assert_eq!(model.name, "sponge");
+    // The ignored field is untouched by either.
+    assert_eq!(model.scratch, 42);
+}
+
+// [spec:pgorm:sem:macros.derive.model/test]    ignored fields have no match arm
+#[test]
+#[should_panic(expected = "field does not exist on Model")]
+fn derive_model_get_panics_on_unmatched_column() {
+    let model = cake::Model {
+        id: 1,
+        name: String::new(),
+        scratch: 0,
+    };
+    let _ = model.get(cake::Column::Table);
+}
+
+// [spec:pgorm:sem:macros.derive.model/test]    ignored fields have no match arm
+#[test]
+#[should_panic(expected = "field does not exist on Model")]
+fn derive_model_set_panics_on_unmatched_column() {
+    let mut model = cake::Model {
+        id: 1,
+        name: String::new(),
+        scratch: 0,
+    };
+    model.set(cake::Column::Table, Value::Int(Some(1)));
+}
+
+// [spec:pgorm:sem:macros.derive.model/test]    the FromQueryResult half, and the entity override
+#[test]
+fn derive_model_from_query_result_and_entity_override() {
+    fn assert_from_query_result<T: FromQueryResult>() {}
+    assert_from_query_result::<cake::Model>();
+    assert_from_query_result::<overrides::AltModel>();
+
+    // The target entity defaults to `Entity`...
+    fn assert_entity<M: ModelTrait<Entity = E>, E: EntityTrait>() {}
+    assert_entity::<cake::Model, cake::Entity>();
+    // ...and `#[pgorm(entity = Ident)]` redirects it. `AltModel` lives in a
+    // scope with no `Entity` at all, so this could only compile if the
+    // attribute were honoured.
+    assert_entity::<overrides::AltModel, overrides::InnerEntity>();
+
+    let alt = overrides::AltModel {
+        id: 3,
+        name: "x".to_owned(),
+    };
+    assert_eq!(alt.get(overrides::InnerColumn::Id), Value::Int(Some(3)));
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    the generated struct and its conversions
+#[test]
+fn derive_active_model_struct_default_and_from_model() {
+    // One `pub field: ActiveValue<T>` per *non-ignored* field: the struct
+    // literal below is exhaustive, so `scratch` is absent.
+    let active = cake::ActiveModel {
+        id: ActiveValue::Set(1),
+        name: ActiveValue::Set("chiffon".to_owned()),
+    };
+    assert_eq!(active.id, ActiveValue::Set(1));
+
+    // `Default` delegates to `ActiveModelBehavior::new()`, which bottoms out in
+    // `ActiveModelTrait::default()` — every field `NotSet`.
+    let blank = <cake::ActiveModel as Default>::default();
+    assert_eq!(blank.id, ActiveValue::NotSet);
+    assert_eq!(blank.name, ActiveValue::NotSet);
+    assert_eq!(blank, <cake::ActiveModel as ActiveModelTrait>::default());
+
+    // `From<Model>` maps every field through `ActiveValue::unchanged`, and
+    // `IntoActiveModel` is implemented for `Model` in terms of it.
+    let model = cake::Model {
+        id: 7,
+        name: "opera".to_owned(),
+        scratch: 5,
+    };
+    let converted: cake::ActiveModel = model.clone().into();
+    assert_eq!(converted.id, ActiveValue::Unchanged(7));
+    assert_eq!(converted.name, ActiveValue::Unchanged("opera".to_owned()));
+    assert_eq!(model.into_active_model(), converted);
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    ActiveModelTrait accessors
+#[test]
+fn derive_active_model_trait_accessors() {
+    let mut active = cake::ActiveModel {
+        id: ActiveValue::Set(1),
+        name: ActiveValue::Unchanged("chiffon".to_owned()),
+    };
+
+    // `get` clones into a wrapped value.
+    assert_eq!(
+        ActiveModelTrait::get(&active, cake::Column::Id),
+        ActiveValue::Set(Value::Int(Some(1)))
+    );
+    // ...and unmatched columns yield `not_set` rather than panicking.
+    assert_eq!(
+        ActiveModelTrait::get(&active, cake::Column::Table),
+        ActiveValue::NotSet
+    );
+
+    // `take` swaps the field out, leaving it `NotSet`.
+    assert_eq!(
+        active.take(cake::Column::Id),
+        ActiveValue::Set(Value::Int(Some(1)))
+    );
+    assert_eq!(active.id, ActiveValue::NotSet);
+    assert_eq!(active.take(cake::Column::Table), ActiveValue::NotSet);
+
+    // `set` assigns `Set(v.unwrap())`.
+    active.set(cake::Column::Id, Value::Int(Some(9)));
+    assert_eq!(active.id, ActiveValue::Set(9));
+
+    // `not_set` clears a field, and silently ignores unmatched columns.
+    active.not_set(cake::Column::Id);
+    assert_eq!(active.id, ActiveValue::NotSet);
+    active.not_set(cake::Column::Table);
+
+    assert!(active.is_not_set(cake::Column::Id));
+    assert!(!active.is_not_set(cake::Column::Name));
+
+    // `reset` turns `Unchanged` into `Set`.
+    active.reset(cake::Column::Name);
+    assert_eq!(active.name, ActiveValue::Set("chiffon".to_owned()));
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    set panics on an unmatched column
+#[test]
+#[should_panic(expected = "This ActiveModel does not have this field")]
+fn active_model_set_panics_on_unmatched_column() {
+    let mut active = <cake::ActiveModel as Default>::default();
+    active.set(cake::Column::Table, Value::Int(Some(1)));
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    is_not_set panics on an unmatched column
+#[test]
+#[should_panic(expected = "This ActiveModel does not have this field")]
+fn active_model_is_not_set_panics_on_unmatched() {
+    let active = <cake::ActiveModel as Default>::default();
+    let _ = active.is_not_set(cake::Column::Table);
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    reset panics on an unmatched column
+#[test]
+#[should_panic(expected = "This ActiveModel does not have this field")]
+fn active_model_reset_panics_on_unmatched_column() {
+    let mut active = <cake::ActiveModel as Default>::default();
+    active.reset(cake::Column::Table);
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    TryFrom<ActiveModel> / TryIntoModel
+#[test]
+fn derive_active_model_try_into_model() {
+    // A non-ignored field left `NotSet` fails with `AttrNotSet(field)`.
+    let partial = cake::ActiveModel {
+        id: ActiveValue::Set(1),
+        name: ActiveValue::NotSet,
+    };
+    match partial.clone().try_into_model() {
+        Err(DbErr::AttrNotSet(field)) => assert_eq!(field, "name"),
+        other => panic!("expected AttrNotSet, got {other:?}"),
+    }
+    assert!(matches!(
+        cake::Model::try_from(partial),
+        Err(DbErr::AttrNotSet(_))
+    ));
+
+    // With everything set, the ignored field is rebuilt with `Default::default()`.
+    let full = cake::ActiveModel {
+        id: ActiveValue::Set(1),
+        name: ActiveValue::Unchanged("chiffon".to_owned()),
+    };
+    let model = full.try_into_model().unwrap();
+    assert_eq!(
+        model,
+        cake::Model {
+            id: 1,
+            name: "chiffon".to_owned(),
+            scratch: 0,
+        }
+    );
+}
+
+// [spec:pgorm:sem:macros.derive.active-model/test]    DeriveActiveModelBehavior + DeriveIntoActiveModel
+#[test]
+fn behavior_and_into_active_model_derives() {
+    // `DeriveActiveModelBehavior` was applied to `NothingLikeAnActiveModel`, yet
+    // it is `behavior_derive::ActiveModel` that gained the impl.
+    fn assert_behavior<A: ActiveModelBehavior>() {}
+    assert_behavior::<behavior_derive::ActiveModel>();
+
+    // `DeriveIntoActiveModel` builds a partial "form" struct into the named
+    // active model, filling the rest with `..Default::default()`.
+    let form = overrides::NameOnly {
+        name: "tart".to_owned(),
+    };
+    let active: overrides::InnerActive = form.into_active_model();
+    assert_eq!(
+        active.name,
+        IntoActiveValue::<String>::into_active_value("tart".to_owned())
+    );
+    assert_eq!(active.id, ActiveValue::NotSet);
+}
+
+// [spec:pgorm:sem:macros.derive.column/test]    default_as_str / IdenStatic / Iden
+#[test]
+fn derive_column_names() {
+    // `default_as_str` is the snake_case of the variant, or the `column_name`
+    // override.
+    assert_eq!(PlainColumn::Id.default_as_str(), "id");
+    assert_eq!(PlainColumn::FirstName.default_as_str(), "first_name");
+    assert_eq!(PlainColumn::LastName.default_as_str(), "lAsTnAmE");
+
+    // `IdenStatic::as_str` is `default_as_str`, and `Iden` writes it.
+    assert_eq!(
+        pgorm::IdenStatic::as_str(&PlainColumn::FirstName),
+        "first_name"
+    );
+    assert_eq!(PlainColumn::FirstName.to_string(), "first_name");
+    assert_eq!(PlainColumn::LastName.to_string(), "lAsTnAmE");
+}
+
+// [spec:pgorm:sem:macros.derive.column/test]    FromStr accepts both spellings
+#[test]
+fn derive_column_from_str() {
+    assert!(matches!(
+        PlainColumn::from_str("first_name"),
+        Ok(PlainColumn::FirstName)
+    ));
+    assert!(matches!(
+        PlainColumn::from_str("firstName"),
+        Ok(PlainColumn::FirstName)
+    ));
+    // The `column_name` override does *not* widen `FromStr`: it still keys off
+    // the variant identifier.
+    assert!(matches!(
+        PlainColumn::from_str("last_name"),
+        Ok(PlainColumn::LastName)
+    ));
+    assert!(matches!(
+        PlainColumn::from_str("lastName"),
+        Ok(PlainColumn::LastName)
+    ));
+
+    match PlainColumn::from_str("lAsTnAmE") {
+        Err(pgorm::ColumnFromStrErr(s)) => assert_eq!(s, "lAsTnAmE"),
+        other => panic!("expected ColumnFromStrErr, got {other:?}"),
+    }
+}
+
+// [spec:pgorm:sem:macros.derive.column/test]    DeriveCustomColumn leaves as_str to the user
+#[test]
+fn derive_custom_column_leaves_as_str_to_user() {
+    // The inherent `default_as_str` and `FromStr` are still generated...
+    assert_eq!(CustomColumn::FirstName.default_as_str(), "first_name");
+    assert!(matches!(
+        CustomColumn::from_str("firstName"),
+        Ok(CustomColumn::FirstName)
+    ));
+    // ...but `IdenStatic` is the hand-written one above, and `Iden` renders it.
+    assert_eq!(
+        pgorm::IdenStatic::as_str(&CustomColumn::FirstName),
+        "SHOUTED"
+    );
+    assert_eq!(CustomColumn::FirstName.to_string(), "SHOUTED");
+    // The escape hatch: delegating back to the generated default.
+    assert_eq!(CustomColumn::Id.to_string(), "id");
+}
+
+// [spec:pgorm:sem:macros.derive.column/test]    neither derive adds EnumIter
+#[test]
+fn column_derives_do_not_add_enum_iter_themselves() {
+    // `EnumIter` is derived alongside above; without it `Column::iter()` would
+    // not exist. Both enums iterate because the caller asked for it.
+    use pgorm::Iterable;
+    assert_eq!(PlainColumn::iter().count(), 3);
+    assert_eq!(CustomColumn::iter().count(), 2);
+}

@@ -11,6 +11,7 @@ use pgorm_migration::prelude::*;
 // [spec:pgorm:def:migration.runner/test]
 // [spec:pgorm:sem:migration.up/test]
 // [spec:pgorm:sem:migration.name/test]    asserted names are file stems
+// [spec:pgorm:def:macros.derive/test]    `DeriveMigrationName` names each migration after the file stem
 #[tokio::test]
 async fn fresh_install_applies_all_pending() -> Result<(), DbErr> {
     let ctx = TestContext::new("pgorm_migration_fresh").await;

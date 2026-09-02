@@ -1083,6 +1083,14 @@ children (
             {
                 id verify.macros
                 title "Verify derive-macro rules (20 rules)"
+                log (
+                    {
+                        at 2026-09-02T09:30:06.21747Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
