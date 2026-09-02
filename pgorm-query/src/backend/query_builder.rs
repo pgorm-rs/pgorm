@@ -754,38 +754,6 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    /// Translate [`LogicalChainOper`] into SQL statement.
-    // [spec:pgorm:req:sql.render.condition-chain] (legacy and_where/or_where chain links)
-    fn prepare_logical_chain_oper(
-        &self,
-        log_chain_oper: &LogicalChainOper,
-        i: usize,
-        length: usize,
-        sql: &mut dyn SqlWriter,
-    ) {
-        let (simple_expr, oper) = match log_chain_oper {
-            LogicalChainOper::And(simple_expr) => (simple_expr, "AND"),
-            LogicalChainOper::Or(simple_expr) => (simple_expr, "OR"),
-        };
-        if i > 0 {
-            write!(sql, " {oper} ").unwrap();
-        }
-        let both_binary = match simple_expr {
-            SimpleExpr::Binary(_, _, right) => {
-                matches!(right.as_ref(), SimpleExpr::Binary(_, _, _))
-            }
-            _ => false,
-        };
-        let need_parentheses = length > 1 && both_binary;
-        if need_parentheses {
-            write!(sql, "(").unwrap();
-        }
-        self.prepare_simple_expr(simple_expr, sql);
-        if need_parentheses {
-            write!(sql, ")").unwrap();
-        }
-    }
-
     /// Translate [`Function`] into SQL statement.
     fn prepare_function_name_common(&self, function: &Function, sql: &mut dyn SqlWriter) {
         if let Function::Custom(iden) = function {
@@ -1371,25 +1339,16 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate a condition to a "WHERE" clause.
-    // [spec:pgorm:req:sql.render.condition-chain]
+    // [spec:pgorm:req:sql.render.condition-chain+1]
     fn prepare_condition(
         &self,
         condition: &ConditionHolder,
         keyword: &str,
         sql: &mut dyn SqlWriter,
     ) {
-        match &condition.contents {
-            ConditionHolderContents::Empty => (),
-            ConditionHolderContents::Chain(conditions) => {
-                write!(sql, " {keyword} ").unwrap();
-                for (i, log_chain_oper) in conditions.iter().enumerate() {
-                    self.prepare_logical_chain_oper(log_chain_oper, i, conditions.len(), sql);
-                }
-            }
-            ConditionHolderContents::Condition(c) => {
-                write!(sql, " {keyword} ").unwrap();
-                self.prepare_condition_where(c, sql);
-            }
+        if let Some(c) = &condition.contents {
+            write!(sql, " {keyword} ").unwrap();
+            self.prepare_condition_where(c, sql);
         }
     }
 

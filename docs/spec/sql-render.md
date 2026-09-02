@@ -247,16 +247,16 @@ an ideal Postgres renderer would emit.
 
 ## Conditions
 
-> [spec:pgorm:req:sql.render.condition-chain]
+> [spec:pgorm:req:sql.render.condition-chain+1]
 > `prepare_condition(holder, keyword, …)` MUST emit nothing at all when the
-> condition holder is empty; otherwise it emits ` {keyword} ` (with surrounding
-> spaces; keyword is `WHERE`, `HAVING`, or `ON`) followed by the condition. An
-> `all`/`any` `Condition` tree renders via its `to_simple_expr()` conversion
-> through the ordinary expression renderer. A legacy `and_where`/`or_where`
-> chain renders each link separated by ` AND ` / ` OR `, wrapping an individual
-> link in parentheses if and only if the chain has more than one link and that
-> link is a binary expression whose right operand is itself a binary
-> expression.
+> condition holder carries no condition; otherwise it emits ` {keyword} ` (with
+> surrounding spaces; keyword is `WHERE`, `HAVING`, or `ON`) followed by the
+> condition. There is exactly one rendering path: the `all`/`any` `Condition`
+> tree is lowered by its `to_simple_expr()` conversion and written by the
+> ordinary expression renderer, so parenthesisation and operator precedence
+> follow `sql.render.precedence` alone. A holder carrying an empty `Condition`
+> still emits the keyword, followed by that set's constant (`TRUE` for `all`,
+> `FALSE` for `any`) per `sql.ast.condition.flattening`.
 
 ## SELECT
 

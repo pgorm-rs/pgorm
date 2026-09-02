@@ -74,7 +74,7 @@ fn select_5() {
     );
 }
 
-// [spec:pgorm:req:sql.render.condition-chain/test]
+// [spec:pgorm:req:sql.render.condition-chain+1/test]
 #[test]
 fn select_6() {
     assert_eq!(
@@ -654,6 +654,7 @@ fn select_42() {
     );
 }
 
+// [spec:pgorm:req:sql.render.condition-chain+1/test]
 #[test]
 fn select_43() {
     let statement = Query::select()
@@ -2221,11 +2222,10 @@ fn keywords_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    the holder's three states: `Empty` emits no
-// clause, the chain style builds `Chain`, the `cond_where` style builds `Condition`
+// [spec:pgorm:req:sql.ast.condition.holder+2/test]    the holder's two states: absent emits no
+// clause, present renders the condition
 #[test]
 fn condition_holder_1() {
-    // Empty.
     assert_eq!(
         Query::select()
             .column(Glyph::Id)
@@ -2234,18 +2234,6 @@ fn condition_holder_1() {
         r#"SELECT "id" FROM "glyph""#
     );
 
-    // Chain: links accumulate in call order and are joined with their own operator.
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(1)))
-            .and_or_where(LogicalChainOper::Or(Expr::col(Glyph::Aspect).eq(2)))
-            .to_string(QueryBuilder),
-        r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 OR "aspect" = 2"#
-    );
-
-    // Condition.
     assert_eq!(
         Query::select()
             .column(Glyph::Id)
@@ -2256,31 +2244,44 @@ fn condition_holder_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    a chain operator added to a holder already in
-// `Condition` state panics
+// [spec:pgorm:req:sql.ast.condition.holder+2/test]    `and_where` is a `cond_where` shorthand, so
+// the two styles are interchangeable and freely interleaved
 #[test]
-#[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
 fn condition_holder_2() {
-    Query::select()
-        .column(Glyph::Id)
-        .from(Glyph::Table)
-        .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
-        .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(2)));
+    let expected = r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND "aspect" = 2"#;
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).eq(1))
+            .and_where(Expr::col(Glyph::Aspect).eq(2))
+            .to_string(QueryBuilder),
+        expected
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .and_where(Expr::col(Glyph::Aspect).eq(2))
+            .to_string(QueryBuilder),
+        expected
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).eq(1))
+            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)))
+            .to_string(QueryBuilder),
+        expected
+    );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    ... and a condition added to a holder already
-// in `Chain` state panics too
-#[test]
-#[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
-fn condition_holder_3() {
-    Query::select()
-        .column(Glyph::Id)
-        .from(Glyph::Table)
-        .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(1)))
-        .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)));
-}
-
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    HAVING is backed by the same holder, with the
+// [spec:pgorm:req:sql.ast.condition.holder+2/test]    HAVING is backed by the same holder, with the
 // same conjoining semantics
 #[test]
 fn condition_holder_3a() {
@@ -2305,7 +2306,7 @@ fn condition_holder_3a() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    repeated `cond_where` conjoins: two
+// [spec:pgorm:req:sql.ast.condition.holder+2/test]    repeated `cond_where` conjoins: two
 // non-negated `All` sets are appended flat, in call order
 #[test]
 fn condition_holder_4() {
@@ -2324,7 +2325,7 @@ fn condition_holder_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder+1/test]    anything else is combined under a fresh
+// [spec:pgorm:req:sql.ast.condition.holder+2/test]    anything else is combined under a fresh
 // `Condition::all()`
 #[test]
 fn condition_holder_5() {

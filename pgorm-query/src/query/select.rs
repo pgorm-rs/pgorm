@@ -2041,11 +2041,6 @@ impl OrderedStatement for SelectStatement {
 
 #[inherent]
 impl ConditionalStatement for SelectStatement {
-    pub fn and_or_where(&mut self, condition: LogicalChainOper) -> &mut Self {
-        self.r#where.add_and_or(condition);
-        self
-    }
-
     pub fn cond_where<C>(&mut self, condition: C) -> &mut Self
     where
         C: IntoCondition,

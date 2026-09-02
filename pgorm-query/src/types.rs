@@ -211,13 +211,6 @@ pub enum BinOper {
     Custom(&'static str),
 }
 
-/// Logical chain operator
-#[derive(Debug, Clone, PartialEq)]
-pub enum LogicalChainOper {
-    And(SimpleExpr),
-    Or(SimpleExpr),
-}
-
 /// Join types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {

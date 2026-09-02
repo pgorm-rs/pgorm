@@ -1752,12 +1752,20 @@ children (
                 id unrep.condition-chain
                 title "Delete the chain condition style; ConditionHolder collapses to Option of Condition"
                 deps (pgparse.oracle)
+                sealed true
                 log (
                     {
                         at 2026-09-02T12:36:26.397942Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit finding that changes the calculus: .and_where(/.or_where( has ZERO call sites in src/ — the entire ORM uses cond_where/cond_having exclusively; all 129 occurrences are pgorm-query's own tests/doctests. So the fix is DELETION, not typestate: drop or_where (sole source of chain heterogeneity), re-express and_where as cond_where(Condition::all().add(e)), delete the doc-hidden and_or_where, and ConditionHolderContents collapses to Option<Condition> — both mixing panics (condition.rs:634-636, :662-664) become unconstructible. Honest cost: parenthesization renders through the ordinary expression path, so many pinned assert strings churn (semantically equivalent, textually different). Bumps sql.ast.condition.holder+1 -> +2 and guts the legacy-chain half of sql.render.condition-chain. M, dominated by test churn."
+                    }
+
+                    {
+                        at 2026-09-02T17:20:22.136562Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

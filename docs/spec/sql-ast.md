@@ -162,16 +162,17 @@ today, including panicking edges and deliberate failsafes.
 > `TRUE` (as inline `SimpleExpr::Constant`s), and a set with `negate` wraps the
 > folded expression in `NOT (...)`.
 
-> [spec:pgorm:req:sql.ast.condition.holder+1]
+> [spec:pgorm:req:sql.ast.condition.holder+2]
 > WHERE and HAVING clauses are backed by `ConditionHolder`, whose contents are
-> one of `Empty`, `Chain(Vec<LogicalChainOper>)`, or `Condition` (built by the
-> `cond_where` style). `ConditionalStatement::and_where` and
-> `and_where_option` delegate to `cond_where` and therefore build the
-> `Condition` state; the only entry point into the `Chain` state is the
-> `#[doc(hidden)]` `and_or_where(LogicalChainOper)`. The two states MUST NOT
-> be mixed on the same holder: adding a chain operator to a holder in
-> `Condition` state, or a condition to a holder in `Chain` state, panics with
-> "Cannot mix `and_where`/`or_where` and `cond_where` in statements".
+> an `Option<Condition>`: absent until a condition is added, `Some` thereafter.
+> There is exactly one way in — `add_condition`, reached through `cond_where`
+> and `cond_having` — so the holder has no second, incompatible representation
+> to mix with, and the API surface offers no operation that can fail on it.
+> `ConditionalStatement::and_where`, `and_where_option`, and `and_having` are
+> shorthands that lift a `SimpleExpr` through `IntoCondition` into
+> `Condition::all().add(expr)` and delegate; a chain style built from
+> per-link `AND`/`OR` operators is deliberately absent, so the two styles
+> cannot disagree about how links combine.
 >
 > Repeated `cond_where` calls MUST conjoin: if both the current and the added
 > condition are non-negated `All` sets the additions are appended flat into the
@@ -322,10 +323,9 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::cust` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table`, a WHERE `ConditionHolder` (chain and condition styles per
-> `sql.ast.condition.holder`), ORDER BY expressions, an optional LIMIT, and an
-> optional `ReturningClause`. `get_values` MUST expose the accumulated
-> assignment pairs for inspection.
+> `table`, a WHERE `ConditionHolder` (per `sql.ast.condition.holder`), ORDER BY
+> expressions, an optional LIMIT, and an optional `ReturningClause`.
+> `get_values` MUST expose the accumulated assignment pairs for inspection.
 
 > [spec:pgorm:def:sql.ast.delete]
 > `DeleteStatement` is the DELETE AST node: a target table set by
