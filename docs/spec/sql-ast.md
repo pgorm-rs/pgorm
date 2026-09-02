@@ -160,14 +160,16 @@ today, including panicking edges and deliberate failsafes.
 > `TRUE` (as inline `SimpleExpr::Constant`s), and a set with `negate` wraps the
 > folded expression in `NOT (...)`.
 
-> [spec:pgorm:req:sql.ast.condition.holder]
+> [spec:pgorm:req:sql.ast.condition.holder+1]
 > WHERE and HAVING clauses are backed by `ConditionHolder`, whose contents are
-> one of `Empty`, `Chain(Vec<LogicalChainOper>)` (built by the `and_where` /
-> `and_where_option` chain style), or `Condition` (built by the `cond_where`
-> style). The two styles MUST NOT be mixed on the same holder: adding a chain
-> operator to a holder in `Condition` state, or a condition to a holder in
-> `Chain` state, panics with "Cannot mix `and_where`/`or_where` and
-> `cond_where` in statements".
+> one of `Empty`, `Chain(Vec<LogicalChainOper>)`, or `Condition` (built by the
+> `cond_where` style). `ConditionalStatement::and_where` and
+> `and_where_option` delegate to `cond_where` and therefore build the
+> `Condition` state; the only entry point into the `Chain` state is the
+> `#[doc(hidden)]` `and_or_where(LogicalChainOper)`. The two states MUST NOT
+> be mixed on the same holder: adding a chain operator to a holder in
+> `Condition` state, or a condition to a holder in `Chain` state, panics with
+> "Cannot mix `and_where`/`or_where` and `cond_where` in statements".
 >
 > Repeated `cond_where` calls MUST conjoin: if both the current and the added
 > condition are non-negated `All` sets the additions are appended flat into the

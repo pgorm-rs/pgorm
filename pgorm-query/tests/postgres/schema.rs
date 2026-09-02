@@ -2,7 +2,7 @@ use super::*;
 use pgorm_query::extension::{Extension, Type};
 use pretty_assertions::assert_eq;
 
-// [spec:pgorm:req:sql.ddl/test]    the whole DDL surface is reachable through the five
+// [spec:pgorm:req:sql.ddl+1/test]    the whole DDL surface is reachable through the five
 // entry-point helpers
 #[test]
 fn every_ddl_entry_point_is_reachable() {
@@ -105,7 +105,7 @@ fn every_ddl_entry_point_is_reachable() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl/test]    table, index and foreign-key statements implement
+// [spec:pgorm:req:sql.ddl+1/test]    table, index and foreign-key statements implement
 // `SchemaStatementBuilder`, whose `build` / `build_any` / `to_string` all delegate to the same
 // `prepare_*` method on the single Postgres `QueryBuilder`
 #[test]
@@ -159,7 +159,7 @@ fn schema_statement_builder_trio_agrees() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl/test]    `TableStatement` is an enum wrapper dispatching to the same
+// [spec:pgorm:req:sql.ddl+1/test]    `TableStatement` is an enum wrapper dispatching to the same
 // builders
 #[test]
 fn table_statement_wrapper_dispatches() {
@@ -240,7 +240,7 @@ fn table_statement_wrapper_dispatches() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl/test]    identifiers render double-quoted, with embedded quotes doubled
+// [spec:pgorm:req:sql.ddl+1/test]    identifiers render double-quoted, with embedded quotes doubled
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(

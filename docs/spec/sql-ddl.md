@@ -9,7 +9,7 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including panics and leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl]
+> [spec:pgorm:req:sql.ddl+1]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`truncate`), `Index` (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`) and
@@ -17,17 +17,14 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > implement `SchemaStatementBuilder` (`build`, `build_any`, `to_string`), all
 > of which delegate to the corresponding `prepare_*` method on the single
 > Postgres `QueryBuilder`; type and extension statements provide equivalent
-> `build_ref`/`build_collect`/`to_string` inherent methods. Identifiers MUST
-> render double-quoted (quote character `"`, embedded quotes doubled).
-> `TableStatement`, `IndexStatement`, `ForeignKeyStatement` and
-> `SchemaStatement` are enum wrappers that dispatch to the same builders.
->
-> Current limitation in the root crate: `src/database/statement.rs` has the
-> `StatementBuilder` wiring for `TypeCreateStatement`, `TypeAlterStatement`
-> and `TypeDropStatement` commented out ("Re-enable postgres extensions once
-> available in pgorm_query"), so type statements cannot be executed through
-> the pgorm `Statement` pipeline even though the `pgorm-query` builders below
-> are fully functional for SQL-string generation.
+> `build_ref`/`build_collect`/`to_string` inherent methods. Identifiers that
+> render through `Iden::prepare` (table, column and type names) MUST render
+> double-quoted (quote character `"`, embedded quotes doubled); index and
+> constraint names are written raw between quote characters, without
+> doubling. `TableStatement` is an enum wrapper carrying its own
+> `build`/`build_any`/`to_string` dispatch methods; `IndexStatement`,
+> `ForeignKeyStatement` and `SchemaStatement` are plain wrapper enums whose
+> variants render through the same builders.
 
 ## Tables
 

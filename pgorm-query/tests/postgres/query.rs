@@ -2219,7 +2219,7 @@ fn keywords_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    the holder's three states: `Empty` emits no
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    the holder's three states: `Empty` emits no
 // clause, the chain style builds `Chain`, the `cond_where` style builds `Condition`
 #[test]
 fn condition_holder_1() {
@@ -2254,7 +2254,7 @@ fn condition_holder_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    a chain operator added to a holder already in
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    a chain operator added to a holder already in
 // `Condition` state panics
 #[test]
 #[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
@@ -2266,7 +2266,7 @@ fn condition_holder_2() {
         .and_or_where(LogicalChainOper::And(Expr::col(Glyph::Aspect).eq(2)));
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    ... and a condition added to a holder already
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    ... and a condition added to a holder already
 // in `Chain` state panics too
 #[test]
 #[should_panic(expected = "Cannot mix `and_where`/`or_where` and `cond_where` in statements")]
@@ -2278,7 +2278,7 @@ fn condition_holder_3() {
         .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)));
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    HAVING is backed by the same holder, with the
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    HAVING is backed by the same holder, with the
 // same conjoining semantics
 #[test]
 fn condition_holder_3a() {
@@ -2303,7 +2303,7 @@ fn condition_holder_3a() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    repeated `cond_where` conjoins: two
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    repeated `cond_where` conjoins: two
 // non-negated `All` sets are appended flat, in call order
 #[test]
 fn condition_holder_4() {
@@ -2322,7 +2322,7 @@ fn condition_holder_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder/test]    anything else is combined under a fresh
+// [spec:pgorm:req:sql.ast.condition.holder+1/test]    anything else is combined under a fresh
 // `Condition::all()`
 #[test]
 fn condition_holder_5() {

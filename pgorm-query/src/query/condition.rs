@@ -39,7 +39,7 @@ pub enum ConditionHolderContents {
     Condition(Condition),
 }
 
-// [spec:pgorm:req:sql.ast.condition.holder]
+// [spec:pgorm:req:sql.ast.condition.holder+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ConditionHolder {
     pub contents: ConditionHolderContents,
@@ -639,7 +639,7 @@ impl ConditionHolder {
         }
     }
 
-    // [spec:pgorm:req:sql.ast.condition.holder]
+    // [spec:pgorm:req:sql.ast.condition.holder+1]
     pub fn add_condition(&mut self, mut addition: Condition) {
         match std::mem::take(&mut self.contents) {
             ConditionHolderContents::Empty => {

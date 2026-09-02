@@ -25,7 +25,7 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl]
+// [spec:pgorm:req:sql.ddl+1]
 #[derive(Debug)]
 pub struct Table;
 

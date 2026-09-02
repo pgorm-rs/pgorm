@@ -259,6 +259,15 @@ children (
                         [spec:pgorm:def:sql.ast.func]
                     )
                 }
+                log (
+                    {
+                        at 2026-09-02T09:29:27.492549Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "sql.ast.condition.holder v0 overclaimed since adoption: it named and_where/and_where_option as the builders of the Chain state, but in this fork ConditionalStatement::and_where delegates to cond_where (Condition state) and or_where no longer exists — the only Chain entry point is the doc-hidden and_or_where. Found by verify.sql while writing honest panic tests; rule corrected at +1 with operator approval, all refs re-pinned."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -305,6 +314,15 @@ children (
                         [spec:pgorm:sem:sql.ddl.panics]
                     )
                 }
+                log (
+                    {
+                        at 2026-09-02T09:29:33.929612Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "sql.ddl v0 carried three inaccuracies since adoption: (1) it claimed universal quote-doubling, but only identifiers on the Iden::prepare path double embedded quotes — index/constraint names are written raw between quotes; (2) it claimed all four wrapper enums dispatch to the builders, but only TableStatement has build/build_any/to_string methods; (3) its \"current limitation\" paragraph described src/database/statement.rs, deleted by decide.statement. Found by verify.sql; rule corrected at +1 with operator approval, all refs re-pinned."
+                        after_done true
+                    }
+                )
             }
 
             {
