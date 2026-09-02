@@ -1,11 +1,14 @@
-use bae::FromAttributes;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 
-/// Attributes to derive an ActiveModel
-#[derive(Default, FromAttributes)]
-pub struct Pgorm {
-    pub active_model: Option<syn::Ident>,
+use super::attributes::from_attributes;
+
+from_attributes! {
+    /// Attributes to derive an ActiveModel
+    #[derive(Default)]
+    pub struct Pgorm {
+        pub active_model: Option<syn::Ident>,
+    }
 }
 
 enum Error {

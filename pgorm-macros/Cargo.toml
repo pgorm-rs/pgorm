@@ -18,8 +18,7 @@ path = "src/lib.rs"
 proc-macro = true
 
 [dependencies]
-bae = { version = "0.2", package = "sea-bae", default-features = false, optional = true }
-syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "derive", "printing"] }
+syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "derive", "printing", "clone-impls", "extra-traits", "full"] }
 quote = { version = "1", default-features = false }
 heck = { version = "0.4", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
@@ -34,6 +33,6 @@ trybuild = "1.0"
 [features]
 default = ["derive"]
 postgres-array = []
-derive = ["bae"]
+derive = []
 strum = []
 seaography = []

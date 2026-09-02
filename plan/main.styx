@@ -987,6 +987,14 @@ children (
                 id polish.sea-bae
                 title "Replace sea-bae/proc-macro-error2 attribute parsing in pgorm-macros"
                 kind @refactor
+                log (
+                    {
+                        at 2026-09-02T01:38:01.86798Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
