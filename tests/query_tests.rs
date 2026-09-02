@@ -252,6 +252,28 @@ pub async fn empty_in_and_not_in_filter_asymmetry() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:def:sql.render.value-literals+1/test]    against a live server: an
+// inline char literal parses and comes back as the char it was rendered from
+#[pgorm_macros::test]
+pub async fn char_literal_round_trips_through_server() {
+    use pgorm::pgorm_query::{Query, QueryBuilder, Value};
+
+    let ctx = TestContext::new("char_literal_round_trips_through_server").await;
+    let db = ctx.db.get().await.unwrap();
+
+    for character in ['a', 'é', '—', '\''] {
+        let sql = Query::select()
+            .expr(Value::Char(Some(character)))
+            .to_string(QueryBuilder);
+        let row = db.query_one(sql.as_str(), &[]).await.unwrap();
+        let echoed: String = row.get(0);
+        assert_eq!(echoed, character.to_string());
+    }
+
+    drop(db);
+    ctx.delete().await;
+}
+
 // [spec:pgorm:sem:exec.crud.select/test]    `all` aborts on the first decode
 // error instead of yielding a partial result set
 #[pgorm_macros::test]

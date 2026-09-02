@@ -159,20 +159,23 @@ an ideal Postgres renderer would emit.
 > followed by `0 b t z n r` maps back to the control character; any other
 > escaped character maps to itself).
 
-> [spec:pgorm:def:sql.render.value-literals]
+> [spec:pgorm:def:sql.render.value-literals+1]
 > `value_to_string` defines the inline literal syntax per `Value` variant:
 >
 > Every `None` variant of every `Value` type renders as the bare keyword
 > `NULL`. `Bool` renders `TRUE` / `FALSE`. All integer, unsigned, float,
 > double, and `Decimal` values render via their plain `Display` output,
 > unquoted. `String` and `Char` render via `write_string_quoted` (see
-> `sql.render.string-escape`); `Char` is first narrowed with `*v as u8`, so
-> only the low byte of a non-ASCII char survives. `Json` renders its compact
-> serialization as a quoted string. `Bytes` renders as a Postgres hex bytea
-> literal `'\xAB01…'` with uppercase two-digit hex per byte. Chrono values
-> render single-quoted with fixed formats: date `%Y-%m-%d`, time `%H:%M:%S`,
-> naive datetime `%Y-%m-%d %H:%M:%S`, and all timezone-aware datetimes
-> `%Y-%m-%d %H:%M:%S %:z` (fractional seconds are truncated). `Uuid`,
+> `sql.render.string-escape`); a `Char` is encoded as the full UTF-8 text of its
+> scalar value and then escaped and quoted exactly as the equivalent
+> one-character `String`, so `é` renders as `'é'`, `—` as `'—'`, and `'` as
+> `E'\''`. The char is never narrowed to a single byte: rendering a char is
+> total, and the rendered text always denotes the char that was given. `Json`
+> renders its compact serialization as a quoted string. `Bytes` renders as a
+> Postgres hex bytea literal `'\xAB01…'` with uppercase two-digit hex per byte.
+> Chrono values render single-quoted with fixed formats: date `%Y-%m-%d`, time
+> `%H:%M:%S`, naive datetime `%Y-%m-%d %H:%M:%S`, and all timezone-aware
+> datetimes `%Y-%m-%d %H:%M:%S %:z` (fractional seconds are truncated). `Uuid`,
 > `IpNetwork`, and `MacAddress` render their `Display` form in single quotes.
 >
 > `Array(_, Some(v))` renders `ARRAY [e1,e2,…]` — the keyword `ARRAY`, a

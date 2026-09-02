@@ -1391,6 +1391,13 @@ children (
                         kind @note
                         text "Audit: query_builder.rs:1168 renders Value::Char via from_utf8(&[*v as u8]).unwrap() — panics for any char whose low byte is >= 0x80 ('é' U+00E9), and silently renders the WRONG character for chars above U+00FF with a low byte < 0x80 ('—' U+2014 -> 0x14). Reachable via Display for Value, sea_value_to_json_value, inject_parameters, and inline constant rendering. Also value.rs:1226 does the same from_utf8 unwrap in to-json. Fix: render the char directly. The spec is WRONG about this (sql.render.value-literals claims lossy-but-successful narrowing) — bump and correct it; sql.value.to-json may bump too."
                     }
+
+                    {
+                        at 2026-09-02T16:53:09.178481Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

@@ -1127,7 +1127,7 @@ impl QueryBuilder {
         self.value_to_string_common(v)
     }
 
-    // [spec:pgorm:def:sql.render.value-literals]
+    // [spec:pgorm:def:sql.render.value-literals+1]
     fn value_to_string_common(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {
@@ -1166,9 +1166,7 @@ impl QueryBuilder {
             Value::Float(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Double(Some(v)) => write!(s, "{v}").unwrap(),
             Value::String(Some(v)) => self.write_string_quoted(v, &mut s),
-            Value::Char(Some(v)) => {
-                self.write_string_quoted(std::str::from_utf8(&[*v as u8]).unwrap(), &mut s)
-            }
+            Value::Char(Some(v)) => self.write_string_quoted(v.encode_utf8(&mut [0u8; 4]), &mut s),
             Value::Bytes(Some(v)) => self.write_bytes(v, &mut s),
             Value::Json(Some(v)) => self.write_string_quoted(&v.to_string(), &mut s),
             Value::ChronoDate(Some(v)) => write!(s, "'{}'", v.format("%Y-%m-%d")).unwrap(),

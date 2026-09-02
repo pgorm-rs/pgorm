@@ -284,6 +284,46 @@ fn to_json_maps_scalars_natively() {
     );
 }
 
+// [spec:pgorm:def:sql.render.value-literals+1/test]    a char renders as its whole
+// UTF-8 text, quoted and escaped exactly like a one-character string
+#[test]
+fn char_renders_whole_scalar_not_low_byte() {
+    assert_eq!(Value::Char(Some('a')).to_string(), "'a'");
+    assert_eq!(Value::Char(Some('é')).to_string(), "'é'");
+    assert_eq!(Value::Char(Some('—')).to_string(), "'—'");
+    assert_eq!(Value::Char(Some('\'')).to_string(), r"E'\''");
+    assert_eq!(
+        Value::Char(Some('é')).to_string(),
+        Value::String(Some(Box::new("é".to_owned()))).to_string()
+    );
+}
+
+// [spec:pgorm:def:sql.render.value-literals+1/test]    the char literals the renderer
+// emits are ones the PostgreSQL grammar accepts
+#[test]
+fn char_literals_parse_as_postgres_literals() {
+    for (character, expected) in [
+        ('a', "SELECT 'a'"),
+        ('é', "SELECT 'é'"),
+        ('—', "SELECT '—'"),
+        ('\'', r"SELECT E'\''"),
+    ] {
+        assert_eq!(
+            Query::select()
+                .expr(Value::Char(Some(character)))
+                .to_string(QueryBuilder),
+            expected
+        );
+    }
+}
+
+// [spec:pgorm:sem:sql.value.to-json/test]    a non-ASCII char keeps its scalar value
+#[test]
+fn to_json_keeps_non_ascii_chars_whole() {
+    assert_eq!(json_of(Value::Char(Some('é'))), json!("é"));
+    assert_eq!(json_of(Value::Char(Some('—'))), json!("—"));
+}
+
 // [spec:pgorm:sem:sql.value.to-json/test]    `Bytes` goes through `from_utf8(..).unwrap()`
 #[test]
 #[should_panic]

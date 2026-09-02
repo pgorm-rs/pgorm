@@ -1120,7 +1120,7 @@ fn select_62() {
 
 // [spec:pgorm:def:sql.ast.insert/test]
 // [spec:pgorm:req:sql.render.insert/test]
-// [spec:pgorm:def:sql.render.value-literals/test]
+// [spec:pgorm:def:sql.render.value-literals+1/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_2() {

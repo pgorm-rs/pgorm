@@ -309,6 +309,7 @@ derived_priorities (
 )
 
 assertions (
+    {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
     {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
     {id decide.cli, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:33:17.849875Z}
