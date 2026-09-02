@@ -1316,4 +1316,412 @@ children (
             }
         )
     }
+
+    {
+        id bug
+        title "Correctness bugs surfaced by the panic/unrepresentable audit"
+        kind @fix
+        children (
+            {
+                id bug.relation-pairing
+                title "ColumnPairs: relation join zip-truncation silently returns wrong rows on arity mismatch"
+                deps (decide.schema-comments)
+                log (
+                    {
+                        at 2026-09-02T12:33:24.161274Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: src/query/helper.rs:893-894 zips from_col/to_col Identity iterators; zip truncates to the shorter side, emitting an under-constrained join — wrong rows, silently. Same def in DDL (relation.rs:422-433) iterates independently and PG rejects with 42804. Remedy is the structural fix: replace the two Identity fields with a ColumnPairs newtype (non-empty Vec of (DynIden, DynIden) pairs) so unbalanced arity cannot exist. Readers to update: loader.rs, schema/entity.rs, link.rs; DeriveRelation output changes shape but not behavior. Bumps entity.relation.def and query.build.join. Also worthwhile while in the struct: is_owner+rel_type collapse into one closed enum (contradiction currently renders a correct join with a backwards FK). Deps on decide.schema-comments only for the schema/entity.rs footprint."
+                    }
+                )
+            }
+
+            {
+                id bug.empty-not-in
+                title "Empty NOT IN renders always-false; correct semantics are always-true"
+                log (
+                    {
+                        at 2026-09-02T12:33:31.16277Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: pgorm-query/src/backend/query_builder.rs:440-451 maps BOTH In and NotIn over an empty tuple to the always-false 'a'='b'. Empty NOT IN is vacuously TRUE — current behavior silently returns zero rows where all rows are correct. Two-line fix (render always-true for NotIn); bumps sql.ast.expr.in and sql.render.empty-in, both of which pin the wrong behavior, and flips the pinning tests."
+                    }
+                )
+            }
+
+            {
+                id bug.char-render
+                title "Value::Char rendering panics on U+0080..FF and mis-renders higher chars via byte narrowing"
+                deps (bug.empty-not-in)
+                log (
+                    {
+                        at 2026-09-02T12:33:39.009301Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: query_builder.rs:1168 renders Value::Char via from_utf8(&[*v as u8]).unwrap() — panics for any char whose low byte is >= 0x80 ('é' U+00E9), and silently renders the WRONG character for chars above U+00FF with a low byte < 0x80 ('—' U+2014 -> 0x14). Reachable via Display for Value, sea_value_to_json_value, inject_parameters, and inline constant rendering. Also value.rs:1226 does the same from_utf8 unwrap in to-json. Fix: render the char directly. The spec is WRONG about this (sql.render.value-literals claims lossy-but-successful narrowing) — bump and correct it; sql.value.to-json may bump too."
+                    }
+                )
+            }
+
+            {
+                id bug.window-position
+                title "WINDOW clause renders after ORDER BY/LIMIT/locking; PG requires it before ORDER BY"
+                deps (bug.char-render)
+                log (
+                    {
+                        at 2026-09-02T12:33:46.917044Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: prepare_select_statement writes ORDER BY (query_builder.rs:262), LIMIT/OFFSET (:273), locking (:275), THEN the named WINDOW clause (:280). PostgreSQL grammar places WINDOW between HAVING and ORDER BY, so window() combined with any of those renders a syntax error; existing tests only exercise window in isolation. Plain rendering-order fix; bumps sql.render.window (and check sql.render.select-order's clause-order claim). Add a combined window+order_by+limit test."
+                    }
+                )
+            }
+
+            {
+                id bug.ident-escaping
+                title "Route the six raw index/constraint/FK name interpolations through DynIden escaping"
+                deps (bug.window-position)
+                log (
+                    {
+                        at 2026-09-02T12:33:55.46788Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: six sites write a raw String between quote characters with no embedded-quote doubling — query_builder.rs:2089-2097 (CONSTRAINT), :2123-2131 (CREATE INDEX), :2179-2187 (DROP INDEX), :2262-2269 and :2294-2302 (FK names). Backing field is name: Option<String> in pgorm-query/src/index/common.rs:6. Converting to DynIden routes through Iden::prepare's escaping (types.rs:17-25) and closes an identifier-injection hole. Note verify.sql's tests pinned the no-doubling behavior on the ddl rule (sql.ddl+1) — that clause flips and re-bumps. Security-motivated; worth doing regardless of API cost."
+                    }
+                )
+            }
+
+            {
+                id bug.insert-empty-model
+                title "Insert of an all-NotSet model dodges the empty failsafe and renders INSERT INTO t ()"
+                log (
+                    {
+                        at 2026-09-02T12:34:02.694428Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: the empty-batch failsafe tests insert_struct.columns.is_empty() (src/executor/insert.rs:57,79,101), but Insert::add pushes one bool PER COLUMN for the first model (src/query/insert.rs:135-140) — an all-NotSet model yields [false,false,...], non-empty, so Empty never fires and INSERT INTO \"t\" () reaches the server. One-line runtime fix (.iter().any(|c| *c)); deeper option is making emptiness a real state on Insert rather than a bitmap predicate. Bumps query.build.insert.empty-failsafe; extend the pinning tests with the all-NotSet single-model case."
+                    }
+                )
+            }
+
+            {
+                id bug.query-doctests
+                title "Fix the two pgorm-query doctests calling the nonexistent Expr::asterisk"
+                kind @docs
+                log (
+                    {
+                        at 2026-09-02T12:34:09.767269Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit (found in passing by the empty-select-list agent): cargo test --doc -p pgorm-query fails 2 doctests — SelectStatement::from and from_values both call a nonexistent Expr::asterisk. Pre-existing; the doctest-restore campaign was root-crate scoped so pgorm-query doctests never ran. Fix the two examples and consider whether pgorm-query doctests should join a routine verification command."
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id nopanic
+        title "De-panic campaign: caller-input panics become typed errors [dec:pgorm:no-panic]"
+        kind @fix
+        children (
+            {
+                id nopanic.loader
+                title "Loader family: nine panics inside Result-returning load_one/load_many paths become DbErr"
+                log (
+                    {
+                        at 2026-09-02T12:34:18.152146Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: 9 sites in src/query/loader.rs, all inside already-Result functions — :229 expect on hashmap key (DATA-DEPENDENT: fires when join keys round-trip asymmetrically, i32<->i64 relations, char(n) padding, citext — survives testing, panics in production); :354-:398 seven panics in extract_key on any hand-written RelationDef naming a column absent from the Column enum; :445 unimplemented on unsupported TableRef. Remedy: extract_key -> Result<ValueTuple, DbErr>, table_column -> Result; no API break. Bumps query.loader.regroup, query.loader.batching, query.loader.table-ref-limitation (all three pin the panics; verify.query's tests pin them too and flip)."
+                    }
+                )
+            }
+
+            {
+                id nopanic.value-tuple
+                title "FromValueTuple arity panics on the insert/update hot path become typed errors"
+                log (
+                    {
+                        at 2026-09-02T12:34:38.170738Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: pgorm-query/src/value.rs:1110/:1126/:1143/:1165 — FromValueTuple arity mismatches panic, and both ORM call sites are on the CRUD hot path (src/executor/insert.rs:236, src/executor/update.rs:179 — every insert/update carrying an explicit PK). Both call sites already return Result<_, DbErr>. Remedy: fallible TryFromValueTuple (or Result-returning from_value_tuple), DbErr at the exec boundary. Bumps sql.value.tuple. Breaking inside pgorm-query only."
+                    }
+                )
+            }
+
+            {
+                id nopanic.connect-builders
+                title "connect_with_builder and connect_multi_with_builder return Result; plain connect stays infallible"
+                log (
+                    {
+                        at 2026-09-02T12:34:45.968375Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit (both sides argued): plain connect (src/database/mod.rs:24) can only fail on pgorm's own defaults — the deliberate-infallibility argument holds; keep it, reframe the expect as an internal invariant. connect_with_builder (:49) and connect_multi_with_builder (:77) take CALLER CLOSURES over PoolBuilder — caller input under the ban, and pool sizing comes from env/config in practice; failure is process death at startup. Convert both to Result<_, DbErr>. Bumps conn.pool and conn.pool.multi (both currently pin the panic in prose). verify.conn's pool_config_tests pin the panic via catch_unwind — flips to assert Err."
+                    }
+                )
+            }
+
+            {
+                id nopanic.codegen-gate
+                title "Codegen validates at transform time: TransformError replaces the wildcard and entry-point panics"
+                log (
+                    {
+                        at 2026-09-02T12:34:57.375819Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: gate everything at EntityTransformer::transform, which already returns Result with TransformError — zero writer churn. Covers: writer.rs:98/:114 bonus_derive/bonus_attributes .parse().unwrap() (bare LexError on a typo in the public entry point; EntityWriterContext::new -> Result); column.rs:82/:179 the operator-approved unimplemented! wildcards (validate types at transform: \"table X column Y: unsupported type Z\" — the rule codegen.entity.types.unsupported currently MANDATES the panic and must be rewritten); column.rs:268 \"ColumnType should not be empty\" (TryFrom<&ColumnDef>); relation.rs:225 + transformer.rs:83 RefTable unwraps; base_entity.rs:196 PK-name/column cross-check missing; transformer.rs:28 inline TableRef match — util::unpack_table_ref already handles all variants, just call it; the DB-name->format_ident! family (~17 sites, labels like \"1\" or \"_\" panic) via one shared safe_ident -> Result. Also: EntityWriterContext's 13-positional-arg constructor with 6 unlabelled bools is the adjacent invalid-states fix (options struct) — fold in if cheap. Bumps codegen.entity.{types.unsupported,context,transform,keywords,enums}."
+                    }
+                )
+            }
+
+            {
+                id nopanic.macro-spans
+                title "Derive macros emit spanned syn::Error instead of unspanned panics on malformed input"
+                log (
+                    {
+                        at 2026-09-02T12:35:11.646657Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: pgorm-macros unspanned panics on real user code. sql_type_match.rs:48/:101 — quote!{ty}.to_string().replace(' ',\"\") mangles whitespace-bearing types (&'a str -> &'astr) then .parse().expect fires; fix by matching &syn::Type structurally (this IS the unrepresentable rung). lib.rs:148 \"Struct name must be Model\"; value_type.rs:24/:26 expects; derive_iden.rs:76 expect(\"something something\") — all become spanned syn::Error (each is spec-pinned as a wart: entity-model.reject, value-type, iden). active_model.rs:55 + model.rs:60 enum_name parse_str().unwrap() — closures already return syn::Result, just ?. Ident::new/format_ident! on camel-cased field names (entity_model.rs:105, active_model.rs:46, model.rs:52, partial_model.rs:92/:108) — heck maps _ -> \"\" and _1 -> \"1\", both panic; spanned error on field.ident. Also value_type.rs:62 .unwrap_or(()) silently swallows attribute parse errors — pinned as Limitation, fix with ?. Generated-code runtime panics (model/active_model field-mismatch, entity_model.rs:96 Table-as-column) are NOT this node — they need trait-signature decisions; left for a future unrep node. partial_model.rs:150/:155 entity unwrap: move entity into the ColumnAs variants (S, internal)."
+                    }
+                )
+            }
+
+            {
+                id nopanic.free-wins
+                title "Free wins: panics inside Result-returning fns, a discarded error, stale Panics docs"
+                log (
+                    {
+                        at 2026-09-02T12:35:22.78268Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit free-win list: src/entity/active_enum.rs:166/:184 panic inside fns already returning Result<_, TryGetError> — return Err (zero API break); pgorm-query/src/value.rs:768 Array try_from maps .unwrap() over element conversions INSIDE a Result fn, discarding the error — collect::<Result<_,_>>(); src/query/combine.rs:15 lone bare unwrap escaping the lint via macro — .expect for consistency; stale # Panics docs with no panic behind them (src/entity/active_model.rs:102, src/executor/update.rs:54 — the latter still claims a backend switch this fork deleted); pgorm-migration/src/util.rs:6 get_file_stem unwrap — make pub(crate) so it's a true internal invariant; migrator.rs:244 SystemTime expect inside Result fn -> DbErr. Schema::create_enum_from_active_enum (src/schema/entity.rs:105) panics on non-enum db_type — input the crate's OWN doc example constructs (active_enum.rs:76-79); return Result (rule schema.from-entity.enum bumps). Pool's 8 poison unwraps deliberately SKIPPED: verbatim upstream deadpool, currently unreachable — divergence cost outweighs defence-in-depth."
+                    }
+                )
+            }
+
+            {
+                id nopanic.value-accessors
+                title "Value accessors return Option instead of panicking on wrong variants (14 sites)"
+                log (
+                    {
+                        at 2026-09-02T12:35:31.449133Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: 14 as_ref_* wrong-variant panics in pgorm-query/src/value.rs:845-1015, the family the no-panic decision names first. The is_*/as_ref_* pairing is itself the representable invalid state. Remedy: non-panicking as_* accessors returning Option (decide whether to preserve the NULL-vs-wrong-variant distinction via Option<Option<&T>> or collapse — collapsing is simpler and is_* remains the discriminator). Also value.rs:185/:189 ValueType::unwrap/expect — delete (callers use try_from); value.rs:817 unimplemented \"Vector does not have array type\" — add the ArrayType member or split array-capability. Rewrites sql.value.accessor-panics (which pins every panic) and its verify.sql test pins. Breaking."
+                    }
+                )
+            }
+
+            {
+                id nopanic.delete-one
+                title "Delete::one returns a typed error on unset primary key, mirroring Update::one"
+                log (
+                    {
+                        at 2026-09-02T12:35:40.1039Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Follow-up flagged by polish.error-dead-code: Delete::one (src/query/delete.rs:118) keeps the \"PrimaryKey is not set\" panic; plumbing is textually identical to update's but fully independent. Same shape as the landed fix: Delete::one -> Result<DeleteOne<A>, DbErr>, EntityTrait::delete forwards, guard at the builder so an unfiltered DeleteOne is unrepresentable (a WHERE-less DELETE is worse than the update case). OPEN DECISION for the operator at start: reuse DbErr::UpdateGetPrimaryKey (misnamed for delete) vs rename the variant to something neutral like PrimaryKeyNotSet (breaking, touches error.model). Bumps query.build.delete; flips delete_one_panics_on_unset_primary_key."
+                    }
+                )
+            }
+
+            {
+                id nopanic.insert-uniform
+                title "Insert columns-mismatch panic becomes DbErr at the exec boundary"
+                deps (bug.insert-empty-model)
+                log (
+                    {
+                        at 2026-09-02T12:35:48.158981Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit consensus (root auditor + design auditor agree): the \"columns mismatch\" panic at src/query/insert.rs:139 — trivially reachable via insert_many over models with differing NotSet fields — becomes a recorded error surfaced as DbErr at the already-fallible exec* boundary, mirroring the TryInsert empty-failsafe pattern. The type-level ColumnSet witness was assessed L-for-the-benefit and rejected; the mistake is loud and immediate once typed. Bumps query.build.insert.uniform-columns (named in both decisions' scope) and flips the should_panic pin in query_build_tests. Deps on bug.insert-empty-model (same files)."
+                    }
+                )
+            }
+
+            {
+                id nopanic.paginator-raw
+                title "SelectorRaw pagination: blind byte-slice and offset multiplication become typed errors"
+                log (
+                    {
+                        at 2026-09-02T12:35:55.805951Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: src/executor/paginator.rs:251 — SelectorRaw pagination slices self.stmt.trim()[6..] assuming a SELECT prefix: any statement under 6 bytes, a WITH...CTE, or a non-boundary byte at index 6 panics; input is fully caller-controlled via the public SelectorRaw::from_statement. Fix: case-insensitive strip_prefix + DbErr (decide where the Result lands — fetch_page vs paginate). Also :54 offset(page_size * page) u64 overflow: debug panic, release silent wrap = wrong OFFSET; checked_mul -> DbErr or saturating. Bumps exec.paginator.raw and exec.paginator.fetch."
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id unrep
+        title "Unrepresentable-states campaign: type-level redesigns [dec:pgorm:invalid-states-unrepresentable]"
+        kind @refactor
+        children (
+            {
+                id unrep.select-only
+                title "select_only typestate: empty projection, model-decode lie and alias panics die at compile time"
+                log (
+                    {
+                        at 2026-09-02T12:36:08.54349Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit design on file (design-lens report): select_only() breaks three invariants while keeping the type — empty projection (NOTE: SELECT FROM is VALID PG since 9.4, returns zero-column rows; .count() over it silently works — quietly-broken), the E::Model decode lie (custom projection still promises all() -> Vec<E::Model>), and the apply_alias panics (src/query/combine.rs:49-65, reachable via find_also_related after select_only().expr(..)). Full design: SelectCustom<E> (no terminal ops) -> SelectProjected<E> (no all()->E::Model, no find_also_related) with SelectColumns gaining an associated Projected type (fixpoint bound); derive macro cost is ONE token (-> S becomes -> S::Projected; single blanket impl at src/query/traits.rs:96). Sized L, semver-major, ~55 mechanical call sites; M checkpoint = two-state SelectProjection<E> (type-preserving, partial-model machinery unchanged, closes diseases 2+3 but not the empty projection — keep the landed runtime guard regardless; it protects raw pgorm-query users either way). OPERATOR DECISION at start: L full typestate vs M checkpoint. Bonus of full: zero-field DerivePartialModel becomes a compile error. Bumps query.build.modifiers+1, query.build.combine, entity traits rules as touched. Fold the four combine.rs alias panics into this node (typed error for whatever stays reachable)."
+                    }
+                )
+            }
+
+            {
+                id unrep.transaction-mode
+                title "TransactionMode enum: only meaningful isolation/access/deferrable combinations exist"
+                log (
+                    {
+                        at 2026-09-02T12:36:17.213011Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: TransactionOptions (src/database/db_connection.rs:67-75) has three independent fields; deferrable:true does NOTHING unless the transaction is both SERIALIZABLE and READ ONLY — constructible, accepted by PG, silent no-op. Also read_only:bool collapses tokio-postgres's three access states, so READ WRITE cannot be forced on a default_transaction_read_only=on session. Redesign: closed TransactionMode enum { Default, ReadWrite{isolation}, ReadOnly{isolation}, DeferrableSnapshot } — only meaningful combinations exist. Smallest, newest surface (begin_with/transaction_with/transaction_with_retry, landed this campaign); best effort-to-correctness ratio. Bumps conn.tx+1 -> +2; verify tests updated. S."
+                    }
+                )
+            }
+
+            {
+                id unrep.condition-chain
+                title "Delete the chain condition style; ConditionHolder collapses to Option of Condition"
+                log (
+                    {
+                        at 2026-09-02T12:36:26.397942Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit finding that changes the calculus: .and_where(/.or_where( has ZERO call sites in src/ — the entire ORM uses cond_where/cond_having exclusively; all 129 occurrences are pgorm-query's own tests/doctests. So the fix is DELETION, not typestate: drop or_where (sole source of chain heterogeneity), re-express and_where as cond_where(Condition::all().add(e)), delete the doc-hidden and_or_where, and ConditionHolderContents collapses to Option<Condition> — both mixing panics (condition.rs:634-636, :662-664) become unconstructible. Honest cost: parenthesization renders through the ordinary expression path, so many pinned assert strings churn (semantically equivalent, textually different). Bumps sql.ast.condition.holder+1 -> +2 and guts the legacy-chain half of sql.render.condition-chain. M, dominated by test churn."
+                    }
+                )
+            }
+
+            {
+                id unrep.cte-builders
+                title "CTE builders: complete constructors only; thirteen render-time unwraps become unconstructible"
+                log (
+                    {
+                        at 2026-09-02T12:36:35.509386Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: 13 category-A render-time unwraps, all one defect — public new()-then-mutate builders for Search/Cycle/CommonTableExpression/WithQuery produce all-None structs that fail only at render, where NO Result channel exists, so the type-level fix is the only fix. Sites: with.rs:223/:252 (bare discarded .unwrap() used as an assertion!), query_builder.rs:847-974 (query/order/expr/alias/set_as/using/table_name unwraps), :916 assert_ne empty-CTE-list, :923 assert_eq exactly-one-for-recursive. Remedy: delete partial builders, keep the complete constructors that already exist (Search::new_from_order_and_expr, Cycle::new_from_expr_set_using) with non-Option fields; WithClause holds a non-empty collection; recursive-with becomes a distinct type holding exactly one CTE. Bumps sql.ast.with.recursive, sql.render.cte, sql.ast.with. L, breaking."
+                    }
+                )
+            }
+
+            {
+                id unrep.tableref-split
+                title "Split TableRef (DDL, three variants) from FromItem (query position); five wildcard panics die"
+                log (
+                    {
+                        at 2026-09-02T12:36:45.101032Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: the crate's highest-leverage unrepresentable change. TableRef spans two disjoint uses; DDL-position code has five wildcard panics for query-position variants (query_builder.rs:1938, :2153, :2176, :2351, :2483). Split into TableRef (DDL/name-only: Table, SchemaTable, DatabaseSchemaTable — and consider dropping DatabaseSchemaTable entirely: PG rejects cross-database refs, see mysql-purge) and FromItem (query position wrapping alias/subquery/values/function forms). The five panics delete themselves, compiler-enforced. Note the just-landed CommentTable in pgorm-query/src/comment.rs is a mini version of this pattern — unify with it. Fold in query_builder.rs:1727 \"No alter option found\" (non-empty options) and the auto_increment unimplemented at :1582 (serial-family constructors replacing the orthogonal flag) if the touch is natural. Bumps sql.types.table-ref, sql.ddl.panics, several DDL rules. M/L, breaking."
+                    }
+                )
+            }
+
+            {
+                id unrep.on-conflict
+                title "OnConflict as a closed action enum; dangling DO UPDATE SET and bare ON CONFLICT unconstructible"
+                log (
+                    {
+                        at 2026-09-02T12:36:53.249538Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: OnConflict has three independent fields (targets/action/action_where, on_conflict.rs:5-10). action:None renders bare \"ON CONFLICT \"; Update(vec![]) renders dangling \"DO UPDATE SET \"; do_nothing().action_and_where(p) renders DO NOTHING WHERE which PG only permits on DO UPDATE; OnConflict::new() is documented in-tree as designed for MySQL. Redesign: mandatory target + closed enum ConflictAction { DoNothing, Update { sets: non-empty, filter: Option<Condition> } } — all four invalid shapes unconstructible. Coordinates with the landed get_on_conflict accessor (try-insert fix). Bumps sql.ast.on-conflict, sql.render.on-conflict. M, breaking."
+                    }
+                )
+            }
+
+            {
+                id unrep.page-size
+                title "Paginator page_size becomes NonZeroU64; the assert and division hazard disappear"
+                deps (nopanic.paginator-raw)
+                log (
+                    {
+                        at 2026-09-02T12:37:00.752748Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: the textbook case — paginate(db, page_size) asserts page_size != 0 at both construction sites (src/executor/paginator.rs:230, :250) and the rule exec.paginator.page-size currently states a zero page size \"is never a recoverable DbErr\" (that sentence is the fix's whole spec cost). NonZeroU64 removes the assert AND the compute_pages_number division hazard; field already pub(crate). Breaking but mechanical (PaginatorTrait signatures). Deps on nopanic.paginator-raw for the shared file. S."
+                    }
+                )
+            }
+
+            {
+                id unrep.cursor-arity
+                title "Cursor keyset arity threaded through IntoIdentity::ValueType; window bounds become one enum"
+                log (
+                    {
+                        at 2026-09-02T12:37:10.539165Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: cursor_by<C: IntoIdentity> and after/before<V: IntoValueTuple> share no type relationship — cursor_by((A,B)).after(1) compiles, panics \"column arity mismatch\" at cursor.rs:186 (spec-pinned by exec.cursor.keyset). Design: IntoIdentity gains type ValueType: IntoValueTuple (arities married through the existing 12-arity macro); Cursor<S, K = ValueTuple>; after/before take K. Escape hatch: impl for Identity keeps runtime arity with the check becoming DbErr per no-panic. Also in the same struct: first/last Option pair upheld by discipline only -> Option<Window> enum (exec.cursor.window); .after(x).desc() silently reverses bound meaning — note in rule. Semver-major, mechanical (15 in-crate impls). M. Bumps exec.cursor.keyset, exec.cursor.window."
+                    }
+                )
+            }
+
+            {
+                id unrep.mysql-purge
+                title "Purge MySQL-era surface that renders invalid or lying Postgres SQL"
+                deps (bug.ident-escaping unrep.tableref-split)
+                log (
+                    {
+                        at 2026-09-02T12:37:22.9137Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: PG-only fork, so variants rendering invalid or lying SQL are invalid states by definition. Delete/collapse: TableOpt Engine/Collate/CharacterSet (render ENGINE=x etc — PG syntax errors; create.rs:69-73, builders :189-207, render query_builder.rs:1981-83) + uninhabited TablePartition; ColumnType::Year + ColumnDef::year() (only outcome is a panic, query_builder.rs:1709); Money(Some((p,s))) renders money(p,s) — PG money takes no args (collapse to Money, delete money_len; sql.ddl.column-types+1 acknowledges); Unsigned/BigUnsigned render signed integer/bigint (lying types — delete, TinyUnsigned/SmallUnsigned precedent); TinyInteger duplicates SmallInteger; Blob/Binary(u32)/VarBinary all render bytea with length silently discarded; DateTime vs Timestamp spell the same PG type twice; JoinOn::Columns never constructed, renders unimplemented (types.rs:251); SelectDistinct::DistinctRow unreachable dead (select.rs:57); TableRef::DatabaseSchemaTable — PG rejects cross-database refs (coordinate with tableref-split). Each S; one sweep node. Bumps sql.ddl.column-types, sql.types.column-type, others as touched."
+                    }
+                )
+            }
+
+            {
+                id unrep.index-kind
+                title "IndexKind closed enum: primary/unique bools no longer render CREATE PRIMARY KEY INDEX"
+                deps (bug.ident-escaping)
+                log (
+                    {
+                        at 2026-09-02T12:37:31.087317Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: IndexCreateStatement's primary and unique are independent bools (index/create.rs:108-109) emitted unconditionally by prepare_index_prefix (query_builder.rs:2207-2214) into CREATE ... INDEX — .primary() renders CREATE PRIMARY KEY INDEX (invalid; PRIMARY KEY is only an inline table constraint), both true renders CREATE PRIMARY KEY UNIQUE INDEX. Closed enum IndexKind { Plain, Unique, PrimaryKey } with PrimaryKey restricted to the inline-constraint path. S. Deps on bug.ident-escaping (same query_builder index region). Bumps sql.ddl.index-create."
+                    }
+                )
+            }
+
+            {
+                id unrep.save-intent
+                title "save() intent inference cannot distinguish Set from Unchanged; explicit entry points instead"
+                log (
+                    {
+                        at 2026-09-02T12:37:39.844041Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: ActiveModelTrait::save branches on is_not_set(pk) (src/entity/active_model.rs:228-240), which cannot distinguish Set from Unchanged — for a manually-keyed entity the caller always populates the key, so save can NEVER insert. Pinned as a documented limitation by entity.active-model.save and by the verify.entity test (save_manual_key_always_updates). The intent is unrepresentable in the input, not merely unchecked: the fix is explicit entry points (insert/update/upsert) rather than inference — decide whether save survives at all (deletion candidate under house policy) or becomes upsert-backed. M, breaking, operator input on the API shape at start. Bumps entity.active-model.save, entity.active-model.persistence."
+                    }
+                )
+            }
+
+            {
+                id unrep.build-any
+                title "Collapse the build_any indirection; the unit QueryBuilder argument disappears workspace-wide"
+                deps (unrep.tableref-split unrep.mysql-purge)
+                log (
+                    {
+                        at 2026-09-02T12:37:48.934815Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: build_any/to_string_any/build_collect_any (~29 sites across schema.rs, table/*, index/*, foreign_key/*, query/*) are sea-query multi-backend vestige — every call passes the single unit-struct QueryBuilder, which carries no state. Collapse to one method per statement and drop the QueryBuilder argument workspace-wide (pgorm-query + root crate + migration call sites + tests). Purely mechanical but the widest churn in the campaign — hence last, deps on tableref-split and mysql-purge. Bumps sql.ast.build, sql.ddl and every rule naming build_any. M."
+                    }
+                )
+            }
+        )
+    }
 )
