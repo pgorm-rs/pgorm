@@ -1,6 +1,6 @@
 use super::*;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::extension::Type;
-use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.ddl.type-enum/test]
 #[test]
@@ -140,7 +140,7 @@ fn alter_3() {
 
 #[test]
 fn alter_4() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Type::alter()
             .name(Font::Table)
             .rename_to(Alias::new("typeface"))
@@ -162,7 +162,7 @@ fn alter_5() {
 
 #[test]
 fn alter_6() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Type::alter()
             .name((Alias::new("schema"), Font::Table))
             .rename_to(Alias::new("typeface"))

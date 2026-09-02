@@ -11,6 +11,8 @@ use std::ops::Deref;
 const QUOTE: Quote = Quote(b'"', b'"');
 
 // [spec:pgorm:def:sql.render]
+// [spec:pgorm:req:sql.render.oracle] (the renderer whose every output the oracle in
+// pgorm-query/tests/postgres/oracle.rs holds to the libpg_query grammar)
 #[derive(Debug, Clone, Copy)]
 pub struct QueryBuilder;
 

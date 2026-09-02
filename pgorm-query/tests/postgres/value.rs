@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::assert_eq;
 
 fn json_of(value: Value) -> serde_json::Value {
     sea_value_to_json_value(&value)

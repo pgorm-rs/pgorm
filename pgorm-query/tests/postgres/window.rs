@@ -1,12 +1,12 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:def:sql.ast.window-statement/test]    PARTITION BY accumulates from all four entry
 // points
 // [spec:pgorm:req:sql.render.window/test]    an inline window renders ` OVER ( … )`
 #[test]
 fn window_1() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -17,7 +17,7 @@ fn window_1() {
         r#"SELECT "character" OVER ( PARTITION BY "font_size" ) FROM "character""#
     );
 
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window_as(
@@ -44,7 +44,7 @@ fn window_1() {
 // [spec:pgorm:req:sql.render.window/test]    ` PARTITION BY … ORDER BY …`
 #[test]
 fn window_2() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window_as(
@@ -65,7 +65,7 @@ fn window_2() {
     );
 
     // A window with no partition at all is just its ORDER BY.
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -83,7 +83,7 @@ fn window_2() {
 // the start bound alone
 #[test]
 fn window_3() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -101,7 +101,7 @@ fn window_3() {
         .join(" ")
     );
 
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -124,7 +124,7 @@ fn window_3() {
     );
 
     // The last `frame`/`frame_start`/`frame_between` call wins.
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -152,7 +152,7 @@ fn window_3() {
 // followed by the keyword, with no separating space
 #[test]
 fn window_4() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -174,7 +174,7 @@ fn window_4() {
     );
 
     // Inline, the same shape drops the placeholder but keeps the missing space.
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -198,7 +198,7 @@ fn window_4() {
 // [spec:pgorm:req:sql.render.window/test]    a named reference renders ` OVER "name"`
 #[test]
 fn window_5() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window_name(Expr::col(Char::Character), Alias::new("w"))
@@ -214,7 +214,7 @@ fn window_5() {
         .join(" ")
     );
 
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window_name_as(Expr::col(Char::Character), Alias::new("w"), Alias::new("C"))
@@ -235,7 +235,7 @@ fn window_5() {
 // a second `window()` call replaces the first
 #[test]
 fn window_6() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .from(Char::Table)
             .expr_window_name(Expr::col(Char::Character), Alias::new("w2"))

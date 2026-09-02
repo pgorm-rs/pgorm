@@ -1,5 +1,5 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ddl.foreign-key/test]
 #[test]

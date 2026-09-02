@@ -1,5 +1,5 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ast/test]
 // [spec:pgorm:def:sql.ast.select/test]
@@ -1657,7 +1657,7 @@ fn update_3() {
 
 #[test]
 fn update_4() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::update()
             .table(Glyph::Table)
             .value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1))
@@ -2211,7 +2211,7 @@ fn keywords_1() {
 // `NullAlias` is the empty identifier
 #[test]
 fn keywords_2() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Query::select()
             .expr_as(Expr::col(Glyph::Id), Alias::new("an alias"))
             .expr_as(Expr::col(Glyph::Aspect), NullAlias::new())

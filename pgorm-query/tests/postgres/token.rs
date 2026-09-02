@@ -1,5 +1,5 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::assert_eq;
 
 // [spec:pgorm:def:sql.token/test]    input is held as a `Vec<char>` plus a cursor
 #[test]

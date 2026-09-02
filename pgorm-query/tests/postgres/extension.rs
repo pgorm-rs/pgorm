@@ -1,6 +1,6 @@
 use super::*;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::extension::{Extension, PgLTree};
-use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.ddl.extension/test]    every part of the CREATE EXTENSION grammar
 #[test]
@@ -14,7 +14,7 @@ fn create_1() {
 // [spec:pgorm:req:sql.ddl.extension/test]
 #[test]
 fn create_2() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Extension::create()
             .name("ltree")
             .schema("public")
@@ -69,7 +69,7 @@ fn drop_1() {
             .to_string(QueryBuilder),
         r#"DROP EXTENSION ltree RESTRICT"#
     );
-    assert_eq!(
+    assert_eq_unparsed!(
         Extension::drop()
             .name("ltree")
             .cascade()
@@ -90,7 +90,7 @@ fn extension_strings_are_interpolated_raw() {
         .version("1.0; --")
         .to_owned();
 
-    assert_eq!(
+    assert_eq_unparsed!(
         statement.build_collect(QueryBuilder, &mut sql),
         r#"CREATE EXTENSION pg"weird ext WITH SCHEMA my schema VERSION 1.0; --"#
     );
@@ -98,7 +98,7 @@ fn extension_strings_are_interpolated_raw() {
     let (_, values) = sql.into_parts();
     assert_eq!(values, Values(vec![]));
 
-    assert_eq!(
+    assert_eq_unparsed!(
         Extension::drop()
             .name(r#"pg"weird ext"#)
             .to_string(QueryBuilder),

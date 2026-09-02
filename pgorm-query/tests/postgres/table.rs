@@ -1,5 +1,5 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+1/test]
 // [spec:pgorm:req:sql.ddl.column-def+1/test]
@@ -138,7 +138,7 @@ fn create_5() {
 
 #[test]
 fn create_6() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Table::create()
             .table(Glyph::Table)
             .col(
@@ -219,7 +219,7 @@ fn create_9() {
 
 #[test]
 fn create_10() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Table::create()
             .table(Glyph::Table)
             .col(
@@ -461,7 +461,7 @@ fn alter_6() {
 
 #[test]
 fn alter_7() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Table::alter()
             .table(Font::Table)
             .add_column(ColumnDef::new(Alias::new("new_col")).integer())
@@ -548,7 +548,7 @@ fn rename_1() {
 
 #[test]
 fn rename_2() {
-    assert_eq!(
+    assert_eq_unparsed!(
         Table::rename()
             .table(
                 (Alias::new("schema"), Font::Table),

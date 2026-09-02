@@ -328,6 +328,7 @@ assertions (
     {id nopanic.loader, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:48:35.194948Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
+    {id pgparse.oracle, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:06:45.622062Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}
     {id polish.error-dead-code, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:21:39.370499Z}
     {id polish.gates, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:56.935942Z}

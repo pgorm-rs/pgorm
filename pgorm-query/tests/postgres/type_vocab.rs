@@ -1,5 +1,5 @@
 use super::*;
-use pretty_assertions::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:def:sql.types.column-ref/test]    the five forms and what `IntoColumnRef` maps onto them
 #[test]
@@ -268,7 +268,7 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::CosineDistance, "<=>"),
         (BinOper::Custom("~~"), "~~"),
     ] {
-        assert_eq!(
+        assert_eq_unparsed!(
             rendered(op),
             format!(r#"SELECT "aspect" {lexeme} 1"#),
             "unexpected rendering for {op:?}"

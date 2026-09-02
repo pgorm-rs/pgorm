@@ -1,6 +1,6 @@
 use super::*;
+use crate::oracle::{assert_eq, assert_query_eq};
 use pgorm_query::extension::{Extension, Type};
-use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.ddl+2/test]    the whole DDL surface is reachable through the six
 // entry-point helpers
@@ -122,11 +122,11 @@ fn every_ddl_entry_point_is_reachable() {
 #[test]
 fn schema_statement_builder_trio_agrees() {
     fn assert_trio<S: SchemaStatementBuilder>(statement: &S, expected: &str) {
-        assert_eq!(statement.build(QueryBuilder), expected);
-        assert_eq!(statement.build_any(&QueryBuilder), expected);
-        assert_eq!(
-            SchemaStatementBuilder::to_string(statement, QueryBuilder),
-            expected
+        assert_query_eq(&statement.build(QueryBuilder), expected);
+        assert_query_eq(&statement.build_any(&QueryBuilder), expected);
+        assert_query_eq(
+            &SchemaStatementBuilder::to_string(statement, QueryBuilder),
+            expected,
         );
     }
 

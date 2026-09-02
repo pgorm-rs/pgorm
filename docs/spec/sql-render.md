@@ -36,6 +36,47 @@ an ideal Postgres renderer would emit.
 > placeholder string and a `numbered` flag; `into_parts()` returns the final
 > `(String, Values)` pair (the `build()` path).
 
+## Render conformance
+
+> [spec:pgorm:req:sql.render.oracle]
+> Every string `QueryBuilder` renders — through the `to_string()` path with
+> literals inlined, or through the `build()` path with `$N` placeholders — MUST
+> parse under the PostgreSQL grammar. The contract is enforced inside the test
+> suite by an oracle: pgorm-query carries a dev-dependency on `pg_query`, the
+> Rust binding to libpg_query (the PostgreSQL server's own parser), pinned to
+> the 6.x line. That line carries the PG17 grammar, which for every construct
+> this renderer emits is a superset of the PG16 grammar the live test server
+> speaks; the 5.x line carries PG16 exactly but does not build against a current
+> macOS SDK, whose `string.h` declares the `strchrnul` that libpg_query 16 also
+> defines.
+>
+> The oracle is `pgorm-query/tests/postgres/oracle.rs`. `assert_parses` feeds a
+> string to the parser and fails with the parser's message and a caret at the
+> token it names; `assert_query_eq` pairs that check with the expected spelling;
+> and an `assert_eq!` shim — imported by a test module in place of
+> `pretty_assertions::assert_eq` — applies the oracle to any left-hand `String`
+> or `&str` that opens with a statement keyword, so the existing render
+> assertions are held to the grammar without being rewritten one by one.
+> Rendered fragments that are not whole statements are skipped by that keyword
+> test. `oracle_sweep.rs` additionally composes a matrix of builder outputs —
+> select/join/CTE/window/union/locking shapes, INSERT/UPDATE/DELETE with
+> RETURNING and ON CONFLICT, the DDL statements, the `ColumnType` and `BinOper`
+> vocabularies, and the `build()` placeholder path — and requires every
+> rendering to parse.
+>
+> The oracle is syntax-only: it has no catalog, so unknown tables and columns,
+> misapplied type modifiers (`money(12, 2)`), an empty select list
+> (`SELECT  FROM "t"`, which is valid PostgreSQL), and cross-database references
+> all pass. The live-Postgres integration suite remains the semantic oracle.
+>
+> Known exceptions MUST be pinned, not skipped. Each render the grammar rejects
+> today has an `oracle_pins_*` test in
+> `pgorm-query/tests/postgres/oracle_pins.rs` asserting the rejection and naming,
+> in a comment, the plan node that fixes it; the assertion site that produces
+> such a render is marked `assert_eq_unparsed!` rather than left on the
+> oracle-checked `assert_eq!`. A pin fails as soon as its render becomes valid,
+> so a fix cannot land without the pin being retired.
+
 ## Placeholders and parameters
 
 > [spec:pgorm:req:sql.render.placeholders]

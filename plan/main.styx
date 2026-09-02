@@ -1834,6 +1834,13 @@ children (
                         kind @note
                         text "Design: dev-dependency on the pg_query crate (pganalyze's libpg_query binding — the actual PostgreSQL server parser). Operator has explicitly waived the C-build-time tax (sole user). Two layers: (1) an assert helper wrapping the render paths in pgorm-query's test suite so every to_string()/build() output must pg_query::parse cleanly — retrofit the existing ~300 render tests through it cheaply (a wrapper on the common assert pattern, not 300 edits); (2) a property layer composing arbitrary builder chains -> render -> must parse. OPEN DECISION at start: version pin — pg_query 5.x speaks PG16 grammar (matches the pgorm-test container), 6.x speaks PG17; pick the conformance target and record it. KNOWN EXPECTED FAILURES the oracle will immediately flag (these are the campaign's bug nodes — mark as known-failing until each lands): WINDOW clause position, ENGINE=/COLLATE= table opts, money(p,s), CREATE PRIMARY KEY INDEX, dangling ON CONFLICT/DO UPDATE SET shapes, Year (panics before render). This node lands BEFORE the renderer campaign — every renderer-touching node now deps on it. Syntax-only ceiling: no catalog, unknown tables/columns pass; the live-PG integration suite remains the semantic oracle."
                     }
+
+                    {
+                        at 2026-09-02T16:06:45.622062Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
