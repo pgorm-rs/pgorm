@@ -821,6 +821,20 @@ children (
                     }
                 )
             }
+
+            {
+                id decide.turso
+                title "Evaluate Turso's Postgres frontend as a secondary compat/test target"
+                kind @chore
+                log (
+                    {
+                        at 2026-09-02T00:16:02.981765Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope sketch (from operator discussion, 2026-09-02): Turso's Postgres frontend (announced July 2026, explicitly experimental, no compat matrix published yet) is NOT a replacement test oracle — the suite pins real-Postgres semantics (multi-database DDL with FORCE, enum types, citext, SQLSTATE fidelity incl. 40001 write-skew, binary wire formats, server-side parameter-type inference) and real PG16 stays the conformance source. The evaluation: run the restored suite against turso main, catalogue pass/fail by concern, and decide whether \"pgorm against embedded Turso\" is worth supporting as a secondary target for local dev. Priority deliberately unpinned per operator."
+                    }
+                )
+            }
         )
     }
 )
