@@ -58,26 +58,64 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias string.
 
-> [spec:pgorm:sem:query.build.modifiers+1]
-> `QuerySelect` mutates the select statement in place: `select_only()` clears
-> the entire select list; `column` appends a column through
-> `col.select_as(col.into_expr())` (same enum-cast rule as the default list);
-> `columns` iterates `column`; `column_as` / `expr_as` / `tbl_col_as` append
-> an expression with an explicit alias; `expr` / `exprs` append raw select
-> expressions. `offset` and `limit` take `Into<Option<u64>>`: `Some(n)` sets
-> the clause (last call wins), `None` removes it. `group_by` adds a GROUP BY
-> expression, `having` accumulates AND-ed HAVING conditions, `distinct` /
-> `distinct_on` add DISTINCT / DISTINCT ON, and `lock`, `lock_shared`,
-> `lock_exclusive` and `lock_with_behavior` add row-locking clauses.
-> `SelectColumns` (in `traits.rs`) re-exposes `column`/`column_as` as
+> [spec:pgorm:sem:query.build.modifiers+2]
+> `QuerySelect` mutates the select statement in place: `column` appends a
+> column through `col.select_as(col.into_expr())` (same enum-cast rule as the
+> default list); `columns` iterates it; `column_as` / `expr_as` / `expr_as_` /
+> `tbl_col_as` append an expression with an explicit alias; `expr` / `exprs`
+> append raw select expressions. `offset` and `limit` take
+> `Into<Option<u64>>`: `Some(n)` sets the clause (last call wins), `None`
+> removes it. `group_by` adds a GROUP BY expression, `having` accumulates
+> AND-ed HAVING conditions, `distinct` / `distinct_on` add DISTINCT /
+> DISTINCT ON, and `lock`, `lock_shared`, `lock_exclusive` and
+> `lock_with_behavior` add row-locking clauses. `SelectColumns` (in
+> `traits.rs`) re-exposes `column`/`column_as` as
 > `select_column`/`select_column_as` for partial-model queries.
 >
-> `select_only()` therefore leaves the statement in a state that renders as
-> `SELECT  FROM "tbl"` until a column or expression is re-added, and rendering
-> keeps emitting exactly that: `to_string` / `build` have no `Result` channel,
-> so they are not where the mistake is caught. The guard is at the execution
-> boundary instead. Every ORM path that would send a SELECT whose projection
-> list is empty MUST return
+> Clearing the select list is a typestate transition, not an in-place
+> mutation, and `select_only` is therefore NOT a `QuerySelect` method.
+> `Select<E>::select_only()` returns `SelectCustom<E>` and
+> `SelectTwo<E, F>::select_only()` returns `SelectTwoCustom<E, F>`;
+> `SelectProjected<E>` and `SelectTwoProjected<E, F>` carry the same method
+> to start a projection over. `SelectTwoMany<E, F>` and `Cursor<S, K>` —
+> whose select lists their own machinery owns — cannot clear one at all.
+>
+> Every projection method returns `QuerySelect::Projected` rather than
+> `Self`, under the fixpoint bound
+> `Projected: QuerySelect<Projected = Self::Projected>`. `Select<E>`,
+> `SelectTwo<E, F>`, `SelectTwoMany<E, F>`, `Cursor<S, K>`,
+> `SelectProjected<E>` and `SelectTwoProjected<E, F>` project onto
+> themselves; `SelectCustom<E>` projects onto `SelectProjected<E>` and
+> `SelectTwoCustom<E, F>` onto `SelectTwoProjected<E, F>`. `SelectColumns`
+> mirrors the associated type through its blanket impl over `QuerySelect`,
+> which is what lets `PartialModelTrait::select_cols<S>` return
+> `S::Projected` (`entity.traits.from-query-result`).
+>
+> The two `Custom` states have no execution path at all: no `all` / `one` /
+> `one_opt` / `stream`, no `into_model` / `into_tuple` / `into_values` /
+> `into_partial_model`, no `paginate` / `count` / `cursor_by`. The two
+> `Projected` states carry the terminals that name a decode target —
+> `into_model`, `into_tuple`, `into_values`, `into_partial_model` (which
+> re-clears the list, so the partial model owns the whole projection), and
+> `cursor_by` plus `cursor_by_other` on the two-model form — but not the
+> `E::Model`-typed ones, and not `select_also` / `select_with` /
+> `find_also_related` / `find_with_related` / `find_also_linked` /
+> `find_with_linked`: a caller's projection is neither `E::Model`'s shape nor
+> carries the `A_`/`B_` aliases those need (`query.build.combine`).
+> `SelectProjected::cursor_by` and `SelectTwoProjected::cursor_by` /
+> `cursor_by_other` accordingly yield `Cursor<SelectUndecoded, K>`, which is
+> not a `SelectorTrait` and so has no `all` until `Cursor::into_model` or
+> `into_partial_model` names one.
+>
+> Both `Custom` states keep the whole of `QueryTrait`, `QueryFilter` and
+> `QueryOrder`: a cleared select list still renders as `SELECT  FROM "tbl"`,
+> and `to_string` / `build` have no `Result` channel, so rendering is not
+> where the mistake is caught. The typestate keeps the ORM's own builders out
+> of the empty-projection state, but two seams remain — an empty
+> `columns([])` / `exprs([])` iterator, and a `SelectStatement` handed
+> straight to `Selector::with_columns` / `Selector::into_tuple` — so the
+> execution-boundary guard stays. Every ORM path that would send a SELECT
+> whose projection list is empty MUST return
 > `DbErr::Query(RuntimeErr::Internal("select list is empty; add at least one
 > column or expression"))` before any statement reaches the server: the paths
 > are `Selector::one` / `one_opt` / `all` / `stream` (and everything routed
@@ -117,14 +155,24 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `reverse_join(R)` performs an INNER JOIN using `R::to()` in the reverse
 > direction.
 
-> [spec:pgorm:sem:query.build.combine]
+> [spec:pgorm:sem:query.build.combine+1]
 > `SelectTwo`/`SelectTwoMany` use a fixed column-aliasing scheme
 > (`combine.rs`): `select_also(F)` / `select_with(F)` first rewrite every
 > select expression of `E` with the `A_` prefix via `apply_alias` (an existing
-> alias becomes `A_<alias>`; an unaliased entry must be a plain column or an
-> `AsEnum`-wrapped column, whose name becomes `A_<column>`; any other
-> expression, including asterisks, panics), then append every `F::Column` as
-> `<select_as expr> AS B_<column>`.
+> alias becomes `A_<alias>`; an unaliased plain column, or an
+> `AsEnum`-wrapped one, becomes `A_<column>`), then append every `F::Column`
+> as `<select_as expr> AS B_<column>`.
+>
+> An unaliased entry with no column name to take — an asterisk, or an
+> expression that is neither a column nor an `AsEnum`-wrapped column — has no
+> correct `A_` name, so `apply_alias` leaves it exactly as written and MUST
+> NOT panic. Such an entry belongs to neither model and neither model's
+> decode looks for it; the models' own columns are aliased either way.
+>
+> These combinators live on `Select<E>` only. A select whose projection was
+> cleared by `select_only` does not carry them at all
+> (`query.build.modifiers`), which is what keeps a wholly caller-authored
+> select list — where every entry could be unaliasable — out of the scheme.
 >
 > `SelectTwoMany::new` additionally appends `ORDER BY <E primary key> ASC`
 > for each primary-key column, so that consecutive rows for the same left

@@ -2,7 +2,8 @@ use super::select::ensure_select_list;
 use crate::{
     ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoBoundary,
     IntoIdentity, PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select,
-    SelectModel, SelectTwo, SelectTwoModel, SelectorTrait, error::query_err,
+    SelectModel, SelectProjected, SelectTwo, SelectTwoModel, SelectTwoProjected, SelectorTrait,
+    error::query_err,
 };
 use pgorm_query::{
     Condition, DynIden, Expr, Order, QueryBuilder, SeaRc, SelectStatement, SimpleExpr, Value,
@@ -35,13 +36,19 @@ impl Window {
     }
 }
 
+/// A cursor over a custom projection that has not named its decode target.
+///
+/// It is not a [`SelectorTrait`], so [`Cursor::all`] does not exist until
+/// [`Cursor::into_model`] or [`Cursor::into_partial_model`] says what the rows
+/// are.
+// [spec:pgorm:sem:query.build.modifiers+2]
+#[derive(Clone, Copy, Debug)]
+pub struct SelectUndecoded;
+
 /// Cursor pagination
-// [spec:pgorm:def:exec.cursor+1]
+// [spec:pgorm:def:exec.cursor+2]
 #[derive(Debug, Clone)]
-pub struct Cursor<S, K = ValueTuple>
-where
-    S: SelectorTrait,
-{
+pub struct Cursor<S, K = ValueTuple> {
     query: SelectStatement,
     table: DynIden,
     order_columns: Identity,
@@ -74,10 +81,7 @@ fn value_tuple_arity(values: &ValueTuple) -> usize {
     }
 }
 
-impl<S, K> Cursor<S, K>
-where
-    S: SelectorTrait,
-{
+impl<S, K> Cursor<S, K> {
     /// Create a new cursor
     pub fn new<C>(query: SelectStatement, table: DynIden, order_columns: C) -> Self
     where
@@ -320,6 +324,46 @@ where
         self
     }
 
+    /// Construct a [Cursor] that fetch any custom struct
+    pub fn into_model<M>(self) -> Cursor<SelectModel<M>, K>
+    where
+        M: FromQueryResult,
+    {
+        Cursor {
+            query: self.query,
+            table: self.table,
+            order_columns: self.order_columns,
+            window: self.window,
+            after: self.after,
+            before: self.before,
+            sort_asc: self.sort_asc,
+            is_result_reversed: self.is_result_reversed,
+            phantom: PhantomData,
+            secondary_order_by: self.secondary_order_by,
+        }
+    }
+
+    /// Return a [`Cursor`] from `Self` that wraps a [`SelectModel`] decoding a
+    /// [`PartialModelTrait`] type
+    pub fn into_partial_model<M>(mut self) -> Cursor<SelectModel<M>, K>
+    where
+        M: PartialModelTrait,
+    {
+        self.query.clear_selects();
+        M::select_cols(self).into_model::<M>()
+    }
+
+    /// Set the cursor ordering for another table when dealing with SelectTwo
+    pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(DynIden, Identity)>) -> &mut Self {
+        self.secondary_order_by = tbl_col;
+        self
+    }
+}
+
+impl<S, K> Cursor<S, K>
+where
+    S: SelectorTrait,
+{
     /// Fetch the paginated result
     // [spec:pgorm:sem:exec.cursor.order]
     pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, DbErr>
@@ -348,57 +392,22 @@ where
         }
         Ok(buffer)
     }
-
-    /// Construct a [Cursor] that fetch any custom struct
-    pub fn into_model<M>(self) -> Cursor<SelectModel<M>, K>
-    where
-        M: FromQueryResult,
-    {
-        Cursor {
-            query: self.query,
-            table: self.table,
-            order_columns: self.order_columns,
-            window: self.window,
-            after: self.after,
-            before: self.before,
-            sort_asc: self.sort_asc,
-            is_result_reversed: self.is_result_reversed,
-            phantom: PhantomData,
-            secondary_order_by: self.secondary_order_by,
-        }
-    }
-
-    /// Return a [`Cursor`] from `Self` that wraps a [`SelectModel`] decoding a
-    /// [`PartialModelTrait`] type
-    pub fn into_partial_model<M>(self) -> Cursor<SelectModel<M>, K>
-    where
-        M: PartialModelTrait,
-    {
-        M::select_cols(QuerySelect::select_only(self)).into_model::<M>()
-    }
-
-    /// Set the cursor ordering for another table when dealing with SelectTwo
-    pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(DynIden, Identity)>) -> &mut Self {
-        self.secondary_order_by = tbl_col;
-        self
-    }
 }
 
-impl<S, K> QuerySelect for Cursor<S, K>
-where
-    S: SelectorTrait,
-{
+impl<S, K> QuerySelect for Cursor<S, K> {
     type QueryStatement = SelectStatement;
+    type Projected = Self;
 
     fn query(&mut self) -> &mut SelectStatement {
         &mut self.query
     }
+
+    fn into_projected(self) -> Self::Projected {
+        self
+    }
 }
 
-impl<S, K> QueryOrder for Cursor<S, K>
-where
-    S: SelectorTrait,
-{
+impl<S, K> QueryOrder for Cursor<S, K> {
     type QueryStatement = SelectStatement;
 
     fn query(&mut self) -> &mut SelectStatement {
@@ -407,7 +416,7 @@ where
 }
 
 /// A trait for any type that can be turn into a cursor
-// [spec:pgorm:def:exec.cursor+1]
+// [spec:pgorm:def:exec.cursor+2]
 pub trait CursorTrait {
     /// Select operation
     type Selector: SelectorTrait + Send + Sync;
@@ -501,6 +510,67 @@ where
 
     /// Convert into a cursor using column of second entity
     pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
+    where
+        C: IdentityOf<F>,
+    {
+        let primary_keys: Vec<(DynIden, Identity)> = <E::PrimaryKey as Iterable>::iter()
+            .map(|pk| {
+                (
+                    SeaRc::new(E::default()),
+                    Identity::Unary(SeaRc::new(pk.into_column())),
+                )
+            })
+            .collect();
+        let mut cursor = Cursor::new(self.query, SeaRc::new(F::default()), order_columns);
+        cursor.set_secondary_order_by(primary_keys);
+        cursor
+    }
+}
+
+// [spec:pgorm:sem:query.build.modifiers+2]
+impl<E> SelectProjected<E>
+where
+    E: EntityTrait,
+{
+    /// Convert into a cursor whose rows have no decode target yet — the
+    /// projection is the caller's, not `E::Model`'s, so
+    /// [`Cursor::into_model`] or [`Cursor::into_partial_model`] has to name
+    /// one before the cursor can be fetched.
+    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
+    where
+        C: IntoIdentity,
+    {
+        Cursor::new(self.query, SeaRc::new(E::default()), order_columns)
+    }
+}
+
+// [spec:pgorm:sem:query.build.modifiers+2]
+impl<E, F> SelectTwoProjected<E, F>
+where
+    E: EntityTrait,
+    F: EntityTrait,
+{
+    /// Convert into a cursor using a column of the first entity. As with
+    /// [`SelectProjected::cursor_by`], the decode target is still open.
+    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
+    where
+        C: IdentityOf<E>,
+    {
+        let primary_keys: Vec<(DynIden, Identity)> = <F::PrimaryKey as Iterable>::iter()
+            .map(|pk| {
+                (
+                    SeaRc::new(F::default()),
+                    Identity::Unary(SeaRc::new(pk.into_column())),
+                )
+            })
+            .collect();
+        let mut cursor = Cursor::new(self.query, SeaRc::new(E::default()), order_columns);
+        cursor.set_secondary_order_by(primary_keys);
+        cursor
+    }
+
+    /// Convert into a cursor using a column of the second entity.
+    pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
     where
         C: IdentityOf<F>,
     {

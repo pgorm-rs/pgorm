@@ -1,7 +1,8 @@
 use crate::{
     ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
-    PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult,
-    QuerySelect, Select, SelectA, SelectB, SelectTwo, SelectTwoMany, TryGetableMany, error::*,
+    PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, Select,
+    SelectA, SelectB, SelectProjected, SelectTwo, SelectTwoMany, SelectTwoProjected,
+    TryGetableMany, error::*,
 };
 use futures::{Stream, StreamExt};
 use pgorm_query::{QueryBuilder, SelectStatement, Value, Values};
@@ -22,7 +23,11 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The guard every ORM path that sends a `SELECT` passes through: a statement
 /// whose projection list is empty renders as `SELECT  FROM "tbl"`, which the
 /// server rejects with an opaque syntax error, so it is refused here instead.
-// [spec:pgorm:sem:query.build.modifiers+1]
+///
+/// The `select_only` typestate keeps the ORM's own builders out of this state,
+/// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
+/// [`SelectStatement`] both still reach it.
+// [spec:pgorm:sem:query.build.modifiers+2]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), DbErr> {
     if query.selects().is_empty() {
         return Err(DbErr::Query(RuntimeErr::Internal(
@@ -250,7 +255,7 @@ where
     where
         M: PartialModelTrait,
     {
-        M::select_cols(QuerySelect::select_only(self)).into_model::<M>()
+        M::select_cols(self.select_only()).into_model::<M>()
     }
 
     /// Decode selected columns into a value or tuple named by a column enum.
@@ -435,6 +440,111 @@ where
     }
 }
 
+// [spec:pgorm:sem:query.build.modifiers+2]
+impl<E> SelectProjected<E>
+where
+    E: EntityTrait,
+{
+    /// Name the type the custom projection decodes into.
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, FromQueryResult};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// #[derive(Debug, FromQueryResult)]
+    /// struct NameOnly {
+    ///     name: String,
+    /// }
+    ///
+    /// let db = pool.get().await?;
+    ///
+    /// let names: Vec<NameOnly> = cake::Entity::find()
+    ///     .select_only()
+    ///     .column(cake::Column::Name)
+    ///     .into_model::<NameOnly>()
+    ///     .all(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    pub fn into_model<M>(self) -> Selector<SelectModel<M>>
+    where
+        M: FromQueryResult,
+    {
+        Selector {
+            query: self.query,
+            selector: SelectModel { model: PhantomData },
+        }
+    }
+
+    /// Decode the custom projection into a value or tuple named by a column
+    /// enum. See [`Select::into_values`].
+    pub fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
+    where
+        T: TryGetableMany,
+        C: strum::IntoEnumIterator + pgorm_query::Iden,
+    {
+        Selector::<SelectGetableValue<T, C>>::with_columns(self.query)
+    }
+
+    /// Decode the custom projection into a value or tuple by ordinal
+    /// position. See [`Select::into_tuple`].
+    pub fn into_tuple<T>(self) -> Selector<SelectGetableTuple<T>>
+    where
+        T: TryGetableMany,
+    {
+        Selector::<SelectGetableTuple<T>>::into_tuple(self.query)
+    }
+
+    /// Replace the projection with the one the partial model declares.
+    ///
+    /// The partial model owns the whole select list, exactly as it does on
+    /// [`Select::into_partial_model`]; the projection built so far is
+    /// discarded, while filters, joins and ordering are kept.
+    pub fn into_partial_model<M>(self) -> Selector<SelectModel<M>>
+    where
+        M: PartialModelTrait,
+    {
+        M::select_cols(self.select_only()).into_model::<M>()
+    }
+}
+
+// [spec:pgorm:sem:query.build.modifiers+2]
+impl<E, F> SelectTwoProjected<E, F>
+where
+    E: EntityTrait,
+    F: EntityTrait,
+{
+    /// Name the pair of types the custom projection decodes into. The `A_` and
+    /// `B_` column-name prefixes still apply, so the projection has to alias
+    /// its expressions accordingly.
+    pub fn into_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
+    where
+        M: FromQueryResult,
+        N: FromQueryResult,
+    {
+        Selector {
+            query: self.query,
+            selector: SelectTwoModel { model: PhantomData },
+        }
+    }
+
+    /// Replace the projection with the two partial models' declared columns.
+    pub fn into_partial_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
+    where
+        M: PartialModelTrait,
+        N: PartialModelTrait,
+    {
+        let select = self.select_only();
+        let select = M::select_cols(select);
+        let select = N::select_cols(select);
+        select.into_model::<M, N>()
+    }
+}
+
 impl<E, F> SelectTwo<E, F>
 where
     E: EntityTrait,
@@ -458,7 +568,7 @@ where
         M: PartialModelTrait,
         N: PartialModelTrait,
     {
-        let select = QuerySelect::select_only(self);
+        let select = self.select_only();
         let select = M::select_cols(select);
         let select = N::select_cols(select);
         select.into_model::<M, N>()

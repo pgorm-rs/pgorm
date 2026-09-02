@@ -78,16 +78,25 @@ pub trait QueryTrait {
 }
 
 /// Select specific column for partial model queries
+// [spec:pgorm:sem:query.build.modifiers+2]
 pub trait SelectColumns {
+    /// The state this builder moves to once a column has been selected.
+    ///
+    /// The bound is a fixpoint: projecting an already-projected builder lands
+    /// on the same type again, so a chain of any length has one type — and a
+    /// chain of length *zero* does not, which is what makes a field-less
+    /// `DerivePartialModel` fail to compile.
+    type Projected: SelectColumns<Projected = Self::Projected>;
+
     /// Add a select column
     ///
     /// For more detail, please visit [QuerySelect::column]
-    fn select_column<C: ColumnTrait>(self, col: C) -> Self;
+    fn select_column<C: ColumnTrait>(self, col: C) -> Self::Projected;
 
     /// Add a select column with alias
     ///
     /// For more detail, please visit [QuerySelect::column_as]
-    fn select_column_as<C, I>(self, col: C, alias: I) -> Self
+    fn select_column_as<C, I>(self, col: C, alias: I) -> Self::Projected
     where
         C: IntoSimpleExpr,
         I: IntoIdentity;
@@ -97,11 +106,13 @@ impl<S> SelectColumns for S
 where
     S: QuerySelect,
 {
-    fn select_column<C: ColumnTrait>(self, col: C) -> Self {
+    type Projected = <S as QuerySelect>::Projected;
+
+    fn select_column<C: ColumnTrait>(self, col: C) -> Self::Projected {
         QuerySelect::column(self, col)
     }
 
-    fn select_column_as<C, I>(self, col: C, alias: I) -> Self
+    fn select_column_as<C, I>(self, col: C, alias: I) -> Self::Projected
     where
         C: IntoSimpleExpr,
         I: IntoIdentity,

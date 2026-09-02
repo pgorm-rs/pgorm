@@ -794,6 +794,19 @@ pub fn derive_from_json_query_result(input: TokenStream) -> TokenStream {
 ///     sum: i32
 /// }
 /// ```
+///
+/// A partial model with no fields selects nothing, so it cannot return the
+/// `SelectColumns::Projected` state `select_cols` promises. The empty
+/// projection is a compile error rather than a query that renders
+/// `SELECT  FROM "tbl"`.
+///
+/// ```compile_fail,E0308
+/// use pgorm::{entity::prelude::*, FromQueryResult, DerivePartialModel};
+///
+/// #[derive(Debug, FromQueryResult, DerivePartialModel)]
+/// #[pgorm(entity = "Entity")]
+/// struct SelectNothing {}
+/// ```
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DerivePartialModel, attributes(pgorm))]
 pub fn derive_partial_model(input: TokenStream) -> TokenStream {

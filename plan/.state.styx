@@ -358,6 +358,7 @@ assertions (
     {id unrep.cte-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:04:04.408634Z}
     {id unrep.cursor-arity, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:12:23.476753Z}
     {id unrep.save-intent, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:58:52.648048Z}
+    {id unrep.select-only, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:10:14.926388Z}
     {id unrep.transaction-mode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:45:38.889783Z}
     {id verify.codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:24:36.309541Z}
     {id verify.conn, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:40:21.722896Z}

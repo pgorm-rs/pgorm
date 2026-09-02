@@ -298,11 +298,14 @@ pub async fn select_only_exclude_option_fields() {
     .expect("could not insert customer");
 
     // An absent column is not a NULL value: only `WasNull` decodes to `None`,
-    // every other decode error propagates.
+    // every other decode error propagates. A custom projection has to name the
+    // model it decodes into, so the mismatch is a decode error, not a silent
+    // `Vec<customer::Model>`.
     let err = Customer::find()
         .select_only()
         .column(customer::Column::Id)
         .column(customer::Column::Name)
+        .into_model::<customer::Model>()
         .all(&db)
         .await
         .expect_err("an absent `notes` column must not decode as None");
@@ -314,6 +317,7 @@ pub async fn select_only_exclude_option_fields() {
         .column(customer::Column::Id)
         .column(customer::Column::Name)
         .column(customer::Column::Notes)
+        .into_model::<customer::Model>()
         .all(&db)
         .await
         .unwrap();

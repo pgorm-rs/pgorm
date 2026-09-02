@@ -2,7 +2,9 @@ use crate::{
     ColumnTrait, EntityTrait, IdenStatic, Iterable, QueryTrait, Select, SelectTwo, SelectTwoMany,
 };
 use core::marker::PhantomData;
-use pgorm_query::{Alias, ColumnRef, Iden, Order, SeaRc, SelectExpr, SelectStatement, SimpleExpr};
+use pgorm_query::{
+    Alias, ColumnRef, DynIden, Iden, Order, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
+};
 
 macro_rules! select_def {
     ( $ident: ident, $str: expr ) => {
@@ -27,7 +29,19 @@ macro_rules! select_def {
 select_def!(SelectA, "A_");
 select_def!(SelectB, "B_");
 
-// [spec:pgorm:sem:query.build.combine]
+/// The identifier an unaliased column reference can be renamed after; an
+/// asterisk names no single column and so has none.
+// [spec:pgorm:sem:query.build.combine+1]
+fn named_column(col_ref: &ColumnRef) -> Option<&DynIden> {
+    match col_ref {
+        ColumnRef::Column(col)
+        | ColumnRef::TableColumn(_, col)
+        | ColumnRef::SchemaTableColumn(_, _, col) => Some(col),
+        ColumnRef::Asterisk | ColumnRef::TableAsterisk(_) => None,
+    }
+}
+
+// [spec:pgorm:sem:query.build.combine+1]
 impl<E> Select<E>
 where
     E: EntityTrait,
@@ -40,32 +54,22 @@ where
                     sel.alias = Some(SeaRc::new(Alias::new(alias)));
                 }
                 None => {
+                    // An entry with neither an alias nor a column to name
+                    // itself after has no `A_`/`B_` name to take, so it is
+                    // left as written: it belongs to neither model, and
+                    // neither model's decode looks for it.
                     let col = match &sel.expr {
-                        SimpleExpr::Column(col_ref) => match &col_ref {
-                            ColumnRef::Column(col)
-                            | ColumnRef::TableColumn(_, col)
-                            | ColumnRef::SchemaTableColumn(_, _, col) => col,
-                            ColumnRef::Asterisk | ColumnRef::TableAsterisk(_) => {
-                                panic!("cannot apply alias for Column with asterisk")
-                            }
-                        },
+                        SimpleExpr::Column(col_ref) => named_column(col_ref),
                         SimpleExpr::AsEnum(_, simple_expr) => match simple_expr.as_ref() {
-                            SimpleExpr::Column(col_ref) => match &col_ref {
-                                ColumnRef::Column(col)
-                                | ColumnRef::TableColumn(_, col)
-                                | ColumnRef::SchemaTableColumn(_, _, col) => col,
-                                ColumnRef::Asterisk | ColumnRef::TableAsterisk(_) => {
-                                    panic!("cannot apply alias for AsEnum with asterisk")
-                                }
-                            },
-                            _ => {
-                                panic!("cannot apply alias for AsEnum with expr other than Column")
-                            }
+                            SimpleExpr::Column(col_ref) => named_column(col_ref),
+                            _ => None,
                         },
-                        _ => panic!("cannot apply alias for expr other than Column or AsEnum"),
+                        _ => None,
                     };
-                    let alias = format!("{}{}", pre, col.to_string().as_str());
-                    sel.alias = Some(SeaRc::new(Alias::new(alias)));
+                    if let Some(col) = col {
+                        let alias = format!("{}{}", pre, col.to_string().as_str());
+                        sel.alias = Some(SeaRc::new(Alias::new(alias)));
+                    }
                 }
             };
         });

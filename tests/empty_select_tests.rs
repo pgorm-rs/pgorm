@@ -10,8 +10,9 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
     ActiveValue::Set, DatabaseConnection, DbErr, PaginatorTrait, QuerySelect, RuntimeErr,
-    entity::prelude::*,
+    SelectGetableTuple, SelectProjected, Selector, entity::prelude::*,
 };
+use pgorm_query::SelectStatement;
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -21,6 +22,7 @@ async fn main() {
 
     let db = ctx.db.get().await.unwrap();
     empty_select_list_is_refused(&db).await;
+    raw_builder_select_list_is_refused(&db).await;
     populated_select_list_still_runs(&db).await;
 
     drop(db);
@@ -43,37 +45,45 @@ fn assert_empty_select_list(err: DbErr) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    every execution path over a
+/// `SelectCustom` has no execution path at all, so the guard is reached
+/// through the one projection method that can add nothing: an empty iterator.
+fn empty_projection() -> SelectProjected<Bakery> {
+    Bakery::find()
+        .select_only()
+        .columns(std::iter::empty::<bakery::Column>())
+}
+
+// [spec:pgorm:sem:query.build.modifiers+2/test]    every execution path over a
 // statement whose projection list is empty returns DbErr::Query before the
 // statement is sent
 pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_model::<bakery::Model>()
             .all(db)
             .await
             .expect_err("all over an empty select list"),
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_model::<bakery::Model>()
             .one(db)
             .await
             .expect_err("one over an empty select list"),
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_model::<bakery::Model>()
             .one_opt(db)
             .await
             .expect_err("one_opt over an empty select list"),
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_model::<bakery::Model>()
             .stream(db)
             .await
             .err()
@@ -81,8 +91,7 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
             .into_tuple::<i32>()
             .all(db)
             .await
@@ -93,14 +102,16 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
         Bakery::find()
             .find_also_related(Baker)
             .select_only()
+            .columns(std::iter::empty::<bakery::Column>())
+            .into_model::<bakery::Model, baker::Model>()
             .all(db)
             .await
             .expect_err("select-two over an empty select list"),
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_tuple::<i32>()
             .paginate(db, 10)
             .fetch()
             .await
@@ -108,17 +119,17 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
+            .into_tuple::<i32>()
             .count(db)
             .await
             .expect_err("count over an empty select list"),
     );
 
     assert_empty_select_list(
-        Bakery::find()
-            .select_only()
+        empty_projection()
             .cursor_by(bakery::Column::Id)
+            .into_model::<bakery::Model>()
             .first(10)
             .all(db)
             .await
@@ -126,7 +137,18 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    a statement whose projection
+// [spec:pgorm:sem:query.build.modifiers+2/test]    a hand-rolled statement,
+// which the typestate never sees, is refused by the same guard
+pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
+    assert_empty_select_list(
+        Selector::<SelectGetableTuple<i32>>::into_tuple::<i32>(SelectStatement::new())
+            .all(db)
+            .await
+            .expect_err("raw statement with no projection"),
+    );
+}
+
+// [spec:pgorm:sem:query.build.modifiers+2/test]    a statement whose projection
 // list is non-empty is untouched by the guard
 pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
     Bakery::insert(bakery::ActiveModel {
@@ -150,6 +172,7 @@ pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
     let counted = Bakery::find()
         .select_only()
         .column(bakery::Column::Id)
+        .into_tuple::<i32>()
         .count(db)
         .await
         .expect("count over a re-populated select list");
@@ -173,6 +196,7 @@ pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
             bakery::Column::ProfitMargin,
         ])
         .cursor_by(bakery::Column::Id)
+        .into_model::<bakery::Model>()
         .first(10)
         .all(db)
         .await

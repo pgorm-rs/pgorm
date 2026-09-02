@@ -160,7 +160,7 @@ impl DerivePartialModel {
         quote! {
             #[automatically_derived]
             impl pgorm::PartialModelTrait for #ident{
-                fn select_cols<S: pgorm::SelectColumns>(#select_ident: S) -> S{
+                fn select_cols<S: pgorm::SelectColumns>(#select_ident: S) -> S::Projected {
                     #(#select_col_code_gen)*
                     #select_ident
                 }
@@ -169,7 +169,7 @@ impl DerivePartialModel {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.partial-model]
+// [spec:pgorm:sem:macros.derive.partial-model+1]
 pub fn expand_derive_partial_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 
@@ -245,7 +245,7 @@ struct PartialModel{
     expr_field : i32
 }
 "#;
-    // [spec:pgorm:sem:macros.derive.partial-model/test]
+    // [spec:pgorm:sem:macros.derive.partial-model+1/test]
     #[test]
     fn test_load_macro_input() -> StdResult<()> {
         let input = parse_str::<DeriveInput>(CODE_SNIPPET)?;

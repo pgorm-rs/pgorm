@@ -366,7 +366,7 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+2/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions, and
 // `SelectColumns` re-exposes the first two
@@ -427,7 +427,7 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+2/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -442,7 +442,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+2/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -478,7 +478,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+2/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -526,7 +526,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+1/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+2/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {
@@ -712,7 +712,7 @@ fn related_helpers_join_via_then_target() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine/test]    `select_also` / `select_with`
+// [spec:pgorm:sem:query.build.combine+1/test]    `select_also` / `select_with`
 // rewrite E's select list with the `A_` prefix (alias, plain column and
 // `AsEnum`-wrapped column alike) and append every F column as `B_<column>`
 #[test]
@@ -748,7 +748,7 @@ fn combine_prefixes_both_column_sets() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine/test]    `SelectTwoMany::new` appends the
+// [spec:pgorm:sem:query.build.combine+1/test]    `SelectTwoMany::new` appends the
 // primary-key ORDER BY that keeps a left model's rows adjacent; `SelectTwo`
 // adds no ordering. `find_also_related` / `find_with_related` are exactly
 // `left_join` plus `select_also` / `select_with`
@@ -795,7 +795,7 @@ fn select_with_orders_by_primary_key() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine/test]    a `Linked` chain LEFT JOINs each
+// [spec:pgorm:sem:query.build.combine+1/test]    a `Linked` chain LEFT JOINs each
 // hop as `r{i}` (joining from `r{i-1}`, or the base table at i = 0) and selects
 // the final target's columns from the last alias; `find_with_linked` skips the
 // primary-key ORDER BY that `find_with_related` adds
@@ -849,26 +849,42 @@ fn find_linked_aliases_every_hop() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine/test]    an unaliased asterisk in the
-// select list cannot be prefixed, so `apply_alias` panics
+// [spec:pgorm:sem:query.build.combine+1/test]    an unaliased asterisk names no
+// single column, so it is carried through unprefixed rather than aliased
 #[test]
-#[should_panic(expected = "cannot apply alias for Column with asterisk")]
-fn combine_panics_on_asterisk_select() {
-    let _ = cake::Entity::find()
-        .select_only()
-        .expr(Expr::col(Asterisk))
-        .select_also(fruit::Entity);
+fn combine_leaves_asterisk_unprefixed() {
+    assert_eq!(
+        cake::Entity::find()
+            .expr(Expr::col(Asterisk))
+            .select_also(fruit::Entity)
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", *,"#,
+            r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+            r#"FROM "cake""#,
+        ]
+        .join(" ")
+    );
 }
 
-// [spec:pgorm:sem:query.build.combine/test]    nor can an unaliased expression
+// [spec:pgorm:sem:query.build.combine+1/test]    nor does an unaliased expression
 // that is neither a column nor an `AsEnum`-wrapped column
 #[test]
-#[should_panic(expected = "cannot apply alias for expr other than Column or AsEnum")]
-fn combine_panics_on_unaliased_expression() {
-    let _ = cake::Entity::find()
-        .select_only()
-        .expr(Func::upper(Expr::col((cake::Entity, cake::Column::Name))))
-        .select_also(fruit::Entity);
+fn combine_leaves_bare_expression_unprefixed() {
+    assert_eq!(
+        cake::Entity::find()
+            .expr(Func::upper(Expr::col((cake::Entity, cake::Column::Name))))
+            .select_also(fruit::Entity)
+            .as_query()
+            .to_string(QueryBuilder),
+        [
+            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", UPPER("cake"."name"),"#,
+            r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
+            r#"FROM "cake""#,
+        ]
+        .join(" ")
+    );
 }
 
 // [spec:pgorm:sem:query.build.insert+1/test]    `Insert::new` renders a valid

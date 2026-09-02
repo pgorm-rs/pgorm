@@ -57,7 +57,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+1/test]    `Select::cursor_by`, `asc`/`desc`, and
+// [spec:pgorm:def:exec.cursor+2/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
 // [spec:pgorm:sem:exec.cursor.keyset+1/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
@@ -595,7 +595,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+1/test]    `SelectTwo::cursor_by` and
+// [spec:pgorm:def:exec.cursor+2/test]    `SelectTwo::cursor_by` and
 // `cursor_by_other` on a joined select, decoded through `into_model`
 // [spec:pgorm:sem:exec.cursor.order/test]    a joined cursor's automatic
 // secondary order on the other entity's primary key, giving the deterministic

@@ -1767,6 +1767,13 @@ children (
                         kind @decision
                         text "Operator decision: FULL three-state typestate (SelectCustom -> SelectProjected, SelectColumns gains the associated Projected type with the fixpoint bound, derive macro return type changes one token). All three invalid states die at compile time; zero-field partial models become compile errors. Semver-major accepted — sole user. Rejected: the two-state M checkpoint. The landed runtime guard stays regardless, protecting raw pgorm-query builder users."
                     }
+
+                    {
+                        at 2026-09-02T19:10:14.926388Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

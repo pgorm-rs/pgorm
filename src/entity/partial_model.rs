@@ -1,8 +1,13 @@
 use crate::{FromQueryResult, SelectColumns};
 
 /// A trait for a part of [Model](super::model::ModelTrait)
-// [spec:pgorm:def:entity.traits.from-query-result]
+// [spec:pgorm:def:entity.traits.from-query-result+1]
 pub trait PartialModelTrait: FromQueryResult {
-    /// Select specific columns this partial model needs
-    fn select_cols<S: SelectColumns>(select: S) -> S;
+    /// Select specific columns this partial model needs.
+    ///
+    /// The return type is [`SelectColumns::Projected`], not `S`: a partial
+    /// model that selects nothing cannot satisfy it, so a field-less
+    /// `DerivePartialModel` is a compile error rather than a query with an
+    /// empty projection.
+    fn select_cols<S: SelectColumns>(select: S) -> S::Projected;
 }

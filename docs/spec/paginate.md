@@ -9,7 +9,7 @@ including the remaining gaps in parameter binding.
 
 ## Cursor pagination (`exec.cursor`)
 
-> [spec:pgorm:def:exec.cursor+1]
+> [spec:pgorm:def:exec.cursor+2]
 > `Cursor<S, K>` wraps a `SelectStatement` plus the target table, an
 > `Identity` of one or more order columns, an optional `Window` row
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
@@ -24,6 +24,13 @@ including the remaining gaps in parameter binding.
 > rows; `into_model` and `into_partial_model` re-target the decoded type
 > and carry `K` across unchanged. `Cursor` also implements `QuerySelect`
 > and `QueryOrder` for further query modification.
+>
+> `S` is unconstrained on the struct: only `Cursor::all` requires
+> `S: SelectorTrait`, because only fetching needs to decode. `SelectUndecoded`
+> exploits that — it is the `S` the `select_only` typestates' `cursor_by`
+> returns (`query.build.modifiers`), and being no `SelectorTrait` it makes a
+> cursor over a caller's projection unfetchable until `into_model` or
+> `into_partial_model` names the row type.
 
 > [spec:pgorm:sem:exec.cursor.keyset+1]
 > `after(values)` filters to rows strictly beyond the boundary in the

@@ -107,15 +107,18 @@ explicit limitations.
 > `ActiveModelTrait::delete`, so behavior hooks run. `TryIntoModel<M>` is the fallible
 > reverse conversion with a blanket identity impl for any model.
 
-> [spec:pgorm:def:entity.traits.from-query-result]
+> [spec:pgorm:def:entity.traits.from-query-result+1]
 > `FromQueryResult` (`src/entity/model.rs`) instantiates a type from a `QueryResult`
 > row given a column-name prefix: `from_query_result(res, pre)`.
 > `from_query_result_optional` converts any decode error into `Ok(None)` — the error
 > value itself is discarded. `find_by_statement(stmt, values)` builds a
 > `SelectorRaw<SelectModel<Self>>` for running raw SQL into typed rows.
 > `PartialModelTrait: FromQueryResult` (`src/entity/partial_model.rs`) adds
-> `select_cols<S: SelectColumns>(S) -> S`, letting a partial model declare exactly the
-> columns it needs on a select.
+> `select_cols<S: SelectColumns>(S) -> S::Projected`, letting a partial model declare
+> exactly the columns it needs on a select. The return type is the *projected* state,
+> not `S`, so an implementation that selects no column cannot typecheck: a field-less
+> `DerivePartialModel` is a compile error rather than a query with an empty
+> projection (`query.build.modifiers`).
 
 > [spec:pgorm:def:entity.traits.active-enum]
 > `ActiveEnum: Sized + Iterable` (`src/entity/active_enum.rs`) maps a Rust enum onto a

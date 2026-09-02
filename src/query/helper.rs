@@ -16,19 +16,29 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+1]
+// [spec:pgorm:sem:query.build.modifiers+2]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
 
+    /// The state this builder moves to once a projection expression is added.
+    ///
+    /// Builders whose projection is already meaningful —
+    /// [`Select<E>`](crate::Select), the two-model selectors,
+    /// [`Cursor`](crate::Cursor) — project onto themselves. The typestate pair
+    /// produced by `select_only` uses it to step
+    /// [`SelectCustom<E>`](crate::SelectCustom) forward to
+    /// [`SelectProjected<E>`](crate::SelectProjected), which is where the
+    /// terminal operations live.
+    type Projected: QuerySelect<Projected = Self::Projected>;
+
     /// Add the select SQL statement
     fn query(&mut self) -> &mut SelectStatement;
 
-    /// Clear the selection list
-    fn select_only(mut self) -> Self {
-        self.query().clear_selects();
-        self
-    }
+    /// Move to [`QuerySelect::Projected`] once a projection expression has
+    /// been written into the statement.
+    #[doc(hidden)]
+    fn into_projected(self) -> Self::Projected;
 
     /// Add a select column
     /// ```
@@ -58,12 +68,12 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
     /// );
     /// ```
-    fn column<C>(mut self, col: C) -> Self
+    fn column<C>(mut self, col: C) -> Self::Projected
     where
         C: ColumnTrait,
     {
         self.query().expr(col.select_as(col.into_expr()));
-        self
+        self.into_projected()
     }
 
     /// Add a select column with alias
@@ -79,7 +89,7 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT COUNT("cake"."id") AS "count" FROM "cake""#
     /// );
     /// ```
-    fn column_as<C, I>(mut self, col: C, alias: I) -> Self
+    fn column_as<C, I>(mut self, col: C, alias: I) -> Self::Projected
     where
         C: IntoSimpleExpr,
         I: IntoIdentity,
@@ -89,7 +99,7 @@ pub trait QuerySelect: Sized {
             alias: Some(SeaRc::new(alias.into_identity())),
             window: None,
         });
-        self
+        self.into_projected()
     }
 
     /// Select columns
@@ -139,15 +149,19 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "lunch_set"."name", CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
     /// );
     /// ```
-    fn columns<C, I>(mut self, cols: I) -> Self
+    ///
+    /// An empty iterator adds nothing, so this is the one projection method
+    /// that can leave the select list empty; the execution-boundary guard
+    /// documented on [`QuerySelect`] is what catches that.
+    fn columns<C, I>(mut self, cols: I) -> Self::Projected
     where
         C: ColumnTrait,
         I: IntoIterator<Item = C>,
     {
         for col in cols.into_iter() {
-            self = self.column(col);
+            self.query().expr(col.select_as(col.into_expr()));
         }
-        self
+        self.into_projected()
     }
 
     /// Add an offset expression. Passing in None would remove the offset.
@@ -455,12 +469,12 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."id" FROM "cake""#
     /// );
     /// ```
-    fn expr<T>(mut self, expr: T) -> Self
+    fn expr<T>(mut self, expr: T) -> Self::Projected
     where
         T: Into<SelectExpr>,
     {
         self.query().expr(expr);
-        self
+        self.into_projected()
     }
 
     /// Add select expressions from vector of [`SelectExpr`].
@@ -480,13 +494,15 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
-    fn exprs<T, I>(mut self, exprs: I) -> Self
+    ///
+    /// Like [`columns`](QuerySelect::columns), an empty iterator adds nothing.
+    fn exprs<T, I>(mut self, exprs: I) -> Self::Projected
     where
         T: Into<SelectExpr>,
         I: IntoIterator<Item = T>,
     {
         self.query().exprs(exprs);
-        self
+        self.into_projected()
     }
 
     /// Select column.
@@ -505,13 +521,13 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
-    fn expr_as<T, A>(mut self, expr: T, alias: A) -> Self
+    fn expr_as<T, A>(mut self, expr: T, alias: A) -> Self::Projected
     where
         T: Into<SimpleExpr>,
         A: IntoIdentity,
     {
         self.query().expr_as(expr, alias.into_identity());
-        self
+        self.into_projected()
     }
 
     /// Same as `expr_as`. Here for legacy reasons.
@@ -533,13 +549,13 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
-    fn expr_as_<T, A>(mut self, expr: T, alias: A) -> Self
+    fn expr_as_<T, A>(mut self, expr: T, alias: A) -> Self::Projected
     where
         T: Into<SimpleExpr>,
         A: IntoIdentity,
     {
         self.query().expr_as(expr, alias.into_identity());
-        self
+        self.into_projected()
     }
 
     /// Shorthand of `expr_as(Expr::col((T, C)), A)`.
@@ -557,7 +573,7 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#
     /// );
     /// ```
-    fn tbl_col_as<T, C, A>(mut self, (tbl, col): (T, C), alias: A) -> Self
+    fn tbl_col_as<T, C, A>(mut self, (tbl, col): (T, C), alias: A) -> Self::Projected
     where
         T: IntoIden + 'static,
         C: IntoIden + 'static,
@@ -565,13 +581,13 @@ pub trait QuerySelect: Sized {
     {
         self.query()
             .expr_as(Expr::col((tbl, col)), alias.into_identity());
-        self
+        self.into_projected()
     }
 }
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+1]
+// [spec:pgorm:sem:query.build.modifiers+2]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;
