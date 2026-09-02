@@ -1398,6 +1398,13 @@ children (
                         kind @note
                         text "Audit: prepare_select_statement writes ORDER BY (query_builder.rs:262), LIMIT/OFFSET (:273), locking (:275), THEN the named WINDOW clause (:280). PostgreSQL grammar places WINDOW between HAVING and ORDER BY, so window() combined with any of those renders a syntax error; existing tests only exercise window in isolation. Plain rendering-order fix; bumps sql.render.window (and check sql.render.select-order's clause-order claim). Add a combined window+order_by+limit test."
                     }
+
+                    {
+                        at 2026-09-02T16:08:57.617509Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Oracle expansion of scope: the position fix alone is not enough. (1) Named windows render without parentheses — WINDOW \"w\" AS PARTITION BY ... is invalid even in isolation; PG requires WINDOW \"w\" AS (PARTITION BY ...). (2) The six window_* tests all render unparseable SQL for a second reason: OVER is being attached to a bare column expression in projection contexts where PG rejects it — read oracle_pins_window_clause_parens and the assert_eq_unparsed! sites in window.rs (12 marked) for the full picture. Fix all three defects together and flip the pins + the 12 unparsed markers to oracle-checked assertions. sql.render.window and possibly sql.ast.window-statement bump."
+                    }
                 )
             }
 
@@ -1446,6 +1453,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id bug.oracle-findings
+                title "Fix the nine rendering defects the conformance oracle found beyond the audit"
+                deps (bug.ident-escaping)
+                log (
+                    {
+                        at 2026-09-02T16:08:40.705111Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Oracle day-one findings, each pinned in pgorm-query/tests/postgres/oracle_pins.rs (flip the pin when fixed): window frame offset renders \"ROWS 2PRECEDING\" (missing space); CROSS JOIN emits \"ON TRUE\" for an empty condition (CROSS JOIN takes no ON); ALTER TABLE mixes ADD COLUMN and RENAME COLUMN in one statement (PG requires separate statements for RENAME); TableRenameStatement accepts a qualified rename target (\"RENAME TO \\\"schema\\\".\\\"name\\\"\" — PG wants a bare name); ALTER TYPE ... RENAME TO emits the new name as a 'string literal' instead of an identifier; interval precision renders as HOUR(43) (precision only valid on SECOND, and max 6); DROP EXTENSION renders CASCADE RESTRICT together; NullAlias renders AS \"\" (zero-length identifier); ESCAPE emitted as a free-standing binary operator; raw-interpolation holes: extension VERSION rendered unquoted (VERSION v0.1.0), extension name interpolated raw, ColumnDef::extra passed through verbatim (extra is by-design — document rather than fix, judgment). All in query_builder.rs — hence deps on the chain end. Some may fold naturally into unrep.mysql-purge/tableref-split scopes; coordinate, don't duplicate."
                     }
                 )
             }
@@ -1519,6 +1540,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: gate everything at EntityTransformer::transform, which already returns Result with TransformError — zero writer churn. Covers: writer.rs:98/:114 bonus_derive/bonus_attributes .parse().unwrap() (bare LexError on a typo in the public entry point; EntityWriterContext::new -> Result); column.rs:82/:179 the operator-approved unimplemented! wildcards (validate types at transform: \"table X column Y: unsupported type Z\" — the rule codegen.entity.types.unsupported currently MANDATES the panic and must be rewritten); column.rs:268 \"ColumnType should not be empty\" (TryFrom<&ColumnDef>); relation.rs:225 + transformer.rs:83 RefTable unwraps; base_entity.rs:196 PK-name/column cross-check missing; transformer.rs:28 inline TableRef match — util::unpack_table_ref already handles all variants, just call it; the DB-name->format_ident! family (~17 sites, labels like \"1\" or \"_\" panic) via one shared safe_ident -> Result. Also: EntityWriterContext's 13-positional-arg constructor with 6 unlabelled bools is the adjacent invalid-states fix (options struct) — fold in if cheap. Bumps codegen.entity.{types.unsupported,context,transform,keywords,enums}."
+                    }
+
+                    {
+                        at 2026-09-02T16:09:12.032584Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -1764,6 +1792,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: PG-only fork, so variants rendering invalid or lying SQL are invalid states by definition. Delete/collapse: TableOpt Engine/Collate/CharacterSet (render ENGINE=x etc — PG syntax errors; create.rs:69-73, builders :189-207, render query_builder.rs:1981-83) + uninhabited TablePartition; ColumnType::Year + ColumnDef::year() (only outcome is a panic, query_builder.rs:1709); Money(Some((p,s))) renders money(p,s) — PG money takes no args (collapse to Money, delete money_len; sql.ddl.column-types+1 acknowledges); Unsigned/BigUnsigned render signed integer/bigint (lying types — delete, TinyUnsigned/SmallUnsigned precedent); TinyInteger duplicates SmallInteger; Blob/Binary(u32)/VarBinary all render bytea with length silently discarded; DateTime vs Timestamp spell the same PG type twice; JoinOn::Columns never constructed, renders unimplemented (types.rs:251); SelectDistinct::DistinctRow unreachable dead (select.rs:57); TableRef::DatabaseSchemaTable — PG rejects cross-database refs (coordinate with tableref-split). Each S; one sweep node. Bumps sql.ddl.column-types, sql.types.column-type, others as touched."
+                    }
+
+                    {
+                        at 2026-09-02T16:11:18.172973Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Oracle correction: money(12, 2) PARSES under the real grammar — typmod validity is resolved semantically, not syntactically, so the deletion rationale for Money(Some((p,s))) shifts from \"invalid SQL\" to \"arguments Postgres will reject at execution and that the type lyingly accepts\". Deletion stands. Likewise \"db\".\"schema\".\"table\" parses but fails at execution (cross-database reference) — the DatabaseSchemaTable removal rationale is semantic too. The oracle cannot police these; the live-PG suite and the type system are the guards. See oracle_records_parse_valid_defects in oracle_pins.rs."
                     }
                 )
             }
