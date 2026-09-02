@@ -470,6 +470,9 @@ children (
                 id orm.binding-types
                 title "Fix ValueHolder type-blind parameter binding (accepts/to_sql ignore inferred types)"
                 kind @fix
+                implements {
+                    main ([spec:pgorm:req:exec.cursor.binding-coerce] [spec:pgorm:req:sql.render.cast-param-type])
+                }
             }
 
             {

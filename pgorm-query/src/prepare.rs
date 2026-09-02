@@ -3,14 +3,23 @@
 use crate::*;
 pub use std::fmt::Write;
 
-// [spec:pgorm:def:sql.render.writer]
+// [spec:pgorm:def:sql.render.writer+1]
 pub trait SqlWriter: Write + ToString {
     fn push_param(&mut self, value: Value, query_builder: &QueryBuilder);
+
+    /// Push a parameter that sits where Postgres would infer the placeholder's
+    /// type from the surrounding expression rather than from the value being
+    /// bound. Sinks that emit placeholders pin the type; sinks that render the
+    /// value inline have nothing to pin and fall back to [`Self::push_param`].
+    // [spec:pgorm:req:sql.render.cast-param-type]
+    fn push_param_source_typed(&mut self, value: Value, query_builder: &QueryBuilder) {
+        self.push_param(value, query_builder)
+    }
 
     fn as_writer(&mut self) -> &mut dyn Write;
 }
 
-// [spec:pgorm:def:sql.render.writer] (inline-rendering sink for the to_string() path)
+// [spec:pgorm:def:sql.render.writer+1] (inline-rendering sink for the to_string() path)
 impl SqlWriter for String {
     fn push_param(&mut self, value: Value, query_builder: &QueryBuilder) {
         self.push_str(&query_builder.value_to_string(&value))
@@ -62,6 +71,7 @@ impl std::fmt::Display for SqlWriterValues {
 }
 
 // [spec:pgorm:req:sql.render.placeholders] (counter increments then emits $N; value collected)
+// [spec:pgorm:def:sql.render.writer+1]
 impl SqlWriter for SqlWriterValues {
     fn push_param(&mut self, value: Value, _: &QueryBuilder) {
         self.counter += 1;
@@ -72,6 +82,15 @@ impl SqlWriter for SqlWriterValues {
             write!(self.string, "{}", self.placeholder).unwrap();
         }
         self.values.push(value)
+    }
+
+    // [spec:pgorm:req:sql.render.cast-param-type]
+    fn push_param_source_typed(&mut self, value: Value, query_builder: &QueryBuilder) {
+        let source_type = value.source_type_name();
+        self.push_param(value, query_builder);
+        if let Some(source_type) = source_type {
+            write!(self.string, "::{source_type}").unwrap();
+        }
     }
 
     fn as_writer(&mut self) -> &mut dyn Write {

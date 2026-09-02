@@ -18,15 +18,18 @@ an ideal Postgres renderer would emit.
 > writes `unwrap()`, and unsupported AST shapes abort via `panic!` /
 > `unimplemented!` rather than returning errors.
 
-> [spec:pgorm:def:sql.render.writer]
+> [spec:pgorm:def:sql.render.writer+1]
 > `SqlWriter` (`prepare.rs`) is the output sink trait for rendering:
-> `fmt::Write + ToString` plus `push_param(value, query_builder)`. Two sinks
-> exist:
+> `fmt::Write + ToString` plus `push_param(value, query_builder)` and
+> `push_param_source_typed(value, query_builder)`, whose default body is
+> `push_param` and which only sinks that emit placeholders override (see
+> `sql.render.cast-param-type`). Two sinks exist:
 >
 > `String` implements `SqlWriter` by rendering each parameter inline —
 > `push_param` appends `QueryBuilder::value_to_string(&value)` — producing a
 > self-contained SQL string with no bind parameters (the `to_string()` build
-> path).
+> path). It takes the default `push_param_source_typed`: an inline literal has
+> no wire format to disagree about.
 >
 > `SqlWriterValues` implements `SqlWriter` by emitting a placeholder and
 > collecting the `Value` into an internal `Vec<Value>`. It is constructed with a
@@ -53,6 +56,42 @@ an ideal Postgres renderer would emit.
 > `Value`s and MUST be parameterized (` LIMIT $N`, ` OFFSET $N`). The values in
 > an `Order::Field` ordering (see `sql.render.select-order`) are inlined via
 > `value_to_string` even in parameterized mode.
+
+> [spec:pgorm:req:sql.render.cast-param-type]
+> A `SimpleExpr::Value` in the left operand of a `BinOper::As` — the operand of
+> a cast, since that binary is the shape `Func::cast_as` builds and the shape
+> `SimpleExpr::AsEnum` and `ColumnTrait::save_as` are rewritten into — MUST be
+> rendered through `push_param_source_typed` rather than `push_param`.
+> Postgres infers a placeholder's type from the cast target, but the driver
+> writes the value in the format of the type it *is*, so an unpinned cast
+> operand binds the wrong bytes: `CAST($1 AS BIT(8))` makes the server expect
+> `bit` for what the driver sends as an `int8`, and it answers `22P03`.
+>
+> `SqlWriterValues` therefore appends `::{type}` to the placeholder, taking the
+> name from `Value::source_type_name`: `bool`; `int2` for `TinyInt` and
+> `SmallInt`, `int4` for `Int`, `int8` for `BigInt`, `Unsigned` and
+> `BigUnsigned`; `float4` / `float8`; `text` for `String` and `Char`; `bytea`;
+> `date`, `time`, `timestamp`, and `timestamptz` for all three zoned chrono
+> variants; `uuid`; `numeric`; `inet`; `macaddr`; and, for `Array`, the element
+> name from `ArrayType::source_type_name` suffixed `[]`. `Json` and `Vector`
+> are `None` and stay unpinned — a JSON payload binds as either `json` or
+> `jsonb` depending on which the server asked for, and the pgvector type name
+> is not guaranteed to resolve in the search path.
+>
+> A pin names a type the value can be *bound* as, not necessarily the type its
+> own `ToSql` impl would name: `TinyInt` pins to `int2` — rather than to the
+> one-byte `"char"` an `i8` binds as by default — because the numeric coercion
+> of `[spec:pgorm:req:exec.cursor.binding-coerce]` widens it, and because
+> `CAST($1::int2 AS text)` yields the digits of the number where
+> `CAST($1::"char" AS text)` would yield the character with that code point.
+> `Unsigned` pins to `int8` rather than `oid` for the same reason. The one
+> shape this costs is a cast from a `TinyInt` to `"char"` itself, for which
+> `int2` has no cast: that (never-exercised) target now fails when the
+> statement is parsed instead of binding.
+>
+> Pinning only annotates the placeholder — the outer cast still runs — so
+> `CAST($1::text AS tea)` reaches an enum through Postgres' text I/O
+> conversion, exactly as the unpinned form did.
 
 ## Identifiers and literals
 

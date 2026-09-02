@@ -80,6 +80,14 @@ struct MarginTotal {
     total: f64,
 }
 
+#[derive(Debug, PartialEq, FromQueryResult, DerivePartialModel)]
+#[pgorm(entity = "bakery::Entity")]
+struct IntScaledBakery {
+    id: i32,
+    #[pgorm(from_expr = "Expr::col(bakery::Column::ProfitMargin).mul(2)")]
+    double_margin: f64,
+}
+
 #[pgorm_macros::test]
 async fn partial_model_select() -> Result<(), DbErr> {
     let ctx = TestContext::new("partial_model_select").await;
@@ -130,6 +138,41 @@ async fn partial_model_select() -> Result<(), DbErr> {
         .await?;
 
     assert_eq!(total, MarginTotal { total: 15.0 });
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:exec.cursor.binding-coerce/test]
+#[pgorm_macros::test]
+async fn integer_operand_against_float_column() -> Result<(), DbErr> {
+    let ctx = TestContext::new("partial_model_int_operand_bindtypes").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    bakery::ActiveModel {
+        name: Set("SeaSide Bakery".to_owned()),
+        profit_margin: Set(10.5),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await?;
+
+    let bakeries = bakery::Entity::find()
+        .order_by_asc(bakery::Column::Id)
+        .into_partial_model::<IntScaledBakery>()
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        bakeries,
+        [IntScaledBakery {
+            id: 1,
+            double_margin: 21.0,
+        }]
+    );
 
     drop(db);
     ctx.delete().await;

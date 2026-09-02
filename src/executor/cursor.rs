@@ -450,7 +450,7 @@ where
     }
 }
 
-// [spec:pgorm:def:exec.cursor.binding+1]
+// [spec:pgorm:def:exec.cursor.binding+2]
 pub struct ValueHolder(pub Value);
 
 impl std::fmt::Debug for ValueHolder {
@@ -460,6 +460,7 @@ impl std::fmt::Debug for ValueHolder {
 }
 
 use bytes::BytesMut;
+use rust_decimal::Decimal;
 
 use super::QueryResult;
 
@@ -468,9 +469,106 @@ fn accepts<T: ToSql>(input: T, ty: &Type) -> bool {
     T::accepts(ty)
 }
 
-// [spec:pgorm:def:exec.cursor.binding+1]
+type BindResult = Result<IsNull, Box<dyn std::error::Error + Sync + Send>>;
+
+fn out_of_range(
+    value: impl std::fmt::Display,
+    ty: &Type,
+) -> Box<dyn std::error::Error + Sync + Send> {
+    format!("value `{value}` is out of range for Postgres type `{ty}`").into()
+}
+
+/// Bind an integer against the numeric type Postgres inferred for the
+/// placeholder, or `None` when the inferred type is outside the numeric family
+/// and the value should be written in its own format.
+// [spec:pgorm:req:exec.cursor.binding-coerce]
+fn integer_to_sql(value: i64, ty: &Type, out: &mut BytesMut) -> Option<BindResult> {
+    let result = if *ty == Type::INT2 {
+        match i16::try_from(value) {
+            Ok(value) => value.to_sql(ty, out),
+            Err(_) => Err(out_of_range(value, ty)),
+        }
+    } else if *ty == Type::INT4 {
+        match i32::try_from(value) {
+            Ok(value) => value.to_sql(ty, out),
+            Err(_) => Err(out_of_range(value, ty)),
+        }
+    } else if *ty == Type::INT8 {
+        value.to_sql(ty, out)
+    } else if *ty == Type::FLOAT4 {
+        (value as f32).to_sql(ty, out)
+    } else if *ty == Type::FLOAT8 {
+        (value as f64).to_sql(ty, out)
+    } else if *ty == Type::NUMERIC {
+        Decimal::from(value).to_sql(ty, out)
+    } else {
+        return None;
+    };
+    Some(result)
+}
+
+/// The floating-point counterpart of [`integer_to_sql`]. Narrowing to `float4`
+/// rounds the way Postgres' own `float8 -> float4` cast does, but a conversion
+/// that would silently drop the fractional part or overflow is an error rather
+/// than a lie.
+// [spec:pgorm:req:exec.cursor.binding-coerce]
+fn float_to_sql(value: f64, ty: &Type, out: &mut BytesMut) -> Option<BindResult> {
+    let result = if *ty == Type::FLOAT4 {
+        let narrowed = value as f32;
+        if value.is_finite() && !narrowed.is_finite() {
+            Err(out_of_range(value, ty))
+        } else {
+            narrowed.to_sql(ty, out)
+        }
+    } else if *ty == Type::FLOAT8 {
+        value.to_sql(ty, out)
+    } else if *ty == Type::NUMERIC {
+        match Decimal::try_from(value) {
+            Ok(value) => value.to_sql(ty, out),
+            Err(_) => Err(out_of_range(value, ty)),
+        }
+    } else if *ty == Type::INT2 || *ty == Type::INT4 || *ty == Type::INT8 {
+        Err(format!(
+            "cannot bind floating-point value `{value}` to Postgres type `{ty}` without loss"
+        )
+        .into())
+    } else {
+        return None;
+    };
+    Some(result)
+}
+
+// [spec:pgorm:req:exec.cursor.binding-coerce]
+fn bind_integer<T>(value: Option<T>, ty: &Type, out: &mut BytesMut) -> BindResult
+where
+    T: ToSql + Copy + Into<i64>,
+{
+    match value {
+        None => Ok(IsNull::Yes),
+        Some(value) => match integer_to_sql(value.into(), ty, out) {
+            Some(result) => result,
+            None => value.to_sql(ty, out),
+        },
+    }
+}
+
+// [spec:pgorm:req:exec.cursor.binding-coerce]
+fn bind_float<T>(value: Option<T>, ty: &Type, out: &mut BytesMut) -> BindResult
+where
+    T: ToSql + Copy + Into<f64>,
+{
+    match value {
+        None => Ok(IsNull::Yes),
+        Some(value) => match float_to_sql(value.into(), ty, out) {
+            Some(result) => result,
+            None => value.to_sql(ty, out),
+        },
+    }
+}
+
+// [spec:pgorm:def:exec.cursor.binding+2]
 impl ToSql for ValueHolder {
-    // [spec:pgorm:req:exec.cursor.binding-gaps+1]
+    // [spec:pgorm:req:exec.cursor.binding-gaps+2]
     fn to_sql(
         &self,
         ty: &Type,
@@ -481,14 +579,14 @@ impl ToSql for ValueHolder {
     {
         match &self.0 {
             Value::Bool(x) => x.to_sql(ty, out),
-            Value::TinyInt(x) => x.to_sql(ty, out),
-            Value::SmallInt(x) => x.to_sql(ty, out),
-            Value::Int(x) => x.to_sql(ty, out),
-            Value::BigInt(x) => x.to_sql(ty, out),
-            Value::Unsigned(x) => x.to_sql(ty, out),
-            Value::BigUnsigned(x) => x.map(|x| x as i64).to_sql(ty, out),
-            Value::Float(x) => x.to_sql(ty, out),
-            Value::Double(x) => x.to_sql(ty, out),
+            Value::TinyInt(x) => bind_integer(*x, ty, out),
+            Value::SmallInt(x) => bind_integer(*x, ty, out),
+            Value::Int(x) => bind_integer(*x, ty, out),
+            Value::BigInt(x) => bind_integer(*x, ty, out),
+            Value::Unsigned(x) => bind_integer(*x, ty, out),
+            Value::BigUnsigned(x) => bind_integer(x.map(|x| x as i64), ty, out),
+            Value::Float(x) => bind_float(*x, ty, out),
+            Value::Double(x) => bind_float(*x, ty, out),
             Value::String(x) => match x.as_ref() {
                 Some(x) => x.to_sql(ty, out),
                 None => Ok(IsNull::Yes),
@@ -563,6 +661,13 @@ impl ToSql for ValueHolder {
         }
     }
 
+    /// Every Postgres type is accepted: a `Value` carries no target type, and
+    /// the types it legitimately binds against include ones no client-side
+    /// check can enumerate (enums, domains, and every other type whose binary
+    /// format is the text of its label). `to_sql` converts within the numeric
+    /// family and errors on conversions it cannot make exactly; every other
+    /// mismatch is still reported by the server rather than here.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+2]
     fn accepts(_ty: &Type) -> bool
     where
         Self: Sized,
@@ -578,14 +683,122 @@ mod tests {
     use super::*;
 
     fn encode(value: Value) -> Option<Vec<u8>> {
+        encode_as(value, &Type::BYTEA).unwrap()
+    }
+
+    fn encode_as(value: Value, ty: &Type) -> Result<Option<Vec<u8>>, String> {
         let mut out = BytesMut::new();
-        match ValueHolder(value).to_sql(&Type::BYTEA, &mut out).unwrap() {
-            IsNull::Yes => None,
-            IsNull::No => Some(out.to_vec()),
+        match ValueHolder(value).to_sql(ty, &mut out) {
+            Ok(IsNull::Yes) => Ok(None),
+            Ok(IsNull::No) => Ok(Some(out.to_vec())),
+            Err(err) => Err(err.to_string()),
         }
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    fn bytes(value: Value, ty: &Type) -> Vec<u8> {
+        encode_as(value, ty).unwrap().unwrap()
+    }
+
+    fn error(value: Value, ty: &Type) -> String {
+        encode_as(value, ty).unwrap_err()
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn binds_integer_as_float() {
+        assert_eq!(
+            bytes(Value::Int(Some(2)), &Type::FLOAT8),
+            2.0f64.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::Int(Some(2)), &Type::FLOAT4),
+            2.0f32.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::BigInt(Some(-3)), &Type::FLOAT8),
+            (-3.0f64).to_be_bytes()
+        );
+        assert_eq!(encode_as(Value::Int(None), &Type::FLOAT8), Ok(None));
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn binds_integer_across_widths() {
+        assert_eq!(
+            bytes(Value::BigInt(Some(300)), &Type::INT2),
+            300i16.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::SmallInt(Some(7)), &Type::INT8),
+            7i64.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::TinyInt(Some(-1)), &Type::INT4),
+            (-1i32).to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::BigUnsigned(Some(9)), &Type::INT2),
+            9i16.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::Unsigned(Some(9)), &Type::OID),
+            9u32.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::TinyInt(Some(65)), &Type::CHAR),
+            65i8.to_be_bytes()
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn binds_integer_as_numeric() {
+        assert_eq!(
+            bytes(Value::Int(Some(2)), &Type::NUMERIC),
+            vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 2]
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn rejects_out_of_range_integer() {
+        assert_eq!(
+            error(Value::BigInt(Some(i64::from(i32::MAX) + 1)), &Type::INT4),
+            "value `2147483648` is out of range for Postgres type `int4`"
+        );
+        assert_eq!(
+            error(Value::Int(Some(40_000)), &Type::INT2),
+            "value `40000` is out of range for Postgres type `int2`"
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn binds_float_across_widths() {
+        assert_eq!(
+            bytes(Value::Float(Some(1.5)), &Type::FLOAT8),
+            1.5f64.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::Double(Some(1.5)), &Type::FLOAT4),
+            1.5f32.to_be_bytes()
+        );
+        assert!(
+            error(Value::Double(Some(1e300)), &Type::FLOAT4)
+                .ends_with("is out of range for Postgres type `float4`")
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    #[test]
+    fn rejects_float_bound_to_integer() {
+        assert_eq!(
+            error(Value::Double(Some(1.5)), &Type::INT8),
+            "cannot bind floating-point value `1.5` to Postgres type `int8` without loss"
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-gaps+2/test]
     #[test]
     fn binds_vector() {
         assert_eq!(
@@ -604,7 +817,7 @@ mod tests {
         assert_eq!(encode(Value::Vector(None)), None);
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-gaps+2/test]
     #[test]
     fn binds_ip_network() {
         assert_eq!(
@@ -616,7 +829,7 @@ mod tests {
         assert_eq!(encode(Value::IpNetwork(None)), None);
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-gaps+2/test]
     #[test]
     fn binds_mac_address() {
         assert_eq!(

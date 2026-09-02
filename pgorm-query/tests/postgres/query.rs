@@ -2134,3 +2134,56 @@ fn test_pgvector_select() {
         r#"SELECT "character" FROM "character" WHERE "character" = '[1,2]'"#
     );
 }
+
+// [spec:pgorm:req:sql.render.cast-param-type/test]
+#[test]
+fn cast_param_is_pinned_to_the_source_type() {
+    assert_eq!(
+        Query::select()
+            .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
+            .build(QueryBuilder),
+        (
+            r#"SELECT CAST($1::int8 AS BIT(8))"#.to_owned(),
+            Values(vec![8i64.into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .expr(Expr::val(vec!["a".to_owned()]).cast_as(Alias::new("tea[]")))
+            .build(QueryBuilder),
+        (
+            r#"SELECT CAST($1::text[] AS tea[])"#.to_owned(),
+            Values(vec![vec!["a".to_owned()].into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .expr(Expr::val(json!({ "a": 1 })).cast_as(Alias::new("jsonb")))
+            .build(QueryBuilder),
+        (
+            r#"SELECT CAST($1 AS jsonb)"#.to_owned(),
+            Values(vec![json!({ "a": 1 }).into()])
+        )
+    );
+}
+
+// [spec:pgorm:req:sql.render.cast-param-type/test]
+#[test]
+fn cast_param_is_not_pinned_when_rendered_inline() {
+    assert_eq!(
+        Query::select()
+            .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
+            .to_string(QueryBuilder),
+        r#"SELECT CAST(8 AS BIT(8))"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .expr(Expr::col(Char::SizeW).cast_as(Alias::new("text")))
+            .build(QueryBuilder)
+            .0,
+        r#"SELECT CAST("size_w" AS text)"#
+    );
+}

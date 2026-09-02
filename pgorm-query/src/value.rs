@@ -248,6 +248,77 @@ impl Value {
     {
         T::expect(self, msg)
     }
+
+    /// Name of the Postgres type this value is bound as, for pinning a
+    /// placeholder whose type would otherwise be inferred from context.
+    ///
+    /// `None` means the variant has no single type to pin it to: `Json` binds
+    /// as either `json` or `jsonb`, and `Vector` binds as an extension type
+    /// whose name is not guaranteed to resolve in the current search path.
+    // [spec:pgorm:req:sql.render.cast-param-type]
+    pub fn source_type_name(&self) -> Option<Cow<'static, str>> {
+        match self {
+            Self::Json(_) | Self::Vector(_) => None,
+            Self::Array(ty, _) => ty
+                .source_type_name()
+                .map(|name| Cow::Owned(format!("{name}[]"))),
+            Self::Bool(_) => Some(Cow::Borrowed("bool")),
+            Self::TinyInt(_) => Some(Cow::Borrowed("int2")),
+            Self::SmallInt(_) => Some(Cow::Borrowed("int2")),
+            Self::Int(_) => Some(Cow::Borrowed("int4")),
+            Self::BigInt(_) => Some(Cow::Borrowed("int8")),
+            Self::Unsigned(_) => Some(Cow::Borrowed("int8")),
+            Self::BigUnsigned(_) => Some(Cow::Borrowed("int8")),
+            Self::Float(_) => Some(Cow::Borrowed("float4")),
+            Self::Double(_) => Some(Cow::Borrowed("float8")),
+            Self::String(_) => Some(Cow::Borrowed("text")),
+            Self::Char(_) => Some(Cow::Borrowed("text")),
+            Self::Bytes(_) => Some(Cow::Borrowed("bytea")),
+            Self::ChronoDate(_) => Some(Cow::Borrowed("date")),
+            Self::ChronoTime(_) => Some(Cow::Borrowed("time")),
+            Self::ChronoDateTime(_) => Some(Cow::Borrowed("timestamp")),
+            Self::ChronoDateTimeUtc(_) => Some(Cow::Borrowed("timestamptz")),
+            Self::ChronoDateTimeLocal(_) => Some(Cow::Borrowed("timestamptz")),
+            Self::ChronoDateTimeWithTimeZone(_) => Some(Cow::Borrowed("timestamptz")),
+            Self::Uuid(_) => Some(Cow::Borrowed("uuid")),
+            Self::Decimal(_) => Some(Cow::Borrowed("numeric")),
+            Self::IpNetwork(_) => Some(Cow::Borrowed("inet")),
+            Self::MacAddress(_) => Some(Cow::Borrowed("macaddr")),
+        }
+    }
+}
+
+impl ArrayType {
+    /// Name of the Postgres type an element of this array is bound as. See
+    /// [`Value::source_type_name`].
+    // [spec:pgorm:req:sql.render.cast-param-type]
+    pub fn source_type_name(&self) -> Option<&'static str> {
+        match self {
+            Self::Json => None,
+            Self::Bool => Some("bool"),
+            Self::TinyInt => Some("int2"),
+            Self::SmallInt => Some("int2"),
+            Self::Int => Some("int4"),
+            Self::BigInt => Some("int8"),
+            Self::Unsigned => Some("int8"),
+            Self::BigUnsigned => Some("int8"),
+            Self::Float => Some("float4"),
+            Self::Double => Some("float8"),
+            Self::String => Some("text"),
+            Self::Char => Some("text"),
+            Self::Bytes => Some("bytea"),
+            Self::ChronoDate => Some("date"),
+            Self::ChronoTime => Some("time"),
+            Self::ChronoDateTime => Some("timestamp"),
+            Self::ChronoDateTimeUtc => Some("timestamptz"),
+            Self::ChronoDateTimeLocal => Some("timestamptz"),
+            Self::ChronoDateTimeWithTimeZone => Some("timestamptz"),
+            Self::Uuid => Some("uuid"),
+            Self::Decimal => Some("numeric"),
+            Self::IpNetwork => Some("inet"),
+            Self::MacAddress => Some("macaddr"),
+        }
+    }
 }
 
 // [spec:pgorm:def:sql.value.conversions+1]

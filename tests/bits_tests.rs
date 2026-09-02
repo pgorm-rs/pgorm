@@ -11,12 +11,10 @@ use pgorm::{
 };
 use pretty_assertions::assert_eq;
 
+// [spec:pgorm:req:sql.render.cast-param-type/test]
 #[pgorm_macros::test]
-#[ignore = "`save_as` casts make Postgres infer the bind parameter as the cast target \
-            (e.g. `CAST($1 AS BIT(8))` infers `bit`), but ValueHolder::to_sql writes the \
-            value in its own binary format, so the server rejects it with 22P03"]
 async fn main() -> Result<(), DbErr> {
-    let ctx = common::TestContext::new("bits_tests").await;
+    let ctx = common::TestContext::new("bits_tests_bindtypes").await;
     create_tables(&ctx.db).await?;
 
     let db = ctx.db.get().await?;

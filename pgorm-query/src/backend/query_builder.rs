@@ -1489,7 +1489,13 @@ impl QueryBuilder {
         if left_paren {
             write!(sql, "(").unwrap();
         }
-        self.prepare_simple_expr(left, sql);
+        match (op, left) {
+            // [spec:pgorm:req:sql.render.cast-param-type]
+            (BinOper::As, SimpleExpr::Value(value)) => {
+                sql.push_param_source_typed(value.clone(), self)
+            }
+            _ => self.prepare_simple_expr(left, sql),
+        }
         if left_paren {
             write!(sql, ")").unwrap();
         }

@@ -939,7 +939,7 @@ mod net_cursor {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:req:exec.cursor.binding-gaps+1/test]
+// [spec:pgorm:req:exec.cursor.binding-gaps+2/test]
 #[pgorm_macros::test]
 async fn cursor_over_network_types() -> Result<(), DbErr> {
     use ipnetwork::IpNetwork;
