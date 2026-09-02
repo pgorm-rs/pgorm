@@ -7,12 +7,14 @@ platforms (
                 cmd "cargo fmt --all -- --check"
                 fix "cargo fmt --all"
             }
-            // The test suite does not compile (see the repair.tests-* plan
-            // nodes); reinstate
-            // `cargo clippy --workspace --all-targets -- -D warnings` and
-            // `cargo nextest run --workspace` once the test targets build.
             check {
                 cmd "cargo check --workspace"
+            }
+            // nextest stays out of the commit gate deliberately: it needs a
+            // live Postgres and does not fit the check budget. Run it
+            // explicitly.
+            clippy {
+                cmd "cargo clippy --workspace --all-targets -- -D warnings"
             }
         }
     }
