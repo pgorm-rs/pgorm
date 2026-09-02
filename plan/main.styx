@@ -1454,6 +1454,13 @@ children (
                         kind @note
                         text "Audit: the empty-batch failsafe tests insert_struct.columns.is_empty() (src/executor/insert.rs:57,79,101), but Insert::add pushes one bool PER COLUMN for the first model (src/query/insert.rs:135-140) — an all-NotSet model yields [false,false,...], non-empty, so Empty never fires and INSERT INTO \"t\" () reaches the server. One-line runtime fix (.iter().any(|c| *c)); deeper option is making emptiness a real state on Insert rather than a bitmap predicate. Bumps query.build.insert.empty-failsafe; extend the pinning tests with the all-NotSet single-model case."
                     }
+
+                    {
+                        at 2026-09-02T18:55:49.663561Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -1509,6 +1516,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope addition: pgorm-macros/tests/compile-fail/value_type_lifetime_field.stderr is churn-fragile — it snapshots an E0277 whose bound list re-renders on every ValueType/IntoIdentity trait-surface change (re-blessed three times in one campaign; also the source of the false \"pre-existing failure\" reports from worktree agents whose stale expected-files diverged). The lifetime-rejection contract is already pinned by the churn-proof unit tests in sql_type_match.rs (macro-spans added them for exactly this reason). When working this node, decide: delete the fragile fixture in favor of the unit pins, or keep it and accept the re-bless ritual."
+                    }
+
+                    {
+                        at 2026-09-02T18:41:30.181606Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator directive: agents must not mass create/drop against the shared server, and the primary flake mechanism is now understood to be CROSS-WORKTREE collision — concurrent agents run the same test binaries, per-test database names derive solely from the test fn name, so two runs share one database and one's DROP ... WITH (FORCE) kills the other's connections (57P01) or races its CREATE. The fix is worktree/process-unique database names (suffix a short hash of the checkout path or pid into TestContext's derivation) plus propagating the CREATE result. Campaign protocol adjusted: agents run scoped DB tests only; the lead runs the full suite serially at integration."
                     }
                 )
             }
