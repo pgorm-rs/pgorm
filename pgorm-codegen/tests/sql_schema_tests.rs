@@ -7,7 +7,7 @@ use common::*;
 use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
 use pgorm_codegen::{Error, WriterOutput};
 use pgorm_query::extension::Type;
-use pgorm_query::{ColumnSpec, QueryBuilder, TableName};
+use pgorm_query::{ColumnSpec, ColumnType, QueryBuilder, TableName};
 
 const SCHEMA: &str = include_str!("sql/schema.sql");
 
@@ -59,7 +59,7 @@ fn schema_sql_generates_one_file_per_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types/test]    the type spellings map onto the
+// [spec:pgorm:sem:codegen.ddl.types+1/test]    the type spellings map onto the
 // ColumnType vocabulary, serial included
 #[test]
 fn column_types_map_through_the_vocabulary() {
@@ -307,7 +307,7 @@ fn unsupported_column_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types/test]    a type spelling outside the
+// [spec:pgorm:sem:codegen.ddl.types+1/test]    a type spelling outside the
 // vocabulary is named, and so is a modifier the vocabulary cannot hold
 #[test]
 fn unsupported_types_are_named() {
@@ -434,6 +434,34 @@ fn rendered_ddl_round_trips_through_the_bridge() {
     let round_tripped = from_sql(&text);
 
     assert_eq!(round_tripped.files, direct.files);
+}
+
+// [spec:pgorm:sem:codegen.ddl.types+1/test]    the types that once shared a
+// spelling with another variant now each recover themselves
+#[test]
+fn one_spelling_one_variant_round_trips() {
+    let statements = || {
+        vec![table_with(
+            "ledger",
+            vec![
+                serial_pk("id"),
+                typed("payload", ColumnType::Bytea),
+                typed("seen", ColumnType::Timestamp),
+                typed("amount", ColumnType::Money),
+                typed("width", ColumnType::SmallInteger),
+            ],
+        )]
+    };
+    let text = statements()
+        .iter()
+        .map(|statement| format!("{};", statement.to_string(QueryBuilder)))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert_eq!(
+        from_sql(&text).files,
+        generate(statements(), Opts::default()).files
+    );
 }
 
 // [spec:pgorm:sem:codegen.ddl.objects/test]    the round trip holds for the

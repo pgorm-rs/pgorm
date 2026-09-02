@@ -68,7 +68,7 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
 > `[spec:pgorm:def:sql.value.array+2]`).
 
-> [spec:pgorm:def:sql.value.value-type+1]
+> [spec:pgorm:def:sql.value.value-type+2]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
 > that maps into `Value`. `try_from(v: Value) -> Result<Self, ValueTypeErr>`
 > succeeds only when `v` is the matching variant with a `Some` payload
@@ -77,10 +77,14 @@ including panic semantics and quirks inherited from sea-query.
 > trait or as an inherent convenience on `Value`.
 > `type_name()` returns the Rust type name, `array_type()` the matching
 > `ArrayType` tag, and `column_type()` the default `ColumnType` for schema
-> generation (e.g. `String`→`String(StringLen::None)`, `Vec<u8>`→
-> `VarBinary(StringLen::None)`, `char`→`Char(None)`, `Decimal`→`Decimal(None)`,
+> generation (e.g. `String`→`String(StringLen::None)`, `Vec<u8>`→`Bytea`,
+> `char`→`Char(None)`, `Decimal`→`Decimal(None)`, `i8`/`i16`→`SmallInteger`,
+> `u32`/`u64`→`BigInteger` — the `int8` those values bind as —
+> `NaiveDateTime`→`Timestamp`,
 > `DateTime<Utc>`/`Local`/`FixedOffset`→`TimestampWithTimeZone`,
-> `IpNetwork`→`Inet`, `MacAddress`→`MacAddr`, `Vector`→`Vector(None)`).
+> `IpNetwork`→`Inet`, `MacAddress`→`MacAddr`, `Vector`→`Vector(None)`). The
+> `ColumnType` a Rust type maps to MUST be one Postgres actually has: no
+> mapping may name a width or signedness the server will not honour.
 >
 > `Nullable` provides `null() -> Value`, the typed-NULL constructor used by the
 > `Option` conversions. `ValueType for Option<T>` returns `Ok(None)` when the
@@ -256,7 +260,7 @@ including panic semantics and quirks inherited from sea-query.
 > Because every DDL target takes `TableName` and every query position takes
 > `FromItem`, an alias, subquery, values list or function call in a DDL
 > position is a type error rather than a render-time panic
-> (`[spec:pgorm:sem:sql.ddl.panics+1]`).
+> (`[spec:pgorm:sem:sql.ddl.panics+2]`).
 
 > [spec:pgorm:def:sql.types.opers]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
@@ -275,25 +279,38 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.column-type+1]
+> [spec:pgorm:def:sql.types.column-type+2]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
-> codegen: `Char(Option<u32>)`, `String(StringLen)`, `Text`, `Blob`,
-> `TinyInteger`, `SmallInteger`, `Integer`, `BigInteger`, `Unsigned`,
-> `BigUnsigned`, `Float`, `Double`,
-> `Decimal(Option<(u32, u32)>)`, `DateTime`, `Timestamp`,
-> `TimestampWithTimeZone`, `Time`, `Date`, `Year`, `Interval(Option<PgInterval>,
-> Option<u32>)`, `Binary(u32)`, `VarBinary(StringLen)`, `Bit(Option<u32>)`,
-> `VarBit(u32)`, `Boolean`, `Money(Option<(u32, u32)>)`, `Json`, `JsonBinary`,
-> `Uuid`, `Custom(DynIden)`, `Enum { name, variants }`,
+> codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
+> `String(StringLen)`, `Text`, `Bytea`, `SmallInteger`, `Integer`,
+> `BigInteger`, `Float`, `Double`, `Decimal(Option<(u32, u32)>)`, `Timestamp`,
+> `TimestampWithTimeZone`, `Time`, `Date`, `Interval(Option<PgInterval>,
+> Option<u32>)`, `Bit(Option<u32>)`, `VarBit(u32)`, `Boolean`, `Money`,
+> `Json`, `JsonBinary`, `Uuid`, `Custom(DynIden)`, `Enum { name, variants }`,
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
-> and `LTree`. `Year` survives from the multi-backend ancestry but is
-> unrenderable on Postgres (see `[spec:pgorm:sem:sql.ddl.panics]`). There is
-> no `TinyUnsigned` or `SmallUnsigned`: Postgres has no unsigned integer
-> types, and the `ColumnDef::tiny_unsigned`/`small_unsigned` builders were
-> removed with the variants.
+> and `LTree`. `ColumnType::serial_spelling` reports the serial form of the
+> integer trio and `None` for everything else
+> (`[spec:pgorm:req:sql.ddl.column-def+2]`).
 >
-> `StringLen` parameterises varchar/varbinary length: `N(u32)`, `Max`, or the
+> The vocabulary carries no MySQL-era spelling and no variant that renders
+> something other than what it names, and MUST NOT reacquire one. `Year` had
+> no Postgres spelling at all. `TinyInteger`, like the already-removed
+> `TinyUnsigned`/`SmallUnsigned`, was a second name for `smallint`;
+> `Unsigned`/`BigUnsigned` rendered plain `integer`/`bigint`, claiming a
+> signedness Postgres does not have; `Blob`, `Binary(u32)` and
+> `VarBinary(StringLen)` were three names for `bytea` with their lengths
+> silently discarded, collapsed into the single `Bytea`; `DateTime` and
+> `Timestamp` were two names for the same `timestamp`, collapsed onto the
+> Postgres spelling; and `Money`'s precision/scale pair produced a
+> `money(p, s)` type modifier Postgres rejects when it resolves it. The
+> `ColumnDef` builders went with them — there is no `tiny_integer`,
+> `unsigned`, `big_unsigned`, `year`, `blob`, `binary`, `binary_len`,
+> `var_binary`, `date_time` or `money_len`, and no `ColumnType::var_binary`
+> constructor; `bytea()`, `timestamp()` and `money()` are the surviving
+> spellings.
+>
+> `StringLen` parameterises varchar length: `N(u32)`, `Max`, or the
 > default `None`. `PgInterval` enumerates the thirteen interval field
 > qualifiers (`Year` through `MinuteToSecond`); it implements `Display` as the
 > SQL keywords (`YEAR TO MONTH`, ...) and a case-insensitive

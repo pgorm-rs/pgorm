@@ -9,7 +9,6 @@ pub struct Model {
     pub ty: String,
     pub key: String,
     pub value: String,
-    #[pgorm(column_type = "var_binary(32)")]
     pub bytes: Vec<u8>,
     pub date: Option<Date>,
     pub time: Option<Time>,

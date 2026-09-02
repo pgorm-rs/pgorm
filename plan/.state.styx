@@ -364,6 +364,7 @@ assertions (
     {id unrep.cte-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:04:04.408634Z}
     {id unrep.cursor-arity, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:12:23.476753Z}
     {id unrep.index-kind, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:42:47.735762Z}
+    {id unrep.mysql-purge, kind @complete, author "brendan@necessary.nu", at 2026-09-02T22:09:57.329153Z}
     {id unrep.save-intent, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:58:52.648048Z}
     {id unrep.select-only, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:10:14.926388Z}
     {id unrep.tableref-split, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:47:05.432653Z}

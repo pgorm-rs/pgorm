@@ -198,15 +198,15 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+1]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
 > key, followed by `auto_increment = false` when that PK column is not
 > auto-increment; `column_type = "..."` for exactly the types whose default
 > mapping is ambiguous — `Float`, `Double`, `Decimal(Some((p, s)))`,
-> `Money(Some(p, s))`, `Text`, `JsonBinary`, `custom("...")`, `Binary(n)`,
-> `VarBinary(StringLen::...)`, `Blob` — with `nullable` appended (only
+> `Money`, `Text`, `JsonBinary`, `custom("...")`, `Bytea` — with
+> `nullable` appended (only
 > alongside a `column_type`) when the column is nullable; and `unique` when
 > the column is unique. Fields needing none of these carry no `#[pgorm]`
 > attribute.
@@ -266,24 +266,26 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+1]
+> [spec:pgorm:sem:codegen.entity.types+2]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
 > | ColumnType | Rust type |
 > |---|---|
 > | `Char(_)`, `String(_)`, `Text`, `Custom(_)` | `String` |
-> | `TinyInteger` / `SmallInteger` / `Integer` / `BigInteger` | `i8` / `i16` / `i32` / `i64` |
-> | `Unsigned` / `BigUnsigned` | `u32` / `u64` |
+> | `SmallInteger` / `Integer` / `BigInteger` | `i16` / `i32` / `i64` |
 > | `Float` / `Double` | `f32` / `f64` |
 > | `Json`, `JsonBinary` | `Json` |
-> | `Decimal(_)`, `Money(_)` | `Decimal` |
+> | `Decimal(_)`, `Money` | `Decimal` |
 > | `Uuid` | `Uuid` |
-> | `Binary(_)`, `VarBinary(_)`, `Blob` | `Vec<u8>` |
+> | `Bytea` | `Vec<u8>` |
 > | `Boolean` | `bool` |
 > | `Enum { name, .. }` | UpperCamelCase of `name` |
 > | `Array(inner)` | `Vec<T(inner)>` (recursive) |
-> | `Date`, `Time`, `DateTime`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime` |
+> | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime+1` |
+>
+> No row produces an unsigned Rust integer: Postgres has no unsigned integer
+> type, so a generated field MUST NOT claim one.
 >
 > The named types resolve through `pgorm::entity::prelude::*`.
 >
@@ -291,16 +293,22 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > type is `Float` or `Double`, checked recursively through `Array` element
 > types; a single float column suppresses `Eq` for the whole Model.
 
-> [spec:pgorm:sem:codegen.entity.types.datetime]
+> [spec:pgorm:sem:codegen.entity.types.datetime+1]
 > `DateTimeCrate` selects the date/time field types:
 >
 > | ColumnType | `Chrono` | `Time` |
 > |---|---|---|
 > | `Date` | `Date` | `TimeDate` |
 > | `Time` | `Time` | `TimeTime` |
-> | `DateTime` | `DateTime` | `TimeDateTime` |
-> | `Timestamp` | `DateTimeUtc` | `TimeDateTime` |
+> | `Timestamp` | `DateTime` | `TimeDateTime` |
 > | `TimestampWithTimeZone` | `DateTimeWithTimeZone` | `TimeDateTimeWithTimeZone` |
+>
+> `Timestamp` MUST map to the time-zone-naive type (`chrono::NaiveDateTime`,
+> re-exported from the prelude as `DateTime`), because that is what Postgres
+> `timestamp` is; mapping it to `DateTimeUtc` claimed a time zone the column
+> does not carry, and disagreed with the inference table's
+> `NaiveDateTime`→`Timestamp` direction
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+3]`).
 >
 > Limitation: only `Chrono` is usable in practice. The `TimeDate`-family
 > aliases in `pgorm::entity::prelude` are gated behind a `with-time` cargo
@@ -565,16 +573,17 @@ compiling the C parser falls on people generating entities and on nobody else.
 > constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
 > rejects. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types]
+> [spec:pgorm:sem:codegen.ddl.types+1]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare, and
 > both forms are accepted. `bpchar` → `Char`, `varchar` → `String`,
 > `text` → `Text`, `int2`/`int4`/`int8` →
 > `SmallInteger`/`Integer`/`BigInteger`, `float4`/`float8` → `Float`/`Double`,
-> `numeric` → `Decimal`, `timestamptz` → `TimestampWithTimeZone`,
+> `numeric` → `Decimal`, `timestamp` → `Timestamp`,
+> `timestamptz` → `TimestampWithTimeZone`,
 > `time` → `Time`, `date` → `Date`, `interval` → `Interval(None, None)`,
-> `bool` → `Boolean`, `money` → `Money(None)`, `bytea` → `Blob`, `bit` → `Bit`,
+> `bool` → `Boolean`, `money` → `Money`, `bytea` → `Bytea`, `bit` → `Bit`,
 > `varbit` → `VarBit`, `json` → `Json`, `jsonb` → `JsonBinary`, `uuid` → `Uuid`,
 > `inet`/`cidr`/`macaddr`/`ltree` → `Inet`/`Cidr`/`MacAddr`/`LTree`,
 > `vector` → `Vector`. `serial`, `bigserial` and `smallserial` (and
@@ -587,14 +596,16 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `numeric(p)` reading as `Decimal(Some((p, 0)))` — its own meaning. An array
 > bound wraps the element type in `Array`; only one unsized `[]` is accepted.
 >
-> Where the spelling contract is many-to-one, the reverse takes the faithful
-> branch and the collapse is stated rather than hidden: `timestamp` reads as
-> `ColumnType::DateTime`, because Postgres' `timestamp` is `timestamp without
-> time zone` and the naive Rust type is its match, leaving `ColumnType::Timestamp`
-> with no reverse; `bytea` reads as `Blob`, `Binary` and `VarBinary` rendering
-> the same spelling with their lengths already discarded; `Unsigned`,
-> `BigUnsigned` and `TinyInteger` have no reverse either, their spellings
-> belonging to `Integer`, `BigInteger` and `SmallInteger`. `ColumnType::Custom`
+> The map is close to a bijection because the forward contract
+> (`[spec:pgorm:req:sql.ddl.column-types+2]`) no longer spells one Postgres
+> type under several names: `bytea`, `timestamp`, `smallint` and `money` each
+> have exactly one `ColumnType` to come back to, so `Bytea`, `Timestamp`,
+> `SmallInteger` and `Money` are recovered rather than chosen from a set. Where
+> the contract is still many-to-one the reverse takes the faithful branch and
+> the collapse is stated rather than hidden: `varchar` reads as
+> `String(StringLen::None)`, since `StringLen::Max` renders the same bare
+> `varchar` and Postgres has no `varchar(max)` to have written it. Every other
+> `ColumnType` in the vocabulary has a reverse. `ColumnType::Custom`
 > is deliberately not produced: a type name outside the table above is an error,
 > not a `String` column that quietly means something else. `varbit` without a
 > length, a modifier the vocabulary cannot hold (`timestamp(3)`), a sized or

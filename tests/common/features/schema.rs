@@ -111,13 +111,7 @@ where
         .col(ColumnDef::new(metadata::Column::Type).string().not_null())
         .col(ColumnDef::new(metadata::Column::Key).string().not_null())
         .col(ColumnDef::new(metadata::Column::Value).string().not_null())
-        .col(
-            ColumnDef::new_with_type(
-                metadata::Column::Bytes,
-                ColumnType::VarBinary(StringLen::N(32)),
-            )
-            .not_null(),
-        )
+        .col(ColumnDef::new_with_type(metadata::Column::Bytes, ColumnType::Bytea).not_null())
         .col(ColumnDef::new(metadata::Column::Date).date())
         .col(ColumnDef::new(metadata::Column::Time).time())
         .to_owned();
@@ -181,7 +175,7 @@ where
     C: ConnectionTrait,
 {
     let mut primary_key_col = ColumnDef::new(byte_primary_key::Column::Id);
-    primary_key_col.binary();
+    primary_key_col.bytea();
 
     let stmt = pgorm_query::Table::create()
         .table(byte_primary_key::Entity)
@@ -317,7 +311,7 @@ where
         )
         .col(
             ColumnDef::new(transaction_log::Column::DateTime)
-                .date_time()
+                .timestamp()
                 .not_null(),
         )
         .col(
@@ -659,15 +653,11 @@ where
                 .auto_increment()
                 .primary_key(),
         )
-        .col(ColumnDef::new(binary::Column::Binary).binary().not_null())
-        .col(
-            ColumnDef::new(binary::Column::Binary10)
-                .binary_len(10)
-                .not_null(),
-        )
+        .col(ColumnDef::new(binary::Column::Binary).bytea().not_null())
+        .col(ColumnDef::new(binary::Column::Binary10).bytea().not_null())
         .col(
             ColumnDef::new(binary::Column::VarBinary16)
-                .var_binary(16)
+                .bytea()
                 .not_null(),
         )
         .to_owned();

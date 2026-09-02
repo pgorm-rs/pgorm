@@ -7,7 +7,7 @@ use common::*;
 use pgorm_codegen::{Column, DateTimeCrate, EntityTransformer, Error};
 use pgorm_query::{Alias, ColumnDef, ColumnType, RcOrArc, StringLen, Table};
 
-// [spec:pgorm:sem:codegen.entity.types+1/test]    `Column::get_rs_type` follows
+// [spec:pgorm:sem:codegen.entity.types+2/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
@@ -20,20 +20,15 @@ fn column_rust_types_follow_the_mapping_table() {
                 typed("c_string", ColumnType::String(StringLen::N(10))),
                 typed("c_text", ColumnType::Text),
                 typed("c_custom", ColumnType::custom("citext")),
-                typed("c_tiny", ColumnType::TinyInteger),
                 typed("c_small", ColumnType::SmallInteger),
                 typed("c_int", ColumnType::Integer),
                 typed("c_big", ColumnType::BigInteger),
-                typed("c_unsigned", ColumnType::Unsigned),
-                typed("c_big_unsigned", ColumnType::BigUnsigned),
                 typed("c_json", ColumnType::Json),
                 typed("c_jsonb", ColumnType::JsonBinary),
                 typed("c_decimal", ColumnType::Decimal(None)),
-                typed("c_money", ColumnType::Money(None)),
+                typed("c_money", ColumnType::Money),
                 typed("c_uuid", ColumnType::Uuid),
-                typed("c_binary", ColumnType::Binary(4)),
-                typed("c_varbinary", ColumnType::VarBinary(StringLen::Max)),
-                typed("c_blob", ColumnType::Blob),
+                typed("c_bytea", ColumnType::Bytea),
                 typed("c_bool", ColumnType::Boolean),
                 enum_col("c_enum", "tea_kind", &["black", "green"]),
                 ColumnDef::new(Alias::new("c_array"))
@@ -58,20 +53,15 @@ fn column_rust_types_follow_the_mapping_table() {
         ("c_string", "String"),
         ("c_text", "String"),
         ("c_custom", "String"),
-        ("c_tiny", "i8"),
         ("c_small", "i16"),
         ("c_int", "i32"),
         ("c_big", "i64"),
-        ("c_unsigned", "u32"),
-        ("c_big_unsigned", "u64"),
         ("c_json", "Json"),
         ("c_jsonb", "Json"),
         ("c_decimal", "Decimal"),
         ("c_money", "Decimal"),
         ("c_uuid", "Uuid"),
-        ("c_binary", "Vec<u8>"),
-        ("c_varbinary", "Vec<u8>"),
-        ("c_blob", "Vec<u8>"),
+        ("c_bytea", "Vec<u8>"),
         ("c_bool", "bool"),
         ("c_enum", "TeaKind"),
         ("c_array", "Vec<i32>"),
@@ -83,7 +73,7 @@ fn column_rust_types_follow_the_mapping_table() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+1/test]    `Float` and `Double` also map
+// [spec:pgorm:sem:codegen.entity.types+2/test]    `Float` and `Double` also map
 // to `f32` / `f64`, and either one suppresses the Model's `Eq` derive —
 // recursively through `Array`
 #[test]
@@ -143,7 +133,7 @@ fn float_and_double_columns_suppress_the_eq_derive() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types.datetime/test]    `DateTimeCrate` picks
+// [spec:pgorm:sem:codegen.entity.types.datetime+1/test]    `DateTimeCrate` picks
 // the date/time field types
 #[test]
 fn date_time_crate_selects_date_time_field_types() {
@@ -154,7 +144,6 @@ fn date_time_crate_selects_date_time_field_types() {
                 serial_pk("id"),
                 typed("d", ColumnType::Date),
                 typed("t", ColumnType::Time),
-                typed("dt", ColumnType::DateTime),
                 typed("ts", ColumnType::Timestamp),
                 typed("tstz", ColumnType::TimestampWithTimeZone),
             ],
@@ -165,8 +154,7 @@ fn date_time_crate_selects_date_time_field_types() {
     for (field, rust_type) in [
         ("d", "Date"),
         ("t", "Time"),
-        ("dt", "DateTime"),
-        ("ts", "DateTimeUtc"),
+        ("ts", "DateTime"),
         ("tstz", "DateTimeWithTimeZone"),
     ] {
         assert_contains(
@@ -185,7 +173,6 @@ fn date_time_crate_selects_date_time_field_types() {
     for (field, rust_type) in [
         ("d", "TimeDate"),
         ("t", "TimeTime"),
-        ("dt", "TimeDateTime"),
         ("ts", "TimeDateTime"),
         ("tstz", "TimeDateTimeWithTimeZone"),
     ] {

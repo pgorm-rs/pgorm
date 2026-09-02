@@ -55,7 +55,7 @@ fn compact_model_attribute_and_empty_relation_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs/test]    the `#[pgorm(..)]` field
+// [spec:pgorm:sem:codegen.entity.compact.attrs+1/test]    the `#[pgorm(..)]` field
 // attribute assembles its parts in one fixed order
 #[test]
 fn compact_field_attribute_parts_assembled_in_fixed_order() {
@@ -91,7 +91,7 @@ fn compact_field_attribute_parts_assembled_in_fixed_order() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs/test]    `column_type` is emitted
+// [spec:pgorm:sem:codegen.entity.compact.attrs+1/test]    `column_type` is emitted
 // for exactly the types whose default mapping is ambiguous
 #[test]
 fn compact_column_type_attribute_covers_ambiguous_types() {
@@ -103,15 +103,11 @@ fn compact_column_type_attribute_covers_ambiguous_types() {
                 typed("a_float", ColumnType::Float),
                 typed("a_double", ColumnType::Double),
                 typed("a_decimal", ColumnType::Decimal(Some((10, 2)))),
-                typed("a_money", ColumnType::Money(Some((10, 2)))),
+                typed("a_money", ColumnType::Money),
                 typed("a_text", ColumnType::Text),
                 typed("a_jsonb", ColumnType::JsonBinary),
                 typed("a_custom", ColumnType::custom("citext")),
-                typed("a_binary", ColumnType::Binary(16)),
-                typed("a_varbinary_n", ColumnType::VarBinary(StringLen::N(8))),
-                typed("a_varbinary_none", ColumnType::VarBinary(StringLen::None)),
-                typed("a_varbinary_max", ColumnType::VarBinary(StringLen::Max)),
-                typed("a_blob", ColumnType::Blob),
+                typed("a_bytea", ColumnType::Bytea),
             ],
         )],
         Opts::default(),
@@ -122,15 +118,11 @@ fn compact_column_type_attribute_covers_ambiguous_types() {
         ("a_float", "Float"),
         ("a_double", "Double"),
         ("a_decimal", "Decimal(Some((10, 2)))"),
-        ("a_money", "Money(Some(10, 2))"),
+        ("a_money", "Money"),
         ("a_text", "Text"),
         ("a_jsonb", "JsonBinary"),
         ("a_custom", r#"custom(\"citext\")"#),
-        ("a_binary", "Binary(16)"),
-        ("a_varbinary_n", "VarBinary(StringLen::N(8))"),
-        ("a_varbinary_none", "VarBinary(StringLen::None)"),
-        ("a_varbinary_max", "VarBinary(StringLen::Max)"),
-        ("a_blob", "Blob"),
+        ("a_bytea", "Bytea"),
     ] {
         assert_contains(
             sample,
@@ -139,7 +131,7 @@ fn compact_column_type_attribute_covers_ambiguous_types() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs/test]    a field needing none of
+// [spec:pgorm:sem:codegen.entity.compact.attrs+1/test]    a field needing none of
 // the parts carries no `#[pgorm]` attribute, and `nullable` never appears
 // without a `column_type`
 #[test]
@@ -207,7 +199,7 @@ fn compact_model_assembles_derives_attributes_fields_in_order() {
                #[pgorm(primary_key)]
                pub id: i32,
                #[pgorm(column_name = "bakedAt")]
-               pub baked_at: DateTimeUtc,
+               pub baked_at: DateTime,
                pub r#type: i32,
            }"#,
     );

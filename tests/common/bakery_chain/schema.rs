@@ -120,7 +120,7 @@ where
         )
         .col(
             ColumnDef::new(order::Column::PlacedAt)
-                .date_time()
+                .timestamp()
                 .not_null(),
         )
         .foreign_key(

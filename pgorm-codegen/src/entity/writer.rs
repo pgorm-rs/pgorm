@@ -32,7 +32,7 @@ pub enum WithSerde {
     Both,
 }
 
-// [spec:pgorm:sem:codegen.entity.types.datetime]
+// [spec:pgorm:sem:codegen.entity.types.datetime+1]
 #[derive(Debug, Default)]
 pub enum DateTimeCrate {
     #[default]
@@ -758,7 +758,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+1]
     // [spec:pgorm:sem:codegen.entity.compact.model]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
@@ -1156,14 +1156,14 @@ mod tests {
                     },
                     Column {
                         name: "testing".to_owned(),
-                        col_type: ColumnType::TinyInteger,
+                        col_type: ColumnType::SmallInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,
                     },
                     Column {
                         name: "rust".to_owned(),
-                        col_type: ColumnType::TinyInteger,
+                        col_type: ColumnType::SmallInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,
@@ -1191,7 +1191,7 @@ mod tests {
                     },
                     Column {
                         name: "crate".to_owned(),
-                        col_type: ColumnType::Unsigned,
+                        col_type: ColumnType::BigInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,
@@ -1205,7 +1205,7 @@ mod tests {
                     },
                     Column {
                         name: "self_id1".to_owned(),
-                        col_type: ColumnType::BigUnsigned,
+                        col_type: ColumnType::BigInteger,
                         auto_increment: false,
                         not_null: true,
                         unique: false,

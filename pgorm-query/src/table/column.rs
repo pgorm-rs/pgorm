@@ -1,7 +1,7 @@
 use crate::{expr::*, types::*};
 
 /// Specification of a table column
-// [spec:pgorm:req:sql.ddl.column-def+1]
+// [spec:pgorm:req:sql.ddl.column-def+2]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableName>,
@@ -16,74 +16,60 @@ pub trait IntoColumnDef {
 
 /// All column types
 ///
-/// | ColumnType            | MySQL data type   | PostgreSQL data type        | SQLite data type             |
-/// |-----------------------|-------------------|-----------------------------|------------------------------|
-/// | Char                  | char              | char                        | char                         |
-/// | String                | varchar           | varchar                     | varchar                      |
-/// | Text                  | text              | text                        | text                         |
-/// | TinyInteger           | tinyint           | smallint                    | tinyint                      |
-/// | SmallInteger          | smallint          | smallint                    | smallint                     |
-/// | Integer               | int               | integer                     | integer                      |
-/// | BigInteger            | bigint            | bigint                      | integer                      |
-/// | Unsigned              | int unsigned      | integer                     | integer                      |
-/// | BigUnsigned           | bigint unsigned   | bigint                      | integer                      |
-/// | Float                 | float             | real                        | float                        |
-/// | Double                | double            | double precision            | double                       |
-/// | Decimal               | decimal           | decimal                     | real                         |
-/// | DateTime              | datetime          | timestamp without time zone | datetime_text                |
-/// | Timestamp             | timestamp         | timestamp                   | timestamp_text               |
-/// | TimestampWithTimeZone | timestamp         | timestamp with time zone    | timestamp_with_timezone_text |
-/// | Time                  | time              | time                        | time_text                    |
-/// | Date                  | date              | date                        | date_text                    |
-/// | Year                  | year              | N/A                         | N/A                          |
-/// | Interval              | N/A               | interval                    | N/A                          |
-/// | Blob                  | blob              | bytea                       | blob                         |
-/// | Binary                | binary            | bytea                       | blob                         |
-/// | VarBinary             | varbinary         | bytea                       | varbinary_blob               |
-/// | Bit                   | bit               | bit                         | N/A                          |
-/// | VarBit                | bit               | varbit                      | N/A                          |
-/// | Boolean               | bool              | bool                        | boolean                      |
-/// | Money                 | decimal           | money                       | real_money                   |
-/// | Json                  | json              | json                        | json_text                    |
-/// | JsonBinary            | json              | jsonb                       | jsonb_text                   |
-/// | Uuid                  | binary(16)        | uuid                        | uuid_text                    |
-/// | Enum                  | ENUM(...)         | ENUM_NAME                   | enum_text                    |
-/// | Array                 | N/A               | DATA_TYPE[]                 | N/A                          |
-/// | Vector                | N/A               | vector                      | N/A                          |
-/// | Cidr                  | N/A               | cidr                        | N/A                          |
-/// | Inet                  | N/A               | inet                        | N/A                          |
-/// | MacAddr               | N/A               | macaddr                     | N/A                          |
-/// | LTree                 | N/A               | ltree                       | N/A                          |
-// [spec:pgorm:def:sql.types.column-type+1]
+/// | ColumnType            | PostgreSQL data type     |
+/// |-----------------------|--------------------------|
+/// | Char                  | char                     |
+/// | String                | varchar                  |
+/// | Text                  | text                     |
+/// | SmallInteger          | smallint                 |
+/// | Integer               | integer                  |
+/// | BigInteger            | bigint                   |
+/// | Float                 | real                     |
+/// | Double                | double precision         |
+/// | Decimal               | decimal                  |
+/// | Timestamp             | timestamp                |
+/// | TimestampWithTimeZone | timestamp with time zone |
+/// | Time                  | time                     |
+/// | Date                  | date                     |
+/// | Interval              | interval                 |
+/// | Bytea                 | bytea                    |
+/// | Bit                   | bit                      |
+/// | VarBit                | varbit                   |
+/// | Boolean               | bool                     |
+/// | Money                 | money                    |
+/// | Json                  | json                     |
+/// | JsonBinary            | jsonb                    |
+/// | Uuid                  | uuid                     |
+/// | Enum                  | ENUM_NAME                |
+/// | Array                 | DATA_TYPE[]              |
+/// | Vector                | vector                   |
+/// | Cidr                  | cidr                     |
+/// | Inet                  | inet                     |
+/// | MacAddr               | macaddr                  |
+/// | LTree                 | ltree                    |
+// [spec:pgorm:def:sql.types.column-type+2]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
     Char(Option<u32>),
     String(StringLen),
     Text,
-    Blob,
-    TinyInteger,
+    Bytea,
     SmallInteger,
     Integer,
     BigInteger,
-    Unsigned,
-    BigUnsigned,
     Float,
     Double,
     Decimal(Option<(u32, u32)>),
-    DateTime,
     Timestamp,
     TimestampWithTimeZone,
     Time,
     Date,
-    Year,
     Interval(Option<PgInterval>, Option<u32>),
-    Binary(u32),
-    VarBinary(StringLen),
     Bit(Option<u32>),
     VarBit(u32),
     Boolean,
-    Money(Option<(u32, u32)>),
+    Money,
     Json,
     JsonBinary,
     Uuid,
@@ -100,7 +86,7 @@ pub enum ColumnType {
     LTree,
 }
 
-/// Length for var-char/binary; default to 255
+/// Length for var-char; default to 255
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum StringLen {
     /// String size
@@ -110,7 +96,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+1]
+// [spec:pgorm:def:sql.types.column-type+2]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -118,11 +104,8 @@ impl PartialEq for ColumnType {
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Decimal(l0), Self::Decimal(r0)) => l0 == r0,
             (Self::Interval(l0, l1), Self::Interval(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::Binary(l0), Self::Binary(r0)) => l0 == r0,
-            (Self::VarBinary(l0), Self::VarBinary(r0)) => l0 == r0,
             (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::VarBit(l0), Self::VarBit(r0)) => l0 == r0,
-            (Self::Money(l0), Self::Money(r0)) => l0 == r0,
             (Self::Custom(l0), Self::Custom(r0)) => l0.to_string() == r0.to_string(),
             (
                 Self::Enum {
@@ -161,8 +144,17 @@ impl ColumnType {
         }
     }
 
-    pub fn var_binary(length: u32) -> ColumnType {
-        ColumnType::VarBinary(StringLen::N(length))
+    /// The `serial` spelling this type is replaced by when the column carries
+    /// [`ColumnSpec::AutoIncrement`], or `None` when Postgres has no serial
+    /// form for it.
+    // [spec:pgorm:req:sql.ddl.column-def+2]
+    pub fn serial_spelling(&self) -> Option<&'static str> {
+        match self {
+            ColumnType::SmallInteger => Some("smallserial"),
+            ColumnType::Integer => Some("serial"),
+            ColumnType::BigInteger => Some("bigserial"),
+            _ => None,
+        }
     }
 }
 
@@ -321,12 +313,6 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as tiny_integer
-    pub fn tiny_integer(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::TinyInteger);
-        self
-    }
-
     /// Set column type as small_integer
     pub fn small_integer(&mut self) -> &mut Self {
         self.types = Some(ColumnType::SmallInteger);
@@ -342,18 +328,6 @@ impl ColumnDef {
     /// Set column type as big_integer
     pub fn big_integer(&mut self) -> &mut Self {
         self.types = Some(ColumnType::BigInteger);
-        self
-    }
-
-    /// Set column type as unsigned
-    pub fn unsigned(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::Unsigned);
-        self
-    }
-
-    /// Set column type as big_unsigned
-    pub fn big_unsigned(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::BigUnsigned);
         self
     }
 
@@ -378,12 +352,6 @@ impl ColumnDef {
     /// Set column type as decimal
     pub fn decimal(&mut self) -> &mut Self {
         self.types = Some(ColumnType::Decimal(None));
-        self
-    }
-
-    /// Set column type as date_time
-    pub fn date_time(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::DateTime);
         self
     }
 
@@ -460,30 +428,6 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as year
-    /// Only MySQL supports year
-    pub fn year(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::Year);
-        self
-    }
-
-    /// Set column type as binary with custom length
-    pub fn binary_len(&mut self, length: u32) -> &mut Self {
-        self.types = Some(ColumnType::Binary(length));
-        self
-    }
-
-    /// Set column type as binary with default length of 1
-    pub fn binary(&mut self) -> &mut Self {
-        self.binary_len(1)
-    }
-
-    /// Set column type as binary with variable length
-    pub fn var_binary(&mut self, length: u32) -> &mut Self {
-        self.types = Some(ColumnType::VarBinary(StringLen::N(length)));
-        self
-    }
-
     /// Set column type as bit with variable length
     pub fn bit(&mut self, length: Option<u32>) -> &mut Self {
         self.types = Some(ColumnType::Bit(length));
@@ -496,9 +440,9 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as blob
-    pub fn blob(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::Blob);
+    /// Set column type as bytea
+    pub fn bytea(&mut self) -> &mut Self {
+        self.types = Some(ColumnType::Bytea);
         self
     }
 
@@ -508,15 +452,9 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as money with custom precision and scale
-    pub fn money_len(&mut self, precision: u32, scale: u32) -> &mut Self {
-        self.types = Some(ColumnType::Money(Some((precision, scale))));
-        self
-    }
-
     /// Set column type as money
     pub fn money(&mut self) -> &mut Self {
-        self.types = Some(ColumnType::Money(None));
+        self.types = Some(ColumnType::Money);
         self
     }
 
@@ -695,7 +633,10 @@ impl ColumnDef {
         self
     }
 
-    /// MySQL only.
+    /// Record a comment for this column.
+    ///
+    /// The spec is skipped when the column renders: on Postgres a column
+    /// comment is a `COMMENT ON` statement of its own.
     pub fn comment<T>(&mut self, string: T) -> &mut Self
     where
         T: Into<String>,

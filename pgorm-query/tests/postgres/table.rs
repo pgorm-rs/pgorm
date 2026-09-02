@@ -1,10 +1,10 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+3/test]
-// [spec:pgorm:req:sql.ddl.column-def+1/test]
+// [spec:pgorm:req:sql.ddl.create-table+4/test]
+// [spec:pgorm:req:sql.ddl.column-def+2/test]
 #[test]
-// [spec:pgorm:def:sql.render.ddl.types+1/test]
+// [spec:pgorm:def:sql.render.ddl.types+2/test]
 fn create_1() {
     assert_eq!(
         Table::create()
@@ -73,8 +73,8 @@ fn create_3() {
             )
             .col(ColumnDef::new(Char::FontSize).integer().not_null())
             .col(ColumnDef::new(Char::Character).string_len(255).not_null())
-            .col(ColumnDef::new(Char::SizeW).unsigned().not_null())
-            .col(ColumnDef::new(Char::SizeH).unsigned().not_null())
+            .col(ColumnDef::new(Char::SizeW).integer().not_null())
+            .col(ColumnDef::new(Char::SizeH).integer().not_null())
             .col(
                 ColumnDef::new(Char::FontId)
                     .integer()
@@ -117,7 +117,7 @@ fn create_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+1/test]
+// [spec:pgorm:req:sql.ddl.column-types+2/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -257,38 +257,19 @@ fn create_11() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.column-types+2/test]
 #[test]
 fn create_12() {
     assert_eq!(
         Table::create()
             .table(BinaryType::Table)
-            .col(ColumnDef::new(BinaryType::BinaryLen).binary_len(32))
-            .col(ColumnDef::new(BinaryType::Binary).binary())
+            .col(ColumnDef::new(BinaryType::BinaryLen).bytea())
+            .col(ColumnDef::new(BinaryType::Binary).bytea())
             .to_string(QueryBuilder),
         [
             r#"CREATE TABLE "binary_type" ("#,
             r#""binlen" bytea,"#,
             r#""bin" bytea"#,
-            r#")"#,
-        ]
-        .join(" ")
-    );
-}
-
-#[test]
-fn create_13() {
-    assert_eq!(
-        Table::create()
-            .table(Char::Table)
-            .col(ColumnDef::new(Char::Character).binary())
-            .col(ColumnDef::new(Char::FontSize).binary_len(10))
-            .col(ColumnDef::new(Char::SizeW).var_binary(10))
-            .to_string(QueryBuilder),
-        [
-            r#"CREATE TABLE "character" ("#,
-            r#""character" bytea,"#,
-            r#""font_size" bytea,"#,
-            r#""size_w" bytea"#,
             r#")"#,
         ]
         .join(" ")
@@ -618,7 +599,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+3/test]
+// [spec:pgorm:req:sql.ddl.create-table+4/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: &mut IndexCreateStatement| {

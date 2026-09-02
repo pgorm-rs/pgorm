@@ -5,14 +5,14 @@ use pgorm::entity::prelude::*;
 pub struct Model {
     #[pgorm(primary_key)]
     pub id: i32,
-    pub testing: i8,
-    pub rust: i8,
+    pub testing: i16,
+    pub rust: i16,
     pub keywords: i16,
     pub r#type: i16,
     pub r#typeof: i32,
-    pub crate_: u32,
+    pub crate_: i64,
     pub self_: i64,
-    pub self_id1: u64,
+    pub self_id1: i64,
     pub self_id2: i32,
     pub fruit_id1: i32,
     pub fruit_id2: i32,

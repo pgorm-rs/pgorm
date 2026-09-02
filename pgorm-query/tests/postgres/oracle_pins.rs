@@ -53,34 +53,21 @@ fn oracle_pins_over_on_a_bare_expression() {
     assert!(assert_rejected(&sql).contains("OVER"));
 }
 
-// Fixed by plan node `unrep.mysql-purge`: `TableOpt::Engine`, `Collate` and
-// `CharacterSet` are MySQL-era table options with no PostgreSQL spelling.
+// The MySQL-era table options (`ENGINE=`, `COLLATE=`, `DEFAULT CHARSET=`) have
+// no PostgreSQL spelling, and `TableCreateStatement` carries no options for them
+// to come from: nothing but the caller's own `extra` string can follow the
+// closing parenthesis. Deletion-proof, so there is no rejection left to pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+3/test]
+// [spec:pgorm:req:sql.ddl.create-table+4/test]
 #[test]
-fn oracle_pins_mysql_table_options() {
-    let table = || {
-        Table::create()
-            .table(Glyph::Table)
-            .col(ColumnDef::new(Glyph::Id).integer())
-            .to_owned()
-    };
+fn create_table_renders_no_trailing_options() {
+    let sql = Table::create()
+        .table(Glyph::Table)
+        .col(ColumnDef::new(Glyph::Id).integer())
+        .to_string(QueryBuilder);
 
-    for (sql, keyword) in [
-        (table().engine("InnoDB").to_string(QueryBuilder), "ENGINE"),
-        (
-            table()
-                .collate("utf8mb4_unicode_ci")
-                .to_string(QueryBuilder),
-            "COLLATE",
-        ),
-        (
-            table().character_set("utf8mb4").to_string(QueryBuilder),
-            "DEFAULT",
-        ),
-    ] {
-        assert!(assert_rejected(&sql).contains(keyword), "{sql}");
-    }
+    assert_eq!(sql, r#"CREATE TABLE "glyph" ( "id" integer )"#);
+    assert_parses(&sql);
 }
 
 // Fixed by plan node `unrep.on-conflict`: targets, action and action-filter are
@@ -147,7 +134,7 @@ fn oracle_pins_update_delete_order_limit() {
 // `prepare_join_on` hook, and an empty condition renders `ON TRUE` rather than
 // nothing, so a CROSS JOIN always gains an ON clause PostgreSQL forbids.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.joins/test]
+// [spec:pgorm:req:sql.render.joins+1/test]
 #[test]
 fn oracle_pins_cross_join_on_clause() {
     let sql = Query::select()
@@ -216,7 +203,7 @@ fn oracle_pins_alter_type_rename_literal() {
 // a precision to the field spelling, but PostgreSQL takes a precision only on the
 // trailing second, as `interval hour to second(p)`.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.ddl.types+1/test]
+// [spec:pgorm:def:sql.render.ddl.types+2/test]
 #[test]
 fn oracle_pins_interval_field_precision() {
     let sql = Table::create()
@@ -307,25 +294,18 @@ fn oracle_pins_escape_outside_like() {
     );
 }
 
-// The oracle's ceiling, recorded rather than pinned: these renders are
-// grammatical, so no parser can catch them. `money(12, 2)` is rejected only when
-// the type modifier is resolved (`unrep.mysql-purge` deletes `money_len`); an
-// empty select list is valid PostgreSQL and was closed as an ORM-layer error by
-// `sql.empty-select-list`. The third member of this family, a cross-database
-// reference, is closed by the type system instead: `TableName` has no
-// database-qualified form to render.
+// The oracle's ceiling, recorded rather than pinned: this render is grammatical,
+// so no parser can catch it. An empty select list is valid PostgreSQL and is
+// closed as an ORM-layer error by `sql.empty-select-list`. The other two members
+// of this family are closed by the type system instead: `money(12, 2)` — which
+// only a resolved type modifier rejects — is gone with `ColumnType::Money`'s
+// precision argument, and a cross-database reference is gone with the
+// database-qualified `TableName` form.
 // [spec:pgorm:req:sql.render.oracle/test]
 #[test]
 fn oracle_records_parse_valid_defects() {
-    let money = Table::create()
-        .table(Glyph::Table)
-        .col(ColumnDef::new(Glyph::Aspect).money_len(12, 2))
-        .to_string(QueryBuilder);
     let empty_select_list = Query::select().from(Glyph::Table).to_string(QueryBuilder);
 
-    assert!(money.contains("money(12, 2)"));
     assert_eq!(empty_select_list, r#"SELECT  FROM "glyph""#);
-
-    assert_parses(&money);
     assert_parses(&empty_select_list);
 }

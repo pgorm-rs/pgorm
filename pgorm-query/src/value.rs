@@ -179,7 +179,7 @@ impl std::fmt::Display for Value {
     }
 }
 
-// [spec:pgorm:def:sql.value.value-type+1]
+// [spec:pgorm:def:sql.value.value-type+2]
 pub trait ValueType: Sized {
     fn try_from(v: Value) -> Result<Self, ValueTypeErr>;
 
@@ -457,12 +457,12 @@ macro_rules! type_to_box_value {
 }
 
 type_to_value!(bool, Bool, Boolean);
-type_to_value!(i8, TinyInt, TinyInteger);
+type_to_value!(i8, TinyInt, SmallInteger);
 type_to_value!(i16, SmallInt, SmallInteger);
 type_to_value!(i32, Int, Integer);
 type_to_value!(i64, BigInt, BigInteger);
-type_to_value!(u32, Unsigned, Unsigned);
-type_to_value!(u64, BigUnsigned, BigUnsigned);
+type_to_value!(u32, Unsigned, BigInteger);
+type_to_value!(u64, BigUnsigned, BigInteger);
 type_to_value!(f32, Float, Float);
 type_to_value!(f64, Double, Double);
 type_to_value!(char, Char, Char(None));
@@ -506,7 +506,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.value-type+1]
+// [spec:pgorm:def:sql.value.value-type+2]
 impl<T> ValueType for Option<T>
 where
     T: ValueType + Nullable,
@@ -559,7 +559,7 @@ impl ValueType for Cow<'_, str> {
     }
 }
 
-type_to_box_value!(Vec<u8>, Bytes, VarBinary(StringLen::None));
+type_to_box_value!(Vec<u8>, Bytes, Bytea);
 type_to_box_value!(String, String, String(StringLen::None));
 
 mod with_json {
@@ -574,7 +574,7 @@ mod with_chrono {
 
     type_to_box_value!(NaiveDate, ChronoDate, Date);
     type_to_box_value!(NaiveTime, ChronoTime, Time);
-    type_to_box_value!(NaiveDateTime, ChronoDateTime, DateTime);
+    type_to_box_value!(NaiveDateTime, ChronoDateTime, Timestamp);
 
     impl From<DateTime<Utc>> for Value {
         fn from(v: DateTime<Utc>) -> Value {
@@ -1415,7 +1415,7 @@ mod tests {
         test_value!(i64, 8589934592);
     }
 
-    // [spec:pgorm:def:sql.value.value-type+1/test]
+    // [spec:pgorm:def:sql.value.value-type+2/test]
     #[test]
     fn test_option_value() {
         macro_rules! test_some_value {

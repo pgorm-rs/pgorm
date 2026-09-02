@@ -581,7 +581,7 @@ mod tests {
         assert_eq!(hello::Column::One.def(), ColumnType::Integer.def());
         assert_eq!(
             hello::Column::Two.def(),
-            ColumnType::TinyInteger.def().unique()
+            ColumnType::SmallInteger.def().unique()
         );
         assert_eq!(
             hello::Column::Three.def(),
@@ -597,7 +597,7 @@ mod tests {
         );
         assert_eq!(
             hello::Column::Eight.def(),
-            ColumnType::Unsigned.def().nullable()
+            ColumnType::BigInteger.def().nullable()
         );
         assert_eq!(
             hello::Column::Ten.def(),
@@ -607,7 +607,7 @@ mod tests {
         );
         assert_eq!(
             hello::Column::Eleven.def(),
-            ColumnType::TinyInteger.def().default(7)
+            ColumnType::SmallInteger.def().default(7)
         );
         assert_eq!(
             hello::Column::Twelve.def(),

@@ -494,7 +494,7 @@ fn context_threads_date_time_crate_into_model_pk() {
 
     let chrono = generate(schema(), expanded());
     assert_contains(chrono.file("event.rs"), "pub at: Date,");
-    assert_contains(chrono.file("event.rs"), "pub seen: DateTimeUtc,");
+    assert_contains(chrono.file("event.rs"), "pub seen: DateTime,");
     assert_contains(chrono.file("event.rs"), "type ValueType = Date;");
 
     let time = generate(

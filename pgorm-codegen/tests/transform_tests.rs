@@ -202,7 +202,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
 
     // not_null decides the `Option<..>` wrapping and the trailing `.null()`
     assert_contains(cake, "pub id: i32,");
-    assert_contains(cake, "pub baked_at: Option<DateTimeUtc>,");
+    assert_contains(cake, "pub baked_at: Option<DateTime>,");
     assert_contains(cake, "Self::BakedAt => ColumnType::Timestamp.def().null(),");
     assert_contains(cake, "Self::Name => ColumnType::Text.def(),");
     // auto_increment

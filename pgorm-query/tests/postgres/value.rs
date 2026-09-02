@@ -118,13 +118,13 @@ fn unsigned_variants_carry_oid_and_limit_counts() {
     );
 }
 
-// [spec:pgorm:def:sql.value.value-type+1/test]    try_from errors on a variant mismatch
+// [spec:pgorm:def:sql.value.value-type+2/test]    try_from errors on a variant mismatch
 #[test]
 fn try_from_errors_on_variant_mismatch() {
     assert!(<i32 as ValueType>::try_from(Value::BigInt(Some(1))).is_err());
 }
 
-// [spec:pgorm:def:sql.value.value-type+1/test]    try_from errors on a nullability mismatch
+// [spec:pgorm:def:sql.value.value-type+2/test]    try_from errors on a nullability mismatch
 #[test]
 fn try_from_errors_on_a_null_payload() {
     assert!(<i32 as ValueType>::try_from(Value::Int(None)).is_err());

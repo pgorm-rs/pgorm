@@ -27,7 +27,7 @@ executes SQL.
 >
 > Comments ride on the create statement (`get_comment()`,
 > `ColumnSpec::Comment`) but are inert there — executing it attaches nothing
-> (`[spec:pgorm:req:sql.ddl.create-table+3]`). They are a second statement
+> (`[spec:pgorm:req:sql.ddl.create-table+4]`). They are a second statement
 > stream instead: `Schema::create_comments_from_entity::<E>()` returns the
 > `COMMENT ON` statements for the same entity — the entity comment first when
 > `E::comment()` is set, then one per column whose `ColumnDef` carries a

@@ -62,7 +62,7 @@ fn is_byte_vec(ty: &Type) -> bool {
             .is_some_and(|name| name == "u8")
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+2]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
 pub fn col_type_match(
     col_type: Option<TokenStream>,
     field_type: &Type,
@@ -87,23 +87,23 @@ fn inferred_col_type(field_type: &Type) -> Option<TokenStream> {
         return Some(quote! { string(None) });
     }
     if is_byte_vec(field_type) {
-        return Some(quote! { VarBinary(pgorm::pgorm_query::StringLen::None) });
+        return Some(quote! { Bytea });
     }
     Some(match bare_name(field_type)?.to_string().as_str() {
         "char" => quote! { Char(None) },
         "String" => quote! { string(None) },
-        "i8" => quote! { TinyInteger },
+        "i8" => quote! { SmallInteger },
         "i16" => quote! { SmallInteger },
         "i32" => quote! { Integer },
-        "u32" => quote! { Unsigned },
+        "u32" => quote! { BigInteger },
         "i64" => quote! { BigInteger },
-        "u64" => quote! { BigUnsigned },
+        "u64" => quote! { BigInteger },
         "f32" => quote! { Float },
         "f64" => quote! { Double },
         "bool" => quote! { Boolean },
         "Date" | "NaiveDate" => quote! { Date },
         "Time" | "NaiveTime" => quote! { Time },
-        "DateTime" | "NaiveDateTime" => quote! { DateTime },
+        "DateTime" | "NaiveDateTime" => quote! { Timestamp },
         "DateTimeUtc" | "DateTimeLocal" | "DateTimeWithTimeZone" => {
             quote! { TimestampWithTimeZone }
         }
@@ -114,7 +114,7 @@ fn inferred_col_type(field_type: &Type) -> Option<TokenStream> {
     })
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+2]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
 pub fn arr_type_match(
     arr_type: Option<TokenStream>,
     field_type: &Type,
@@ -178,7 +178,7 @@ mod tests {
         arr_type_match(None, &ty, Span::call_site()).to_string()
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    only bare `&str` is in the table
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    only bare `&str` is in the table
     #[test]
     fn shared_str_matches_without_a_lifetime() {
         assert!(col("&str").contains("ColumnType :: string"));
@@ -188,7 +188,7 @@ mod tests {
         assert!(col("&mut str").contains("ValueType"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    the fallback keeps the written type
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    the fallback keeps the written type
     #[test]
     fn fallback_reproduces_the_type_verbatim() {
         assert!(col("&'a str").contains("& 'a str"));
@@ -196,16 +196,16 @@ mod tests {
         assert!(col("<T as Trait>::Assoc").contains("< T as Trait > :: Assoc"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    `Vec<u8>` is the only byte row
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    `Vec<u8>` is the only byte row
     #[test]
     fn byte_vec_matches_only_vec_of_u8() {
-        assert!(col("Vec<u8>").contains("VarBinary"));
+        assert!(col("Vec<u8>").contains("Bytea"));
         assert!(col("Vec<u16>").contains("ValueType"));
         assert!(col("Vec<u8, A>").contains("ValueType"));
         assert!(arr("Vec<u8>").contains("ValueType"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    `Option<T>` unwrapping is structural
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    `Option<T>` unwrapping is structural
     #[test]
     fn option_unwraps_only_when_bare() {
         let bare = parse_str::<Type>("Option<i64>").expect("test type parses");

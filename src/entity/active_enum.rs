@@ -390,12 +390,12 @@ mod tests {
             };
         }
 
-        test_num_value_int!(I8, "i8", "TinyInteger", TinyInteger);
+        test_num_value_int!(I8, "i8", "SmallInteger", SmallInteger);
         test_num_value_int!(I16, "i16", "SmallInteger", SmallInteger);
         test_num_value_int!(I32, "i32", "Integer", Integer);
         test_num_value_int!(I64, "i64", "BigInteger", BigInteger);
 
-        test_fallback_int!(I8Fallback, i8, "i8", "TinyInteger", TinyInteger);
+        test_fallback_int!(I8Fallback, i8, "i8", "SmallInteger", SmallInteger);
         test_fallback_int!(I16Fallback, i16, "i16", "SmallInteger", SmallInteger);
         test_fallback_int!(I32Fallback, i32, "i32", "Integer", Integer);
         test_fallback_int!(I64Fallback, i64, "i64", "BigInteger", BigInteger);

@@ -43,9 +43,11 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select]
+> [spec:pgorm:def:sql.ast.select+1]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional
-> `SelectDistinct` (`All`, `Distinct`, `DistinctRow`, `DistinctOn(Vec<ColumnRef>)`),
+> `SelectDistinct` (`All`, `Distinct`, `DistinctOn(Vec<ColumnRef>)` — the
+> MySQL-era `DistinctRow`, which no builder set and no renderer spelled, is
+> gone and MUST NOT return),
 > a list of `SelectExpr` projections (each an expression with optional alias and
 > optional window), `from` table references, `JoinExpr` joins, a WHERE
 > `ConditionHolder`, GROUP BY expressions, a HAVING `ConditionHolder`, a list of

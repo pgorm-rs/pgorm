@@ -15,7 +15,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types]
+// [spec:pgorm:sem:codegen.ddl.types+1]
 pub(super) fn column_kind(
     type_name: &TypeName,
     enums: &Enums,
@@ -78,7 +78,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types]
+// [spec:pgorm:sem:codegen.ddl.types+1]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
@@ -122,14 +122,14 @@ fn named_type(
         ("numeric" | "decimal", [precision, scale]) => {
             ColumnType::Decimal(Some((*precision, *scale)))
         }
-        ("timestamp", []) => ColumnType::DateTime,
+        ("timestamp", []) => ColumnType::Timestamp,
         ("timestamptz", []) => ColumnType::TimestampWithTimeZone,
         ("time", []) => ColumnType::Time,
         ("date", []) => ColumnType::Date,
         ("interval", []) => ColumnType::Interval(None, None),
         ("bool" | "boolean", []) => ColumnType::Boolean,
-        ("money", []) => ColumnType::Money(None),
-        ("bytea", []) => ColumnType::Blob,
+        ("money", []) => ColumnType::Money,
+        ("bytea", []) => ColumnType::Bytea,
         ("bit", []) => ColumnType::Bit(None),
         ("bit", [length]) => ColumnType::Bit(Some(*length)),
         ("varbit", [length]) => ColumnType::VarBit(*length),

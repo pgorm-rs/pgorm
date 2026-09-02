@@ -1947,6 +1947,7 @@ children (
                 id unrep.mysql-purge
                 title "Purge MySQL-era surface that renders invalid or lying Postgres SQL"
                 deps (bug.ident-escaping unrep.tableref-split)
+                sealed true
                 log (
                     {
                         at 2026-09-02T12:37:22.9137Z
@@ -1967,6 +1968,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope updates from landed work: DatabaseSchemaTable is DONE (deleted by tableref-split — strike it). The auto_increment/serial-family redesign is CONFIRMED in this node's scope per tableref-split's analysis (ColumnSpec::AutoIncrement wires through codegen, the derives and PrimaryKeyTrait::auto_increment() — a serial-family constructor redesign reaches all of them; assess whether to do the full replacement or keep the flag and only delete the unimplemented render arm, reporting the call). Also remember: this node's landing ends the standing function-density bypass for query_builder.rs."
+                    }
+
+                    {
+                        at 2026-09-02T22:09:57.329153Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

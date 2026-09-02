@@ -49,13 +49,11 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+3]
+// [spec:pgorm:req:sql.ddl.create-table+4]
 #[derive(Default, Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: Option<TableName>,
     pub(crate) columns: Vec<ColumnDef>,
-    pub(crate) options: Vec<TableOpt>,
-    pub(crate) partitions: Vec<TablePartition>,
     pub(crate) indexes: Vec<IndexCreateStatement>,
     pub(crate) foreign_keys: Vec<ForeignKeyCreateStatement>,
     pub(crate) if_not_exists: bool,
@@ -63,18 +61,6 @@ pub struct TableCreateStatement {
     pub(crate) comment: Option<String>,
     pub(crate) extra: Option<String>,
 }
-
-/// All available table options
-#[derive(Debug, Clone)]
-pub enum TableOpt {
-    Engine(String),
-    Collate(String),
-    CharacterSet(String),
-}
-
-/// All available table partition options
-#[derive(Debug, Clone)]
-pub enum TablePartition {}
 
 impl TableCreateStatement {
     /// Construct create table statement
@@ -119,28 +105,7 @@ impl TableCreateStatement {
         self
     }
 
-    /// Add an index. MySQL only.
-    ///
-    // / # Examples
-    // /
-    // / ```
-    // / use pgorm_query::{tests_cfg::*, *};
-    // /
-    // / assert_eq!(
-    // /     Table::create()
-    // /         .table(Glyph::Table)
-    // /         .col(ColumnDef::new(Glyph::Id).integer().not_null())
-    // /         .index(Index::create().unique().name("idx-glyph-id").col(Glyph::Id))
-    // /         .to_string(MysqlQueryBuilder),
-    // /     [
-    // /         "CREATE TABLE `glyph` (",
-    // /         "`id` int NOT NULL,",
-    // /         "UNIQUE KEY `idx-glyph-id` (`id`)",
-    // /         ")",
-    // /     ]
-    // /     .join(" ")
-    // / );
-    // / ```
+    /// Add a table-level index expression to the create statement
     pub fn index(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
         self.indexes.push(index.take());
         self
@@ -182,44 +147,6 @@ impl TableCreateStatement {
     /// Add a foreign key
     pub fn foreign_key(&mut self, foreign_key: &mut ForeignKeyCreateStatement) -> &mut Self {
         self.foreign_keys.push(foreign_key.take());
-        self
-    }
-
-    /// Set database engine. MySQL only.
-    pub fn engine<T>(&mut self, string: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.opt(TableOpt::Engine(string.into()));
-        self
-    }
-
-    /// Set database collate. MySQL only.
-    pub fn collate<T>(&mut self, string: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.opt(TableOpt::Collate(string.into()));
-        self
-    }
-
-    /// Set database character set. MySQL only.
-    pub fn character_set<T>(&mut self, name: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.opt(TableOpt::CharacterSet(name.into()));
-        self
-    }
-
-    fn opt(&mut self, option: TableOpt) -> &mut Self {
-        self.options.push(option);
-        self
-    }
-
-    #[allow(dead_code)]
-    fn partition(&mut self, partition: TablePartition) -> &mut Self {
-        self.partitions.push(partition);
         self
     }
 
@@ -294,8 +221,6 @@ impl TableCreateStatement {
         Self {
             table: self.table.take(),
             columns: std::mem::take(&mut self.columns),
-            options: std::mem::take(&mut self.options),
-            partitions: std::mem::take(&mut self.partitions),
             indexes: std::mem::take(&mut self.indexes),
             foreign_keys: std::mem::take(&mut self.foreign_keys),
             if_not_exists: self.if_not_exists,

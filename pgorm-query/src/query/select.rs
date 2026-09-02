@@ -31,7 +31,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select]
+// [spec:pgorm:def:sql.ast.select+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
     pub(crate) distinct: Option<SelectDistinct>,
@@ -54,7 +54,6 @@ pub struct SelectStatement {
 pub enum SelectDistinct {
     All,
     Distinct,
-    DistinctRow,
     DistinctOn(Vec<ColumnRef>),
 }
 
@@ -103,7 +102,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select]
+// [spec:pgorm:def:sql.ast.select+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct LockClause {
     pub(crate) r#type: LockType,

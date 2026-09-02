@@ -52,7 +52,6 @@ impl QueryBuilder {
                 });
                 write!(sql, ")").unwrap();
             }
-            _ => {}
         };
     }
 
@@ -598,7 +597,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.joins]
+    // [spec:pgorm:req:sql.render.joins+1]
     fn prepare_join_expr(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
         self.prepare_join_type(&join_expr.join, sql);
         write!(sql, " ").unwrap();
@@ -959,11 +958,10 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinOn`] into SQL statement.
-    // [spec:pgorm:req:sql.render.joins] (JoinOn::Columns unimplemented; only ON conditions render)
+    // [spec:pgorm:req:sql.render.joins+1]
     fn prepare_join_on(&self, join_on: &JoinOn, sql: &mut dyn SqlWriter) {
         match join_on {
             JoinOn::Condition(c) => self.prepare_condition(c, "ON", sql),
-            JoinOn::Columns(_c) => unimplemented!(),
         }
     }
 
@@ -1501,14 +1499,12 @@ impl QueryBuilder {
 
     // COMMON
     // START: impl that ought not be here
-    // [spec:pgorm:sem:sql.ddl.panics+1]
-    // [spec:pgorm:def:sql.render.ddl.types+1] (serial family for auto-increment columns)
+    // [spec:pgorm:sem:sql.ddl.panics+2]
+    // [spec:pgorm:def:sql.render.ddl.types+2] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
-        match &column_type {
-            ColumnType::SmallInteger => write!(sql, "smallserial").unwrap(),
-            ColumnType::Integer => write!(sql, "serial").unwrap(),
-            ColumnType::BigInteger => write!(sql, "bigserial").unwrap(),
-            _ => unimplemented!("{:?} doesn't support auto increment", column_type),
+        match column_type.serial_spelling() {
+            Some(serial) => write!(sql, "{serial}").unwrap(),
+            None => self.prepare_column_type(column_type, sql),
         }
     }
 
@@ -1532,7 +1528,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.column-def+1]
+    // [spec:pgorm:req:sql.ddl.column-def+2]
     fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
     where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
@@ -1561,8 +1557,8 @@ impl QueryBuilder {
         self.prepare_column_def_common(column_def, sql, f);
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types+1]
-    // [spec:pgorm:def:sql.render.ddl.types+1]
+    // [spec:pgorm:req:sql.ddl.column-types+2]
+    // [spec:pgorm:def:sql.render.ddl.types+2]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1577,17 +1573,15 @@ impl QueryBuilder {
                     _ => "varchar".into(),
                 },
                 ColumnType::Text => "text".into(),
-                ColumnType::TinyInteger => "smallint".into(),
                 ColumnType::SmallInteger => "smallint".into(),
-                ColumnType::Integer | ColumnType::Unsigned => "integer".into(),
-                ColumnType::BigInteger | ColumnType::BigUnsigned => "bigint".into(),
+                ColumnType::Integer => "integer".into(),
+                ColumnType::BigInteger => "bigint".into(),
                 ColumnType::Float => "real".into(),
                 ColumnType::Double => "double precision".into(),
                 ColumnType::Decimal(precision) => match precision {
                     Some((precision, scale)) => format!("decimal({precision}, {scale})"),
                     None => "decimal".into(),
                 },
-                ColumnType::DateTime => "timestamp without time zone".into(),
                 ColumnType::Timestamp => "timestamp".into(),
                 ColumnType::TimestampWithTimeZone => "timestamp with time zone".into(),
                 ColumnType::Time => "time".into(),
@@ -1602,8 +1596,7 @@ impl QueryBuilder {
                     }
                     typ
                 }
-                ColumnType::Binary(_) | ColumnType::VarBinary(_) | ColumnType::Blob =>
-                    "bytea".into(),
+                ColumnType::Bytea => "bytea".into(),
                 ColumnType::Bit(length) => {
                     match length {
                         Some(length) => format!("bit({length})"),
@@ -1614,10 +1607,7 @@ impl QueryBuilder {
                     format!("varbit({length})")
                 }
                 ColumnType::Boolean => "bool".into(),
-                ColumnType::Money(precision) => match precision {
-                    Some((precision, scale)) => format!("money({precision}, {scale})"),
-                    None => "money".into(),
-                },
+                ColumnType::Money => "money".into(),
                 ColumnType::Json => "json".into(),
                 ColumnType::JsonBinary => "jsonb".into(),
                 ColumnType::Uuid => "uuid".into(),
@@ -1635,7 +1625,6 @@ impl QueryBuilder {
                 ColumnType::Cidr => "cidr".into(),
                 ColumnType::Inet => "inet".into(),
                 ColumnType::MacAddr => "macaddr".into(),
-                ColumnType::Year => unimplemented!("Year is not available in Postgres."),
                 ColumnType::LTree => "ltree".into(),
             }
         )
@@ -1795,7 +1784,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+3]
+    // [spec:pgorm:req:sql.ddl.create-table+4]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1845,8 +1834,6 @@ impl QueryBuilder {
         });
 
         write!(sql, " )").unwrap();
-
-        self.prepare_table_opt(create, sql);
 
         if let Some(extra) = &create.extra {
             write!(sql, " {extra}").unwrap();
@@ -1905,32 +1892,6 @@ impl QueryBuilder {
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
         write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
     }
-
-    /// Translate [`TableOpt`] into SQL statement.
-    fn prepare_table_opt(&self, create: &TableCreateStatement, sql: &mut dyn SqlWriter) {
-        self.prepare_table_opt_def(create, sql)
-    }
-
-    /// Default function
-    fn prepare_table_opt_def(&self, create: &TableCreateStatement, sql: &mut dyn SqlWriter) {
-        for table_opt in create.options.iter() {
-            write!(sql, " ").unwrap();
-            write!(
-                sql,
-                "{}",
-                match table_opt {
-                    TableOpt::Engine(s) => format!("ENGINE={s}"),
-                    TableOpt::Collate(s) => format!("COLLATE={s}"),
-                    TableOpt::CharacterSet(s) => format!("DEFAULT CHARSET={s}"),
-                }
-            )
-            .unwrap()
-        }
-    }
-
-    // /// Translate [`TablePartition`] into SQL statement.
-    // fn prepare_table_partition(&self, _table_partition: &TablePartition, _sql: &mut dyn SqlWriter) {
-    // }
 
     /// Translate [`TableDropStatement`] into SQL statement.
     // [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]

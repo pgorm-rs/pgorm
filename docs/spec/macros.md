@@ -99,19 +99,22 @@ they describe what the macros generate and reject today, including known limitat
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def+2]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
 > parsed `column_type` attribute if present; otherwise it is inferred by matching the
 > field's Rust type structurally — against the `syn::Type`, never against a
 > whitespace-stripped rendering of it: `char`→`Char(None)`,
 > `String`/`&str`→`string(None)`,
-> `i8`→`TinyInteger`, `i16`→`SmallInteger`, `i32`→`Integer`,
-> `i64`→`BigInteger`, `u32`→`Unsigned`, `u64`→`BigUnsigned`,
+> `i8`/`i16`→`SmallInteger`, `i32`→`Integer`,
+> `i64`/`u32`/`u64`→`BigInteger`,
 > `f32`→`Float`, `f64`→`Double`, `bool`→`Boolean`,
 > `Date`/`NaiveDate`→`Date`, `Time`/`NaiveTime`→`Time`, `DateTime`/`NaiveDateTime`→
-> `DateTime`, `DateTimeUtc`/`DateTimeLocal`/`DateTimeWithTimeZone`→
+> `Timestamp`, `DateTimeUtc`/`DateTimeLocal`/`DateTimeWithTimeZone`→
 > `TimestampWithTimeZone`, `Uuid`→`Uuid`, `Json`→`Json`, `Decimal`→`Decimal(None)`,
-> `Vec<u8>`→`VarBinary(StringLen::None)`. A named row matches only a bare,
+> `Vec<u8>`→`Bytea`. Every row names a `ColumnType` Postgres has, so a
+> narrower Rust integer widens to the Postgres type that holds it rather than
+> naming a type the server lacks — `i8` to `smallint`, `u32` and `u64` to the
+> `int8` their `Value` binds as. A named row matches only a bare,
 > single-segment path carrying no generic arguments, so a qualified spelling
 > (`std::string::String`) is not in the table; `&str` matches only a shared reference
 > with neither lifetime nor `mut`, and `Vec<u8>` only that exact one-argument spelling.
@@ -320,7 +323,7 @@ they describe what the macros generate and reject today, including known limitat
 > attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+2]`, falling back to
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+3]`, falling back to
 > `<T as ValueType>::column_type()`/`array_type()`. Attribute errors propagate: a
 > non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a
 > spanned compile error rather than being silently ignored. The expansion implements

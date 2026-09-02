@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ast/test]
-// [spec:pgorm:def:sql.ast.select/test]
+// [spec:pgorm:def:sql.ast.select+1/test]
 // [spec:pgorm:req:sql.render.ident-quoting/test]
 #[test]
 fn select_1() {
@@ -101,7 +101,7 @@ fn select_7() {
     );
 }
 
-// [spec:pgorm:req:sql.render.joins/test]
+// [spec:pgorm:req:sql.render.joins+1/test]
 #[test]
 fn select_8() {
     assert_eq!(

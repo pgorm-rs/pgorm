@@ -281,14 +281,15 @@ an ideal Postgres renderer would emit.
 > `FIELD()`-style ordering. Unions render as ` UNION (…)`, ` UNION ALL (…)`,
 > ` INTERSECT (…)`, or ` EXCEPT (…)` with the sub-select parenthesized.
 
-> [spec:pgorm:req:sql.render.joins]
+> [spec:pgorm:req:sql.render.joins+1]
 > Join types MUST render as `JOIN`, `CROSS JOIN`, `INNER JOIN`, `LEFT JOIN`,
 > `RIGHT JOIN`, `FULL OUTER JOIN`, followed by the joined table reference
 > (prefixed `LATERAL ` when the join is marked lateral), followed by the join
 > constraint rendered as an ` ON …` condition via `sql.render.condition-chain`.
-> Current limitation: `JoinOn::Columns` is not implemented — reaching it panics
-> via `unimplemented!()` (`query_builder.rs:1018`); only `JoinOn::Condition` is
-> renderable, so there is no `USING (…)` output.
+> `JoinOn` has exactly one form, `Condition`, so `prepare_join_on` is total.
+> There is no `USING (…)` output: the `JoinOn::Columns` variant that stood for
+> it was never constructed by any builder and rendered `unimplemented!()`, and
+> it MUST NOT return without a renderer.
 
 > [spec:pgorm:sem:sql.render.locking]
 > A lock clause renders as `FOR ` plus `UPDATE`, `NO KEY UPDATE`, `SHARE`, or
@@ -333,7 +334,7 @@ an ideal Postgres renderer would emit.
 > alias is bound. Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
 > a value-bearing reference never reaches them
-> (`[spec:pgorm:sem:sql.ddl.panics+1]`).
+> (`[spec:pgorm:sem:sql.ddl.panics+2]`).
 
 ## CTEs
 
@@ -424,24 +425,23 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types+1]
+> [spec:pgorm:def:sql.render.ddl.types+2]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
-> `varchar(n)`/`varchar`; Text → `text`; TinyInteger and SmallInteger →
-> `smallint`; Integer/Unsigned → `integer`;
-> BigInteger/BigUnsigned → `bigint`; Float → `real`; Double →
-> `double precision`; Decimal → `decimal(p, s)`/`decimal`; DateTime →
-> `timestamp without time zone`; Timestamp → `timestamp`;
-> TimestampWithTimeZone → `timestamp with time zone`; Time → `time`; Date →
-> `date`; Interval → `interval [fields][(p)]`; Binary/VarBinary/Blob →
+> `varchar(n)`/`varchar`; Text → `text`; SmallInteger → `smallint`; Integer →
+> `integer`; BigInteger → `bigint`; Float → `real`; Double →
+> `double precision`; Decimal → `decimal(p, s)`/`decimal`; Timestamp →
+> `timestamp`; TimestampWithTimeZone → `timestamp with time zone`; Time →
+> `time`; Date → `date`; Interval → `interval [fields][(p)]`; Bytea →
 > `bytea`; Bit → `bit(n)`/`bit`; VarBit → `varbit(n)`; Boolean → `bool`;
-> Money → `money(p, s)`/`money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
+> Money → `money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
 > `vector(n)`/`vector`; Cidr → `cidr`; Inet → `inet`; MacAddr → `macaddr`;
-> LTree → `ltree`; Custom/Enum → the identifier's raw string. `Year` is
-> unsupported and panics. An auto-increment column instead renders
-> `smallserial`, `serial`, or `bigserial` by integer width; auto-increment on
-> any other type panics. Table DDL (`CREATE TABLE … ( … )`, `ALTER TABLE`
+> LTree → `ltree`; Custom/Enum → the identifier's raw string. The mapping is
+> total — no variant is unsupported and none panics. An auto-increment column
+> instead renders `smallserial`, `serial`, or `bigserial` by integer width;
+> auto-increment on any other type renders that type's own spelling. Table
+> DDL (`CREATE TABLE … ( … )`, `ALTER TABLE`
 > add/modify/rename/drop column and add/drop foreign key, `DROP TABLE`,
 > `TRUNCATE TABLE`, `ALTER TABLE … RENAME TO`), index DDL
 > (`CREATE [UNIQUE ]INDEX … ON … [USING BTREE|GIN|HASH] (cols)` with

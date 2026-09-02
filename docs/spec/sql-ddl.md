@@ -33,15 +33,14 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+3]
+> [spec:pgorm:req:sql.ddl.create-table+4]
 > `TableCreateStatement` composes a table name (`table()`, any
 > `IntoTableName`), ordered `ColumnDef`s (`col()`, which stamps the table ref
 > onto each column), table-level indexes (`index()` and `primary_key()` — the
 > latter takes an `IndexCreateStatement` and forces its kind to
 > `IndexKind::PrimaryKey`, the one position in which that kind is spelled),
 > foreign keys (`foreign_key()`), check expressions (`check()`), an
-> `if_not_exists` flag, MySQL-era options (`engine`, `collate`,
-> `character_set`), a `comment` and a trailing `extra` string.
+> `if_not_exists` flag, a `comment` and a trailing `extra` string.
 >
 > Rendering MUST emit `CREATE TABLE [IF NOT EXISTS ]<table> ( ... )` with the
 > body in this fixed order: column definitions, then embedded index
@@ -52,15 +51,19 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+2]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
-> so renders a constraint Postgres rejects. After the closing parenthesis the
-> MySQL-style options still render verbatim (`ENGINE=`, `COLLATE=`,
-> `DEFAULT CHARSET=`) — a leftover that produces invalid Postgres if used —
-> followed by the `extra` string (e.g. `USING columnar`). The table-level
+> so renders a constraint Postgres rejects. After the closing parenthesis only
+> the `extra` string follows (e.g. `USING columnar`). There are no table
+> options: the MySQL-era `TableOpt` (`Engine`, `Collate`, `CharacterSet`) and
+> its `engine`/`collate`/`character_set` builders rendered `ENGINE=`,
+> `COLLATE=` and `DEFAULT CHARSET=` trailers Postgres rejects, and the
+> uninhabited `TablePartition` had no renderer at all; both are gone with the
+> statement's `options` and `partitions` fields, and MUST NOT return. The
+> table-level
 > `comment` is stored and exposed via `get_comment()` but is not rendered
 > here: on Postgres a table comment is a statement of its own, built through
 > `[spec:pgorm:req:sql.ddl.comment]`.
 
-> [spec:pgorm:req:sql.ddl.column-def+1]
+> [spec:pgorm:req:sql.ddl.column-def+2]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr, stored }`,
@@ -75,32 +78,34 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > STORED`/`VIRTUAL` (`VIRTUAL` is emitted for non-stored generated columns
 > even though Postgres does not accept it), and `Extra` verbatim.
 > `AutoIncrement` produces no keyword; instead it replaces the type spelling
-> with the serial family — `SmallInteger`→`smallserial`, `Integer`→`serial`,
-> `BigInteger`→`bigserial`. `Comment` specs are skipped entirely — a column
+> with the serial family, which `ColumnType::serial_spelling` defines over the
+> integer trio alone — `SmallInteger`→`smallserial`, `Integer`→`serial`,
+> `BigInteger`→`bigserial`. Every other type has no serial form, so the spec
+> contributes nothing and the column renders its declared type; the
+> substitution MUST NOT panic, and MUST NOT invent a serial spelling for a
+> type Postgres has none for. `Comment` specs are skipped entirely — a column
 > comment is a statement of its own (`[spec:pgorm:req:sql.ddl.comment]`).
 > `IntoColumnDef` accepts both `ColumnDef` and `&mut ColumnDef` (via
 > `take()`), enabling the builder-by-reference doctest style.
 
-> [spec:pgorm:req:sql.ddl.column-types+1]
+> [spec:pgorm:req:sql.ddl.column-types+2]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
-> contract. It MUST spell: `Char(Some(n))`→`char(n)`, `Char(None)`→`char`;
-> `String(N(n))`→`varchar(n)`, `String(Max|None)`→`varchar`; `Text`→`text`;
-> `TinyInteger`/`SmallInteger`→`smallint`;
-> `Integer`/`Unsigned`→`integer`; `BigInteger`/`BigUnsigned`→`bigint`;
-> `Float`→`real`; `Double`→`double precision`; `Decimal(Some((p,s)))`→
-> `decimal(p, s)`, `Decimal(None)`→`decimal`; `DateTime`→`timestamp without
-> time zone`; `Timestamp`→`timestamp`; `TimestampWithTimeZone`→`timestamp
-> with time zone`; `Time`→`time`; `Date`→`date`; `Interval(fields, p)`→
-> `interval[ FIELDS][(p)]`; `Binary(_)`/`VarBinary(_)`/`Blob`→`bytea`
-> (lengths discarded); `Bit(Some(n))`→`bit(n)`, `Bit(None)`→`bit`;
-> `VarBit(n)`→`varbit(n)`; `Boolean`→`bool`; `Money(Some((p,s)))`→
-> `money(p, s)`, `Money(None)`→`money` (Postgres `money` takes no arguments —
-> rendered anyway); `Json`→`json`; `JsonBinary`→`jsonb`; `Uuid`→`uuid`;
-> `Array(t)`→ recursive element spelling plus `[]`; `Vector(Some(n))`→
-> `vector(n)`, `Vector(None)`→`vector`; `Custom(iden)`→ the unquoted iden
-> text; `Enum { name, .. }`→ the unquoted enum type name; `Cidr`→`cidr`;
-> `Inet`→`inet`; `MacAddr`→`macaddr`; `LTree`→`ltree`. `Year` has no
-> Postgres spelling and panics (see `[spec:pgorm:sem:sql.ddl.panics]`).
+> contract, and it is total: every variant has exactly one Postgres spelling
+> and none can fail. It MUST spell: `Char(Some(n))`→`char(n)`,
+> `Char(None)`→`char`; `String(N(n))`→`varchar(n)`,
+> `String(Max|None)`→`varchar`; `Text`→`text`; `SmallInteger`→`smallint`;
+> `Integer`→`integer`; `BigInteger`→`bigint`; `Float`→`real`;
+> `Double`→`double precision`; `Decimal(Some((p,s)))`→`decimal(p, s)`,
+> `Decimal(None)`→`decimal`; `Timestamp`→`timestamp`;
+> `TimestampWithTimeZone`→`timestamp with time zone`; `Time`→`time`;
+> `Date`→`date`; `Interval(fields, p)`→`interval[ FIELDS][(p)]`;
+> `Bytea`→`bytea`; `Bit(Some(n))`→`bit(n)`, `Bit(None)`→`bit`;
+> `VarBit(n)`→`varbit(n)`; `Boolean`→`bool`; `Money`→`money`; `Json`→`json`;
+> `JsonBinary`→`jsonb`; `Uuid`→`uuid`; `Array(t)`→ recursive element spelling
+> plus `[]`; `Vector(Some(n))`→`vector(n)`, `Vector(None)`→`vector`;
+> `Custom(iden)`→ the unquoted iden text; `Enum { name, .. }`→ the unquoted
+> enum type name; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
+> `LTree`→`ltree`.
 
 > [spec:pgorm:req:sql.ddl.alter-table]
 > `TableAlterStatement` collects `TableAlterOption`s: `AddColumn` (with an
@@ -175,7 +180,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+3]`.
+> `[spec:pgorm:req:sql.ddl.create-table+4]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
@@ -259,13 +264,21 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Panics and unsupported forms
 
-> [spec:pgorm:sem:sql.ddl.panics+1]
-> DDL building is panic-based rather than error-based at its remaining edges:
-> `auto_increment()` on a column whose type is not
-> `SmallInteger`/`Integer`/`BigInteger` panics with `... doesn't support auto
-> increment` at render time; `ColumnType::Year` panics with `Year is not
-> available in Postgres.`; an empty `TableAlterStatement` panics with `No
-> alter option found`. There is no `Result`-returning DDL build path.
+> [spec:pgorm:sem:sql.ddl.panics+2]
+> DDL building is panic-based rather than error-based at its one remaining
+> edge: an empty `TableAlterStatement` panics with `No alter option found`.
+> There is no `Result`-returning DDL build path.
+>
+> Column type and auto-increment shape are no longer among them, and MUST NOT
+> return to them. `ColumnType` carries no variant without a Postgres spelling
+> — `Year` is gone with the enum entry that produced the `Year is not
+> available in Postgres.` panic — so `prepare_column_type` is total. The
+> serial substitution is likewise total: `auto_increment()` on a type outside
+> the integer trio renders the declared type rather than panicking with
+> `... doesn't support auto increment`
+> (`[spec:pgorm:req:sql.ddl.column-def+2]`). Neither guard is a `Result`; both
+> are closed by making the renderer's match exhaustive over spellings that
+> exist.
 >
 > Table reference shape is no longer among them, and MUST NOT return to
 > them. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index

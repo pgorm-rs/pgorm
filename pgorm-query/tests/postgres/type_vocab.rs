@@ -303,8 +303,8 @@ fn the_binary_operator_vocabulary_is_complete() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+1/test]    `StringLen` parameterises varchar/varbinary
-// and the convenience constructors go through it
+// [spec:pgorm:def:sql.types.column-type+2/test]    `StringLen` parameterises varchar and the
+// convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
     assert_eq!(StringLen::default(), StringLen::None);
@@ -317,16 +317,39 @@ fn string_len_and_the_convenience_constructors() {
         ColumnType::String(StringLen::None)
     );
     assert_eq!(
-        ColumnType::var_binary(10),
-        ColumnType::VarBinary(StringLen::N(10))
-    );
-    assert_eq!(
         ColumnType::custom("citext"),
         ColumnType::Custom(Alias::new("citext").into_iden())
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+1/test]    equality compares parameters, renders
+// [spec:pgorm:req:sql.ddl.column-def+2/test]    only the integer trio has a serial spelling
+#[test]
+fn serial_spelling_covers_the_integer_trio() {
+    assert_eq!(
+        ColumnType::SmallInteger.serial_spelling(),
+        Some("smallserial")
+    );
+    assert_eq!(ColumnType::Integer.serial_spelling(), Some("serial"));
+    assert_eq!(ColumnType::BigInteger.serial_spelling(), Some("bigserial"));
+
+    for other in [ColumnType::Uuid, ColumnType::Text, ColumnType::Bytea] {
+        assert_eq!(other.serial_spelling(), None);
+    }
+}
+
+// [spec:pgorm:req:sql.ddl.column-def+2/test]    a type with no serial form renders itself
+#[test]
+fn auto_increment_without_serial_form_renders_type() {
+    assert_eq!(
+        Table::create()
+            .table(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).uuid().auto_increment())
+            .to_string(QueryBuilder),
+        r#"CREATE TABLE "glyph" ( "id" uuid )"#
+    );
+}
+
+// [spec:pgorm:def:sql.types.column-type+2/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -396,7 +419,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+1/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+2/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {

@@ -164,7 +164,7 @@ pub trait IntoColumnRef {
 /// Table::truncate().table(Glyph::Table.into_from_item().alias(Alias::new("g")));
 /// ```
 // [spec:pgorm:def:sql.types.table-ref+1]
-// [spec:pgorm:sem:sql.ddl.panics+1/test]    the DDL-position panics are gone because the shapes
+// [spec:pgorm:sem:sql.ddl.panics+2/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableName {
@@ -297,10 +297,10 @@ pub struct OrderExpr {
 }
 
 /// Join on types
+// [spec:pgorm:req:sql.render.joins+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum JoinOn {
     Condition(Box<ConditionHolder>),
-    Columns(Vec<SimpleExpr>),
 }
 
 /// Ordering options

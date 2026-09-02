@@ -109,7 +109,7 @@ fn sweep_expression_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the join vocabulary
-// [spec:pgorm:req:sql.render.joins/test]
+// [spec:pgorm:req:sql.render.joins+1/test]
 #[test]
 fn sweep_join_shapes() {
     let joins = [
@@ -404,7 +404,7 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+3/test]
+// [spec:pgorm:req:sql.ddl.create-table+4/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -579,7 +579,7 @@ fn sweep_schema_object_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    every `ColumnType` that has a PostgreSQL spelling
-// [spec:pgorm:def:sql.render.ddl.types+1/test]
+// [spec:pgorm:def:sql.render.ddl.types+2/test]
 #[test]
 fn sweep_column_type_vocabulary() {
     let types = [
@@ -588,31 +588,25 @@ fn sweep_column_type_vocabulary() {
         ColumnType::String(StringLen::None),
         ColumnType::String(StringLen::N(255)),
         ColumnType::Text,
-        ColumnType::TinyInteger,
         ColumnType::SmallInteger,
         ColumnType::Integer,
         ColumnType::BigInteger,
-        ColumnType::Unsigned,
-        ColumnType::BigUnsigned,
         ColumnType::Float,
         ColumnType::Double,
         ColumnType::Decimal(None),
         ColumnType::Decimal(Some((12, 2))),
-        ColumnType::DateTime,
         ColumnType::Timestamp,
         ColumnType::TimestampWithTimeZone,
         ColumnType::Time,
         ColumnType::Date,
         ColumnType::Interval(None, None),
         ColumnType::Interval(Some(PgInterval::YearToMonth), None),
-        ColumnType::Binary(16),
-        ColumnType::VarBinary(StringLen::N(16)),
-        ColumnType::Blob,
+        ColumnType::Bytea,
         ColumnType::Bit(None),
         ColumnType::Bit(Some(8)),
         ColumnType::VarBit(8),
         ColumnType::Boolean,
-        ColumnType::Money(None),
+        ColumnType::Money,
         ColumnType::Json,
         ColumnType::JsonBinary,
         ColumnType::Uuid,

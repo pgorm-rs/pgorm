@@ -380,31 +380,31 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
     use scalars::Column as C;
 
     assert_eq!(C::Txt.def(), ColumnType::string(None).def());
-    assert_eq!(C::Tiny.def(), ColumnType::TinyInteger.def());
+    assert_eq!(C::Tiny.def(), ColumnType::SmallInteger.def());
     assert_eq!(C::Small.def(), ColumnType::SmallInteger.def());
     assert_eq!(C::Id.def(), ColumnType::Integer.def());
     assert_eq!(C::Big.def(), ColumnType::BigInteger.def());
-    assert_eq!(C::Uns.def(), ColumnType::Unsigned.def());
+    assert_eq!(C::Uns.def(), ColumnType::BigInteger.def());
     assert_eq!(C::Single.def(), ColumnType::Float.def());
     assert_eq!(C::Dbl.def(), ColumnType::Double.def());
     assert_eq!(C::Flag.def(), ColumnType::Boolean.def());
     assert_eq!(C::D.def(), ColumnType::Date.def());
     assert_eq!(C::T.def(), ColumnType::Time.def());
-    assert_eq!(C::Dt.def(), ColumnType::DateTime.def());
+    assert_eq!(C::Dt.def(), ColumnType::Timestamp.def());
     assert_eq!(C::Dtu.def(), ColumnType::TimestampWithTimeZone.def());
     assert_eq!(C::Dtl.def(), ColumnType::TimestampWithTimeZone.def());
     assert_eq!(C::Dttz.def(), ColumnType::TimestampWithTimeZone.def());
     assert_eq!(C::Uid.def(), ColumnType::Uuid.def());
     assert_eq!(C::Js.def(), ColumnType::Json.def());
     assert_eq!(C::Dec.def(), ColumnType::Decimal(None).def());
-    assert_eq!(C::Blob.def(), ColumnType::VarBinary(StringLen::None).def());
+    assert_eq!(C::Blob.def(), ColumnType::Bytea.def());
 
     // `Option<T>` is unwrapped to `T` and forces nullability.
     assert_eq!(C::Maybe.def(), ColumnType::BigInteger.def().nullable());
@@ -417,7 +417,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+2/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.
