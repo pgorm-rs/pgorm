@@ -117,7 +117,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
 // [spec:pgorm:sem:query.build.insert/test]    the capture that makes that
 // possible: `Insert::add` records the model's primary-key value tuple when the
 // entity's key is not auto-increment
-// [spec:pgorm:sem:exec.crud.update+1/test]    `UpdateOne::exec` returns the model
+// [spec:pgorm:sem:exec.crud.update+2/test]    `UpdateOne::exec` returns the model
 // built from the full-column RETURNING, including a column set back to NULL
 pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
     let repository = repository::Model {
@@ -148,7 +148,7 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         .exec(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+1] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+2] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(DbErr::RecordNotFound));
 

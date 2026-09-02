@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, Iterable,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, Iterable,
     PrimaryKeyToColumn, QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
@@ -29,9 +29,13 @@ where
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:sem:query.build.delete]
+// [spec:pgorm:sem:query.build.delete+1]
 impl Delete {
     /// Delete one Model or ActiveModel
+    ///
+    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// `model` is [`ActiveValue::NotSet`], since there would be nothing to
+    /// narrow the statement to a single row.
     ///
     /// Model
     /// ```
@@ -42,6 +46,7 @@ impl Delete {
     ///         id: 1,
     ///         name: "Apple Pie".to_owned(),
     ///     })
+    ///     .expect("the primary key is set")
     ///     .as_query()
     ///     .to_string(QueryBuilder),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
@@ -56,12 +61,26 @@ impl Delete {
     ///         id: ActiveValue::set(1),
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
+    ///     .expect("the primary key is set")
     ///     .as_query()
     ///     .to_string(QueryBuilder),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
     /// );
     /// ```
-    pub fn one<E, A, M>(model: M) -> DeleteOne<A>
+    ///
+    /// ```
+    /// use pgorm::{entity::*, error::DbErr, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     Delete::one(cake::ActiveModel {
+    ///         id: ActiveValue::not_set(),
+    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///     })
+    ///     .unwrap_err(),
+    ///     DbErr::PrimaryKeyNotSet,
+    /// );
+    /// ```
+    pub fn one<E, A, M>(model: M) -> Result<DeleteOne<A>, DbErr>
     where
         E: EntityTrait,
         A: ActiveModelTrait<Entity = E>,
@@ -73,7 +92,7 @@ impl Delete {
                 .to_owned(),
             model: model.into_active_model(),
         };
-        myself.prepare()
+        myself.prepare_filters()
     }
 
     /// Delete many ActiveModel
@@ -102,23 +121,22 @@ impl Delete {
     }
 }
 
-// [spec:pgorm:sem:query.build.delete]
+// [spec:pgorm:sem:query.build.delete+1]
 impl<A> DeleteOne<A>
 where
     A: ActiveModelTrait,
 {
-    pub(crate) fn prepare(mut self) -> Self {
+    fn prepare_filters(mut self) -> Result<Self, DbErr> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            let av = self.model.get(col);
-            match av {
+            match self.model.get(col) {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
-                ActiveValue::NotSet => panic!("PrimaryKey is not set"),
+                ActiveValue::NotSet => return Err(DbErr::PrimaryKeyNotSet),
             }
         }
-        self
+        Ok(self)
     }
 }
 
@@ -195,6 +213,7 @@ mod tests {
                 id: 1,
                 name: "Apple Pie".to_owned(),
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
@@ -204,6 +223,7 @@ mod tests {
                 id: ActiveValue::set(1),
                 name: ActiveValue::set("Apple Pie".to_owned()),
             })
+            .expect("the primary key is set")
             .as_query()
             .to_string(QueryBuilder),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,

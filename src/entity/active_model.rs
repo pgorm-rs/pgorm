@@ -271,7 +271,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     {
         let am = ActiveModelBehavior::before_delete(self, db).await?;
         let am_clone = am.clone();
-        let delete_res = Self::Entity::delete(am).exec(db).await?;
+        let delete_res = Self::Entity::delete(am)?.exec(db).await?;
         ActiveModelBehavior::after_delete(am_clone, db).await?;
         Ok(delete_res)
     }

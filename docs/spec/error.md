@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+2]
+> [spec:pgorm:def:error.model+3]
 > `DbErr` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -15,7 +15,7 @@ it.
 > exhaustion and acquisition timeouts surface here). The remaining variants
 > are constructed by pgorm itself: `TryIntoErr { from, into, source }`,
 > `Query(RuntimeErr)`, `ConvertFromU64(&'static str)`, `UnpackInsertId`,
-> `UpdateGetPrimaryKey`, `AttrNotSet(String)`, `Type(String)`,
+> `PrimaryKeyNotSet`, `AttrNotSet(String)`, `Type(String)`,
 > `Json(String)`, `RecordNotFound`, `RecordNotInserted`, `RecordNotUpdated`,
 > and `Custom(String)`. Every variant MUST have at least one construction
 > site: variants that no code can produce are removed rather than kept as

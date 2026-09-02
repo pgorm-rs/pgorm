@@ -27,7 +27,7 @@ async fn main() -> Result<(), DbErr> {
 
 // [spec:pgorm:def:exec.crud/test]    `into_values` decoding through
 // `SelectGetableValue` and `into_tuple` through `SelectGetableTuple`
-// [spec:pgorm:sem:exec.crud.update+1/test]    `UpdateOne::exec` returns the
+// [spec:pgorm:sem:exec.crud.update+2/test]    `UpdateOne::exec` returns the
 // updated model, and surfaces RecordNotFound when the filter matches nothing
 pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
     use common::features::byte_primary_key::*;
@@ -55,7 +55,7 @@ pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
         .exec(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+1] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+2] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(DbErr::RecordNotFound));
 

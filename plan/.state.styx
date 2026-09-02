@@ -309,6 +309,7 @@ derived_priorities (
 )
 
 assertions (
+    {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
     {id decide.cli, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:33:17.849875Z}
     {id decide.docs, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:53:13.404026Z}
     {id decide.schema-comments, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:38:16.477006Z}
@@ -322,6 +323,7 @@ assertions (
     {id infra.tx.metric-tx, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:08:31.330198Z}
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
+    {id nopanic.delete-one, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:41:53.878346Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}
@@ -346,7 +348,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
 )
 
 impl_evidence (

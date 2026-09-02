@@ -23,7 +23,7 @@ impl fmt::Display for Boom {
 
 impl StdError for Boom {}
 
-// [spec:pgorm:def:error.model+2/test]    the variants pgorm constructs itself, and how each renders
+// [spec:pgorm:def:error.model+3/test]    the variants pgorm constructs itself, and how each renders
 #[test]
 fn db_err_variants_render_expected_messages() {
     let cases: Vec<(DbErr, &str)> = vec![
@@ -44,10 +44,7 @@ fn db_err_variants_render_expected_messages() {
             "Type 'Uuid' cannot be converted from u64",
         ),
         (DbErr::UnpackInsertId, "Failed to unpack last_insert_id"),
-        (
-            DbErr::UpdateGetPrimaryKey,
-            "Failed to get primary key from model",
-        ),
+        (DbErr::PrimaryKeyNotSet, "A primary key value is not set"),
         (
             DbErr::AttrNotSet("name".to_owned()),
             "Attribute name is NotSet",
@@ -74,7 +71,7 @@ fn db_err_variants_render_expected_messages() {
     }
 }
 
-// [spec:pgorm:def:error.model+2/test]    PartialEq/Eq compare rendered messages, not payloads
+// [spec:pgorm:def:error.model+3/test]    PartialEq/Eq compare rendered messages, not payloads
 #[test]
 fn db_err_eq_compares_rendered_messages() {
     fn assert_is_eq<T: Eq>() {}
@@ -100,7 +97,7 @@ fn db_err_eq_compares_rendered_messages() {
     assert_eq!(DbErr::RecordNotFound, DbErr::RecordNotFound);
 }
 
-// [spec:pgorm:def:error.model+2/test]    ColumnFromStrErr covers FromStr failures on entity columns
+// [spec:pgorm:def:error.model+3/test]    ColumnFromStrErr covers FromStr failures on entity columns
 #[test]
 fn column_from_str_err_reports_bad_input() {
     assert!(matches!(
@@ -166,7 +163,7 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+2/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
+// [spec:pgorm:def:error.model+3/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
 #[pgorm_macros::test]
 async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
     let ctx = TestContext::new("error_model_postgres_errmodel").await;
@@ -217,7 +214,7 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+2/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
+// [spec:pgorm:def:error.model+3/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
 #[pgorm_macros::test]
 async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
     let db_name = "error_model_pool_errmodel";

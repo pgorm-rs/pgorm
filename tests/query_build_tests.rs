@@ -93,7 +93,8 @@ fn every_builder_wraps_one_statement() {
     );
     let _: UpdateStatement = update_many.into_query();
 
-    let delete_one: DeleteOne<cake::ActiveModel> = Delete::one(apple());
+    let delete_one: DeleteOne<cake::ActiveModel> =
+        Delete::one(apple()).expect("the primary key is set");
     assert_eq!(
         delete_one.as_query().to_string(QueryBuilder),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
@@ -1056,7 +1057,7 @@ fn try_insert_conversions_and_conflict_clause() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+1/test]    `Update::one` filters on every
+// [spec:pgorm:sem:query.build.update+2/test]    `Update::one` filters on every
 // primary-key column and SETs only `Set`, non-key columns
 #[test]
 fn update_one_sets_changed_non_key_columns() {
@@ -1105,7 +1106,7 @@ fn update_one_sets_changed_non_key_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+1/test]    a `NotSet` primary key has no
+// [spec:pgorm:sem:query.build.update+2/test]    a `NotSet` primary key has no
 // filter to contribute, so `Update::one` refuses to build the statement
 #[test]
 fn update_one_errs_on_unset_primary_key() {
@@ -1114,7 +1115,7 @@ fn update_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("a NotSet primary key cannot narrow the update");
-    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
 
     // A composite key rejects the model when any one of its columns is unset.
     let err = Update::one(cake_filling_price::ActiveModel {
@@ -1123,7 +1124,7 @@ fn update_one_errs_on_unset_primary_key() {
         price: ActiveValue::Set(rust_decimal::Decimal::ONE),
     })
     .expect_err("half a composite key is not a key");
-    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
 
     // `EntityTrait::update` forwards the same error.
     let err = cake::Entity::update(cake::ActiveModel {
@@ -1131,10 +1132,10 @@ fn update_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("the entry point forwards the builder's error");
-    assert_eq!(err, DbErr::UpdateGetPrimaryKey);
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.update+1/test]    `Update::many` adds no implicit
+// [spec:pgorm:sem:query.build.update+2/test]    `Update::many` adds no implicit
 // filter; `set` writes `Set` columns including primary keys, `col_expr` writes
 // a raw expression, and `QueryFilter` supplies the WHERE clause
 #[test]
@@ -1172,7 +1173,7 @@ fn update_many_has_no_implicit_filter() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete/test]    `Delete::one` filters on the
+// [spec:pgorm:sem:query.build.delete+1/test]    `Delete::one` filters on the
 // primary key only — non-key attributes never reach the WHERE clause
 #[test]
 fn delete_one_filters_by_primary_key_only() {
@@ -1181,6 +1182,7 @@ fn delete_one_filters_by_primary_key_only() {
             id: 1,
             name: "Apple Pie".to_owned(),
         })
+        .expect("the primary key is set")
         .as_query()
         .to_string(QueryBuilder),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
@@ -1191,6 +1193,7 @@ fn delete_one_filters_by_primary_key_only() {
             id: ActiveValue::Unchanged(1),
             name: ActiveValue::Set("Apple Pie".to_owned()),
         })
+        .expect("the primary key is unchanged, not unset")
         .as_query()
         .to_string(QueryBuilder),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
@@ -1201,6 +1204,7 @@ fn delete_one_filters_by_primary_key_only() {
             cake_id: 1,
             filling_id: 2,
         })
+        .expect("both primary-key columns are set")
         .as_query()
         .to_string(QueryBuilder),
         [
@@ -1211,17 +1215,35 @@ fn delete_one_filters_by_primary_key_only() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete/test]    a `NotSet` primary key panics
+// [spec:pgorm:sem:query.build.delete+1/test]    a `NotSet` primary key has no
+// filter to contribute, so `Delete::one` refuses to build the statement
 #[test]
-#[should_panic(expected = "PrimaryKey is not set")]
-fn delete_one_panics_on_unset_primary_key() {
-    let _ = Delete::one(cake::ActiveModel {
+fn delete_one_errs_on_unset_primary_key() {
+    let err = Delete::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
         name: ActiveValue::Set("Apple Pie".to_owned()),
-    });
+    })
+    .expect_err("a NotSet primary key cannot narrow the delete");
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+
+    // A composite key rejects the model when any one of its columns is unset.
+    let err = Delete::one(cake_filling::ActiveModel {
+        cake_id: ActiveValue::Set(1),
+        filling_id: ActiveValue::NotSet,
+    })
+    .expect_err("half a composite key is not a key");
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+
+    // `EntityTrait::delete` forwards the same error.
+    let err = cake::Entity::delete(cake::ActiveModel {
+        id: ActiveValue::NotSet,
+        name: ActiveValue::Set("Apple Pie".to_owned()),
+    })
+    .expect_err("the entry point forwards the builder's error");
+    assert_eq!(err, DbErr::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.delete/test]    `Delete::many` is bare; narrowing
+// [spec:pgorm:sem:query.build.delete+1/test]    `Delete::many` is bare; narrowing
 // it is the caller's job through `QueryFilter`
 #[test]
 fn delete_many_is_unconstrained_until_filtered() {

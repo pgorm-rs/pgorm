@@ -32,7 +32,7 @@ where
 impl Update {
     /// Update one ActiveModel
     ///
-    /// Fails with [`DbErr::UpdateGetPrimaryKey`] when a primary-key column of
+    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`], since there would be nothing to
     /// narrow the statement to a single row.
     ///
@@ -60,7 +60,7 @@ impl Update {
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
     ///     .unwrap_err(),
-    ///     DbErr::UpdateGetPrimaryKey,
+    ///     DbErr::PrimaryKeyNotSet,
     /// );
     /// ```
     pub fn one<E, A>(model: A) -> Result<UpdateOne<A>, DbErr>
@@ -102,7 +102,7 @@ impl Update {
     }
 }
 
-// [spec:pgorm:sem:query.build.update+1]
+// [spec:pgorm:sem:query.build.update+2]
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
@@ -114,7 +114,7 @@ where
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
-                ActiveValue::NotSet => return Err(DbErr::UpdateGetPrimaryKey),
+                ActiveValue::NotSet => return Err(DbErr::PrimaryKeyNotSet),
             }
         }
         Ok(self)
@@ -197,7 +197,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.update+1]
+// [spec:pgorm:sem:query.build.update+2]
 impl<E> UpdateMany<E>
 where
     E: EntityTrait,

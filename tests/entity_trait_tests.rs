@@ -432,6 +432,7 @@ fn entity_crud_surface() {
             name: NotSet,
             note: NotSet,
         })
+        .expect("the primary key is set")
         .build()
         .0,
         r#"DELETE FROM "item" WHERE "item"."id" = $1"#

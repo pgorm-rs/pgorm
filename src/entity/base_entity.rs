@@ -294,7 +294,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
-    /// Fails with [`DbErr::UpdateGetPrimaryKey`] when a primary-key column of
+    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
     ///
     /// # Example
@@ -395,6 +395,9 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
+    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -409,7 +412,7 @@ pub trait EntityTrait: EntityName {
     /// };
     ///
     /// // Deleting zero rows is `Ok` with `rows_affected: 0`, never an error.
-    /// let delete_result = fruit::Entity::delete(orange).exec(&db).await?;
+    /// let delete_result = fruit::Entity::delete(orange)?.exec(&db).await?;
     /// let affected: u64 = delete_result.rows_affected;
     /// # Ok(())
     /// # }
@@ -424,11 +427,14 @@ pub trait EntityTrait: EntityName {
     /// };
     ///
     /// assert_eq!(
-    ///     fruit::Entity::delete(orange).build().0,
+    ///     fruit::Entity::delete(orange)
+    ///         .expect("the primary key is set")
+    ///         .build()
+    ///         .0,
     ///     r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#
     /// );
     /// ```
-    fn delete<A>(model: A) -> DeleteOne<A>
+    fn delete<A>(model: A) -> Result<DeleteOne<A>, DbErr>
     where
         A: ActiveModelTrait<Entity = Self>,
     {

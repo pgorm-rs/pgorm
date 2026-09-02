@@ -2,7 +2,7 @@ use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+2]
+// [spec:pgorm:def:error.model+3]
 #[derive(Error, Debug)]
 pub enum DbErr {
     /// Postgres error
@@ -30,10 +30,10 @@ pub enum DbErr {
     /// After an insert statement it was impossible to retrieve the last_insert_id
     #[error("Failed to unpack last_insert_id")]
     UnpackInsertId,
-    /// When updating, a model should know its primary key to check
-    /// if the record has been correctly updated, otherwise this error will occur
-    #[error("Failed to get primary key from model")]
-    UpdateGetPrimaryKey,
+    /// A primary-key column of the model is `NotSet`, so there is nothing to
+    /// narrow the statement to a single row
+    #[error("A primary key value is not set")]
+    PrimaryKeyNotSet,
     /// Thrown by `TryFrom<ActiveModel>`, which assumes all attributes are set/unchanged
     #[error("Attribute {0} is NotSet")]
     AttrNotSet(String),
@@ -68,7 +68,7 @@ pub enum RuntimeErr {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+2]    Display-string equality
+// [spec:pgorm:def:error.model+3]    Display-string equality
 impl PartialEq for DbErr {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

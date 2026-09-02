@@ -1565,6 +1565,13 @@ children (
                         kind @decision
                         text "Operator decision: rename the variant. DbErr::UpdateGetPrimaryKey becomes DbErr::PrimaryKeyNotSet, serving both Update::one and Delete::one; error.model bumps again and the just-landed Update::one sites and tests adjust in the same change. Rejected: reusing the update-named variant for delete (documented misnomer)."
                     }
+
+                    {
+                        at 2026-09-02T15:41:53.878346Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

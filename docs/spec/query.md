@@ -178,12 +178,12 @@ what makes it total over partially-set models.
 > is mapped to `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.
 
-> [spec:pgorm:sem:query.build.update+1]
+> [spec:pgorm:sem:query.build.update+2]
 > `Update::one(model)` builds an `UpdateOne<A>` in two passes over the
 > ActiveModel and returns `Result<UpdateOne<A>, DbErr>`. Filters: every
 > primary-key column contributes a `WHERE pk = value` equality from a `Set`
 > or `Unchanged` value; a `NotSet` primary key aborts the build with
-> `Err(DbErr::UpdateGetPrimaryKey)` rather than panicking, so an `UpdateOne`
+> `Err(DbErr::PrimaryKeyNotSet)` rather than panicking, so an `UpdateOne`
 > can never exist without a filter on every primary-key column. Values: only
 > `Set`, non-primary-key columns are written into the SET clause (through
 > `col.save_as`); `Unchanged` and `NotSet` columns are omitted, so only
@@ -195,12 +195,16 @@ what makes it total over partially-set models.
 > primary-key columns, and `col_expr(col, expr)` sets a raw expression. Both
 > forms implement `QueryFilter` for WHERE clauses.
 
-> [spec:pgorm:sem:query.build.delete]
+> [spec:pgorm:sem:query.build.delete+1]
 > `Delete::one(model)` converts through `IntoActiveModel`, targets the
-> entity's table and adds one `WHERE pk = value` equality per primary-key
-> column from `Set` or `Unchanged` values; a `NotSet` primary key panics with
-> `"PrimaryKey is not set"`. Non-key attribute values do not participate in
-> the filter. `Delete::many(entity)` builds a bare `DELETE FROM <table>`;
+> entity's table and returns `Result<DeleteOne<A>, DbErr>`: every primary-key
+> column contributes a `WHERE pk = value` equality from a `Set` or
+> `Unchanged` value; a `NotSet` primary key aborts the build with
+> `Err(DbErr::PrimaryKeyNotSet)` rather than panicking, so a `DeleteOne` can
+> never exist without a filter on every primary-key column and this path
+> cannot render an unfiltered `DELETE`. Non-key attribute values do not
+> participate in the filter. `EntityTrait::delete` forwards both the success
+> and the error. `Delete::many(entity)` builds a bare `DELETE FROM <table>`;
 > constraining it is the caller's job via `QueryFilter`.
 
 > [spec:pgorm:def:query.build.debug-query]

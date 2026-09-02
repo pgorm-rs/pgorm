@@ -64,7 +64,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+1]
+// [spec:pgorm:sem:exec.crud.update+2]
 impl Updater {
     /// Instantiate an update using an [UpdateStatement]
     pub fn new(query: UpdateStatement) -> Self {
@@ -163,7 +163,7 @@ impl Updater {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+1]
+// [spec:pgorm:sem:exec.crud.update+2]
 async fn find_updated_model_by_id<A, C>(
     model: A,
     db: &C,
@@ -177,7 +177,7 @@ where
 
     let primary_key_value = match model.get_primary_key_value() {
         Some(val) => ValueType::<A>::from_value_tuple(val),
-        None => return Err(DbErr::UpdateGetPrimaryKey),
+        None => return Err(DbErr::PrimaryKeyNotSet),
     };
     let found = Entity::<A>::find_by_id(primary_key_value).one(db).await?;
 
