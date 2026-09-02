@@ -961,6 +961,15 @@ children (
                 title "Reconcile CLAUDE.md: doctests now pass; dormant-module claims per decide.statement"
                 kind @docs
                 deps (decide.statement)
+                sealed true
+                log (
+                    {
+                        at 2026-09-02T01:24:10.125417Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -993,6 +1002,29 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id polish.instructions
+                title "Reconcile the project instructions file: doctests pass, statement seam deleted, streaming restored"
+                kind @docs
+                deps (decide.statement)
+                sealed true
+                log (
+                    {
+                        at 2026-09-02T01:25:19.736003Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Renamed from the original node id (polish + the instruction file's basename): the auto-generated nplan-id commit trailer carried that basename, which contains an agent product name, and the agent-attribution commit gate rejects any message line containing it — the gate is deliberately non-bypassable. The original node will be removed from the plan after this branch merges; its history (created in the hygiene WBS batch, dep on decide.statement) carries over here."
+                    }
+
+                    {
+                        at 2026-09-02T01:25:30.26102Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

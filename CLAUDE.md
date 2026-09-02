@@ -10,7 +10,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 
 ### Testing
 - `cargo nextest run --workspace` - Run the test suite (the preferred runner; skips doctests)
-- `cargo test` - Also runs doctests; the doctest phase currently fails, as most doc examples still reference the removed mock backend (`MockDatabase`, `DbBackend`)
+- `cargo test --doc` - Run the doctests, which nextest skips; the suite passes (105 pass, 1 deliberately ignored)
 - Tests require a running PostgreSQL instance. Set `DATABASE_URL` to the *server* URL with no database path, e.g. `DATABASE_URL=postgres://postgres:postgres@localhost:5432`
 - `.env.local` and `.env` are loaded automatically via dotenv, so `DATABASE_URL` can live in either
 
@@ -40,7 +40,7 @@ There is no CLI crate: the inherited `pgorm-cli` was retired (it targeted sqlx/s
 - **Schema**: `src/schema/` - DDL statement generation from entity definitions (`Schema::create_table_from_entity`, `create_enum_from_entity`, `create_index_from_entity`). This is generation only, not introspection.
 - **Metrics**: `src/metric.rs` - Opt-in instrumentation wrappers
 
-`src/database/statement.rs` and `src/database/stream/` are commented out of `src/database/mod.rs`; `Statement`/`StatementBuilder` and row streaming are not reachable through the public crate today.
+Row streaming is reachable through the public crate: `ConnectionTrait::query_raw` returns a tokio-postgres `RowStream`, and `src/executor/select.rs` decodes it into models — `stream` on `Select`, `SelectTwo`, `Selector`, and `SelectorRaw`, plus `stream_partial_model`, each yielding a `PinBoxSendStream`. pgorm no longer carries its own `Statement`/`StatementBuilder`: `src/database/statement.rs` was deleted, leaving `src/database/` as just `connection.rs` and `db_connection.rs`, and SQL now travels as a plain `&str` (anything `ToStatement`) alongside its parameters.
 
 ### Key Differences from SeaORM
 - PostgreSQL-only (no multi-database support)
