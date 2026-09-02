@@ -5,6 +5,21 @@ use crate::{
 use core::marker::PhantomData;
 use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
 
+/// The column shape an [`Insert`] has recorded from the models added to it.
+///
+/// Emptiness is a variant rather than a predicate over the bitmap: `Present` is
+/// only reachable through [`Insert::add`] for a model that set at least one
+/// column, so an all-`NotSet` model cannot present itself as a row of values.
+#[derive(Debug)]
+enum InsertColumns {
+    /// No column is set. `rows` counts the models added so far, every one of
+    /// which left every column `NotSet`; zero is the initial state.
+    Empty { rows: u32 },
+    /// Per-column presence recorded from the first model added, which set at
+    /// least one column.
+    Present(Vec<bool>),
+}
+
 /// Performs INSERT operations on a ActiveModel
 #[derive(Debug)]
 pub struct Insert<A>
@@ -12,7 +27,7 @@ where
     A: ActiveModelTrait,
 {
     pub(crate) query: InsertStatement,
-    pub(crate) columns: Vec<bool>,
+    columns: InsertColumns,
     pub(crate) primary_key: Option<ValueTuple>,
     pub(crate) model: PhantomData<A>,
 }
@@ -26,7 +41,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.insert]
+// [spec:pgorm:sem:query.build.insert+1]
 impl<A> Insert<A>
 where
     A: ActiveModelTrait,
@@ -37,10 +52,17 @@ where
                 .into_table(A::Entity::default().table_ref())
                 .or_default_values()
                 .to_owned(),
-            columns: Vec::new(),
+            columns: InsertColumns::Empty { rows: 0 },
             primary_key: None,
             model: PhantomData,
         }
+    }
+
+    /// Whether the statement carries no column at all: either no model was
+    /// added, or every model added left every column `NotSet`.
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
+    pub(crate) fn is_empty(&self) -> bool {
+        matches!(self.columns, InsertColumns::Empty { .. })
     }
 
     /// Insert one Model or ActiveModel
@@ -115,6 +137,7 @@ where
     ///
     /// Panics if the column value has discrepancy across rows
     // [spec:pgorm:req:query.build.insert.uniform-columns]
+    // [spec:pgorm:sem:query.build.insert+1]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
     where
@@ -129,15 +152,10 @@ where
             };
         let mut columns = Vec::new();
         let mut values = Vec::new();
-        let columns_empty = self.columns.is_empty();
-        for (idx, col) in <A::Entity as EntityTrait>::Column::iter().enumerate() {
+        let mut present = Vec::new();
+        for col in <A::Entity as EntityTrait>::Column::iter() {
             let av = am.take(col);
-            let av_has_val = av.is_set() || av.is_unchanged();
-            if columns_empty {
-                self.columns.push(av_has_val);
-            } else if self.columns[idx] != av_has_val {
-                panic!("columns mismatch");
-            }
+            present.push(av.is_set() || av.is_unchanged());
             match av {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     columns.push(col);
@@ -146,6 +164,22 @@ where
                 ActiveValue::NotSet => {}
             }
         }
+
+        match &self.columns {
+            InsertColumns::Empty { rows } if columns.is_empty() => {
+                let rows = rows.saturating_add(1);
+                self.columns = InsertColumns::Empty { rows };
+                self.query.or_default_values_many(rows);
+                return self;
+            }
+            InsertColumns::Empty { rows: 0 } => self.columns = InsertColumns::Present(present),
+            InsertColumns::Empty { .. } => panic!("columns mismatch"),
+            InsertColumns::Present(recorded) if *recorded != present => {
+                panic!("columns mismatch")
+            }
+            InsertColumns::Present(_) => {}
+        }
+
         self.query.columns(columns);
         self.query.values_panic(values);
         self
@@ -246,7 +280,7 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
     pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -285,7 +319,7 @@ where
 ///
 /// All functions works the same as if it is `Insert<A>`. Please refer to the
 /// `Insert<A>` page for more information
-// [spec:pgorm:sem:query.build.insert.empty-failsafe]
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
 #[derive(Debug)]
 pub struct TryInsert<A>
 where

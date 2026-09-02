@@ -871,7 +871,7 @@ fn combine_panics_on_unaliased_expression() {
         .select_also(fruit::Entity);
 }
 
-// [spec:pgorm:sem:query.build.insert/test]    `Insert::new` renders a valid
+// [spec:pgorm:sem:query.build.insert+1/test]    `Insert::new` renders a valid
 // DEFAULT VALUES statement before any model is added, and `one`/`many` /
 // `add`/`add_many` take anything `IntoActiveModel`
 #[test]
@@ -913,7 +913,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert/test]    `add` writes `Set` and
+// [spec:pgorm:sem:query.build.insert+1/test]    `add` writes `Set` and
 // `Unchanged` columns through `col.save_as` and omits `NotSet` ones entirely
 #[test]
 fn insert_add_omits_not_set_columns() {
@@ -950,7 +950,7 @@ fn insert_add_omits_not_set_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert/test]    `on_conflict` attaches the given
+// [spec:pgorm:sem:query.build.insert+1/test]    `on_conflict` attaches the given
 // pgorm-query clause verbatim
 #[test]
 fn insert_on_conflict_is_attached_verbatim() {
@@ -1010,7 +1010,50 @@ fn insert_many_rejects_mismatched_columns() {
     ]);
 }
 
-// [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    `do_nothing` and
+// [spec:pgorm:sem:query.build.insert+1/test]    a model with nothing set
+// contributes a default-values row rather than an arity-zero column and value
+// list, and one such row per model
+#[test]
+fn all_not_set_model_renders_a_default_row() {
+    let blank = || cake::ActiveModel {
+        id: ActiveValue::NotSet,
+        name: ActiveValue::NotSet,
+    };
+
+    assert_eq!(
+        Insert::<cake::ActiveModel>::one(blank())
+            .as_query()
+            .to_string(QueryBuilder),
+        r#"INSERT INTO "cake" VALUES (DEFAULT)"#
+    );
+
+    assert_eq!(
+        Insert::<cake::ActiveModel>::many([blank(), blank(), blank()])
+            .as_query()
+            .to_string(QueryBuilder),
+        r#"INSERT INTO "cake" VALUES (DEFAULT), (DEFAULT), (DEFAULT)"#
+    );
+}
+
+// [spec:pgorm:req:query.build.insert.uniform-columns/test]    a first model
+// that sets nothing is a column set like any other: a later model that sets a
+// column mismatches it
+#[test]
+#[should_panic(expected = "columns mismatch")]
+fn insert_many_rejects_a_blank_first_model() {
+    let _ = Insert::<cake::ActiveModel>::many([
+        cake::ActiveModel {
+            id: ActiveValue::NotSet,
+            name: ActiveValue::NotSet,
+        },
+        cake::ActiveModel {
+            id: ActiveValue::NotSet,
+            name: ActiveValue::Set("Orange".to_owned()),
+        },
+    ]);
+}
+
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    `do_nothing` and
 // `on_empty_do_nothing` convert to `TryInsert` without touching the statement,
 // while `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]

@@ -26,7 +26,7 @@ async fn main() {
 
 // [spec:pgorm:sem:exec.crud.try-insert+1/test]    `TryInsert::exec` reporting
 // Inserted, Conflicted and Empty
-// [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    `on_empty_do_nothing`
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    `on_empty_do_nothing`
 // / `on_conflict_do_nothing` produce a `TryInsert` whose `exec` maps
 // RecordNotInserted to Conflicted and an empty batch to Empty
 pub async fn test(db: &DatabaseConnection) {
@@ -56,7 +56,7 @@ pub async fn test(db: &DatabaseConnection) {
 
     assert!(matches!(conflict_insert, Ok(TryInsertResult::Conflicted)));
 
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe] An empty batch is a
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1] An empty batch is a
     // no-op that reports Empty before any SQL is issued.
     let empty_insert = Bakery::insert_many(std::iter::empty::<bakery::ActiveModel>())
         .on_empty_do_nothing()
@@ -64,4 +64,16 @@ pub async fn test(db: &DatabaseConnection) {
         .await;
 
     assert!(matches!(empty_insert, Ok(TryInsertResult::Empty)));
+
+    // A model with every column NotSet records no column either, so it reaches
+    // the same empty state and leaves the database untouched.
+    let blank_insert = Bakery::insert(bakery::ActiveModel {
+        ..Default::default()
+    })
+    .on_empty_do_nothing()
+    .exec(db)
+    .await;
+
+    assert!(matches!(blank_insert, Ok(TryInsertResult::Empty)));
+    assert_eq!(Bakery::find().all(db).await.unwrap().len(), 1);
 }

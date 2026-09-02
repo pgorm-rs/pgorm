@@ -143,7 +143,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.
 
-> [spec:pgorm:sem:query.build.insert]
+> [spec:pgorm:sem:query.build.insert+1]
 > `Insert::<A>::new` targets `A::Entity`'s table and applies
 > `or_default_values()`, so a builder to which no model was ever added still
 > renders a valid default-values INSERT rather than invalid SQL. `Insert::one`
@@ -153,9 +153,13 @@ what makes it total over partially-set models.
 > `add` iterates every `A::Entity` column in order: `Set` and `Unchanged`
 > values are included (each value passed through `col.save_as(...)`, applying
 > any save-time cast); `NotSet` columns are omitted from the column and value
-> lists entirely. When the entity's primary key is not auto-increment, the
-> model's primary-key value tuple is captured on the builder (used later to
-> report `last_insert_id`); for auto-increment keys it is left `None`.
+> lists entirely. A model that leaves every column `NotSet` therefore
+> contributes no column list and no values row: instead of an arity-zero row
+> it raises the statement's default-values row count, so `n` such models
+> render `VALUES (DEFAULT)` repeated `n` times, one row of database defaults
+> each. When the entity's primary key is not auto-increment, the model's
+> primary-key value tuple is captured on the builder (used later to report
+> `last_insert_id`); for auto-increment keys it is left `None`.
 > `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
 
 > [spec:pgorm:req:query.build.insert.uniform-columns]
@@ -165,17 +169,23 @@ what makes it total over partially-set models.
 > causes `add` to panic with `"columns mismatch"`. Rows with heterogeneous
 > column sets are not merged into a column union.
 
-> [spec:pgorm:sem:query.build.insert.empty-failsafe]
+> [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
 > `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:
 > `Insert::do_nothing()` and its alias `on_empty_do_nothing()` convert without
 > altering the statement, while `Insert::on_conflict_do_nothing()` first
 > attaches `ON CONFLICT (<primary key columns>) DO NOTHING` and then converts.
-> Every `TryInsert` execution path (`exec`, `exec_without_returning`,
-> `exec_with_returning`) first checks the recorded column bitmap: if no
-> columns were ever added (e.g. `insert_many` over an empty iterator), it
-> returns `TryInsertResult::Empty` without sending any SQL, leaving the
-> database untouched. A `DbErr::RecordNotInserted` from the underlying insert
-> is mapped to `TryInsertResult::Conflicted`; success wraps the result in
+>
+> Emptiness is a state the builder records, not a predicate re-derived at each
+> execution. An `Insert` holds either the per-column presence bitmap of the
+> first model added — which always marks at least one column present — or the
+> empty state, reached both by adding no model at all (`insert_many` over an
+> empty iterator) and by adding only models that leave every column `NotSet`.
+> All three `TryInsert` execution paths (`exec`, `exec_without_returning`,
+> `exec_with_returning`) read that one state, so an all-`NotSet` model reports
+> `TryInsertResult::Empty` on every path exactly as an empty batch does,
+> without sending any SQL and leaving the database untouched. A
+> `DbErr::RecordNotInserted` from the underlying insert is mapped to
+> `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.
 
 > [spec:pgorm:sem:query.build.update+2]

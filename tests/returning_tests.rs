@@ -266,9 +266,10 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from a skipped `ON CONFLICT` insert, and any other error
 // propagating
-// [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    the same three
-// entry points reading the recorded column bitmap: an insert over an empty
-// iterator returns Empty with the database left untouched
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    the same three
+// entry points reading the one recorded empty state: an insert over an empty
+// iterator and an insert of an all-NotSet model both return Empty with the
+// database left untouched
 #[pgorm_macros::test]
 async fn try_insert_result_variants() -> Result<(), DbErr> {
     use pgorm::TryInsertResult;
@@ -298,6 +299,35 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
     ));
     assert!(matches!(
         Bakery::insert_many(empty())
+            .on_empty_do_nothing()
+            .exec_with_returning(&db)
+            .await?,
+        TryInsertResult::Empty
+    ));
+    assert_eq!(Bakery::find().all(&db).await?, []);
+
+    // A model that sets no column reaches the same state, so it reads as Empty
+    // on all three entry points too rather than inserting a row of defaults.
+    let blank = || bakery::ActiveModel {
+        ..Default::default()
+    };
+
+    assert!(matches!(
+        Bakery::insert(blank())
+            .on_empty_do_nothing()
+            .exec(&db)
+            .await?,
+        TryInsertResult::Empty
+    ));
+    assert!(matches!(
+        Bakery::insert(blank())
+            .on_empty_do_nothing()
+            .exec_without_returning(&db)
+            .await?,
+        TryInsertResult::Empty
+    ));
+    assert!(matches!(
+        Bakery::insert(blank())
             .on_empty_do_nothing()
             .exec_with_returning(&db)
             .await?,

@@ -20,6 +20,42 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:query.build.insert+1/test]    a batch of models that set no
+// column inserts one default row per model rather than collapsing into one
+#[pgorm_macros::test]
+async fn all_not_set_models_insert_one_row_each() -> Result<(), DbErr> {
+    use insert_default::*;
+
+    let ctx = TestContext::new("insert_default_tests_blank_batch").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let affected = Entity::insert_many([
+        ActiveModel {
+            ..Default::default()
+        },
+        ActiveModel {
+            ..Default::default()
+        },
+        ActiveModel {
+            ..Default::default()
+        },
+    ])
+    .exec_without_returning(&db)
+    .await?;
+
+    assert_eq!(affected, 3);
+    assert_eq!(
+        Entity::find().all(&db).await?,
+        [Model { id: 1 }, Model { id: 2 }, Model { id: 3 }]
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
