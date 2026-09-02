@@ -474,7 +474,7 @@ pub async fn having() {
 // empty `Vec` for a left row with no right model
 // [spec:pgorm:req:entity.relation+1/test]    `Related::find_related` inner-joins
 // `to()` onto a fresh `Select<R>`, exercised against real rows
-// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::find_related` scopes
+// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::find_related` scopes
 // that select to a single model instance
 #[pgorm_macros::test]
 pub async fn related() -> Result<(), DbErr> {
@@ -723,7 +723,7 @@ pub async fn related() -> Result<(), DbErr> {
 // [spec:pgorm:req:entity.relation.linked/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
-// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::find_linked` scopes
+// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::find_linked` scopes
 // a multi-hop join to one model instance
 #[pgorm_macros::test]
 pub async fn linked() -> Result<(), DbErr> {

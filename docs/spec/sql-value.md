@@ -66,14 +66,15 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array+1]`).
+> `[spec:pgorm:def:sql.value.array+2]`).
 
-> [spec:pgorm:def:sql.value.value-type]
+> [spec:pgorm:def:sql.value.value-type+1]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
 > that maps into `Value`. `try_from(v: Value) -> Result<Self, ValueTypeErr>`
 > succeeds only when `v` is the matching variant with a `Some` payload
-> (`ValueTypeErr` displays as "Value type mismatch"). `unwrap` and
-> `expect(msg)` are `try_from` followed by `Result::unwrap`/`expect`.
+> (`ValueTypeErr` displays as "Value type mismatch") and is the trait's only
+> extraction entry point: there is no panicking `unwrap`/`expect` pair, on the
+> trait or as an inherent convenience on `Value`.
 > `type_name()` returns the Rust type name, `array_type()` the matching
 > `ArrayType` tag, and `column_type()` the default `ColumnType` for schema
 > generation (e.g. `String`→`String(StringLen::None)`, `Vec<u8>`→
@@ -86,33 +87,42 @@ including panic semantics and quirks inherited from sea-query.
 > input equals `T::null()` and otherwise delegates to `T::try_from`, so a
 > `None` payload of the right variant round-trips to `Option::None` while a
 > wrong-variant value still errors.
->
-> `Value::unwrap::<T>()` and `Value::expect::<T>(msg)` are inherent
-> conveniences delegating to `T::unwrap` / `T::expect`.
 
-> [spec:pgorm:sem:sql.value.accessor-panics]
-> The non-`try` accessors panic rather than error. `ValueType::unwrap` (and
-> therefore `Value::unwrap`) panics on any variant or nullability mismatch.
-> The `is_*`/`as_ref_*` inherent accessor pairs (`is_json`/`as_ref_json`,
-> `is_chrono_date`/`as_ref_chrono_date`, the other chrono accessors,
+> [spec:pgorm:sem:sql.value.accessor-panics+1]
+> The inherent accessors on `Value` MUST NOT panic. (The rule keeps the id it
+> was given when they did: every `as_ref_*` panicked with a message like
+> `not Value::Json` on a variant other than its own.)
+>
+> The `is_*`/`as_ref_*` pairs are `is_json`/`as_ref_json`,
+> `is_chrono_date`/`as_ref_chrono_date` and the other five chrono accessors,
 > `is_decimal`/`as_ref_decimal`, `is_uuid`/`as_ref_uuid`,
-> `is_array`/`as_ref_array`, `is_ipnetwork`/`as_ref_ipnetwork`,
-> `is_mac_address`/`as_ref_mac_address`) return `Option<&T>` (`None` for SQL
-> NULL of the right variant) but panic with messages like `not Value::Json`
-> when called on a different variant. `chrono_as_naive_utc_in_string` panics
-> with `not chrono Value` on non-chrono variants and stringifies the UTC-naive
-> form of zoned values. `as_ipaddr` panics on non-`IpNetwork` values and
-> returns the network address. `decimal_to_f64` returns
-> `Option<f64>` via `to_f64().unwrap()` on the payload.
+> `is_array`/`as_ref_array`, `is_ipnetwork`/`as_ref_ipnetwork` and
+> `is_mac_address`/`as_ref_mac_address`. Each `as_ref_*` returns `Option<&T>`
+> borrowed from the payload, and its `None` is ambiguous by design: it means
+> either SQL NULL of the accessor's own variant or a value of some other
+> variant entirely, and the return value cannot distinguish them. The `is_*`
+> predicate of the pair is the discriminator for a caller that needs the
+> distinction — `is_array` is true for an `Array` of any element tag — and
+> `ValueType::try_from` is the typed extraction that reports a mismatch as
+> `ValueTypeErr`.
+>
+> `chrono_as_naive_utc_in_string` stringifies any non-NULL chrono variant, in
+> the UTC-naive form for the three zoned ones, and returns `None` for both a
+> NULL chrono variant and a non-chrono one. `as_ipaddr` returns the network
+> address of a non-NULL `IpNetwork` and `None` otherwise. `decimal_to_f64`
+> returns the payload of a non-NULL `Decimal` through `to_f64`, and `None` if
+> the value is not a `Decimal`, is NULL, or has no `f64` representation.
 
 ## Arrays
 
-> [spec:pgorm:def:sql.value.array+1]
+> [spec:pgorm:def:sql.value.array+2]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
-> chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`). There is no
-> nested-array tag and no `Vector` tag — `ValueType::array_type()` for
-> `pgvector::Vector` is `unimplemented!` and panics.
+> chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
+> no nested-array tag. `ValueType::array_type()` is total — `pgvector::Vector`
+> answers `ArrayType::Vector` rather than panicking — but `Vector` does not
+> implement `NotU8`, so `Vec<Vector>` has no `From`/`ValueType` impl and the tag
+> reaches no `Value` through the generic array conversions.
 >
 > `Vec<T>` converts to `Value::Array(T::array_type(), ...)` only for `T`
 > implementing the `NotU8` marker trait (all supported element types except

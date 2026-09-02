@@ -95,10 +95,12 @@ explicit limitations.
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.
 
-> [spec:pgorm:def:entity.traits.model]
+> [spec:pgorm:def:entity.traits.model+1]
 > `ModelTrait: Clone + Send + Debug` (`src/entity/model.rs`) is the read-side row
-> representation. `get(column)` returns the column's `Value` and `set(column, value)`
-> writes it. `find_related(R)` returns a `Select<R>` scoped to this instance via
+> representation. `get(column)` returns the column's `Value`;
+> `set(column, value) -> Result<(), DbErr>` writes it, reporting a column this
+> model does not carry, or a value whose type does not match the field, as
+> `DbErr::Type`. `find_related(R)` returns a `Select<R>` scoped to this instance via
 > `Related::find_related().belongs_to(self)`; `find_linked(L)` scopes a multi-hop
 > `Linked` join to this instance using the last hop's `r{n}` table alias.
 > `delete(self, db)` converts the model through `IntoActiveModel` and delegates to
@@ -138,11 +140,13 @@ explicit limitations.
 
 ## Active model
 
-> [spec:pgorm:req:entity.active-model]
+> [spec:pgorm:req:entity.active-model+1]
 > `ActiveModelTrait: Clone + Debug` (`src/entity/active_model.rs`) is the write-side
 > row representation whose fields are `ActiveValue`s. Implementations MUST provide
 > per-column state access: `get` (immutable), `take` (removes and returns, leaving
-> `NotSet`), `set` (stores a `Value` as `Set`), `not_set` (clears to `NotSet`),
+> `NotSet`), `set` (stores a `Value` as `Set`, returning `Result<(), DbErr>` so an
+> unmatched column or a value of the wrong type for the field comes back as
+> `DbErr::Type` instead of unwinding), `not_set` (clears to `NotSet`),
 > `is_not_set`, `reset` (per-column `Unchanged` → `Set`), and `default()` (all columns
 > `NotSet`). `reset_all` applies `reset` to every column. `get_primary_key_value`
 > returns the key as a `ValueTuple` (`One`/`Two`/`Three`/`Many` chosen by

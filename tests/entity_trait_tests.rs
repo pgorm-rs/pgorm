@@ -932,7 +932,7 @@ fn primary_key_trait_surface() {
 // entity.traits.model
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::get` reads a column
+// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::get` reads a column
 // as a `Value` and `set` writes one; `find_related` scopes a `Select` to this
 // instance; and `TryIntoModel` has a blanket identity impl for any model
 #[test]
@@ -951,19 +951,26 @@ fn model_trait_get_set_and_identity() {
     );
     assert_eq!(model.get(item::Column::Note), Value::String(None));
 
-    // `set` writes it back.
-    model.set(
-        item::Column::Name,
-        Value::String(Some(Box::new("Pear".to_owned()))),
-    );
+    // `set` writes it back, reporting a value of the wrong type as an error.
+    model
+        .set(
+            item::Column::Name,
+            Value::String(Some(Box::new("Pear".to_owned()))),
+        )
+        .expect("Name takes a String");
     assert_eq!(model.name, "Pear");
-    model.set(
-        item::Column::Note,
-        Value::String(Some(Box::new("ripe".to_owned()))),
-    );
+    model
+        .set(
+            item::Column::Note,
+            Value::String(Some(Box::new("ripe".to_owned()))),
+        )
+        .expect("Note takes a String");
     assert_eq!(model.note, Some("ripe".to_owned()));
-    model.set(item::Column::Note, Value::String(None));
+    model
+        .set(item::Column::Note, Value::String(None))
+        .expect("Note is nullable");
     assert_eq!(model.note, None);
+    assert!(model.set(item::Column::Name, Value::Int(Some(1))).is_err());
 
     // `TryIntoModel` has a blanket identity impl for any `ModelTrait`.
     let same = model.clone().try_into_model().unwrap();
@@ -988,7 +995,7 @@ fn model_trait_get_set_and_identity() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::delete` converts the
+// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::delete` converts the
 // model through `IntoActiveModel` and delegates to `ActiveModelTrait::delete`,
 // so the behavior hooks run on the way through
 #[pgorm_macros::test]

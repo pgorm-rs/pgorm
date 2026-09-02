@@ -170,29 +170,35 @@ they describe what the macros generate and reject today, including known limitat
 > delegate to `default_as_str`) — this is the escape hatch for non-snake-case column
 > names. Note that neither derive adds `EnumIter`; callers derive it alongside.
 
-> [spec:pgorm:sem:macros.derive.model]
+> [spec:pgorm:sem:macros.derive.model+1]
 > `DeriveModel` (named-field structs only; otherwise a compile error) generates two
 > impls. `FromQueryResult`: each field is read with
 > `row.try_get(pre, Column::<Variant>.as_str())`, where the variant name follows the
 > same trim/UpperCamelCase/keyword-escape/`enum_name` rules as
 > `[spec:pgorm:sem:macros.derive.entity-model.casing+1]`; `#[pgorm(ignore)]` fields are
 > filled with `Default::default()` instead. `ModelTrait`: `get` clones the field and
-> converts it `.into()` a `Value`, `set` assigns `v.unwrap()`; ignored fields have no
-> match arm, so `get`/`set` on them panics with "field does not exist on {Model}". The
+> converts it `.into()` a `Value`; `set` converts through `ValueType::try_from` and
+> assigns, answering `DbErr::Type("value does not match the type of {Model} field
+> {field}")` when the value is of another type. Ignored fields have no match arm, so
+> `get` on them panics with "field does not exist on {Model}" and `set` returns that
+> same text as `DbErr::Type`. The
 > target entity defaults to `Entity`, overridable via `#[pgorm(entity = Ident)]`.
 
-> [spec:pgorm:sem:macros.derive.active-model]
+> [spec:pgorm:sem:macros.derive.active-model+1]
 > `DeriveActiveModel` (named-field structs only) generates a
 > `pub struct ActiveModel` — name and entity are hard-coded as `ActiveModel`/`Entity` —
 > with one `pub field: ActiveValue<T>` per non-ignored field, plus: `Default`
 > delegating to `ActiveModelBehavior::new()`; `From<Model>` mapping every field through
 > `ActiveValue::unchanged`; an `IntoActiveModel` impl for `Model`; and
 > `ActiveModelTrait` with `take`/`get` (unmatched columns yield `not_set`),
-> `set` (panics "This ActiveModel does not have this field" on unmatched columns),
+> `set` (`DbErr::Type("This ActiveModel does not have this field")` on an unmatched
+> column, and `DbErr::Type("value does not match the type of ActiveModel field
+> {field}")` when the value is of another type),
 > `not_set` (silently ignores unmatched), `is_not_set` (panics on unmatched),
 > `default` (all fields `not_set`), and `reset`. It also generates
-> `TryFrom<ActiveModel> for Model` and `TryIntoModel`: any non-ignored field left
-> `NotSet` fails with `DbErr::AttrNotSet(field)`; ignored fields are rebuilt with
+> `TryFrom<ActiveModel> for Model` and `TryIntoModel`: each non-ignored field is
+> taken out of its `ActiveValue` directly — no round trip through `Value` — and one
+> left `NotSet` fails with `DbErr::AttrNotSet(field)`; ignored fields are rebuilt with
 > `Default::default()`.
 >
 > `DeriveActiveModelBehavior` unconditionally emits

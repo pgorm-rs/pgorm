@@ -61,7 +61,7 @@ impl<V: Into<Value>> From<V> for ActiveValue<V> {
 /// A Trait for ActiveModel to perform Create, Update or Delete operation.
 /// The type must also implement the [EntityTrait].
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:req:entity.active-model]
+// [spec:pgorm:req:entity.active-model+1]
 #[async_trait]
 pub trait ActiveModelTrait: Clone + Debug {
     /// The Entity this ActiveModel belongs to
@@ -73,8 +73,9 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// Get a immutable [ActiveValue] from an ActiveModel
     fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> ActiveValue<Value>;
 
-    /// Set the Value into an ActiveModel
-    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value);
+    /// Set the Value into an ActiveModel, reporting a column this model does not
+    /// carry, or a value of the wrong type for it, as [`DbErr::Type`].
+    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), DbErr>;
 
     /// Set the state of an [ActiveValue] to the not set state
     fn not_set(&mut self, c: <Self::Entity as EntityTrait>::Column);
@@ -297,7 +298,7 @@ pub trait ActiveModelTrait: Clone + Debug {
         // Restore primary key values
         for (col, active_value) in primary_key_values {
             match active_value {
-                ActiveValue::Unchanged(v) | ActiveValue::Set(v) => self.set(col, v),
+                ActiveValue::Unchanged(v) | ActiveValue::Set(v) => self.set(col, v)?,
                 NotSet => self.not_set(col),
             }
         }
@@ -331,7 +332,7 @@ pub trait ActiveModelTrait: Clone + Debug {
         for (col, json_key_exists) in json_keys {
             match (json_key_exists, am.get(col)) {
                 (true, ActiveValue::Set(value) | ActiveValue::Unchanged(value)) => {
-                    am.set(col, value);
+                    am.set(col, value)?;
                 }
                 _ => {
                     am.not_set(col);
@@ -1072,7 +1073,9 @@ mod tests {
         let mut fruit: fruit::ActiveModel = Default::default();
         assert!(!fruit.is_changed());
 
-        fruit.set(fruit::Column::Name, "apple".into());
+        fruit
+            .set(fruit::Column::Name, "apple".into())
+            .expect("Name is a column of fruit::ActiveModel");
         assert!(fruit.is_changed());
     }
 

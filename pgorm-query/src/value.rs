@@ -22,7 +22,7 @@ pub use pgvector::Vector;
 use crate::{ColumnType, QueryBuilder, StringLen};
 
 /// [`Value`] types variant for Postgres array
-// [spec:pgorm:def:sql.value.array+1]
+// [spec:pgorm:def:sql.value.array+2]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -59,6 +59,8 @@ pub enum ArrayType {
     IpNetwork,
 
     MacAddress,
+
+    Vector,
 }
 
 /// Value variants
@@ -177,17 +179,9 @@ impl std::fmt::Display for Value {
     }
 }
 
-// [spec:pgorm:def:sql.value.value-type]
+// [spec:pgorm:def:sql.value.value-type+1]
 pub trait ValueType: Sized {
     fn try_from(v: Value) -> Result<Self, ValueTypeErr>;
-
-    fn unwrap(v: Value) -> Self {
-        Self::try_from(v).unwrap()
-    }
-
-    fn expect(v: Value, msg: &str) -> Self {
-        Self::try_from(v).expect(msg)
-    }
 
     fn type_name() -> String;
 
@@ -313,20 +307,6 @@ pub trait Nullable {
 }
 
 impl Value {
-    pub fn unwrap<T>(self) -> T
-    where
-        T: ValueType,
-    {
-        T::unwrap(self)
-    }
-
-    pub fn expect<T>(self, msg: &str) -> T
-    where
-        T: ValueType,
-    {
-        T::expect(self, msg)
-    }
-
     /// Name of the Postgres type this value is bound as, for pinning a
     /// placeholder whose type would otherwise be inferred from context.
     ///
@@ -372,7 +352,7 @@ impl ArrayType {
     // [spec:pgorm:req:sql.render.cast-param-type]
     pub fn source_type_name(&self) -> Option<&'static str> {
         match self {
-            Self::Json => None,
+            Self::Json | Self::Vector => None,
             Self::Bool => Some("bool"),
             Self::TinyInt => Some("int2"),
             Self::SmallInt => Some("int2"),
@@ -526,7 +506,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.value-type]
+// [spec:pgorm:def:sql.value.value-type+1]
 impl<T> ValueType for Option<T>
 where
     T: ValueType + Nullable,
@@ -764,7 +744,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
-// [spec:pgorm:def:sql.value.array+1]
+// [spec:pgorm:def:sql.value.array+2]
 pub mod with_array {
     use super::*;
     use crate::RcOrArc;
@@ -892,7 +872,7 @@ pub mod with_vector {
         }
 
         fn array_type() -> ArrayType {
-            unimplemented!("Vector does not have array type")
+            ArrayType::Vector
         }
 
         fn column_type() -> ColumnType {
@@ -901,26 +881,19 @@ pub mod with_vector {
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! box_to_opt_ref {
-    ( $v: expr ) => {
-        match $v {
-            Some(v) => Some(v.as_ref()),
-            None => None,
-        }
-    };
-}
-
-// [spec:pgorm:sem:sql.value.accessor-panics]
+// [spec:pgorm:sem:sql.value.accessor-panics+1]
 impl Value {
     pub fn is_json(&self) -> bool {
         matches!(self, Self::Json(_))
     }
 
+    /// The payload of a non-NULL [`Value::Json`]; `None` for a NULL of that
+    /// variant and for every other variant alike. Discriminate with
+    /// [`Value::is_json`].
     pub fn as_ref_json(&self) -> Option<&Json> {
         match self {
-            Self::Json(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::Json"),
+            Self::Json(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -930,10 +903,11 @@ impl Value {
         matches!(self, Self::ChronoDate(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoDate`]; `None` otherwise.
     pub fn as_ref_chrono_date(&self) -> Option<&NaiveDate> {
         match self {
-            Self::ChronoDate(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoDate"),
+            Self::ChronoDate(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -943,10 +917,11 @@ impl Value {
         matches!(self, Self::ChronoTime(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoTime`]; `None` otherwise.
     pub fn as_ref_chrono_time(&self) -> Option<&NaiveTime> {
         match self {
-            Self::ChronoTime(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoTime"),
+            Self::ChronoTime(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -956,10 +931,11 @@ impl Value {
         matches!(self, Self::ChronoDateTime(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoDateTime`]; `None` otherwise.
     pub fn as_ref_chrono_date_time(&self) -> Option<&NaiveDateTime> {
         match self {
-            Self::ChronoDateTime(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoDateTime"),
+            Self::ChronoDateTime(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -969,10 +945,11 @@ impl Value {
         matches!(self, Self::ChronoDateTimeUtc(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoDateTimeUtc`]; `None` otherwise.
     pub fn as_ref_chrono_date_time_utc(&self) -> Option<&DateTime<Utc>> {
         match self {
-            Self::ChronoDateTimeUtc(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoDateTimeUtc"),
+            Self::ChronoDateTimeUtc(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -982,10 +959,11 @@ impl Value {
         matches!(self, Self::ChronoDateTimeLocal(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoDateTimeLocal`]; `None` otherwise.
     pub fn as_ref_chrono_date_time_local(&self) -> Option<&DateTime<Local>> {
         match self {
-            Self::ChronoDateTimeLocal(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoDateTimeLocal"),
+            Self::ChronoDateTimeLocal(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -995,16 +973,20 @@ impl Value {
         matches!(self, Self::ChronoDateTimeWithTimeZone(_))
     }
 
+    /// The payload of a non-NULL [`Value::ChronoDateTimeWithTimeZone`]; `None`
+    /// otherwise.
     pub fn as_ref_chrono_date_time_with_time_zone(&self) -> Option<&DateTime<FixedOffset>> {
         match self {
-            Self::ChronoDateTimeWithTimeZone(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::ChronoDateTimeWithTimeZone"),
+            Self::ChronoDateTimeWithTimeZone(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics]
+// [spec:pgorm:sem:sql.value.accessor-panics+1]
 impl Value {
+    /// The UTC-naive form of any non-NULL chrono variant, stringified; `None`
+    /// for a NULL chrono variant and for every non-chrono variant alike.
     pub fn chrono_as_naive_utc_in_string(&self) -> Option<String> {
         match self {
             Self::ChronoDate(v) => v.as_ref().map(|v| v.to_string()),
@@ -1013,7 +995,7 @@ impl Value {
             Self::ChronoDateTimeUtc(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
             Self::ChronoDateTimeLocal(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
             Self::ChronoDateTimeWithTimeZone(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
-            _ => panic!("not chrono Value"),
+            _ => None,
         }
     }
 }
@@ -1023,17 +1005,20 @@ impl Value {
         matches!(self, Self::Decimal(_))
     }
 
+    /// The payload of a non-NULL [`Value::Decimal`]; `None` otherwise.
     pub fn as_ref_decimal(&self) -> Option<&Decimal> {
         match self {
-            Self::Decimal(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::Decimal"),
+            Self::Decimal(v) => v.as_deref(),
+            _ => None,
         }
     }
 
+    /// The payload of a non-NULL [`Value::Decimal`] as `f64`; `None` otherwise,
+    /// and `None` again for a payload that has no `f64` representation.
     pub fn decimal_to_f64(&self) -> Option<f64> {
         use rust_decimal::prelude::ToPrimitive;
 
-        self.as_ref_decimal().map(|d| d.to_f64().unwrap())
+        self.as_ref_decimal().and_then(|d| d.to_f64())
     }
 }
 
@@ -1041,10 +1026,12 @@ impl Value {
     pub fn is_uuid(&self) -> bool {
         matches!(self, Self::Uuid(_))
     }
+
+    /// The payload of a non-NULL [`Value::Uuid`]; `None` otherwise.
     pub fn as_ref_uuid(&self) -> Option<&Uuid> {
         match self {
-            Self::Uuid(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::Uuid"),
+            Self::Uuid(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -1054,10 +1041,12 @@ impl Value {
         matches!(self, Self::Array(_, _))
     }
 
+    /// The elements of a non-NULL [`Value::Array`], whatever its element tag;
+    /// `None` otherwise.
     pub fn as_ref_array(&self) -> Option<&Vec<Value>> {
         match self {
-            Self::Array(_, v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::Array"),
+            Self::Array(_, v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -1067,17 +1056,19 @@ impl Value {
         matches!(self, Self::IpNetwork(_))
     }
 
+    /// The payload of a non-NULL [`Value::IpNetwork`]; `None` otherwise.
     pub fn as_ref_ipnetwork(&self) -> Option<&IpNetwork> {
         match self {
-            Self::IpNetwork(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::IpNetwork"),
+            Self::IpNetwork(v) => v.as_deref(),
+            _ => None,
         }
     }
 
+    /// The network address of a non-NULL [`Value::IpNetwork`]; `None` otherwise.
     pub fn as_ipaddr(&self) -> Option<IpAddr> {
         match self {
-            Self::IpNetwork(v) => v.clone().map(|v| v.network()),
-            _ => panic!("not Value::IpNetwork"),
+            Self::IpNetwork(v) => v.as_ref().map(|v| v.network()),
+            _ => None,
         }
     }
 }
@@ -1087,10 +1078,11 @@ impl Value {
         matches!(self, Self::MacAddress(_))
     }
 
+    /// The payload of a non-NULL [`Value::MacAddress`]; `None` otherwise.
     pub fn as_ref_mac_address(&self) -> Option<&MacAddress> {
         match self {
-            Self::MacAddress(v) => box_to_opt_ref!(v),
-            _ => panic!("not Value::MacAddress"),
+            Self::MacAddress(v) => v.as_deref(),
+            _ => None,
         }
     }
 }
@@ -1411,7 +1403,7 @@ mod tests {
             ( $type: ty, $val: literal ) => {
                 let val: $type = $val;
                 let v: Value = val.into();
-                let out: $type = v.unwrap();
+                let out: $type = <$type as ValueType>::try_from(v).unwrap();
                 assert_eq!(out, val);
             };
         }
@@ -1423,14 +1415,14 @@ mod tests {
         test_value!(i64, 8589934592);
     }
 
-    // [spec:pgorm:def:sql.value.value-type/test]
+    // [spec:pgorm:def:sql.value.value-type+1/test]
     #[test]
     fn test_option_value() {
         macro_rules! test_some_value {
             ( $type: ty, $val: literal ) => {
                 let val: Option<$type> = Some($val);
                 let v: Value = val.into();
-                let out: $type = v.unwrap();
+                let out: $type = <$type as ValueType>::try_from(v).unwrap();
                 assert_eq!(out, val.unwrap());
             };
         }
@@ -1461,7 +1453,7 @@ mod tests {
         let val: Cow<str> = "hello".into();
         let val2 = val.clone();
         let v: Value = val.into();
-        let out: Cow<str> = v.unwrap();
+        let out: Cow<str> = <Cow<str> as ValueType>::try_from(v).unwrap();
         assert_eq!(out, val2);
     }
 
@@ -1469,7 +1461,7 @@ mod tests {
     fn test_box_value() {
         let val: String = "hello".to_owned();
         let v: Value = val.clone().into();
-        let out: String = v.unwrap();
+        let out: String = <String as ValueType>::try_from(v).unwrap();
         assert_eq!(out, val);
     }
 
@@ -1748,7 +1740,7 @@ mod tests {
             "b": "hello",
         }};
         let value: Value = json.clone().into();
-        let out: Json = value.unwrap();
+        let out: Json = <Json as ValueType>::try_from(value).unwrap();
         assert_eq!(out, json);
     }
 
@@ -1760,7 +1752,7 @@ mod tests {
             .and_hms_opt(2, 2, 2)
             .unwrap();
         let value: Value = timestamp.into();
-        let out: NaiveDateTime = value.unwrap();
+        let out: NaiveDateTime = <NaiveDateTime as ValueType>::try_from(value).unwrap();
         assert_eq!(out, timestamp);
     }
 
@@ -1775,7 +1767,7 @@ mod tests {
             Utc,
         );
         let value: Value = timestamp.into();
-        let out: DateTime<Utc> = value.unwrap();
+        let out: DateTime<Utc> = <DateTime<Utc> as ValueType>::try_from(value).unwrap();
         assert_eq!(out, timestamp);
     }
 
@@ -1791,7 +1783,7 @@ mod tests {
         );
         let timestamp_local: DateTime<Local> = timestamp_utc.into();
         let value: Value = timestamp_local.into();
-        let out: DateTime<Local> = value.unwrap();
+        let out: DateTime<Local> = <DateTime<Local> as ValueType>::try_from(value).unwrap();
         assert_eq!(out, timestamp_local);
     }
 
@@ -1800,7 +1792,8 @@ mod tests {
     fn test_chrono_timezone_value() {
         let timestamp = DateTime::parse_from_rfc3339("2020-01-01T02:02:02+08:00").unwrap();
         let value: Value = timestamp.into();
-        let out: DateTime<FixedOffset> = value.unwrap();
+        let out: DateTime<FixedOffset> =
+            <DateTime<FixedOffset> as ValueType>::try_from(value).unwrap();
         assert_eq!(out, timestamp);
     }
 
@@ -1828,27 +1821,27 @@ mod tests {
     fn test_uuid_value() {
         let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
         let value: Value = uuid.into();
-        let out: Uuid = value.unwrap();
+        let out: Uuid = <Uuid as ValueType>::try_from(value).unwrap();
         assert_eq!(out, uuid);
 
         let uuid_braced = uuid.braced();
         let value: Value = uuid_braced.into();
-        let out: Uuid = value.unwrap();
+        let out: Uuid = <Uuid as ValueType>::try_from(value).unwrap();
         assert_eq!(out, uuid);
 
         let uuid_hyphenated = uuid.hyphenated();
         let value: Value = uuid_hyphenated.into();
-        let out: Uuid = value.unwrap();
+        let out: Uuid = <Uuid as ValueType>::try_from(value).unwrap();
         assert_eq!(out, uuid);
 
         let uuid_simple = uuid.simple();
         let value: Value = uuid_simple.into();
-        let out: Uuid = value.unwrap();
+        let out: Uuid = <Uuid as ValueType>::try_from(value).unwrap();
         assert_eq!(out, uuid);
 
         let uuid_urn = uuid.urn();
         let value: Value = uuid_urn.into();
-        let out: Uuid = value.unwrap();
+        let out: Uuid = <Uuid as ValueType>::try_from(value).unwrap();
         assert_eq!(out, uuid);
     }
 
@@ -1860,24 +1853,31 @@ mod tests {
         let num = "2.02";
         let val = Decimal::from_str(num).unwrap();
         let v: Value = val.into();
-        let out: Decimal = v.unwrap();
+        let out: Decimal = <Decimal as ValueType>::try_from(v).unwrap();
         assert_eq!(out.to_string(), num);
     }
 
-    // [spec:pgorm:def:sql.value.array+1/test]
+    // [spec:pgorm:def:sql.value.array+2/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
         let v: Value = array.into();
-        let out: Vec<i32> = v.unwrap();
+        let out: Vec<i32> = <Vec<i32> as ValueType>::try_from(v).unwrap();
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
-    // [spec:pgorm:def:sql.value.array+1/test]
+    // [spec:pgorm:def:sql.value.array+2/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);
-        let out: Option<Vec<i32>> = v.unwrap();
+        let out: Option<Vec<i32>> = <Option<Vec<i32>> as ValueType>::try_from(v).unwrap();
         assert_eq!(out, None);
+    }
+
+    // [spec:pgorm:def:sql.value.array+2/test]
+    #[test]
+    fn vector_has_an_array_type_tag() {
+        assert_eq!(<Vector as ValueType>::array_type(), ArrayType::Vector);
+        assert_eq!(ArrayType::Vector.source_type_name(), None);
     }
 }

@@ -121,7 +121,7 @@ mod pk4 {
 // ActiveModelTrait: per-column state access
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model/test]    the per-column state surface —
+// [spec:pgorm:req:entity.active-model+1/test]    the per-column state surface —
 // `default()` leaves every column `NotSet`, `set` stores a `Value` as `Set`,
 // `get` reads without consuming, `take` removes and leaves `NotSet` behind,
 // `not_set` clears, `is_not_set` reports, and `reset` / `reset_all` promote
@@ -140,7 +140,8 @@ fn active_model_column_state_access() {
     am.set(
         row::Column::Name,
         Value::String(Some(Box::new("Apple".to_owned()))),
-    );
+    )
+    .expect("Name takes a String");
     assert!(!am.is_not_set(row::Column::Name));
     assert_eq!(
         am.get(row::Column::Name),
@@ -165,7 +166,8 @@ fn active_model_column_state_access() {
     am.set(
         row::Column::Name,
         Value::String(Some(Box::new("Pear".to_owned()))),
-    );
+    )
+    .expect("Name takes a String");
     assert!(!am.is_not_set(row::Column::Name));
     am.not_set(row::Column::Name);
     assert!(am.is_not_set(row::Column::Name));
@@ -210,7 +212,7 @@ fn active_model_column_state_access() {
     assert!(all.is_changed());
 }
 
-// [spec:pgorm:req:entity.active-model/test]    `get_primary_key_value` picks the
+// [spec:pgorm:req:entity.active-model+1/test]    `get_primary_key_value` picks the
 // `ValueTuple` arm from `PrimaryKeyArity::ARITY` — One / Two / Three / Many — and
 // returns `None` when any key component is `NotSet`
 #[test]

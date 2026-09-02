@@ -153,6 +153,10 @@ impl DeriveModel {
             .collect();
 
         let missing_field_msg = format!("field does not exist on {ident}");
+        let mismatch_msgs: Vec<String> = field_idents
+            .iter()
+            .map(|field| format!("value does not match the type of {ident} field {field}"))
+            .collect();
 
         quote!(
             #[automatically_derived]
@@ -166,10 +170,14 @@ impl DeriveModel {
                     }
                 }
 
-                fn set(&mut self, c: <Self::Entity as pgorm::entity::EntityTrait>::Column, v: pgorm::Value) {
+                fn set(&mut self, c: <Self::Entity as pgorm::entity::EntityTrait>::Column, v: pgorm::Value) -> std::result::Result<(), pgorm::DbErr> {
                     match c {
-                        #(<Self::Entity as pgorm::entity::EntityTrait>::Column::#column_idents => self.#field_idents = v.unwrap(),)*
-                        _ => panic!(#missing_field_msg),
+                        #(<Self::Entity as pgorm::entity::EntityTrait>::Column::#column_idents => {
+                            self.#field_idents = pgorm::pgorm_query::ValueType::try_from(v)
+                                .map_err(|_| pgorm::DbErr::Type(#mismatch_msgs.to_owned()))?;
+                            Ok(())
+                        },)*
+                        _ => Err(pgorm::DbErr::Type(#missing_field_msg.to_owned())),
                     }
                 }
             }
@@ -178,7 +186,7 @@ impl DeriveModel {
 }
 
 /// Method to derive an ActiveModel
-// [spec:pgorm:sem:macros.derive.model]
+// [spec:pgorm:sem:macros.derive.model+1]
 pub fn expand_derive_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
     match DeriveModel::new(input) {

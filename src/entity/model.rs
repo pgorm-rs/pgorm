@@ -8,7 +8,7 @@ use pgorm_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
-// [spec:pgorm:def:entity.traits.model]
+// [spec:pgorm:def:entity.traits.model+1]
 #[async_trait]
 pub trait ModelTrait: Clone + Send + Debug {
     #[allow(missing_docs)]
@@ -17,8 +17,9 @@ pub trait ModelTrait: Clone + Send + Debug {
     /// Get the [Value] of a column from an Entity
     fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> Value;
 
-    /// Set the [Value] of a column in an Entity
-    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value);
+    /// Set the [Value] of a column in an Entity, reporting a column this model
+    /// does not carry, or a value of the wrong type for it, as [`DbErr::Type`].
+    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), DbErr>;
 
     /// Find related Models
     fn find_related<R>(&self, _: R) -> Select<R>

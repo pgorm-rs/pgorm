@@ -1643,6 +1643,13 @@ children (
                         kind @note
                         text "Audit: 14 as_ref_* wrong-variant panics in pgorm-query/src/value.rs:845-1015, the family the no-panic decision names first. The is_*/as_ref_* pairing is itself the representable invalid state. Remedy: non-panicking as_* accessors returning Option (decide whether to preserve the NULL-vs-wrong-variant distinction via Option<Option<&T>> or collapse — collapsing is simpler and is_* remains the discriminator). Also value.rs:185/:189 ValueType::unwrap/expect — delete (callers use try_from); value.rs:817 unimplemented \"Vector does not have array type\" — add the ArrayType member or split array-capability. Rewrites sql.value.accessor-panics (which pins every panic) and its verify.sql test pins. Breaking."
                     }
+
+                    {
+                        at 2026-09-02T18:11:30.878873Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

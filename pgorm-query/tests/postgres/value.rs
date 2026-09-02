@@ -118,22 +118,20 @@ fn unsigned_variants_carry_oid_and_limit_counts() {
     );
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    `unwrap` panics on a variant mismatch
+// [spec:pgorm:def:sql.value.value-type+1/test]    try_from errors on a variant mismatch
 #[test]
-#[should_panic]
-fn unwrap_panics_on_variant_mismatch() {
-    let _: i32 = Value::BigInt(Some(1)).unwrap();
+fn try_from_errors_on_variant_mismatch() {
+    assert!(<i32 as ValueType>::try_from(Value::BigInt(Some(1))).is_err());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    `unwrap` panics on a nullability mismatch
+// [spec:pgorm:def:sql.value.value-type+1/test]    try_from errors on a nullability mismatch
 #[test]
-#[should_panic]
-fn unwrap_panics_on_a_null_payload() {
-    let _: i32 = Value::Int(None).unwrap();
+fn try_from_errors_on_a_null_payload() {
+    assert!(<i32 as ValueType>::try_from(Value::Int(None)).is_err());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    `as_ref_*` yields None for SQL NULL of the
-// right variant, but panics on a different variant
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]    `as_ref_*` yields None for SQL NULL of the
+// right variant
 #[test]
 fn as_ref_accessors_return_none_on_typed_null() {
     assert!(Value::Json(None).as_ref_json().is_none());
@@ -151,21 +149,24 @@ fn as_ref_accessors_return_none_on_typed_null() {
     assert!(Value::Json(None).is_json());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]    None is ambiguous: the wrong variant reads
+// the same as a typed NULL, and only the `is_*` discriminator separates them
 #[test]
-#[should_panic(expected = "not Value::Json")]
-fn as_ref_json_panics_on_another_variant() {
-    Value::Int(Some(1)).as_ref_json();
+fn as_ref_json_returns_none_on_another_variant() {
+    assert!(Value::Int(Some(1)).as_ref_json().is_none());
+    assert!(Value::Json(None).as_ref_json().is_none());
+    assert!(!Value::Int(Some(1)).is_json());
+    assert!(Value::Json(None).is_json());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]
 #[test]
-#[should_panic(expected = "not Value::Uuid")]
-fn as_ref_uuid_panics_on_another_variant() {
-    Value::Int(Some(1)).as_ref_uuid();
+fn as_ref_uuid_returns_none_on_another_variant() {
+    assert!(Value::Int(Some(1)).as_ref_uuid().is_none());
+    assert!(!Value::Int(Some(1)).is_uuid());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    chrono accessor stringifies the UTC-naive form
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]    chrono accessor stringifies the UTC-naive form
 #[test]
 fn as_naive_utc_in_string_uses_naive_form() {
     let zoned = DateTime::parse_from_rfc3339("2020-01-01T02:02:02+08:00").unwrap();
@@ -185,14 +186,17 @@ fn as_naive_utc_in_string_uses_naive_form() {
     );
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]
 #[test]
-#[should_panic(expected = "not chrono Value")]
-fn as_naive_utc_in_string_rejects_non_chrono() {
-    Value::Int(Some(1)).chrono_as_naive_utc_in_string();
+fn chrono_as_naive_utc_none_on_other_variant() {
+    assert!(
+        Value::Int(Some(1))
+            .chrono_as_naive_utc_in_string()
+            .is_none()
+    );
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    `as_ipaddr` returns the network address
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]    `as_ipaddr` returns the network address
 #[test]
 fn as_ipaddr_returns_the_network_address() {
     let net = IpNetwork::from_str("10.1.2.3/32").unwrap();
@@ -202,14 +206,14 @@ fn as_ipaddr_returns_the_network_address() {
     );
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]
 #[test]
-#[should_panic(expected = "not Value::IpNetwork")]
-fn as_ipaddr_panics_on_a_non_ipnetwork_value() {
-    Value::Int(Some(1)).as_ipaddr();
+fn as_ipaddr_returns_none_on_another_variant() {
+    assert!(Value::Int(Some(1)).as_ipaddr().is_none());
+    assert!(Value::IpNetwork(None).as_ipaddr().is_none());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics/test]    `decimal_to_f64` goes through the payload
+// [spec:pgorm:sem:sql.value.accessor-panics+1/test]    `decimal_to_f64` goes through the payload
 #[test]
 fn decimal_to_f64_converts_the_payload() {
     let decimal = Decimal::from_str("2.02").unwrap();

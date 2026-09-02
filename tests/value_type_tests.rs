@@ -99,13 +99,10 @@ pub fn conversion_test() {
     );
 
     let value_random_int = Value::Int(Some(523));
-    let unwrap_int = Integer::unwrap(value_random_int.clone());
     let try_from_int =
         <Integer as ValueType>::try_from(value_random_int).expect("should be ok to convert");
 
-    // tests for unwrap and try_from
     let direct_int: Integer = 523.into();
-    assert_eq!(direct_int, unwrap_int);
     assert_eq!(direct_int, try_from_int);
 
     // test for error
