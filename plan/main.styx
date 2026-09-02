@@ -886,12 +886,34 @@ children (
                 id decide.turso
                 title "Evaluate Turso's Postgres frontend as a secondary compat/test target"
                 kind @chore
+                sealed true
                 log (
                     {
                         at 2026-09-02T00:16:02.981765Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope sketch (from operator discussion, 2026-09-02): Turso's Postgres frontend (announced July 2026, explicitly experimental, no compat matrix published yet) is NOT a replacement test oracle — the suite pins real-Postgres semantics (multi-database DDL with FORCE, enum types, citext, SQLSTATE fidelity incl. 40001 write-skew, binary wire formats, server-side parameter-type inference) and real PG16 stays the conformance source. The evaluation: run the restored suite against turso main, catalogue pass/fail by concern, and decide whether \"pgorm against embedded Turso\" is worth supporting as a secondary target for local dev. Priority deliberately unpinned per operator."
+                    }
+
+                    {
+                        at 2026-09-02T00:49:38.521388Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-02T00:54:47.3076Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Evaluation verdict: NOT VIABLE as a test backend today. Empirical basis: turso main @ 2f26f55 (2026-09-01), release build of `tursopg --server`, probed with tokio-postgres 0.7 (pgorm's driver) plus a live run of the pgorm suite. Findings, each independently disqualifying: (1) Every parameterized statement fails at Describe — the server echoes client-declared parameter types instead of inferring them, so tokio-postgres aborts with \"expected 0 parameters but got 1\"; pgorm passes parameters with every statement by design, so 100% of ORM-generated queries fail. (2) Even past Describe, Bind is text-format-only (postgres/server/lib.rs pg_bytes_to_value ignores format codes; COMPAT.md: \"text-format values only\") while tokio-postgres sends binary and has no text mode. (3) All errors carry SQLSTATE XX000 — a real unique violation returns XX000, not 23505 — killing sql_err() classification and RetryableError (40001/40P01) semantics. (4) Isolation levels are accepted-but-ignored and SSI is absent, so the serialization-conflict tests cannot conflict. (5) The per-test harness is incompatible: CREATE/DROP DATABASE unsupported, and the first setup statement (DROP DATABASE IF EXISTS ... WITH (FORCE)) panicked the server (core/storage/wal.rs:3197 \"VACUUM lock guard is already installed\") and closed the connection — 0/502 tests can run. (6) Binary result decoding is partial (count(*) fails to deserialize; NUMERIC is declared float8; timestamps are text). What works: simple protocol, unparameterized extended queries, RETURNING/ON CONFLICT/arrays/enums per COMPAT.md, instant single-binary startup. Revisit if the frontend gains: parameter-type inference at Describe, binary format-code support on Bind/results, and real SQLSTATEs. Ceiling on benefit is modest anyway — the suite already runs 502 tests in ~11s against Dockerized PG16, which remains the sole conformance oracle."
+                    }
+
+                    {
+                        at 2026-09-02T00:54:51.122793Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
