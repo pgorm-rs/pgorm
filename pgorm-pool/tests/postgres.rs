@@ -1,10 +1,24 @@
-use std::{collections::HashMap, env, sync::Once, time::Duration};
+use std::{
+    collections::HashMap,
+    env,
+    sync::{
+        Arc, Once,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
-use futures::future;
+use futures::{TryStreamExt, future, pin_mut};
 use serde::{Deserialize, Serialize};
-use tokio_postgres::{IsolationLevel, types::Type};
+use tokio_postgres::{
+    IsolationLevel,
+    error::SqlState,
+    types::{ToSql, Type},
+};
 
-use pgorm_pool::{ManagerConfig, Pool, RecyclingMethod};
+use pgorm_pool::{
+    Client, ClientWrapper, GenericClient, ManagerConfig, Object, Pool, PoolConfig, RecyclingMethod,
+};
 
 static DOTENV: Once = Once::new();
 
@@ -30,6 +44,41 @@ fn create_pool() -> Pool {
     test_config().create_pool(tokio_postgres::NoTls).unwrap()
 }
 
+/// A pool capped at a single connection, so every checkout after the first is
+/// the same physical connection put through `Manager::recycle`.
+fn single_connection_pool(recycling_method: RecyclingMethod) -> Pool {
+    let mut cfg = test_config();
+    cfg.manager = Some(ManagerConfig {
+        recycling_method,
+        tag: Default::default(),
+    });
+    cfg.pool = Some(PoolConfig::new(1));
+    cfg.create_pool(tokio_postgres::NoTls).unwrap()
+}
+
+/// How many server-side prepared statements the current database session
+/// parsed from `sql`. Counts `Parse` messages that are still live, so a cache hit shows up
+/// as one statement where a re-prepare shows up as two.
+async fn prepared_count(client: &Client, sql: &str) -> i64 {
+    client
+        .query_one(
+            "SELECT count(*) FROM pg_prepared_statements WHERE statement = $1",
+            &[&sql],
+        )
+        .await
+        .unwrap()
+        .get(0)
+}
+
+async fn session_setting(client: &Client, name: &str) -> String {
+    client
+        .query_one("SELECT current_setting($1)", &[&name])
+        .await
+        .unwrap()
+        .get(0)
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    prepare_cached inserts on a miss and the statement is usable
 #[tokio::test]
 async fn basic() {
     let pool = create_pool();
@@ -41,6 +90,7 @@ async fn basic() {
     assert_eq!(client.statement_cache.size(), 1);
 }
 
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    prepare_typed_cached binds the declared parameter types
 #[tokio::test]
 async fn prepare_typed_cached() {
     let pool = create_pool();
@@ -65,6 +115,7 @@ async fn prepare_typed_error() {
     assert!(client.query(&stmt, &[&42i32]).await.is_err());
 }
 
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    a statement cached inside a transaction lands in the client's cache
 #[tokio::test]
 async fn transaction_1() {
     let pool = create_pool();
@@ -80,6 +131,7 @@ async fn transaction_1() {
     assert_eq!(client.statement_cache.size(), 1);
 }
 
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    a statement cached on the client is reusable inside its transaction
 #[tokio::test]
 async fn transaction_2() {
     let pool = create_pool();
@@ -142,6 +194,7 @@ async fn generic_client() {
     _use_generic_client(&**client);
 }
 
+// [spec:pgorm:sem:conn.pool.recycle/test]    every recycling method keeps handing out usable connections
 #[tokio::test]
 async fn recycling_methods() {
     let recycling_methods = vec![
@@ -170,6 +223,7 @@ fn _use_generic_client(_client: &impl tokio_postgres::GenericClient) {
     // nop
 }
 
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    per-connection clear()
 #[tokio::test]
 async fn statement_cache_clear() {
     let pool = create_pool();
@@ -181,6 +235,8 @@ async fn statement_cache_clear() {
     assert!(client.statement_cache.size() == 0);
 }
 
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    the manager-level registry clears every live cache
+// [spec:pgorm:sem:conn.pool.lifecycle/test]    each created connection gets a fresh cache, registered with the manager
 #[tokio::test]
 async fn statement_caches_clear() {
     let pool = create_pool();
@@ -198,6 +254,495 @@ async fn statement_caches_clear() {
     pool.manager().statement_caches.clear();
     assert!(client0.statement_cache.size() == 0);
     assert!(client1.statement_cache.size() == 0);
+}
+
+// [spec:pgorm:sem:conn.pool.lifecycle/test]    dropping a ClientWrapper aborts its connection task
+#[tokio::test]
+async fn client_wrapper_drop_aborts_conn_task() {
+    struct AbortWitness(Arc<AtomicBool>);
+
+    impl Drop for AbortWitness {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let (client, connection) =
+        tokio_postgres::connect(&format!("{}/postgres", base_url()), tokio_postgres::NoTls)
+            .await
+            .unwrap();
+    let _driver = tokio::spawn(async move {
+        let _ = connection.await;
+    });
+
+    let aborted = Arc::new(AtomicBool::new(false));
+    let witness = AbortWitness(aborted.clone());
+    // Stands in for the connection driver task. It never resolves on its own,
+    // so the witness can only fire because the task was aborted.
+    let conn_task = tokio::spawn(async move {
+        let _witness = witness;
+        std::future::pending::<()>().await;
+    });
+
+    let wrapper = ClientWrapper::new(client, conn_task);
+    let rows = wrapper.query("SELECT 1 + 2", &[]).await.unwrap();
+    assert_eq!(rows[0].get::<_, i32>(0), 3);
+    assert!(!aborted.load(Ordering::SeqCst));
+
+    drop(wrapper);
+
+    // `JoinHandle::abort` only schedules the cancellation; the runtime drops
+    // the task's future afterwards.
+    for _ in 0..200 {
+        if aborted.load(Ordering::SeqCst) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(
+        aborted.load(Ordering::SeqCst),
+        "dropping a ClientWrapper must abort its connection task"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.lifecycle/test]    recycle refuses a client whose is_closed() is true
+#[tokio::test]
+async fn recycle_rejects_closed_connection() {
+    let pool = single_connection_pool(RecyclingMethod::Fast);
+
+    let client = pool.get().await.unwrap();
+    let pid: i32 = client
+        .query_one("SELECT pg_backend_pid()", &[])
+        .await
+        .unwrap()
+        .get(0);
+
+    // Kill the pooled backend from an unrelated pool.
+    let executioner = create_pool();
+    let executioner = executioner.get().await.unwrap();
+    let _ = executioner
+        .query("SELECT pg_terminate_backend($1)", &[&pid])
+        .await
+        .unwrap();
+
+    for _ in 0..200 {
+        if client.is_closed() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(
+        client.is_closed(),
+        "the terminated backend must close the client"
+    );
+
+    // Hand the dead connection back to the pool it came from.
+    drop(client);
+
+    let client = pool.get().await.unwrap();
+    let new_pid: i32 = client
+        .query_one("SELECT pg_backend_pid()", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_ne!(
+        new_pid, pid,
+        "recycle must reject the closed client and the pool create a fresh one"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.lifecycle/test]    detach unregisters the connection's statement cache
+#[tokio::test]
+async fn detach_unregisters_statement_cache() {
+    let pool = create_pool();
+
+    let pooled = pool.get().await.unwrap();
+    pooled.prepare_cached("SELECT 1;").await.unwrap();
+    assert_eq!(pooled.statement_cache.size(), 1);
+
+    // Taking an object out of the pool runs `Manager::detach`.
+    let detached = Object::take(pooled);
+    assert_eq!(detached.statement_cache.size(), 1);
+
+    let registered = pool.get().await.unwrap();
+    registered.prepare_cached("SELECT 1;").await.unwrap();
+    assert_eq!(registered.statement_cache.size(), 1);
+
+    pool.manager().statement_caches.clear();
+
+    assert_eq!(
+        registered.statement_cache.size(),
+        0,
+        "a still-pooled connection's cache is reachable from the registry"
+    );
+    assert_eq!(
+        detached.statement_cache.size(),
+        1,
+        "a detached connection's cache is no longer in the registry"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.recycle/test]    Fast runs no query, so session state survives recycling
+#[tokio::test]
+async fn recycle_fast_keeps_session_state() {
+    let pool = single_connection_pool(RecyclingMethod::Fast);
+
+    let client = pool.get().await.unwrap();
+    client
+        .batch_execute("SET application_name = 'pgorm-recycle-fast'")
+        .await
+        .unwrap();
+    drop(client);
+
+    let client = pool.get().await.unwrap();
+    assert_eq!(
+        session_setting(&client, "application_name").await,
+        "pgorm-recycle-fast",
+        "Fast only checks is_closed(); it runs no cleanup query"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.recycle/test]    Clean's RESET ALL wipes session state on reuse
+#[tokio::test]
+async fn recycle_clean_resets_session_state() {
+    let pool = single_connection_pool(RecyclingMethod::Clean);
+
+    let client = pool.get().await.unwrap();
+    client
+        .batch_execute("SET application_name = 'pgorm-recycle-clean'")
+        .await
+        .unwrap();
+    assert_eq!(
+        session_setting(&client, "application_name").await,
+        "pgorm-recycle-clean"
+    );
+    drop(client);
+
+    let client = pool.get().await.unwrap();
+    assert_ne!(
+        session_setting(&client, "application_name").await,
+        "pgorm-recycle-clean",
+        "Clean runs RESET ALL as part of its recycling sequence"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.recycle/test]    Clean omits DEALLOCATE ALL, so cached statements survive
+#[tokio::test]
+async fn recycle_clean_keeps_cached_statements() {
+    let pool = single_connection_pool(RecyclingMethod::Clean);
+
+    let client = pool.get().await.unwrap();
+    let stmt = client.prepare_cached("SELECT 1 + 2").await.unwrap();
+    drop(client);
+
+    let client = pool.get().await.unwrap();
+    assert_eq!(client.statement_cache.size(), 1);
+    let rows = client.query(&stmt, &[]).await.unwrap();
+    assert_eq!(
+        rows[0].get::<_, i32>(0),
+        3,
+        "the server-side statement must outlive Clean's recycling sequence"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.recycle/test]    Custom runs the caller's SQL, here one that does deallocate
+#[tokio::test]
+async fn recycle_custom_discard_all_deallocates() {
+    let pool = single_connection_pool(RecyclingMethod::Custom("DISCARD ALL;".to_string()));
+
+    let client = pool.get().await.unwrap();
+    let stmt = client.prepare_cached("SELECT 1 + 2").await.unwrap();
+    drop(client);
+
+    let client = pool.get().await.unwrap();
+    assert_eq!(
+        client.statement_cache.size(),
+        1,
+        "recycling never touches the client-side cache"
+    );
+    let err = client
+        .query(&stmt, &[])
+        .await
+        .expect_err("DISCARD ALL deallocates the server-side statement");
+    assert_eq!(
+        err.code(),
+        Some(&SqlState::INVALID_SQL_STATEMENT_NAME),
+        "this is the deallocation Clean deliberately avoids"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    the cache key is (query text, parameter types)
+#[tokio::test]
+async fn statement_cache_keys_include_param_types() {
+    const SQL: &str = "SELECT $1::int8";
+
+    let pool = create_pool();
+    let client = pool.get().await.unwrap();
+
+    let untyped = client.prepare_cached(SQL).await.unwrap();
+    assert_eq!(client.statement_cache.size(), 1);
+
+    let typed = client
+        .prepare_typed_cached(SQL, &[Type::INT8])
+        .await
+        .unwrap();
+    assert_eq!(
+        client.statement_cache.size(),
+        2,
+        "the same query text under different parameter types is a different key"
+    );
+
+    assert_eq!(
+        client
+            .query_one(&untyped, &[&7i64])
+            .await
+            .unwrap()
+            .get::<_, i64>(0),
+        7
+    );
+    assert_eq!(
+        client
+            .query_one(&typed, &[&8i64])
+            .await
+            .unwrap()
+            .get::<_, i64>(0),
+        8
+    );
+
+    assert!(client.statement_cache.remove(SQL, &[]).is_some());
+    assert_eq!(client.statement_cache.size(), 1);
+    assert!(client.statement_cache.remove(SQL, &[Type::INT8]).is_some());
+    assert_eq!(client.statement_cache.size(), 0);
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    a hit returns the cached statement instead of preparing again
+#[tokio::test]
+async fn statement_cache_hit_avoids_reparse() {
+    const CACHED: &str = "SELECT 'cached-parse'";
+    const UNCACHED: &str = "SELECT 'uncached-parse'";
+
+    let pool = create_pool();
+    let client = pool.get().await.unwrap();
+
+    let first = client.prepare_cached(CACHED).await.unwrap();
+    let second = client.prepare_cached(CACHED).await.unwrap();
+    assert_eq!(client.statement_cache.size(), 1);
+    assert_eq!(
+        prepared_count(&client, CACHED).await,
+        1,
+        "the second prepare_cached is a hit, not a second Parse"
+    );
+
+    // The uncached path is the control: every prepare parses again.
+    let third = client.prepare(UNCACHED).await.unwrap();
+    let fourth = client.prepare(UNCACHED).await.unwrap();
+    assert_eq!(prepared_count(&client, UNCACHED).await, 2);
+    assert_eq!(client.statement_cache.size(), 1);
+
+    drop((first, second, third, fourth));
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    the registry removes one statement across every live cache
+#[tokio::test]
+async fn statement_caches_remove_one_statement() {
+    let pool = create_pool();
+    let client0 = pool.get().await.unwrap();
+    let client1 = pool.get().await.unwrap();
+
+    for client in [&client0, &client1] {
+        client.prepare_cached("SELECT 1;").await.unwrap();
+        client.prepare_cached("SELECT 2;").await.unwrap();
+        assert_eq!(client.statement_cache.size(), 2);
+    }
+
+    pool.manager().statement_caches.remove("SELECT 1;", &[]);
+
+    assert_eq!(client0.statement_cache.size(), 1);
+    assert_eq!(client1.statement_cache.size(), 1);
+    assert!(client0.statement_cache.remove("SELECT 1;", &[]).is_none());
+    assert!(client0.statement_cache.remove("SELECT 2;", &[]).is_some());
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    the cache is opt-in: the plain statement paths never consult it
+#[tokio::test]
+async fn plain_query_bypasses_statement_cache() {
+    let pool = create_pool();
+    let client = pool.get().await.unwrap();
+
+    for _ in 0..3 {
+        let rows = client.query("SELECT 1 + 2", &[]).await.unwrap();
+        assert_eq!(rows[0].get::<_, i32>(0), 3);
+    }
+    let _ = client.execute("SELECT 1 + 2", &[]).await.unwrap();
+    let _ = client.query_one("SELECT 1 + 2", &[]).await.unwrap();
+    client.batch_execute("SELECT 1 + 2").await.unwrap();
+
+    assert_eq!(
+        client.statement_cache.size(),
+        0,
+        "only prepare_cached / prepare_typed_cached populate the cache"
+    );
+}
+
+// [spec:pgorm:sem:conn.pool.statement-cache/test]    nested transactions and savepoints share the owning client's cache
+#[tokio::test]
+async fn savepoint_shares_client_statement_cache() {
+    let pool = create_pool();
+    let mut client = pool.get().await.unwrap();
+
+    {
+        let mut txn = client.transaction().await.unwrap();
+        txn.prepare_cached("SELECT 1;").await.unwrap();
+
+        {
+            let mut nested = txn.transaction().await.unwrap();
+            nested.prepare_cached("SELECT 2;").await.unwrap();
+
+            {
+                let savepoint = nested.savepoint("shared_cache_probe").await.unwrap();
+                savepoint.prepare_cached("SELECT 3;").await.unwrap();
+                assert_eq!(savepoint.statement_cache.size(), 3);
+            }
+
+            assert_eq!(nested.statement_cache.size(), 3);
+        }
+
+        txn.commit().await.unwrap();
+    }
+
+    assert_eq!(
+        client.statement_cache.size(),
+        3,
+        "every nesting level writes through to the connection's one cache"
+    );
+}
+
+/// Exercises the whole `GenericClient` surface that delegates to
+/// `tokio_postgres`, so it can be run against both implementors.
+async fn exercise_generic_client<C>(client: &C)
+where
+    C: GenericClient,
+{
+    const SQL: &str = "SELECT $1::int4 + 1";
+
+    let prepared = client.prepare(SQL).await.unwrap();
+    assert_eq!(
+        client
+            .query_one(&prepared, &[&1i32])
+            .await
+            .unwrap()
+            .get::<_, i32>(0),
+        2
+    );
+
+    let typed = client.prepare_typed(SQL, &[Type::INT4]).await.unwrap();
+    assert_eq!(client.query(&typed, &[&2i32]).await.unwrap().len(), 1);
+
+    let cached = client.prepare_cached(SQL).await.unwrap();
+    assert_eq!(
+        client
+            .query_opt(&cached, &[&3i32])
+            .await
+            .unwrap()
+            .unwrap()
+            .get::<_, i32>(0),
+        4
+    );
+
+    let typed_cached = client
+        .prepare_typed_cached(SQL, &[Type::INT4])
+        .await
+        .unwrap();
+    assert_eq!(client.execute(&typed_cached, &[&4i32]).await.unwrap(), 1);
+
+    let params: [&(dyn ToSql + Sync); 1] = [&5i32];
+    assert_eq!(client.execute_raw(&prepared, params).await.unwrap(), 1);
+
+    let params: [&(dyn ToSql + Sync); 1] = [&6i32];
+    let stream = client.query_raw(&prepared, params).await.unwrap();
+    pin_mut!(stream);
+    assert_eq!(
+        stream.try_next().await.unwrap().unwrap().get::<_, i32>(0),
+        7
+    );
+    assert!(stream.try_next().await.unwrap().is_none());
+
+    // The only multi-statement method: it goes through the simple protocol.
+    client.batch_execute("SELECT 1; SELECT 2;").await.unwrap();
+}
+
+// [spec:pgorm:def:conn.pool.generic-client/test]    one statement surface over both implementors, Client and Transaction
+#[tokio::test]
+async fn generic_client_covers_client_and_txn() {
+    let pool = create_pool();
+    let mut client = pool.get().await.unwrap();
+
+    exercise_generic_client(&client).await;
+
+    let mut txn = GenericClient::transaction(&mut client).await.unwrap();
+    exercise_generic_client(&txn).await;
+
+    txn.batch_execute("CREATE TEMP TABLE generic_client_probe (id int)")
+        .await
+        .unwrap();
+
+    {
+        let mut nested = GenericClient::transaction(&mut txn).await.unwrap();
+        exercise_generic_client(&nested).await;
+        let _ = nested
+            .execute("INSERT INTO generic_client_probe VALUES (1)", &[])
+            .await
+            .unwrap();
+
+        {
+            let deeper = GenericClient::transaction(&mut nested).await.unwrap();
+            let _ = deeper
+                .execute("INSERT INTO generic_client_probe VALUES (2)", &[])
+                .await
+                .unwrap();
+        }
+    }
+
+    // A nested transaction is a savepoint, so dropping it rolls back only its
+    // own work and leaves the outer transaction usable.
+    let remaining: i64 = txn
+        .query_one("SELECT count(*) FROM generic_client_probe", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(remaining, 0);
+
+    txn.commit().await.unwrap();
+}
+
+// [spec:pgorm:def:conn.pool.generic-client/test]    cached prepares route through the wrapper types onto one shared cache
+#[tokio::test]
+async fn generic_client_cached_prepare_shares_cache() {
+    let pool = create_pool();
+    let mut client = pool.get().await.unwrap();
+
+    GenericClient::prepare_cached(&client, "SELECT 1;")
+        .await
+        .unwrap();
+    assert_eq!(client.statement_cache.size(), 1);
+
+    {
+        let txn = GenericClient::transaction(&mut client).await.unwrap();
+        GenericClient::prepare_cached(&txn, "SELECT 2;")
+            .await
+            .unwrap();
+        GenericClient::prepare_typed_cached(&txn, "SELECT $1::int4", &[Type::INT4])
+            .await
+            .unwrap();
+        assert_eq!(txn.statement_cache.size(), 3);
+        txn.commit().await.unwrap();
+    }
+
+    assert_eq!(
+        client.statement_cache.size(),
+        3,
+        "the transaction writes into the owning client's cache, not its own"
+    );
 }
 
 #[derive(Debug, Deserialize, Serialize)]

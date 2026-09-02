@@ -1095,6 +1095,14 @@ children (
                 id verify.conn
                 title "Verify connection, pool and tx-guard rules (9 rules)"
                 deps (decide.statement polish.pool-tests)
+                log (
+                    {
+                        at 2026-09-02T09:40:21.722896Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

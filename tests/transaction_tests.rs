@@ -95,6 +95,7 @@ async fn _transaction_with_reference(
     Ok(())
 }
 
+// [spec:pgorm:sem:conn.tx.guard+1/test]    the implicit path: dropping an uncommitted handle rolls back, and the queued ROLLBACK lands ahead of the connection's next statement
 #[pgorm_macros::test]
 pub async fn transaction_begin_out_of_scope() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_begin_out_of_scope_test").await;
@@ -195,6 +196,7 @@ pub async fn transaction_error_rollback() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:sem:conn.tx.guard+1/test]    the explicit path: rollback() consumes the handle and awaits the round trip
 #[pgorm_macros::test]
 pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_explicit_rollback_txrollback").await;
@@ -213,6 +215,100 @@ pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
     txn.rollback().await.unwrap();
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:conn.tx.guard+1/test]    the ROLLBACK queued by Drop still lands after the connection returns to the pool
+#[pgorm_macros::test]
+pub async fn transaction_drop_rollback_survives_handback() -> Result<(), DbErr> {
+    const DB_NAME: &str = "transaction_drop_rollback_survives_handback";
+
+    let ctx = TestContext::new(DB_NAME).await;
+    create_tables(&ctx.db).await?;
+
+    let base_url =
+        std::env::var("DATABASE_URL").expect("Enviroment variable 'DATABASE_URL' not set");
+    // One connection only, so the next checkout is guaranteed to be the very
+    // connection the dropped transaction queued its ROLLBACK on.
+    let pool = pgorm::connect_with_builder(common::setup::config(&base_url, DB_NAME), |builder| {
+        builder.max_size(1)
+    });
+
+    let mut db = pool.get().await?;
+    let pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);
+
+    {
+        let txn = db.begin().await?;
+        insert_bakery(&txn, "Dropped Bakery", 10.4).await?;
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
+        // Dropped without commit: Drop enqueues ROLLBACK and returns at once,
+        // without awaiting the server's response.
+    }
+
+    drop(db);
+
+    let db = pool.get().await?;
+    let same_pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);
+    assert_eq!(
+        same_pid, pid,
+        "a max_size 1 pool hands the same connection to the next caller"
+    );
+    assert_eq!(
+        count_bakeries(&db, "Bakery").await?,
+        0,
+        "the queued ROLLBACK is drained before the next caller's work"
+    );
+
+    drop(db);
+    drop(pool);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:conn.tx.guard+1/test]    a failing COMMIT reaches the caller as DbErr::Postgres
+#[pgorm_macros::test]
+pub async fn transaction_commit_failure_maps_dberr() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_commit_failure_maps_dberr").await;
+    let mut db = ctx.db.get().await?;
+
+    // A deferred constraint is only checked at COMMIT, so the failure can reach
+    // no statement other than commit() itself.
+    db.batch_execute(
+        "CREATE TABLE deferred_probe (id int, CONSTRAINT deferred_probe_key UNIQUE (id) \
+         DEFERRABLE INITIALLY DEFERRED)",
+    )
+    .await?;
+
+    let txn = db.begin().await?;
+    txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
+        .await?;
+    txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
+        .await?;
+
+    let err = txn
+        .commit()
+        .await
+        .expect_err("the deferred unique constraint must fail the COMMIT");
+
+    match &err {
+        DbErr::Postgres(e) => assert_eq!(
+            e.as_db_error().map(|e| e.code()),
+            Some(&SqlState::UNIQUE_VIOLATION),
+        ),
+        other => panic!("expected DbErr::Postgres, got {other:?}"),
+    }
+
+    assert!(
+        db.query_all("SELECT id FROM deferred_probe", &[])
+            .await?
+            .is_empty(),
+        "a failed COMMIT leaves nothing behind"
+    );
 
     drop(db);
     ctx.delete().await;
