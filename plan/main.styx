@@ -1467,6 +1467,13 @@ children (
                         kind @note
                         text "Audit: 9 sites in src/query/loader.rs, all inside already-Result functions — :229 expect on hashmap key (DATA-DEPENDENT: fires when join keys round-trip asymmetrically, i32<->i64 relations, char(n) padding, citext — survives testing, panics in production); :354-:398 seven panics in extract_key on any hand-written RelationDef naming a column absent from the Column enum; :445 unimplemented on unsupported TableRef. Remedy: extract_key -> Result<ValueTuple, DbErr>, table_column -> Result; no API break. Bumps query.loader.regroup, query.loader.batching, query.loader.table-ref-limitation (all three pin the panics; verify.query's tests pin them too and flip)."
                     }
+
+                    {
+                        at 2026-09-02T15:48:35.194948Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

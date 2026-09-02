@@ -1,6 +1,6 @@
 use crate::{
-    Condition, ConnectionTrait, DbErr, EntityTrait, Identity, ModelTrait, QueryFilter, Related,
-    RelationType, Select, error::*,
+    Condition, ConnectionTrait, DbErr, EntityName, EntityTrait, Identity, ModelTrait, QueryFilter,
+    Related, RelationType, Select, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{ColumnRef, DynIden, Expr, IntoColumnRef, SimpleExpr, TableRef, ValueTuple};
@@ -128,7 +128,7 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.regroup]
+    // [spec:pgorm:sem:query.loader.regroup+1]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -153,25 +153,19 @@ where
         let keys: Vec<ValueTuple> = self
             .iter()
             .map(|model: &M| extract_key(&rel_def.from_col, model))
-            .collect();
+            .collect::<Result<_, DbErr>>()?;
 
-        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys);
+        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
 
         let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
         let data = stmt.all(db).await?;
 
-        let hashmap: HashMap<ValueTuple, <R as EntityTrait>::Model> = data.into_iter().fold(
-            HashMap::new(),
-            |mut acc, value: <R as EntityTrait>::Model| {
-                {
-                    let key = extract_key(&rel_def.to_col, &value);
-                    acc.insert(key, value);
-                }
-
-                acc
-            },
-        );
+        let mut hashmap: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
+        for value in data {
+            let key = extract_key(&rel_def.to_col, &value)?;
+            hashmap.insert(key, value);
+        }
 
         let result: Vec<Option<<R as EntityTrait>::Model>> =
             keys.iter().map(|key| hashmap.get(key).cloned()).collect();
@@ -179,7 +173,7 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.regroup]
+    // [spec:pgorm:sem:query.loader.regroup+1]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
     where
         C: ConnectionTrait,
@@ -205,9 +199,9 @@ where
         let keys: Vec<ValueTuple> = self
             .iter()
             .map(|model: &M| extract_key(&rel_def.from_col, model))
-            .collect();
+            .collect::<Result<_, DbErr>>()?;
 
-        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys);
+        let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
 
         let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
@@ -220,16 +214,15 @@ where
                     acc
                 });
 
-        data.into_iter()
-            .for_each(|value: <R as EntityTrait>::Model| {
-                let key = extract_key(&rel_def.to_col, &value);
+        for value in data {
+            let key = extract_key(&rel_def.to_col, &value)?;
 
-                let vec = hashmap
-                    .get_mut(&key)
-                    .expect("Failed at finding key on hashmap");
+            let vec = hashmap.get_mut(&key).ok_or_else(|| {
+                unmatched_key_err(&key, &keys, &rel_def.from_col, &rel_def.to_col)
+            })?;
 
-                vec.push(value);
-            });
+            vec.push(value);
+        }
 
         let result: Vec<Vec<R::Model>> = keys
             .iter()
@@ -279,40 +272,34 @@ where
             let pkeys: Vec<ValueTuple> = self
                 .iter()
                 .map(|model: &M| extract_key(&via_rel.from_col, model))
-                .collect();
+                .collect::<Result<_, DbErr>>()?;
 
             // Map of M::PK -> Vec<R::PK>
             let mut keymap: HashMap<ValueTuple, Vec<ValueTuple>> = Default::default();
 
             let keys: Vec<ValueTuple> = {
-                let condition = prepare_condition(&via_rel.to_tbl, &via_rel.to_col, &pkeys);
+                let condition = prepare_condition(&via_rel.to_tbl, &via_rel.to_col, &pkeys)?;
                 let stmt = V::find().filter(condition);
                 let data = stmt.all(db).await?;
-                data.into_iter().for_each(|model| {
-                    let pk = extract_key(&via_rel.to_col, &model);
-                    let entry = keymap.entry(pk).or_default();
-
-                    let fk = extract_key(&rel_def.from_col, &model);
-                    entry.push(fk);
-                });
+                for model in data {
+                    let pk = extract_key(&via_rel.to_col, &model)?;
+                    let fk = extract_key(&rel_def.from_col, &model)?;
+                    keymap.entry(pk).or_default().push(fk);
+                }
 
                 keymap.values().flatten().cloned().collect()
             };
 
-            let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys);
+            let condition = prepare_condition(&rel_def.to_tbl, &rel_def.to_col, &keys)?;
 
             let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
 
-            let data = stmt.all(db).await?;
-
             // Map of R::PK -> R::Model
-            let data: HashMap<ValueTuple, <R as EntityTrait>::Model> = data
-                .into_iter()
-                .map(|model| {
-                    let key = extract_key(&rel_def.to_col, &model);
-                    (key, model)
-                })
-                .collect();
+            let mut data: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
+            for model in stmt.all(db).await? {
+                let key = extract_key(&rel_def.to_col, &model)?;
+                data.insert(key, model);
+            }
 
             let result: Vec<Vec<R::Model>> = pkeys
                 .into_iter()
@@ -340,108 +327,124 @@ fn cmp_table_ref(left: &TableRef, right: &TableRef) -> bool {
     format!("{left:?}") == format!("{right:?}")
 }
 
-// [spec:pgorm:sem:query.loader.batching]
-fn extract_key<Model>(target_col: &Identity, model: &Model) -> ValueTuple
+fn identity_columns(identity: &Identity) -> String {
+    identity
+        .clone()
+        .into_iter()
+        .map(|col| col.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+// [spec:pgorm:sem:query.loader.regroup+1]
+fn unmatched_key_err(
+    key: &ValueTuple,
+    input_keys: &[ValueTuple],
+    from_col: &Identity,
+    to_col: &Identity,
+) -> DbErr {
+    let sample = match input_keys.first() {
+        Some(sample) => format!("{sample:?}"),
+        None => "none".to_owned(),
+    };
+    query_err(format!(
+        "Loader cannot regroup a returned row: the key {key:?} read from `{to}` equals none of \
+         the keys read from `{from}` (an input key reads as {sample}). The two sides of the \
+         relation match in SQL but not as Rust values; check for a width, padding or collation \
+         difference between the columns.",
+        to = identity_columns(to_col),
+        from = identity_columns(from_col),
+    ))
+}
+
+// [spec:pgorm:sem:query.loader.batching+1]
+fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, DbErr>
 where
     Model: ModelTrait,
 {
-    match target_col {
-        Identity::Unary(a) => {
-            let column_a =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &a.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column A:1"));
-            ValueTuple::One(model.get(column_a))
-        }
-        Identity::Binary(a, b) => {
-            let column_a =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &a.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column A:2"));
-            let column_b =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &b.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column B:2"));
-            ValueTuple::Two(model.get(column_a), model.get(column_b))
-        }
-        Identity::Ternary(a, b, c) => {
-            let column_a =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &a.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column A:3"));
-            let column_b =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &b.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column B:3"));
-            let column_c =
-                <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &c.to_string(),
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping string to column C:3"));
-            ValueTuple::Three(
-                model.get(column_a),
-                model.get(column_b),
-                model.get(column_c),
-            )
-        }
-        Identity::Many(cols) => {
-            let values = cols.iter().map(|col| {
-                let col_name = col.to_string();
-                let column = <<<Model as ModelTrait>::Entity as EntityTrait>::Column as FromStr>::from_str(
-                    &col_name,
-                )
-                .unwrap_or_else(|_| panic!("Failed at mapping '{}' to column", col_name));
-                model.get(column)
-            })
-            .collect();
-            ValueTuple::Many(values)
-        }
-    }
+    let name = col.to_string();
+    <<Model::Entity as EntityTrait>::Column as FromStr>::from_str(&name).map_err(|_| {
+        let entity = <Model::Entity as Default>::default();
+        query_err(format!(
+            "Relation names column `{name}`, which is not a column of `{}`",
+            entity.table_name(),
+        ))
+    })
 }
 
-// [spec:pgorm:sem:query.loader.batching]
-fn prepare_condition(table: &TableRef, col: &Identity, keys: &[ValueTuple]) -> Condition {
+// [spec:pgorm:sem:query.loader.batching+1]
+fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, DbErr>
+where
+    Model: ModelTrait,
+{
+    Ok(match target_col {
+        Identity::Unary(a) => ValueTuple::One(model.get(resolve_column::<Model>(a)?)),
+        Identity::Binary(a, b) => ValueTuple::Two(
+            model.get(resolve_column::<Model>(a)?),
+            model.get(resolve_column::<Model>(b)?),
+        ),
+        Identity::Ternary(a, b, c) => ValueTuple::Three(
+            model.get(resolve_column::<Model>(a)?),
+            model.get(resolve_column::<Model>(b)?),
+            model.get(resolve_column::<Model>(c)?),
+        ),
+        Identity::Many(cols) => {
+            let mut values = Vec::with_capacity(cols.len());
+            for col in cols {
+                values.push(model.get(resolve_column::<Model>(col)?));
+            }
+            ValueTuple::Many(values)
+        }
+    })
+}
+
+// [spec:pgorm:sem:query.loader.batching+1]
+fn prepare_condition(
+    table: &TableRef,
+    col: &Identity,
+    keys: &[ValueTuple],
+) -> Result<Condition, DbErr> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
-    match col {
+    Ok(match col {
         Identity::Unary(column_a) => {
-            let column_a = table_column(table, column_a);
+            let column_a = table_column(table, column_a)?;
             Condition::all().add(Expr::col(column_a).is_in(keys.into_iter().flatten()))
         }
         Identity::Binary(column_a, column_b) => Condition::all().add(
             Expr::tuple([
-                SimpleExpr::Column(table_column(table, column_a)),
-                SimpleExpr::Column(table_column(table, column_b)),
+                SimpleExpr::Column(table_column(table, column_a)?),
+                SimpleExpr::Column(table_column(table, column_b)?),
             ])
             .in_tuples(keys),
         ),
         Identity::Ternary(column_a, column_b, column_c) => Condition::all().add(
             Expr::tuple([
-                SimpleExpr::Column(table_column(table, column_a)),
-                SimpleExpr::Column(table_column(table, column_b)),
-                SimpleExpr::Column(table_column(table, column_c)),
+                SimpleExpr::Column(table_column(table, column_a)?),
+                SimpleExpr::Column(table_column(table, column_b)?),
+                SimpleExpr::Column(table_column(table, column_c)?),
             ])
             .in_tuples(keys),
         ),
         Identity::Many(cols) => {
-            let columns = cols
-                .iter()
-                .map(|col| SimpleExpr::Column(table_column(table, col)));
+            let mut columns = Vec::with_capacity(cols.len());
+            for col in cols {
+                columns.push(SimpleExpr::Column(table_column(table, col)?));
+            }
             Condition::all().add(Expr::tuple(columns).in_tuples(keys))
         }
-    }
+    })
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation]
-fn table_column(tbl: &TableRef, col: &DynIden) -> ColumnRef {
+// [spec:pgorm:req:query.loader.table-ref-limitation+1]
+fn table_column(tbl: &TableRef, col: &DynIden) -> Result<ColumnRef, DbErr> {
     match tbl.to_owned() {
-        TableRef::Table(tbl) => (tbl, col.clone()).into_column_ref(),
-        TableRef::SchemaTable(sch, tbl) => (sch, tbl, col.clone()).into_column_ref(),
-        val => unimplemented!("Unsupported TableRef {val:?}"),
+        TableRef::Table(tbl) => Ok((tbl, col.clone()).into_column_ref()),
+        TableRef::SchemaTable(sch, tbl) => Ok((sch, tbl, col.clone()).into_column_ref()),
+        val => Err(query_err(format!(
+            "Loader cannot qualify key column `{}` against table reference {val:?}: only \
+             `TableRef::Table` and `TableRef::SchemaTable` relation targets are supported",
+            col.to_string(),
+        ))),
     }
 }

@@ -238,15 +238,20 @@ what makes it total over partially-set models.
 > by `Debug` formatting). An empty input slice short-circuits to an empty
 > result without querying.
 
-> [spec:pgorm:sem:query.loader.batching]
+> [spec:pgorm:sem:query.loader.batching+1]
 > Keys are collected in input order: for each input model, `extract_key`
 > builds a `ValueTuple` from the relation's `from_col` `Identity` (unary,
 > binary, ternary or many), resolving each column name back to the entity's
-> `Column` enum via `FromStr` and panicking if a name does not map. The
+> `Column` enum via `FromStr`. A name that does not map is a caller-authored
+> relation naming a column its model does not have, so `extract_key` MUST
+> return `Err(DbErr::Query)` naming the unresolved column and the model's
+> table rather than panicking, and the load aborts with that error. The
 > batch filter built by `prepare_condition` is a single IN predicate against
 > the relation's `to_col` on `to_tbl`: a unary key becomes
 > `col IN (v1, v2, ...)` over the flattened values; composite keys become a
-> tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`.
+> tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`;
+> `prepare_condition` is likewise fallible, propagating the qualification
+> error of [spec:pgorm:req:query.loader.table-ref-limitation].
 >
 > Keys are not deduplicated: duplicate key values across input models are
 > repeated verbatim in the IN list (the dedup is an acknowledged TODO in
@@ -254,17 +259,24 @@ what makes it total over partially-set models.
 > is AND-ed onto the caller-supplied `Select` via `QueryFilter::filter`, so
 > user filters and the key predicate compose.
 
-> [spec:pgorm:sem:query.loader.regroup]
+> [spec:pgorm:sem:query.loader.regroup+1]
 > Results are regrouped to input order by hashing on the extracted `to_col`
 > key of each returned row. `load_one` builds a `HashMap<ValueTuple, Model>`
 > — if several returned rows share a key, the last row wins — and yields, per
 > input key, `Some(model.clone())` or `None`; inputs sharing a key each
 > receive a clone of the same model. `load_many` seeds the map with an empty
 > `Vec` per input key, pushes each returned row onto its key's bucket in
-> result order (a row whose key is somehow absent from the seeded map panics
-> via `expect`), and yields a clone of the bucket per input key — so inputs
+> result order, and yields a clone of the bucket per input key — so inputs
 > sharing a key receive duplicated vectors, and unmatched inputs receive an
 > empty `Vec`.
+>
+> A returned row whose key is absent from the seeded map means the relation's
+> two sides matched in SQL but not as Rust values — differing integer widths,
+> `char(n)` blank padding, a case-insensitive collation. `load_many` MUST
+> report that as `Err(DbErr::Query)` rather than panicking, and the message
+> MUST carry the unmatched key and a sample input key in `Debug` form (so both
+> value types are named) together with the `from_col` and `to_col` column
+> lists, making the asymmetry diagnosable from the error alone.
 
 > [spec:pgorm:sem:query.loader.many-to-many]
 > `load_many_to_many` issues two queries. First the junction entity is loaded
@@ -279,12 +291,13 @@ what makes it total over partially-set models.
 > (e.g. filtered out by the caller's `Select`) are silently dropped, and
 > shared targets are cloned per referencing input.
 
-> [spec:pgorm:req:query.loader.table-ref-limitation]
+> [spec:pgorm:req:query.loader.table-ref-limitation+1]
 > Loader key predicates can only qualify columns for `TableRef::Table` and
 > `TableRef::SchemaTable` relation targets: `table_column` matches exactly
-> those two variants and calls `unimplemented!("Unsupported TableRef ...")`
-> for every other variant (aliased, database-qualified, subquery, values-list
-> or function-call table refs), aborting the load with a panic rather than an
-> `Err`. Entities whose relations resolve to such table refs MUST NOT be used
-> with `LoaderTrait`; this is an explicit, known limitation of the current
-> implementation.
+> those two variants and MUST return `Err(DbErr::Query)` for every other
+> variant (aliased, database-qualified, subquery, values-list or
+> function-call table refs), naming the key column it could not qualify and
+> the offending table reference. `prepare_condition` propagates that error,
+> so the load aborts with an `Err` and not a panic. Entities whose relations
+> resolve to such table refs still cannot be loaded through `LoaderTrait`;
+> the limitation is unchanged, only its reporting.

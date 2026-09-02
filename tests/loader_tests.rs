@@ -3,7 +3,6 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use futures::FutureExt;
 use pgorm::pgorm_query::{Alias, Expr};
 use pgorm::{ActiveValue::Set, DatabaseConnection, DbErr, RuntimeErr, Schema, entity::*, query::*};
 
@@ -52,7 +51,7 @@ async fn loader_load_one() -> Result<(), DbErr> {
 // [spec:pgorm:req:query.loader/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
-// [spec:pgorm:sem:query.loader.regroup/test]    a bucket per input key in
+// [spec:pgorm:sem:query.loader.regroup+1/test]    a bucket per input key in
 // result order, an empty `Vec` for an input nothing matched, and a clone of
 // the same model for two inputs sharing a key
 #[pgorm_macros::test]
@@ -345,6 +344,53 @@ impl Related<ledger::Entity> for customer::Entity {
     }
 }
 
+/// A relation naming a column the source model does not have, which the
+/// loader's key extraction cannot resolve to a `Column` variant.
+impl Related<ledger::Entity> for baker::Entity {
+    fn to() -> RelationDef {
+        let mut def: RelationDef = baker::Entity::belongs_to(ledger::Entity)
+            .from(baker::Column::Id)
+            .to(ledger::Column::OwnerId)
+            .into();
+        def.from_col = "no_such_column".into_identity();
+        def
+    }
+}
+
+// A second fixture whose key column is blank-padded `char(3)`: a key matches in
+// SQL, because `bpchar` comparison ignores trailing blanks, but reads back
+// padded, so the returned row's key is not equal to the input key it was
+// fetched for.
+mod padded {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "padded")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(column_type = "Char(Some(3))")]
+        pub code: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// `HasMany` from an unpadded `text` column onto that padded one.
+impl Related<padded::Entity> for bakery::Entity {
+    fn to() -> RelationDef {
+        let mut def: RelationDef = bakery::Entity::belongs_to(padded::Entity)
+            .from(bakery::Column::Name)
+            .to(padded::Column::Code)
+            .into();
+        def.rel_type = RelationType::HasMany;
+        def
+    }
+}
+
 /// A self-relation on a composite primary key: every row matches exactly
 /// itself, so the batch predicate has to be a tuple `IN` list.
 impl Related<cakes_bakers::Entity> for cakes_bakers::Entity {
@@ -362,11 +408,26 @@ fn internal_err<T>(message: &str) -> Result<T, DbErr> {
     Err(DbErr::Query(RuntimeErr::Internal(message.to_owned())))
 }
 
+fn internal_message<T: std::fmt::Debug>(outcome: Result<T, DbErr>, context: &str) -> String {
+    match outcome.expect_err(context) {
+        DbErr::Query(RuntimeErr::Internal(message)) => message,
+        other => panic!("{context}, got: {other:?}"),
+    }
+}
+
 async fn create_ledger_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
     let stmt = Schema::new().create_table_from_entity(ledger::Entity);
+    create_table_without_asserts(db, &stmt).await
+}
+
+async fn create_padded_table<C>(db: &C) -> Result<u64, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let stmt = Schema::new().create_table_from_entity(padded::Entity);
     create_table_without_asserts(db, &stmt).await
 }
 
@@ -487,7 +548,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching/test]    keys are collected in input
+// [spec:pgorm:sem:query.loader.batching+1/test]    keys are collected in input
 // order and become a single IN predicate on the relation's `to_col`: a
 // composite key renders as a tuple `IN` list through `in_tuples` (the unary
 // `col IN (..)` form is what every other loader test here exercises). The
@@ -495,7 +556,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
 // with it. The rule's note that duplicate keys are repeated rather than
 // deduplicated concerns the emitted SQL text, which is not observable through
 // this API.
-// [spec:pgorm:sem:query.loader.regroup/test]    two inputs sharing a key each
+// [spec:pgorm:sem:query.loader.regroup+1/test]    two inputs sharing a key each
 // receive their own clone of that key's bucket
 #[pgorm_macros::test]
 async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
@@ -559,11 +620,11 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup/test]    `load_one` indexes the returned
+// [spec:pgorm:sem:query.loader.regroup+1/test]    `load_one` indexes the returned
 // rows into a map keyed on `to_col` in result order, so when a relation
 // declared `HasOne` matches several rows for one key the last row wins, an
 // unmatched input gets `None`, and inputs sharing a key each get a clone
-// [spec:pgorm:req:query.loader.table-ref-limitation/test]    the supported
+// [spec:pgorm:req:query.loader.table-ref-limitation+1/test]    the supported
 // `TableRef::SchemaTable` target: its key column is qualified and the load runs
 #[pgorm_macros::test]
 async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
@@ -589,12 +650,12 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation/test]    a relation whose
+// [spec:pgorm:req:query.loader.table-ref-limitation+1/test]    a relation whose
 // target resolves to any other `TableRef` variant — an aliased table here —
-// cannot have its key column qualified, so the load aborts through
-// `unimplemented!` rather than returning an `Err`
+// cannot have its key column qualified, so the load returns an `Err` naming the
+// column and the offending table reference
 #[pgorm_macros::test]
-async fn loader_panics_on_unsupported_table_ref() -> Result<(), DbErr> {
+async fn loader_errors_on_unsupported_table_ref() -> Result<(), DbErr> {
     let ctx = TestContext::new("loader_test_table_ref_limit").await;
     create_tables(&ctx.db).await?;
     let db = &ctx.db.get().await?;
@@ -609,22 +670,77 @@ async fn loader_panics_on_unsupported_table_ref() -> Result<(), DbErr> {
         .await?,
     ];
 
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let outcome = std::panic::AssertUnwindSafe(customers.load_one(ledger::Entity, db))
-        .catch_unwind()
-        .await;
-    std::panic::set_hook(hook);
-
-    let payload = outcome.expect_err("an aliased TableRef must abort the load");
-    let message = payload
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| payload.downcast_ref::<&str>().copied())
-        .unwrap_or_default()
-        .to_owned();
+    let message = internal_message(
+        customers.load_one(ledger::Entity, db).await,
+        "an aliased TableRef must abort the load",
+    );
     assert!(
-        message.starts_with("not implemented: Unsupported TableRef"),
+        message.starts_with("Loader cannot qualify key column `owner_id`"),
+        "{message}"
+    );
+    assert!(message.contains("SchemaTableAlias"), "{message}");
+    assert!(message.contains("ledger"), "{message}");
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.batching+1/test]    a relation naming a column
+// its source model does not have is reported as an `Err` naming that column and
+// the model's table, not a panic
+#[pgorm_macros::test]
+async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
+    let ctx = TestContext::new("loader_test_unknown_column").await;
+    create_tables(&ctx.db).await?;
+    let db = &ctx.db.get().await?;
+    create_ledger_table(db).await?;
+
+    let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
+    let bakers = vec![insert_baker(db, "Jane", bakery_1.id).await?];
+
+    let message = internal_message(
+        bakers.load_one(ledger::Entity, db).await,
+        "an unresolvable relation column must abort the load",
+    );
+    assert_eq!(
+        message,
+        "Relation names column `no_such_column`, which is not a column of `baker`"
+    );
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.regroup+1/test]    a returned row whose key is
+// absent from the seeded map — here because `char(3)` pads it back out — is an
+// `Err` naming the unmatched key, a sample input key and both column lists,
+// rather than a panic
+#[pgorm_macros::test]
+async fn loader_errors_on_unmatched_returned_key() -> Result<(), DbErr> {
+    let ctx = TestContext::new("loader_test_unmatched_key").await;
+    create_tables(&ctx.db).await?;
+    let db = &ctx.db.get().await?;
+    create_padded_table(db).await?;
+
+    let bakery_1 = insert_bakery(db, "ab").await?;
+    padded::ActiveModel {
+        code: Set("ab".to_owned()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+
+    // The row really is reachable through the key predicate; it is only the
+    // regrouping that cannot match it back.
+    let bakeries = vec![bakery_1];
+    let message = internal_message(
+        bakeries.load_many(padded::Entity, db).await,
+        "a padded key must abort the regrouping",
+    );
+    assert!(
+        message.starts_with(
+            "Loader cannot regroup a returned row: the key One(String(Some(\"ab \"))) read from \
+             `code` equals none of the keys read from `name` (an input key reads as \
+             One(String(Some(\"ab\"))))."
+        ),
         "{message}"
     );
 
