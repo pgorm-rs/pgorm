@@ -54,12 +54,14 @@ where
     }
 
     /// Execute an insert operation
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     #[allow(unused_mut)]
     pub async fn exec<'a, C>(self, db: &'a C) -> Result<TryInsertResult<InsertResult<A>>, DbErr>
     where
         C: ConnectionTrait,
         A: 'a,
     {
+        self.ensure_uniform_columns()?;
         if self.insert_struct.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
@@ -73,6 +75,7 @@ where
 
     /// Execute an insert operation without returning (don't use `RETURNING` syntax)
     /// Number of rows affected is returned
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     pub async fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
@@ -82,6 +85,7 @@ where
         C: ConnectionTrait,
         A: 'a,
     {
+        self.ensure_uniform_columns()?;
         if self.insert_struct.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
@@ -96,6 +100,7 @@ where
     }
 
     /// Execute an insert operation and return the inserted model (use `RETURNING` syntax if supported)
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     pub async fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
@@ -105,6 +110,7 @@ where
         C: ConnectionTrait,
         A: 'a,
     {
+        self.ensure_uniform_columns()?;
         if self.insert_struct.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
@@ -125,6 +131,7 @@ where
 {
     /// Execute an insert operation
     // [spec:pgorm:sem:exec.crud.insert+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     #[allow(unused_mut)]
     pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
     where
@@ -132,18 +139,22 @@ where
         A: 'a,
     {
         // so that self is dropped before entering await
-        let mut query = self.query;
-        let returning =
-            Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
-                c.into_column()
-                    .select_as(c.into_column().into_returning_expr())
-            }));
-        query.returning(returning);
-        Inserter::<A>::new(self.primary_key, query).exec(db)
+        let inserter = self.ensure_uniform_columns().map(|()| {
+            let mut query = self.query;
+            let returning =
+                Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
+                    c.into_column()
+                        .select_as(c.into_column().into_returning_expr())
+                }));
+            query.returning(returning);
+            Inserter::<A>::new(self.primary_key, query)
+        });
+        async move { inserter?.exec(db).await }
     }
 
     /// Execute an insert operation without returning (don't use `RETURNING` syntax)
     /// Number of rows affected is returned
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     pub fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
@@ -153,10 +164,14 @@ where
         C: ConnectionTrait,
         A: 'a,
     {
-        Inserter::<A>::new(self.primary_key, self.query).exec_without_returning(db)
+        let inserter = self
+            .ensure_uniform_columns()
+            .map(|()| Inserter::<A>::new(self.primary_key, self.query));
+        async move { inserter?.exec_without_returning(db).await }
     }
 
     /// Execute an insert operation and return the inserted model (use `RETURNING` syntax if supported)
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     pub fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
@@ -166,7 +181,10 @@ where
         C: ConnectionTrait,
         A: 'a,
     {
-        Inserter::<A>::new(self.primary_key, self.query).exec_with_returning(db)
+        let inserter = self
+            .ensure_uniform_columns()
+            .map(|()| Inserter::<A>::new(self.primary_key, self.query));
+        async move { inserter?.exec_with_returning(db).await }
     }
 }
 

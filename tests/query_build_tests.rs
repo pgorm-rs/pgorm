@@ -987,8 +987,8 @@ fn insert_on_conflict_is_attached_verbatim() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns/test]    models sharing a
-// presence bitmap merge into one multi-row VALUES list
+// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    models sharing
+// a presence bitmap merge into one multi-row VALUES list
 #[test]
 fn insert_many_shares_one_column_list() {
     assert_eq!(
@@ -1008,22 +1008,37 @@ fn insert_many_shares_one_column_list() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns/test]    a model whose
-// presence differs from the first one panics rather than widening the column
-// list into a union
+// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    a model whose
+// presence differs from the first one is recorded as a mismatch, naming the
+// column it does not share, and contributes nothing to the statement
 #[test]
-#[should_panic(expected = "columns mismatch")]
 fn insert_many_rejects_mismatched_columns() {
-    let _ = Insert::<cake::ActiveModel>::many([
-        cake::ActiveModel {
-            id: ActiveValue::NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
-        },
-        cake::ActiveModel {
-            id: ActiveValue::Set(2),
-            name: ActiveValue::Set("Orange".to_owned()),
-        },
-    ]);
+    let mismatched = || {
+        Insert::<cake::ActiveModel>::many([
+            cake::ActiveModel {
+                id: ActiveValue::NotSet,
+                name: ActiveValue::Set("Apple".to_owned()),
+            },
+            cake::ActiveModel {
+                id: ActiveValue::Set(2),
+                name: ActiveValue::Set("Orange".to_owned()),
+            },
+        ])
+    };
+
+    let err = mismatched()
+        .ensure_uniform_columns()
+        .expect_err("the second model sets a column the first does not");
+    assert_eq!(
+        err.to_string(),
+        "Query Error: models added to one insert do not share a column set: \
+         `id` is set in a later model but not in the first"
+    );
+
+    assert_eq!(
+        mismatched().as_query().to_string(QueryBuilder),
+        r#"INSERT INTO "cake" ("name") VALUES ('Apple')"#
+    );
 }
 
 // [spec:pgorm:sem:query.build.insert+1/test]    a model with nothing set
@@ -1051,13 +1066,12 @@ fn all_not_set_model_renders_a_default_row() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns/test]    a first model
+// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    a first model
 // that sets nothing is a column set like any other: a later model that sets a
 // column mismatches it
 #[test]
-#[should_panic(expected = "columns mismatch")]
 fn insert_many_rejects_a_blank_first_model() {
-    let _ = Insert::<cake::ActiveModel>::many([
+    let err = Insert::<cake::ActiveModel>::many([
         cake::ActiveModel {
             id: ActiveValue::NotSet,
             name: ActiveValue::NotSet,
@@ -1066,7 +1080,15 @@ fn insert_many_rejects_a_blank_first_model() {
             id: ActiveValue::NotSet,
             name: ActiveValue::Set("Orange".to_owned()),
         },
-    ]);
+    ])
+    .ensure_uniform_columns()
+    .expect_err("the second model sets a column the blank first one does not");
+
+    assert_eq!(
+        err.to_string(),
+        "Query Error: models added to one insert do not share a column set: \
+         `name` is set in a later model but not in the first"
+    );
 }
 
 // [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    `do_nothing` and

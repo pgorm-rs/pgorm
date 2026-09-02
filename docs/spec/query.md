@@ -213,12 +213,27 @@ what makes it total over partially-set models.
 > `last_insert_id`); for auto-increment keys it is left `None`.
 > `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
 
-> [spec:pgorm:req:query.build.insert.uniform-columns]
+> [spec:pgorm:req:query.build.insert.uniform-columns+1]
 > All models added to a single `Insert` MUST have the same set of present
-> (`Set` or `Unchanged`) columns. The first model added records a per-column
-> presence bitmap; any subsequent model whose presence differs for any column
-> causes `add` to panic with `"columns mismatch"`. Rows with heterogeneous
-> column sets are not merged into a column union.
+> (`Set` or `Unchanged`) columns; rows with heterogeneous column sets are never
+> merged into a column union. The first model added records a per-column
+> presence bitmap and every later model is compared against it — including
+> against the empty state, so a batch that opens with models setting nothing
+> mismatches the first model that sets something.
+>
+> `add` returns `Self` so that calls chain, and therefore cannot report the
+> disagreement where it finds it: a mismatching model is recorded as a third
+> builder state naming the columns present in the earlier models and absent in
+> it and vice versa, and contributes neither its columns nor its values to the
+> statement. That state is terminal — models added after it are no longer
+> compared — so a mismatch never panics and never renders a ragged VALUES list.
+>
+> `Insert::ensure_uniform_columns`, mirrored on `TryInsert`, reports the
+> recorded state as `Err(DbErr::Query(RuntimeErr::Internal(..)))` whose message
+> names the offending columns on each side. Every execution path of both types
+> (`exec`, `exec_without_returning`, `exec_with_returning`) asks it first and
+> fails with that error before any SQL is sent, so a mismatched batch leaves
+> the database untouched.
 
 > [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
 > `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:

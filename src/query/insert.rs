@@ -1,6 +1,6 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, IntoActiveModel, Iterable,
-    PrimaryKeyTrait, QueryTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityName, EntityTrait, IdenStatic,
+    IntoActiveModel, Iterable, PrimaryKeyTrait, QueryTrait, RuntimeErr,
 };
 use core::marker::PhantomData;
 use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
@@ -10,6 +10,9 @@ use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
 /// Emptiness is a variant rather than a predicate over the bitmap: `Present` is
 /// only reachable through [`Insert::add`] for a model that set at least one
 /// column, so an all-`NotSet` model cannot present itself as a row of values.
+/// A model that disagrees with the shape already recorded is a variant too:
+/// [`Insert::add`] returns `Self` so calls chain and has nowhere to report the
+/// disagreement, so it holds it until an execution path can fail with it.
 #[derive(Debug)]
 enum InsertColumns {
     /// No column is set. `rows` counts the models added so far, every one of
@@ -18,6 +21,70 @@ enum InsertColumns {
     /// Per-column presence recorded from the first model added, which set at
     /// least one column.
     Present(Vec<bool>),
+    /// A model's present columns differed from what was already recorded.
+    /// Terminal: the statement took neither that model's columns nor its
+    /// values, and models added afterwards are no longer compared.
+    Mismatch {
+        /// Columns the models before it set and it did not.
+        first_only: Vec<String>,
+        /// Columns it set and the models before it did not.
+        later_only: Vec<String>,
+    },
+}
+
+impl InsertColumns {
+    /// Records the disagreement between the presence bitmap already held and
+    /// that of the model being added, naming the columns by which they differ.
+    /// A `recorded` shorter than `present` reads as "set nothing", which is the
+    /// empty state's shape.
+    fn mismatch<A>(recorded: &[bool], present: &[bool]) -> Self
+    where
+        A: ActiveModelTrait,
+    {
+        let set = |bitmap: &[bool], index: usize| bitmap.get(index).copied().unwrap_or(false);
+        let mut first_only = Vec::new();
+        let mut later_only = Vec::new();
+        for (index, col) in <A::Entity as EntityTrait>::Column::iter().enumerate() {
+            match (set(recorded, index), set(present, index)) {
+                (true, false) => first_only.push(col.as_str().to_owned()),
+                (false, true) => later_only.push(col.as_str().to_owned()),
+                (true, true) | (false, false) => {}
+            }
+        }
+        Self::Mismatch {
+            first_only,
+            later_only,
+        }
+    }
+}
+
+/// Names the columns each side of a mismatch sets and the other does not,
+/// dropping the side that has none.
+fn columns_mismatch_err(first_only: &[String], later_only: &[String]) -> DbErr {
+    let sides = [
+        (first_only, "set in the first model but not in a later one"),
+        (later_only, "set in a later model but not in the first"),
+    ]
+    .into_iter()
+    .filter(|(names, _)| !names.is_empty())
+    .map(|(names, side)| format!("{} {side}", quoted_columns(names)))
+    .collect::<Vec<_>>();
+
+    DbErr::Query(RuntimeErr::Internal(format!(
+        "models added to one insert do not share a column set: {}",
+        sides.join("; ")
+    )))
+}
+
+/// Renders `` `id` is `` for one column and `` `id`, `name` are `` for several.
+fn quoted_columns(names: &[String]) -> String {
+    let list = names
+        .iter()
+        .map(|name| format!("`{name}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let verb = if names.len() == 1 { "is" } else { "are" };
+    format!("{list} {verb}")
 }
 
 /// Performs INSERT operations on a ActiveModel
@@ -63,6 +130,24 @@ where
     // [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.columns, InsertColumns::Empty { .. })
+    }
+
+    /// The columns mismatch recorded while models were added, if any.
+    ///
+    /// [`add`](Self::add) returns `Self` so that calls chain, so a model whose
+    /// present columns disagree with the first model's is recorded rather than
+    /// reported there. Every execution path asks here and fails with the
+    /// resulting [`DbErr::Query`] before sending any SQL; callers that want the
+    /// error sooner can ask directly.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    pub fn ensure_uniform_columns(&self) -> Result<(), DbErr> {
+        match &self.columns {
+            InsertColumns::Mismatch {
+                first_only,
+                later_only,
+            } => Err(columns_mismatch_err(first_only, later_only)),
+            InsertColumns::Empty { .. } | InsertColumns::Present(_) => Ok(()),
+        }
     }
 
     /// Insert one Model or ActiveModel
@@ -133,10 +218,11 @@ where
 
     /// Add a Model to Self
     ///
-    /// # Panics
-    ///
-    /// Panics if the column value has discrepancy across rows
-    // [spec:pgorm:req:query.build.insert.uniform-columns]
+    /// A model whose present columns differ from those of the models already
+    /// added contributes neither columns nor values; the disagreement is
+    /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
+    /// and by every execution path.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
     // [spec:pgorm:sem:query.build.insert+1]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
@@ -166,6 +252,7 @@ where
         }
 
         match &self.columns {
+            InsertColumns::Mismatch { .. } => return self,
             InsertColumns::Empty { rows } if columns.is_empty() => {
                 let rows = rows.saturating_add(1);
                 self.columns = InsertColumns::Empty { rows };
@@ -173,9 +260,13 @@ where
                 return self;
             }
             InsertColumns::Empty { rows: 0 } => self.columns = InsertColumns::Present(present),
-            InsertColumns::Empty { .. } => panic!("columns mismatch"),
+            InsertColumns::Empty { .. } => {
+                self.columns = InsertColumns::mismatch::<A>(&[], &present);
+                return self;
+            }
             InsertColumns::Present(recorded) if *recorded != present => {
-                panic!("columns mismatch")
+                self.columns = InsertColumns::mismatch::<A>(recorded, &present);
+                return self;
             }
             InsertColumns::Present(_) => {}
         }
@@ -394,6 +485,13 @@ where
             insert_struct: insert,
         }
     }
+
+    /// The columns mismatch recorded while models were added, if any; see
+    /// [`Insert::ensure_uniform_columns`].
+    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    pub fn ensure_uniform_columns(&self) -> Result<(), DbErr> {
+        self.insert_struct.ensure_uniform_columns()
+    }
 }
 
 impl<A> QueryTrait for TryInsert<A>
@@ -484,7 +582,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "columns mismatch")]
     fn insert_5() {
         let apple = cake::ActiveModel {
             name: ActiveValue::set("Apple".to_owned()),
@@ -494,12 +591,12 @@ mod tests {
             id: ActiveValue::set(2),
             name: ActiveValue::set("Orange".to_owned()),
         };
+        let insert = Insert::<cake::ActiveModel>::new().add_many([apple, orange]);
+
+        assert!(insert.ensure_uniform_columns().is_err());
         assert_eq!(
-            Insert::<cake::ActiveModel>::new()
-                .add_many([apple, orange])
-                .as_query()
-                .to_string(QueryBuilder),
-            r#"INSERT INTO "cake" ("id", "name") VALUES (NULL, 'Apple'), (2, 'Orange')"#,
+            insert.as_query().to_string(QueryBuilder),
+            r#"INSERT INTO "cake" ("name") VALUES ('Apple')"#,
         );
     }
 

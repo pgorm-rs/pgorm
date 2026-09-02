@@ -19,6 +19,7 @@ async fn main() {
 
     let db = ctx.db.get().await.unwrap();
     test(&db).await;
+    columns_mismatch_is_refused(&db).await;
 
     drop(db);
     ctx.delete().await;
@@ -75,5 +76,53 @@ pub async fn test(db: &DatabaseConnection) {
     .await;
 
     assert!(matches!(blank_insert, Ok(TryInsertResult::Empty)));
+    assert_eq!(Bakery::find().all(db).await.unwrap().len(), 1);
+}
+
+// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    every execution
+// path of both insert types reports the recorded mismatch instead of sending
+// SQL, so the batch leaves the database untouched
+pub async fn columns_mismatch_is_refused(db: &DatabaseConnection) {
+    let mismatched = || {
+        Bakery::insert_many([
+            bakery::ActiveModel {
+                name: Set("Hillside Bakery".to_owned()),
+                profit_margin: Set(1.0),
+                ..Default::default()
+            },
+            bakery::ActiveModel {
+                id: Set(9),
+                name: Set("Riverside Bakery".to_owned()),
+                profit_margin: Set(2.0),
+            },
+        ])
+    };
+    let expected = "Query Error: models added to one insert do not share a column set: \
+                    `id` is set in a later model but not in the first";
+
+    let refused = [
+        mismatched().exec(db).await.err(),
+        mismatched().exec_without_returning(db).await.err(),
+        mismatched().exec_with_returning(db).await.err(),
+        mismatched().do_nothing().exec(db).await.err(),
+        mismatched()
+            .do_nothing()
+            .exec_without_returning(db)
+            .await
+            .err(),
+        mismatched()
+            .do_nothing()
+            .exec_with_returning(db)
+            .await
+            .err(),
+    ];
+
+    for err in refused {
+        assert_eq!(
+            err.expect("a mismatched batch cannot execute").to_string(),
+            expected
+        );
+    }
+
     assert_eq!(Bakery::find().all(db).await.unwrap().len(), 1);
 }
