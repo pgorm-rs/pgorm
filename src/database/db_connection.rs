@@ -60,44 +60,69 @@ impl DatabasePool {
 #[derive(Debug)]
 pub struct DatabaseConnection(pub(crate) Object);
 
-/// Isolation level, access mode, and deferrability for a transaction opened
-/// with [`DatabaseConnection::begin_with`]. The default leaves every option
-/// unset, which is equivalent to [`TransactionTrait::begin`].
-// [spec:pgorm:req:conn.tx+1]    transaction configuration
+/// How [`DatabaseConnection::begin_with`] opens a transaction: the isolation
+/// level and access mode it selects, as the combinations PostgreSQL acts on.
+///
+/// `DEFERRABLE` is reachable only through [`TransactionMode::DeferrableSnapshot`],
+/// which carries the whole `SERIALIZABLE READ ONLY DEFERRABLE` combination,
+/// because that is the only one in which the server honours it.
+// [spec:pgorm:req:conn.tx+2]    transaction configuration
 #[derive(Debug, Clone, Copy, Default)]
-pub struct TransactionOptions {
-    /// Isolation level; `None` inherits the session default.
-    pub isolation_level: Option<IsolationLevel>,
-    /// Open the transaction `READ ONLY`.
-    pub read_only: bool,
-    /// Open the transaction `DEFERRABLE`.
-    pub deferrable: bool,
+pub enum TransactionMode {
+    /// Inherit the session defaults: `START TRANSACTION` with no clause, the
+    /// same transaction [`TransactionTrait::begin`] opens.
+    #[default]
+    Default,
+    /// `READ WRITE`, emitted explicitly so it overrides a session running
+    /// under `SET default_transaction_read_only = on`.
+    ReadWrite {
+        /// `ISOLATION LEVEL <level>`; `None` inherits the session default.
+        isolation: Option<IsolationLevel>,
+    },
+    /// `READ ONLY`: the server rejects any write with SQLSTATE `25006`.
+    ReadOnly {
+        /// `ISOLATION LEVEL <level>`; `None` inherits the session default.
+        isolation: Option<IsolationLevel>,
+    },
+    /// `ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`: opening it may
+    /// block until a snapshot is safe, after which the transaction cannot fail
+    /// with a serialization error.
+    DeferrableSnapshot,
 }
 
 impl DatabaseConnection {
-    /// Execute SQL `BEGIN` with the given isolation level, access mode, and
-    /// deferrability.
+    /// Open a transaction configured by `mode`.
     ///
     /// This is an inherent method rather than a [`TransactionTrait`] one
-    /// because a nested transaction is a savepoint, and `SAVEPOINT` takes none
-    /// of these options.
-    // [spec:pgorm:req:conn.tx+1]    configured BEGIN on the pooled client
+    /// because a nested transaction is a savepoint, and `SAVEPOINT` takes
+    /// neither an isolation level nor an access mode.
+    // [spec:pgorm:req:conn.tx+2]    configured START TRANSACTION on the pooled client
     pub async fn begin_with(
         &mut self,
-        opts: TransactionOptions,
+        mode: TransactionMode,
     ) -> Result<DatabaseTransaction<'_>, DbErr> {
         let mut builder = self.0.build_transaction();
 
-        if let Some(level) = opts.isolation_level {
-            builder = builder.isolation_level(level);
-        }
-
-        if opts.read_only {
-            builder = builder.read_only(true);
-        }
-
-        if opts.deferrable {
-            builder = builder.deferrable(true);
+        match mode {
+            TransactionMode::Default => {}
+            TransactionMode::ReadWrite { isolation } => {
+                if let Some(level) = isolation {
+                    builder = builder.isolation_level(level);
+                }
+                builder = builder.read_only(false);
+            }
+            TransactionMode::ReadOnly { isolation } => {
+                if let Some(level) = isolation {
+                    builder = builder.isolation_level(level);
+                }
+                builder = builder.read_only(true);
+            }
+            TransactionMode::DeferrableSnapshot => {
+                builder = builder
+                    .isolation_level(IsolationLevel::Serializable)
+                    .read_only(true)
+                    .deferrable(true);
+            }
         }
 
         Ok(DatabaseTransaction(Some(builder.start().await?)))
@@ -123,24 +148,24 @@ impl DatabaseConnection {
     }
 
     /// [`DatabaseConnection::transaction`] over a transaction configured by
-    /// `opts`, as [`DatabaseConnection::begin_with`] would open it.
+    /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
     // [spec:pgorm:sem:conn.tx.closure]    configured BEGIN
     pub async fn transaction_with<'s, T, E, F>(
         &'s mut self,
-        opts: TransactionOptions,
+        mode: TransactionMode,
         f: F,
     ) -> Result<T, TransactionError<E>>
     where
         F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
     {
-        let txn = DatabaseConnection::begin_with(self, opts)
+        let txn = DatabaseConnection::begin_with(self, mode)
             .await
             .map_err(TransactionError::Connection)?;
 
         drive(txn, f).await
     }
 
-    /// Run `f` inside a transaction configured by `opts`, retrying the whole
+    /// Run `f` inside a transaction configured by `mode`, retrying the whole
     /// begin/run/commit cycle up to `max_retries` extra times while the failure
     /// is retryable.
     ///
@@ -152,7 +177,7 @@ impl DatabaseConnection {
     // [spec:pgorm:sem:conn.tx.retry]
     pub async fn transaction_with_retry<T, E, F>(
         &mut self,
-        opts: TransactionOptions,
+        mode: TransactionMode,
         max_retries: u32,
         mut f: F,
     ) -> Result<T, TransactionError<E>>
@@ -164,7 +189,7 @@ impl DatabaseConnection {
 
         loop {
             let mut txn = self
-                .begin_with(opts)
+                .begin_with(mode)
                 .await
                 .map_err(TransactionError::Connection)?;
 
@@ -545,7 +570,7 @@ impl TransactionTrait for DatabaseTransaction<'_> {
     }
 }
 
-// [spec:pgorm:req:conn.tx+1]    BEGIN on the pooled client
+// [spec:pgorm:req:conn.tx+2]    BEGIN on the pooled client
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {

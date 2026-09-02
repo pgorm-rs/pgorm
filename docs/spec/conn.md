@@ -155,7 +155,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Transactions
 
-> [spec:pgorm:req:conn.tx+1]
+> [spec:pgorm:req:conn.tx+2]
 > `TransactionTrait::begin(&mut self)` MUST return a `DatabaseTransaction<'_>`
 > borrowing the parent exclusively, so no other statement can run on the
 > connection while the transaction handle is alive. `DatabaseConnection::begin`
@@ -163,15 +163,43 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > nested transaction, which `tokio_postgres` implements as a savepoint. Both
 > transaction levels share the connection's statement cache.
 >
-> `DatabaseConnection::begin_with(opts: TransactionOptions)` is the configured
-> counterpart, issuing `BEGIN` through `pgorm_pool`'s `TransactionBuilder`.
-> `TransactionOptions` is a `Debug + Clone + Copy + Default` struct of exactly
-> three public fields — `isolation_level: Option<IsolationLevel>`, `read_only:
-> bool`, `deferrable: bool` — and each is forwarded to the builder only when
-> set, so `TransactionOptions::default()` produces the same plain `BEGIN` as
-> `begin` and unset options inherit the session defaults rather than being
-> pinned to `READ WRITE` / `NOT DEFERRABLE`. `IsolationLevel` is
-> `tokio_postgres::IsolationLevel`, re-exported from `pgorm`.
+> `DatabaseConnection::begin_with(mode: TransactionMode)` is the configured
+> counterpart, opening the transaction through `pgorm_pool`'s
+> `TransactionBuilder`, which emits `START TRANSACTION` followed by the clauses
+> the mode selects. `TransactionMode` MUST be a closed `Debug + Clone + Copy +
+> Default` enum of exactly four variants, each one a combination PostgreSQL
+> acts on:
+>
+> - `Default` — the `Default::default()` variant — appends no clause. The bare
+>   `START TRANSACTION` inherits `default_transaction_isolation`,
+>   `default_transaction_read_only`, and `default_transaction_deferrable`, so it
+>   opens the same transaction `begin` does.
+> - `ReadWrite { isolation: Option<IsolationLevel> }` appends `ISOLATION LEVEL
+>   <level>` when `isolation` is `Some`, then `READ WRITE`. That clause is
+>   emitted unconditionally rather than elided as the usual server default, so
+>   the mode overrides a session running under `SET
+>   default_transaction_read_only = on` instead of inheriting it.
+> - `ReadOnly { isolation: Option<IsolationLevel> }` appends `ISOLATION LEVEL
+>   <level>` when `isolation` is `Some`, then `READ ONLY`. A write inside such a
+>   transaction is rejected by the server with SQLSTATE `25006`
+>   (`read_only_sql_transaction`).
+> - `DeferrableSnapshot` appends `ISOLATION LEVEL SERIALIZABLE, READ ONLY,
+>   DEFERRABLE`, and takes no parameter. Opening it may block until the snapshot
+>   is safe, after which the transaction cannot be aborted by a serialization
+>   failure.
+>
+> `DeferrableSnapshot` MUST be the only shape that reaches `DEFERRABLE`, and it
+> MUST carry the isolation level and access mode itself rather than accepting
+> either from the caller. PostgreSQL honours `DEFERRABLE` only when the
+> transaction is both `SERIALIZABLE` and `READ ONLY`; in every other
+> combination the server parses the clause and ignores it. Deferrability as an
+> independent flag would therefore be constructible, accepted, and a silent
+> no-op — an invalid state the type MUST NOT be able to represent. For the same
+> reason no variant offers `NOT DEFERRABLE`: it is the server default, and
+> selecting it says nothing.
+>
+> `IsolationLevel` is `tokio_postgres::IsolationLevel`, re-exported from
+> `pgorm`.
 >
 > `begin_with` is an inherent method on `DatabaseConnection`, deliberately NOT
 > on `TransactionTrait`: the trait's other implementor is

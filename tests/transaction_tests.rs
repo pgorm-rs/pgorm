@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
     ActiveValue::Set, DatabaseConnection, DatabaseTransaction, IsolationLevel, TransactionError,
-    TransactionOptions, TransactionTrait, entity::prelude::*,
+    TransactionMode, TransactionTrait, entity::prelude::*,
 };
 use pretty_assertions::assert_eq;
 use tokio_postgres::error::SqlState;
@@ -34,6 +34,26 @@ where
         .all(db)
         .await?
         .len())
+}
+
+async fn show<C>(db: &C, setting: &str) -> Result<String, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let row = db
+        .query_one(format!("SHOW {setting}").as_str(), &[])
+        .await?;
+    Ok(row.get(0))
+}
+
+fn assert_read_only_violation(err: &DbErr) {
+    match err {
+        DbErr::Postgres(e) => assert_eq!(
+            e.as_db_error().map(|e| e.code()),
+            Some(&SqlState::READ_ONLY_SQL_TRANSACTION),
+        ),
+        other => panic!("expected DbErr::Postgres, got {other:?}"),
+    }
 }
 
 #[pgorm_macros::test]
@@ -316,7 +336,7 @@ pub async fn transaction_commit_failure_maps_dberr() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+1/test]    read-only access mode is enforced by the server
+// [spec:pgorm:req:conn.tx+2/test]    ReadOnly emits both clauses, and the server enforces the access mode
 #[pgorm_macros::test]
 pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_read_only_txconfig").await;
@@ -324,23 +344,22 @@ pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
     let mut db = ctx.db.get().await?;
 
     let txn = db
-        .begin_with(TransactionOptions {
-            read_only: true,
-            ..Default::default()
+        .begin_with(TransactionMode::ReadOnly {
+            isolation: Some(IsolationLevel::RepeatableRead),
         })
         .await?;
+
+    assert_eq!(
+        show(&txn, "transaction_isolation").await?,
+        "repeatable read"
+    );
+    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
 
     let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
         .await
         .expect_err("INSERT must be rejected in a read-only transaction");
 
-    match &err {
-        DbErr::Postgres(e) => assert_eq!(
-            e.as_db_error().map(|e| e.code()),
-            Some(&SqlState::READ_ONLY_SQL_TRANSACTION),
-        ),
-        other => panic!("expected DbErr::Postgres, got {other:?}"),
-    }
+    assert_read_only_violation(&err);
 
     txn.rollback().await?;
 
@@ -352,7 +371,7 @@ pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+1/test]    a configured isolation level still commits
+// [spec:pgorm:req:conn.tx+2/test]    ReadWrite carries the isolation level, and still commits
 #[pgorm_macros::test]
 pub async fn transaction_serializable_txconfig() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_serializable_txconfig").await;
@@ -360,17 +379,83 @@ pub async fn transaction_serializable_txconfig() -> Result<(), DbErr> {
     let mut db = ctx.db.get().await?;
 
     let txn = db
-        .begin_with(TransactionOptions {
-            isolation_level: Some(IsolationLevel::Serializable),
-            ..Default::default()
+        .begin_with(TransactionMode::ReadWrite {
+            isolation: Some(IsolationLevel::Serializable),
         })
         .await?;
+
+    assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
+    assert_eq!(show(&txn, "transaction_read_only").await?, "off");
 
     insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
 
     assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
 
     txn.commit().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.tx+2/test]    Default appends no clause, so the session default stands
+#[pgorm_macros::test]
+pub async fn transaction_default_inherits_session_txconfig() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_default_inherits_session_txconfig").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    db.batch_execute("SET default_transaction_read_only = on")
+        .await?;
+
+    let txn = db.begin_with(TransactionMode::Default).await?;
+
+    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
+
+    let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
+        .await
+        .expect_err("Default must inherit the session's read-only default");
+
+    assert_read_only_violation(&err);
+
+    txn.rollback().await?;
+
+    db.batch_execute("SET default_transaction_read_only = off")
+        .await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.tx+2/test]    ReadWrite overrides a read-only session default
+#[pgorm_macros::test]
+pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_read_write_overrides_default_txconfig").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    db.batch_execute("SET default_transaction_read_only = on")
+        .await?;
+
+    let txn = db
+        .begin_with(TransactionMode::ReadWrite { isolation: None })
+        .await?;
+
+    assert_eq!(show(&txn, "transaction_read_only").await?, "off");
+
+    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+
+    txn.commit().await?;
+
+    db.batch_execute("SET default_transaction_read_only = off")
+        .await?;
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
 
@@ -563,10 +648,9 @@ pub async fn transaction_nested() -> Result<(), DbErr> {
     Ok(())
 }
 
-fn serializable() -> TransactionOptions {
-    TransactionOptions {
-        isolation_level: Some(IsolationLevel::Serializable),
-        ..Default::default()
+fn serializable() -> TransactionMode {
+    TransactionMode::ReadWrite {
+        isolation: Some(IsolationLevel::Serializable),
     }
 }
 
@@ -771,7 +855,7 @@ pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+1/test]    a savepoint under a configured outer transaction
+// [spec:pgorm:req:conn.tx+2/test]    a savepoint under a configured outer transaction
 #[pgorm_macros::test]
 pub async fn transaction_nested_under_config_txtests() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_nested_under_config_txtests").await;
@@ -814,7 +898,7 @@ pub async fn transaction_nested_under_config_txtests() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+1/test]    read only + deferrable + serializable, the one valid deferrable combination
+// [spec:pgorm:req:conn.tx+2/test]    DeferrableSnapshot carries serializable + read only, the one combination DEFERRABLE needs
 #[pgorm_macros::test]
 pub async fn transaction_deferrable_txtests() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_deferrable_txtests").await;
@@ -823,13 +907,11 @@ pub async fn transaction_deferrable_txtests() -> Result<(), DbErr> {
 
     insert_bakery(&db, "SeaSide Bakery", 10.4).await?;
 
-    let txn = db
-        .begin_with(TransactionOptions {
-            isolation_level: Some(IsolationLevel::Serializable),
-            read_only: true,
-            deferrable: true,
-        })
-        .await?;
+    let txn = db.begin_with(TransactionMode::DeferrableSnapshot).await?;
+
+    assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
+    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
+    assert_eq!(show(&txn, "transaction_deferrable").await?, "on");
 
     assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
 

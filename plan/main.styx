@@ -1654,6 +1654,13 @@ children (
                         kind @note
                         text "Audit: TransactionOptions (src/database/db_connection.rs:67-75) has three independent fields; deferrable:true does NOTHING unless the transaction is both SERIALIZABLE and READ ONLY — constructible, accepted by PG, silent no-op. Also read_only:bool collapses tokio-postgres's three access states, so READ WRITE cannot be forced on a default_transaction_read_only=on session. Redesign: closed TransactionMode enum { Default, ReadWrite{isolation}, ReadOnly{isolation}, DeferrableSnapshot } — only meaningful combinations exist. Smallest, newest surface (begin_with/transaction_with/transaction_with_retry, landed this campaign); best effort-to-correctness ratio. Bumps conn.tx+1 -> +2; verify tests updated. S."
                     }
+
+                    {
+                        at 2026-09-02T15:45:38.889783Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

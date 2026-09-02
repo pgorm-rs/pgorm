@@ -89,7 +89,7 @@ pub trait ConnectionTrait: Sync {
 }
 
 /// Spawn database transaction
-// [spec:pgorm:req:conn.tx+1]
+// [spec:pgorm:req:conn.tx+2]
 #[async_trait::async_trait]
 pub trait TransactionTrait {
     /// Execute SQL `BEGIN` transaction.
