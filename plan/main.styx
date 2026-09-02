@@ -1096,6 +1096,14 @@ children (
             {
                 id verify.codegen
                 title "Verify entity-codegen rules (25 rules)"
+                log (
+                    {
+                        at 2026-09-02T09:24:36.309541Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
