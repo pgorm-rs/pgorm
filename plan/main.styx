@@ -973,6 +973,14 @@ children (
                 id polish.conn-acquire
                 title "Remove the unconstructed ConnAcquireErr / DbErr::ConnectionAcquire variant (spec bump on error.model)"
                 kind @refactor
+                log (
+                    {
+                        at 2026-09-02T01:17:54.023277Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

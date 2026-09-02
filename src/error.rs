@@ -2,7 +2,7 @@ use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model]
+// [spec:pgorm:def:error.model+1]
 #[derive(Error, Debug)]
 pub enum DbErr {
     /// Postgres error
@@ -11,9 +11,6 @@ pub enum DbErr {
     /// Pool error
     #[error("Pool Error: {0}")]
     Pool(#[from] pgorm_pool::PoolError),
-    /// This error can happen when the connection pool is fully-utilized
-    #[error("Failed to acquire connection from pool: {0}")]
-    ConnectionAcquire(#[source] ConnAcquireErr),
     /// Runtime type conversion error
     #[error("Error converting `{from}` into `{into}`: {source}")]
     TryIntoErr {
@@ -68,20 +65,8 @@ pub enum DbErr {
     Custom(String),
 }
 
-/// Connection Acquire error
-// [spec:pgorm:def:error.model.runtime]    acquisition failure taxonomy
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum ConnAcquireErr {
-    /// Connection pool timed out
-    #[error("Connection pool timed out")]
-    Timeout,
-    /// Connection closed
-    #[error("Connection closed")]
-    ConnectionClosed,
-}
-
 /// Runtime error
-// [spec:pgorm:def:error.model.runtime]
+// [spec:pgorm:def:error.model.runtime+1]
 #[derive(Error, Debug)]
 pub enum RuntimeErr {
     /// Error generated from within pgorm
@@ -89,7 +74,7 @@ pub enum RuntimeErr {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model]    Display-string equality
+// [spec:pgorm:def:error.model+1]    Display-string equality
 impl PartialEq for DbErr {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

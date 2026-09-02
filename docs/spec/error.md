@@ -6,14 +6,14 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model]
+> [spec:pgorm:def:error.model+1]
 > `DbErr` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
 > its `Display` includes the server `DbError` detail when present) and
-> `Pool(pgorm_pool::PoolError)` (produced by `DatabasePool::get`). The
-> remaining variants are constructed by pgorm itself:
-> `ConnectionAcquire(ConnAcquireErr)`, `TryIntoErr { from, into, source }`,
+> `Pool(pgorm_pool::PoolError)` (produced by `DatabasePool::get`; pool
+> exhaustion and acquisition timeouts surface here). The remaining variants
+> are constructed by pgorm itself: `TryIntoErr { from, into, source }`,
 > `Conn(RuntimeErr)`, `Exec(RuntimeErr)`, `Query(RuntimeErr)`,
 > `ConvertFromU64(&'static str)`, `UnpackInsertId`, `UpdateGetPrimaryKey`,
 > `AttrNotSet(String)`, `Type(String)`, `Json(String)`, `RecordNotFound`,
@@ -24,15 +24,12 @@ it.
 > equal. A separate `ColumnFromStrErr(String)` covers `FromStr` failures on
 > entity columns.
 
-> [spec:pgorm:def:error.model.runtime]
+> [spec:pgorm:def:error.model.runtime+1]
 > `RuntimeErr` has exactly one variant, `Internal(String)`, wrapping
-> pgorm-internal failure messages; crate-private helpers (`conn_err`,
+> pgorm-internal failure messages, and is the payload of the `Conn`, `Exec`,
+> and `Query` variants of `DbErr`. Crate-private helpers (`conn_err`,
 > `exec_err`, `query_err`, `type_err`, `json_err`) build the corresponding
-> `DbErr` variants from anything `ToString`. `ConnAcquireErr` enumerates pool
-> acquisition failures as `Timeout` and `ConnectionClosed` — but no code path
-> currently constructs `DbErr::ConnectionAcquire`; in practice pool
-> exhaustion and acquisition timeouts surface as `DbErr::Pool` instead, and
-> the variant is retained for API compatibility.
+> `DbErr` variants from anything `ToString`.
 
 ## SQLSTATE classification
 
