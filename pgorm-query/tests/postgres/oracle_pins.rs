@@ -56,7 +56,7 @@ fn oracle_pins_over_on_a_bare_expression() {
 // Fixed by plan node `unrep.mysql-purge`: `TableOpt::Engine`, `Collate` and
 // `CharacterSet` are MySQL-era table options with no PostgreSQL spelling.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+1/test]
+// [spec:pgorm:req:sql.ddl.create-table+2/test]
 #[test]
 fn oracle_pins_mysql_table_options() {
     let table = || {
@@ -81,30 +81,6 @@ fn oracle_pins_mysql_table_options() {
     ] {
         assert!(assert_rejected(&sql).contains(keyword), "{sql}");
     }
-}
-
-// Fixed by plan node `unrep.index-kind`: `primary` and `unique` are independent
-// booleans emitted into the CREATE INDEX prefix, but PRIMARY KEY is only ever an
-// inline table constraint.
-// [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.index-create/test]
-#[test]
-fn oracle_pins_primary_key_index() {
-    let index = || {
-        Index::create()
-            .name("idx")
-            .table(Glyph::Table)
-            .col(Glyph::Aspect)
-            .to_owned()
-    };
-
-    let primary = index().primary().to_string(QueryBuilder);
-    let both = index().primary().unique().to_string(QueryBuilder);
-
-    assert!(primary.starts_with("CREATE PRIMARY KEY INDEX"));
-    assert!(both.starts_with("CREATE PRIMARY KEY UNIQUE INDEX"));
-    assert!(assert_rejected(&primary).contains("PRIMARY"));
-    assert!(assert_rejected(&both).contains("PRIMARY"));
 }
 
 // Fixed by plan node `unrep.on-conflict`: targets, action and action-filter are

@@ -49,7 +49,7 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+1]
+// [spec:pgorm:req:sql.ddl.create-table+2]
 #[derive(Default, Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: Option<TableRef>,
@@ -174,7 +174,7 @@ impl TableCreateStatement {
     /// ```
     pub fn primary_key(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
         let mut index = index.take();
-        index.primary = true;
+        index.kind = IndexKind::PrimaryKey;
         self.indexes.push(index);
         self
     }

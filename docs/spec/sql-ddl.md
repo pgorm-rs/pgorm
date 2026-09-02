@@ -33,11 +33,12 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+1]
+> [spec:pgorm:req:sql.ddl.create-table+2]
 > `TableCreateStatement` composes a table name (`table()`, any
 > `IntoTableRef`), ordered `ColumnDef`s (`col()`, which stamps the table ref
 > onto each column), table-level indexes (`index()` and `primary_key()` — the
-> latter takes an `IndexCreateStatement` and forces its `primary` flag),
+> latter takes an `IndexCreateStatement` and forces its kind to
+> `IndexKind::PrimaryKey`, the one position in which that kind is spelled),
 > foreign keys (`foreign_key()`), check expressions (`check()`), an
 > `if_not_exists` flag, MySQL-era options (`engine`, `collate`,
 > `character_set`), a `comment` and a trailing `extra` string.
@@ -46,13 +47,17 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > body in this fixed order: column definitions, then embedded index
 > expressions, then foreign-key clauses (in `Mode::Creation`, i.e. without
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
-> Embedded indexes render as `[CONSTRAINT "name" ]PRIMARY KEY |UNIQUE [NULLS
-> NOT DISTINCT ](cols)`. After the closing parenthesis the MySQL-style
-> options still render verbatim (`ENGINE=`, `COLLATE=`, `DEFAULT CHARSET=`) —
-> a leftover that produces invalid Postgres if used — followed by the `extra`
-> string (e.g. `USING columnar`). The table-level `comment` is stored and
-> exposed via `get_comment()` but is not rendered here: on Postgres a table
-> comment is a statement of its own, built through
+> Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
+> ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+1]`) and `NULLS NOT
+> DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
+> `index()`, since `primary_key()` sets the kind — contributes no keyword and
+> so renders a constraint Postgres rejects. After the closing parenthesis the
+> MySQL-style options still render verbatim (`ENGINE=`, `COLLATE=`,
+> `DEFAULT CHARSET=`) — a leftover that produces invalid Postgres if used —
+> followed by the `extra` string (e.g. `USING columnar`). The table-level
+> `comment` is stored and exposed via `get_comment()` but is not rendered
+> here: on Postgres a table comment is a statement of its own, built through
 > `[spec:pgorm:req:sql.ddl.comment]`.
 
 > [spec:pgorm:req:sql.ddl.column-def+1]
@@ -153,17 +158,35 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create]
+> [spec:pgorm:req:sql.ddl.index-create+1]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
-> ordered `IndexColumn`s), and `primary`, `unique`, `nulls_not_distinct`,
-> `index_type` and `if_not_exists` flags. `IntoIndexColumn` accepts an iden,
-> `(iden, u32)` prefix, `(iden, IndexOrder)` or `(iden, u32, IndexOrder)`.
-> The standalone form MUST render `CREATE [PRIMARY KEY ][UNIQUE ]INDEX [IF
-> NOT EXISTS ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`,
-> where `<type>` is `BTREE`, `GIN` (the `FullText` mapping, also set by
+> ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
+> `index_type` and `if_not_exists` flags. `IndexKind` is the closed set
+> `Plain | Unique | PrimaryKey`, so what an index constrains is one state and
+> never a combination: `primary()` and `unique()` each set the kind outright,
+> replacing whatever was set before, and an index is never both a primary key
+> and a unique key. `is_primary_key()`, `is_unique_key()` and `kind()` read it
+> back. `IntoIndexColumn` accepts an iden, `(iden, u32)` prefix,
+> `(iden, IndexOrder)` or `(iden, u32, IndexOrder)`.
+>
+> Postgres spells `PRIMARY KEY` only as an inline table constraint, so
+> `IndexKind::PrimaryKey` has no standalone spelling and the standalone
+> renderer MUST NOT be able to see it: it reads the kind through
+> `IndexKind::standalone`, whose image is the two-variant
+> `StandaloneIndexKind` (`Plain | Unique`) and which maps `PrimaryKey` to
+> `None`. That absence is typed rather than a failure — a statement marked
+> primary and rendered standalone emits a plain `CREATE INDEX`, and the
+> primary-key constraint is reachable only through the embedded path of
+> `[spec:pgorm:req:sql.ddl.create-table+2]`.
+>
+> The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
+> ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
+> `<type>` is `BTREE`, `GIN` (the `FullText` mapping, also set by
 > `full_text()`), `HASH`, or a custom identifier, and each column renders as
 > `"name"[ (prefix)][ ASC|DESC]` — the MySQL-style `(prefix)` length is still
-> emitted even though Postgres does not accept it.
+> emitted even though Postgres does not accept it. Postgres defines
+> `NULLS NOT DISTINCT` for unique indexes alone, so the flag MUST render only
+> when the kind is `Unique`; on any other kind it is carried but not spelled.
 >
 > There is no support for partial indexes (`WHERE`), `INCLUDE` columns,
 > expression columns or operator classes in the current builder. Index table

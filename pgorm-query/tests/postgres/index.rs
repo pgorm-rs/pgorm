@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.index-create/test]
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -69,7 +69,7 @@ fn create_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create/test]
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
 #[test]
 fn create_6() {
     assert_eq!(
@@ -82,6 +82,65 @@ fn create_6() {
             .col(Glyph::Image)
             .to_string(QueryBuilder),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "glyph" ("aspect", "image") NULLS NOT DISTINCT"#
+    );
+}
+
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
+#[test]
+fn standalone_index_spells_plain_or_unique_only() {
+    let index = || {
+        Index::create()
+            .name("idx")
+            .table(Glyph::Table)
+            .col(Glyph::Aspect)
+            .to_owned()
+    };
+    let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
+    let unique = r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#;
+
+    assert_eq!(index().to_string(QueryBuilder), plain);
+    assert_eq!(index().unique().to_string(QueryBuilder), unique);
+    assert_eq!(index().primary().to_string(QueryBuilder), plain);
+    assert_eq!(index().primary().unique().to_string(QueryBuilder), unique);
+    assert_eq!(index().unique().primary().to_string(QueryBuilder), plain);
+}
+
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
+#[test]
+fn index_kind_accessors_are_mutually_exclusive() {
+    let index = Index::create().col(Glyph::Aspect).to_owned();
+
+    assert_eq!(index.kind(), IndexKind::Plain);
+    assert!(!index.is_primary_key());
+    assert!(!index.is_unique_key());
+
+    let unique = index.clone().unique().to_owned();
+    assert!(unique.is_unique_key());
+    assert!(!unique.is_primary_key());
+
+    let primary = index.clone().unique().primary().to_owned();
+    assert!(primary.is_primary_key());
+    assert!(!primary.is_unique_key());
+}
+
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
+#[test]
+fn nulls_not_distinct_needs_the_unique_kind() {
+    let index = || {
+        Index::create()
+            .name("idx")
+            .table(Glyph::Table)
+            .col(Glyph::Aspect)
+            .nulls_not_distinct()
+            .to_owned()
+    };
+    let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
+
+    assert_eq!(index().to_string(QueryBuilder), plain);
+    assert_eq!(index().primary().to_string(QueryBuilder), plain);
+    assert_eq!(
+        index().unique().to_string(QueryBuilder),
+        r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect") NULLS NOT DISTINCT"#
     );
 }
 

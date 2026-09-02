@@ -1961,6 +1961,13 @@ children (
                         kind @note
                         text "Audit: IndexCreateStatement's primary and unique are independent bools (index/create.rs:108-109) emitted unconditionally by prepare_index_prefix (query_builder.rs:2207-2214) into CREATE ... INDEX — .primary() renders CREATE PRIMARY KEY INDEX (invalid; PRIMARY KEY is only an inline table constraint), both true renders CREATE PRIMARY KEY UNIQUE INDEX. Closed enum IndexKind { Plain, Unique, PrimaryKey } with PrimaryKey restricted to the inline-constraint path. S. Deps on bug.ident-escaping (same query_builder index region). Bumps sql.ddl.index-create."
                     }
+
+                    {
+                        at 2026-09-02T19:42:47.735762Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+1/test]
+// [spec:pgorm:req:sql.ddl.create-table+2/test]
 // [spec:pgorm:req:sql.ddl.column-def+1/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+1/test]
@@ -616,4 +616,36 @@ fn create_16() {
         ]
         .join(" ")
     );
+}
+
+// [spec:pgorm:req:sql.ddl.create-table+2/test]
+#[test]
+fn embedded_index_is_the_only_primary_key_spelling() {
+    let table = |index: &mut IndexCreateStatement| {
+        Table::create()
+            .table(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer().not_null())
+            .col(ColumnDef::new(Glyph::Image).string().not_null())
+            .primary_key(index)
+            .to_string(QueryBuilder)
+    };
+    let expected = [
+        r#"CREATE TABLE "glyph" ("#,
+        r#""id" integer NOT NULL,"#,
+        r#""image" varchar NOT NULL,"#,
+        r#"CONSTRAINT "pk-glyph" PRIMARY KEY ("id", "image")"#,
+        r#")"#,
+    ]
+    .join(" ");
+    let index = || {
+        Index::create()
+            .name("pk-glyph")
+            .col(Glyph::Id)
+            .col(Glyph::Image)
+            .to_owned()
+    };
+
+    assert_eq!(table(&mut index()), expected);
+    assert_eq!(table(index().primary()), expected);
+    assert_eq!(table(index().unique()), expected);
 }

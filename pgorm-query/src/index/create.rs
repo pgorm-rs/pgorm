@@ -100,16 +100,57 @@ use super::common::*;
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create]
+// [spec:pgorm:req:sql.ddl.index-create+1]
 #[derive(Default, Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: Option<TableRef>,
     pub(crate) index: TableIndex,
-    pub(crate) primary: bool,
-    pub(crate) unique: bool,
+    pub(crate) kind: IndexKind,
     pub(crate) nulls_not_distinct: bool,
     pub(crate) index_type: Option<IndexType>,
     pub(crate) if_not_exists: bool,
+}
+
+/// What an index constrains: nothing, uniqueness, or the table's primary key.
+///
+/// The three states are mutually exclusive, so no index is both a primary key
+/// and a unique key. PostgreSQL spells `PRIMARY KEY` only as an inline table
+/// constraint, so [`IndexKind::PrimaryKey`] is meaningful only on the embedded
+/// path — it is what [`TableCreateStatement::primary_key`] sets. A standalone
+/// `CREATE INDEX` sees the kind through [`IndexKind::standalone`], which has no
+/// primary-key image.
+///
+/// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
+// [spec:pgorm:req:sql.ddl.index-create+1]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexKind {
+    #[default]
+    Plain,
+    Unique,
+    PrimaryKey,
+}
+
+/// The index kinds a standalone `CREATE ... INDEX` can spell.
+///
+/// Obtained only through [`IndexKind::standalone`], so the standalone renderer
+/// cannot be handed a primary key.
+// [spec:pgorm:req:sql.ddl.index-create+1]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StandaloneIndexKind {
+    Plain,
+    Unique,
+}
+
+impl IndexKind {
+    /// This kind as a standalone `CREATE INDEX` prefix, or `None` for
+    /// [`IndexKind::PrimaryKey`], which has no standalone spelling.
+    pub fn standalone(self) -> Option<StandaloneIndexKind> {
+        match self {
+            Self::Plain => Some(StandaloneIndexKind::Plain),
+            Self::Unique => Some(StandaloneIndexKind::Unique),
+            Self::PrimaryKey => None,
+        }
+    }
 }
 
 /// Specification of a table index
@@ -160,19 +201,26 @@ impl IndexCreateStatement {
         self
     }
 
-    /// Set index as primary
+    /// Set index kind to [`IndexKind::PrimaryKey`], replacing any kind already
+    /// set.
+    ///
+    /// A primary key is only spelled inside `CREATE TABLE`; rendered standalone
+    /// the statement is a plain `CREATE INDEX`.
     pub fn primary(&mut self) -> &mut Self {
-        self.primary = true;
+        self.kind = IndexKind::PrimaryKey;
         self
     }
 
-    /// Set index as unique
+    /// Set index kind to [`IndexKind::Unique`], replacing any kind already set.
     pub fn unique(&mut self) -> &mut Self {
-        self.unique = true;
+        self.kind = IndexKind::Unique;
         self
     }
 
-    /// Set nulls to not be treated as distinct values. Only available on Postgres.
+    /// Set nulls to not be treated as distinct values.
+    ///
+    /// PostgreSQL defines this only for unique indexes and unique constraints,
+    /// so it is rendered only when the kind is [`IndexKind::Unique`].
     pub fn nulls_not_distinct(&mut self) -> &mut Self {
         self.nulls_not_distinct = true;
         self
@@ -191,12 +239,16 @@ impl IndexCreateStatement {
         self
     }
 
+    pub fn kind(&self) -> IndexKind {
+        self.kind
+    }
+
     pub fn is_primary_key(&self) -> bool {
-        self.primary
+        self.kind == IndexKind::PrimaryKey
     }
 
     pub fn is_unique_key(&self) -> bool {
-        self.unique
+        self.kind == IndexKind::Unique
     }
 
     pub fn is_nulls_not_distinct(&self) -> bool {
@@ -211,8 +263,7 @@ impl IndexCreateStatement {
         Self {
             table: self.table.take(),
             index: self.index.take(),
-            primary: self.primary,
-            unique: self.unique,
+            kind: self.kind,
             nulls_not_distinct: self.nulls_not_distinct,
             index_type: self.index_type.take(),
             if_not_exists: self.if_not_exists,

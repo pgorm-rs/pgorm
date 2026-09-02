@@ -404,7 +404,7 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+1/test]
+// [spec:pgorm:req:sql.ddl.create-table+2/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -492,7 +492,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create/test]
+// [spec:pgorm:req:sql.ddl.index-create+1/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([

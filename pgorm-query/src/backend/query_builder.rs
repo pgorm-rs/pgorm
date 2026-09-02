@@ -1789,7 +1789,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+1]
+    // [spec:pgorm:req:sql.ddl.create-table+2]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -2061,23 +2061,32 @@ impl QueryBuilder {
             write!(sql, " ").unwrap();
         }
 
-        self.prepare_index_prefix(create, sql);
+        match create.kind {
+            IndexKind::Plain => {}
+            IndexKind::Unique => write!(sql, "UNIQUE ").unwrap(),
+            IndexKind::PrimaryKey => write!(sql, "PRIMARY KEY ").unwrap(),
+        }
 
-        if create.nulls_not_distinct {
+        if create.nulls_not_distinct && create.kind == IndexKind::Unique {
             write!(sql, "NULLS NOT DISTINCT ").unwrap();
         }
 
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create]
+    // [spec:pgorm:req:sql.ddl.index-create+1]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
         sql: &mut dyn SqlWriter,
     ) {
+        let kind = create.kind.standalone();
+
         write!(sql, "CREATE ").unwrap();
-        self.prepare_index_prefix(create, sql);
+        match kind {
+            Some(StandaloneIndexKind::Unique) => write!(sql, "UNIQUE ").unwrap(),
+            Some(StandaloneIndexKind::Plain) | None => {}
+        }
         write!(sql, "INDEX ").unwrap();
 
         if create.if_not_exists {
@@ -2097,7 +2106,7 @@ impl QueryBuilder {
         write!(sql, " ").unwrap();
         self.prepare_index_columns(&create.index.columns, sql);
 
-        if create.nulls_not_distinct {
+        if create.nulls_not_distinct && kind == Some(StandaloneIndexKind::Unique) {
             write!(sql, " NULLS NOT DISTINCT").unwrap();
         }
     }
@@ -2151,15 +2160,6 @@ impl QueryBuilder {
                 }
             )
             .unwrap();
-        }
-    }
-
-    fn prepare_index_prefix(&self, create: &IndexCreateStatement, sql: &mut dyn SqlWriter) {
-        if create.primary {
-            write!(sql, "PRIMARY KEY ").unwrap();
-        }
-        if create.unique {
-            write!(sql, "UNIQUE ").unwrap();
         }
     }
 
