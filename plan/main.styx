@@ -922,6 +922,14 @@ children (
                 id decide.statement
                 title "Statement/StatementBuilder: revive or delete the dormant module"
                 kind @refactor
+                log (
+                    {
+                        at 2026-09-02T01:08:46.614303Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: delete the dormant module. src/database/statement.rs goes, along with the commented-out mod/pub-use lines in src/database/mod.rs (including the transaction corpse lines), and the two spec rules documenting the dormancy (conn.statement, conn.statement.disabled-types) retire from docs/spec/conn.md with infra.conn's implements claims trimmed to match. Rationale: nothing in the crate needs Statement/StatementBuilder — execution passes SQL + params directly, and the fork's policy is delete-don't-deprecate. Rejected: revival as public API (no consumer, and it would resurrect the inject_parameters Display path the fork deliberately moved away from)."
+                    }
+                )
             }
         )
     }
@@ -1014,6 +1022,7 @@ children (
             {
                 id verify.misc
                 title "Verify error-model, metric-layer and schema-gen rules (8 rules)"
+                deps (polish.conn-acquire)
             }
         )
         log (
