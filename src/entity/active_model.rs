@@ -277,7 +277,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// Set the corresponding attributes in the ActiveModel from a JSON value
     ///
     /// Note that this method will not alter the primary key values in ActiveModel.
-    // [spec:pgorm:req:entity.active-model.json]
+    // [spec:pgorm:req:entity.active-model.json+1]
     #[cfg(feature = "with-json")]
     fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), DbErr>
     where
@@ -308,7 +308,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Create ActiveModel from a JSON value
-    // [spec:pgorm:req:entity.active-model.json]
+    // [spec:pgorm:req:entity.active-model.json+1]
     #[cfg(feature = "with-json")]
     fn from_json(json: serde_json::Value) -> Result<Self, DbErr>
     where

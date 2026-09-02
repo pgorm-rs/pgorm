@@ -384,6 +384,15 @@ children (
                         [spec:pgorm:req:entity.relation.fk]
                     )
                 }
+                log (
+                    {
+                        at 2026-09-02T10:01:06.384697Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "Two entity rules overclaimed since adoption, found by verify.entity: (1) entity.relation said has_one/has_many derive their builder \"by reversing the related entity's definition\" — RelationBuilder::from_rel keeps only tables and columns of the reversed definition, discarding on_delete/on_update actions, condition hooks and fk_name (baker declares on_delete=SetNull; Bakery::has_many(Baker) yields on_delete None). (2) entity.active-model.json said set_from_json restores key states \"preserving Set/Unchanged values\" — the restore path calls set(), so an Unchanged key returns as Set with its value intact. Both rules corrected at +1 with operator approval, refs re-pinned; behavior deliberately unchanged."
+                        after_done true
+                    }
+                )
             }
 
             {

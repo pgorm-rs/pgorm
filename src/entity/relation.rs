@@ -20,14 +20,14 @@ pub enum RelationType {
 pub(crate) type ForeignKeyAction = pgorm_query::ForeignKeyAction;
 
 /// Defines the relations of an Entity
-// [spec:pgorm:req:entity.relation]
+// [spec:pgorm:req:entity.relation+1]
 pub trait RelationTrait: Iterable + Debug + 'static {
     /// The method to call
     fn def(&self) -> RelationDef;
 }
 
 /// Checks if Entities are related
-// [spec:pgorm:req:entity.relation]
+// [spec:pgorm:req:entity.relation+1]
 pub trait Related<R>
 where
     R: EntityTrait,

@@ -217,27 +217,32 @@ explicit limitations.
 > feature-gated `Json`/date-time/`Decimal`/`Uuid` types) MUST produce `Set`
 > (`src/entity/active_model.rs`).
 
-> [spec:pgorm:req:entity.active-model.json]
+> [spec:pgorm:req:entity.active-model.json+1]
 > Under the `with-json` feature, `ActiveModelTrait::from_json` builds an active model
 > by deserializing the JSON object into the entity's `Model` (errors surface as
 > `DbErr`), converting it with `IntoActiveModel`, then normalizing states per column:
 > attributes whose key exists in the JSON object become `Set`, and all others MUST be
 > `NotSet`. `set_from_json` applies the same conversion in place but MUST NOT alter
-> the primary-key values: key states are taken before the overwrite and restored
-> afterwards, preserving `Set`/`Unchanged` values and `NotSet` states
-> (`src/entity/active_model.rs`).
+> the primary-key values: key values are taken before the overwrite and put back
+> afterwards via `set()`, so a `Set` or `Unchanged` key keeps its value but comes
+> back in the `Set` state (an `Unchanged` key is upgraded), while `NotSet` keys are
+> restored as `NotSet` (`src/entity/active_model.rs`).
 
 ## Relations
 
-> [spec:pgorm:req:entity.relation]
+> [spec:pgorm:req:entity.relation+1]
 > Relations are declared per entity through `RelationTrait: Iterable + Debug`, whose
 > `def(&self) -> RelationDef` maps each variant of the entity's `Relation` enum to a
 > definition (`src/entity/relation.rs`). `RelationType` has exactly two variants:
 > `HasOne` and `HasMany` — belongs-to is expressed as ownership direction, not a third
 > type. `EntityTrait::belongs_to(related)` MUST start a builder with `HasOne` and
 > `is_owner = false`; `EntityTrait::has_one(R)` and `has_many(R)` require
-> `R: Related<Self>` and MUST derive their builder by reversing the related entity's
-> definition (`R::to().rev()`) with `is_owner = true`. The `Related<R>` trait exposes
+> `R: Related<Self>` and derive their builder from the reversed related entity's
+> definition (`R::to().rev()`) with `is_owner = true` — but the builder keeps only
+> the tables and columns of that reversed definition: its `on_delete`/`on_update`
+> actions, condition hooks and `fk_name` are discarded (`RelationBuilder::from_rel`),
+> so FK actions declared on the belongs-to side do not surface on the reversed
+> relation. The `Related<R>` trait exposes
 > `to()`, `via()` (defaulting to `None`; `Some` denotes a junction-table hop), and
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.

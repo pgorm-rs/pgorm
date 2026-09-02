@@ -472,7 +472,7 @@ pub async fn having() {
 // [spec:pgorm:sem:exec.crud.consolidate/test]    `SelectTwoMany::all` grouping
 // on a unary primary key: children in row order, one entry per left key, and an
 // empty `Vec` for a left row with no right model
-// [spec:pgorm:req:entity.relation/test]    `Related::find_related` inner-joins
+// [spec:pgorm:req:entity.relation+1/test]    `Related::find_related` inner-joins
 // `to()` onto a fresh `Select<R>`, exercised against real rows
 // [spec:pgorm:def:entity.traits.model/test]    `ModelTrait::find_related` scopes
 // that select to a single model instance
@@ -1292,7 +1292,7 @@ fn action(a: &Option<pgorm_query::ForeignKeyAction>) -> String {
     format!("{a:?}")
 }
 
-// [spec:pgorm:req:entity.relation/test]    `RelationType` has exactly two
+// [spec:pgorm:req:entity.relation+1/test]    `RelationType` has exactly two
 // variants; `belongs_to` starts a `HasOne` builder with `is_owner = false`;
 // `has_one` / `has_many` derive theirs from `R::to().rev()` with
 // `is_owner = true`; and `Related::to` / `via` / `find_related` behave as stated

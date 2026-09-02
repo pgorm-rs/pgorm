@@ -663,7 +663,7 @@ fn into_active_model_and_into_active_value() {
 // JSON
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model.json/test]    `from_json` normalises per
+// [spec:pgorm:req:entity.active-model.json+1/test]    `from_json` normalises per
 // column — keys present in the JSON object become `Set`, everything else `NotSet`
 // — and a deserialization failure surfaces as `DbErr`
 #[test]
@@ -709,7 +709,7 @@ fn active_model_from_json() {
     );
 }
 
-// [spec:pgorm:req:entity.active-model.json/test]    `set_from_json` applies the
+// [spec:pgorm:req:entity.active-model.json+1/test]    `set_from_json` applies the
 // same normalisation in place but MUST NOT alter the primary key: the key states
 // are taken before the overwrite and restored after, so `Set` / `Unchanged`
 // payloads survive and `NotSet` stays `NotSet` whatever the JSON said
