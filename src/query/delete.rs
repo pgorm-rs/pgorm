@@ -35,29 +35,29 @@ impl Delete {
     ///
     /// Model
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::Model {
     ///         id: 1,
     ///         name: "Apple Pie".to_owned(),
     ///     })
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
     /// );
     /// ```
     /// ActiveModel
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
     ///         id: ActiveValue::set(1),
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
     /// );
     /// ```
@@ -79,13 +79,13 @@ impl Delete {
     /// Delete many ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     Delete::many(fruit::Entity)
     ///         .filter(fruit::Column::Name.contains("Apple"))
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```

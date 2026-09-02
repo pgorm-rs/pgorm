@@ -37,46 +37,34 @@ macro_rules! debug_query_build {
 //     &DatabaseConnection,
 // >| x.value.get_database_backend());
 
-/// Helper to get a `Statement` from an object that impl `QueryTrait`.
+/// Helper to get a statement from an object that impl `QueryTrait`.
 ///
-/// # Example
+/// # Non-functional
+///
+/// This macro expands to `DebugQuery { .. }.build()`, but every
+/// `debug_query_build!` invocation that would generate those `build` impls is
+/// commented out, so [`DebugQuery`] has no `build` method and this macro has no
+/// working expansion target. It is retained only for API compatibility.
+///
+/// Use [`QueryTrait::build`](crate::QueryTrait::build) for the parameterised
+/// statement, or `as_query().to_string(QueryBuilder)` for a value-inlined one:
 ///
 /// ```
-/// # #[cfg(feature = "mock")]
-/// # use pgorm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
-/// #
-/// # let conn = MockDatabase::new(DbBackend::Postgres)
-/// #     .into_connection();
-/// #
-/// use pgorm::{debug_query_stmt, entity::*, query::*, tests_cfg::cake};
+/// use pgorm::pgorm_query::QueryBuilder;
+/// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
 ///     id: ActiveValue::set(1),
 ///     name: ActiveValue::set("Apple Pie".to_owned()),
 /// });
 ///
-/// let raw_sql = debug_query_stmt!(&c, &conn).to_string();
 /// assert_eq!(
-///     raw_sql,
+///     c.build().0,
+///     r#"INSERT INTO "cake" ("id", "name") VALUES ($1, $2)"#
+/// );
+/// assert_eq!(
+///     c.as_query().to_string(QueryBuilder),
 ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
-/// );
-///
-/// let raw_sql = debug_query_stmt!(&c, conn).to_string();
-/// assert_eq!(
-///     raw_sql,
-///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
-/// );
-///
-/// let raw_sql = debug_query_stmt!(&c, DbBackend::MySql).to_string();
-/// assert_eq!(
-///     raw_sql,
-///     r#"INSERT INTO `cake` (`id`, `name`) VALUES (1, 'Apple Pie')"#
-/// );
-///
-/// let raw_sql = debug_query_stmt!(&c, &DbBackend::MySql).to_string();
-/// assert_eq!(
-///     raw_sql,
-///     r#"INSERT INTO `cake` (`id`, `name`) VALUES (1, 'Apple Pie')"#
 /// );
 /// ```
 // [spec:pgorm:def:query.build.debug-query]
@@ -93,37 +81,24 @@ macro_rules! debug_query_stmt {
 
 /// Helper to get a raw SQL string from an object that impl `QueryTrait`.
 ///
-/// # Example
+/// # Non-functional
+///
+/// This macro delegates to [`debug_query_stmt!`], which has no working
+/// expansion target — see that macro's documentation. Use
+/// `as_query().to_string(QueryBuilder)` to render a query with its values
+/// inlined:
 ///
 /// ```
-/// # #[cfg(feature = "mock")]
-/// # use pgorm::{error::*, tests_cfg::*, MockDatabase, MockExecResult, DbBackend};
-/// #
-/// # let conn = MockDatabase::new(DbBackend::Postgres)
-/// #     .into_connection();
-/// #
-/// use pgorm::{debug_query, entity::*, query::*, tests_cfg::cake};
+/// use pgorm::pgorm_query::QueryBuilder;
+/// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
 ///     id: ActiveValue::set(1),
 ///     name: ActiveValue::set("Apple Pie".to_owned()),
 /// });
 ///
-/// let raw_sql = debug_query!(&c, &conn);
 /// assert_eq!(
-///     raw_sql,
-///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
-/// );
-///
-/// let raw_sql = debug_query!(&c, conn);
-/// assert_eq!(
-///     raw_sql,
-///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
-/// );
-///
-/// let raw_sql = debug_query!(&c, DbBackend::Sqlite);
-/// assert_eq!(
-///     raw_sql,
+///     c.as_query().to_string(QueryBuilder),
 ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
 /// );
 /// ```

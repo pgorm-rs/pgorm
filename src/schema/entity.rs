@@ -46,17 +46,17 @@ impl Schema {
     /// ```
     /// use crate::pgorm::IdenStatic;
     /// use pgorm::{
-    ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, DbBackend, EntityName,
-    ///     EntityTrait, EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
+    ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, EntityName, EntityTrait,
+    ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
     /// };
     /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
-    /// use pgorm_query::{MysqlQueryBuilder, TableAlterStatement};
+    /// use pgorm_query::{QueryBuilder, TableAlterStatement};
     ///
     /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     /// #[pgorm(table_name = "posts")]
     /// pub struct Model {
     ///     #[pgorm(primary_key)]
-    ///     pub id: u32,
+    ///     pub id: i32,
     ///     pub title: String,
     /// }
     ///
@@ -70,15 +70,15 @@ impl Schema {
     /// }
     /// impl ActiveModelBehavior for ActiveModel {}
     ///
-    /// let schema = Schema::new(DbBackend::MySql);
+    /// let schema = Schema::new();
     ///
     /// let mut alter_table = TableAlterStatement::new()
     ///     .table(Entity)
     ///     .add_column(&mut schema.get_column_def::<Entity>(Column::Title))
     ///     .take();
     /// assert_eq!(
-    ///     alter_table.to_string(MysqlQueryBuilder::default()),
-    ///     "ALTER TABLE `posts` ADD COLUMN `title` varchar(255) NOT NULL"
+    ///     alter_table.to_string(QueryBuilder),
+    ///     r#"ALTER TABLE "posts" ADD COLUMN "title" varchar NOT NULL"#
     /// );
     /// ```
     pub fn get_column_def<E>(&self, column: E::Column) -> ColumnDef

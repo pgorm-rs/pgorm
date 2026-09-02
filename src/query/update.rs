@@ -33,15 +33,15 @@ impl Update {
     /// Update one ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
     ///         id: ActiveValue::set(1),
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
     /// );
     /// ```
@@ -63,14 +63,14 @@ impl Update {
     /// Update many ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::Expr, tests_cfg::fruit, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::{Expr, QueryBuilder}, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     Update::many(fruit::Entity)
     ///         .col_expr(fruit::Column::Name, Expr::value("Golden Apple"))
     ///         .filter(fruit::Column::Name.contains("Apple"))
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"UPDATE "fruit" SET "name" = 'Golden Apple' WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```

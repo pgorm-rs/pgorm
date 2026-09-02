@@ -170,6 +170,14 @@ children (
                 title "Restore doctests against the current API"
                 kind @docs
                 deps (repair.tests-root)
+                log (
+                    {
+                        at 2026-09-02T00:16:51.409375Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

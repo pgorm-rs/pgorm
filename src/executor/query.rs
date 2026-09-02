@@ -467,61 +467,33 @@ pub trait TryGetableMany: Sized {
     /// Get a tuple value from the query result based on the order in the select expressions
     fn try_get_many_by_index(res: &QueryResult) -> Result<Self, TryGetError>;
 
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(all(feature = "mock", feature = "macros"))]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("New York Cheese"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveIden, EnumIter, TryGetableMany};
+    /// Run a raw statement and decode each row into a tuple, naming the
+    /// columns through an `Iden` enum.
     ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{error::*, query::*, DatabasePool, DeriveIden, EnumIter, TryGetableMany};
+    /// # use pgorm::pgorm_query::Values;
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// #[derive(EnumIter, DeriveIden)]
     /// enum ResultCol {
     ///     Name,
     ///     NumOfCakes,
     /// }
     ///
-    /// let res: Vec<(String, i32)> =
-    ///     <(String, i32)>::find_by_statement::<ResultCol>(Statement::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake""#,
-    ///         [],
-    ///     ))
-    ///     .all(&db)
-    ///     .await?;
+    /// let db = pool.get().await?;
     ///
-    /// assert_eq!(
-    ///     res,
-    ///     [
-    ///         ("Chocolate Forest".to_owned(), 1),
-    ///         ("New York Cheese".to_owned(), 1),
-    ///     ]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake""#,
-    ///         []
-    ///     ),]
-    /// );
-    /// #
+    /// let res: Vec<(String, i64)> = <(String, i64)>::find_by_statement::<ResultCol>(
+    ///     r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake" GROUP BY "cake"."name""#
+    ///         .to_owned(),
+    ///     Values(vec![]),
+    /// )
+    /// .all(&db)
+    /// .await?;
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     fn find_by_statement<C>(

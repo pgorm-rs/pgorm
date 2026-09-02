@@ -106,76 +106,31 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// // `one` appends `LIMIT 1` and fails with `DbErr::RecordNotFound` when no
+    /// // row matches; `one_opt` returns `None` in that case instead.
+    /// let cake: cake::Model = cake::Entity::find().one(&db).await?;
+    /// let maybe_cake: Option<cake::Model> = cake::Entity::find().one_opt(&db).await?;
+    ///
+    /// let cakes: Vec<cake::Model> = cake::Entity::find().all(&db).await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         vec![
-    /// #             cake::Model {
-    /// #                 id: 1,
-    /// #                 name: "New York Cheese".to_owned(),
-    /// #             },
-    /// #         ],
-    /// #         vec![
-    /// #             cake::Model {
-    /// #                 id: 1,
-    /// #                 name: "New York Cheese".to_owned(),
-    /// #             },
-    /// #             cake::Model {
-    /// #                 id: 2,
-    /// #                 name: "Chocolate Forest".to_owned(),
-    /// #             },
-    /// #         ],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
+    ///
+    /// The statement selects every column of the entity:
+    ///
+    /// ```
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
-    ///     cake::Entity::find().one(&db).await?,
-    ///     Some(cake::Model {
-    ///         id: 1,
-    ///         name: "New York Cheese".to_owned(),
-    ///     })
+    ///     cake::Entity::find().build().0,
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
-    ///
-    /// assert_eq!(
-    ///     cake::Entity::find().all(&db).await?,
-    ///     [
-    ///         cake::Model {
-    ///             id: 1,
-    ///             name: "New York Cheese".to_owned(),
-    ///         },
-    ///         cake::Model {
-    ///             id: 2,
-    ///             name: "Chocolate Forest".to_owned(),
-    ///         },
-    ///     ]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::Postgres,
-    ///             r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT $1"#,
-    ///             [1u64.into()]
-    ///         ),
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::Postgres,
-    ///             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
-    ///             []
-    ///         ),
-    ///     ]
-    /// );
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     fn find() -> Select<Self> {
         Select::new()
@@ -185,88 +140,37 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// let sponge_cake: cake::Model = cake::Entity::find_by_id(11).one(&db).await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [
-    /// #             cake::Model {
-    /// #                 id: 11,
-    /// #                 name: "Sponge Cake".to_owned(),
-    /// #             },
-    /// #         ],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
+    ///
+    /// ```
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
-    ///     cake::Entity::find_by_id(11).all(&db).await?,
-    ///     [cake::Model {
-    ///         id: 11,
-    ///         name: "Sponge Cake".to_owned(),
-    ///     }]
+    ///     cake::Entity::find_by_id(11).build().0,
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = $1"#
     /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = $1"#,
-    ///         [11i32.into()]
-    ///     )]
-    /// );
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     /// Find by composite key
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [
-    /// #             cake_filling::Model {
-    /// #                 cake_id: 2,
-    /// #                 filling_id: 3,
-    /// #             },
-    /// #         ],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
     /// use pgorm::{entity::*, query::*, tests_cfg::cake_filling};
     ///
     /// assert_eq!(
-    ///     cake_filling::Entity::find_by_id((2, 3)).all(&db).await?,
-    ///     [cake_filling::Model {
-    ///         cake_id: 2,
-    ///         filling_id: 3,
-    ///     }]
+    ///     cake_filling::Entity::find_by_id((2, 3)).build().0,
+    ///     [
+    ///         r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id" FROM "cake_filling""#,
+    ///         r#"WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#,
+    ///     ]
+    ///     .join(" ")
     /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         [
-    ///             r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id" FROM "cake_filling""#,
-    ///             r#"WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#,
-    ///         ].join(" ").as_str(),
-    ///         [2i32.into(), 3i32.into()]
-    ///     )]);
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     ///
     /// # Panics
@@ -295,85 +199,39 @@ pub trait EntityTrait: EntityName {
 
     /// Insert an model into database
     ///
-    /// # Example (Postgres)
+    /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[maplit::btreemap! {
-    /// #         "id" => Into::<Value>::into(15),
-    /// #     }]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
+    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     ..Default::default()
     /// };
     ///
+    /// // `exec` appends `RETURNING` for the primary key and resolves it into
+    /// // `InsertResult::last_insert_id`.
     /// let insert_result = cake::Entity::insert(apple).exec(&db).await?;
-    ///
-    /// assert_eq!(dbg!(insert_result.last_insert_id), 15);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"INSERT INTO "cake" ("name") VALUES ($1) RETURNING "id""#,
-    ///         ["Apple Pie".into()]
-    ///     )]
-    /// );
-    /// #
+    /// let id: i32 = insert_result.last_insert_id;
     /// # Ok(())
     /// # }
     /// ```
     ///
-    /// # Example (MySQL)
-    ///
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::MySql)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 15,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
+    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     ..Default::default()
     /// };
     ///
-    /// let insert_result = cake::Entity::insert(apple).exec(&db).await?;
-    ///
-    /// assert_eq!(insert_result.last_insert_id, 15);
-    ///
     /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::MySql,
-    ///         r#"INSERT INTO `cake` (`name`) VALUES (?)"#,
-    ///         ["Apple Pie".into()]
-    ///     )]
+    ///     cake::Entity::insert(apple).build().0,
+    ///     r#"INSERT INTO "cake" ("name") VALUES ($1)"#
     /// );
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     fn insert<A>(model: A) -> Insert<A>
     where
@@ -384,93 +242,45 @@ pub trait EntityTrait: EntityName {
 
     /// Insert many models into database
     ///
-    /// # Example (Postgres)
+    /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[maplit::btreemap! {
-    /// #         "id" => Into::<Value>::into(28),
-    /// #     }]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
+    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     ..Default::default()
     /// };
     /// let orange = cake::ActiveModel {
-    ///     name: Set("Orange Scone".to_owned()),
+    ///     name: ActiveValue::Set("Orange Scone".to_owned()),
     ///     ..Default::default()
     /// };
     ///
+    /// // `last_insert_id` is taken from the last returned row.
     /// let insert_result = cake::Entity::insert_many([apple, orange]).exec(&db).await?;
-    ///
-    /// assert_eq!(insert_result.last_insert_id, 28);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"INSERT INTO "cake" ("name") VALUES ($1), ($2) RETURNING "id""#,
-    ///         ["Apple Pie".into(), "Orange Scone".into()]
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
     /// ```
     ///
-    /// # Example (MySQL)
-    ///
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::MySql)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 28,
-    /// #             rows_affected: 2,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
+    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     ..Default::default()
     /// };
     /// let orange = cake::ActiveModel {
-    ///     name: Set("Orange Scone".to_owned()),
+    ///     name: ActiveValue::Set("Orange Scone".to_owned()),
     ///     ..Default::default()
     /// };
     ///
-    /// let insert_result = cake::Entity::insert_many([apple, orange]).exec(&db).await?;
-    ///
-    /// assert_eq!(insert_result.last_insert_id, 28);
-    ///
     /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::MySql,
-    ///         r#"INSERT INTO `cake` (`name`) VALUES (?), (?)"#,
-    ///         ["Apple Pie".into(), "Orange Scone".into()]
-    ///     )]
+    ///     cake::Entity::insert_many([apple, orange]).build().0,
+    ///     r#"INSERT INTO "cake" ("name") VALUES ($1), ($2)"#
     /// );
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     fn insert_many<A, I>(models: I) -> Insert<A>
     where
@@ -484,118 +294,50 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
-    /// # Example (Postgres)
+    /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [fruit::Model {
-    /// #             id: 1,
-    /// #             name: "Orange".to_owned(),
-    /// #             cake_id: None,
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: Set(1),
-    ///     name: Set("Orange".to_owned()),
+    ///     id: ActiveValue::Set(1),
+    ///     name: ActiveValue::Set("Orange".to_owned()),
     ///     ..Default::default()
     /// };
     ///
-    /// assert_eq!(
-    ///     fruit::Entity::update(orange.clone())
-    ///         .filter(fruit::Column::Name.contains("orange"))
-    ///         .exec(&db)
-    ///         .await?,
-    ///     fruit::Model {
-    ///         id: 1,
-    ///         name: "Orange".to_owned(),
-    ///         cake_id: None,
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"UPDATE "fruit" SET "name" = $1 WHERE "fruit"."id" = $2 AND "fruit"."name" LIKE $3 RETURNING "id", "name", "cake_id""#,
-    ///         ["Orange".into(), 1i32.into(), "%orange%".into()]
-    ///     )]);
-    /// #
+    /// // `exec` returns the updated model through `RETURNING`, and fails with
+    /// // `DbErr::RecordNotFound` when the statement matches no row.
+    /// let updated: fruit::Model = fruit::Entity::update(orange)
+    ///     .filter(fruit::Column::Name.contains("orange"))
+    ///     .exec(&db)
+    ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
     ///
-    /// # Example (MySQL)
-    ///
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::MySql)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .append_query_results([
-    /// #         [fruit::Model {
-    /// #             id: 1,
-    /// #             name: "Orange".to_owned(),
-    /// #             cake_id: None,
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
     /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: Set(1),
-    ///     name: Set("Orange".to_owned()),
+    ///     id: ActiveValue::Set(1),
+    ///     name: ActiveValue::Set("Orange".to_owned()),
     ///     ..Default::default()
     /// };
     ///
     /// assert_eq!(
-    ///     fruit::Entity::update(orange.clone())
+    ///     fruit::Entity::update(orange)
     ///         .filter(fruit::Column::Name.contains("orange"))
-    ///         .exec(&db)
-    ///         .await?,
-    ///     fruit::Model {
-    ///         id: 1,
-    ///         name: "Orange".to_owned(),
-    ///         cake_id: None,
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
+    ///         .build()
+    ///         .0,
     ///     [
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"UPDATE `fruit` SET `name` = ? WHERE `fruit`.`id` = ? AND `fruit`.`name` LIKE ?"#,
-    ///             ["Orange".into(), 1i32.into(), "%orange%".into()]
-    ///         ),
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit` WHERE `fruit`.`id` = ? LIMIT ?"#,
-    ///             [1i32.into(), 1u64.into()]
-    ///         )]);
-    /// #
-    /// # Ok(())
-    /// # }
+    ///         r#"UPDATE "fruit" SET "name" = $1"#,
+    ///         r#"WHERE "fruit"."id" = $2 AND "fruit"."name" LIKE $3"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
     /// ```
     fn update<A>(model: A) -> UpdateOne<A>
     where
@@ -610,28 +352,12 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
+    /// # use pgorm::pgorm_query::{Expr, Value};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 5,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{
-    ///     entity::*,
-    ///     query::*,
-    ///     pgorm_query::{Expr, Value},
-    ///     tests_cfg::fruit,
-    /// };
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let update_result = fruit::Entity::update_many()
     ///     .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
@@ -639,19 +365,23 @@ pub trait EntityTrait: EntityName {
     ///     .exec(&db)
     ///     .await?;
     ///
-    /// assert_eq!(update_result.rows_affected, 5);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"UPDATE "fruit" SET "cake_id" = $1 WHERE "fruit"."name" LIKE $2"#,
-    ///         [Value::Int(None), "%Apple%".into()]
-    ///     )]
-    /// );
-    /// #
+    /// let affected: u64 = update_result.rows_affected;
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// ```
+    /// use pgorm::pgorm_query::{Expr, Value};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    ///
+    /// assert_eq!(
+    ///     fruit::Entity::update_many()
+    ///         .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
+    ///         .filter(fruit::Column::Name.contains("Apple"))
+    ///         .build()
+    ///         .0,
+    ///     r#"UPDATE "fruit" SET "cake_id" = $1 WHERE "fruit"."name" LIKE $2"#
+    /// );
     /// ```
     fn update_many() -> UpdateMany<Self> {
         Update::many(Self::default())
@@ -663,44 +393,36 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: Set(3),
+    ///     id: ActiveValue::Set(3),
     ///     ..Default::default()
     /// };
     ///
+    /// // Deleting zero rows is `Ok` with `rows_affected: 0`, never an error.
     /// let delete_result = fruit::Entity::delete(orange).exec(&db).await?;
-    ///
-    /// assert_eq!(delete_result.rows_affected, 1);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#,
-    ///         [3i32.into()]
-    ///     )]
-    /// );
-    /// #
+    /// let affected: u64 = delete_result.rows_affected;
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    ///
+    /// let orange = fruit::ActiveModel {
+    ///     id: ActiveValue::Set(3),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// assert_eq!(
+    ///     fruit::Entity::delete(orange).build().0,
+    ///     r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#
+    /// );
     /// ```
     fn delete<A>(model: A) -> DeleteOne<A>
     where
@@ -715,48 +437,30 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 5,
-    /// #         },
-    /// #     ])
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 15,
-    /// #             name: "Apple Pie".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let delete_result = fruit::Entity::delete_many()
     ///     .filter(fruit::Column::Name.contains("Apple"))
     ///     .exec(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(delete_result.rows_affected, 5);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE $1"#,
-    ///         ["%Apple%".into()]
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    ///
+    /// assert_eq!(
+    ///     fruit::Entity::delete_many()
+    ///         .filter(fruit::Column::Name.contains("Apple"))
+    ///         .build()
+    ///         .0,
+    ///     r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE $1"#
+    /// );
     /// ```
     fn delete_many() -> DeleteMany<Self> {
         Delete::many(Self::default())
@@ -766,74 +470,37 @@ pub trait EntityTrait: EntityName {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let delete_result = fruit::Entity::delete_by_id(1).exec(&db).await?;
-    ///
-    /// assert_eq!(delete_result.rows_affected, 1);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#,
-    ///         [1i32.into()]
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    ///
+    /// assert_eq!(
+    ///     fruit::Entity::delete_by_id(1).build().0,
+    ///     r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#
+    /// );
     /// ```
     /// Delete by composite key
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    ///
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
     /// use pgorm::{entity::*, query::*, tests_cfg::cake_filling};
     ///
-    /// let delete_result = cake_filling::Entity::delete_by_id((2, 3)).exec(&db).await?;
-    ///
-    /// assert_eq!(delete_result.rows_affected, 1);
-    ///
     /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"DELETE FROM "cake_filling" WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#,
-    ///         [2i32.into(), 3i32.into()]
-    ///     )]
+    ///     cake_filling::Entity::delete_by_id((2, 3)).build().0,
+    ///     [
+    ///         r#"DELETE FROM "cake_filling""#,
+    ///         r#"WHERE "cake_filling"."cake_id" = $1 AND "cake_filling"."filling_id" = $2"#,
+    ///     ]
+    ///     .join(" ")
     /// );
-    /// #
-    /// # Ok(())
-    /// # }
     /// ```
     ///
     /// # Panics

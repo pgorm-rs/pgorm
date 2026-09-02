@@ -32,38 +32,30 @@ pub trait QuerySelect: Sized {
 
     /// Add a select column
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column(cake::Column::Name)
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."name" FROM "cake""#
     /// );
     /// ```
     ///
-    /// Enum column will be casted into text (PostgreSQL only)
+    /// Enum column will be casted into text
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::lunch_set, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::lunch_set};
     ///
     /// assert_eq!(
     ///     lunch_set::Entity::find()
     ///         .select_only()
     ///         .column(lunch_set::Column::Tea)
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
-    /// );
-    /// assert_eq!(
-    ///     lunch_set::Entity::find()
-    ///         .select_only()
-    ///         .column(lunch_set::Column::Tea)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     r#"SELECT `lunch_set`.`tea` FROM `lunch_set`"#
     /// );
     /// ```
     fn column<C>(mut self, col: C) -> Self
@@ -76,14 +68,14 @@ pub trait QuerySelect: Sized {
 
     /// Add a select column with alias
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column_as(cake::Column::Id.count(), "count")
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT COUNT("cake"."id") AS "count" FROM "cake""#
     /// );
     /// ```
@@ -103,14 +95,14 @@ pub trait QuerySelect: Sized {
     /// Select columns
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .columns([cake::Column::Id, cake::Column::Name])
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -118,7 +110,7 @@ pub trait QuerySelect: Sized {
     /// Conditionally select all columns expect a specific column
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -127,32 +119,24 @@ pub trait QuerySelect: Sized {
     ///             cake::Column::Id => false,
     ///             _ => true,
     ///         }))
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."name" FROM "cake""#
     /// );
     /// ```
     ///
-    /// Enum column will be casted into text (PostgreSQL only)
+    /// Enum column will be casted into text
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::lunch_set, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::lunch_set};
     ///
     /// assert_eq!(
     ///     lunch_set::Entity::find()
     ///         .select_only()
     ///         .columns([lunch_set::Column::Name, lunch_set::Column::Tea])
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "lunch_set"."name", CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
-    /// );
-    /// assert_eq!(
-    ///     lunch_set::Entity::find()
-    ///         .select_only()
-    ///         .columns([lunch_set::Column::Name, lunch_set::Column::Tea])
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     r#"SELECT `lunch_set`.`name`, `lunch_set`.`tea` FROM `lunch_set`"#
     /// );
     /// ```
     fn columns<C, I>(mut self, cols: I) -> Self
@@ -169,32 +153,32 @@ pub trait QuerySelect: Sized {
     /// Add an offset expression. Passing in None would remove the offset.
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .offset(10)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` OFFSET 10"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" OFFSET 10"#
     /// );
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .offset(Some(10))
     ///         .offset(Some(20))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` OFFSET 20"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" OFFSET 20"#
     /// );
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .offset(10)
     ///         .offset(None)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
     fn offset<T>(mut self, offset: T) -> Self
@@ -212,32 +196,32 @@ pub trait QuerySelect: Sized {
     /// Add a limit expression. Passing in None would remove the limit.
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .limit(10)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` LIMIT 10"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 10"#
     /// );
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .limit(Some(10))
     ///         .limit(Some(20))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` LIMIT 20"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 20"#
     /// );
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .limit(10)
     ///         .limit(None)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
     fn limit<T>(mut self, limit: T) -> Self
@@ -254,15 +238,15 @@ pub trait QuerySelect: Sized {
 
     /// Add a group by column
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column(cake::Column::Name)
     ///         .group_by(cake::Column::Name)
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."name" FROM "cake" GROUP BY "cake"."name""#
     /// );
     ///
@@ -272,8 +256,8 @@ pub trait QuerySelect: Sized {
     ///         .column_as(cake::Column::Id.count(), "count")
     ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
     ///         .group_by(cake::Column::Name)
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT COUNT("cake"."id") AS "count", SUM("cake"."id") AS "sum_of_id" FROM "cake" GROUP BY "cake"."name""#
     /// );
     /// ```
@@ -287,15 +271,15 @@ pub trait QuerySelect: Sized {
 
     /// Add an AND HAVING expression
     /// ```
-    /// use pgorm::{pgorm_query::{Alias, Expr}, entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{pgorm_query::{Alias, Expr, QueryBuilder}, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .having(cake::Column::Id.eq(4))
     ///         .having(cake::Column::Id.eq(5))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` HAVING `cake`.`id` = 4 AND `cake`.`id` = 5"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" HAVING "cake"."id" = 4 AND "cake"."id" = 5"#
     /// );
     ///
     /// assert_eq!(
@@ -305,9 +289,9 @@ pub trait QuerySelect: Sized {
     ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
     ///         .group_by(cake::Column::Name)
     ///         .having(Expr::col(Alias::new("count")).gt(6))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT COUNT(`cake`.`id`) AS `count`, SUM(`cake`.`id`) AS `sum_of_id` FROM `cake` GROUP BY `cake`.`name` HAVING `count` > 6"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT COUNT("cake"."id") AS "count", SUM("cake"."id") AS "sum_of_id" FROM "cake" GROUP BY "cake"."name" HAVING "count" > 6"#
     /// );
     /// ```
     fn having<F>(mut self, filter: F) -> Self
@@ -320,7 +304,7 @@ pub trait QuerySelect: Sized {
 
     /// Add a DISTINCT expression
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -333,9 +317,9 @@ pub trait QuerySelect: Sized {
     ///             Condition::all().add_option(input.name.map(|n| cake::Column::Name.contains(&n)))
     ///         )
     ///         .distinct()
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT DISTINCT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT DISTINCT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     fn distinct(mut self) -> Self {
@@ -344,9 +328,8 @@ pub trait QuerySelect: Sized {
     }
 
     /// Add a DISTINCT ON expression
-    /// NOTE: this function is only supported by `sqlx-postgres`
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -359,8 +342,8 @@ pub trait QuerySelect: Sized {
     ///             Condition::all().add_option(input.name.map(|n| cake::Column::Name.contains(&n)))
     ///         )
     ///         .distinct_on([(cake::Entity, cake::Column::Name)])
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT DISTINCT ON ("cake"."name") "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
@@ -461,15 +444,15 @@ pub trait QuerySelect: Sized {
     /// Add an expression to the select expression list.
     /// ```
     /// use pgorm::pgorm_query::Expr;
-    /// use pgorm::{entity::*, tests_cfg::cake, DbBackend, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .expr(Expr::col((cake::Entity, cake::Column::Id)))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id" FROM "cake""#
     /// );
     /// ```
     fn expr<T>(mut self, expr: T) -> Self
@@ -483,7 +466,7 @@ pub trait QuerySelect: Sized {
     /// Add select expressions from vector of [`SelectExpr`].
     /// ```
     /// use pgorm::pgorm_query::Expr;
-    /// use pgorm::{entity::*, tests_cfg::cake, DbBackend, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -492,9 +475,9 @@ pub trait QuerySelect: Sized {
     ///             Expr::col((cake::Entity, cake::Column::Id)),
     ///             Expr::col((cake::Entity, cake::Column::Name)),
     ///         ])
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
     fn exprs<T, I>(mut self, exprs: I) -> Self
@@ -509,7 +492,7 @@ pub trait QuerySelect: Sized {
     /// Select column.
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, DbBackend, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -517,9 +500,9 @@ pub trait QuerySelect: Sized {
     ///             Func::upper(Expr::col((cake::Entity, cake::Column::Name))),
     ///             "name_upper"
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name`, UPPER(`cake`.`name`) AS `name_upper` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
     fn expr_as<T, A>(mut self, expr: T, alias: A) -> Self
@@ -537,7 +520,7 @@ pub trait QuerySelect: Sized {
     ///
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, DbBackend, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -545,9 +528,9 @@ pub trait QuerySelect: Sized {
     ///             Func::upper(Expr::col((cake::Entity, cake::Column::Name))),
     ///             "name_upper"
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name`, UPPER(`cake`.`name`) AS `name_upper` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
     fn expr_as_<T, A>(mut self, expr: T, alias: A) -> Self
@@ -563,15 +546,15 @@ pub trait QuerySelect: Sized {
     ///
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, DbBackend, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .tbl_col_as((cake::Entity, cake::Column::Name), "cake_name")
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`name` AS `cake_name` FROM `cake`"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#
     /// );
     /// ```
     fn tbl_col_as<T, C, A>(mut self, (tbl, col): (T, C), alias: A) -> Self
@@ -598,15 +581,15 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by(cake::Column::Id, Order::Asc)
     ///         .order_by(cake::Column::Name, Order::Desc)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` ORDER BY `cake`.`id` ASC, `cake`.`name` DESC"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC, "cake"."name" DESC"#
     /// );
     /// ```
     fn order_by<C>(mut self, col: C, ord: Order) -> Self
@@ -619,14 +602,14 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression (ascending)
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_asc(cake::Column::Id)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` ORDER BY `cake`.`id` ASC"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC"#
     /// );
     /// ```
     fn order_by_asc<C>(mut self, col: C) -> Self
@@ -640,14 +623,14 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression (descending)
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_desc(cake::Column::Id)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` ORDER BY `cake`.`id` DESC"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" DESC"#
     /// );
     /// ```
     fn order_by_desc<C>(mut self, col: C) -> Self
@@ -661,14 +644,14 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression with nulls ordering option
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     /// use pgorm_query::NullOrdering;
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_with_nulls(cake::Column::Id, Order::Asc, NullOrdering::First)
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC NULLS FIRST"#
     /// );
     /// ```
@@ -694,21 +677,21 @@ pub trait QueryFilter: Sized {
 
     /// Add an AND WHERE expression
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.eq(4))
     ///         .filter(cake::Column::Id.eq(5))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` = 4 AND `cake`.`id` = 5"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 4 AND "cake"."id" = 5"#
     /// );
     /// ```
     ///
     /// Add a condition tree.
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -717,44 +700,45 @@ pub trait QueryFilter: Sized {
     ///                 .add(cake::Column::Id.eq(4))
     ///                 .add(cake::Column::Id.eq(5))
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` = 4 OR `cake`.`id` = 5"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 4 OR "cake"."id" = 5"#
     /// );
     /// ```
     ///
     /// Like above, but using the `IN` operator.
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.is_in([4, 5]))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` IN (4, 5)"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" IN (4, 5)"#
     /// );
     /// ```
     ///
-    /// Like above, but using the `ANY` operator. Postgres only.
+    /// Like above, but using the `ANY` operator, which binds the whole list as
+    /// a single array parameter instead of one placeholder per element.
     ///
     /// ```
-    /// use pgorm::pgorm_query::{extension::postgres::PgFunc, Expr};
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::pgorm_query::{Expr, Func, QueryBuilder};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
-    ///         .filter(Expr::col((cake::Entity, cake::Column::Id)).eq(PgFunc::any(vec![4, 5])))
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .filter(Expr::col((cake::Entity, cake::Column::Id)).eq(Func::any(vec![4, 5])))
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY(ARRAY [4,5])"#
     /// );
     /// ```
     ///
     /// Add a runtime-built condition tree.
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -770,15 +754,15 @@ pub trait QueryFilter: Sized {
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(conditions)
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     ///
     /// Add a runtime-built condition tree, functional-way.
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -791,15 +775,15 @@ pub trait QueryFilter: Sized {
     ///         .filter(
     ///             Condition::all().add_option(input.name.map(|n| cake::Column::Name.contains(&n)))
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     ///
     /// A slightly more complex example.
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, pgorm_query::Expr, DbBackend};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, pgorm_query::{Expr, QueryBuilder}};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -817,21 +801,21 @@ pub trait QueryFilter: Sized {
     ///                         .add(Expr::val(4).eq(4))
     ///                 )
     ///         )
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE (NOT (1 = 1 AND 2 = 2)) AND (3 = 3 OR 4 = 4)"#
     /// );
     /// ```
     /// Use a pgorm_query expression
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::Expr, tests_cfg::fruit, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::{Expr, QueryBuilder}, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     fruit::Entity::find()
     ///         .filter(Expr::col(fruit::Column::CakeId).is_null())
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit` WHERE `cake_id` IS NULL"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit" WHERE "cake_id" IS NULL"#
     /// );
     /// ```
     fn filter<F>(mut self, filter: F) -> Self

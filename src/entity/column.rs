@@ -95,14 +95,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     bind_oper!(lte, SmallerThanOrEqual);
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.between(2, 3))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` BETWEEN 2 AND 3"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" BETWEEN 2 AND 3"#
     /// );
     /// ```
     fn between<V>(&self, a: V, b: V) -> SimpleExpr
@@ -113,14 +113,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.not_between(2, 3))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` NOT BETWEEN 2 AND 3"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" NOT BETWEEN 2 AND 3"#
     /// );
     /// ```
     fn not_between<V>(&self, a: V, b: V) -> SimpleExpr
@@ -131,14 +131,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.like("cheese"))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE 'cheese'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese'"#
     /// );
     /// ```
     fn like<T>(&self, s: T) -> SimpleExpr
@@ -149,14 +149,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.not_like("cheese"))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` NOT LIKE 'cheese'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" NOT LIKE 'cheese'"#
     /// );
     /// ```
     fn not_like<T>(&self, s: T) -> SimpleExpr
@@ -167,14 +167,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.starts_with("cheese"))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE 'cheese%'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese%'"#
     /// );
     /// ```
     fn starts_with<T>(&self, s: T) -> SimpleExpr
@@ -186,14 +186,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.ends_with("cheese"))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese'"#
     /// );
     /// ```
     fn ends_with<T>(&self, s: T) -> SimpleExpr
@@ -205,14 +205,14 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.contains("cheese"))
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     "SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`name` LIKE '%cheese%'"
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     fn contains<T>(&self, s: T) -> SimpleExpr

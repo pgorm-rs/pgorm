@@ -47,29 +47,29 @@ where
     ///
     /// Model
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::Model {
     ///         id: 1,
     ///         name: "Apple Pie".to_owned(),
     ///     })
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
     /// );
     /// ```
     /// ActiveModel
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::ActiveModel {
-    ///         id: NotSet,
-    ///         name: Set("Apple Pie".to_owned()),
+    ///         id: ActiveValue::NotSet,
+    ///         name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     })
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie')"#,
     /// );
     /// ```
@@ -83,7 +83,7 @@ where
     /// Insert many Model or ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::many([
@@ -96,8 +96,8 @@ where
     ///             name: "Orange Scone".to_owned(),
     ///         }
     ///     ])
-    ///     .build(DbBackend::Postgres)
-    ///     .to_string(),
+    ///     .as_query()
+    ///     .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#,
     /// );
     /// ```
@@ -167,7 +167,7 @@ where
     ///
     /// on conflict do nothing
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -180,15 +180,15 @@ where
     ///                 .do_nothing()
     ///                 .to_owned()
     ///         )
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
     /// );
     /// ```
     ///
     /// on conflict do update
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -201,8 +201,8 @@ where
     ///                 .update_column(cake::Column::Name)
     ///                 .to_owned()
     ///         )
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
     /// );
     /// ```
@@ -228,10 +228,10 @@ where
         TryInsert::from_insert(self)
     }
 
-    /// Set ON CONFLICT on primary key do nothing, but with MySQL specific polyfill.
+    /// Set ON CONFLICT on the primary key columns to do nothing.
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake, DbBackend};
+    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -239,24 +239,10 @@ where
     /// };
     ///
     /// assert_eq!(
-    ///     cake::Entity::insert(orange.clone())
-    ///         .on_conflict_do_nothing()
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
-    ///     r#"INSERT INTO `cake` (`id`, `name`) VALUES (2, 'Orange') ON DUPLICATE KEY UPDATE `id` = `id`"#,
-    /// );
-    /// assert_eq!(
-    ///     cake::Entity::insert(orange.clone())
-    ///         .on_conflict_do_nothing()
-    ///         .build(DbBackend::Postgres)
-    ///         .to_string(),
-    ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
-    /// );
-    /// assert_eq!(
     ///     cake::Entity::insert(orange)
     ///         .on_conflict_do_nothing()
-    ///         .build(DbBackend::Sqlite)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```

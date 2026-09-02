@@ -62,56 +62,30 @@ pub trait FromQueryResult: Sized {
         Ok(Self::from_query_result(res, pre).ok())
     }
 
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let mut db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(2),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{query::*, FromQueryResult};
+    /// Run a raw statement and decode every row into `Self`.
     ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{error::*, query::*, DatabasePool, FromQueryResult};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {
     ///     name: String,
-    ///     num_of_cakes: i32,
+    ///     num_of_cakes: i64,
     /// }
     ///
-    /// let res: Vec<SelectResult> = SelectResult::find_by_statement(Statement::from_sql_and_values(
-    ///     DbBackend::Postgres,
+    /// let db = pool.get().await?;
+    ///
+    /// let res: Vec<SelectResult> = SelectResult::find_by_statement(
     ///     r#"SELECT "name", COUNT(*) AS "num_of_cakes" FROM "cake" GROUP BY("name")"#,
-    ///     [],
-    /// ))
+    ///     vec![],
+    /// )
     /// .all(&db)
     /// .await?;
-    ///
-    /// assert_eq!(
-    ///     res,
-    ///     [SelectResult {
-    ///         name: "Chocolate Forest".to_owned(),
-    ///         num_of_cakes: 2,
-    ///     },]
-    /// );
-    /// #
-    /// # assert_eq!(
-    /// #     db.into_transaction_log(),
-    /// #     [Transaction::from_sql_and_values(
-    /// #         DbBackend::Postgres,
-    /// #         r#"SELECT "name", COUNT(*) AS "num_of_cakes" FROM "cake" GROUP BY("name")"#,
-    /// #         []
-    /// #     ),]
-    /// # );
-    /// #
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     fn find_by_statement(

@@ -264,6 +264,7 @@ assertions (
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
     {id repair.cursor-tosql, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:16:54.2968Z}
+    {id repair.doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:16:51.409375Z}
     {id repair.features, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:19:18.959205Z}
     {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
     {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}

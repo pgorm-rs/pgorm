@@ -140,33 +140,21 @@ where
 
     /// Fetch one page and increment the page counter
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// Yields `None` once a page comes back empty.
+    ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let owned_db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         vec![cake::Model {
-    /// #             id: 1,
-    /// #             name: "Cake".to_owned(),
-    /// #         }],
-    /// #         vec![],
-    /// #     ])
-    /// #     .into_connection();
-    /// # let db = &owned_db;
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
     /// let mut cake_pages = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
-    ///     .paginate(db, 50);
+    ///     .paginate(&db, 50);
     ///
     /// while let Some(cakes) = cake_pages.fetch_and_next().await? {
     ///     // Do something on cakes: Vec<cake::Model>
     /// }
-    /// #
     /// # Ok(())
     /// # }
     /// ```
@@ -180,35 +168,21 @@ where
 
     /// Convert self into an async stream
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use futures::TryStreamExt;
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let owned_db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         vec![cake::Model {
-    /// #             id: 1,
-    /// #             name: "Cake".to_owned(),
-    /// #         }],
-    /// #         vec![],
-    /// #     ])
-    /// #     .into_connection();
-    /// # let db = &owned_db;
-    /// #
-    /// use futures::TryStreamExt;
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
     /// let mut cake_stream = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
-    ///     .paginate(db, 50)
+    ///     .paginate(&db, 50)
     ///     .into_stream();
     ///
     /// while let Some(cakes) = cake_stream.try_next().await? {
     ///     // Do something on cakes: Vec<cake::Model>
     /// }
-    /// #
     /// # Ok(())
     /// # }
     /// ```

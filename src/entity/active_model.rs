@@ -22,7 +22,7 @@ pub use ActiveValue::NotSet;
 ///
 /// ```
 /// use pgorm::tests_cfg::{cake, fruit};
-/// use pgorm::{entity::*, query::*, DbBackend};
+/// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*};
 ///
 /// // The code snipped below does an UPDATE operation on a `ActiveValue`
 /// assert_eq!(
@@ -31,8 +31,8 @@ pub use ActiveValue::NotSet;
 ///         name: ActiveValue::set("Orange".to_owned()),
 ///         cake_id: ActiveValue::not_set(),
 ///     })
-///     .build(DbBackend::Postgres)
-///     .to_string(),
+///     .as_query()
+///     .to_string(QueryBuilder),
 ///     r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#
 /// );
 /// ```
@@ -147,107 +147,22 @@ pub trait ActiveModelTrait: Clone + Debug {
 
     /// Perform an `INSERT` operation on the ActiveModel
     ///
-    /// # Example (Postgres)
+    /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 15,
-    /// #             name: "Apple Pie".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
+    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     ..Default::default()
     /// };
     ///
-    /// assert_eq!(
-    ///     apple.insert(&db).await?,
-    ///     cake::Model {
-    ///         id: 15,
-    ///         name: "Apple Pie".to_owned(),
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"INSERT INTO "cake" ("name") VALUES ($1) RETURNING "id", "name""#,
-    ///         ["Apple Pie".into()]
-    ///     )]
-    /// );
-    /// #
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Example (MySQL)
-    ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::MySql)
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 15,
-    /// #             name: "Apple Pie".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 15,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
-    ///
-    /// let apple = cake::ActiveModel {
-    ///     name: Set("Apple Pie".to_owned()),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     apple.insert(&db).await?,
-    ///     cake::Model {
-    ///         id: 15,
-    ///         name: "Apple Pie".to_owned(),
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"INSERT INTO `cake` (`name`) VALUES (?)"#,
-    ///             ["Apple Pie".into()]
-    ///         ),
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"SELECT `cake`.`id`, `cake`.`name` FROM `cake` WHERE `cake`.`id` = ? LIMIT ?"#,
-    ///             [15.into(), 1u64.into()]
-    ///         )
-    ///     ]
-    /// );
-    /// #
+    /// // The insert carries `RETURNING` over every column, so the fully
+    /// // populated model comes back without a second round-trip.
+    /// let apple: cake::Model = apple.insert(&db).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -270,110 +185,22 @@ pub trait ActiveModelTrait: Clone + Debug {
 
     /// Perform the `UPDATE` operation on an ActiveModel
     ///
-    /// # Example (Postgres)
+    /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [fruit::Model {
-    /// #             id: 1,
-    /// #             name: "Orange".to_owned(),
-    /// #             cake_id: None,
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: Set(1),
-    ///     name: Set("Orange".to_owned()),
+    ///     id: ActiveValue::Set(1),
+    ///     name: ActiveValue::Set("Orange".to_owned()),
     ///     ..Default::default()
     /// };
     ///
-    /// assert_eq!(
-    ///     orange.update(&db).await?,
-    ///     fruit::Model {
-    ///         id: 1,
-    ///         name: "Orange".to_owned(),
-    ///         cake_id: None,
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"UPDATE "fruit" SET "name" = $1 WHERE "fruit"."id" = $2 RETURNING "id", "name", "cake_id""#,
-    ///         ["Orange".into(), 1i32.into()]
-    ///     )]);
-    /// #
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Example (MySQL)
-    ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::MySql)
-    /// #     .append_query_results([
-    /// #         [fruit::Model {
-    /// #             id: 1,
-    /// #             name: "Orange".to_owned(),
-    /// #             cake_id: None,
-    /// #         }],
-    /// #     ])
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
-    ///
-    /// let orange = fruit::ActiveModel {
-    ///     id: Set(1),
-    ///     name: Set("Orange".to_owned()),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     orange.update(&db).await?,
-    ///     fruit::Model {
-    ///         id: 1,
-    ///         name: "Orange".to_owned(),
-    ///         cake_id: None,
-    ///     }
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"UPDATE `fruit` SET `name` = ? WHERE `fruit`.`id` = ?"#,
-    ///             ["Orange".into(), 1i32.into()]
-    ///         ),
-    ///         Transaction::from_sql_and_values(
-    ///             DbBackend::MySql,
-    ///             r#"SELECT `fruit`.`id`, `fruit`.`name`, `fruit`.`cake_id` FROM `fruit` WHERE `fruit`.`id` = ? LIMIT ?"#,
-    ///             [1i32.into(), 1u64.into()]
-    ///         )]);
-    /// #
+    /// // Fails with `DbErr::RecordNotFound` when the primary key matches no row.
+    /// let orange: fruit::Model = orange.update(&db).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -418,42 +245,19 @@ pub trait ActiveModelTrait: Clone + Debug {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_exec_results([
-    /// #         MockExecResult {
-    /// #             last_insert_id: 0,
-    /// #             rows_affected: 1,
-    /// #         },
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: Set(3),
+    ///     id: ActiveValue::Set(3),
     ///     ..Default::default()
     /// };
     ///
     /// let delete_result = orange.delete(&db).await?;
-    ///
-    /// assert_eq!(delete_result.rows_affected, 1);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#,
-    ///         [3i32.into()]
-    ///     )]
-    /// );
-    /// #
+    /// let affected: u64 = delete_result.rows_affected;
     /// # Ok(())
     /// # }
     /// ```
@@ -550,28 +354,26 @@ pub trait ActiveModelTrait: Clone + Debug {
 /// A Trait for overriding the ActiveModel behavior
 ///
 /// ### Example
-/// ```ignore
+/// ```
+/// # #[cfg(feature = "macros")]
+/// # {
 /// use pgorm::entity::prelude::*;
 ///
-///  // Use [DeriveEntity] to derive the EntityTrait automatically
-/// #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
-/// pub struct Entity;
-///
-/// /// The [EntityName] describes the name of a table
-/// impl EntityName for Entity {
-///     fn table_name(&self) -> &str {
-///         "cake"
-///     }
-/// }
-///
-/// // Derive the ActiveModel
-/// #[derive(Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel)]
+/// // `DeriveEntityModel` derives the Entity, Column, PrimaryKey and ActiveModel
+/// #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+/// #[pgorm(table_name = "cake")]
 /// pub struct Model {
+///     #[pgorm(primary_key)]
 ///     pub id: i32,
 ///     pub name: String,
 /// }
 ///
+/// #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+/// pub enum Relation {}
+///
+/// // Every hook has a no-op default; override only what you need
 /// impl ActiveModelBehavior for ActiveModel {}
+/// # }
 /// ```
 /// See module level docs [crate::entity] for a full example
 // [spec:pgorm:req:entity.active-model.hooks]

@@ -186,9 +186,8 @@ impl RelationDef {
     ///     entity::*,
     ///     query::*,
     ///     tests_cfg::{cake, cake_filling},
-    ///     DbBackend,
     /// };
-    /// use pgorm_query::Alias;
+    /// use pgorm_query::{Alias, QueryBuilder};
     ///
     /// let cf = Alias::new("cf");
     ///
@@ -203,12 +202,12 @@ impl RelationDef {
     ///             JoinType::LeftJoin,
     ///             cake_filling::Relation::Filling.def().from_alias(cf)
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     [
-    ///         "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-    ///         "LEFT JOIN `cake_filling` AS `cf` ON `cake`.`id` = `cf`.`cake_id`",
-    ///         "LEFT JOIN `filling` ON `cf`.`filling_id` = `filling`.`id`",
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+    ///         r#"LEFT JOIN "cake_filling" AS "cf" ON "cake"."id" = "cf"."cake_id""#,
+    ///         r#"LEFT JOIN "filling" ON "cf"."filling_id" = "filling"."id""#,
     ///     ]
     ///     .join(" ")
     /// );
@@ -231,7 +230,7 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
+    /// use pgorm::{entity::*, query::*, pgorm_query::QueryBuilder, tests_cfg::{cake, cake_filling}};
     /// use pgorm_query::{Expr, IntoCondition};
     ///
     /// assert_eq!(
@@ -247,11 +246,11 @@ impl RelationDef {
     ///                         .into_condition()
     ///                 })
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     [
-    ///         "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-    ///         "LEFT JOIN `cake_filling` ON `cake`.`id` = `cake_filling`.`cake_id` AND `cake_filling`.`cake_id` > 10",
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+    ///         r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" AND "cake_filling"."cake_id" > 10"#,
     ///     ]
     ///     .join(" ")
     /// );
@@ -269,7 +268,7 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, DbBackend, tests_cfg::{cake, cake_filling}};
+    /// use pgorm::{entity::*, query::*, pgorm_query::QueryBuilder, tests_cfg::{cake, cake_filling}};
     /// use pgorm_query::{Expr, IntoCondition, ConditionType};
     ///
     /// assert_eq!(
@@ -286,11 +285,11 @@ impl RelationDef {
     ///                         .into_condition()
     ///                 })
     ///         )
-    ///         .build(DbBackend::MySql)
-    ///         .to_string(),
+    ///         .as_query()
+    ///         .to_string(QueryBuilder),
     ///     [
-    ///         "SELECT `cake`.`id`, `cake`.`name` FROM `cake`",
-    ///         "LEFT JOIN `cake_filling` ON `cake`.`id` = `cake_filling`.`cake_id` OR `cake_filling`.`cake_id` > 10",
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+    ///         r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" OR "cake_filling"."cake_id" > 10"#,
     ///     ]
     ///     .join(" ")
     /// );
@@ -462,7 +461,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{Alias, IntoIden, MysqlQueryBuilder, TableAlterStatement, TableRef, ConditionType};
+/// use pgorm_query::{Alias, IntoIden, QueryBuilder, TableAlterStatement, TableRef, ConditionType};
 /// use pgorm::{EnumIter, Iden, Identity, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
@@ -483,8 +482,8 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     .table(TableRef::Table(Alias::new("foo").into_iden()))
 ///     .add_foreign_key(&mut relation.into()).take();
 /// assert_eq!(
-///     alter_table.to_string(MysqlQueryBuilder::default()),
-///     "ALTER TABLE `foo` ADD CONSTRAINT `foo-bar` FOREIGN KEY (`bar_id`) REFERENCES `bar` (`bar_id`)"
+///     alter_table.to_string(QueryBuilder),
+///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```
 // [spec:pgorm:req:entity.relation.fk]

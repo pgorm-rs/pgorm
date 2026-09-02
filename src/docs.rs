@@ -1,62 +1,20 @@
 //! 1. Async
 //!
-//!     Relying on [SQLx](https://github.com/launchbadge/sqlx), pgorm is a new library with async support from day 1.
+//!     Built on [tokio-postgres](https://github.com/sfackler/rust-postgres) and
+//!     [deadpool](https://github.com/bikeshedder/deadpool), pgorm is async from
+//!     day 1: a connection is a pooled handle, and independent queries can be
+//!     driven concurrently on separate handles.
 //!
-//! ```
-//! # use pgorm::{error::*, tests_cfg::*, *};
+//! ```no_run
+//! # use pgorm::{entity::*, error::*, query::*, tests_cfg::*, DatabasePool};
 //! #
-//! # #[smol_potat::main]
-//! # #[cfg(feature = "mock")]
-//! # pub async fn main() -> Result<(), DbErr> {
-//! #
-//! # let db = MockDatabase::new(DbBackend::Postgres)
-//! #     .append_query_results([
-//! #         [cake::Model {
-//! #             id: 1,
-//! #             name: "New York Cheese".to_owned(),
-//! #         }
-//! #         .into_mock_row()],
-//! #         [fruit::Model {
-//! #             id: 1,
-//! #             name: "Apple".to_owned(),
-//! #             cake_id: Some(1),
-//! #         }
-//! #         .into_mock_row()],
-//! #     ])
-//! #     .into_connection();
-//! #
+//! # async fn function(pool: &DatabasePool) -> Result<(), DbErr> {
+//! // one pooled connection per concurrent query
+//! let (cake_conn, fruit_conn) = futures::try_join!(pool.get(), pool.get())?;
+//!
 //! // execute multiple queries in parallel
 //! let cakes_and_fruits: (Vec<cake::Model>, Vec<fruit::Model>) =
-//!     futures::try_join!(Cake::find().all(&db), Fruit::find().all(&db))?;
-//! # assert_eq!(
-//! #     cakes_and_fruits,
-//! #     (
-//! #         vec![cake::Model {
-//! #             id: 1,
-//! #             name: "New York Cheese".to_owned(),
-//! #         }],
-//! #         vec![fruit::Model {
-//! #             id: 1,
-//! #             name: "Apple".to_owned(),
-//! #             cake_id: Some(1),
-//! #         }]
-//! #     )
-//! # );
-//! # assert_eq!(
-//! #     db.into_transaction_log(),
-//! #     [
-//! #         Transaction::from_sql_and_values(
-//! #             DbBackend::Postgres,
-//! #             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
-//! #             []
-//! #         ),
-//! #         Transaction::from_sql_and_values(
-//! #             DbBackend::Postgres,
-//! #             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
-//! #             []
-//! #         ),
-//! #     ]
-//! # );
+//!     futures::try_join!(Cake::find().all(&cake_conn), Fruit::find().all(&fruit_conn))?;
 //! # Ok(())
 //! # }
 //! ```
@@ -65,10 +23,10 @@
 //!
 //!     Built upon [SeaQuery](https://github.com/SeaQL/sea-query), pgorm allows you to build complex queries without 'fighting the ORM'.
 //!
-//! ```
+//! ```no_run
 //! # use pgorm_query::Query;
-//! # use pgorm::{DbConn, error::*, entity::*, query::*, tests_cfg::*};
-//! # async fn function(db: DbConn) -> Result<(), DbErr> {
+//! # use pgorm::{entity::*, error::*, query::*, tests_cfg::*, DatabaseConnection};
+//! # async fn function(db: &DatabaseConnection) -> Result<(), DbErr> {
 //! // build subquery with ease
 //! let cakes_with_filling: Vec<cake::Model> = cake::Entity::find()
 //!     .filter(
@@ -81,59 +39,42 @@
 //!             ),
 //!         ),
 //!     )
-//!     .all(&db)
+//!     .all(db)
 //!     .await?;
 //!
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! 3. Testable
+//! 3. Inspectable
 //!
-//!     Use mock connections to write unit tests for your logic.
+//!     Every builder renders to PostgreSQL text plus its bound parameters
+//!     before it is sent, so a query can be asserted on without a database.
 //!
 //! ```
-//! # use pgorm::{error::*, entity::*, query::*, tests_cfg::*, DbConn, MockDatabase, Transaction, DbBackend};
-//! # async fn function(db: DbConn) -> Result<(), DbErr> {
-//! // Setup mock connection
-//! let db = MockDatabase::new(DbBackend::Postgres)
-//!     .append_query_results([
-//!         [
-//!             cake::Model {
-//!                 id: 1,
-//!                 name: "New York Cheese".to_owned(),
-//!             },
-//!         ],
-//!     ])
-//!     .into_connection();
+//! use pgorm::pgorm_query::{Value, Values};
+//! use pgorm::{entity::*, query::*, tests_cfg::*};
 //!
-//! // Perform your application logic
-//! assert_eq!(
-//!     cake::Entity::find().one(&db).await?,
-//!     Some(cake::Model {
-//!         id: 1,
-//!         name: "New York Cheese".to_owned(),
-//!     })
-//! );
+//! let (sql, values) = cake::Entity::find()
+//!     .filter(cake::Column::Name.contains("chocolate"))
+//!     .build();
 //!
-//! // Compare it against the expected transaction log
 //! assert_eq!(
-//!     db.into_transaction_log(),
-//!     [
-//!         Transaction::from_sql_and_values(
-//!             DbBackend::Postgres,
-//!             r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT $1"#,
-//!             [1u64.into()]
-//!         ),
-//!     ]
+//!     sql,
+//!     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE $1"#
 //! );
-//! # Ok(())
-//! # }
+//! assert_eq!(
+//!     values,
+//!     Values(vec![Value::String(Some(Box::new("%chocolate%".to_owned())))])
+//! );
 //! ```
 //!
 //! 4. Service Oriented
 //!
 //!     Quickly build services that join, filter, sort and paginate data in APIs.
+//!
+//!     The sketch below is `ignore`d because it is written against a web
+//!     framework (Rocket) that pgorm does not depend on.
 //!
 //! ```ignore
 //! #[get("/?<page>&<posts_per_page>")]

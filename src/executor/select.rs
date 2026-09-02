@@ -180,7 +180,7 @@ where
     ///     entity::*,
     ///     query::*,
     ///     tests_cfg::cake::{self, Entity as Cake},
-    ///     DbBackend, DerivePartialModel, FromQueryResult,
+    ///     DerivePartialModel, FromQueryResult,
     /// };
     /// use pgorm_query::{Expr, Func, SimpleExpr};
     ///
@@ -194,13 +194,46 @@ where
     ///     name_upper: String,
     /// }
     ///
+    /// // The select list is cleared, then re-filled with exactly the columns
+    /// // and expressions the partial model asks for.
     /// assert_eq!(
-    ///     cake::Entity::find()
-    ///         .into_partial_model::<PartialCake>()
-    ///         .into_statement(DbBackend::Sqlite)
-    ///         .to_string(),
+    ///     PartialCake::select_cols(cake::Entity::find().select_only())
+    ///         .build()
+    ///         .0,
     ///     r#"SELECT "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
+    /// # }
+    /// ```
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{
+    /// #     entity::*, error::*, query::*,
+    /// #     tests_cfg::cake::{self, Entity as Cake},
+    /// #     DatabasePool, DerivePartialModel, FromQueryResult,
+    /// # };
+    /// # use pgorm_query::{Expr, Func, SimpleExpr};
+    /// #
+    /// # #[derive(DerivePartialModel, FromQueryResult)]
+    /// # #[pgorm(entity = "Cake")]
+    /// # struct PartialCake {
+    /// #     name: String,
+    /// #     #[pgorm(
+    /// #         from_expr = r#"SimpleExpr::FunctionCall(Func::upper(Expr::col((Cake, cake::Column::Name))))"#
+    /// #     )]
+    /// #     name_upper: String,
+    /// # }
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// let cakes: Vec<PartialCake> = cake::Entity::find()
+    ///     .into_partial_model::<PartialCake>()
+    ///     .all(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// # }
     /// ```
     pub fn into_partial_model<M>(self) -> Selector<SelectModel<M>>
@@ -210,30 +243,20 @@ where
         M::select_cols(QuerySelect::select_only(self)).into_model::<M>()
     }
 
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(all(feature = "mock", feature = "macros"))]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("Chocolate Forest"),
-    /// #         },
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("New York Cheese"),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
+    /// Decode selected columns into a value or tuple named by a column enum.
     ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, DeriveColumn, EnumIter};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
     ///     CakeName,
     /// }
+    ///
+    /// let db = pool.get().await?;
     ///
     /// let res: Vec<String> = cake::Entity::find()
     ///     .select_only()
@@ -241,48 +264,47 @@ where
     ///     .into_values::<_, QueryAs>()
     ///     .all(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(
-    ///     res,
-    ///     ["Chocolate Forest".to_owned(), "New York Cheese".to_owned()]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#,
-    ///         []
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     ///
     /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(all(feature = "mock", feature = "macros"))]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(2i64),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
+    /// # #[cfg(feature = "macros")]
+    /// # {
     /// use pgorm::{entity::*, query::*, tests_cfg::cake, DeriveColumn, EnumIter};
     ///
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
     ///     CakeName,
+    /// }
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .select_only()
+    ///         .column_as(cake::Column::Name, QueryAs::CakeName)
+    ///         .build()
+    ///         .0,
+    ///     r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#
+    /// );
+    /// # }
+    /// ```
+    ///
+    /// Several columns decode into a tuple:
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, DeriveColumn, EnumIter};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+    /// enum QueryAs {
+    ///     CakeName,
     ///     NumOfCakes,
     /// }
+    ///
+    /// let db = pool.get().await?;
     ///
     /// let res: Vec<(String, i64)> = cake::Entity::find()
     ///     .select_only()
@@ -292,24 +314,8 @@ where
     ///     .into_values::<_, QueryAs>()
     ///     .all(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(res, [("Chocolate Forest".to_owned(), 2i64)]);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         [
-    ///             r#"SELECT "cake"."name" AS "cake_name", COUNT("cake"."id") AS "num_of_cakes""#,
-    ///             r#"FROM "cake" GROUP BY "cake"."name""#,
-    ///         ]
-    ///         .join(" ")
-    ///         .as_str(),
-    ///         []
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     pub fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
@@ -320,25 +326,13 @@ where
         Selector::<SelectGetableValue<T, C>>::with_columns(self.query)
     }
 
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
+    /// Decode selected columns into a value or tuple by ordinal position.
+    ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(all(feature = "mock", feature = "macros"))]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results(vec![vec![
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("Chocolate Forest"),
-    /// #         },
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("New York Cheese"),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
     ///
     /// let res: Vec<String> = cake::Entity::find()
     ///     .select_only()
@@ -347,43 +341,7 @@ where
     ///     .all(&db)
     ///     .await?;
     ///
-    /// assert_eq!(
-    ///     res,
-    ///     vec!["Chocolate Forest".to_owned(), "New York Cheese".to_owned()]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     vec![Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name" FROM "cake""#,
-    ///         vec![]
-    ///     )]
-    /// );
-    /// #
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(all(feature = "mock", feature = "macros"))]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results(vec![vec![
-    /// #         maplit::btreemap! {
-    /// #             "cake_name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(2i64),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
-    ///
-    /// let res: Vec<(String, i64)> = cake::Entity::find()
+    /// let pairs: Vec<(String, i32)> = cake::Entity::find()
     ///     .select_only()
     ///     .column(cake::Column::Name)
     ///     .column(cake::Column::Id)
@@ -391,25 +349,23 @@ where
     ///     .into_tuple()
     ///     .all(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(res, vec![("Chocolate Forest".to_owned(), 2i64)]);
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     vec![Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         vec![
-    ///             r#"SELECT "cake"."name", "cake"."id""#,
-    ///             r#"FROM "cake" GROUP BY "cake"."name""#,
-    ///         ]
-    ///         .join(" ")
-    ///         .as_str(),
-    ///         vec![]
-    ///     )]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
+    /// ```
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .select_only()
+    ///         .column(cake::Column::Name)
+    ///         .column(cake::Column::Id)
+    ///         .group_by(cake::Column::Name)
+    ///         .build()
+    ///         .0,
+    ///     r#"SELECT "cake"."name", "cake"."id" FROM "cake" GROUP BY "cake"."name""#
+    /// );
     /// ```
     pub fn into_tuple<T>(self) -> Selector<SelectGetableTuple<T>>
     where
@@ -729,68 +685,34 @@ where
         }
     }
 
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([[
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("Chocolate Forest"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #         maplit::btreemap! {
-    /// #             "name" => Into::<Value>::into("New York Cheese"),
-    /// #             "num_of_cakes" => Into::<Value>::into(1),
-    /// #         },
-    /// #     ]])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, FromQueryResult};
+    /// Decode the raw statement's rows into a custom `FromQueryResult` type.
     ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, FromQueryResult};
+    /// # use pgorm::pgorm_query::Values;
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {
     ///     name: String,
-    ///     num_of_cakes: i32,
+    ///     num_of_cakes: i64,
     /// }
     ///
+    /// let db = pool.get().await?;
+    ///
     /// let res: Vec<SelectResult> = cake::Entity::find()
-    ///     .from_raw_sql(Statement::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake""#,
-    ///         [],
-    ///     ))
+    ///     .from_raw_sql(
+    ///         r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake" GROUP BY "cake"."name""#
+    ///             .to_owned(),
+    ///         Values(vec![]),
+    ///     )
     ///     .into_model::<SelectResult>()
     ///     .all(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(
-    ///     res,
-    ///     [
-    ///         SelectResult {
-    ///             name: "Chocolate Forest".to_owned(),
-    ///             num_of_cakes: 1,
-    ///         },
-    ///         SelectResult {
-    ///             name: "New York Cheese".to_owned(),
-    ///             num_of_cakes: 1,
-    ///         },
-    ///     ]
-    /// );
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."name", count("cake"."id") AS "num_of_cakes" FROM "cake""#,
-    ///         []
-    ///     ),]
-    /// );
-    /// #
     /// # Ok(())
+    /// # }
     /// # }
     /// ```
     pub fn into_model<M>(self) -> SelectorRaw<SelectModel<M>>
@@ -804,43 +726,26 @@ where
         }
     }
 
-    /// Get an item from the Select query
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 1,
-    /// #             name: "Cake".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// Get an item from the Select query.
     ///
-    /// let _: Option<cake::Model> = cake::Entity::find()
-    ///     .from_raw_sql(Statement::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
-    ///         [1.into()],
-    ///     ))
+    /// The raw statement is executed exactly as written — no `LIMIT` is
+    /// injected. Zero rows fails with [`DbErr::RecordNotFound`]; use
+    /// [`one_opt`](SelectorRaw::one_opt) for an `Option` instead.
+    ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
+    /// # use pgorm::pgorm_query::{Value, Values};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// let cake: cake::Model = cake::Entity::find()
+    ///     .from_raw_sql(
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#.to_owned(),
+    ///         Values(vec![Value::Int(Some(1))]),
+    ///     )
     ///     .one(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
-    ///         [1.into()]
-    ///     ),]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
     /// ```
@@ -863,43 +768,22 @@ where
         }
     }
 
-    /// Get an item from the Select query
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 1,
-    /// #             name: "Cake".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// Get an item from the Select query, or `None` when it returns no rows.
     ///
-    /// let _: Option<cake::Model> = cake::Entity::find()
-    ///     .from_raw_sql(Statement::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
-    ///         [1.into()],
-    ///     ))
-    ///     .one(&db)
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
+    /// # use pgorm::pgorm_query::{Value, Values};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// let cake: Option<cake::Model> = cake::Entity::find()
+    ///     .from_raw_sql(
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#.to_owned(),
+    ///         Values(vec![Value::Int(Some(1))]),
+    ///     )
+    ///     .one_opt(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "id" = $1"#,
-    ///         [1.into()]
-    ///     ),]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
     /// ```
@@ -921,43 +805,22 @@ where
         }
     }
 
-    /// Get all items from the Select query
-    /// ```
-    /// # use pgorm::{error::*, tests_cfg::*, *};
-    /// #
-    /// # #[smol_potat::main]
-    /// # #[cfg(feature = "mock")]
-    /// # pub async fn main() -> Result<(), DbErr> {
-    /// #
-    /// # let db = MockDatabase::new(DbBackend::Postgres)
-    /// #     .append_query_results([
-    /// #         [cake::Model {
-    /// #             id: 1,
-    /// #             name: "Cake".to_owned(),
-    /// #         }],
-    /// #     ])
-    /// #     .into_connection();
-    /// #
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// Get all items from the Select query.
     ///
-    /// let _: Vec<cake::Model> = cake::Entity::find()
-    ///     .from_raw_sql(Statement::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
-    ///         [],
-    ///     ))
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
+    /// # use pgorm::pgorm_query::Values;
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// let db = pool.get().await?;
+    ///
+    /// let cakes: Vec<cake::Model> = cake::Entity::find()
+    ///     .from_raw_sql(
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#.to_owned(),
+    ///         Values(vec![]),
+    ///     )
     ///     .all(&db)
     ///     .await?;
-    ///
-    /// assert_eq!(
-    ///     db.into_transaction_log(),
-    ///     [Transaction::from_sql_and_values(
-    ///         DbBackend::Postgres,
-    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
-    ///         []
-    ///     ),]
-    /// );
-    /// #
     /// # Ok(())
     /// # }
     /// ```
