@@ -276,7 +276,7 @@ fn inverse_relations_render_without_from_and_to() {
 // same facts render as `RelationTrait::def` builder chains
 #[test]
 fn expanded_relation_defs_render_as_builder_chains() {
-    let generated = generate(vec![cake(), fruit()], Opts::expanded());
+    let generated = generate(vec![cake(), fruit()], expanded());
 
     assert_contains(
         generated.file("cake.rs"),
@@ -290,7 +290,7 @@ fn expanded_relation_defs_render_as_builder_chains() {
             .into(),",
     );
 
-    let self_ref = generate(vec![self_referencing_cake()], Opts::expanded());
+    let self_ref = generate(vec![self_referencing_cake()], expanded());
     assert_contains(
         self_ref.file("cake.rs"),
         "Self::SelfRef => Entity::belongs_to(Entity)
@@ -304,7 +304,7 @@ fn expanded_relation_defs_render_as_builder_chains() {
 // gets `impl Related<super::<module>::Entity> for Entity`, in both formats
 #[test]
 fn ordinary_relations_get_related_impl_in_both_formats() {
-    for opts in [Opts::default(), Opts::expanded()] {
+    for opts in [Opts::default(), expanded()] {
         let generated = generate(vec![cake(), fruit()], opts);
         assert_contains(
             generated.file("fruit.rs"),
@@ -379,7 +379,7 @@ fn conjunct_shadowed_relations_lose_their_plain_related_impl() {
 // emits the many-to-many `Related` impl with `to()` and `via()`
 #[test]
 fn conjunct_relations_emit_a_via_related_impl() {
-    for opts in [Opts::default(), Opts::expanded()] {
+    for opts in [Opts::default(), expanded()] {
         let generated = generate(cake_schema(), opts);
         assert_contains(
             generated.file("cake.rs"),
@@ -397,7 +397,7 @@ fn conjunct_relations_emit_a_via_related_impl() {
 // after the plain `Related` impls, in both formats
 #[test]
 fn via_impls_follow_the_plain_related_impls() {
-    for opts in [Opts::default(), Opts::expanded()] {
+    for opts in [Opts::default(), expanded()] {
         let generated = generate(cake_schema(), opts);
         let cake = generated.file("cake.rs");
 

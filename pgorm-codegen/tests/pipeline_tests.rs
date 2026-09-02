@@ -5,7 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::{DateTimeCrate, EntityTransformer, Error, WithSerde};
+use pgorm_codegen::{DateTimeCrate, EntityTransformer, EntityWriterContext, Error, WithSerde};
 use pgorm_query::{Alias, ColumnDef, ColumnType, Table};
 use std::path::Path;
 
@@ -130,7 +130,7 @@ fn every_context_option_selects_generated_output() {
 
     // expanded_format
     assert_contains(
-        generate(schema(), Opts::expanded()).file("task.rs"),
+        generate(schema(), expanded()).file("task.rs"),
         "pub struct Entity;",
     );
     assert_not_contains(
@@ -388,7 +388,7 @@ fn entity_file_blocks_are_joined_with_blank_lines() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context/test]    `bonus_derive` folds extra
+// [spec:pgorm:sem:codegen.entity.context+1/test]    `bonus_derive` folds extra
 // derives into one leading-comma fragment appended to the derive list
 #[test]
 fn context_folds_extra_derives_into_comma_fragment() {
@@ -411,7 +411,7 @@ fn context_folds_extra_derives_into_comma_fragment() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context/test]    `bonus_attributes` wraps each
+// [spec:pgorm:sem:codegen.entity.context+1/test]    `bonus_attributes` wraps each
 // extra attribute in its own `#[...]` line
 #[test]
 fn context_wraps_each_extra_attribute_in_own_line() {
@@ -437,31 +437,43 @@ fn context_wraps_each_extra_attribute_in_own_line() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context/test]    an unparsable extra derive
-// panics at context construction, before any file is generated
+// [spec:pgorm:sem:codegen.entity.context+1/test]    an unparsable extra derive
+// comes back from the constructor as an `Error` naming the option and the
+// string, before any file is generated
 #[test]
-#[should_panic]
-fn context_panics_on_unparsable_extra_derive() {
-    let _ctx = Opts {
-        model_extra_derives: vec!["(".to_owned()],
-        ..Default::default()
-    }
-    .build();
+fn context_rejects_unparsable_extra_derive() {
+    assert_context_error(
+        Opts {
+            model_extra_derives: vec!["(".to_owned()],
+            ..Default::default()
+        },
+        "`model_extra_derives` entry `(` is not valid Rust token text",
+    );
 }
 
-// [spec:pgorm:sem:codegen.entity.context/test]    the same holds for an
+// [spec:pgorm:sem:codegen.entity.context+1/test]    the same holds for an
 // unparsable extra attribute
 #[test]
-#[should_panic]
-fn context_panics_on_unparsable_extra_attribute() {
-    let _ctx = Opts {
-        enum_extra_attributes: vec!["(".to_owned()],
-        ..Default::default()
-    }
-    .build();
+fn context_rejects_unparsable_extra_attribute() {
+    assert_context_error(
+        Opts {
+            enum_extra_attributes: vec!["(".to_owned()],
+            ..Default::default()
+        },
+        "`enum_extra_attributes` entry `(` is not valid Rust token text",
+    );
 }
 
-// [spec:pgorm:sem:codegen.entity.context/test]    `date_time_crate` is threaded
+#[track_caller]
+fn assert_context_error(opts: Opts, expected: &str) {
+    match EntityWriterContext::new(opts) {
+        Err(Error::TransformError(msg)) => assert_eq!(msg, expected),
+        Err(other) => panic!("expected a TransformError, got {other:?}"),
+        Ok(_) => panic!("expected a TransformError, got a context"),
+    }
+}
+
+// [spec:pgorm:sem:codegen.entity.context+1/test]    `date_time_crate` is threaded
 // into Model field types and the expanded `PrimaryKeyTrait::ValueType`
 #[test]
 fn context_threads_date_time_crate_into_model_pk() {
@@ -480,7 +492,7 @@ fn context_threads_date_time_crate_into_model_pk() {
         )]
     };
 
-    let chrono = generate(schema(), Opts::expanded());
+    let chrono = generate(schema(), expanded());
     assert_contains(chrono.file("event.rs"), "pub at: Date,");
     assert_contains(chrono.file("event.rs"), "pub seen: DateTimeUtc,");
     assert_contains(chrono.file("event.rs"), "type ValueType = Date;");

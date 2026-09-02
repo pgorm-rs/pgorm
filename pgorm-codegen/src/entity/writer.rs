@@ -1,4 +1,4 @@
-use crate::{ActiveEnum, Entity, util::escape_rust_keyword};
+use crate::{ActiveEnum, Entity, Error, util::escape_rust_keyword};
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -23,8 +23,9 @@ pub struct OutputFile {
 }
 
 // [spec:pgorm:def:codegen.entity.serde]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub enum WithSerde {
+    #[default]
     None,
     Serialize,
     Deserialize,
@@ -32,10 +33,31 @@ pub enum WithSerde {
 }
 
 // [spec:pgorm:sem:codegen.entity.types.datetime]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum DateTimeCrate {
+    #[default]
     Chrono,
     Time,
+}
+
+/// Every generation option, named. `Default` is the no-flags shape: compact
+/// format, no serde, chrono, `mod.rs`.
+// [spec:pgorm:sem:codegen.entity.context+1]
+#[derive(Debug, Default)]
+pub struct EntityWriterOptions {
+    pub expanded_format: bool,
+    pub with_serde: WithSerde,
+    pub with_copy_enums: bool,
+    pub date_time_crate: DateTimeCrate,
+    pub schema_name: Option<String>,
+    pub lib: bool,
+    pub serde_skip_deserializing_primary_key: bool,
+    pub serde_skip_hidden_column: bool,
+    pub model_extra_derives: Vec<String>,
+    pub model_extra_attributes: Vec<String>,
+    pub enum_extra_derives: Vec<String>,
+    pub enum_extra_attributes: Vec<String>,
+    pub seaography: bool,
 }
 
 #[derive(Debug)]
@@ -85,39 +107,49 @@ impl WithSerde {
     }
 }
 
-/// Converts *_extra_derives argument to token stream
-// [spec:pgorm:sem:codegen.entity.context]    extra-derive normalization
-pub(crate) fn bonus_derive<T, I>(extra_derives: I) -> TokenStream
+/// Converts *_extra_derives argument to token stream. `option` names the
+/// option the strings came from, so a rejection points at the caller's field.
+// [spec:pgorm:sem:codegen.entity.context+1]    extra-derive normalization
+pub(crate) fn bonus_derive<T, I>(option: &str, extra_derives: I) -> Result<TokenStream, Error>
 where
     T: Into<String>,
     I: IntoIterator<Item = T>,
 {
-    extra_derives.into_iter().map(Into::<String>::into).fold(
+    extra_derives
+        .into_iter()
+        .map(Into::<String>::into)
+        .try_fold(TokenStream::default(), |acc, derive| {
+            let tokens: TokenStream = parse_bonus(option, &derive)?;
+            Ok(quote! { #acc, #tokens })
+        })
+}
+
+/// convert *_extra_attributes argument to token stream
+// [spec:pgorm:sem:codegen.entity.context+1]    extra-attribute normalization
+pub(crate) fn bonus_attributes<T, I>(option: &str, attributes: I) -> Result<TokenStream, Error>
+where
+    T: Into<String>,
+    I: IntoIterator<Item = T>,
+{
+    attributes.into_iter().map(Into::<String>::into).try_fold(
         TokenStream::default(),
-        |acc, derive| {
-            let tokens: TokenStream = derive.parse().unwrap();
-            quote! { #acc, #tokens }
+        |acc, attribute| {
+            let tokens: TokenStream = parse_bonus(option, &attribute)?;
+            Ok(quote! {
+                #acc
+                #[#tokens]
+            })
         },
     )
 }
 
-/// convert *_extra_attributes argument to token stream
-// [spec:pgorm:sem:codegen.entity.context]    extra-attribute normalization
-pub(crate) fn bonus_attributes<T, I>(attributes: I) -> TokenStream
-where
-    T: Into<String>,
-    I: IntoIterator<Item = T>,
-{
-    attributes.into_iter().map(Into::<String>::into).fold(
-        TokenStream::default(),
-        |acc, attribute| {
-            let tokens: TokenStream = attribute.parse().unwrap();
-            quote! {
-                #acc
-                #[#tokens]
-            }
-        },
-    )
+// [spec:pgorm:sem:codegen.entity.context+1]
+fn parse_bonus(option: &str, source: &str) -> Result<TokenStream, Error> {
+    source.parse().map_err(|_| {
+        Error::TransformError(format!(
+            "`{option}` entry `{source}` is not valid Rust token text"
+        ))
+    })
 }
 
 impl FromStr for WithSerde {
@@ -140,38 +172,29 @@ impl FromStr for WithSerde {
 }
 
 impl EntityWriterContext {
-    // [spec:pgorm:sem:codegen.entity.context]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        expanded_format: bool,
-        with_serde: WithSerde,
-        with_copy_enums: bool,
-        date_time_crate: DateTimeCrate,
-        schema_name: Option<String>,
-        lib: bool,
-        serde_skip_deserializing_primary_key: bool,
-        serde_skip_hidden_column: bool,
-        model_extra_derives: Vec<String>,
-        model_extra_attributes: Vec<String>,
-        enum_extra_derives: Vec<String>,
-        enum_extra_attributes: Vec<String>,
-        seaography: bool,
-    ) -> Self {
-        Self {
-            expanded_format,
-            with_serde,
-            with_copy_enums,
-            date_time_crate,
-            schema_name,
-            lib,
-            serde_skip_deserializing_primary_key,
-            serde_skip_hidden_column,
-            model_extra_derives: bonus_derive(model_extra_derives),
-            model_extra_attributes: bonus_attributes(model_extra_attributes),
-            enum_extra_derives: bonus_derive(enum_extra_derives),
-            enum_extra_attributes: bonus_attributes(enum_extra_attributes),
-            seaography,
-        }
+    // [spec:pgorm:sem:codegen.entity.context+1]
+    pub fn new(options: EntityWriterOptions) -> Result<Self, Error> {
+        Ok(Self {
+            expanded_format: options.expanded_format,
+            with_serde: options.with_serde,
+            with_copy_enums: options.with_copy_enums,
+            date_time_crate: options.date_time_crate,
+            schema_name: options.schema_name,
+            lib: options.lib,
+            serde_skip_deserializing_primary_key: options.serde_skip_deserializing_primary_key,
+            serde_skip_hidden_column: options.serde_skip_hidden_column,
+            model_extra_derives: bonus_derive("model_extra_derives", options.model_extra_derives)?,
+            model_extra_attributes: bonus_attributes(
+                "model_extra_attributes",
+                options.model_extra_attributes,
+            )?,
+            enum_extra_derives: bonus_derive("enum_extra_derives", options.enum_extra_derives)?,
+            enum_extra_attributes: bonus_attributes(
+                "enum_extra_attributes",
+                options.enum_extra_attributes,
+            )?,
+            seaography: options.seaography,
+        })
     }
 }
 
@@ -194,7 +217,7 @@ impl EntityWriter {
     }
 
     // [spec:pgorm:sem:codegen.entity.serde.skip]
-    // [spec:pgorm:sem:codegen.entity.context]    date_time_crate threading
+    // [spec:pgorm:sem:codegen.entity.context+1]    date_time_crate threading
     pub fn write_entities(&self, context: &EntityWriterContext) -> Vec<OutputFile> {
         self.entities
             .iter()
@@ -300,7 +323,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.enums]
+    // [spec:pgorm:sem:codegen.entity.enums+1]
     pub fn write_pgorm_active_enums(
         &self,
         with_serde: &WithSerde,
@@ -1959,7 +1982,7 @@ mod tests {
                 &None,
                 false,
                 false,
-                &bonus_derive(["ts_rs::TS"]),
+                &bonus_derive("model_extra_derives", ["ts_rs::TS"]).expect("valid derives"),
                 &TokenStream::new(),
                 false,
             ))
@@ -1975,7 +1998,8 @@ mod tests {
                 &None,
                 false,
                 false,
-                &bonus_derive(["ts_rs::TS", "utoipa::ToSchema"]),
+                &bonus_derive("model_extra_derives", ["ts_rs::TS", "utoipa::ToSchema"])
+                    .expect("valid derives"),
                 &TokenStream::new(),
                 false,
             ))
@@ -2009,7 +2033,7 @@ mod tests {
                 &None,
                 false,
                 false,
-                &bonus_derive(["ts_rs::TS"]),
+                &bonus_derive("model_extra_derives", ["ts_rs::TS"]).expect("valid derives"),
                 &TokenStream::new(),
                 false,
             ))
@@ -2025,7 +2049,8 @@ mod tests {
                 &None,
                 false,
                 false,
-                &bonus_derive(["ts_rs::TS", "utoipa::ToSchema"]),
+                &bonus_derive("model_extra_derives", ["ts_rs::TS", "utoipa::ToSchema"])
+                    .expect("valid derives"),
                 &TokenStream::new(),
                 false,
             ))
@@ -2148,7 +2173,11 @@ mod tests {
                 false,
                 false,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#]),
+                &bonus_attributes(
+                    "model_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#]
+                )
+                .expect("valid attributes"),
                 false,
             ))
         );
@@ -2164,7 +2193,11 @@ mod tests {
                 false,
                 false,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#, "ts(export)"]),
+                &bonus_attributes(
+                    "model_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#, "ts(export)"]
+                )
+                .expect("valid attributes"),
                 false,
             ))
         );
@@ -2198,7 +2231,11 @@ mod tests {
                 false,
                 false,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#]),
+                &bonus_attributes(
+                    "model_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#]
+                )
+                .expect("valid attributes"),
                 false,
             ))
         );
@@ -2214,7 +2251,11 @@ mod tests {
                 false,
                 false,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#, "ts(export)"]),
+                &bonus_attributes(
+                    "model_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#, "ts(export)"]
+                )
+                .expect("valid attributes"),
                 false,
             ))
         );

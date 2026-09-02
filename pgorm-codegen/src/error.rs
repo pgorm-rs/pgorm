@@ -7,6 +7,18 @@ pub enum Error {
     TransformError(String),
 }
 
+impl Error {
+    /// Qualify a transform failure with the table it was found in, so a
+    /// conversion that knows only its own column or foreign key still names
+    /// the table once it reaches the transform gate.
+    pub(crate) fn in_table(self, table: &str) -> Self {
+        match self {
+            Self::TransformError(msg) => Self::TransformError(format!("table `{table}` {msg}")),
+            other => other,
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

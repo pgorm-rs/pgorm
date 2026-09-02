@@ -28,7 +28,7 @@ fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    one Entity per input
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    one Entity per input
 // statement, held in a BTreeMap so every output is ordered by table name
 #[test]
 fn transform_builds_entity_per_statement_ordered_by_name() {
@@ -52,7 +52,7 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    the table name is unpacked
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    the table name is unpacked
 // from every `TableRef` variant that carries a table iden
 #[test]
 fn transform_unpacks_table_name_from_every_table_ref() {
@@ -84,7 +84,7 @@ fn transform_unpacks_table_name_from_every_table_ref() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    a statement with no table
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a statement with no table
 // name is a `TransformError`
 #[test]
 fn transform_rejects_a_statement_without_a_table_name() {
@@ -96,19 +96,92 @@ fn transform_rejects_a_statement_without_a_table_name() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    a column with no
-// `ColumnType` panics
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a column with no
+// `ColumnType` is a `TransformError` naming the table and the column
 #[test]
-#[should_panic(expected = "ColumnType should not be empty")]
-fn transform_panics_on_column_without_column_type() {
+fn transform_rejects_a_column_without_column_type() {
     let untyped = Table::create()
         .table(Alias::new("cake"))
         .col(ColumnDef::new(Alias::new("id")))
         .to_owned();
-    let _ = EntityTransformer::transform(vec![untyped]);
+
+    assert_transform_error(
+        vec![untyped],
+        "table `cake` column `id`: column type should not be empty",
+    );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    `auto_increment`,
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a foreign key with no
+// referenced table is a `TransformError`, not an unwrap on `None`
+#[test]
+fn transform_rejects_foreign_key_without_ref_table() {
+    let dangling = Table::create()
+        .table(Alias::new("fruit"))
+        .col(serial_pk("id"))
+        .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+        .foreign_key(ForeignKey::create().from(Alias::new("fruit"), Alias::new("cake_id")))
+        .to_owned();
+
+    assert_transform_error(
+        vec![dangling],
+        "table `fruit` foreign key on `cake_id`: referenced table should not be empty",
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a primary-key index naming
+// a column the table does not have is a `TransformError`
+#[test]
+fn transform_rejects_primary_key_over_unknown_column() {
+    let mismatched = Table::create()
+        .table(Alias::new("cake"))
+        .col(
+            ColumnDef::new(Alias::new("id"))
+                .integer()
+                .not_null()
+                .to_owned(),
+        )
+        .primary_key(Index::create().col(Alias::new("missing")))
+        .to_owned();
+
+    assert_transform_error(
+        vec![mismatched],
+        "table `cake`: primary key column `missing` is not a column of the table",
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a DB name with no Rust
+// identifier form is a `TransformError` naming what it came from
+#[test]
+fn transform_rejects_names_without_identifier_form() {
+    assert_transform_error(
+        vec![table_with(
+            "cake",
+            vec![serial_pk("id"), typed("1", ColumnType::Integer)],
+        )],
+        "table `cake` column `1`: `1` is not a valid Rust identifier",
+    );
+    assert_transform_error(
+        vec![table_with("-", vec![serial_pk("id")])],
+        "table `-`: `` is not a valid Rust identifier",
+    );
+    assert_transform_error(
+        vec![table_with(
+            "cake",
+            vec![serial_pk("id"), enum_col("tea", "tea", &["€"])],
+        )],
+        "enum `tea` value `€`: `€` is not a valid Rust identifier",
+    );
+}
+
+#[track_caller]
+fn assert_transform_error(stmts: Vec<TableCreateStatement>, expected: &str) {
+    match EntityTransformer::transform(stmts) {
+        Err(Error::TransformError(msg)) => assert_eq!(msg, expected),
+        other => panic!("expected a TransformError, got {other:?}"),
+    }
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    `auto_increment`,
 // `not_null` and `unique` come from the matching `ColumnSpec`
 #[test]
 fn transform_reads_column_specs_off_the_column_definition() {
@@ -129,7 +202,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
                     .to_owned(),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     let cake = generated.file("cake.rs");
 
@@ -143,19 +216,21 @@ fn transform_reads_column_specs_off_the_column_definition() {
 
     // `unique` likewise comes off `ColumnSpec::UniqueKey` when a `ColumnDef` is
     // converted into a codegen `Column`
-    let unique: Column = (&ColumnDef::new(Alias::new("email"))
-        .string()
-        .not_null()
-        .unique_key()
-        .to_owned())
-        .into();
+    let unique = Column::try_from(
+        &ColumnDef::new(Alias::new("email"))
+            .string()
+            .not_null()
+            .unique_key()
+            .to_owned(),
+    )
+    .expect("a typed column def should convert");
     assert_eq!(
         norm(&unique.get_def().to_string()),
         norm("ColumnType::String(StringLen::None).def().unique()")
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a single-column unique index
 // over exactly that column also marks it unique
 #[test]
 fn transform_marks_columns_from_single_column_unique_index() {
@@ -205,14 +280,11 @@ fn transform_marks_columns_from_single_column_unique_index() {
     assert_not_contains(vendor, "#[pgorm(unique)] pub tier: String,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    primary keys come from
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    primary keys come from
 // `ColumnSpec::PrimaryKey` and are extended by a table-level primary-key index
 #[test]
 fn transform_collects_pks_from_specs_and_table_indexes() {
-    let by_spec = generate(
-        vec![table_with("cake", vec![serial_pk("id")])],
-        Opts::expanded(),
-    );
+    let by_spec = generate(vec![table_with("cake", vec![serial_pk("id")])], expanded());
     assert_contains(by_spec.file("cake.rs"), "pub enum PrimaryKey { Id, }");
 
     let by_index = generate(
@@ -238,7 +310,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
                 )
                 .to_owned(),
         ],
-        Opts::expanded(),
+        expanded(),
     );
     assert_contains(
         by_index.file("cake_filling.rs"),
@@ -250,7 +322,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    every enum column registers
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    every enum column registers
 // an `ActiveEnum` keyed by enum name, deduplicated across tables and looked
 // through `Array`
 #[test]
@@ -298,7 +370,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
     assert!(position_of(enums, "pub enum Mood") < position_of(enums, "pub enum Tea"));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    foreign keys become
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    foreign keys become
 // `BelongsTo` relations that keep their columns, referenced columns and
 // on_update / on_delete actions
 #[test]
@@ -352,7 +424,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    a relation onto its own
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    a relation onto its own
 // table is flagged self-referencing
 #[test]
 fn transform_flags_self_referencing_relations() {
@@ -367,7 +439,7 @@ fn transform_flags_self_referencing_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    several FKs onto the same
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    several FKs onto the same
 // target take 1-based `num_suffix`es in declaration order; a lone FK keeps 0
 #[test]
 fn transform_numbers_repeated_fks_to_same_table() {
@@ -435,7 +507,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
     assert_not_contains(basket, "Cake1,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+1/test]    relations are sorted by
+// [spec:pgorm:sem:codegen.entity.transform+2/test]    relations are sorted by
 // referenced table name and conjunct relations by target name
 #[test]
 fn transform_sorts_relations_and_conjunct_relations() {

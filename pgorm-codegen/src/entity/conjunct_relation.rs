@@ -2,7 +2,10 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::Ident;
 use quote::format_ident;
 
-use crate::util::escape_rust_keyword;
+use crate::{
+    Error,
+    util::{escape_rust_keyword, safe_ident},
+};
 
 #[derive(Clone, Debug)]
 pub struct ConjunctRelation {
@@ -11,6 +14,15 @@ pub struct ConjunctRelation {
 }
 
 impl ConjunctRelation {
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let context = format!("conjunct relation via `{}` to `{}`", self.via, self.to);
+        safe_ident(&context, &escape_rust_keyword(self.via.to_snake_case()))?;
+        safe_ident(&context, &escape_rust_keyword(self.to.to_snake_case()))?;
+        safe_ident(&context, &self.to.to_upper_camel_case())?;
+        Ok(())
+    }
+
     pub fn get_via_snake_case(&self) -> Ident {
         format_ident!("{}", escape_rust_keyword(self.via.to_snake_case()))
     }

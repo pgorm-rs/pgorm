@@ -30,7 +30,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+1]
+> [spec:pgorm:sem:codegen.entity.transform+2]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. The table name is unpacked from any `TableRef`
 > variant carrying a table iden (`Table`, `SchemaTable`,
@@ -39,18 +39,39 @@ golden fixtures under `pgorm-codegen/tests/`.
 >
 > Per column: `auto_increment` and `not_null` come from the presence of the
 > matching `ColumnSpec` on the column definition; a column with no
-> `ColumnType` panics with `"ColumnType should not be empty"`. `unique` does
-> not: the transformer overwrites the value the `From<&ColumnDef> for
-> Column` conversion derived, assigning `unique` solely from the table's
+> `ColumnType` yields
+> ``TransformError("table `<table>` column `<column>`: column type should
+> not be empty")``. `unique` does not: the transformer overwrites the value
+> the `TryFrom<&ColumnDef> for Column` conversion derived, assigning
+> `unique` solely from the table's
 > indexes — true exactly when some unique index of the table covers that one
 > column and nothing else. A `ColumnSpec::UniqueKey` on the column
 > definition is therefore discarded on this path; it takes effect only when
-> a `ColumnDef` is converted through the public `From<&ColumnDef> for
+> a `ColumnDef` is converted through the public `TryFrom<&ColumnDef> for
 > Column` impl directly, outside `transform`. Primary keys are collected
 > from `ColumnSpec::PrimaryKey` markers and extended with the column names
 > of any table-level primary-key index. Every column whose (possibly
 > array-inner) type is `ColumnType::Enum` registers an `ActiveEnum` in a
 > `BTreeMap` keyed by enum name, deduplicating across tables.
+>
+> `transform` is the pipeline's validation gate: every failure a caller's
+> schema can cause MUST come back from this one call as a `TransformError`,
+> leaving the writer that follows infallible on its output. Besides the
+> table name and the column types (`codegen.entity.types.unsupported`), the
+> gate checks that every identifier the writer will derive from a DB name —
+> table, column, primary key, relation target, conjunct relation, enum name
+> and enum value, in each of the snake_case, camel-case and keyword-escaped
+> forms the generators use — has a legal Rust form
+> (`codegen.entity.keywords`); that every primary-key name is the name of a
+> column of its own table, else
+> ``TransformError("table `<table>`: primary key column `<column>` is not a
+> column of the table")``; and that every foreign key names a referenced
+> table, else ``TransformError("table `<table>` foreign key on `<columns>`:
+> referenced table should not be empty")``. Validation runs over the final
+> entities, after inverse and conjunct relations are synthesised, so the
+> derived relations are covered too. The `format_ident!` and column-lookup
+> sites downstream of the gate are therefore internal invariants, not
+> caller-reachable failures.
 >
 > Foreign keys become `BelongsTo` relations on the owning table, keeping the
 > FK's columns, referenced columns, `on_update`, and `on_delete` actions. A
@@ -111,15 +132,20 @@ golden fixtures under `pgorm-codegen/tests/`.
 > per entity. Entity-file code blocks are joined with blank lines; content
 > is unformatted `TokenStream` text (callers are expected to run rustfmt).
 
-> [spec:pgorm:sem:codegen.entity.context]
-> `EntityWriterContext::new` normalizes the option lists at construction:
+> [spec:pgorm:sem:codegen.entity.context+1]
+> `EntityWriterContext::new` takes one `EntityWriterOptions` struct — every
+> generation option is a named field, and its `Default` is the no-flags
+> shape (compact format, no serde, chrono, `mod.rs`) — and returns
+> `Result<EntityWriterContext, Error>`. It normalizes the option lists at
+> construction:
 > `model_extra_derives` / `enum_extra_derives` pass through `bonus_derive`,
 > which parses each string as a `TokenStream` and folds them into a single
 > leading-comma fragment (`, A, B`); `model_extra_attributes` /
 > `enum_extra_attributes` pass through `bonus_attributes`, which wraps each
-> parsed string in its own `#[...]` attribute line. Parsing is
-> `.parse().unwrap()`, so an extra derive or attribute that is not valid
-> Rust token text panics at context construction, before any file is
+> parsed string in its own `#[...]` attribute line. An extra derive or
+> attribute that is not valid Rust token text is returned as
+> ``TransformError("`<option>` entry `<string>` is not valid Rust token
+> text")`` — naming the option field it came from — before any file is
 > generated.
 >
 > `date_time_crate` is threaded by reference from the context through
@@ -282,13 +308,23 @@ golden fixtures under `pgorm-codegen/tests/`.
 > `with-chrono-0_4` only — so code generated with `DateTimeCrate::Time` does
 > not compile against pgorm as shipped.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported]
-> Column types outside the mapping table are not supported: `get_rs_type`
-> panics via `unimplemented!("column type {other:?} is not supported by
-> codegen")`, and the expanded-format `ColumnDef` writer (`Column::get_def`)
-> likewise hits an `unimplemented!()` wildcard. Codegen MUST NOT be expected
-> to degrade gracefully on such types — the generation run aborts by panic
-> rather than emitting placeholder code.
+> [spec:pgorm:req:codegen.entity.types.unsupported+1]
+> Column types outside the mapping table are not supported, and support is
+> decided when a `Column` is built rather than when it is rendered. Both
+> `TryFrom<&ColumnDef> for Column` and — through it —
+> `EntityTransformer::transform` MUST reject an unsupported type with
+> ``TransformError("table `<table>` column `<column>`: column type <type> is
+> not supported by codegen")``, where `<type>` is the `ColumnType`'s `Debug`
+> form; outside `transform` the message names the column alone. `Array`
+> element types are checked recursively, so an array of an unsupported
+> element type is itself unsupported.
+>
+> Codegen MUST NOT be expected to degrade gracefully on such a type: no
+> placeholder code is emitted and no file is generated, the whole run fails.
+> It MUST NOT abort by panic either — the failure is a value the caller
+> handles. Because no `Column` can hold an unsupported type, the wildcard
+> arms of `Column::get_rs_type` and `Column::get_def` are unreachable and
+> stand as internal invariants.
 
 ## Serde
 
@@ -383,7 +419,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Active enums
 
-> [spec:pgorm:sem:codegen.entity.enums]
+> [spec:pgorm:sem:codegen.entity.enums+1]
 > All discovered database enums are generated into a single
 > `pgorm_active_enums.rs`, in alphabetical order by enum name. Each becomes
 > `#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]`
@@ -397,7 +433,11 @@ golden fixtures under `pgorm-codegen/tests/`.
 > UpperCamelCase form is empty (punctuation-only, etc.) fall back to
 > per-character encoding — ASCII chars as `U<hex, 4 digits>` and multi-byte
 > chars kept verbatim (`/` → `U002F`, `你好` → `你好`) — with a warning
-> printed to stdout; everything else is plain UpperCamelCase. Entity files
+> printed to stdout as `transform` validates the enum; everything else is
+> plain UpperCamelCase. A value whose derived variant name is still not a
+> legal Rust identifier (a multi-byte character that cannot start one, a
+> digit-led value carrying a space) is a `TransformError` per
+> `codegen.entity.keywords`, not a panic. Entity files
 > using an enum column import it via
 > `use super::pgorm_active_enums::<EnumName>;` (deduplicated per file), and
 > the expanded `ColumnTrait::def()` renders the column as
@@ -405,7 +445,7 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Identifier hygiene
 
-> [spec:pgorm:sem:codegen.entity.keywords]
+> [spec:pgorm:sem:codegen.entity.keywords+1]
 > Generated identifiers derived from DB names (module names, Model field
 > names, table idents) pass through `escape_rust_keyword`: 49 strict/reserved
 > Rust keywords are emitted as raw identifiers (`type` → `r#type`,
@@ -415,6 +455,18 @@ golden fixtures under `pgorm-codegen/tests/`.
 > the column name; when that differs from the raw DB name, the DB name is
 > preserved via `column_name` attributes (compact Model fields and expanded
 > `Column` variants).
+>
+> Keyword escaping is the only rescue on offer. A DB name whose derived form
+> is still not a legal Rust identifier — empty after case conversion, all
+> digits, or carrying characters an identifier cannot hold (`1`, `-`,
+> punctuation-only) — is not mangled into something else: the shared
+> `safe_ident` helper rejects it, and every such derivation is put through
+> that helper at the `transform` gate, so the failure is
+> ``TransformError("<what>: `<derived>` is not a valid Rust identifier")``
+> where `<what>` names the table, column, primary key, relation, conjunct
+> relation, enum or enum value it came from. The `format_ident!` call sites
+> in the writer are downstream of that check and cannot panic on validated
+> input.
 
 ## Seaography support
 

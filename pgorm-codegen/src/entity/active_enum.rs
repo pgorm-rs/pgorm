@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::fmt::Write;
 
-use crate::WithSerde;
+use crate::{Error, WithSerde, util::safe_ident};
 
 #[derive(Clone, Debug)]
 pub struct ActiveEnum {
@@ -12,8 +12,63 @@ pub struct ActiveEnum {
     pub(crate) values: Vec<DynIden>,
 }
 
+/// The Rust variant name a DB enum value maps to, and whether deriving it
+/// needed the per-character encoding fallback.
+struct Variant {
+    name: String,
+    encoded: bool,
+}
+
+// [spec:pgorm:sem:codegen.entity.enums+1]
+fn variant(value: &str) -> Variant {
+    if value.chars().next().map(char::is_numeric).unwrap_or(false) {
+        return Variant {
+            name: format!("_{value}"),
+            encoded: false,
+        };
+    }
+    let camel_case = value.to_upper_camel_case();
+    if !camel_case.is_empty() {
+        return Variant {
+            name: camel_case,
+            encoded: false,
+        };
+    }
+    let mut name = String::new();
+    for c in value.chars() {
+        if c.len_utf8() > 1 {
+            let _ = write!(&mut name, "{c}");
+        } else {
+            let _ = write!(&mut name, "U{:04X}", c as u32);
+        }
+    }
+    Variant {
+        name,
+        encoded: true,
+    }
+}
+
 impl ActiveEnum {
-    // [spec:pgorm:sem:codegen.entity.enums]
+    // [spec:pgorm:sem:codegen.entity.enums+1]
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let enum_name = self.enum_name.to_string();
+        let context = format!("enum `{enum_name}`");
+        safe_ident(&context, &enum_name.to_upper_camel_case())?;
+        for value in self.values.iter().map(|value| value.to_string()) {
+            let value = value.trim();
+            let variant = variant(value);
+            if variant.encoded {
+                println!(
+                    "Warning: item '{value}' in the enumeration '{enum_name}' cannot be converted into a valid Rust enum member name. It will be converted to its corresponding UTF-8 encoding. You can modify it later as needed."
+                );
+            }
+            safe_ident(&format!("{context} value `{value}`"), &variant.name)?;
+        }
+        Ok(())
+    }
+
+    // [spec:pgorm:sem:codegen.entity.enums+1]
     pub fn impl_active_enum(
         &self,
         with_serde: &WithSerde,
@@ -24,27 +79,9 @@ impl ActiveEnum {
         let enum_name = &self.enum_name.to_string();
         let enum_iden = format_ident!("{}", enum_name.to_upper_camel_case());
         let values: Vec<String> = self.values.iter().map(|v| v.to_string()).collect();
-        let variants = values.iter().map(|v| v.trim()).map(|v| {
-            if v.chars().next().map(char::is_numeric).unwrap_or(false) {
-                format_ident!("_{}", v)
-            } else {
-                let variant_name = v.to_upper_camel_case();
-                if variant_name.is_empty() {
-                    println!("Warning: item '{}' in the enumeration '{}' cannot be converted into a valid Rust enum member name. It will be converted to its corresponding UTF-8 encoding. You can modify it later as needed.", v, enum_name);
-                    let mut ss = String::new();
-                    for c in v.chars() {
-                        if c.len_utf8() > 1 {
-                            write!(&mut ss, "{c}").unwrap();
-                        } else {
-                            write!(&mut ss, "U{:04X}", c as u32).unwrap();
-                        }
-                    }
-                    format_ident!("{}", ss)
-                } else {
-                    format_ident!("{}", variant_name)
-                }
-            }
-        });
+        let variants = values
+            .iter()
+            .map(|value| format_ident!("{}", variant(value.trim()).name));
 
         let serde_derive = with_serde.extra_derive();
         let copy_derive = if with_copy_enums {
@@ -148,7 +185,8 @@ mod tests {
             .impl_active_enum(
                 &WithSerde::None,
                 true,
-                &bonus_derive(["specta::Type", "ts_rs::TS"]),
+                &bonus_derive("enum_extra_derives", ["specta::Type", "ts_rs::TS"])
+                    .expect("valid derives"),
                 &TokenStream::new(),
             )
             .to_string(),
@@ -185,7 +223,11 @@ mod tests {
                 &WithSerde::None,
                 true,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#])
+                &bonus_attributes(
+                    "enum_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#]
+                )
+                .expect("valid attributes")
             )
             .to_string(),
             quote!(
@@ -217,7 +259,11 @@ mod tests {
                 &WithSerde::None,
                 true,
                 &TokenStream::new(),
-                &bonus_attributes([r#"serde(rename_all = "camelCase")"#, "ts(export)"])
+                &bonus_attributes(
+                    "enum_extra_attributes",
+                    [r#"serde(rename_all = "camelCase")"#, "ts(export)"]
+                )
+                .expect("valid attributes")
             )
             .to_string(),
             quote!(

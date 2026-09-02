@@ -4,7 +4,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::{Column, DateTimeCrate};
+use pgorm_codegen::{Column, DateTimeCrate, EntityTransformer, Error};
 use pgorm_query::{Alias, ColumnDef, ColumnType, RcOrArc, StringLen, Table};
 
 // [spec:pgorm:sem:codegen.entity.types+1/test]    `Column::get_rs_type` follows
@@ -196,38 +196,53 @@ fn date_time_crate_selects_date_time_field_types() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported/test]    a type outside the
-// mapping aborts the generation run by panic rather than emitting a placeholder
+// [spec:pgorm:req:codegen.entity.types.unsupported+1/test]    a type outside the
+// mapping fails the whole run with a `TransformError` naming table, column and
+// type — no placeholder code, and no panic
 #[test]
-#[should_panic(expected = "column type Inet is not supported by codegen")]
-fn generation_panics_on_column_type_outside_mapping() {
-    let _ = generate(
-        vec![table_with(
-            "device",
-            vec![serial_pk("id"), typed("address", ColumnType::Inet)],
-        )],
-        Opts::default(),
-    );
+fn transform_rejects_column_type_outside_mapping() {
+    let unsupported = EntityTransformer::transform(vec![table_with(
+        "device",
+        vec![serial_pk("id"), typed("address", ColumnType::Inet)],
+    )]);
+
+    match unsupported {
+        Err(Error::TransformError(msg)) => assert_eq!(
+            msg,
+            "table `device` column `address`: column type Inet is not supported by codegen"
+        ),
+        other => panic!("expected a TransformError, got {other:?}"),
+    }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported/test]    the expanded-format
-// `ColumnDef` writer panics on its wildcard arm for unmapped types
+// [spec:pgorm:req:codegen.entity.types.unsupported+1/test]    the check sits at
+// `Column` construction, so the writer never meets an unmapped type; `Array`
+// element types are checked through
 #[test]
-#[should_panic(expected = "not implemented")]
-fn expanded_column_def_writer_panics_on_unsupported_type() {
-    let column: Column =
-        (&ColumnDef::new_with_type(Alias::new("address"), ColumnType::Inet).to_owned()).into();
-    let _ = column.get_def();
+fn column_conversion_rejects_unsupported_type() {
+    for col_type in [
+        ColumnType::Inet,
+        ColumnType::Array(RcOrArc::new(ColumnType::Inet)),
+    ] {
+        let col_def = ColumnDef::new_with_type(Alias::new("address"), col_type).to_owned();
+        match Column::try_from(&col_def) {
+            Err(Error::TransformError(msg)) => assert_eq!(
+                msg,
+                "column `address`: column type Inet is not supported by codegen"
+            ),
+            other => panic!("expected a TransformError, got {other:?}"),
+        }
+    }
 }
 
 // [spec:pgorm:sem:codegen.entity.pk/test]    the expanded `ValueType` is the PK
 // column's Rust type, or a tuple for a composite key
 #[test]
 fn expanded_pk_value_type_is_type_or_tuple() {
-    let single = generate(vec![cake()], Opts::expanded());
+    let single = generate(vec![cake()], expanded());
     assert_contains(single.file("cake.rs"), "type ValueType = i32;");
 
-    let composite = generate(vec![cake_filling()], Opts::expanded());
+    let composite = generate(vec![cake_filling()], expanded());
     assert_contains(
         composite.file("cake_filling.rs"),
         "type ValueType = (i32, i32);",
@@ -243,7 +258,7 @@ fn expanded_pk_value_type_is_type_or_tuple() {
                     .to_owned(),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     assert_contains(text_key.file("setting.rs"), "type ValueType = String;");
 }
@@ -272,7 +287,7 @@ fn expanded_pk_auto_increment_looks_at_every_column() {
                 )
                 .to_owned(),
         ],
-        Opts::expanded(),
+        expanded(),
     );
 
     assert_contains(
@@ -293,7 +308,7 @@ fn expanded_pk_auto_increment_looks_at_every_column() {
                     .to_owned(),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     assert_contains(
         no_auto.file("ticket.rs"),

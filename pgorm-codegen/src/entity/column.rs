@@ -1,4 +1,7 @@
-use crate::{DateTimeCrate, util::escape_rust_keyword};
+use crate::{
+    DateTimeCrate, Error,
+    util::{escape_rust_keyword, safe_ident},
+};
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, StringLen};
 use proc_macro2::{Ident, TokenStream};
@@ -15,7 +18,23 @@ pub struct Column {
 }
 
 impl Column {
-    // [spec:pgorm:sem:codegen.entity.keywords]
+    /// Reject anything the writer could not render: a type outside the mapping
+    /// table, and a DB name whose case-converted forms are not Rust
+    /// identifiers.
+    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let context = format!("column `{}`", self.name);
+        validate_col_type(&context, &self.col_type)?;
+        safe_ident(&context, &escape_rust_keyword(self.name.to_snake_case()))?;
+        safe_ident(
+            &context,
+            &escape_rust_keyword(self.name.to_upper_camel_case()),
+        )?;
+        Ok(())
+    }
+
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub fn get_name_snake_case(&self) -> Ident {
         format_ident!("{}", escape_rust_keyword(self.name.to_snake_case()))
     }
@@ -30,7 +49,7 @@ impl Column {
 
     // [spec:pgorm:sem:codegen.entity.types+1]
     // [spec:pgorm:sem:codegen.entity.types.datetime]
-    // [spec:pgorm:req:codegen.entity.types.unsupported]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
     pub fn get_rs_type(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType, date_time_crate: &DateTimeCrate) -> String {
             #[allow(unreachable_patterns)]
@@ -79,12 +98,15 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type, date_time_crate))
                 }
-                other => unimplemented!("column type {other:?} is not supported by codegen"),
+                other => unreachable!(
+                    "column type {other:?} reached the writer; \
+                     every Column is type-checked when it is built"
+                ),
             }
         }
         let ident: TokenStream = write_rs_type(&self.col_type, date_time_crate)
             .parse()
-            .unwrap();
+            .expect("mapped Rust type names are token text");
         match self.not_null {
             true => quote! { #ident },
             false => quote! { Option<#ident> },
@@ -113,7 +135,7 @@ impl Column {
         col_type.map(|ty| quote! { column_type = #ty })
     }
 
-    // [spec:pgorm:req:codegen.entity.types.unsupported]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
     pub fn get_def(&self) -> TokenStream {
         fn write_col_def(col_type: &ColumnType) -> TokenStream {
             match col_type {
@@ -176,7 +198,10 @@ impl Column {
                     quote! { ColumnType::Array(RcOrArc::new(#column_type)) }
                 }
                 #[allow(unreachable_patterns)]
-                _ => unimplemented!(),
+                other => unreachable!(
+                    "column type {other:?} reached the writer; \
+                     every Column is type-checked when it is built"
+                ),
             }
         }
         let mut col_def = write_col_def(&self.col_type);
@@ -254,18 +279,66 @@ impl Column {
     }
 }
 
-impl From<ColumnDef> for Column {
-    fn from(col_def: ColumnDef) -> Self {
-        (&col_def).into()
+/// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
+/// through `Array` element types and over the enum names they will emit.
+// [spec:pgorm:req:codegen.entity.types.unsupported+1]
+fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> {
+    match col_type {
+        ColumnType::Char(_)
+        | ColumnType::String(_)
+        | ColumnType::Text
+        | ColumnType::Custom(_)
+        | ColumnType::TinyInteger
+        | ColumnType::SmallInteger
+        | ColumnType::Integer
+        | ColumnType::BigInteger
+        | ColumnType::Unsigned
+        | ColumnType::BigUnsigned
+        | ColumnType::Float
+        | ColumnType::Double
+        | ColumnType::Json
+        | ColumnType::JsonBinary
+        | ColumnType::Date
+        | ColumnType::Time
+        | ColumnType::DateTime
+        | ColumnType::Timestamp
+        | ColumnType::TimestampWithTimeZone
+        | ColumnType::Decimal(_)
+        | ColumnType::Money(_)
+        | ColumnType::Uuid
+        | ColumnType::Binary(_)
+        | ColumnType::VarBinary(_)
+        | ColumnType::Blob
+        | ColumnType::Boolean => Ok(()),
+        ColumnType::Enum { name, .. } => {
+            safe_ident(context, &name.to_string().to_upper_camel_case())?;
+            Ok(())
+        }
+        ColumnType::Array(inner_col_type) => validate_col_type(context, inner_col_type),
+        other => Err(Error::TransformError(format!(
+            "{context}: column type {other:?} is not supported by codegen"
+        ))),
     }
 }
 
-impl From<&ColumnDef> for Column {
-    fn from(col_def: &ColumnDef) -> Self {
+impl TryFrom<ColumnDef> for Column {
+    type Error = Error;
+
+    fn try_from(col_def: ColumnDef) -> Result<Self, Self::Error> {
+        Self::try_from(&col_def)
+    }
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+2]
+impl TryFrom<&ColumnDef> for Column {
+    type Error = Error;
+
+    fn try_from(col_def: &ColumnDef) -> Result<Self, Self::Error> {
         let name = col_def.get_column_name();
-        let col_type = match col_def.get_column_type() {
-            Some(ty) => ty.clone(),
-            None => panic!("ColumnType should not be empty"),
+        let Some(col_type) = col_def.get_column_type().cloned() else {
+            return Err(Error::TransformError(format!(
+                "column `{name}`: column type should not be empty"
+            )));
         };
         let auto_increment = col_def
             .get_column_spec()
@@ -279,13 +352,15 @@ impl From<&ColumnDef> for Column {
             .get_column_spec()
             .iter()
             .any(|spec| matches!(spec, ColumnSpec::UniqueKey));
-        Self {
+        let column = Self {
             name,
             col_type,
             auto_increment,
             not_null,
             unique,
-        }
+        };
+        column.validate()?;
+        Ok(column)
     }
 }
 
@@ -295,6 +370,10 @@ mod tests {
     use pgorm_query::{Alias, ColumnDef, ColumnType, SeaRc, StringLen};
     use proc_macro2::TokenStream;
     use quote::quote;
+
+    fn to_column(col_def: ColumnDef) -> Column {
+        Column::try_from(col_def).expect("column def should convert")
+    }
 
     fn setup() -> Vec<Column> {
         macro_rules! make_col {
@@ -530,140 +609,153 @@ mod tests {
 
     #[test]
     fn test_get_info() {
-        let column: Column = ColumnDef::new(Alias::new("id")).string().to_owned().into();
+        let column = to_column(ColumnDef::new(Alias::new("id")).string().to_owned());
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `id`: Option<String>"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `id`: String, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .not_null()
-            .unique_key()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .not_null()
+                .unique_key()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `id`: String, not_null, unique"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .not_null()
-            .unique_key()
-            .auto_increment()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .not_null()
+                .unique_key()
+                .auto_increment()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `id`: String, auto_increment, not_null, unique"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("date_field"))
-            .date()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("date_field"))
+                .date()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `date_field`: Date, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("date_field"))
-            .date()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("date_field"))
+                .date()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Time).as_str(),
             "Column `date_field`: TimeDate, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("time_field"))
-            .time()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("time_field"))
+                .time()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `time_field`: Time, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("time_field"))
-            .time()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("time_field"))
+                .time()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Time).as_str(),
             "Column `time_field`: TimeTime, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("date_time_field"))
-            .date_time()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("date_time_field"))
+                .date_time()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `date_time_field`: DateTime, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("date_time_field"))
-            .date_time()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("date_time_field"))
+                .date_time()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Time).as_str(),
             "Column `date_time_field`: TimeDateTime, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("timestamp_field"))
-            .timestamp()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("timestamp_field"))
+                .timestamp()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `timestamp_field`: DateTimeUtc, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("timestamp_field"))
-            .timestamp()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("timestamp_field"))
+                .timestamp()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Time).as_str(),
             "Column `timestamp_field`: TimeDateTime, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
-            .timestamp_with_time_zone()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
+                .timestamp_with_time_zone()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Chrono).as_str(),
             "Column `timestamp_with_timezone_field`: DateTimeWithTimeZone, not_null"
         );
 
-        let column: Column = ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
-            .timestamp_with_time_zone()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
+                .timestamp_with_time_zone()
+                .not_null()
+                .to_owned(),
+        );
         assert_eq!(
             column.get_info(&DateTimeCrate::Time).as_str(),
             "Column `timestamp_with_timezone_field`: TimeDateTimeWithTimeZone, not_null"
@@ -672,7 +764,7 @@ mod tests {
 
     #[test]
     fn test_from_column_def() {
-        let column: Column = ColumnDef::new(Alias::new("id")).string().to_owned().into();
+        let column = to_column(ColumnDef::new(Alias::new("id")).string().to_owned());
         assert_eq!(
             column.get_def().to_string(),
             quote! {
@@ -681,29 +773,32 @@ mod tests {
             .to_string()
         );
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .not_null()
+                .to_owned(),
+        );
         assert!(column.not_null);
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .unique_key()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .unique_key()
+                .not_null()
+                .to_owned(),
+        );
         assert!(column.unique);
         assert!(column.not_null);
 
-        let column: Column = ColumnDef::new(Alias::new("id"))
-            .string()
-            .auto_increment()
-            .unique_key()
-            .not_null()
-            .to_owned()
-            .into();
+        let column = to_column(
+            ColumnDef::new(Alias::new("id"))
+                .string()
+                .auto_increment()
+                .unique_key()
+                .not_null()
+                .to_owned(),
+        );
         assert!(column.auto_increment);
         assert!(column.unique);
         assert!(column.not_null);

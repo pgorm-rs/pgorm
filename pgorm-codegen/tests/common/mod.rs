@@ -6,75 +6,27 @@
 //! `Relation` and friends all keep `pub(crate)` fields.
 #![allow(dead_code)]
 
-use pgorm_codegen::{DateTimeCrate, EntityTransformer, EntityWriterContext, WithSerde};
+use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions};
 use pgorm_query::{
     Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Table, TableCreateStatement,
 };
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-/// The full `EntityWriterContext::new` option set, defaulted to the shape a
-/// caller gets with no flags: compact format, no serde, chrono, `mod.rs`.
-pub struct Opts {
-    pub expanded_format: bool,
-    pub with_serde: WithSerde,
-    pub with_copy_enums: bool,
-    pub date_time_crate: DateTimeCrate,
-    pub schema_name: Option<String>,
-    pub lib: bool,
-    pub serde_skip_deserializing_primary_key: bool,
-    pub serde_skip_hidden_column: bool,
-    pub model_extra_derives: Vec<String>,
-    pub model_extra_attributes: Vec<String>,
-    pub enum_extra_derives: Vec<String>,
-    pub enum_extra_attributes: Vec<String>,
-    pub seaography: bool,
-}
+/// The full `EntityWriterContext::new` option set; `Opts::default()` is the
+/// shape a caller gets with no flags: compact format, no serde, chrono,
+/// `mod.rs`.
+pub type Opts = EntityWriterOptions;
 
-impl Default for Opts {
-    fn default() -> Self {
-        Self {
-            expanded_format: false,
-            with_serde: WithSerde::None,
-            with_copy_enums: false,
-            date_time_crate: DateTimeCrate::Chrono,
-            schema_name: None,
-            lib: false,
-            serde_skip_deserializing_primary_key: false,
-            serde_skip_hidden_column: false,
-            model_extra_derives: Vec::new(),
-            model_extra_attributes: Vec::new(),
-            enum_extra_derives: Vec::new(),
-            enum_extra_attributes: Vec::new(),
-            seaography: false,
-        }
+/// The same set with the expanded format selected.
+pub fn expanded() -> Opts {
+    Opts {
+        expanded_format: true,
+        ..Default::default()
     }
 }
 
-impl Opts {
-    pub fn expanded() -> Self {
-        Self {
-            expanded_format: true,
-            ..Default::default()
-        }
-    }
-
-    pub fn build(self) -> EntityWriterContext {
-        EntityWriterContext::new(
-            self.expanded_format,
-            self.with_serde,
-            self.with_copy_enums,
-            self.date_time_crate,
-            self.schema_name,
-            self.lib,
-            self.serde_skip_deserializing_primary_key,
-            self.serde_skip_hidden_column,
-            self.model_extra_derives,
-            self.model_extra_attributes,
-            self.enum_extra_derives,
-            self.enum_extra_attributes,
-            self.seaography,
-        )
-    }
+pub fn context(opts: Opts) -> EntityWriterContext {
+    EntityWriterContext::new(opts).expect("options should build a context")
 }
 
 /// The in-memory `WriterOutput`, keyed for convenient lookup while preserving
@@ -104,7 +56,7 @@ impl Generated {
 
 /// Run the whole pipeline: schema statements in, generated files out.
 pub fn generate(stmts: Vec<TableCreateStatement>, opts: Opts) -> Generated {
-    let ctx = opts.build();
+    let ctx = context(opts);
     let writer = EntityTransformer::transform(stmts).expect("transform should succeed");
     Generated {
         files: writer

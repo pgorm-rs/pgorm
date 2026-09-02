@@ -2,12 +2,22 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::Ident;
 use quote::format_ident;
 
+use crate::{Error, util::safe_ident};
+
 #[derive(Clone, Debug)]
 pub struct PrimaryKey {
     pub(crate) name: String,
 }
 
 impl PrimaryKey {
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let context = format!("primary key `{}`", self.name);
+        safe_ident(&context, &self.name.to_snake_case())?;
+        safe_ident(&context, &self.name.to_upper_camel_case())?;
+        Ok(())
+    }
+
     pub fn get_name_snake_case(&self) -> Ident {
         format_ident!("{}", self.name.to_snake_case())
     }

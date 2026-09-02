@@ -1,11 +1,13 @@
-use crate::util::unpack_table_ref;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ForeignKeyAction, TableForeignKey};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::{punctuated::Punctuated, token::Comma};
 
-use crate::util::escape_rust_keyword;
+use crate::{
+    Error,
+    util::{escape_rust_keyword, safe_ident, unpack_table_ref},
+};
 
 #[derive(Clone, Debug)]
 pub enum RelationType {
@@ -28,6 +30,20 @@ pub struct Relation {
 }
 
 impl Relation {
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let context = format!("relation to `{}`", self.ref_table);
+        safe_ident(
+            &context,
+            &escape_rust_keyword(self.ref_table.to_snake_case()),
+        )?;
+        safe_ident(&context, &self.ref_table.to_upper_camel_case())?;
+        for column in self.columns.iter().chain(self.ref_columns.iter()) {
+            safe_ident(&context, &column.to_upper_camel_case())?;
+        }
+        Ok(())
+    }
+
     // [spec:pgorm:sem:codegen.entity.relations]
     pub fn get_enum_name(&self) -> Ident {
         let name = if self.self_referencing {
@@ -218,18 +234,29 @@ impl Relation {
     }
 }
 
-impl From<&TableForeignKey> for Relation {
-    fn from(tbl_fk: &TableForeignKey) -> Self {
-        let ref_table = match tbl_fk.get_ref_table() {
-            Some(s) => unpack_table_ref(s),
-            None => panic!("RefTable should not be empty"),
-        };
+// [spec:pgorm:sem:codegen.entity.transform+2]
+impl TryFrom<&TableForeignKey> for Relation {
+    type Error = Error;
+
+    fn try_from(tbl_fk: &TableForeignKey) -> Result<Self, Self::Error> {
         let columns = tbl_fk.get_columns();
+        let ref_table = match tbl_fk.get_ref_table() {
+            Some(table_ref) => unpack_table_ref(table_ref),
+            None => {
+                let context = match columns.as_slice() {
+                    [] => "foreign key".to_owned(),
+                    columns => format!("foreign key on `{}`", columns.join("`, `")),
+                };
+                return Err(Error::TransformError(format!(
+                    "{context}: referenced table should not be empty"
+                )));
+            }
+        };
         let ref_columns = tbl_fk.get_ref_columns();
         let rel_type = RelationType::BelongsTo;
         let on_delete = tbl_fk.get_on_delete();
         let on_update = tbl_fk.get_on_update();
-        Self {
+        Ok(Self {
             ref_table,
             columns,
             ref_columns,
@@ -239,7 +266,7 @@ impl From<&TableForeignKey> for Relation {
             self_referencing: false,
             num_suffix: 0,
             impl_related: true,
-        }
+        })
     }
 }
 

@@ -5,7 +5,8 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::{
-    Column, ConjunctRelation, DateTimeCrate, PrimaryKey, Relation, util::escape_rust_keyword,
+    Column, ConjunctRelation, DateTimeCrate, Error, PrimaryKey, Relation,
+    util::{escape_rust_keyword, safe_ident},
 };
 
 #[derive(Clone, Debug)]
@@ -18,6 +19,44 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// Everything the writer derives from this entity's DB names, checked while
+    /// the caller can still be handed the failure.
+    // [spec:pgorm:sem:codegen.entity.transform+2]
+    // [spec:pgorm:sem:codegen.entity.keywords+1]
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let table = self.table_name.as_str();
+        let context = format!("table `{table}`");
+        safe_ident(
+            &context,
+            &escape_rust_keyword(self.get_table_name_snake_case()),
+        )?;
+        safe_ident(
+            &context,
+            &escape_rust_keyword(self.get_table_name_camel_case()),
+        )?;
+        for column in self.columns.iter() {
+            column.validate().map_err(|err| err.in_table(table))?;
+        }
+        for primary_key in self.primary_keys.iter() {
+            if !self.columns.iter().any(|col| col.name == primary_key.name) {
+                return Err(Error::TransformError(format!(
+                    "{context}: primary key column `{}` is not a column of the table",
+                    primary_key.name
+                )));
+            }
+            primary_key.validate().map_err(|err| err.in_table(table))?;
+        }
+        for relation in self.relations.iter() {
+            relation.validate().map_err(|err| err.in_table(table))?;
+        }
+        for conjunct_relation in self.conjunct_relations.iter() {
+            conjunct_relation
+                .validate()
+                .map_err(|err| err.in_table(table))?;
+        }
+        Ok(())
+    }
+
     pub fn get_table_name_snake_case(&self) -> String {
         self.table_name.to_snake_case()
     }
@@ -193,7 +232,7 @@ impl Entity {
                 self.columns
                     .iter()
                     .find(|col| col.name.eq(&primary_key.name))
-                    .unwrap()
+                    .expect("every primary key names a column of its own table")
                     .get_rs_type(date_time_crate)
                     .to_string()
             })
@@ -204,7 +243,10 @@ impl Entity {
             } else {
                 types
             };
-            value_type.join("").parse().unwrap()
+            value_type
+                .join("")
+                .parse()
+                .expect("mapped Rust type names are token text")
         } else {
             TokenStream::new()
         }

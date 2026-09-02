@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+1]
+    // [spec:pgorm:sem:codegen.entity.transform+2]
     // [spec:pgorm:sem:codegen.entity.transform.inverse]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {
@@ -18,15 +18,7 @@ impl EntityTransformer {
         let mut entities = BTreeMap::new();
         for table_create in table_create_stmts.into_iter() {
             let table_name = match table_create.get_table_name() {
-                Some(table_ref) => match table_ref {
-                    pgorm_query::TableRef::Table(t)
-                    | pgorm_query::TableRef::SchemaTable(_, t)
-                    | pgorm_query::TableRef::DatabaseSchemaTable(_, _, t)
-                    | pgorm_query::TableRef::TableAlias(t, _)
-                    | pgorm_query::TableRef::SchemaTableAlias(_, t, _)
-                    | pgorm_query::TableRef::DatabaseSchemaTableAlias(_, _, t, _) => t.to_string(),
-                    _ => unimplemented!(),
-                },
+                Some(table_ref) => unpack_table_ref(table_ref),
                 None => {
                     return Err(Error::TransformError(
                         "Table name should not be empty".into(),
@@ -34,64 +26,55 @@ impl EntityTransformer {
                 }
             };
             let mut primary_keys: Vec<PrimaryKey> = Vec::new();
-            let columns: Vec<Column> = table_create
-                .get_columns()
-                .iter()
-                .map(|col_def| {
-                    let primary_key = col_def
-                        .get_column_spec()
-                        .iter()
-                        .any(|spec| matches!(spec, ColumnSpec::PrimaryKey));
-                    if primary_key {
-                        primary_keys.push(PrimaryKey {
-                            name: col_def.get_column_name(),
-                        });
-                    }
-                    col_def.into()
-                })
-                .map(|mut col: Column| {
-                    col.unique = table_create
-                        .get_indexes()
-                        .iter()
-                        .filter(|index| index.is_unique_key())
-                        .map(|index| index.get_index_spec().get_column_names())
-                        .filter(|col_names| col_names.len() == 1 && col_names[0] == col.name)
-                        .count()
-                        > 0;
-                    col
-                })
-                .inspect(|col| {
-                    if let pgorm_query::ColumnType::Enum { name, variants } =
-                        col.get_inner_col_type()
-                    {
-                        enums.insert(
-                            name.to_string(),
-                            ActiveEnum {
-                                enum_name: name.clone(),
-                                values: variants.clone(),
-                            },
-                        );
-                    }
-                })
-                .collect();
+            let mut columns: Vec<Column> = Vec::new();
+            for col_def in table_create.get_columns() {
+                let primary_key = col_def
+                    .get_column_spec()
+                    .iter()
+                    .any(|spec| matches!(spec, ColumnSpec::PrimaryKey));
+                if primary_key {
+                    primary_keys.push(PrimaryKey {
+                        name: col_def.get_column_name(),
+                    });
+                }
+                let mut col = Column::try_from(col_def).map_err(|err| err.in_table(&table_name))?;
+                col.unique = table_create
+                    .get_indexes()
+                    .iter()
+                    .filter(|index| index.is_unique_key())
+                    .map(|index| index.get_index_spec().get_column_names())
+                    .filter(|col_names| col_names.len() == 1 && col_names[0] == col.name)
+                    .count()
+                    > 0;
+                if let pgorm_query::ColumnType::Enum { name, variants } = col.get_inner_col_type() {
+                    enums.insert(
+                        name.to_string(),
+                        ActiveEnum {
+                            enum_name: name.clone(),
+                            values: variants.clone(),
+                        },
+                    );
+                }
+                columns.push(col);
+            }
             let mut ref_table_counts: BTreeMap<String, usize> = BTreeMap::new();
-            let relations: Vec<Relation> = table_create
+            let foreign_keys = table_create
                 .get_foreign_key_create_stmts()
                 .iter()
-                .map(|fk_create_stmt| fk_create_stmt.get_foreign_key())
-                .map(|tbl_fk| {
-                    let ref_tbl = unpack_table_ref(tbl_fk.get_ref_table().unwrap());
-                    if let Some(count) = ref_table_counts.get_mut(&ref_tbl) {
-                        if *count == 0 {
-                            *count = 1;
-                        }
-                        *count += 1;
-                    } else {
-                        ref_table_counts.insert(ref_tbl, 0);
-                    };
-                    tbl_fk.into()
-                })
-                .collect::<Vec<_>>()
+                .map(|fk_create_stmt| Relation::try_from(fk_create_stmt.get_foreign_key()))
+                .collect::<Result<Vec<Relation>, Error>>()
+                .map_err(|err| err.in_table(&table_name))?;
+            for relation in foreign_keys.iter() {
+                if let Some(count) = ref_table_counts.get_mut(&relation.ref_table) {
+                    if *count == 0 {
+                        *count = 1;
+                    }
+                    *count += 1;
+                } else {
+                    ref_table_counts.insert(relation.ref_table.clone(), 0);
+                }
+            }
+            let relations: Vec<Relation> = foreign_keys
                 .into_iter()
                 .rev()
                 .map(|mut rel: Relation| {
@@ -191,69 +174,73 @@ impl EntityTransformer {
                 }
             }
         }
-        for table_name in entities.clone().keys() {
-            let relations = match entities.get(table_name) {
-                Some(entity) => {
-                    let is_conjunct_relation =
-                        entity.relations.len() == 2 && entity.primary_keys.len() == 2;
-                    if !is_conjunct_relation {
-                        continue;
-                    }
-                    entity.relations.clone()
-                }
-                None => unreachable!(),
+        let mut conjunct_relations: Vec<(String, ConjunctRelation)> = Vec::new();
+        for (table_name, entity) in entities.iter() {
+            if entity.primary_keys.len() != 2 {
+                continue;
+            }
+            let [one, other] = entity.relations.as_slice() else {
+                continue;
             };
-            for (i, rel) in relations.iter().enumerate() {
-                let another_rel = relations.get((i == 0) as usize).unwrap();
-                if let Some(entity) = entities.get_mut(&rel.ref_table) {
-                    let conjunct_relation = ConjunctRelation {
+            for (rel, another_rel) in [(one, other), (other, one)] {
+                conjunct_relations.push((
+                    rel.ref_table.clone(),
+                    ConjunctRelation {
                         via: table_name.clone(),
                         to: another_rel.ref_table.clone(),
-                    };
-                    entity.conjunct_relations.push(conjunct_relation);
-                }
+                    },
+                ));
             }
         }
-        Ok(EntityWriter {
-            entities: entities
-                .into_values()
-                .map(|mut v| {
-                    // Filter duplicated conjunct relations
-                    let duplicated_to: Vec<_> = v
-                        .conjunct_relations
+        for (ref_table, conjunct_relation) in conjunct_relations {
+            if let Some(entity) = entities.get_mut(&ref_table) {
+                entity.conjunct_relations.push(conjunct_relation);
+            }
+        }
+        let entities: Vec<Entity> = entities
+            .into_values()
+            .map(|mut v| {
+                // Filter duplicated conjunct relations
+                let duplicated_to: Vec<_> = v
+                    .conjunct_relations
+                    .iter()
+                    .fold(HashMap::new(), |mut acc, conjunct_relation| {
+                        acc.entry(conjunct_relation.to.clone())
+                            .and_modify(|c| *c += 1)
+                            .or_insert(1);
+                        acc
+                    })
+                    .into_iter()
+                    .filter(|(_, v)| v > &1)
+                    .map(|(k, _)| k)
+                    .collect();
+                v.conjunct_relations
+                    .retain(|conjunct_relation| !duplicated_to.contains(&conjunct_relation.to));
+
+                // Skip `impl Related ... { fn to() ... }` implementation block,
+                // if the same related entity is being referenced by a conjunct relation
+                v.relations.iter_mut().for_each(|relation| {
+                    if v.conjunct_relations
                         .iter()
-                        .fold(HashMap::new(), |mut acc, conjunct_relation| {
-                            acc.entry(conjunct_relation.to.clone())
-                                .and_modify(|c| *c += 1)
-                                .or_insert(1);
-                            acc
-                        })
-                        .into_iter()
-                        .filter(|(_, v)| v > &1)
-                        .map(|(k, _)| k)
-                        .collect();
-                    v.conjunct_relations
-                        .retain(|conjunct_relation| !duplicated_to.contains(&conjunct_relation.to));
+                        .any(|conjunct_relation| conjunct_relation.to == relation.ref_table)
+                    {
+                        relation.impl_related = false;
+                    }
+                });
 
-                    // Skip `impl Related ... { fn to() ... }` implementation block,
-                    // if the same related entity is being referenced by a conjunct relation
-                    v.relations.iter_mut().for_each(|relation| {
-                        if v.conjunct_relations
-                            .iter()
-                            .any(|conjunct_relation| conjunct_relation.to == relation.ref_table)
-                        {
-                            relation.impl_related = false;
-                        }
-                    });
-
-                    // Sort relation vectors
-                    v.relations.sort_by(|a, b| a.ref_table.cmp(&b.ref_table));
-                    v.conjunct_relations.sort_by(|a, b| a.to.cmp(&b.to));
-                    v
-                })
-                .collect(),
-            enums,
-        })
+                // Sort relation vectors
+                v.relations.sort_by(|a, b| a.ref_table.cmp(&b.ref_table));
+                v.conjunct_relations.sort_by(|a, b| a.to.cmp(&b.to));
+                v
+            })
+            .collect();
+        for entity in entities.iter() {
+            entity.validate()?;
+        }
+        for active_enum in enums.values() {
+            active_enum.validate()?;
+        }
+        Ok(EntityWriter { entities, enums })
     }
 }
 

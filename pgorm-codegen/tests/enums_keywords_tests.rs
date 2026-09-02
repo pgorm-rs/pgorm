@@ -7,7 +7,7 @@ use common::*;
 use pgorm_codegen::WithSerde;
 use pgorm_query::{Alias, ColumnDef, ColumnType, Table};
 
-// [spec:pgorm:sem:codegen.entity.enums/test]    every discovered enum lands in
+// [spec:pgorm:sem:codegen.entity.enums+1/test]    every discovered enum lands in
 // one `pgorm_active_enums.rs`, alphabetically by enum name
 #[test]
 fn active_enums_are_generated_into_one_alphabetical_file() {
@@ -43,7 +43,7 @@ fn active_enums_are_generated_into_one_alphabetical_file() {
     assert!(position_of(enums, "pub enum AppleKind") < position_of(enums, "pub enum ZebraKind"));
 }
 
-// [spec:pgorm:sem:codegen.entity.enums/test]    each enum gets the base derives,
+// [spec:pgorm:sem:codegen.entity.enums+1/test]    each enum gets the base derives,
 // the `#[pgorm(rs_type, db_type, enum_name)]` attribute, extra attributes, an
 // UpperCamelCase name and one `string_value` per variant
 #[test]
@@ -79,7 +79,7 @@ fn active_enum_derives_attributes_and_string_values() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.enums/test]    variant naming: a leading digit
+// [spec:pgorm:sem:codegen.entity.enums+1/test]    variant naming: a leading digit
 // gets an underscore prefix, an empty UpperCamelCase falls back to per-character
 // encoding (ASCII as `U<hex>`, multi-byte verbatim), everything else is plain
 // UpperCamelCase
@@ -115,7 +115,7 @@ fn active_enum_variant_naming_digits_punctuation_multibyte() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.enums/test]    entity files import each enum
+// [spec:pgorm:sem:codegen.entity.enums+1/test]    entity files import each enum
 // they use, and the expanded `ColumnTrait::def` renders enum columns as
 // `<EnumName>::db_type()`
 #[test]
@@ -129,7 +129,7 @@ fn entity_files_import_enums_and_render_db_type() {
                 enum_col("second_tea", "tea_kind", &["black", "green"]),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     let file = generated.file("tea_pairing.rs");
 
@@ -144,7 +144,7 @@ fn entity_files_import_enums_and_render_db_type() {
     assert_contains(file, "Self::SecondTea => TeaKind::db_type().def(),");
 }
 
-// [spec:pgorm:sem:codegen.entity.keywords/test]    strict / reserved Rust
+// [spec:pgorm:sem:codegen.entity.keywords+1/test]    strict / reserved Rust
 // keywords are emitted as raw identifiers
 #[test]
 fn rust_keywords_in_column_names_become_raw_identifiers() {
@@ -160,7 +160,7 @@ fn rust_keywords_in_column_names_become_raw_identifiers() {
                 typed("plain", ColumnType::Integer),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     let sample = generated.file("sample.rs");
 
@@ -182,7 +182,7 @@ fn rust_keywords_in_column_names_become_raw_identifiers() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.keywords/test]    `crate`, `self` and `Self`
+// [spec:pgorm:sem:codegen.entity.keywords+1/test]    `crate`, `self` and `Self`
 // cannot be raw identifiers, so they get a trailing underscore instead
 #[test]
 fn crate_and_self_keywords_get_a_trailing_underscore() {
@@ -195,7 +195,7 @@ fn crate_and_self_keywords_get_a_trailing_underscore() {
                 typed("self", ColumnType::Integer),
             ],
         )],
-        Opts::expanded(),
+        expanded(),
     );
     let sample = generated.file("sample.rs");
 
@@ -208,7 +208,7 @@ fn crate_and_self_keywords_get_a_trailing_underscore() {
     assert_contains(sample, "pub enum Column { Id, Crate, Self_, }");
 }
 
-// [spec:pgorm:sem:codegen.entity.keywords/test]    module names and table idents
+// [spec:pgorm:sem:codegen.entity.keywords+1/test]    module names and table idents
 // are escaped too
 #[test]
 fn keyword_table_names_escaped_in_index_and_prelude() {
@@ -241,7 +241,7 @@ fn keyword_table_names_escaped_in_index_and_prelude() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.keywords/test]    field names are the snake_case
+// [spec:pgorm:sem:codegen.entity.keywords+1/test]    field names are the snake_case
 // of the column name; when that differs from the raw DB name the DB name is
 // preserved by a `column_name` attribute in both formats
 #[test]
@@ -266,7 +266,7 @@ fn non_snake_case_names_preserved_by_column_name() {
         r#"#[pgorm(column_name = "bakedAt")] pub baked_at: i32,"#,
     );
 
-    let expanded = generate(schema(), Opts::expanded());
+    let expanded = generate(schema(), expanded());
     assert_contains(expanded.file("cake.rs"), "pub baked_at: i32,");
     assert_contains(
         expanded.file("cake.rs"),
