@@ -806,6 +806,15 @@ children (
                     )
                 }
                 deps (codegen.macros)
+                log (
+                    {
+                        at 2026-09-02T09:33:24.935268Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "codegen.entity.transform v0 overclaimed since adoption: (1) it said repeated FKs to one target get num_suffix \"in declaration order\", but the rev/map/rev pipeline in transformer.rs hands suffixes out in reverse — first-declared gets the highest; behavior deliberately kept so regenerated entities keep their relation variant names. (2) It said `unique` comes from the matching ColumnSpec, but the transform path unconditionally overwrites it from single-column unique indexes, discarding ColumnSpec::UniqueKey (which is live only in the public From<&ColumnDef> conversion). Found by verify.codegen; rule corrected at +1 with operator approval, all 13 refs re-pinned."
+                        after_done true
+                    }
+                )
             }
         )
     }

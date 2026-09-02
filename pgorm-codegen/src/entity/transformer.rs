@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform]
+    // [spec:pgorm:sem:codegen.entity.transform+1]
     // [spec:pgorm:sem:codegen.entity.transform.inverse]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {

@@ -28,7 +28,7 @@ fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    one Entity per input
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    one Entity per input
 // statement, held in a BTreeMap so every output is ordered by table name
 #[test]
 fn transform_builds_entity_per_statement_ordered_by_name() {
@@ -52,7 +52,7 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    the table name is unpacked
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    the table name is unpacked
 // from every `TableRef` variant that carries a table iden
 #[test]
 fn transform_unpacks_table_name_from_every_table_ref() {
@@ -84,7 +84,7 @@ fn transform_unpacks_table_name_from_every_table_ref() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    a statement with no table
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    a statement with no table
 // name is a `TransformError`
 #[test]
 fn transform_rejects_a_statement_without_a_table_name() {
@@ -96,7 +96,7 @@ fn transform_rejects_a_statement_without_a_table_name() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    a column with no
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    a column with no
 // `ColumnType` panics
 #[test]
 #[should_panic(expected = "ColumnType should not be empty")]
@@ -108,7 +108,7 @@ fn transform_panics_on_column_without_column_type() {
     let _ = EntityTransformer::transform(vec![untyped]);
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    `auto_increment`,
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    `auto_increment`,
 // `not_null` and `unique` come from the matching `ColumnSpec`
 #[test]
 fn transform_reads_column_specs_off_the_column_definition() {
@@ -155,7 +155,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    a single-column unique index
 // over exactly that column also marks it unique
 #[test]
 fn transform_marks_columns_from_single_column_unique_index() {
@@ -205,7 +205,7 @@ fn transform_marks_columns_from_single_column_unique_index() {
     assert_not_contains(vendor, "#[pgorm(unique)] pub tier: String,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    primary keys come from
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    primary keys come from
 // `ColumnSpec::PrimaryKey` and are extended by a table-level primary-key index
 #[test]
 fn transform_collects_pks_from_specs_and_table_indexes() {
@@ -250,7 +250,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    every enum column registers
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    every enum column registers
 // an `ActiveEnum` keyed by enum name, deduplicated across tables and looked
 // through `Array`
 #[test]
@@ -298,7 +298,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
     assert!(position_of(enums, "pub enum Mood") < position_of(enums, "pub enum Tea"));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    foreign keys become
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    foreign keys become
 // `BelongsTo` relations that keep their columns, referenced columns and
 // on_update / on_delete actions
 #[test]
@@ -352,7 +352,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    a relation onto its own
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    a relation onto its own
 // table is flagged self-referencing
 #[test]
 fn transform_flags_self_referencing_relations() {
@@ -367,7 +367,7 @@ fn transform_flags_self_referencing_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    several FKs onto the same
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    several FKs onto the same
 // target take 1-based `num_suffix`es in declaration order; a lone FK keeps 0
 #[test]
 fn transform_numbers_repeated_fks_to_same_table() {
@@ -435,7 +435,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
     assert_not_contains(basket, "Cake1,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform/test]    relations are sorted by
+// [spec:pgorm:sem:codegen.entity.transform+1/test]    relations are sorted by
 // referenced table name and conjunct relations by target name
 #[test]
 fn transform_sorts_relations_and_conjunct_relations() {

@@ -30,30 +30,39 @@ golden fixtures under `pgorm-codegen/tests/`.
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform]
+> [spec:pgorm:sem:codegen.entity.transform+1]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. The table name is unpacked from any `TableRef`
 > variant carrying a table iden (`Table`, `SchemaTable`,
 > `DatabaseSchemaTable`, and their alias forms); a statement with no table
 > name yields `Error::TransformError("Table name should not be empty")`.
 >
-> Per column: `auto_increment`, `not_null`, and `unique` come from the
-> presence of the matching `ColumnSpec` on the column definition; a column
-> with no `ColumnType` panics with `"ColumnType should not be empty"`.
-> Additionally, a column is marked `unique` when the table has a
-> single-column unique index over exactly that column. Primary keys are
-> collected from `ColumnSpec::PrimaryKey` markers and extended with the
-> column names of any table-level primary-key index. Every column whose
-> (possibly array-inner) type is `ColumnType::Enum` registers an
-> `ActiveEnum` in a `BTreeMap` keyed by enum name, deduplicating across
-> tables.
+> Per column: `auto_increment` and `not_null` come from the presence of the
+> matching `ColumnSpec` on the column definition; a column with no
+> `ColumnType` panics with `"ColumnType should not be empty"`. `unique` does
+> not: the transformer overwrites the value the `From<&ColumnDef> for
+> Column` conversion derived, assigning `unique` solely from the table's
+> indexes — true exactly when some unique index of the table covers that one
+> column and nothing else. A `ColumnSpec::UniqueKey` on the column
+> definition is therefore discarded on this path; it takes effect only when
+> a `ColumnDef` is converted through the public `From<&ColumnDef> for
+> Column` impl directly, outside `transform`. Primary keys are collected
+> from `ColumnSpec::PrimaryKey` markers and extended with the column names
+> of any table-level primary-key index. Every column whose (possibly
+> array-inner) type is `ColumnType::Enum` registers an `ActiveEnum` in a
+> `BTreeMap` keyed by enum name, deduplicating across tables.
 >
 > Foreign keys become `BelongsTo` relations on the owning table, keeping the
 > FK's columns, referenced columns, `on_update`, and `on_delete` actions. A
 > relation whose referenced table equals its own table is flagged
 > `self_referencing`. When several FKs of one table reference the same
-> target table, each such relation receives a 1-based `num_suffix` in
-> declaration order (a single FK to a target keeps suffix 0).
+> target table, each such relation receives a distinct 1-based `num_suffix`
+> — but the numbering runs in reverse declaration order: the per-target
+> counter is seeded with the number of FKs to that target and decremented as
+> suffixes are handed out, so for N FKs to one target the first-declared
+> receives suffix N and the last-declared receives 1 (`fruit_id1` becomes
+> `Fruit2` and `fruit_id2` becomes `Fruit1`). A single FK to a target keeps
+> suffix 0.
 >
 > Entities are held in a `BTreeMap` keyed by table name, so all outputs that
 > iterate entities (entity files, `mod.rs`, `prelude.rs`) are ordered
