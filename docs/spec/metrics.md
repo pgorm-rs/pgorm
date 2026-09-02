@@ -53,18 +53,32 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Transaction instrumentation
 
-> [spec:pgorm:sem:metric.layer.tx]
+> [spec:pgorm:sem:metric.layer.tx+1]
 > `TransactionTrait::begin` on `InstrumentedConnection` times `BEGIN` and
 > reports `record_transaction_begin` on success; a failed begin is reported
-> through `record_query_error("begin", ..)`, not a dedicated hook. The
-> returned value is a plain `DatabaseTransaction` — begin does not
-> auto-instrument; callers must wrap it via `InstrumentedTransaction::new` to
-> keep per-statement metrics inside the transaction.
+> through `record_query_error("begin", ..)`, not a dedicated hook. Its return
+> type is fixed by the trait, so it hands back a plain `DatabaseTransaction`:
+> statements issued through that handle bypass the collector entirely unless
+> the caller wraps it via `InstrumentedTransaction::new`.
+> `InstrumentedConnection::begin_instrumented` is the wrapping counterpart — an
+> inherent method reporting the same two hooks, but returning an
+> `InstrumentedTransaction<'_, M>` sharing a clone of the collector, so
+> per-statement metrics inside the transaction need no second call.
 >
 > `InstrumentedTransaction::commit` times the commit and reports
 > `record_transaction_commit` on success; a failed commit is reported as
 > `record_transaction_rollback` (Postgres aborts the transaction when commit
-> fails). Its `Drop` impl is intentionally an empty no-op: dropping an
-> uncommitted instrumented transaction records no rollback metric and defers
-> entirely to the inner `DatabaseTransaction`'s drop behavior (tracing warning
-> plus implicit rollback).
+> fails). `InstrumentedTransaction::rollback` consumes the handle, awaits the
+> inner `DatabaseTransaction::rollback`, and reports
+> `record_transaction_rollback` on either outcome — the transaction is
+> discarded whether or not the `ROLLBACK` round trip succeeds — additionally
+> reporting a failed round trip through `record_query_error("rollback", ..)`.
+>
+> Its `Drop` impl is an empty no-op, and dropping an uncommitted instrumented
+> transaction therefore records nothing at all — not even a rollback. This is a
+> limit, not a policy: every collector hook is `async` while `Drop::drop` is
+> synchronous, so no hook is reachable from drop. Drop defers entirely to the
+> inner `DatabaseTransaction`'s drop behavior (tracing warning plus a
+> fire-and-forget `ROLLBACK`), and a rollback only reaches the collector when a
+> caller asks for one by calling `rollback` (or when a failing `commit` forces
+> one).

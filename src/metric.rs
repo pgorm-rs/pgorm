@@ -184,6 +184,31 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     pub fn metrics(&self) -> &M {
         &self.metrics
     }
+
+    /// Begin a transaction that is already wrapped for instrumentation.
+    ///
+    /// Reports the same hooks as [`TransactionTrait::begin`], and hands back an
+    /// [`InstrumentedTransaction`] sharing a clone of the collector, so
+    /// statements issued inside the transaction stay instrumented without the
+    /// caller wrapping the handle by hand.
+    // [spec:pgorm:sem:metric.layer.tx+1]    instrumented begin
+    pub async fn begin_instrumented(&mut self) -> Result<InstrumentedTransaction<'_, M>, DbErr> {
+        let metrics = self.metrics.clone();
+        let start = Instant::now();
+        let result = self.connection.begin().await;
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok(_) => {
+                metrics.record_transaction_begin(elapsed).await;
+            }
+            Err(e) => {
+                metrics.record_query_error("begin", elapsed, e).await;
+            }
+        }
+
+        result.map(|transaction| InstrumentedTransaction::new(transaction, metrics))
+    }
 }
 
 // [spec:pgorm:req:metric.layer.delegate+1]
@@ -357,7 +382,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
 }
 
 /// A transaction wrapper that instruments transaction operations
-// [spec:pgorm:sem:metric.layer.tx]    commit reporting + no-op drop
+// [spec:pgorm:sem:metric.layer.tx+1]    commit + rollback reporting, no-op drop
 #[derive(Debug)]
 pub struct InstrumentedTransaction<'a, M: MetricsCollector> {
     transaction: Option<DatabaseTransaction<'a>>,
@@ -390,6 +415,30 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
                     metrics.record_transaction_rollback(elapsed).await;
                 }
             }
+
+            result
+        } else {
+            unreachable!("Transaction already consumed")
+        }
+    }
+
+    /// Roll the transaction back, reporting the rollback to the collector.
+    ///
+    /// Dropping the handle instead rolls back on the connection but records
+    /// nothing; this is the only path that reports a rollback the caller asked
+    /// for rather than one Postgres forced by a failed commit.
+    pub async fn rollback(mut self) -> Result<(), DbErr> {
+        let start = Instant::now();
+        let metrics = self.metrics.clone();
+
+        if let Some(transaction) = self.transaction.take() {
+            let result = transaction.rollback().await;
+            let elapsed = start.elapsed();
+
+            if let Err(e) = &result {
+                metrics.record_query_error("rollback", elapsed, e).await;
+            }
+            metrics.record_transaction_rollback(elapsed).await;
 
             result
         } else {
@@ -602,7 +651,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx]    timed begin
+// [spec:pgorm:sem:metric.layer.tx+1]    timed begin, uninstrumented handle
 #[async_trait]
 impl<M: MetricsCollector> TransactionTrait for InstrumentedConnection<M> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
