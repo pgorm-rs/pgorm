@@ -674,3 +674,75 @@ pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), DbErr> {
 
     Ok(())
 }
+
+// [spec:pgorm:req:conn.tx+1/test]    a savepoint under a configured outer transaction
+#[pgorm_macros::test]
+pub async fn transaction_nested_under_config_txtests() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_nested_under_config_txtests").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    let mut txn = db.begin_with(serializable()).await?;
+
+    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+
+    {
+        let txn2 = txn.begin().await?;
+
+        insert_bakery(&txn2, "Rolled Back Bakery", 88.88).await?;
+
+        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
+    }
+
+    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
+
+    {
+        let txn2 = txn.begin().await?;
+
+        insert_bakery(&txn2, "Top Bakery", 15.0).await?;
+
+        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
+
+        txn2.commit().await?;
+    }
+
+    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
+
+    txn.commit().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 2);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.tx+1/test]    read only + deferrable + serializable, the one valid deferrable combination
+#[pgorm_macros::test]
+pub async fn transaction_deferrable_txtests() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_deferrable_txtests").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    insert_bakery(&db, "SeaSide Bakery", 10.4).await?;
+
+    let txn = db
+        .begin_with(TransactionOptions {
+            isolation_level: Some(IsolationLevel::Serializable),
+            read_only: true,
+            deferrable: true,
+        })
+        .await?;
+
+    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
+
+    txn.commit().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}

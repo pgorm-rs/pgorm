@@ -677,6 +677,22 @@ children (
                             infra.tx.metric-tx
                             infra.tx.closure
                         )
+                        sealed true
+                        log (
+                            {
+                                at 2026-09-02T00:38:55.229651Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-09-02T00:44:19.363915Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
+                            }
+                        )
                     }
 
                     {
