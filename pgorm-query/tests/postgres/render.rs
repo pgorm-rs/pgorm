@@ -26,16 +26,10 @@ fn the_single_backend_renders_every_statement_kind() {
         .from_table(Glyph::Table)
         .and_where(Expr::col(Glyph::Id).eq(1))
         .to_owned();
-    let with = select().with(
-        WithClause::new()
-            .cte(
-                CommonTableExpression::new()
-                    .table_name(Alias::new("cte"))
-                    .query(select())
-                    .to_owned(),
-            )
-            .to_owned(),
-    );
+    let with = select().with(WithClause::new(CommonTableExpression::new(
+        Alias::new("cte"),
+        select(),
+    )));
 
     assert_eq!(
         select().to_string(QueryBuilder),

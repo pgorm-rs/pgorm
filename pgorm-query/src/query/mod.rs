@@ -78,9 +78,14 @@ impl Query {
         DeleteStatement::new()
     }
 
-    /// Construct [`WithClause`]
-    pub fn with() -> WithClause {
-        WithClause::new()
+    /// Construct [`WithClause`] around its first common table expression
+    pub fn with(cte: CommonTableExpression) -> WithClause {
+        WithClause::new(cte)
+    }
+
+    /// Construct [`RecursiveWithClause`] around the one common table expression it may hold
+    pub fn with_recursive(cte: CommonTableExpression) -> RecursiveWithClause {
+        RecursiveWithClause::new(cte)
     }
 
     /// Construct [`Returning`]

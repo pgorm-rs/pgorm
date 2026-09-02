@@ -336,37 +336,50 @@ today, including panicking edges and deliberate failsafes.
 
 ## WITH clauses and CTEs
 
-> [spec:pgorm:def:sql.ast.with]
-> `CommonTableExpression` defines one named query in a WITH clause: a mandatory
-> `table_name`, optional column list (`column`/`columns`), a mandatory `query`
-> (any `QueryStatementBuilder`, stored as a `SubQueryStatement` — the AST does
-> not restrict UPDATE/DELETE CTEs; validity is left to PostgreSQL), and an
-> optional `materialized` flag rendering `MATERIALIZED` / `NOT MATERIALIZED`.
+> [spec:pgorm:def:sql.ast.with+1]
+> `CommonTableExpression` defines one named query in a WITH clause and MUST be
+> complete the moment it exists: `CommonTableExpression::new(table_name, query)`
+> takes both mandatory parts, the query being any `QueryStatementBuilder` stored
+> as a `SubQueryStatement` — the AST does not restrict UPDATE/DELETE CTEs;
+> validity is left to PostgreSQL. Only the genuinely optional parts remain
+> builder methods: the column list (`column`/`columns`) and the `materialized`
+> flag rendering `MATERIALIZED` / `NOT MATERIALIZED`.
 > `CommonTableExpression::from_select` derives a CTE from a `SelectStatement`,
 > naming it `cte_<table>` after the first FROM table and deriving column names
-> from aliases or plain column projections; `try_set_cols_from_select` performs
-> only the column derivation and reports `false` (leaving columns untouched)
-> when any projection is an expression or wildcard it cannot name.
+> from aliases or plain column projections; it returns `Option<Self>`, yielding
+> `None` when the select has no FROM table to take a name from rather than
+> producing a nameless CTE. `try_set_cols_from_select` performs only the column
+> derivation and reports `false` (leaving columns untouched) when any projection
+> is an expression or wildcard it cannot name.
 >
-> `WithClause` aggregates a `recursive` flag, an optional `Search`, an optional
-> `Cycle`, and the CTE list (`cte`); `WithClause::query(stmt)` (or
-> `stmt.with(clause)` on select/insert/update/delete) produces a `WithQuery`
-> pairing the clause with the statement it prefixes. `WithQuery` also exposes
-> the same setters directly (`recursive`, `search`, `cycle`, `cte`, `query`).
+> The two shapes a WITH clause can take are distinct types rather than a
+> `recursive` flag. `WithClause` is the non-recursive form and holds a non-empty
+> CTE collection: `WithClause::new(cte)` takes the first, `cte` appends further
+> ones, and `ctes` iterates them in order. `RecursiveWithClause` is the
+> recursive form, described by `sql.ast.with.recursive`. `AnyWithClause` is the
+> closed sum of the two, and `Into<AnyWithClause>` is what `WithQuery::new`,
+> `WithClause::query(stmt)`, `RecursiveWithClause::query(stmt)`, and
+> `stmt.with(clause)` on select/insert/update/delete accept. `WithQuery::new`
+> takes the clause and the statement it prefixes together, so a `WithQuery` is
+> likewise never half-built.
 
-> [spec:pgorm:req:sql.ast.with.recursive]
-> Rendering a `WithQuery` MUST panic (assert) if its clause contains no CTE,
-> and MUST panic if `recursive` is set and the clause contains more than one
-> CTE — a recursive WITH must consist of exactly one CTE containing a union
-> query. When `recursive` is set the clause renders `WITH RECURSIVE` and the
-> optional `SEARCH` and `CYCLE` clauses are emitted; they are ignored for
-> non-recursive queries.
+> [spec:pgorm:req:sql.ast.with.recursive+1]
+> The recursive WITH form MUST be a distinct type, `RecursiveWithClause`, whose
+> single `CommonTableExpression` is taken by `RecursiveWithClause::new` — a
+> recursive WITH consists of exactly one CTE containing a union query, and the
+> multi-CTE recursive clause is therefore not constructible. It renders
+> `WITH RECURSIVE` and carries the optional `SEARCH` (`search`) and `CYCLE`
+> (`cycle`) clauses, which only this form accepts, so no setting can be
+> silently ignored. Neither this type nor `WithClause` can be built empty, so
+> rendering asserts nothing and MUST NOT panic on any clause a caller can
+> construct.
 >
-> `Search` pairs a `SearchOrder` (`BREADTH`/`DEPTH`) with a `SelectExpr` whose
-> alias names the generated order column; `Search::new_from_order_and_expr` and
-> `Search::expr` MUST panic (`unwrap` on the alias) when the given expression
-> has no alias. `Cycle` requires the node-identifying expression (`expr`), the
-> cycle-mark column name (`set`), and the path column name (`using`), rendering
+> `Search::new(order, expr, alias)` pairs a `SearchOrder` (`BREADTH`/`DEPTH`)
+> with the expression tracking the path and the name of the generated order
+> column; the name is a constructor argument rather than an optional alias on a
+> `SelectExpr`, so the missing-alias failure cannot arise. `Cycle::new(expr,
+> set, using)` likewise requires the node-identifying expression, the cycle-mark
+> column name, and the path column name at construction, rendering
 > `CYCLE <expr> SET <set> USING <using>`.
 
 ## Window statements

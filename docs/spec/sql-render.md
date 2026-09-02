@@ -335,18 +335,21 @@ an ideal Postgres renderer would emit.
 
 ## CTEs
 
-> [spec:pgorm:req:sql.render.cte]
-> A `WithClause` renders `WITH ` (or `WITH RECURSIVE `) followed by
-> comma-separated common table expressions, each as: quoted table name;
-> optional ` ("col", …)` column list; ` AS `; optional materialization hint
+> [spec:pgorm:req:sql.render.cte+1]
+> A `WithClause` renders `WITH ` followed by its comma-separated common table
+> expressions; a `RecursiveWithClause` renders `WITH RECURSIVE ` followed by the
+> single one it holds. Each CTE renders as: quoted table name; optional
+> ` ("col", …)` column list; ` AS `; optional materialization hint
 > (` MATERIALIZED ` or `NOT MATERIALIZED `); then the parenthesized
-> sub-statement followed by a trailing space. For recursive queries the
-> options render after the CTE list: `SEARCH BREADTH FIRST BY ` /
-> `SEARCH DEPTH FIRST BY ` expr ` SET "alias" `, and `CYCLE ` expr
-> ` SET "col" USING "col" `. The renderer MUST refuse (by `assert!` panic) a
-> with-clause containing zero CTEs, and a recursive with-clause containing
-> more than one CTE. The attached statement (`WithQuery`) may be any of
-> SELECT/INSERT/UPDATE/DELETE/nested-WITH via `SubQueryStatement`.
+> sub-statement followed by a trailing space — so the separator between two CTEs
+> reads `) , ` rather than `), `. For the recursive form the options render
+> after the CTE: `SEARCH BREADTH FIRST BY ` / `SEARCH DEPTH FIRST BY ` expr
+> ` SET "alias" `, and `CYCLE ` expr ` SET "col" USING "col" `. The renderer has
+> nothing to refuse — the empty clause and the multi-CTE recursive clause are
+> unrepresentable per `sql.ast.with` and `sql.ast.with.recursive` — so it
+> carries no assertion and MUST NOT panic on a caller-built clause. The attached
+> statement (`WithQuery`) may be any of SELECT/INSERT/UPDATE/DELETE/nested-WITH
+> via `SubQueryStatement`.
 
 ## INSERT / UPDATE / DELETE
 

@@ -1,7 +1,7 @@
 use crate::{
-    OnConflict, QueryStatementBuilder, QueryStatementWriter, ReturningClause, SelectStatement,
-    SimpleExpr, SubQueryStatement, Values, WithClause, WithQuery, backend::QueryBuilder, error::*,
-    prepare::*, types::*,
+    AnyWithClause, OnConflict, QueryStatementBuilder, QueryStatementWriter, ReturningClause,
+    SelectStatement, SimpleExpr, SubQueryStatement, Values, WithQuery, backend::QueryBuilder,
+    error::*, prepare::*, types::*,
 };
 use inherent::inherent;
 
@@ -341,7 +341,9 @@ impl InsertStatement {
         self.returning(ReturningClause::All)
     }
 
-    /// Create a [WithQuery] by specifying a [WithClause] to execute this query with.
+    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
+    /// either a [`WithClause`](crate::WithClause) or a
+    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
     ///
     /// # Examples
     ///
@@ -352,14 +354,12 @@ impl InsertStatement {
     ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
     ///         .from(Glyph::Table)
     ///         .to_owned();
-    ///     let cte = CommonTableExpression::new()
-    ///         .query(select)
+    ///     let cte = CommonTableExpression::new(Alias::new("cte"), select)
     ///         .column(Glyph::Id)
     ///         .column(Glyph::Image)
     ///         .column(Glyph::Aspect)
-    ///         .table_name(Alias::new("cte"))
     ///         .to_owned();
-    ///     let with_clause = WithClause::new().cte(cte).to_owned();
+    ///     let with_clause = WithClause::new(cte);
     ///     let select = SelectStatement::new()
     ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
     ///         .from(Alias::new("cte"))
@@ -377,8 +377,11 @@ impl InsertStatement {
     ///     r#"WITH "cte" ("id", "image", "aspect") AS (SELECT "id", "image", "aspect" FROM "glyph") INSERT INTO "glyph" ("id", "image", "aspect") SELECT "id", "image", "aspect" FROM "cte""#
     /// );
     /// ```
-    pub fn with(self, clause: WithClause) -> WithQuery {
-        clause.query(self)
+    pub fn with<C>(self, clause: C) -> WithQuery
+    where
+        C: Into<AnyWithClause>,
+    {
+        WithQuery::new(clause, self)
     }
 
     /// Insert with default values if columns and values are not supplied.

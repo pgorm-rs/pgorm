@@ -813,97 +813,63 @@ impl QueryBuilder {
 
     pub(crate) fn prepare_with_query(&self, query: &WithQuery, sql: &mut dyn SqlWriter) {
         self.prepare_with_clause(&query.with_clause, sql);
-        self.prepare_query_statement(query.query.as_ref().unwrap().deref(), sql);
+        self.prepare_query_statement(query.query.deref(), sql);
     }
 
-    // [spec:pgorm:req:sql.render.cte]
-    pub(crate) fn prepare_with_clause(&self, with_clause: &WithClause, sql: &mut dyn SqlWriter) {
-        self.prepare_with_clause_start(with_clause, sql);
-        self.prepare_with_clause_common_tables(with_clause, sql);
-        if with_clause.recursive {
-            self.prepare_with_clause_recursive_options(with_clause, sql);
+    // [spec:pgorm:req:sql.render.cte+1]
+    pub(crate) fn prepare_with_clause(&self, with_clause: &AnyWithClause, sql: &mut dyn SqlWriter) {
+        match with_clause {
+            AnyWithClause::Plain(plain) => {
+                write!(sql, "WITH ").unwrap();
+                for (i, cte) in plain.ctes().enumerate() {
+                    if i != 0 {
+                        write!(sql, ", ").unwrap();
+                    }
+                    self.prepare_with_query_clause_common_table(cte, sql);
+                }
+            }
+            AnyWithClause::Recursive(recursive) => {
+                write!(sql, "WITH RECURSIVE ").unwrap();
+                self.prepare_with_query_clause_common_table(&recursive.cte, sql);
+                self.prepare_with_clause_recursive_options(recursive, sql);
+            }
         }
     }
 
     fn prepare_with_clause_recursive_options(
         &self,
-        with_clause: &WithClause,
+        with_clause: &RecursiveWithClause,
         sql: &mut dyn SqlWriter,
     ) {
-        if with_clause.recursive {
-            if let Some(search) = &with_clause.search {
-                write!(
-                    sql,
-                    "SEARCH {} FIRST BY ",
-                    match &search.order.as_ref().unwrap() {
-                        SearchOrder::BREADTH => "BREADTH",
-                        SearchOrder::DEPTH => "DEPTH",
-                    }
-                )
-                .unwrap();
+        if let Some(search) = &with_clause.search {
+            write!(
+                sql,
+                "SEARCH {} FIRST BY ",
+                match &search.order {
+                    SearchOrder::BREADTH => "BREADTH",
+                    SearchOrder::DEPTH => "DEPTH",
+                }
+            )
+            .unwrap();
 
-                self.prepare_simple_expr(&search.expr.as_ref().unwrap().expr, sql);
+            self.prepare_simple_expr(&search.expr, sql);
 
-                write!(sql, " SET ").unwrap();
+            write!(sql, " SET ").unwrap();
 
-                search
-                    .expr
-                    .as_ref()
-                    .unwrap()
-                    .alias
-                    .as_ref()
-                    .unwrap()
-                    .prepare(sql.as_writer(), self.quote());
-                write!(sql, " ").unwrap();
-            }
-            if let Some(cycle) = &with_clause.cycle {
-                write!(sql, "CYCLE ").unwrap();
-
-                self.prepare_simple_expr(cycle.expr.as_ref().unwrap(), sql);
-
-                write!(sql, " SET ").unwrap();
-
-                cycle
-                    .set_as
-                    .as_ref()
-                    .unwrap()
-                    .prepare(sql.as_writer(), self.quote());
-                write!(sql, " USING ").unwrap();
-                cycle
-                    .using
-                    .as_ref()
-                    .unwrap()
-                    .prepare(sql.as_writer(), self.quote());
-                write!(sql, " ").unwrap();
-            }
+            search.alias.prepare(sql.as_writer(), self.quote());
+            write!(sql, " ").unwrap();
         }
-    }
+        if let Some(cycle) = &with_clause.cycle {
+            write!(sql, "CYCLE ").unwrap();
 
-    // [spec:pgorm:req:sql.render.cte] (assert-refusal of zero CTEs / recursive with multiple CTEs)
-    fn prepare_with_clause_common_tables(&self, with_clause: &WithClause, sql: &mut dyn SqlWriter) {
-        let mut cte_first = true;
-        assert_ne!(
-            with_clause.cte_expressions.len(),
-            0,
-            "Cannot build a with query that has no common table expression!"
-        );
+            self.prepare_simple_expr(&cycle.expr, sql);
 
-        if with_clause.recursive {
-            assert_eq!(
-                with_clause.cte_expressions.len(),
-                1,
-                "Cannot build a recursive query with more than one common table! \
-                A recursive with query must have a single cte inside it that has a union query of \
-                two queries!"
-            );
-        }
-        for cte in &with_clause.cte_expressions {
-            if !cte_first {
-                write!(sql, ", ").unwrap();
-            }
-            cte_first = false;
+            write!(sql, " SET ").unwrap();
 
-            self.prepare_with_query_clause_common_table(cte, sql);
+            cycle.set_as.prepare(sql.as_writer(), self.quote());
+            write!(sql, " USING ").unwrap();
+            cycle.using.prepare(sql.as_writer(), self.quote());
+            write!(sql, " ").unwrap();
         }
     }
 
@@ -912,10 +878,7 @@ impl QueryBuilder {
         cte: &CommonTableExpression,
         sql: &mut dyn SqlWriter,
     ) {
-        cte.table_name
-            .as_ref()
-            .unwrap()
-            .prepare(sql.as_writer(), self.quote());
+        cte.table_name.prepare(sql.as_writer(), self.quote());
 
         if cte.cols.is_empty() {
             write!(sql, " ").unwrap();
@@ -940,7 +903,7 @@ impl QueryBuilder {
 
         write!(sql, "(").unwrap();
 
-        self.prepare_query_statement(cte.query.as_ref().unwrap().deref(), sql);
+        self.prepare_query_statement(cte.query.deref(), sql);
 
         write!(sql, ") ").unwrap();
     }
@@ -957,14 +920,6 @@ impl QueryBuilder {
                 if materialized { "" } else { "NOT" }
             )
             .unwrap()
-        }
-    }
-
-    fn prepare_with_clause_start(&self, with_clause: &WithClause, sql: &mut dyn SqlWriter) {
-        write!(sql, "WITH ").unwrap();
-
-        if with_clause.recursive {
-            write!(sql, "RECURSIVE ").unwrap();
         }
     }
 

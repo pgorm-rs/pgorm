@@ -868,38 +868,35 @@ mod tests {
             )
             .to_owned();
 
-        let common_table_expression = CommonTableExpression::new()
-            .query(
-                base_query
-                    .clone()
-                    .union(UnionType::All, cte_referencing)
-                    .to_owned(),
-            )
-            .columns([
-                Alias::new("id"),
-                Alias::new("depth"),
-                Alias::new("next"),
-                Alias::new("value"),
-            ])
-            .table_name(Alias::new("cte_traversal"))
-            .to_owned();
+        let common_table_expression = CommonTableExpression::new(
+            Alias::new("cte_traversal"),
+            base_query
+                .clone()
+                .union(UnionType::All, cte_referencing)
+                .to_owned(),
+        )
+        .columns([
+            Alias::new("id"),
+            Alias::new("depth"),
+            Alias::new("next"),
+            Alias::new("value"),
+        ])
+        .to_owned();
 
         let select = SelectStatement::new()
             .column(ColumnRef::Asterisk)
             .from(Alias::new("cte_traversal"))
             .to_owned();
 
-        let with_clause = WithClause::new()
-            .recursive(true)
-            .cte(common_table_expression)
-            .cycle(Cycle::new_from_expr_set_using(
+        let with_clause = RecursiveWithClause::new(common_table_expression)
+            .cycle(Cycle::new(
                 SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_iden())),
                 Alias::new("looped"),
                 Alias::new("traversal_path"),
             ))
             .to_owned();
 
-        let with_query = select.with(with_clause).to_owned();
+        let with_query = select.with(with_clause);
 
         assert_eq!(
             with_query.to_string(QueryBuilder),

@@ -232,16 +232,15 @@ fn sweep_union_and_locking_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    common table expressions
-// [spec:pgorm:req:sql.render.cte/test]
+// [spec:pgorm:req:sql.render.cte+1/test]
 #[test]
 fn sweep_cte_shapes() {
-    let cte = || {
-        CommonTableExpression::new()
-            .table_name(Alias::new("cte"))
+    let named = |name: &str| {
+        CommonTableExpression::new(Alias::new(name), base())
             .column(Glyph::Id)
-            .query(base())
             .to_owned()
     };
+    let cte = || named("cte");
     let outer = || {
         Query::select()
             .column(Glyph::Id)
@@ -250,25 +249,18 @@ fn sweep_cte_shapes() {
     };
 
     sweep([
+        outer().with(WithClause::new(cte())).to_string(QueryBuilder),
         outer()
-            .with(WithClause::new().cte(cte()).to_owned())
+            .with(WithClause::new(cte().materialized(true).to_owned()))
             .to_string(QueryBuilder),
         outer()
-            .with(
-                WithClause::new()
-                    .cte(cte().materialized(true).to_owned())
-                    .to_owned(),
-            )
+            .with(WithClause::new(cte().materialized(false).to_owned()))
             .to_string(QueryBuilder),
         outer()
-            .with(
-                WithClause::new()
-                    .cte(cte().materialized(false).to_owned())
-                    .to_owned(),
-            )
+            .with(WithClause::new(cte()).cte(named("other")).to_owned())
             .to_string(QueryBuilder),
         outer()
-            .with(WithClause::new().recursive(true).cte(cte()).to_owned())
+            .with(RecursiveWithClause::new(cte()))
             .to_string(QueryBuilder),
     ]);
 }

@@ -1,5 +1,5 @@
 use crate::{
-    QueryStatementBuilder, QueryStatementWriter, ReturningClause, SubQueryStatement, WithClause,
+    AnyWithClause, QueryStatementBuilder, QueryStatementWriter, ReturningClause, SubQueryStatement,
     WithQuery,
     backend::QueryBuilder,
     expr::*,
@@ -201,7 +201,9 @@ impl UpdateStatement {
         self.returning(ReturningClause::All)
     }
 
-    /// Create a [WithQuery] by specifying a [WithClause] to execute this query with.
+    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
+    /// either a [`WithClause`](crate::WithClause) or a
+    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
     ///
     /// # Examples
     ///
@@ -213,12 +215,10 @@ impl UpdateStatement {
     ///         .from(Glyph::Table)
     ///         .and_where(Expr::col(Glyph::Image).like("0%"))
     ///         .to_owned();
-    ///     let cte = CommonTableExpression::new()
-    ///         .query(select)
+    ///     let cte = CommonTableExpression::new(Alias::new("cte"), select)
     ///         .column(Glyph::Id)
-    ///         .table_name(Alias::new("cte"))
     ///         .to_owned();
-    ///     let with_clause = WithClause::new().cte(cte).to_owned();
+    ///     let with_clause = WithClause::new(cte);
     ///     let update = UpdateStatement::new()
     ///         .table(Glyph::Table)
     ///         .and_where(Expr::col(Glyph::Id).in_subquery(SelectStatement::new().column(Glyph::Id).from(Alias::new("cte")).to_owned()))
@@ -231,8 +231,11 @@ impl UpdateStatement {
     ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph" WHERE "image" LIKE '0%') UPDATE "glyph" SET "aspect" = 60 * 24 * 24 WHERE "id" IN (SELECT "id" FROM "cte")"#
     /// );
     /// ```
-    pub fn with(self, clause: WithClause) -> WithQuery {
-        clause.query(self)
+    pub fn with<C>(self, clause: C) -> WithQuery
+    where
+        C: Into<AnyWithClause>,
+    {
+        WithQuery::new(clause, self)
     }
 
     /// Get column values

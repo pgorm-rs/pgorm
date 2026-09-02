@@ -1787,6 +1787,13 @@ children (
                         kind @note
                         text "Audit: 13 category-A render-time unwraps, all one defect — public new()-then-mutate builders for Search/Cycle/CommonTableExpression/WithQuery produce all-None structs that fail only at render, where NO Result channel exists, so the type-level fix is the only fix. Sites: with.rs:223/:252 (bare discarded .unwrap() used as an assertion!), query_builder.rs:847-974 (query/order/expr/alias/set_as/using/table_name unwraps), :916 assert_ne empty-CTE-list, :923 assert_eq exactly-one-for-recursive. Remedy: delete partial builders, keep the complete constructors that already exist (Search::new_from_order_and_expr, Cycle::new_from_expr_set_using) with non-Option fields; WithClause holds a non-empty collection; recursive-with becomes a distinct type holding exactly one CTE. Bumps sql.ast.with.recursive, sql.render.cte, sql.ast.with. L, breaking."
                     }
+
+                    {
+                        at 2026-09-02T18:04:04.408634Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

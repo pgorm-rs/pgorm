@@ -1000,19 +1000,16 @@ fn select_57() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with/test]
-// [spec:pgorm:req:sql.render.cte/test]
+// [spec:pgorm:def:sql.ast.with+1/test]
+// [spec:pgorm:req:sql.render.cte+1/test]
 #[test]
 fn select_58() {
     let select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Glyph::Table)
         .to_owned();
-    let cte = CommonTableExpression::new()
-        .query(select)
-        .table_name(Alias::new("cte"))
-        .to_owned();
-    let with_clause = WithClause::new().cte(cte).to_owned();
+    let cte = CommonTableExpression::new(Alias::new("cte"), select);
+    let with_clause = WithClause::new(cte);
     let select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Alias::new("cte"))
@@ -1098,11 +1095,8 @@ fn select_62() {
         .column(Asterisk)
         .from_values([(1i32, "hello"), (2, "world")], Alias::new("x"))
         .to_owned();
-    let cte = CommonTableExpression::new()
-        .query(select)
-        .table_name(Alias::new("cte"))
-        .to_owned();
-    let with_clause = WithClause::new().cte(cte).to_owned();
+    let cte = CommonTableExpression::new(Alias::new("cte"), select);
+    let with_clause = WithClause::new(cte);
     let select = SelectStatement::new()
         .columns([Alias::new("column1"), Alias::new("column2")])
         .from(Alias::new("cte"))
@@ -1214,21 +1208,19 @@ fn insert_from_select() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with/test]
+// [spec:pgorm:def:sql.ast.with+1/test]
 #[test]
 fn insert_6() -> error::Result<()> {
     let select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Glyph::Table)
         .to_owned();
-    let cte = CommonTableExpression::new()
-        .query(select)
+    let cte = CommonTableExpression::new(Alias::new("cte"), select)
         .column(Glyph::Id)
         .column(Glyph::Image)
         .column(Glyph::Aspect)
-        .table_name(Alias::new("cte"))
         .to_owned();
-    let with_clause = WithClause::new().cte(cte).to_owned();
+    let with_clause = WithClause::new(cte);
     let select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Alias::new("cte"))
@@ -2361,87 +2353,111 @@ fn condition_holder_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.with.recursive/test]    a with-clause with no CTE is refused at render
-// time
+// [spec:pgorm:def:sql.ast.with+1/test]    a non-recursive clause takes its first CTE at
+// construction and renders every one it was given
+// [spec:pgorm:req:sql.render.cte+1/test]
 #[test]
-#[should_panic(expected = "Cannot build a with query that has no common table expression!")]
-fn with_recursive_1() {
-    WithClause::new()
-        .to_owned()
-        .query(Query::select().column(Glyph::Id).from(Glyph::Table).take())
-        .to_string(QueryBuilder);
-}
-
-// [spec:pgorm:req:sql.ast.with.recursive/test]    a recursive with-clause holding more than one
-// CTE is refused too
-#[test]
-#[should_panic(expected = "Cannot build a recursive query with more than one common table!")]
-fn with_recursive_2() {
+fn with_clause_renders_each_of_its_ctes() {
     let cte = |name: &str| {
-        CommonTableExpression::new()
-            .table_name(Alias::new(name))
-            .query(Query::select().column(Glyph::Id).from(Glyph::Table).take())
-            .to_owned()
+        CommonTableExpression::new(
+            Alias::new(name),
+            Query::select().column(Glyph::Id).from(Glyph::Table).take(),
+        )
     };
 
-    WithClause::new()
-        .recursive(true)
-        .cte(cte("one"))
-        .cte(cte("two"))
-        .to_owned()
-        .query(
-            Query::select()
-                .column(Glyph::Id)
-                .from(Alias::new("one"))
-                .take(),
-        )
-        .to_string(QueryBuilder);
+    assert_eq!(
+        WithClause::new(cte("one"))
+            .cte(cte("two"))
+            .to_owned()
+            .query(
+                Query::select()
+                    .column(Glyph::Id)
+                    .from(Alias::new("one"))
+                    .take(),
+            )
+            .to_string(QueryBuilder),
+        [
+            r#"WITH "one" AS (SELECT "id" FROM "glyph") ,"#,
+            r#""two" AS (SELECT "id" FROM "glyph")"#,
+            r#"SELECT "id" FROM "one""#,
+        ]
+        .join(" ")
+    );
 }
 
-// [spec:pgorm:req:sql.ast.with.recursive/test]    `recursive` renders `WITH RECURSIVE` and emits
-// the optional SEARCH and CYCLE clauses
+// [spec:pgorm:def:sql.ast.with+1/test]    `from_select` names the CTE after the select's first
+// FROM table and takes its columns from the projection
 #[test]
-fn with_recursive_3() {
-    let mut base = Query::select()
-        .column(Glyph::Id)
-        .expr(1i32)
-        .from(Glyph::Table)
-        .take();
-    let step = Query::select()
-        .column(Glyph::Id)
-        .expr(Expr::col(Alias::new("depth")).add(1i32))
-        .from(Glyph::Table)
-        .inner_join(
-            Alias::new("cte"),
-            Expr::col((Alias::new("cte"), Glyph::Id)).equals((Glyph::Table, Glyph::Id)),
-        )
-        .take();
-    let cte = CommonTableExpression::new()
-        .table_name(Alias::new("cte"))
-        .column(Glyph::Id)
-        .column(Alias::new("depth"))
-        .query(base.union(UnionType::All, step).take())
-        .to_owned();
+fn from_select_names_the_cte_after_its_table() {
+    let cte = CommonTableExpression::from_select(
+        Query::select()
+            .columns([Glyph::Id, Glyph::Aspect])
+            .from(Glyph::Table)
+            .take(),
+    )
+    .expect("a select with a FROM table names its CTE");
 
-    let search = Search::new_from_order_and_expr(
-        SearchOrder::BREADTH,
-        SelectExpr {
-            expr: SimpleExpr::Column(ColumnRef::Column(Alias::new("depth").into_iden())),
-            alias: Some(Alias::new("ordercol").into_iden()),
-            window: None,
-        },
+    assert_eq!(
+        WithClause::new(cte)
+            .query(
+                Query::select()
+                    .column(Glyph::Id)
+                    .from(Alias::new("cte_glyph"))
+                    .take(),
+            )
+            .to_string(QueryBuilder),
+        [
+            r#"WITH "cte_glyph" ("id", "aspect") AS (SELECT "id", "aspect" FROM "glyph")"#,
+            r#"SELECT "id" FROM "cte_glyph""#,
+        ]
+        .join(" ")
     );
-    let cycle = Cycle::new_from_expr_set_using(
-        Expr::col(Glyph::Id),
-        Alias::new("looped"),
-        Alias::new("path"),
-    );
+}
 
-    let with_clause = WithClause::new()
-        .recursive(true)
-        .cte(cte.clone())
-        .search(search.clone())
-        .cycle(cycle.clone())
+// [spec:pgorm:def:sql.ast.with+1/test]    a select with no FROM table has no name to derive, so
+// `from_select` declines rather than yielding a nameless CTE
+#[test]
+fn from_select_declines_a_select_without_a_table() {
+    assert!(CommonTableExpression::from_select(Query::select().expr(1i32).take()).is_none());
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive+1/test]    the recursive form renders `WITH RECURSIVE`
+// around the single CTE it holds
+#[test]
+fn recursive_with_clause_renders_its_single_cte() {
+    assert_eq!(
+        Query::select()
+            .column(Asterisk)
+            .from(Alias::new("cte"))
+            .take()
+            .with(RecursiveWithClause::new(recursive_cte()))
+            .to_string(QueryBuilder),
+        [
+            r#"WITH RECURSIVE "cte" ("id", "depth") AS"#,
+            r#"(SELECT "id", 1 FROM "glyph""#,
+            r#"UNION ALL (SELECT "id", "depth" + 1 FROM "glyph""#,
+            r#"INNER JOIN "cte" ON "cte"."id" = "glyph"."id"))"#,
+            r#"SELECT * FROM "cte""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.with.recursive+1/test]    the optional SEARCH and CYCLE clauses attach
+// to the recursive form only, and carry the column names given to their constructors
+#[test]
+fn recursive_with_clause_renders_search_and_cycle() {
+    let with_clause = RecursiveWithClause::new(recursive_cte())
+        .search(Search::new(
+            SearchOrder::BREADTH,
+            Expr::col(Alias::new("depth")),
+            Alias::new("ordercol"),
+        ))
+        .cycle(Cycle::new(
+            Expr::col(Glyph::Id),
+            Alias::new("looped"),
+            Alias::new("path"),
+        ))
         .to_owned();
 
     assert_eq!(
@@ -2462,46 +2478,28 @@ fn with_recursive_3() {
         ]
         .join(" ")
     );
-
-    // The same SEARCH / CYCLE settings are ignored when the clause is not recursive.
-    let non_recursive = WithClause::new()
-        .cte(cte)
-        .search(search)
-        .cycle(cycle)
-        .to_owned();
-
-    assert_eq!(
-        Query::select()
-            .column(Asterisk)
-            .from(Alias::new("cte"))
-            .take()
-            .with(non_recursive)
-            .to_string(QueryBuilder),
-        [
-            r#"WITH "cte" ("id", "depth") AS"#,
-            r#"(SELECT "id", 1 FROM "glyph""#,
-            r#"UNION ALL (SELECT "id", "depth" + 1 FROM "glyph""#,
-            r#"INNER JOIN "cte" ON "cte"."id" = "glyph"."id"))"#,
-            r#"SELECT * FROM "cte""#,
-        ]
-        .join(" ")
-    );
 }
 
-// [spec:pgorm:req:sql.ast.with.recursive/test]    `Search` demands an aliased expression
-#[test]
-#[should_panic]
-fn with_recursive_4() {
-    Search::new_from_order_and_expr(SearchOrder::DEPTH, Expr::col(Glyph::Id));
-}
+fn recursive_cte() -> CommonTableExpression {
+    let mut base = Query::select()
+        .column(Glyph::Id)
+        .expr(1i32)
+        .from(Glyph::Table)
+        .take();
+    let step = Query::select()
+        .column(Glyph::Id)
+        .expr(Expr::col(Alias::new("depth")).add(1i32))
+        .from(Glyph::Table)
+        .inner_join(
+            Alias::new("cte"),
+            Expr::col((Alias::new("cte"), Glyph::Id)).equals((Glyph::Table, Glyph::Id)),
+        )
+        .take();
 
-// [spec:pgorm:req:sql.ast.with.recursive/test]    ... through the setter as well
-#[test]
-#[should_panic]
-fn with_recursive_5() {
-    Search::new()
-        .order(SearchOrder::DEPTH)
-        .expr(Expr::col(Glyph::Id));
+    CommonTableExpression::new(Alias::new("cte"), base.union(UnionType::All, step).take())
+        .column(Glyph::Id)
+        .column(Alias::new("depth"))
+        .to_owned()
 }
 
 // [spec:pgorm:sem:sql.render.empty-in+1/test]    an empty `IN` is rewritten to the always-false
