@@ -957,22 +957,6 @@ children (
             }
 
             {
-                id polish.claude-md
-                title "Reconcile CLAUDE.md: doctests now pass; dormant-module claims per decide.statement"
-                kind @docs
-                deps (decide.statement)
-                sealed true
-                log (
-                    {
-                        at 2026-09-02T01:24:10.125417Z
-                        author "brendan@necessary.nu"
-                        kind @status
-                        text "Doing → Done (nplan complete)"
-                    }
-                )
-            }
-
-            {
                 id polish.sea-bae
                 title "Replace sea-bae/proc-macro-error2 attribute parsing in pgorm-macros"
                 kind @refactor
