@@ -1,17 +1,17 @@
 error[E0277]: the trait bound `pgorm::RelationDef: From<RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>>` is not satisfied
  --> tests/compile-fail/relation_builder_without_columns.rs:5:66
   |
-5 |     let _: RelationDef = fruit::Entity::belongs_to(cake::Entity).into();
-  |                                                                  ^^^^ the trait `From<RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>>` is not implemented for `pgorm::RelationDef`
-  |
+  5 |     let _: RelationDef = fruit::Entity::belongs_to(cake::Entity).into();
+    |                                                                  ^^^^ the trait `From<RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>>` is not implemented for `pgorm::RelationDef`
+    |
 help: the trait `From<RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>>` is not implemented for `pgorm::RelationDef`
       but trait `From<RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, ColumnPairs>>` is implemented for it
- --> $WORKSPACE/src/entity/relation.rs
-  |
-  | / impl<E, R> From<RelationBuilder<E, R, ColumnPairs>> for RelationDef
-  | | where
-  | |     E: EntityTrait,
-  | |     R: EntityTrait,
-  | |___________________^
-  = help: for that trait implementation, expected `ColumnPairs`, found `NoColumns`
-  = note: required for `RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>` to implement `Into<pgorm::RelationDef>`
+   --> $WORKSPACE/src/entity/relation.rs
+    |
+    | / impl<E, R> From<RelationBuilder<E, R, ColumnPairs>> for RelationDef
+    | | where
+    | |     E: EntityTrait,
+    | |     R: EntityTrait,
+    | |___________________^
+    = help: for that trait implementation, expected `ColumnPairs`, found `NoColumns`
+    = note: required for `RelationBuilder<pgorm::tests_cfg::Fruit, pgorm::tests_cfg::Cake, NoColumns>` to implement `Into<pgorm::RelationDef>`
