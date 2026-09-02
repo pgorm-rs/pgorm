@@ -1362,6 +1362,7 @@ children (
             {
                 id bug.empty-not-in
                 title "Empty NOT IN renders always-false; correct semantics are always-true"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:33:31.16277Z
@@ -1417,6 +1418,7 @@ children (
             {
                 id bug.insert-empty-model
                 title "Insert of an all-NotSet model dodges the empty failsafe and renders INSERT INTO t ()"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:34:02.694428Z
@@ -1569,12 +1571,20 @@ children (
             {
                 id nopanic.paginator-raw
                 title "SelectorRaw pagination: blind byte-slice and offset multiplication become typed errors"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:35:55.805951Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: src/executor/paginator.rs:251 — SelectorRaw pagination slices self.stmt.trim()[6..] assuming a SELECT prefix: any statement under 6 bytes, a WITH...CTE, or a non-boundary byte at index 6 panics; input is fully caller-controlled via the public SelectorRaw::from_statement. Fix: case-insensitive strip_prefix + DbErr (decide where the Result lands — fetch_page vs paginate). Also :54 offset(page_size * page) u64 overflow: debug panic, release silent wrap = wrong OFFSET; checked_mul -> DbErr or saturating. Bumps exec.paginator.raw and exec.paginator.fetch."
+                    }
+
+                    {
+                        at 2026-09-02T14:49:38.567115Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Reshaped by the pgparse decision (operator: WBS all five uses, tax waived): instead of a string-level strip_prefix guard, use pg_query to parse the raw statement — verify it is a single SELECT (typed DbErr otherwise, naming what it actually was) and wrap for pagination from knowledge of the real statement rather than byte surgery at [6..]. This handles WITH ... CTEs correctly, which the prefix approach cannot. The offset-multiplication overflow fix from the original note stands unchanged. Now deps on pgparse.oracle for the pg_query plumbing. exec.paginator.raw bumps accordingly."
                     }
                 )
             }
@@ -1615,6 +1625,7 @@ children (
             {
                 id unrep.condition-chain
                 title "Delete the chain condition style; ConditionHolder collapses to Option of Condition"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:36:26.397942Z
@@ -1628,6 +1639,7 @@ children (
             {
                 id unrep.cte-builders
                 title "CTE builders: complete constructors only; thirteen render-time unwraps become unconstructible"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:36:35.509386Z
@@ -1641,6 +1653,7 @@ children (
             {
                 id unrep.tableref-split
                 title "Split TableRef (DDL, three variants) from FromItem (query position); five wildcard panics die"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:36:45.101032Z
@@ -1654,6 +1667,7 @@ children (
             {
                 id unrep.on-conflict
                 title "OnConflict as a closed action enum; dangling DO UPDATE SET and bare ON CONFLICT unconstructible"
+                deps (pgparse.oracle)
                 log (
                     {
                         at 2026-09-02T12:36:53.249538Z
@@ -1742,6 +1756,69 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: build_any/to_string_any/build_collect_any (~29 sites across schema.rs, table/*, index/*, foreign_key/*, query/*) are sea-query multi-backend vestige — every call passes the single unit-struct QueryBuilder, which carries no state. Collapse to one method per statement and drop the QueryBuilder argument workspace-wide (pgorm-query + root crate + migration call sites + tests). Purely mechanical but the widest churn in the campaign — hence last, deps on tableref-split and mysql-purge. Bumps sql.ast.build, sql.ddl and every rule naming build_any. M."
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id pgparse
+        title "libpg_query integration: the real PostgreSQL grammar as oracle, gate and tool"
+        kind @feat
+        children (
+            {
+                id pgparse.oracle
+                title "Render-conformance oracle: everything pgorm-query renders must parse under the real PG grammar"
+                kind @test
+                log (
+                    {
+                        at 2026-09-02T14:48:56.760729Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Design: dev-dependency on the pg_query crate (pganalyze's libpg_query binding — the actual PostgreSQL server parser). Operator has explicitly waived the C-build-time tax (sole user). Two layers: (1) an assert helper wrapping the render paths in pgorm-query's test suite so every to_string()/build() output must pg_query::parse cleanly — retrofit the existing ~300 render tests through it cheaply (a wrapper on the common assert pattern, not 300 edits); (2) a property layer composing arbitrary builder chains -> render -> must parse. OPEN DECISION at start: version pin — pg_query 5.x speaks PG16 grammar (matches the pgorm-test container), 6.x speaks PG17; pick the conformance target and record it. KNOWN EXPECTED FAILURES the oracle will immediately flag (these are the campaign's bug nodes — mark as known-failing until each lands): WINDOW clause position, ENGINE=/COLLATE= table opts, money(p,s), CREATE PRIMARY KEY INDEX, dangling ON CONFLICT/DO UPDATE SET shapes, Year (panics before render). This node lands BEFORE the renderer campaign — every renderer-touching node now deps on it. Syntax-only ceiling: no catalog, unknown tables/columns pass; the live-PG integration suite remains the semantic oracle."
+                    }
+                )
+            }
+
+            {
+                id pgparse.sql-macro
+                title "Compile-time sql! macro: raw SQL strings validated by libpg_query at build time"
+                deps (pgparse.oracle)
+                log (
+                    {
+                        at 2026-09-02T14:49:08.376608Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The original README aspiration, made real: a macro (working name sql!) that runs libpg_query at compile time over a SQL string literal, so a syntactically invalid raw query is a compile error with the parser's position info spanned onto the literal — the unrepresentable-states principle extended to the raw-SQL escape hatch. Target call sites: SelectorRaw::from_statement, ConnectionTrait::query_raw/execute_raw/batch_execute, migration bodies. Proc-macro crates can't export from pgorm-macros without taxing every build with the C dependency — operator waived the tax, but a sibling crate (pgorm-sql-macro or a feature) is still the cleaner shape; decide at start. Honest ceiling: syntax only — unknown columns/tables still pass; document that the macro validates grammar, not schema. Multi-statement literals validated via pg_query split+parse. New spec rules under a macros. or sql. prefix; deps on pgparse.oracle for the version-pin decision and dependency plumbing."
+                    }
+                )
+            }
+
+            {
+                id pgparse.fingerprint
+                title "Query fingerprinting for the metrics layer via pg_query normalize/fingerprint"
+                deps (pgparse.oracle)
+                log (
+                    {
+                        at 2026-09-02T14:49:19.695888Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pg_query::fingerprint gives stable constants-normalized query identities (the shape pg_stat_statements thinks in) and normalize gives the $n-parameterized text. Wire into the opt-in metrics layer: the instrumented wrappers tag statement hooks with the fingerprint so a MetricsCollector can aggregate by query shape instead of raw SQL text. Design questions at start: where the fingerprint is computed (per-call vs memoized by statement text — a small cache matters since the hot path repeats statements), and whether MetricsCollector grows a parameter (breaking the trait — it has no default methods by design, metric.layer.collector bumps) or the fingerprint rides in an existing argument. Runtime dependency on pg_query gated behind a feature on pgorm even with the tax waived — the metrics layer's whole design is unwrapped-code-pays-nothing (metric.layer rule). Deps on pgparse.oracle for plumbing/version pin."
+                    }
+                )
+            }
+
+            {
+                id pgparse.codegen-ddl
+                title "Entities from schema.sql: bridge the PG parse tree into TableCreateStatement for codegen"
+                deps (pgparse.oracle nopanic.codegen-gate)
+                log (
+                    {
+                        at 2026-09-02T14:49:29.4323Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Entities from a schema.sql with no live database: parse CREATE TABLE (and CREATE TYPE ... AS ENUM, CREATE INDEX, COMMENT ON) via pg_query, bridge the PG parse tree into pgorm-query's TableCreateStatement/TypeCreateStatement, and feed the existing EntityTransformer pipeline. Scope decision at start: the supported DDL subset (start with what the transformer consumes — columns, types, PK/unique/FK constraints, enums; reject the rest with named TransformErrors, never silently drop — the Turso COMPAT.md's \"silently ignored\" pattern is the anti-goal). Deps on nopanic.codegen-gate (build on the fallible transform surface, avoid churn collision in pgorm-codegen) and pgparse.oracle (plumbing). New spec rules under codegen.; the bridge is also reusable groundwork if migration diffing ever becomes a want."
                     }
                 )
             }
