@@ -256,14 +256,15 @@ derived_priorities (
 )
 
 assertions (
-    {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
-    {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
-    {id repair.features, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:19:18.959205Z}
-    {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
-    {id repair.cursor-tosql, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:16:54.2968Z}
-    {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
     {id decide.docs, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:53:13.404026Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
+    {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
+    {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
+    {id repair.cursor-tosql, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:16:54.2968Z}
+    {id repair.features, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:19:18.959205Z}
+    {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
+    {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
+    {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
 )
 
 impl_evidence (
@@ -603,6 +604,13 @@ impl_evidence (
         {impl_name main, rule query.loader.regroup}
         {impl_name main, rule query.loader.table-ref-limitation}
     )}
+    {id orm.stream, covered_rules (
+        exec.stream
+        exec.stream.decode
+    ), covered_claims (
+        {impl_name main, rule exec.stream}
+        {impl_name main, rule exec.stream.decode}
+    )}
     {id sql.ast, covered_rules (
         sql.ast
         sql.ast.build
@@ -791,13 +799,6 @@ impl_evidence (
         {impl_name main, rule sql.value.to-json}
         {impl_name main, rule sql.value.tuple}
         {impl_name main, rule sql.value.value-type}
-    )}
-    {id orm.stream, covered_rules (
-        exec.stream
-        exec.stream.decode
-    ), covered_claims (
-        {impl_name main, rule exec.stream}
-        {impl_name main, rule exec.stream.decode}
     )}
 )
 

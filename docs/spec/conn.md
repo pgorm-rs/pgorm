@@ -143,16 +143,34 @@ under **Statement seam** below.)
 > `DatabaseConnection::begin_with_config` helper and are not reachable through
 > the public trait.
 
-> [spec:pgorm:sem:conn.tx.guard]
+> [spec:pgorm:sem:conn.tx.guard+1]
 > `DatabaseTransaction` wraps `Option<pgorm_pool::Transaction>` as a
-> commit-or-rollback guard. `commit(self)` consumes the handle, takes the
-> inner transaction, and commits, mapping failure to `DbErr::Postgres`. There
-> is no explicit `rollback` method: rollback is achieved by dropping the
-> handle uncommitted, in which case the underlying `tokio_postgres`
-> transaction rolls back and pgorm's `Drop` impl emits a
-> `tracing::warn!("Transaction dropped without committing!")` — the
+> commit-or-rollback guard. `commit(self)` and `rollback(self)` each consume
+> the handle, `take()` the inner transaction, and await `COMMIT` / `ROLLBACK`
+> respectively, mapping failure to `DbErr::Postgres`. Because both take the
+> `Option`, the `Drop` impl's
+> `tracing::warn!("Transaction dropped without committing!")` fires only on
+> the implicit path — neither `commit` nor `rollback` was called.
+>
+> The two rollback paths are not equivalent. Explicit `rollback` awaits the
+> round trip, so a failure reaches the caller. The implicit path — dropping an
+> uncommitted handle — is fire-and-forget: `tokio_postgres::Transaction::drop`
+> synchronously enqueues a raw `ROLLBACK` (`ROLLBACK TO <savepoint>` when
+> nested) onto the connection's unbounded request channel and discards both the
+> response stream and any send error, so the rollback's outcome is
+> unobservable and the warning is the only trace of it. The
 > uncommitted-transaction check is a runtime warning, not a compile-time or
 > panic-level guarantee.
+>
+> The queued rollback is nevertheless correctly ordered against subsequent work
+> on the same connection. The enqueue happens inside `Drop`, and the exclusive
+> `&mut` borrow the transaction holds on the client (`conn.tx`) is not released
+> until that drop completes, so no later statement can reach the channel first;
+> the connection driver task drains the channel in FIFO order. That task is
+> owned by `ClientWrapper` and aborted only when the wrapper is dropped
+> (`conn.pool.lifecycle`) — pool recycling borrows the wrapper rather than
+> replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
+> after the connection returns to the pool and is handed to the next caller.
 
 ## Statement seam
 

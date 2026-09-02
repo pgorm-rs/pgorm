@@ -194,6 +194,31 @@ pub async fn transaction_error_rollback() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
+pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
+    let ctx = TestContext::new("transaction_explicit_rollback_txrollback").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    let txn = db.begin().await?;
+
+    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+    insert_bakery(&txn, "Top Bakery", 15.0).await?;
+
+    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
+
+    txn.rollback().await.unwrap();
+
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+#[pgorm_macros::test]
 pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
     let ctx = TestContext::new("transaction_with_active_model_behaviour_test").await;
     create_tables(&ctx.db).await?;

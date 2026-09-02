@@ -538,7 +538,6 @@ children (
                 id infra.sql-err
                 title "Implement SqlErr classification over DbErr::Postgres SQLSTATEs"
                 kind @feat
-                sealed true
                 log (
                     {
                         at 2026-09-01T23:57:44.542609Z
@@ -595,6 +594,14 @@ children (
                         id infra.tx.rollback
                         title "Explicit rollback(); Drop warns only on the implicit path; document queued-rollback ordering"
                         kind @feat
+                        log (
+                            {
+                                at 2026-09-02T00:00:13.457041Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
+                            }
+                        )
                     }
 
                     {

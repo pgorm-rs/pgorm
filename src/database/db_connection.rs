@@ -80,7 +80,7 @@ impl DatabaseConnection {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.guard]
+// [spec:pgorm:sem:conn.tx.guard+1]
 #[derive(Debug)]
 pub struct DatabaseTransaction<'a>(pub(crate) Option<Transaction<'a>>);
 
@@ -92,9 +92,25 @@ impl DatabaseTransaction<'_> {
             unreachable!()
         }
     }
+
+    /// Rolls the transaction back, discarding every change made within it.
+    ///
+    /// Dropping an uncommitted handle also rolls back, but the two paths differ:
+    /// `Drop` queues a `ROLLBACK` on the connection and returns immediately,
+    /// discarding the server's response, so a failure is invisible and only a
+    /// `tracing::warn!` marks that it happened. This method awaits the
+    /// `ROLLBACK` round trip and surfaces any failure as `DbErr::Postgres`, and
+    /// consumes the handle so no warning is emitted.
+    pub async fn rollback(mut self) -> Result<(), DbErr> {
+        if let Some(tx) = self.0.take() {
+            tx.rollback().await.map_err(|e| DbErr::Postgres(e))
+        } else {
+            unreachable!()
+        }
+    }
 }
 
-// [spec:pgorm:sem:conn.tx.guard]    rollback-on-drop warning
+// [spec:pgorm:sem:conn.tx.guard+1]    rollback-on-drop warning
 impl Drop for DatabaseTransaction<'_> {
     fn drop(&mut self) {
         if self.0.is_some() {
