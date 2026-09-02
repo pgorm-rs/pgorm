@@ -262,9 +262,10 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert/test]    `TryInsertResult` across all
+// [spec:pgorm:sem:exec.crud.try-insert+1/test]    `TryInsertResult` across all
 // three executions: Empty without touching the database, Inserted on success,
-// Conflicted from RecordNotInserted, and any other error propagating
+// Conflicted from a skipped `ON CONFLICT` insert, and any other error
+// propagating
 // [spec:pgorm:sem:query.build.insert.empty-failsafe/test]    the same three
 // entry points reading the recorded column bitmap: an insert over an empty
 // iterator returns Empty with the database left untouched
@@ -327,8 +328,10 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
     };
     let on_conflict = || OnConflict::new().do_nothing().to_owned();
 
-    // `Insert::exec` reports a skipped row as RecordNotInserted, which becomes
-    // Conflicted.
+    // An `ON CONFLICT DO NOTHING` clause that skips the row reads as Conflicted
+    // on every entry point: `exec` from RecordNotInserted,
+    // `exec_without_returning` from a zero rows-affected count, and
+    // `exec_with_returning` from the absent RETURNING row.
     assert!(matches!(
         Bakery::insert(duplicate())
             .on_conflict(on_conflict())
@@ -337,27 +340,31 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
             .await?,
         TryInsertResult::Conflicted
     ));
-
-    // `exec_without_returning` never raises RecordNotInserted, so the same
-    // conflict is a successful insert of zero rows.
     assert!(matches!(
         Bakery::insert(duplicate())
             .on_conflict(on_conflict())
             .do_nothing()
             .exec_without_returning(&db)
             .await?,
-        TryInsertResult::Inserted(0)
+        TryInsertResult::Conflicted
     ));
-
-    // Every other error propagates rather than being folded into a variant:
-    // `exec_with_returning` fails with RecordNotFound, not Conflicted.
     assert!(matches!(
         Bakery::insert(duplicate())
             .on_conflict(on_conflict())
             .do_nothing()
             .exec_with_returning(&db)
+            .await?,
+        TryInsertResult::Conflicted
+    ));
+
+    // With no conflict clause to attribute it to, a failing insert propagates
+    // its error rather than being folded into a variant.
+    assert!(matches!(
+        Bakery::insert(duplicate())
+            .on_empty_do_nothing()
+            .exec_with_returning(&db)
             .await,
-        Err(DbErr::RecordNotFound)
+        Err(DbErr::Postgres(_))
     ));
 
     drop(db);

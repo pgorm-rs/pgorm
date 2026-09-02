@@ -206,15 +206,25 @@ These rules capture what the code does today, including known gaps.
 > appends no `RETURNING` clause and returns the rows-affected count as
 > `u64`.
 
-> [spec:pgorm:sem:exec.crud.try-insert]
+> [spec:pgorm:sem:exec.crud.try-insert+1]
 > `TryInsert::exec`, `exec_without_returning`, and `exec_with_returning`
 > wrap the corresponding `Insert` executions in `TryInsertResult`. When
 > the underlying insert statement has no columns (e.g. `insert_many`
 > with an empty iterator), they return `TryInsertResult::Empty` without
-> touching the database — the failsafe for empty batch inserts. A
-> `DbErr::RecordNotInserted` from the inner execution becomes
-> `TryInsertResult::Conflicted`; success becomes
-> `TryInsertResult::Inserted(..)`; every other error propagates.
+> touching the database — the failsafe for empty batch inserts.
+>
+> All three otherwise report an insert that the conflict clause skipped
+> as `TryInsertResult::Conflicted`, each reading the signal its own
+> execution yields for "no row was written". `exec` maps a
+> `DbErr::RecordNotInserted`, which `exec.crud.insert` raises only when
+> the primary-key `RETURNING` came back empty. `exec_without_returning`
+> maps a zero rows-affected count and `exec_with_returning` maps a
+> missing `RETURNING` row — both only when the statement carries an
+> `ON CONFLICT` clause, since neither signal can otherwise be attributed
+> to a conflict. Without such a clause those two keep the plain `Insert`
+> outcome, `TryInsertResult::Inserted(0)` and `DbErr::RecordNotFound`
+> respectively. Success becomes `TryInsertResult::Inserted(..)`; every
+> other error propagates.
 
 > [spec:pgorm:sem:exec.crud.update]
 > `Updater::exec` short-circuits when the update statement carries no SET

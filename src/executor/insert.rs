@@ -31,7 +31,7 @@ where
 }
 
 /// The types of results for an INSERT operation
-// [spec:pgorm:sem:exec.crud.try-insert]
+// [spec:pgorm:sem:exec.crud.try-insert+1]
 #[derive(Debug)]
 pub enum TryInsertResult<T> {
     /// The INSERT statement did not have any value to insert
@@ -42,11 +42,17 @@ pub enum TryInsertResult<T> {
     Inserted(T),
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert]
+// [spec:pgorm:sem:exec.crud.try-insert+1]
 impl<A> TryInsert<A>
 where
     A: ActiveModelTrait,
 {
+    /// Whether the statement carries an `ON CONFLICT` clause, and so could have
+    /// skipped the insert rather than failed it.
+    fn has_conflict_clause(&self) -> bool {
+        self.insert_struct.query.get_on_conflict().is_some()
+    }
+
     /// Execute an insert operation
     #[allow(unused_mut)]
     pub async fn exec<'a, C>(self, db: &'a C) -> Result<TryInsertResult<InsertResult<A>>, DbErr>
@@ -79,8 +85,10 @@ where
         if self.insert_struct.columns.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
+        let conflict_clause = self.has_conflict_clause();
         let res = self.insert_struct.exec_without_returning(db).await;
         match res {
+            Ok(0) if conflict_clause => Ok(TryInsertResult::Conflicted),
             Ok(res) => Ok(TryInsertResult::Inserted(res)),
             Err(DbErr::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
             Err(err) => Err(err),
@@ -100,10 +108,12 @@ where
         if self.insert_struct.columns.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
-        let res = self.insert_struct.exec_with_returning(db).await;
+        let conflict_clause = self.has_conflict_clause();
+        let res = exec_insert_with_returning_opt::<A, C>(self.insert_struct.query, db).await;
         match res {
-            Ok(res) => Ok(TryInsertResult::Inserted(res)),
-            Err(DbErr::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
+            Ok(Some(res)) => Ok(TryInsertResult::Inserted(res)),
+            Ok(None) if conflict_clause => Ok(TryInsertResult::Conflicted),
+            Ok(None) => Err(DbErr::RecordNotFound),
             Err(err) => Err(err),
         }
     }
@@ -273,9 +283,26 @@ where
 
 // [spec:pgorm:sem:exec.crud.insert-returning]
 async fn exec_insert_with_returning<A, C>(
-    mut insert_statement: InsertStatement,
+    insert_statement: InsertStatement,
     db: &C,
 ) -> Result<<A::Entity as EntityTrait>::Model, DbErr>
+where
+    <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
+    C: ConnectionTrait,
+    A: ActiveModelTrait,
+{
+    exec_insert_with_returning_opt::<A, C>(insert_statement, db)
+        .await?
+        .ok_or(DbErr::RecordNotFound)
+}
+
+/// A missing `RETURNING` row is reported as `None` rather than an error, so
+/// callers that can tell an `ON CONFLICT` skip from a genuine miss decide which
+/// it was.
+async fn exec_insert_with_returning_opt<A, C>(
+    mut insert_statement: InsertStatement,
+    db: &C,
+) -> Result<Option<<A::Entity as EntityTrait>::Model>, DbErr>
 where
     <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
     C: ConnectionTrait,
@@ -287,13 +314,7 @@ where
     insert_statement.returning(returning);
     let (stmt, values) = insert_statement.build(QueryBuilder);
 
-    let found =
-        SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)
-            .one_opt(db)
-            .await?;
-
-    match found {
-        Some(model) => Ok(model),
-        None => Err(DbErr::RecordNotFound),
-    }
+    SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)
+        .one_opt(db)
+        .await
 }

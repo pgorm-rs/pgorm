@@ -548,6 +548,13 @@ children (
                         kind @note
                         text "Found by verify.exec: only TryInsert::exec produces TryInsertResult::Conflicted. exec_without_returning returns Ok(0) from Insert's path so a skipped conflict reports Inserted(0); exec_with_returning propagates RecordNotFound instead of mapping to Conflicted. All three behaviors pinned in tests/returning_tests.rs (try_insert_result_variants). Fix = map the empty/not-found outcomes to Conflicted consistently; exec.crud.try-insert bumps and the pinning test flips from documenting the asymmetry to asserting the fix."
                     }
+
+                    {
+                        at 2026-09-02T12:15:34.424217Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )
@@ -779,7 +786,6 @@ children (
                 id infra.schema-index-qualify
                 title "Schema-qualify create_index_from_entity (index DDL drops the schema of qualified tables)"
                 kind @fix
-                sealed true
                 log (
                     {
                         at 2026-09-02T11:32:37.723612Z

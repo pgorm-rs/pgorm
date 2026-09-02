@@ -263,6 +263,11 @@ impl InsertStatement {
         self
     }
 
+    /// Get the ON CONFLICT clause, if one was set.
+    pub fn get_on_conflict(&self) -> Option<&OnConflict> {
+        self.on_conflict.as_ref()
+    }
+
     /// RETURNING expressions.
     ///
     /// # Examples
