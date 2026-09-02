@@ -1,9 +1,9 @@
 use crate::{ColumnTrait, EntityTrait, IdenStatic};
-use pgorm_query::{Alias, DynIden, Iden, IntoIden, SeaRc};
+use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SeaRc, Value, ValueTuple};
 use std::fmt;
 
 /// List of column identifier
-// [spec:pgorm:def:entity.relation.def]
+// [spec:pgorm:def:entity.relation.def+1]
 #[derive(Debug, Clone)]
 pub enum Identity {
     /// Column identifier consists of 1 column
@@ -55,13 +55,31 @@ impl Iden for Identity {
 }
 
 /// Performs a conversion into an [Identity]
+// [spec:pgorm:def:entity.relation.def+1]
 pub trait IntoIdentity {
+    /// The shape a boundary value must have to line up with this identity: a
+    /// tuple of [`Value`] of the same length, so the arity of a column set and
+    /// the arity of the values compared against it are one fact rather than
+    /// two. [`Identity`] itself, whose arity is only known at runtime, maps to
+    /// [`ValueTuple`].
+    type ValueType: IntoValueTuple;
+
     /// Method to perform the conversion
     fn into_identity(self) -> Identity;
 }
 
+/// A value tuple whose arity matches the order-key shape `K`.
+///
+/// `K` is the [`IntoIdentity::ValueType`] of a column set, so a tuple of the
+/// wrong length has no implementation here and is rejected at compile time.
+/// The exception is `K = ValueTuple`, the shape of a runtime-built
+/// [`Identity`], which accepts any tuple and leaves the arity to be checked
+/// when the query runs.
+// [spec:pgorm:def:entity.relation.def+1]
+pub trait IntoBoundary<K>: IntoValueTuple {}
+
 /// Check the [Identity] of an Entity
-pub trait IdentityOf<E>
+pub trait IdentityOf<E>: IntoIdentity
 where
     E: EntityTrait,
 {
@@ -69,19 +87,29 @@ where
     fn identity_of(self) -> Identity;
 }
 
+impl<T> IntoBoundary<ValueTuple> for T where T: IntoValueTuple {}
+
 impl IntoIdentity for Identity {
+    type ValueType = ValueTuple;
+
     fn into_identity(self) -> Identity {
         self
     }
 }
 
+impl<V> IntoBoundary<Value> for V where V: Into<Value> {}
+
 impl IntoIdentity for String {
+    type ValueType = Value;
+
     fn into_identity(self) -> Identity {
         self.as_str().into_identity()
     }
 }
 
 impl IntoIdentity for &str {
+    type ValueType = Value;
+
     fn into_identity(self) -> Identity {
         Identity::Unary(SeaRc::new(Alias::new(self)))
     }
@@ -91,6 +119,8 @@ impl<T> IntoIdentity for T
 where
     T: IdenStatic,
 {
+    type ValueType = Value;
+
     fn into_identity(self) -> Identity {
         Identity::Unary(self.into_iden())
     }
@@ -101,9 +131,18 @@ where
     T: IdenStatic,
     C: IdenStatic,
 {
+    type ValueType = (Value, Value);
+
     fn into_identity(self) -> Identity {
         Identity::Binary(self.0.into_iden(), self.1.into_iden())
     }
+}
+
+impl<T, C> IntoBoundary<(Value, Value)> for (T, C)
+where
+    T: Into<Value>,
+    C: Into<Value>,
+{
 }
 
 impl<T, C, R> IntoIdentity for (T, C, R)
@@ -112,9 +151,27 @@ where
     C: IdenStatic,
     R: IdenStatic,
 {
+    type ValueType = (Value, Value, Value);
+
     fn into_identity(self) -> Identity {
         Identity::Ternary(self.0.into_iden(), self.1.into_iden(), self.2.into_iden())
     }
+}
+
+impl<T, C, R> IntoBoundary<(Value, Value, Value)> for (T, C, R)
+where
+    T: Into<Value>,
+    C: Into<Value>,
+    R: Into<Value>,
+{
+}
+
+/// Expands to [`Value`] once per type parameter of a tuple impl, so the
+/// boundary shape is built from the same repetition as the tuple itself.
+macro_rules! boundary_element {
+    ( $T:ident ) => {
+        Value
+    };
 }
 
 macro_rules! impl_into_identity {
@@ -123,11 +180,19 @@ macro_rules! impl_into_identity {
         where
             $($T: IdenStatic),+
         {
+            type ValueType = ( $(boundary_element!($T)),+ );
+
             fn into_identity(self) -> Identity {
                 Identity::Many(vec![
                     $(self.$N.into_iden()),+
                 ])
             }
+        }
+
+        impl< $($T),+ > IntoBoundary<( $(boundary_element!($T)),+ )> for ( $($T),+ )
+        where
+            $($T: Into<Value>),+
+        {
         }
     };
 }

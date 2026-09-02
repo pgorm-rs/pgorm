@@ -1,12 +1,12 @@
 use super::select::ensure_select_list;
 use crate::{
-    ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoIdentity,
-    PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select, SelectModel, SelectTwo,
-    SelectTwoModel, SelectorTrait,
+    ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoBoundary,
+    IntoIdentity, PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select,
+    SelectModel, SelectTwo, SelectTwoModel, SelectorTrait, error::query_err,
 };
 use pgorm_query::{
-    Condition, DynIden, Expr, IntoValueTuple, Order, QueryBuilder, SeaRc, SelectStatement,
-    SimpleExpr, Value, ValueTuple,
+    Condition, DynIden, Expr, Order, QueryBuilder, SeaRc, SelectStatement, SimpleExpr, Value,
+    ValueTuple,
 };
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -16,10 +16,29 @@ use strum::IntoEnumIterator as Iterable;
 // #[cfg(feature = "with-json")]
 // use crate::JsonValue;
 
+/// Which end of the ordered result set a cursor's row limit is taken from.
+// [spec:pgorm:sem:exec.cursor.window+1]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Window {
+    /// The first `N` rows in the cursor's logical order.
+    First(u64),
+    /// The last `N` rows in the cursor's logical order.
+    Last(u64),
+}
+
+impl Window {
+    /// The row limit, whichever end the window is taken from.
+    pub const fn rows(self) -> u64 {
+        match self {
+            Window::First(rows) | Window::Last(rows) => rows,
+        }
+    }
+}
+
 /// Cursor pagination
-// [spec:pgorm:def:exec.cursor]
+// [spec:pgorm:def:exec.cursor+1]
 #[derive(Debug, Clone)]
-pub struct Cursor<S>
+pub struct Cursor<S, K = ValueTuple>
 where
     S: SelectorTrait,
 {
@@ -27,30 +46,48 @@ where
     table: DynIden,
     order_columns: Identity,
     secondary_order_by: Vec<(DynIden, Identity)>,
-    first: Option<u64>,
-    last: Option<u64>,
+    window: Option<Window>,
     before: Option<ValueTuple>,
     after: Option<ValueTuple>,
     sort_asc: bool,
     is_result_reversed: bool,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(S, K)>,
 }
 
-impl<S> Cursor<S>
+// [spec:pgorm:sem:exec.cursor.keyset+1]
+fn identity_arity(columns: &Identity) -> usize {
+    match columns {
+        Identity::Unary(..) => 1,
+        Identity::Binary(..) => 2,
+        Identity::Ternary(..) => 3,
+        Identity::Many(columns) => columns.len(),
+    }
+}
+
+// [spec:pgorm:sem:exec.cursor.keyset+1]
+fn value_tuple_arity(values: &ValueTuple) -> usize {
+    match values {
+        ValueTuple::One(..) => 1,
+        ValueTuple::Two(..) => 2,
+        ValueTuple::Three(..) => 3,
+        ValueTuple::Many(values) => values.len(),
+    }
+}
+
+impl<S, K> Cursor<S, K>
 where
     S: SelectorTrait,
 {
     /// Create a new cursor
     pub fn new<C>(query: SelectStatement, table: DynIden, order_columns: C) -> Self
     where
-        C: IntoIdentity,
+        C: IntoIdentity<ValueType = K>,
     {
         Self {
             query,
             table,
             order_columns: order_columns.into_identity(),
-            last: None,
-            first: None,
+            window: None,
             after: None,
             before: None,
             sort_asc: true,
@@ -63,7 +100,7 @@ where
     /// Filter paginated result with corresponding column less than the input value
     pub fn before<V>(&mut self, values: V) -> &mut Self
     where
-        V: IntoValueTuple,
+        V: IntoBoundary<K>,
     {
         self.before = Some(values.into_value_tuple());
         self
@@ -72,19 +109,19 @@ where
     /// Filter paginated result with corresponding column greater than the input value
     pub fn after<V>(&mut self, values: V) -> &mut Self
     where
-        V: IntoValueTuple,
+        V: IntoBoundary<K>,
     {
         self.after = Some(values.into_value_tuple());
         self
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset]
-    fn apply_filters(&mut self) -> &mut Self {
+    // [spec:pgorm:sem:exec.cursor.keyset+1]
+    fn apply_filters(&mut self) -> Result<(), DbErr> {
         if let Some(values) = self.after.clone() {
             let condition = self.apply_filter(values, |c, v| {
                 let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
                 if self.sort_asc { exp.gt(v) } else { exp.lt(v) }
-            });
+            })?;
             self.query.cond_where(condition);
         }
 
@@ -92,19 +129,19 @@ where
             let condition = self.apply_filter(values, |c, v| {
                 let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
                 if self.sort_asc { exp.lt(v) } else { exp.gt(v) }
-            });
+            })?;
             self.query.cond_where(condition);
         }
 
-        self
+        Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset]
-    fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Condition
+    // [spec:pgorm:sem:exec.cursor.keyset+1]
+    fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, DbErr>
     where
         F: Fn(&DynIden, Value) -> SimpleExpr,
     {
-        match (&self.order_columns, values) {
+        let condition = match (&self.order_columns, values) {
             (Identity::Unary(c1), ValueTuple::One(v1)) => Condition::all().add(f(c1, v1)),
             (Identity::Binary(c1, c2), ValueTuple::Two(v1, v2)) => Condition::any()
                 .add(
@@ -184,8 +221,16 @@ where
                         cond_any.add(inner_cond_all)
                     })
             }
-            _ => panic!("column arity mismatch"),
-        }
+            (columns, values) => {
+                return Err(query_err(format!(
+                    "cursor boundary of arity {} does not match {} order column(s)",
+                    value_tuple_arity(&values),
+                    identity_arity(columns),
+                )));
+            }
+        };
+
+        Ok(condition)
     }
 
     /// Use ascending sort order
@@ -200,24 +245,25 @@ where
         self
     }
 
-    /// Limit result set to only first N rows in ascending order of the order by column
-    // [spec:pgorm:sem:exec.cursor.window]
+    /// Take the window of N rows from the near end of the cursor's order,
+    /// replacing any window already set
+    // [spec:pgorm:sem:exec.cursor.window+1]
     pub fn first(&mut self, num_rows: u64) -> &mut Self {
-        self.last = None;
-        self.first = Some(num_rows);
+        self.window = Some(Window::First(num_rows));
         self
     }
 
-    /// Limit result set to only last N rows in ascending order of the order by column
+    /// Take the window of N rows from the far end of the cursor's order,
+    /// replacing any window already set
+    // [spec:pgorm:sem:exec.cursor.window+1]
     pub fn last(&mut self, num_rows: u64) -> &mut Self {
-        self.first = None;
-        self.last = Some(num_rows);
+        self.window = Some(Window::Last(num_rows));
         self
     }
 
-    // [spec:pgorm:sem:exec.cursor.window]
+    // [spec:pgorm:sem:exec.cursor.window+1]
     fn resolve_sort_order(&mut self) -> Order {
-        let should_reverse_order = self.last.is_some();
+        let should_reverse_order = matches!(self.window, Some(Window::Last(_)));
         self.is_result_reversed = should_reverse_order;
 
         if (self.sort_asc && !should_reverse_order) || (!self.sort_asc && should_reverse_order) {
@@ -227,11 +273,10 @@ where
         }
     }
 
+    // [spec:pgorm:sem:exec.cursor.window+1]
     fn apply_limit(&mut self) -> &mut Self {
-        if let Some(num_rows) = self.first {
-            self.query.limit(num_rows);
-        } else if let Some(num_rows) = self.last {
-            self.query.limit(num_rows);
+        if let Some(window) = self.window {
+            self.query.limit(window.rows());
         }
 
         self
@@ -283,7 +328,7 @@ where
     {
         self.apply_limit();
         self.apply_order_by();
-        self.apply_filters();
+        self.apply_filters()?;
         ensure_select_list(&self.query)?;
 
         let (stmt, values) = self.query.build(QueryBuilder);
@@ -305,7 +350,7 @@ where
     }
 
     /// Construct a [Cursor] that fetch any custom struct
-    pub fn into_model<M>(self) -> Cursor<SelectModel<M>>
+    pub fn into_model<M>(self) -> Cursor<SelectModel<M>, K>
     where
         M: FromQueryResult,
     {
@@ -313,8 +358,7 @@ where
             query: self.query,
             table: self.table,
             order_columns: self.order_columns,
-            last: self.last,
-            first: self.first,
+            window: self.window,
             after: self.after,
             before: self.before,
             sort_asc: self.sort_asc,
@@ -326,7 +370,7 @@ where
 
     /// Return a [`Cursor`] from `Self` that wraps a [`SelectModel`] decoding a
     /// [`PartialModelTrait`] type
-    pub fn into_partial_model<M>(self) -> Cursor<SelectModel<M>>
+    pub fn into_partial_model<M>(self) -> Cursor<SelectModel<M>, K>
     where
         M: PartialModelTrait,
     {
@@ -340,7 +384,7 @@ where
     }
 }
 
-impl<S> QuerySelect for Cursor<S>
+impl<S, K> QuerySelect for Cursor<S, K>
 where
     S: SelectorTrait,
 {
@@ -351,7 +395,7 @@ where
     }
 }
 
-impl<S> QueryOrder for Cursor<S>
+impl<S, K> QueryOrder for Cursor<S, K>
 where
     S: SelectorTrait,
 {
@@ -363,7 +407,7 @@ where
 }
 
 /// A trait for any type that can be turn into a cursor
-// [spec:pgorm:def:exec.cursor]
+// [spec:pgorm:def:exec.cursor+1]
 pub trait CursorTrait {
     /// Select operation
     type Selector: SelectorTrait + Send + Sync;
@@ -383,7 +427,36 @@ where
     M: FromQueryResult + Sized + Send + Sync,
 {
     /// Convert into a cursor
-    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>>
+    ///
+    /// The order columns fix the arity of every boundary later handed to
+    /// [`Cursor::before`] / [`Cursor::after`], so a boundary of the wrong
+    /// length is rejected before the query is built:
+    ///
+    /// ```
+    /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
+    /// cake::Entity::find().cursor_by(cake::Column::Id).after(1);
+    /// cake::Entity::find()
+    ///     .cursor_by((cake::Column::Id, cake::Column::Name))
+    ///     .after((1, "cheese"));
+    /// ```
+    ///
+    /// Two order columns and a single boundary value do not typecheck:
+    ///
+    /// ```compile_fail,E0277
+    /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
+    /// cake::Entity::find()
+    ///     .cursor_by((cake::Column::Id, cake::Column::Name))
+    ///     .after(1);
+    /// ```
+    ///
+    /// Nor do one order column and a pair:
+    ///
+    /// ```compile_fail,E0277
+    /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
+    /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
+    /// ```
+    // [spec:pgorm:sem:exec.cursor.keyset+1/test]
+    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoIdentity,
     {
@@ -409,7 +482,7 @@ where
     N: FromQueryResult + Sized + Send + Sync,
 {
     /// Convert into a cursor using column of first entity
-    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>>
+    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
     where
         C: IdentityOf<E>,
     {
@@ -421,17 +494,13 @@ where
                 )
             })
             .collect();
-        let mut cursor = Cursor::new(
-            self.query,
-            SeaRc::new(E::default()),
-            order_columns.identity_of(),
-        );
+        let mut cursor = Cursor::new(self.query, SeaRc::new(E::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }
 
     /// Convert into a cursor using column of second entity
-    pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>>
+    pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
     where
         C: IdentityOf<F>,
     {
@@ -443,11 +512,7 @@ where
                 )
             })
             .collect();
-        let mut cursor = Cursor::new(
-            self.query,
-            SeaRc::new(F::default()),
-            order_columns.identity_of(),
-        );
+        let mut cursor = Cursor::new(self.query, SeaRc::new(F::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }

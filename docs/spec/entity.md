@@ -254,7 +254,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def]
+> [spec:pgorm:def:entity.relation.def+1]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`TableRef`), `from_col` / `to_col`
 > (`Identity`, permitting composite keys), `is_owner`, optional `on_delete` /
@@ -269,7 +269,17 @@ explicit limitations.
 > `Identity` (`src/entity/identity.rs`) encodes column-set arity as
 > `Unary` / `Binary` / `Ternary` / `Many(Vec<DynIden>)`. `IntoIdentity` converts
 > `&str` and `String` (via `Alias`), any `IdenStatic`, and tuples of up to 12
-> identifiers; `IdentityOf<E>` restricts conversions to columns of entity `E`.
+> identifiers; `IdentityOf<E>`, a subtrait of `IntoIdentity`, restricts
+> conversions to columns of entity `E`.
+>
+> Each `IntoIdentity` impl also names a `ValueType`: the tuple of `Value` of the
+> same length as the columns it produces, or `ValueTuple` for `Identity` itself,
+> whose arity is only known at runtime. `IntoBoundary<K>` is the matching
+> relation on the value side, implemented exactly for the tuples whose length `K`
+> describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+1]`)
+> therefore gets the arity agreement from the type system rather than by
+> checking it, and the `Identity` case is the only one left to check.
 
 > [spec:pgorm:req:entity.relation.builder]
 > `RelationBuilder<E, R>` (`src/entity/relation.rs`) accumulates a `RelationDef`.

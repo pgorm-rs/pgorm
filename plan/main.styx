@@ -1856,6 +1856,13 @@ children (
                         kind @note
                         text "Audit: cursor_by<C: IntoIdentity> and after/before<V: IntoValueTuple> share no type relationship — cursor_by((A,B)).after(1) compiles, panics \"column arity mismatch\" at cursor.rs:186 (spec-pinned by exec.cursor.keyset). Design: IntoIdentity gains type ValueType: IntoValueTuple (arities married through the existing 12-arity macro); Cursor<S, K = ValueTuple>; after/before take K. Escape hatch: impl for Identity keeps runtime arity with the check becoming DbErr per no-panic. Also in the same struct: first/last Option pair upheld by discipline only -> Option<Window> enum (exec.cursor.window); .after(x).desc() silently reverses bound meaning — note in rule. Semver-major, mechanical (15 in-crate impls). M. Bumps exec.cursor.keyset, exec.cursor.window."
                     }
+
+                    {
+                        at 2026-09-02T18:12:23.476753Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

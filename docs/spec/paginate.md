@@ -9,20 +9,23 @@ including the remaining gaps in parameter binding.
 
 ## Cursor pagination (`exec.cursor`)
 
-> [spec:pgorm:def:exec.cursor]
-> `Cursor<S>` wraps a `SelectStatement` plus the target table, an
-> `Identity` of one or more order columns, optional `first`/`last` row
-> limits, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
-> flag (default ascending), and a list of secondary order columns.
-> Cursors are created via `Select::cursor_by` (order columns on the
-> entity's table) and, for joined selects, `SelectTwo::cursor_by` /
+> [spec:pgorm:def:exec.cursor+1]
+> `Cursor<S, K>` wraps a `SelectStatement` plus the target table, an
+> `Identity` of one or more order columns, an optional `Window` row
+> limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
+> flag (default ascending), and a list of secondary order columns. `K` is
+> the boundary shape the order columns fix — the `IntoIdentity::ValueType`
+> of `[spec:pgorm:def:entity.relation.def+1]` — and defaults to
+> `ValueTuple`. Cursors are created via `Select::cursor_by` (order columns
+> on the entity's table) and, for joined selects, `SelectTwo::cursor_by` /
 > `cursor_by_other` (order columns on the first or second entity
-> respectively). `CursorTrait` names the `SelectorTrait` used to decode
-> rows; `into_model` and `into_partial_model` re-target the decoded type.
-> `Cursor` also implements `QuerySelect` and `QueryOrder` for further
-> query modification.
+> respectively), each returning a cursor keyed by its argument's
+> `ValueType`. `CursorTrait` names the `SelectorTrait` used to decode
+> rows; `into_model` and `into_partial_model` re-target the decoded type
+> and carry `K` across unchanged. `Cursor` also implements `QuerySelect`
+> and `QueryOrder` for further query modification.
 
-> [spec:pgorm:sem:exec.cursor.keyset]
+> [spec:pgorm:sem:exec.cursor.keyset+1]
 > `after(values)` filters to rows strictly beyond the boundary in the
 > logical sort direction: column `>` value when ascending, `<` when
 > descending. `before(values)` is the mirror image (`<` ascending, `>`
@@ -34,19 +37,36 @@ including the remaining gaps in parameter binding.
 > Conditions are added to the query's `WHERE` via `cond_where`; both
 > `before` and `after` may be set simultaneously.
 >
-> The arity of the boundary tuple must match the arity of the order
-> columns; any mismatch (including differing lengths for
-> `Identity::Many`) panics with "column arity mismatch".
+> Boundary arity is a type error, not a runtime one. `before` and `after`
+> accept any `V: IntoBoundary<K>`, and for the `K` a `cursor_by` argument
+> fixes, the only tuples implementing `IntoBoundary<K>` are those of the
+> same length — so `cursor_by((A, B)).after(1)` does not compile, and
+> neither does `cursor_by(A).after((1, 2))`. The one exception is a
+> runtime-built `Identity`, whose `ValueType` is `ValueTuple`: that `K`
+> admits any `IntoValueTuple`, keeping the arity check for execution.
+> A length that does not match the columns MUST then be reported when the
+> filters are composed, as `DbErr::Query(RuntimeErr::Internal)` reading
+> "cursor boundary of arity {n} does not match {m} order column(s)". No
+> arity mismatch panics.
+>
+> The comparison direction is read when the filters are composed, from the
+> cursor's final `sort_asc` — not at the call to `before`/`after`. So
+> `after(x).desc()` and `desc().after(x)` build the same query, and both
+> mean "the rows following `x` in descending order", i.e. those less than
+> `x`, rather than the ascending sense the `after(x)` call site suggests.
 
-> [spec:pgorm:sem:exec.cursor.window]
-> `first(N)` and `last(N)` are mutually exclusive: each clears the other,
-> so the most recent call wins. Either applies `LIMIT N`. `last` fetches
-> the window from the far end by flipping the emitted SQL sort order:
-> the SQL order is ascending iff `sort_asc` XNOR no-`last` (i.e. `asc` +
-> `first` or `desc` + `last` emit `ASC`; the other two combinations emit
-> `DESC`). When `last` was used, the fetched buffer is reversed in
-> memory after decoding, so `all` always returns rows in the cursor's
-> logical (`asc`/`desc`) order regardless of windowing direction.
+> [spec:pgorm:sem:exec.cursor.window+1]
+> The row limit is a single `Option<Window>`, where `Window` is
+> `First(u64)` or `Last(u64)` and `Window::rows` projects out the count.
+> A "first" and a "last" limit therefore cannot both be set: `first(N)`
+> and `last(N)` each replace the whole window, so the most recent call
+> wins. A set window applies `LIMIT rows`. `Last` fetches the window from
+> the far end by flipping the emitted SQL sort order: the SQL order is
+> ascending iff `sort_asc` XNOR `Last` (i.e. `asc` + `First` or `desc` +
+> `Last` emit `ASC`; the other two combinations emit `DESC`). When the
+> window is `Last`, the fetched buffer is reversed in memory after
+> decoding, so `all` always returns rows in the cursor's logical
+> (`asc`/`desc`) order regardless of windowing direction.
 
 > [spec:pgorm:sem:exec.cursor.order]
 > `Cursor::all` composes the query by applying the limit, then the order

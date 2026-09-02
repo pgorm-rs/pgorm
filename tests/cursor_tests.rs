@@ -57,12 +57,12 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor/test]    `Select::cursor_by`, `asc`/`desc`, and
+// [spec:pgorm:def:exec.cursor+1/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
-// [spec:pgorm:sem:exec.cursor.keyset/test]    `before` / `after` comparison
+// [spec:pgorm:sem:exec.cursor.keyset+1/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
-// [spec:pgorm:sem:exec.cursor.window/test]    `first` and `last` clearing each
-// other, and `last` reversing the fetched buffer back into logical order
+// [spec:pgorm:sem:exec.cursor.window+1/test]    `first` and `last` replacing
+// each other, and `last` reversing the fetched buffer back into logical order
 pub async fn cursor_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
@@ -595,7 +595,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor/test]    `SelectTwo::cursor_by` and
+// [spec:pgorm:def:exec.cursor+1/test]    `SelectTwo::cursor_by` and
 // `cursor_by_other` on a joined select, decoded through `into_model`
 // [spec:pgorm:sem:exec.cursor.order/test]    a joined cursor's automatic
 // secondary order on the other entity's primary key, giving the deterministic
@@ -1144,7 +1144,7 @@ fn ids(rows: &[cursor_composite::Model]) -> Vec<i32> {
     rows.iter().map(|row| row.id).collect()
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset/test]    the row-value emulation of a
+// [spec:pgorm:sem:exec.cursor.keyset+1/test]    the row-value emulation of a
 // composite boundary, in each arity, in both sort directions
 #[pgorm_macros::test]
 async fn cursor_composite_keyset() -> Result<(), DbErr> {
@@ -1236,56 +1236,53 @@ async fn cursor_composite_keyset() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset/test]    a boundary tuple whose arity does
-// not match the order columns panics with "column arity mismatch"
+// [spec:pgorm:sem:exec.cursor.keyset+1/test]    a boundary whose arity does not
+// match a runtime-built `Identity` is a `DbErr`, not a panic; the typed
+// counterpart of the same mismatch does not compile at all, which the
+// `compile_fail` doctests on `Select::cursor_by` prove
 #[pgorm_macros::test]
-async fn cursor_boundary_arity_mismatch() -> Result<(), DbErr> {
+async fn cursor_dynamic_boundary_arity_error() -> Result<(), DbErr> {
     use cursor_composite::{Column, Entity};
-    use futures::FutureExt;
+    use pgorm::IntoIdentity;
 
     let ctx = TestContext::new("cursor_tests_arity_mismatch").await;
     let db = ctx.db.get().await?;
     seed_composite(&db).await?;
 
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-
     // A pair against a unary order column.
-    let unary = std::panic::AssertUnwindSafe(async {
-        Entity::find()
-            .cursor_by(Column::A)
-            .after((1, 2))
-            .first(1)
-            .all(&db)
-            .await
-    })
-    .catch_unwind()
-    .await;
+    let unary = Entity::find()
+        .cursor_by(Column::A.into_identity())
+        .after((1, 2))
+        .first(1)
+        .all(&db)
+        .await;
+    assert_eq!(
+        unary.unwrap_err().to_string(),
+        "Query Error: cursor boundary of arity 2 does not match 1 order column(s)"
+    );
 
     // And a five-element tuple against a four-column `Identity::Many`.
-    let many = std::panic::AssertUnwindSafe(async {
-        Entity::find()
-            .cursor_by((Column::A, Column::B, Column::C, Column::D))
-            .after((1, 2, 3, 4, 5))
-            .first(1)
+    let many = Entity::find()
+        .cursor_by((Column::A, Column::B, Column::C, Column::D).into_identity())
+        .after((1, 2, 3, 4, 5))
+        .first(1)
+        .all(&db)
+        .await;
+    assert_eq!(
+        many.unwrap_err().to_string(),
+        "Query Error: cursor boundary of arity 5 does not match 4 order column(s)"
+    );
+
+    // A matching arity still runs through the same dynamic path.
+    assert_eq!(
+        ids(&Entity::find()
+            .cursor_by(Column::Id.into_identity())
+            .after(6)
+            .first(2)
             .all(&db)
-            .await
-    })
-    .catch_unwind()
-    .await;
-
-    std::panic::set_hook(hook);
-
-    for outcome in [unary, many] {
-        let payload = outcome.expect_err("an arity mismatch must panic");
-        let message = payload
-            .downcast_ref::<String>()
-            .map(String::as_str)
-            .or_else(|| payload.downcast_ref::<&str>().copied())
-            .unwrap_or_default()
-            .to_owned();
-        assert_eq!(message, "column arity mismatch");
-    }
+            .await?),
+        [7, 8]
+    );
 
     drop(db);
     ctx.delete().await;
