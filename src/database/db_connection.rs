@@ -374,9 +374,13 @@ impl ConnectionTrait for &DatabaseConnection {
     {
         Ok(self.0.query_raw(statement, params).await?)
     }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+        Ok(pgorm_pool::GenericClient::batch_execute(&self.0, sql).await?)
+    }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+1]    delegating impls
+// [spec:pgorm:def:conn.pool.conn-trait+2]    delegating impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
@@ -440,6 +444,10 @@ impl ConnectionTrait for DatabaseConnection {
         I::IntoIter: ExactSizeIterator,
     {
         Ok(self.0.query_raw(statement, params).await?)
+    }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+        Ok(pgorm_pool::GenericClient::batch_execute(&self.0, sql).await?)
     }
 }
 
@@ -526,6 +534,10 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
             .unwrap()
             .query_raw(statement, params)
             .await?)
+    }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+        Ok(pgorm_pool::GenericClient::batch_execute(self.0.as_ref().unwrap(), sql).await?)
     }
 }
 #[async_trait::async_trait]

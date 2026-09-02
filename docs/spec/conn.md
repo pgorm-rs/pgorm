@@ -94,12 +94,12 @@ under **Statement seam** below.)
 
 ## Statement execution surface
 
-> [spec:pgorm:def:conn.pool.conn-trait+1]
+> [spec:pgorm:def:conn.pool.conn-trait+2]
 > `ConnectionTrait` is the uniform statement-execution surface over
-> connections and transactions. It defines six async methods, all generic
-> over `T: ?Sized + ToStatement + Send + Sync` with parameter binding (no
-> string interpolation): `execute(stmt, params) -> u64` (affected-row count),
-> `execute_raw(stmt, params)` taking an `ExactSizeIterator` of
+> connections and transactions. It defines seven async methods. Six are
+> generic over `T: ?Sized + ToStatement + Send + Sync` with parameter binding
+> (no string interpolation): `execute(stmt, params) -> u64` (affected-row
+> count), `execute_raw(stmt, params)` taking an `ExactSizeIterator` of
 > `BorrowToSql` values instead of a `&[&dyn ToSql]` slice, `query_one ->
 > Row` (errors if not exactly one row), `query_opt -> Option<Row>`,
 > `query_all -> Vec<Row>`, and `query_raw(stmt, params) -> RowStream`,
@@ -107,9 +107,25 @@ under **Statement seam** below.)
 > the unbuffered row stream of `exec.stream`. Errors map to
 > `DbErr::Postgres`.
 >
+> The seventh, `batch_execute(sql: &str) -> ()`, is neither generic nor
+> parameterized: it sends `sql` through the simple-query protocol, so the
+> string MAY hold several `;`-separated statements, and it returns no rows.
+> It is the only method that accepts a multi-statement string — the other six
+> go through the extended protocol, where a prepared statement carries exactly
+> one command and PostgreSQL rejects a second with *cannot insert multiple
+> commands into a prepared statement*. Execution stops at the first statement
+> that fails. Nothing is prepared, so the statement cache
+> (`conn.pool.statement-cache`) is bypassed by construction rather than by
+> policy. It exists for DDL, migration, and fixture surfaces, where a script
+> is the unit of work; since values can reach it only by interpolation, `sql`
+> must be built from trusted input.
+>
 > It is implemented for `DatabaseConnection`, `&DatabaseConnection`, and
 > `DatabaseTransaction`, each delegating directly to the underlying
-> `pgorm-pool` client or transaction.
+> `pgorm-pool` client or transaction — `batch_execute` through
+> `GenericClient::batch_execute` (`conn.pool.generic-client`), which is
+> otherwise unreachable from pgorm because the wrapper types' inner fields are
+> crate-private.
 
 > [spec:pgorm:def:conn.pool.generic-client]
 > `pgorm_pool::GenericClient` is the sealed trait (`Sync` + a private

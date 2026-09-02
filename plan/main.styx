@@ -641,6 +641,14 @@ children (
                         id infra.tx.batch
                         title "batch_execute on ConnectionTrait (three impls + metric layer)"
                         kind @feat
+                        log (
+                            {
+                                at 2026-09-02T00:36:48.34752Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
+                            }
+                        )
                     }
 
                     {
@@ -810,7 +818,6 @@ children (
                 title "pgorm-cli: revive or retire"
                 priority 2
                 deps (codegen.generate decide.migration)
-                sealed true
                 log (
                     {
                         at 2026-09-02T00:32:32.701744Z

@@ -134,6 +134,48 @@ pub async fn instrumented_begin_and_commit() -> Result<(), DbErr> {
     Ok(())
 }
 
+// [spec:pgorm:req:metric.layer.delegate+2/test]    batch_execute reports a rowless success
+#[pgorm_macros::test]
+pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
+    let ctx = TestContext::new("metric_layer_batch_execute_txbatch").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let mut conn = pool.get().await?;
+    conn.batch_execute(
+        "CREATE TABLE widget (id int primary key);
+         INSERT INTO widget (id) VALUES (1);",
+    )
+    .await?;
+
+    let txn = conn.begin_instrumented().await?;
+    txn.batch_execute("INSERT INTO widget (id) VALUES (2); INSERT INTO widget (id) VALUES (3);")
+        .await?;
+    txn.commit().await?;
+
+    assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 3);
+
+    assert_eq!(
+        metrics.count("query_success:batch_execute:None"),
+        2,
+        "batch_execute reports no row count through either wrapper: {:?}",
+        metrics.events()
+    );
+    assert_eq!(metrics.count("query_error"), 0);
+
+    let error = conn
+        .batch_execute("CREATE TABLE widget (id int primary key);")
+        .await
+        .expect_err("the table already exists");
+    assert!(matches!(error, DbErr::Postgres(_)));
+    assert_eq!(metrics.count("query_error:batch_execute"), 1);
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
 // [spec:pgorm:sem:metric.layer.tx+1/test]    dropping an instrumented transaction records nothing
 #[pgorm_macros::test]
 pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), DbErr> {

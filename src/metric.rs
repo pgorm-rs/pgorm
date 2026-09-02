@@ -211,7 +211,7 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate+1]
+// [spec:pgorm:req:metric.layer.delegate+2]
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -379,6 +379,27 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
 
         result
     }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+        let start = Instant::now();
+        let result = self.connection.batch_execute(sql).await;
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok(()) => {
+                self.metrics
+                    .record_query_success("batch_execute", elapsed, None)
+                    .await;
+            }
+            Err(e) => {
+                self.metrics
+                    .record_query_error("batch_execute", elapsed, e)
+                    .await;
+            }
+        }
+
+        result
+    }
 }
 
 /// A transaction wrapper that instruments transaction operations
@@ -457,7 +478,7 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.delegate+1]    statements inside a transaction
+// [spec:pgorm:req:metric.layer.delegate+2]    statements inside a transaction
 #[async_trait]
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
@@ -643,6 +664,31 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
             Err(e) => {
                 self.metrics
                     .record_query_error("query_raw", elapsed, e)
+                    .await;
+            }
+        }
+
+        result
+    }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+        let start = Instant::now();
+        let result = if let Some(transaction) = &self.transaction {
+            transaction.batch_execute(sql).await
+        } else {
+            unreachable!("Transaction already consumed")
+        };
+        let elapsed = start.elapsed();
+
+        match &result {
+            Ok(()) => {
+                self.metrics
+                    .record_query_success("batch_execute", elapsed, None)
+                    .await;
+            }
+            Err(e) => {
+                self.metrics
+                    .record_query_error("batch_execute", elapsed, e)
                     .await;
             }
         }

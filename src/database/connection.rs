@@ -8,7 +8,7 @@ use super::DatabaseTransaction;
 
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
-// [spec:pgorm:def:conn.pool.conn-trait+1]
+// [spec:pgorm:def:conn.pool.conn-trait+2]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a [Statement]
@@ -57,6 +57,27 @@ pub trait ConnectionTrait: Sync {
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator;
+
+    /// Send `sql` through the simple-query protocol, running every
+    /// `;`-separated statement it contains.
+    ///
+    /// This is the only method that accepts a multi-statement string: the
+    /// others go through the extended protocol, where a prepared statement
+    /// carries exactly one command and PostgreSQL answers a second one with
+    /// *cannot insert multiple commands into a prepared statement*. Execution
+    /// stops at the first statement that fails, and outside an explicit
+    /// transaction PostgreSQL runs the whole string as one implicit
+    /// transaction, so that failure discards the statements before it too.
+    ///
+    /// It takes no parameters and yields no rows. Nothing is prepared, so the
+    /// statement cache is bypassed by construction. It is meant for DDL,
+    /// migration, and fixture surfaces, where a script is the unit of work.
+    ///
+    /// Because there is no parameter binding, any value has to be interpolated
+    /// into `sql` by the caller — build these strings from trusted input only,
+    /// and reach for [`ConnectionTrait::execute`] the moment user data is
+    /// involved.
+    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr>;
 }
 
 /// Spawn database transaction
