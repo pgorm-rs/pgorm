@@ -1440,6 +1440,13 @@ children (
                         kind @note
                         text "Audit (found in passing by the empty-select-list agent): cargo test --doc -p pgorm-query fails 2 doctests — SelectStatement::from and from_values both call a nonexistent Expr::asterisk. Pre-existing; the doctest-restore campaign was root-crate scoped so pgorm-query doctests never ran. Fix the two examples and consider whether pgorm-query doctests should join a routine verification command."
                     }
+
+                    {
+                        at 2026-09-02T15:32:50.012368Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )
@@ -1551,6 +1558,13 @@ children (
                         kind @note
                         text "Follow-up flagged by polish.error-dead-code: Delete::one (src/query/delete.rs:118) keeps the \"PrimaryKey is not set\" panic; plumbing is textually identical to update's but fully independent. Same shape as the landed fix: Delete::one -> Result<DeleteOne<A>, DbErr>, EntityTrait::delete forwards, guard at the builder so an unfiltered DeleteOne is unrepresentable (a WHERE-less DELETE is worse than the update case). OPEN DECISION for the operator at start: reuse DbErr::UpdateGetPrimaryKey (misnamed for delete) vs rename the variant to something neutral like PrimaryKeyNotSet (breaking, touches error.model). Bumps query.build.delete; flips delete_one_panics_on_unset_primary_key."
                     }
+
+                    {
+                        at 2026-09-02T15:25:49.26854Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: rename the variant. DbErr::UpdateGetPrimaryKey becomes DbErr::PrimaryKeyNotSet, serving both Update::one and Delete::one; error.model bumps again and the just-landed Update::one sites and tests adjust in the same change. Rejected: reusing the update-named variant for delete (documented misnomer)."
+                    }
                 )
             }
 
@@ -1605,6 +1619,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit design on file (design-lens report): select_only() breaks three invariants while keeping the type — empty projection (NOTE: SELECT FROM is VALID PG since 9.4, returns zero-column rows; .count() over it silently works — quietly-broken), the E::Model decode lie (custom projection still promises all() -> Vec<E::Model>), and the apply_alias panics (src/query/combine.rs:49-65, reachable via find_also_related after select_only().expr(..)). Full design: SelectCustom<E> (no terminal ops) -> SelectProjected<E> (no all()->E::Model, no find_also_related) with SelectColumns gaining an associated Projected type (fixpoint bound); derive macro cost is ONE token (-> S becomes -> S::Projected; single blanket impl at src/query/traits.rs:96). Sized L, semver-major, ~55 mechanical call sites; M checkpoint = two-state SelectProjection<E> (type-preserving, partial-model machinery unchanged, closes diseases 2+3 but not the empty projection — keep the landed runtime guard regardless; it protects raw pgorm-query users either way). OPERATOR DECISION at start: L full typestate vs M checkpoint. Bonus of full: zero-field DerivePartialModel becomes a compile error. Bumps query.build.modifiers+1, query.build.combine, entity traits rules as touched. Fold the four combine.rs alias panics into this node (typed error for whatever stays reachable)."
+                    }
+
+                    {
+                        at 2026-09-02T15:25:56.577094Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: FULL three-state typestate (SelectCustom -> SelectProjected, SelectColumns gains the associated Projected type with the fixpoint bound, derive macro return type changes one token). All three invalid states die at compile time; zero-field partial models become compile errors. Semver-major accepted — sole user. Rejected: the two-state M checkpoint. The landed runtime guard stays regardless, protecting raw pgorm-query builder users."
                     }
                 )
             }
@@ -1742,6 +1763,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: ActiveModelTrait::save branches on is_not_set(pk) (src/entity/active_model.rs:228-240), which cannot distinguish Set from Unchanged — for a manually-keyed entity the caller always populates the key, so save can NEVER insert. Pinned as a documented limitation by entity.active-model.save and by the verify.entity test (save_manual_key_always_updates). The intent is unrepresentable in the input, not merely unchecked: the fix is explicit entry points (insert/update/upsert) rather than inference — decide whether save survives at all (deletion candidate under house policy) or becomes upsert-backed. M, breaking, operator input on the API shape at start. Bumps entity.active-model.save, entity.active-model.persistence."
+                    }
+
+                    {
+                        at 2026-09-02T15:26:04.187738Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision: DELETE save() outright per delete-don't-deprecate — callers choose insert/update explicitly (upsert remains available through the on_conflict surface). The broken inference goes away rather than being redefined. Rejected: redefining save() as ON CONFLICT-backed upsert. entity.active-model.save retires or is rewritten to specify the absence; persistence rule bumps."
                     }
                 )
             }
