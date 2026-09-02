@@ -57,7 +57,7 @@ pub trait EntityName: IdenStatic + Default {
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
 // [spec:pgorm:def:entity.traits]
-// [spec:pgorm:req:entity.traits.crud]
+// [spec:pgorm:req:entity.traits.crud+1]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]
     type Model: ModelTrait<Entity = Self> + FromQueryResult;
@@ -176,7 +176,7 @@ pub trait EntityTrait: EntityName {
     /// # Panics
     ///
     /// Panics if arity of input values don't match arity of primary key
-    // [spec:pgorm:req:entity.traits.crud]
+    // [spec:pgorm:req:entity.traits.crud+1]
     fn find_by_id<T>(values: T) -> Select<Self>
     where
         T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,

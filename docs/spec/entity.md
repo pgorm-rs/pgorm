@@ -30,15 +30,17 @@ explicit limitations.
 > reference otherwise (`src/entity/base_entity.rs`). All generated SQL that names the
 > table goes through `table_ref`, so a `Some` schema name qualifies every statement.
 
-> [spec:pgorm:req:entity.traits.crud]
+> [spec:pgorm:req:entity.traits.crud+1]
 > `EntityTrait` provides the static CRUD surface (`src/entity/base_entity.rs`):
 > `find()` returns a fresh `Select<Self>`; `find_by_id(values)` builds on `find()` by
 > adding an equality filter per primary-key column, consuming the value tuple in
 > primary-key iteration order. `insert(model)` returns `Insert::one`,
-> `insert_many(models)` returns `Insert::many`, `update(model)` returns an `UpdateOne`,
-> `update_many()` an `UpdateMany`, `delete(model)` a `DeleteOne`, `delete_many()` a
-> `DeleteMany`, and `delete_by_id(values)` a `DeleteMany` filtered per primary-key
-> column like `find_by_id`.
+> `insert_many(models)` returns `Insert::many`, `update(model)` returns
+> `Result<UpdateOne<A>, DbErr>` and `delete(model)` `Result<DeleteOne<A>, DbErr>` —
+> both forward the builder guards of `query.build.update` / `query.build.delete`,
+> erring on an unset primary key. `update_many()` returns an `UpdateMany`,
+> `delete_many()` a `DeleteMany`, and `delete_by_id(values)` a `DeleteMany` filtered
+> per primary-key column like `find_by_id`.
 >
 > `find_by_id` and `delete_by_id` MUST panic with `primary key arity mismatch` when the
 > number of supplied values differs from the primary key's arity, in either direction.

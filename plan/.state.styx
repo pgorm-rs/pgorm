@@ -626,32 +626,6 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
-    ), rule_versions_seen (
-        {id entity.active-model, version 0}
-        {id entity.active-model.active-value, version 0}
-        {id entity.active-model.active-value.ops, version 0}
-        {id entity.active-model.from-sugar, version 0}
-        {id entity.active-model.hooks, version 0}
-        {id entity.active-model.into, version 0}
-        {id entity.active-model.json, version 1}
-        {id entity.active-model.persistence, version 0}
-        {id entity.active-model.save, version 0}
-        {id entity.relation, version 1}
-        {id entity.relation.builder, version 0}
-        {id entity.relation.def, version 0}
-        {id entity.relation.fk, version 0}
-        {id entity.relation.linked, version 0}
-        {id entity.traits, version 0}
-        {id entity.traits.active-enum, version 0}
-        {id entity.traits.active-enum.limits, version 0}
-        {id entity.traits.column, version 0}
-        {id entity.traits.column-def, version 0}
-        {id entity.traits.column.enum-cast, version 0}
-        {id entity.traits.crud, version 0}
-        {id entity.traits.entity-name, version 0}
-        {id entity.traits.from-query-result, version 0}
-        {id entity.traits.model, version 0}
-        {id entity.traits.primary-key, version 0}
     )}
     {id orm.exec, covered_rules (
         exec.crud
