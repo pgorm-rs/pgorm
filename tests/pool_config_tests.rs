@@ -10,8 +10,8 @@ use pgorm_pool::{PoolBuilder, PoolConfig};
 use pretty_assertions::assert_eq;
 
 fn database_url() -> String {
-    dotenv::from_filename(".env.local").ok();
-    dotenv::from_filename(".env").ok();
+    dotenvy::from_filename(".env.local").ok();
+    dotenvy::from_filename(".env").ok();
     std::env::var("DATABASE_URL").expect("Enviroment variable 'DATABASE_URL' not set")
 }
 

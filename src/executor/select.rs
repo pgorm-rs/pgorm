@@ -1099,11 +1099,9 @@ where
                     break;
                 }
             }
-            if same_l {
-                if let Some(r) = r {
-                    last_r.push(r);
-                    continue;
-                }
+            if same_l && let Some(r) = r {
+                last_r.push(r);
+                continue;
             }
         }
         let rows = match r {

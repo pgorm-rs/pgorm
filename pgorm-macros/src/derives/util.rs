@@ -15,12 +15,11 @@ pub(crate) fn field_not_ignored(field: &Field) -> bool {
 
         if let Ok(list) = attr.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated) {
             for meta in list.iter() {
-                if let Meta::Path(path) = meta {
-                    if let Some(name) = path.get_ident() {
-                        if name == "ignore" {
-                            return false;
-                        }
-                    }
+                if let Meta::Path(path) = meta
+                    && let Some(name) = path.get_ident()
+                    && name == "ignore"
+                {
+                    return false;
                 }
             }
         }

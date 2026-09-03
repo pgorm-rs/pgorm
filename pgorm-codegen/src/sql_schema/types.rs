@@ -92,16 +92,14 @@ fn named_type(
         [_, name] => (false, name),
         _ => return Err(unsupported(format!("a type name on {context}"), at)),
     };
-    if !catalog {
-        if let Some(variants) = enums.get(name.as_str()) {
-            return Ok(plain(ColumnType::Enum {
-                name: SeaRc::new(Alias::new(name.as_str())),
-                variants: variants
-                    .iter()
-                    .map(|variant| SeaRc::new(Alias::new(variant.as_str())))
-                    .collect(),
-            }));
-        }
+    if !catalog && let Some(variants) = enums.get(name.as_str()) {
+        return Ok(plain(ColumnType::Enum {
+            name: SeaRc::new(Alias::new(name.as_str())),
+            variants: variants
+                .iter()
+                .map(|variant| SeaRc::new(Alias::new(variant.as_str())))
+                .collect(),
+        }));
     }
     let col_type = match (name.as_str(), modifiers) {
         ("serial" | "serial4", []) => return Ok(serial(ColumnType::Integer)),

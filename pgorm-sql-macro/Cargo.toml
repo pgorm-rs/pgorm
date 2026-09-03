@@ -10,7 +10,7 @@ documentation = "https://docs.rs/pgorm"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["postgres", "sql", "macro"]
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "pgorm_sql_macro"
@@ -19,10 +19,10 @@ proc-macro = true
 
 [dependencies]
 pg_query = "6.2.0"
-proc-macro2 = { version = "1", default-features = false }
-quote = { version = "1", default-features = false }
-syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "printing"] }
+proc-macro2 = { version = "1.0.107", default-features = false }
+quote = { version = "1.0.47", default-features = false }
+syn = { version = "3", default-features = false, features = ["parsing", "proc-macro", "printing"] }
 
 [dev-dependencies]
 pgorm-sql-macro = { path = "." }
-trybuild = "1.0"
+trybuild = "1.0.120"

@@ -2,7 +2,7 @@
 name = "pgorm-pool"
 version = "0.14.1"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
 description = "Dead simple async pool for tokio-postgres"
 keywords = ["async", "database", "pool", "postgres"]
@@ -25,17 +25,11 @@ serde.workspace = true
 # ], optional = true }
 tokio.workspace = true # = { version = "1.29", features = ["rt"] }
 tracing.workspace = true # = "0.1.37"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio-postgres.workspace = true
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-tokio-postgres = { version = "0.7.9", default-features = false }
-
 [dev-dependencies]
-config = { version = "0.14", features = ["json"] }
-dotenvy = "0.15.0"
-futures = "0.3.1"
-futures-util = "0.3.30"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+config = { version = "0.15", features = ["json"] }
+dotenvy = "0.15.7"
+futures = "0.3.34"
+futures-util = "0.3.34"
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }

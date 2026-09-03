@@ -12,7 +12,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 - `cargo nextest run --workspace` - Run the test suite (the preferred runner; skips doctests)
 - `cargo test --doc --workspace` - Run the doctests, which nextest skips; the whole-workspace suite passes (a handful are deliberately ignored)
 - Tests require a running PostgreSQL instance. Set `DATABASE_URL` to the *server* URL with no database path, e.g. `DATABASE_URL=postgres://postgres:postgres@localhost:5432`
-- `.env.local` and `.env` are loaded automatically via dotenv, so `DATABASE_URL` can live in either
+- `.env.local` and `.env` are loaded automatically via dotenvy, so `DATABASE_URL` can live in either
 
 ### Build and Development
 - `cargo build` - Build the project

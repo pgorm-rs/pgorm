@@ -1216,6 +1216,20 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.deps-latest
+                title "Refresh every workspace dependency to its latest release"
+                kind @build
+                log (
+                    {
+                        at 2026-09-03T16:33:05.51096Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
+            }
         )
     }
 

@@ -10,7 +10,7 @@ documentation = "https://docs.rs/pgorm"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["sql", "mysql", "postgres", "sqlite"]
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "pgorm_codegen"
@@ -22,12 +22,12 @@ pgorm-query.workspace = true
 # pgorm-codegen is a build-time tool nothing links into a running application,
 # so the C build cost lands on people generating entities and on nobody else.
 pg_query = "6.2.0"
-syn = { version = "2", default-features = false, features = ["parsing", "proc-macro", "derive", "printing"] }
-quote = { version = "1", default-features = false }
-heck = { version = "0.4", default-features = false }
-proc-macro2 = { version = "1", default-features = false }
-tracing = { version = "0.1", default-features = false, features = ["log"] }
+syn = { version = "3", default-features = false, features = ["parsing", "proc-macro", "derive", "printing"] }
+quote = { version = "1.0.47", default-features = false }
+heck = { version = "0.5", default-features = false }
+proc-macro2 = { version = "1.0.107", default-features = false }
+tracing = { version = "0.1.44", default-features = false, features = ["log"] }
 
 [dev-dependencies]
-pretty_assertions = { version = "0.7" }
+pretty_assertions = { version = "1.4" }
 pgorm = { path = "../", default-features = false, features = ["macros", "with-rust_decimal"] }

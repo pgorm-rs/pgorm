@@ -15,7 +15,10 @@ pub fn unwrap_option(ty: &Type) -> Option<&Type> {
 }
 
 fn sole_segment(ty: &Type) -> Option<&PathSegment> {
-    let Type::Path(TypePath { qself: None, path }) = ty else {
+    let Type::Path(TypePath {
+        qself: None, path, ..
+    }) = ty
+    else {
         return None;
     };
     if path.leading_colon.is_some() || path.segments.len() != 1 {

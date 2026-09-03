@@ -152,14 +152,14 @@ impl ActiveEnum {
                     //rust doesn't provide negative variants in enums as a single LitInt, this workarounds that
                     Some((_, Expr::Unary(exprnlit))) => {
                         if let UnOp::Neg(_) = exprnlit.op {
-                            if let Expr::Lit(exprlit) = *exprnlit.expr {
-                                if let Lit::Int(litint) = exprlit.lit {
-                                    let negative_token = quote! { -#litint };
-                                    let litint = parse(negative_token.into()).unwrap();
+                            if let Expr::Lit(exprlit) = *exprnlit.expr
+                                && let Lit::Int(litint) = exprlit.lit
+                            {
+                                let negative_token = quote! { -#litint };
+                                let litint = parse(negative_token.into()).unwrap();
 
-                                    is_int = true;
-                                    num_value = Some(litint);
-                                }
+                                is_int = true;
+                                num_value = Some(litint);
                             }
                         } else {
                             return Err(Error::TT(quote_spanned! {

@@ -6,7 +6,7 @@ use tokio_postgres::error::SqlState;
 #[derive(Error, Debug)]
 pub enum DbErr {
     /// Postgres error
-    #[error("Postgres Error: {0:?} {:?}", .0.as_db_error())]
+    #[error("Postgres Error: {0:?} {db:?}", db = .0.as_db_error())]
     Postgres(#[from] tokio_postgres::Error),
     /// Pool error
     #[error("Pool Error: {0}")]
