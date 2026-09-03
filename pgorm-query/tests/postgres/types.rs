@@ -1,10 +1,10 @@
 use super::*;
-use crate::oracle::{assert_eq, assert_eq_unparsed};
+use crate::oracle::assert_eq;
 use pgorm_query::extension::Type;
 
 // [spec:pgorm:req:sql.ddl.type-enum/test]
 #[test]
-// [spec:pgorm:req:sql.render.ddl.enum-type/test]
+// [spec:pgorm:req:sql.render.ddl.enum-type+1/test]
 fn create_1() {
     assert_eq!(
         Type::create()
@@ -60,7 +60,7 @@ fn create_3() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+1/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -103,7 +103,7 @@ fn drop_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+1/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -140,12 +140,12 @@ fn alter_3() {
 
 #[test]
 fn alter_4() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Type::alter()
             .name(Font::Table)
             .rename_to(Alias::new("typeface"))
             .to_string(QueryBuilder),
-        r#"ALTER TYPE "font" RENAME TO 'typeface'"#
+        r#"ALTER TYPE "font" RENAME TO "typeface""#
     )
 }
 
@@ -162,11 +162,11 @@ fn alter_5() {
 
 #[test]
 fn alter_6() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Type::alter()
             .name((Alias::new("schema"), Font::Table))
             .rename_to(Alias::new("typeface"))
             .to_string(QueryBuilder),
-        r#"ALTER TYPE "schema"."font" RENAME TO 'typeface'"#
+        r#"ALTER TYPE "schema"."font" RENAME TO "typeface""#
     )
 }

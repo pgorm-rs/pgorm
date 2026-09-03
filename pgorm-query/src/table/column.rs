@@ -1,7 +1,7 @@
 use crate::{expr::*, types::*};
 
 /// Specification of a table column
-// [spec:pgorm:req:sql.ddl.column-def+2]
+// [spec:pgorm:req:sql.ddl.column-def+3]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableName>,
@@ -47,7 +47,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+2]
+// [spec:pgorm:def:sql.types.column-type+3]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -65,7 +65,7 @@ pub enum ColumnType {
     TimestampWithTimeZone,
     Time,
     Date,
-    Interval(Option<PgInterval>, Option<u32>),
+    Interval(IntervalSpec),
     Bit(Option<u32>),
     VarBit(u32),
     Boolean,
@@ -96,14 +96,14 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+2]
+// [spec:pgorm:def:sql.types.column-type+3]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Char(l0), Self::Char(r0)) => l0 == r0,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Decimal(l0), Self::Decimal(r0)) => l0 == r0,
-            (Self::Interval(l0, l1), Self::Interval(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Interval(l0), Self::Interval(r0)) => l0 == r0,
             (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::VarBit(l0), Self::VarBit(r0)) => l0 == r0,
             (Self::Custom(l0), Self::Custom(r0)) => l0.to_string() == r0.to_string(),
@@ -147,7 +147,7 @@ impl ColumnType {
     /// The `serial` spelling this type is replaced by when the column carries
     /// [`ColumnSpec::AutoIncrement`], or `None` when Postgres has no serial
     /// form for it.
-    // [spec:pgorm:req:sql.ddl.column-def+2]
+    // [spec:pgorm:req:sql.ddl.column-def+3]
     pub fn serial_spelling(&self) -> Option<&'static str> {
         match self {
             ColumnType::SmallInteger => Some("smallserial"),
@@ -173,7 +173,74 @@ pub enum ColumnSpec {
     Comment(String),
 }
 
-// All interval fields
+/// The `[fields] [(p)]` tail of a PostgreSQL `interval` type.
+///
+/// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
+/// the precision sits on the second-bearing field spellings and on the
+/// unqualified form, and `interval HOUR(3)` has no spelling here.
+// [spec:pgorm:def:sql.types.column-type+3]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum IntervalSpec {
+    /// `interval`, or `interval(p)` — every field, with a fractional-seconds
+    /// precision when one is given.
+    Any(Option<IntervalPrecision>),
+    /// `interval <fields>` — one of the field-qualified forms.
+    Fields(PgInterval),
+}
+
+/// Fractional-seconds precision of an interval type.
+///
+/// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
+// [spec:pgorm:def:sql.types.column-type+3]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum IntervalPrecision {
+    P0,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+}
+
+impl IntervalPrecision {
+    /// The precision `digits` names, or `None` where PostgreSQL has none.
+    pub const fn new(digits: u8) -> Option<Self> {
+        match digits {
+            0 => Some(Self::P0),
+            1 => Some(Self::P1),
+            2 => Some(Self::P2),
+            3 => Some(Self::P3),
+            4 => Some(Self::P4),
+            5 => Some(Self::P5),
+            6 => Some(Self::P6),
+            _ => None,
+        }
+    }
+
+    /// The digit count this precision spells.
+    pub const fn digits(self) -> u8 {
+        match self {
+            Self::P0 => 0,
+            Self::P1 => 1,
+            Self::P2 => 2,
+            Self::P3 => 3,
+            Self::P4 => 4,
+            Self::P5 => 5,
+            Self::P6 => 6,
+        }
+    }
+}
+
+impl std::fmt::Display for IntervalPrecision {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.digits())
+    }
+}
+
+/// All interval field qualifiers; the second-bearing ones carry the precision
+/// PostgreSQL allows only there.
+// [spec:pgorm:def:sql.types.column-type+3]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,
@@ -181,14 +248,14 @@ pub enum PgInterval {
     Day,
     Hour,
     Minute,
-    Second,
+    Second(Option<IntervalPrecision>),
     YearToMonth,
     DayToHour,
     DayToMinute,
-    DayToSecond,
+    DayToSecond(Option<IntervalPrecision>),
     HourToMinute,
-    HourToSecond,
-    MinuteToSecond,
+    HourToSecond(Option<IntervalPrecision>),
+    MinuteToSecond(Option<IntervalPrecision>),
 }
 
 impl ColumnDef {
@@ -355,7 +422,7 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as interval type with optional fields and precision. Postgres only
+    /// Set column type as interval type. Postgres only
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -364,22 +431,24 @@ impl ColumnDef {
     ///         .table(Glyph::Table)
     ///         .col(
     ///             ColumnDef::new(Alias::new("I1"))
-    ///                 .interval(None, None)
+    ///                 .interval(IntervalSpec::Any(None))
     ///                 .not_null()
     ///         )
     ///         .col(
     ///             ColumnDef::new(Alias::new("I2"))
-    ///                 .interval(Some(PgInterval::YearToMonth), None)
+    ///                 .interval(IntervalSpec::Fields(PgInterval::YearToMonth))
     ///                 .not_null()
     ///         )
     ///         .col(
     ///             ColumnDef::new(Alias::new("I3"))
-    ///                 .interval(None, Some(42))
+    ///                 .interval(IntervalSpec::Any(Some(IntervalPrecision::P4)))
     ///                 .not_null()
     ///         )
     ///         .col(
     ///             ColumnDef::new(Alias::new("I4"))
-    ///                 .interval(Some(PgInterval::Hour), Some(43))
+    ///                 .interval(IntervalSpec::Fields(PgInterval::HourToSecond(Some(
+    ///                     IntervalPrecision::P3
+    ///                 ))))
     ///                 .not_null()
     ///         )
     ///         .to_string(QueryBuilder),
@@ -387,15 +456,16 @@ impl ColumnDef {
     ///         r#"CREATE TABLE "glyph" ("#,
     ///         r#""I1" interval NOT NULL,"#,
     ///         r#""I2" interval YEAR TO MONTH NOT NULL,"#,
-    ///         r#""I3" interval(42) NOT NULL,"#,
-    ///         r#""I4" interval HOUR(43) NOT NULL"#,
+    ///         r#""I3" interval(4) NOT NULL,"#,
+    ///         r#""I4" interval HOUR TO SECOND(3) NOT NULL"#,
     ///         r#")"#,
     ///     ]
     ///     .join(" ")
     /// );
     /// ```
-    pub fn interval(&mut self, fields: Option<PgInterval>, precision: Option<u32>) -> &mut Self {
-        self.types = Some(ColumnType::Interval(fields, precision));
+    // [spec:pgorm:def:sql.types.column-type+3]
+    pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
+        self.types = Some(ColumnType::Interval(spec));
         self
     }
 
@@ -660,7 +730,7 @@ impl ColumnDef {
     pub fn take(&mut self) -> Self {
         Self {
             table: self.table.take(),
-            name: std::mem::replace(&mut self.name, SeaRc::new(NullAlias::new())),
+            name: self.name.clone(),
             types: self.types.take(),
             spec: std::mem::take(&mut self.spec),
         }

@@ -76,11 +76,11 @@ pub struct SelectExpr {
 }
 
 /// Join expression used in select statement
+// [spec:pgorm:req:sql.ast.select.join+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JoinExpr {
-    pub join: JoinType,
+    pub join: JoinKind,
     pub table: Box<FromItem>,
-    pub on: Option<JoinOn>,
     pub lateral: bool,
 }
 
@@ -907,6 +907,10 @@ impl SelectStatement {
 
     /// Cross join.
     ///
+    /// A cross join takes no condition — PostgreSQL forbids `ON` after
+    /// `CROSS JOIN`. Filter the product in `WHERE`, or use [`Self::inner_join`]
+    /// to join on a condition.
+    ///
     /// # Examples
     ///
     /// ```
@@ -916,39 +920,25 @@ impl SelectStatement {
     ///     .column(Char::Character)
     ///     .column((Font::Table, Font::Name))
     ///     .from(Char::Table)
-    ///     .cross_join(Font::Table, Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///     .cross_join(Font::Table)
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "character", "font"."name" FROM "character" CROSS JOIN "font" ON "character"."font_id" = "font"."id""#
-    /// );
-    ///
-    /// // Constructing chained join conditions
-    /// let query = Query::select()
-    ///         .column(Char::Character)
-    ///         .column((Font::Table, Font::Name))
-    ///         .from(Char::Table)
-    ///         .cross_join(
-    ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
-    ///         )
-    ///         .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     r#"SELECT "character", "font"."name" FROM "character" CROSS JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
+    ///     r#"SELECT "character", "font"."name" FROM "character" CROSS JOIN "font""#
     /// );
     /// ```
-    pub fn cross_join<R, C>(&mut self, tbl_ref: R, condition: C) -> &mut Self
+    // [spec:pgorm:req:sql.ast.select.join+1]
+    pub fn cross_join<R>(&mut self, tbl_ref: R) -> &mut Self
     where
         R: IntoFromItem,
-        C: IntoCondition,
     {
-        self.join(JoinType::CrossJoin, tbl_ref, condition)
+        self.join.push(JoinExpr {
+            join: JoinKind::Cross,
+            table: Box::new(tbl_ref.into_from_item()),
+            lateral: false,
+        });
+        self
     }
 
     /// Left join.
@@ -1174,7 +1164,7 @@ impl SelectStatement {
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.join]
+    // [spec:pgorm:req:sql.ast.select.join+1]
     pub fn join<R, C>(&mut self, join: JoinType, tbl_ref: R, condition: C) -> &mut Self
     where
         R: IntoFromItem,
@@ -1357,7 +1347,7 @@ impl SelectStatement {
     ///     r#"SELECT "name" FROM "font" LEFT JOIN LATERAL (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id" AND "font"."id" = "sub_glyph"."id""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.join]
+    // [spec:pgorm:req:sql.ast.select.join+1]
     pub fn join_lateral<T, C>(
         &mut self,
         join: JoinType,
@@ -1387,9 +1377,8 @@ impl SelectStatement {
         lateral: bool,
     ) -> &mut Self {
         self.join.push(JoinExpr {
-            join,
+            join: JoinKind::Qualified(join, on),
             table: Box::new(table),
-            on: Some(on),
             lateral,
         });
         self

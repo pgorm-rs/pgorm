@@ -203,7 +203,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+1]
+> [spec:pgorm:def:sql.types+2]
 > `Iden` is the identifier trait (bounded `Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
 > which doubles any embedded quote character — and `prepare`, which writes the
@@ -222,8 +222,11 @@ including panic semantics and quirks inherited from sea-query.
 > `IdenList` is implemented for a single iden and for 2- and 3-tuples,
 > yielding `DynIden`s in order.
 >
-> `Alias` wraps an arbitrary `String` as an identifier; `NullAlias` renders as
-> the empty string.
+> `Alias` wraps an arbitrary `String` as an identifier. There is no empty-name
+> identifier type: PostgreSQL rejects a zero-length delimited identifier, so
+> the `NullAlias` that rendered one — and only ever served as a placeholder
+> inside `ColumnDef::take` — is gone
+> (`[dec:pgorm:invalid-states-unrepresentable]`).
 
 > [spec:pgorm:def:sql.types.column-ref]
 > `ColumnRef` has five forms: `Column(DynIden)`, `TableColumn(DynIden,
@@ -262,10 +265,10 @@ including panic semantics and quirks inherited from sea-query.
 > position is a type error rather than a render-time panic
 > (`[spec:pgorm:sem:sql.ddl.panics+2]`).
 
-> [spec:pgorm:def:sql.types.opers]
+> [spec:pgorm:def:sql.types.opers+1]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
 > operator vocabulary: logical `And`/`Or`; pattern `Like`/`NotLike` plus
-> Postgres `ILike`/`NotILike` and `Escape`; `Is`/`IsNot`; `In`/`NotIn`;
+> Postgres `ILike`/`NotILike`; `Is`/`IsNot`; `In`/`NotIn`;
 > `Between`/`NotBetween`; comparisons `Equal`, `NotEqual`, `SmallerThan`,
 > `GreaterThan`, `SmallerThanOrEqual`, `GreaterThanOrEqual`; arithmetic
 > `Add`/`Sub`/`Mul`/`Div`/`Mod`; shifts `LShift`/`RShift`; `As`;
@@ -275,23 +278,26 @@ including panic semantics and quirks inherited from sea-query.
 > `GetJsonField` (`->`) and `CastJsonField` (`->>`); regex `Regex` (`~`) and
 > `RegexCaseInsensitive` (`~*`); pgvector distances `EuclideanDistance`,
 > `NegativeInnerProduct`, `CosineDistance`; and an escape hatch
-> `Custom(&'static str)`.
+> `Custom(&'static str)`. There is no `Escape` operator: `ESCAPE` is
+> grammatical only as the tail of a `LIKE` pattern, so it belongs to
+> `SimpleExpr::LikePattern` and cannot be applied to two arbitrary operands
+> (`[dec:pgorm:invalid-states-unrepresentable]`).
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.column-type+2]
+> [spec:pgorm:def:sql.types.column-type+3]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
 > `String(StringLen)`, `Text`, `Bytea`, `SmallInteger`, `Integer`,
 > `BigInteger`, `Float`, `Double`, `Decimal(Option<(u32, u32)>)`, `Timestamp`,
-> `TimestampWithTimeZone`, `Time`, `Date`, `Interval(Option<PgInterval>,
-> Option<u32>)`, `Bit(Option<u32>)`, `VarBit(u32)`, `Boolean`, `Money`,
+> `TimestampWithTimeZone`, `Time`, `Date`, `Interval(IntervalSpec)`,
+> `Bit(Option<u32>)`, `VarBit(u32)`, `Boolean`, `Money`,
 > `Json`, `JsonBinary`, `Uuid`, `Custom(DynIden)`, `Enum { name, variants }`,
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
 > and `LTree`. `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
-> (`[spec:pgorm:req:sql.ddl.column-def+2]`).
+> (`[spec:pgorm:req:sql.ddl.column-def+3]`).
 >
 > The vocabulary carries no MySQL-era spelling and no variant that renders
 > something other than what it names, and MUST NOT reacquire one. `Year` had
@@ -311,10 +317,20 @@ including panic semantics and quirks inherited from sea-query.
 > spellings.
 >
 > `StringLen` parameterises varchar length: `N(u32)`, `Max`, or the
-> default `None`. `PgInterval` enumerates the thirteen interval field
-> qualifiers (`Year` through `MinuteToSecond`); it implements `Display` as the
-> SQL keywords (`YEAR TO MONTH`, ...) and a case-insensitive
-> `TryFrom<&str>` inverse.
+> default `None`. `IntervalSpec` is the interval tail: `Any(Option<
+> IntervalPrecision>)` for the unqualified `interval`/`interval(p)`, and
+> `Fields(PgInterval)` for the qualified forms. `PgInterval` enumerates the
+> thirteen interval field qualifiers (`Year` through `MinuteToSecond`); the
+> four second-bearing ones (`Second`, `DayToSecond`, `HourToSecond`,
+> `MinuteToSecond`) carry an `Option<IntervalPrecision>` because PostgreSQL
+> takes a precision only where the trailing field is `SECOND`, so
+> `interval HOUR(3)` does not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `IntervalPrecision` is the
+> closed set PostgreSQL accepts, `P0` through `P6`, with `new(digits)`
+> returning `None` outside it and `digits()`/`Display` spelling it back.
+> `PgInterval` implements `Display` as the SQL keywords with the precision
+> appended (`YEAR TO MONTH`, `SECOND(3)`, ...) and a case-insensitive
+> `TryFrom<&str>` inverse over the bare keywords.
 >
 > `ColumnType` equality compares parameters for the parameterised variants,
 > compares `Custom` and `Enum` by rendered identifier strings (and variant

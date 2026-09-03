@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_query_eq};
 use pgorm_query::extension::{Extension, Type};
 
-// [spec:pgorm:req:sql.ddl+3/test]    the whole DDL surface is reachable through the six
+// [spec:pgorm:req:sql.ddl+4/test]    the whole DDL surface is reachable through the six
 // entry-point helpers
 #[test]
 fn every_ddl_entry_point_is_reachable() {
@@ -116,7 +116,7 @@ fn every_ddl_entry_point_is_reachable() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+3/test]    table, index, foreign-key and comment statements implement
+// [spec:pgorm:req:sql.ddl+4/test]    table, index, foreign-key and comment statements implement
 // `SchemaStatementBuilder`, whose `build` / `build_any` / `to_string` all delegate to the same
 // `prepare_*` method on the single Postgres `QueryBuilder`
 #[test]
@@ -174,7 +174,7 @@ fn schema_statement_builder_trio_agrees() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+3/test]    `TableStatement` is an enum wrapper dispatching to the same
+// [spec:pgorm:req:sql.ddl+4/test]    `TableStatement` is an enum wrapper dispatching to the same
 // builders
 #[test]
 fn table_statement_wrapper_dispatches() {
@@ -255,7 +255,7 @@ fn table_statement_wrapper_dispatches() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+3/test]    identifiers render double-quoted, with embedded quotes doubled
+// [spec:pgorm:req:sql.ddl+4/test]    identifiers render double-quoted, with embedded quotes doubled
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(
@@ -283,7 +283,7 @@ fn ddl_identifiers_are_double_quoted() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+3/test]    index and constraint names are idens, so an embedded
+// [spec:pgorm:req:sql.ddl+4/test]    index and constraint names are idens, so an embedded
 // quote is doubled at every site that writes one
 #[test]
 fn ddl_index_and_constraint_names_escape_quotes() {

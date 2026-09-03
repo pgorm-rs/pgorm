@@ -188,10 +188,10 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators]
+> [spec:pgorm:def:sql.render.operators+1]
 > `prepare_bin_oper_common` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`, `IN`,
-> `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `ESCAPE`, `AS`. Comparison: `=`, `<>`,
+> `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `AS`. Comparison: `=`, `<>`,
 > `<`, `>`, `<=`, `>=`. Arithmetic: `+`, `-`, `*`, `/`, `%`. Shift: `<<`,
 > `>>`. PostgreSQL-specific: `@@` (Matches), `@>` (Contains), `<@`
 > (Contained), `||` (Concatenate), `&&` (Overlap), `%` (Similarity), `<%`
@@ -204,6 +204,11 @@ an ideal Postgres renderer would emit.
 > lexeme collisions: `%` serves both Mod and Similarity, `<->` both
 > SimilarityDistance and EuclideanDistance. The only unary operator is
 > `UnOper::Not` → `NOT`.
+>
+> `ESCAPE` is not an operator: it is grammatical only as the tail of a `LIKE`
+> / `ILIKE` pattern, so it renders from `SimpleExpr::LikePattern` — the
+> pattern as a value, then ` ESCAPE ` and the escape character as an inline
+> constant — and there is no `BinOper` that could place it anywhere else.
 
 > [spec:pgorm:def:sql.render.precedence]
 > Parenthesis elision is driven by
@@ -281,11 +286,14 @@ an ideal Postgres renderer would emit.
 > `FIELD()`-style ordering. Unions render as ` UNION (…)`, ` UNION ALL (…)`,
 > ` INTERSECT (…)`, or ` EXCEPT (…)` with the sub-select parenthesized.
 
-> [spec:pgorm:req:sql.render.joins+1]
+> [spec:pgorm:req:sql.render.joins+2]
 > Join types MUST render as `JOIN`, `CROSS JOIN`, `INNER JOIN`, `LEFT JOIN`,
 > `RIGHT JOIN`, `FULL OUTER JOIN`, followed by the joined table reference
-> (prefixed `LATERAL ` when the join is marked lateral), followed by the join
-> constraint rendered as an ` ON …` condition via `sql.render.condition-chain`.
+> (prefixed `LATERAL ` when the join is marked lateral). A `JoinKind::Qualified`
+> join then renders its constraint as an ` ON …` condition via
+> `sql.render.condition-chain`; a `JoinKind::Cross` join renders nothing after
+> the table, because PostgreSQL admits no `ON` after `CROSS JOIN` and the AST
+> carries no condition for one (`sql.ast.select.join`).
 > `JoinOn` has exactly one form, `Condition`, so `prepare_join_on` is total.
 > There is no `USING (…)` output: the `JoinOn::Columns` variant that stood for
 > it was never constructed by any builder and rendered `unimplemented!()`, and
@@ -296,7 +304,7 @@ an ideal Postgres renderer would emit.
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
 
-> [spec:pgorm:req:sql.render.window+1]
+> [spec:pgorm:req:sql.render.window+2]
 > A window specification is never emitted bare: `prepare_window_spec` wraps it
 > in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
 > way a specification reaches the sink. Both spelling sites therefore agree —
@@ -317,10 +325,9 @@ an ideal Postgres renderer would emit.
 > ` ORDER BY ` order-exprs, then the frame clause: ` RANGE ` or ` ROWS `,
 > followed by either `BETWEEN start AND end` when an end bound exists or the
 > start bound alone. Frame bounds render `UNBOUNDED PRECEDING`,
-> `CURRENT ROW`, `UNBOUNDED FOLLOWING`; bounded offsets render the value as a
-> parameter immediately followed by the keyword with **no separating space**
-> (`$1PRECEDING`, `$1FOLLOWING`) — a known limitation of the current frame
-> renderer, and the one window render PostgreSQL still rejects.
+> `CURRENT ROW`, `UNBOUNDED FOLLOWING`; bounded offsets render the value —
+> a `$N` parameter in the `build()` path, the literal inline — then a space
+> and the keyword (`$1 PRECEDING`, `2 FOLLOWING`).
 
 > [spec:pgorm:req:sql.render.subquery+1]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
@@ -425,14 +432,17 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types+2]
+> [spec:pgorm:def:sql.render.ddl.types+3]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
 > `varchar(n)`/`varchar`; Text → `text`; SmallInteger → `smallint`; Integer →
 > `integer`; BigInteger → `bigint`; Float → `real`; Double →
 > `double precision`; Decimal → `decimal(p, s)`/`decimal`; Timestamp →
 > `timestamp`; TimestampWithTimeZone → `timestamp with time zone`; Time →
-> `time`; Date → `date`; Interval → `interval [fields][(p)]`; Bytea →
+> `time`; Date → `date`; Interval → `interval`, `interval(p)` or
+> `interval <fields>` per `IntervalSpec`, the fractional-seconds precision
+> spelled by the second-bearing field itself (`interval HOUR TO SECOND(3)`);
+> Bytea →
 > `bytea`; Bit → `bit(n)`/`bit`; VarBit → `varbit(n)`; Boolean → `bool`;
 > Money → `money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
@@ -450,20 +460,25 @@ an ideal Postgres renderer would emit.
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered
 > by the same builder with identifiers quoted per `sql.render.ident-quoting`.
 
-> [spec:pgorm:req:sql.render.ddl.enum-type]
+> [spec:pgorm:req:sql.render.ddl.enum-type+1]
 > `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` where each enum label
 > is emitted through `prepare_value` — i.e. as a `$N` parameter in the
 > `build()` path and as a quoted string inline in the `to_string()` path.
 > `ALTER TYPE name` supports ` ADD VALUE v [BEFORE w | AFTER w]`,
-> ` RENAME TO v`, and ` RENAME VALUE v TO w`, all label operands likewise
-> parameterized. `DROP TYPE [IF EXISTS ]name, … [CASCADE|RESTRICT]` renders
+> ` RENAME TO v`, and ` RENAME VALUE v TO w`; every label operand is likewise
+> parameterized, but the `RENAME TO` target is a type name rather than a
+> label and MUST render as a quoted identifier. `DROP TYPE [IF EXISTS ]name, … [CASCADE|RESTRICT]` renders
 > type names via `TypeRef` with quoted, dot-joined parts. Callers executing
 > these statements against PostgreSQL MUST use a rendering path that inlines
 > the labels, since Postgres does not accept bind parameters in DDL.
 
-> [spec:pgorm:sem:sql.render.ddl.extension]
+> [spec:pgorm:sem:sql.render.ddl.extension+1]
 > `CREATE EXTENSION [IF NOT EXISTS ]name [WITH SCHEMA s] [VERSION v]
-> [CASCADE]` and `DROP EXTENSION [IF EXISTS ]name [CASCADE] [RESTRICT]`
-> interpolate the extension name, schema, and version strings raw — no
-> identifier quoting, no escaping, no parameterization. Callers are
-> responsible for the trustworthiness of these strings.
+> [CASCADE]` and `DROP EXTENSION [IF EXISTS ]name [CASCADE|RESTRICT]` MUST
+> render the extension name and schema as quoted identifiers, escaped through
+> `Alias` like any other identifier, and the version as a single-quoted string
+> literal through `sql.render.string-escape` — the grammar takes a word or a
+> string there, and a version like `v0.1.0` is not a word. The one string a
+> DDL render still interpolates verbatim is `ColumnDef::extra`, which exists
+> to carry SQL text the vocabulary cannot spell and is documented as caller
+> responsibility by `sql.ddl.column-def`.

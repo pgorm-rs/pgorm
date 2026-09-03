@@ -26,7 +26,7 @@ use inherent::inherent;
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table]
+// [spec:pgorm:req:sql.ddl.alter-table+1]
 #[derive(Default, Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: Option<TableName>,
@@ -41,13 +41,17 @@ pub struct AddColumnOption {
 }
 
 /// All available table alter options
+///
+/// `RENAME` is absent: PostgreSQL takes it only as the sole action of a
+/// statement, so it lives in [`ColumnRenameStatement`] where it cannot be
+/// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
+// [spec:pgorm:req:sql.ddl.alter-table+1]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
     ModifyColumn(ColumnDef),
-    RenameColumn(DynIden, DynIden),
     DropColumn(DynIden),
     AddForeignKey(TableForeignKey),
     DropForeignKey(DynIden),
@@ -158,34 +162,6 @@ impl TableAlterStatement {
     /// ```
     pub fn modify_column<C: IntoColumnDef>(&mut self, column_def: C) -> &mut Self {
         self.add_alter_option(TableAlterOption::ModifyColumn(column_def.into_column_def()))
-    }
-
-    /// Rename a column in an existing table
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let table = Table::alter()
-    ///     .table(Font::Table)
-    ///     .rename_column(Alias::new("new_col"), Alias::new("new_column"))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
-    ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
-    /// );
-    /// ```
-    pub fn rename_column<T, R>(&mut self, from_name: T, to_name: R) -> &mut Self
-    where
-        T: IntoIden,
-        R: IntoIden,
-    {
-        self.add_alter_option(TableAlterOption::RenameColumn(
-            from_name.into_iden(),
-            to_name.into_iden(),
-        ))
     }
 
     /// Drop a column from an existing table

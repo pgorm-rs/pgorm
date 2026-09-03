@@ -37,6 +37,9 @@ pub enum SimpleExpr {
     AsEnum(DynIden, Box<SimpleExpr>),
     Case(Box<CaseStatement>),
     Constant(Value),
+    /// The right operand of a `LIKE` / `ILIKE`: a pattern and the optional
+    /// `ESCAPE` character, which the grammar admits only as a pattern's tail.
+    LikePattern(LikeExpr),
 }
 
 pub(crate) mod private {
@@ -54,17 +57,7 @@ pub(crate) mod private {
         where
             O: Into<BinOper>,
         {
-            self.bin_op(
-                op,
-                match like.escape {
-                    Some(escape) => SimpleExpr::Binary(
-                        Box::new(like.pattern.into()),
-                        BinOper::Escape,
-                        Box::new(SimpleExpr::Constant(escape.into())),
-                    ),
-                    None => like.pattern.into(),
-                },
-            )
+            self.bin_op(op, SimpleExpr::LikePattern(like))
         }
     }
 }

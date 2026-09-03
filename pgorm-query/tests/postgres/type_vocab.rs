@@ -219,7 +219,7 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+1/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -230,7 +230,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+1/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -247,7 +247,6 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::NotLike, "NOT LIKE"),
         (BinOper::ILike, "ILIKE"),
         (BinOper::NotILike, "NOT ILIKE"),
-        (BinOper::Escape, "ESCAPE"),
         (BinOper::Is, "IS"),
         (BinOper::IsNot, "IS NOT"),
         (BinOper::In, "IN"),
@@ -303,7 +302,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+2/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+3/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -322,7 +321,7 @@ fn string_len_and_the_convenience_constructors() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+2/test]    only the integer trio has a serial spelling
+// [spec:pgorm:req:sql.ddl.column-def+3/test]    only the integer trio has a serial spelling
 #[test]
 fn serial_spelling_covers_the_integer_trio() {
     assert_eq!(
@@ -337,7 +336,7 @@ fn serial_spelling_covers_the_integer_trio() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+2/test]    a type with no serial form renders itself
+// [spec:pgorm:req:sql.ddl.column-def+3/test]    a type with no serial form renders itself
 #[test]
 fn auto_increment_without_serial_form_renders_type() {
     assert_eq!(
@@ -349,7 +348,7 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+2/test]    equality compares parameters, renders
+// [spec:pgorm:def:sql.types.column-type+3/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -365,12 +364,20 @@ fn column_type_equality_semantics() {
         ColumnType::Decimal(None)
     );
     assert_eq!(
-        ColumnType::Interval(Some(PgInterval::Hour), Some(3)),
-        ColumnType::Interval(Some(PgInterval::Hour), Some(3))
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::Second(Some(
+            IntervalPrecision::P3
+        )))),
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::Second(Some(
+            IntervalPrecision::P3
+        ))))
     );
     assert_ne!(
-        ColumnType::Interval(Some(PgInterval::Hour), None),
-        ColumnType::Interval(Some(PgInterval::Day), None)
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::Hour)),
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::Day))
+    );
+    assert_ne!(
+        ColumnType::Interval(IntervalSpec::Any(None)),
+        ColumnType::Interval(IntervalSpec::Any(Some(IntervalPrecision::P0)))
     );
 
     // `Custom` compares by rendered identifier, not by concrete iden type.
@@ -419,7 +426,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+2/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+3/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -429,20 +436,26 @@ fn pg_interval_display_and_parse_round_trip() {
         (PgInterval::Day, "DAY"),
         (PgInterval::Hour, "HOUR"),
         (PgInterval::Minute, "MINUTE"),
-        (PgInterval::Second, "SECOND"),
+        (PgInterval::Second(None), "SECOND"),
         (PgInterval::YearToMonth, "YEAR TO MONTH"),
         (PgInterval::DayToHour, "DAY TO HOUR"),
         (PgInterval::DayToMinute, "DAY TO MINUTE"),
-        (PgInterval::DayToSecond, "DAY TO SECOND"),
+        (PgInterval::DayToSecond(None), "DAY TO SECOND"),
         (PgInterval::HourToMinute, "HOUR TO MINUTE"),
-        (PgInterval::HourToSecond, "HOUR TO SECOND"),
-        (PgInterval::MinuteToSecond, "MINUTE TO SECOND"),
+        (PgInterval::HourToSecond(None), "HOUR TO SECOND"),
+        (PgInterval::MinuteToSecond(None), "MINUTE TO SECOND"),
     ];
 
     for (field, keywords) in all {
         assert_eq!(field.to_string(), keywords);
         assert_eq!(PgInterval::try_from(keywords).unwrap(), field);
     }
+
+    // A precision is spelled by the field that carries it.
+    assert_eq!(
+        PgInterval::MinuteToSecond(Some(IntervalPrecision::P6)).to_string(),
+        "MINUTE TO SECOND(6)"
+    );
 
     // Case and surrounding whitespace are forgiven; anything else is an error.
     assert_eq!(
@@ -453,4 +466,18 @@ fn pg_interval_display_and_parse_round_trip() {
         PgInterval::try_from("century".to_owned()).unwrap_err(),
         "Cannot turn \"CENTURY\" into a Postgres interval field".to_owned()
     );
+}
+
+// [spec:pgorm:def:sql.types.column-type+3/test]    the precision vocabulary is the closed set
+// PostgreSQL accepts, and nothing outside it constructs
+#[test]
+fn interval_precision_is_zero_through_six() {
+    for digits in 0..=6u8 {
+        let precision = IntervalPrecision::new(digits).expect("0..=6 are precisions");
+        assert_eq!(precision.digits(), digits);
+        assert_eq!(precision.to_string(), digits.to_string());
+    }
+
+    assert_eq!(IntervalPrecision::new(7), None);
+    assert_eq!(IntervalPrecision::new(u8::MAX), None);
 }

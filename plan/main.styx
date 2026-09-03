@@ -1510,12 +1510,20 @@ children (
                 id bug.oracle-findings
                 title "Fix the nine rendering defects the conformance oracle found beyond the audit"
                 deps (bug.ident-escaping)
+                sealed true
                 log (
                     {
                         at 2026-09-02T16:08:40.705111Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Oracle day-one findings, each pinned in pgorm-query/tests/postgres/oracle_pins.rs (flip the pin when fixed): window frame offset renders \"ROWS 2PRECEDING\" (missing space); CROSS JOIN emits \"ON TRUE\" for an empty condition (CROSS JOIN takes no ON); ALTER TABLE mixes ADD COLUMN and RENAME COLUMN in one statement (PG requires separate statements for RENAME); TableRenameStatement accepts a qualified rename target (\"RENAME TO \\\"schema\\\".\\\"name\\\"\" — PG wants a bare name); ALTER TYPE ... RENAME TO emits the new name as a 'string literal' instead of an identifier; interval precision renders as HOUR(43) (precision only valid on SECOND, and max 6); DROP EXTENSION renders CASCADE RESTRICT together; NullAlias renders AS \"\" (zero-length identifier); ESCAPE emitted as a free-standing binary operator; raw-interpolation holes: extension VERSION rendered unquoted (VERSION v0.1.0), extension name interpolated raw, ColumnDef::extra passed through verbatim (extra is by-design — document rather than fix, judgment). All in query_builder.rs — hence deps on the chain end. Some may fold naturally into unrep.mysql-purge/tableref-split scopes; coordinate, don't duplicate."
+                    }
+
+                    {
+                        at 2026-09-02T23:13:32.053159Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

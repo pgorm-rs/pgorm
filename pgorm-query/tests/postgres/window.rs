@@ -1,5 +1,5 @@
 use super::*;
-use crate::oracle::{assert_eq, assert_eq_unparsed};
+use crate::oracle::assert_eq;
 
 fn counted() -> FunctionCall {
     Func::count(Expr::col(Char::Id))
@@ -7,7 +7,7 @@ fn counted() -> FunctionCall {
 
 // [spec:pgorm:def:sql.ast.window-statement+1/test]    PARTITION BY accumulates from all four entry
 // points
-// [spec:pgorm:req:sql.render.window+1/test]    an inline window renders ` OVER ( … )`
+// [spec:pgorm:req:sql.render.window+2/test]    an inline window renders ` OVER ( … )`
 #[test]
 fn window_1() {
     assert_eq!(
@@ -42,7 +42,7 @@ fn window_1() {
 
 // [spec:pgorm:def:sql.ast.window-statement+1/test]    ORDER BY comes from the shared
 // `OrderedStatement` trait
-// [spec:pgorm:req:sql.render.window+1/test]    ` PARTITION BY … ORDER BY …`
+// [spec:pgorm:req:sql.render.window+2/test]    ` PARTITION BY … ORDER BY …`
 #[test]
 fn window_2() {
     assert_eq!(
@@ -89,7 +89,7 @@ fn window_2() {
 
 // [spec:pgorm:def:sql.ast.window-statement+1/test]    `frame_start` sets a single bound,
 // `frame_between` sets both, for either frame type
-// [spec:pgorm:req:sql.render.window+1/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
+// [spec:pgorm:req:sql.render.window+2/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
 // the start bound alone
 #[test]
 fn window_3() {
@@ -158,12 +158,11 @@ fn window_3() {
     );
 }
 
-// [spec:pgorm:req:sql.render.window+1/test]    a bounded offset renders as a parameter immediately
-// followed by the keyword, with no separating space — still pinned as invalid by
-// `oracle_pins_window_frame_offset_spacing`
+// [spec:pgorm:req:sql.render.window+2/test]    a bounded offset renders the value, a space, then
+// the keyword
 #[test]
 fn window_4() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -176,7 +175,7 @@ fn window_4() {
         (
             [
                 r#"SELECT COUNT("id") OVER ("#,
-                r#"PARTITION BY "font_size" ROWS BETWEEN $1PRECEDING AND $2FOLLOWING )"#,
+                r#"PARTITION BY "font_size" ROWS BETWEEN $1 PRECEDING AND $2 FOLLOWING )"#,
                 r#"FROM "character""#,
             ]
             .join(" "),
@@ -184,8 +183,8 @@ fn window_4() {
         )
     );
 
-    // Inline, the same shape drops the placeholder but keeps the missing space.
-    assert_eq_unparsed!(
+    // Inline, the same shape drops the placeholder for the literal.
+    assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
@@ -197,7 +196,7 @@ fn window_4() {
             .to_string(QueryBuilder),
         [
             r#"SELECT COUNT("id") OVER ("#,
-            r#"PARTITION BY "font_size" ROWS 2PRECEDING )"#,
+            r#"PARTITION BY "font_size" ROWS 2 PRECEDING )"#,
             r#"FROM "character""#,
         ]
         .join(" ")
@@ -206,7 +205,7 @@ fn window_4() {
 
 // [spec:pgorm:def:sql.ast.window-statement+1/test]    `WindowSelectType::Name` references a window
 // declared at statement level with `SelectStatement::window`
-// [spec:pgorm:req:sql.render.window+1/test]    a named reference renders ` OVER "name"` and its
+// [spec:pgorm:req:sql.render.window+2/test]    a named reference renders ` OVER "name"` and its
 // declaration ` WINDOW "name" AS ( … )`
 #[test]
 fn window_5() {
@@ -280,7 +279,7 @@ fn window_7() {
 
 // [spec:pgorm:req:sql.render.select-order+1/test]    WINDOW sits with HAVING, ahead of the tail
 // clauses that apply to the whole result
-// [spec:pgorm:req:sql.render.window+1/test]
+// [spec:pgorm:req:sql.render.window+2/test]
 #[test]
 fn window_clause_precedes_order_limit_lock() {
     assert_eq!(

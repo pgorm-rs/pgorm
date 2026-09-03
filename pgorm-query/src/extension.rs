@@ -46,7 +46,7 @@ impl Extension {
 ///         .cascade()
 ///         .if_not_exists()
 ///         .to_string(QueryBuilder),
-///     r#"CREATE EXTENSION IF NOT EXISTS ltree WITH SCHEMA public VERSION v0.1.0 CASCADE"#
+///     r#"CREATE EXTENSION IF NOT EXISTS "ltree" WITH SCHEMA "public" VERSION 'v0.1.0' CASCADE"#
 /// );
 /// ```
 ///
@@ -55,7 +55,7 @@ impl Extension {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension]
+// [spec:pgorm:req:sql.ddl.extension+1]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensionCreateStatement {
     pub(crate) name: String,
@@ -126,7 +126,7 @@ impl ExtensionCreateStatement {
 ///         .cascade()
 ///         .if_exists()
 ///         .to_string(QueryBuilder),
-///     r#"DROP EXTENSION IF EXISTS ltree CASCADE"#
+///     r#"DROP EXTENSION IF EXISTS "ltree" CASCADE"#
 /// );
 /// ```
 ///
@@ -135,20 +135,27 @@ impl ExtensionCreateStatement {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
+// [spec:pgorm:req:sql.ddl.extension+1]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensionDropStatement {
     pub(crate) name: String,
-    pub(crate) schema: Option<String>,
-    pub(crate) version: Option<String>,
 
     /// Conditional to execute query based on existance of the extension.
     pub(crate) if_exists: bool,
 
-    /// Determines the presence of the `RESTRICT` statement.
-    pub(crate) restrict: bool,
+    /// The drop behaviour, at most one of `CASCADE` and `RESTRICT`.
+    pub(crate) option: Option<ExtensionDropOpt>,
+}
 
-    /// Determines the presence of the `CASCADE` statement
-    pub(crate) cascade: bool,
+/// The drop behaviour of a `DROP EXTENSION` statement.
+///
+/// PostgreSQL takes one of `CASCADE` and `RESTRICT`, never both, so the two
+/// spellings share one slot.
+// [spec:pgorm:req:sql.ddl.extension+1]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExtensionDropOpt {
+    Cascade,
+    Restrict,
 }
 
 impl ExtensionDropStatement {
@@ -168,15 +175,15 @@ impl ExtensionDropStatement {
         self
     }
 
-    /// Uses "CASCADE" on Drop Extension Statement.
+    /// Uses "CASCADE" on Drop Extension Statement, replacing any "RESTRICT".
     pub fn cascade(&mut self) -> &mut Self {
-        self.cascade = true;
+        self.option = Some(ExtensionDropOpt::Cascade);
         self
     }
 
-    /// Uses "RESTRICT" on Drop Extension Statement.
+    /// Uses "RESTRICT" on Drop Extension Statement, replacing any "CASCADE".
     pub fn restrict(&mut self) -> &mut Self {
-        self.restrict = true;
+        self.option = Some(ExtensionDropOpt::Restrict);
         self
     }
 }
@@ -248,30 +255,34 @@ mod test {
             .to_owned();
 
         assert_eq!(drop_extension_stmt.name, "ltree");
-        assert!(drop_extension_stmt.cascade);
         assert!(drop_extension_stmt.if_exists);
-        assert!(drop_extension_stmt.restrict);
+        assert_eq!(drop_extension_stmt.option, Some(ExtensionDropOpt::Restrict));
     }
 }
 
+// [spec:pgorm:def:sql.types.column-type+3]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let fields = match self {
-            PgInterval::Year => "YEAR",
-            PgInterval::Month => "MONTH",
-            PgInterval::Day => "DAY",
-            PgInterval::Hour => "HOUR",
-            PgInterval::Minute => "MINUTE",
-            PgInterval::Second => "SECOND",
-            PgInterval::YearToMonth => "YEAR TO MONTH",
-            PgInterval::DayToHour => "DAY TO HOUR",
-            PgInterval::DayToMinute => "DAY TO MINUTE",
-            PgInterval::DayToSecond => "DAY TO SECOND",
-            PgInterval::HourToMinute => "HOUR TO MINUTE",
-            PgInterval::HourToSecond => "HOUR TO SECOND",
-            PgInterval::MinuteToSecond => "MINUTE TO SECOND",
+        let (fields, precision) = match self {
+            PgInterval::Year => ("YEAR", None),
+            PgInterval::Month => ("MONTH", None),
+            PgInterval::Day => ("DAY", None),
+            PgInterval::Hour => ("HOUR", None),
+            PgInterval::Minute => ("MINUTE", None),
+            PgInterval::Second(precision) => ("SECOND", *precision),
+            PgInterval::YearToMonth => ("YEAR TO MONTH", None),
+            PgInterval::DayToHour => ("DAY TO HOUR", None),
+            PgInterval::DayToMinute => ("DAY TO MINUTE", None),
+            PgInterval::DayToSecond(precision) => ("DAY TO SECOND", *precision),
+            PgInterval::HourToMinute => ("HOUR TO MINUTE", None),
+            PgInterval::HourToSecond(precision) => ("HOUR TO SECOND", *precision),
+            PgInterval::MinuteToSecond(precision) => ("MINUTE TO SECOND", *precision),
         };
-        write!(f, "{fields}")
+        write!(f, "{fields}")?;
+        match precision {
+            Some(precision) => write!(f, "({precision})"),
+            None => Ok(()),
+        }
     }
 }
 
@@ -301,14 +312,14 @@ impl TryFrom<&str> for PgInterval {
             "DAY" => Ok(PgInterval::Day),
             "HOUR" => Ok(PgInterval::Hour),
             "MINUTE" => Ok(PgInterval::Minute),
-            "SECOND" => Ok(PgInterval::Second),
+            "SECOND" => Ok(PgInterval::Second(None)),
             "YEAR TO MONTH" => Ok(PgInterval::YearToMonth),
             "DAY TO HOUR" => Ok(PgInterval::DayToHour),
             "DAY TO MINUTE" => Ok(PgInterval::DayToMinute),
-            "DAY TO SECOND" => Ok(PgInterval::DayToSecond),
+            "DAY TO SECOND" => Ok(PgInterval::DayToSecond(None)),
             "HOUR TO MINUTE" => Ok(PgInterval::HourToMinute),
-            "HOUR TO SECOND" => Ok(PgInterval::HourToSecond),
-            "MINUTE TO SECOND" => Ok(PgInterval::MinuteToSecond),
+            "HOUR TO SECOND" => Ok(PgInterval::HourToSecond(None)),
+            "MINUTE TO SECOND" => Ok(PgInterval::MinuteToSecond(None)),
             field => Err(format!(
                 "Cannot turn \"{field}\" into a Postgres interval field",
             )),
@@ -453,7 +464,7 @@ pub struct TypeDropStatement {
     pub(crate) if_exists: bool,
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+1]
 #[derive(Debug, Clone, Default)]
 pub struct TypeAlterStatement {
     pub(crate) name: Option<TypeRef>,

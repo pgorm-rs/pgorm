@@ -2,9 +2,9 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+4/test]
-// [spec:pgorm:req:sql.ddl.column-def+2/test]
+// [spec:pgorm:req:sql.ddl.column-def+3/test]
 #[test]
-// [spec:pgorm:def:sql.render.ddl.types+2/test]
+// [spec:pgorm:def:sql.render.ddl.types+3/test]
 fn create_1() {
     assert_eq!(
         Table::create()
@@ -117,7 +117,7 @@ fn create_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+2/test]
+// [spec:pgorm:req:sql.ddl.column-types+3/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -164,7 +164,7 @@ fn create_7() {
             .table(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
-                    .interval(None, None)
+                    .interval(IntervalSpec::Any(None))
                     .not_null()
             )
             .to_string(QueryBuilder),
@@ -184,7 +184,7 @@ fn create_8() {
             .table(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
-                    .interval(Some(PgInterval::YearToMonth), None)
+                    .interval(IntervalSpec::Fields(PgInterval::YearToMonth))
                     .not_null()
             )
             .to_string(QueryBuilder),
@@ -204,33 +204,37 @@ fn create_9() {
             .table(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
-                    .interval(None, Some(42))
+                    .interval(IntervalSpec::Any(Some(IntervalPrecision::P4)))
                     .not_null()
             )
             .to_string(QueryBuilder),
         [
             r#"CREATE TABLE "glyph" ("#,
-            r#""aspect" interval(42) NOT NULL"#,
+            r#""aspect" interval(4) NOT NULL"#,
             r#")"#,
         ]
         .join(" ")
     );
 }
 
+// [spec:pgorm:def:sql.types.column-type+3/test]    a precision rides on the second-bearing
+// field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Table::create()
             .table(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
-                    .interval(Some(PgInterval::Hour), Some(43))
+                    .interval(IntervalSpec::Fields(PgInterval::HourToSecond(Some(
+                        IntervalPrecision::P3
+                    ))))
                     .not_null()
             )
             .to_string(QueryBuilder),
         [
             r#"CREATE TABLE "glyph" ("#,
-            r#""aspect" interval HOUR(43) NOT NULL"#,
+            r#""aspect" interval HOUR TO SECOND(3) NOT NULL"#,
             r#")"#,
         ]
         .join(" ")
@@ -257,7 +261,7 @@ fn create_11() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+2/test]
+// [spec:pgorm:req:sql.ddl.column-types+3/test]
 #[test]
 fn create_12() {
     assert_eq!(
@@ -320,7 +324,7 @@ fn create_15() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -363,7 +367,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table/test]
+// [spec:pgorm:req:sql.ddl.alter-table+1/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -380,7 +384,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table/test]
+// [spec:pgorm:req:sql.ddl.alter-table+1/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -404,9 +408,9 @@ fn alter_2() {
 #[test]
 fn alter_3() {
     assert_eq!(
-        Table::alter()
+        Table::rename_column()
             .table(Font::Table)
-            .rename_column(Alias::new("new_col"), Alias::new("new_column"))
+            .column(Alias::new("new_col"), Alias::new("new_column"))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
     );
@@ -426,9 +430,9 @@ fn alter_4() {
 #[test]
 fn alter_5() {
     assert_eq!(
-        Table::alter()
+        Table::rename_column()
             .table((Alias::new("schema"), Font::Table))
-            .rename_column(Alias::new("new_col"), Alias::new("new_column"))
+            .column(Alias::new("new_col"), Alias::new("new_column"))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "schema"."font" RENAME COLUMN "new_col" TO "new_column""#
     );
@@ -440,15 +444,17 @@ fn alter_6() {
     Table::alter().to_string(QueryBuilder);
 }
 
+// [spec:pgorm:req:sql.ddl.alter-table+1/test]    a rename is a statement of its own, so it
+// cannot join the comma-separated options
 #[test]
 fn alter_7() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Table::alter()
             .table(Font::Table)
             .add_column(ColumnDef::new(Alias::new("new_col")).integer())
-            .rename_column(Font::Name, Alias::new("name_new"))
+            .drop_column(Font::Name)
             .to_string(QueryBuilder),
-        r#"ALTER TABLE "font" ADD COLUMN "new_col" integer, RENAME COLUMN "name" TO "name_new""#
+        r#"ALTER TABLE "font" ADD COLUMN "new_col" integer, DROP COLUMN "name""#
     );
 }
 
@@ -516,7 +522,7 @@ fn alter_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
 #[test]
 fn rename_1() {
     assert_eq!(
@@ -529,14 +535,11 @@ fn rename_1() {
 
 #[test]
 fn rename_2() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Table::rename()
-            .table(
-                (Alias::new("schema"), Font::Table),
-                (Alias::new("schema"), Alias::new("font_new")),
-            )
+            .table((Alias::new("schema"), Font::Table), Alias::new("font_new"))
             .to_string(QueryBuilder),
-        r#"ALTER TABLE "schema"."font" RENAME TO "schema"."font_new""#
+        r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#
     );
 }
 

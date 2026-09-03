@@ -101,7 +101,7 @@ fn select_7() {
     );
 }
 
-// [spec:pgorm:req:sql.render.joins+1/test]
+// [spec:pgorm:req:sql.render.joins+2/test]
 #[test]
 fn select_8() {
     assert_eq!(
@@ -117,7 +117,7 @@ fn select_8() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.join/test]
+// [spec:pgorm:req:sql.ast.select.join+1/test]
 #[test]
 fn select_9() {
     assert_eq!(
@@ -781,7 +781,7 @@ fn select_48a() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+1/test]    `Asterisk` as a bare projection
+// [spec:pgorm:def:sql.ast.keywords+2/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -792,7 +792,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
-// [spec:pgorm:def:sql.ast.keywords+1/test]    `(Table, Asterisk)` renders `"table".*`
+// [spec:pgorm:def:sql.ast.keywords+2/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -1791,7 +1791,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators/test]
+// [spec:pgorm:def:sql.render.operators+1/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -2185,7 +2185,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+1/test]    the bare-keyword expressions and their constructors
+// [spec:pgorm:def:sql.ast.keywords+2/test]    the bare-keyword expressions and their constructors
 #[test]
 fn keywords_1() {
     assert_eq!(
@@ -2200,17 +2200,17 @@ fn keywords_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+1/test]    `Alias` wraps an arbitrary string as an identifier,
-// `NullAlias` is the empty identifier
+// [spec:pgorm:def:sql.ast.keywords+2/test]    `Alias` wraps an arbitrary string as an identifier,
+// and it is the only identifier helper — there is no empty-name alias
 #[test]
 fn keywords_2() {
-    assert_eq_unparsed!(
+    assert_eq!(
         Query::select()
             .expr_as(Expr::col(Glyph::Id), Alias::new("an alias"))
-            .expr_as(Expr::col(Glyph::Aspect), NullAlias::new())
+            .expr_as(Expr::col(Glyph::Aspect), Alias::new("ratio"))
             .from(Glyph::Table)
             .to_string(QueryBuilder),
-        r#"SELECT "id" AS "an alias", "aspect" AS "" FROM "glyph""#
+        r#"SELECT "id" AS "an alias", "aspect" AS "ratio" FROM "glyph""#
     );
 }
 

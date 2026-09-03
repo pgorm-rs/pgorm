@@ -109,7 +109,7 @@ fn sweep_expression_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the join vocabulary
-// [spec:pgorm:req:sql.render.joins+1/test]
+// [spec:pgorm:req:sql.render.joins+2/test]
 #[test]
 fn sweep_join_shapes() {
     let joins = [
@@ -135,6 +135,13 @@ fn sweep_join_shapes() {
         })
         .collect();
 
+    statements.push(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .cross_join(Font::Table)
+            .to_string(QueryBuilder),
+    );
     statements.push(
         Query::select()
             .column(Char::Id)
@@ -266,7 +273,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window+1/test]
+// [spec:pgorm:req:sql.render.window+2/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {
@@ -460,9 +467,9 @@ fn sweep_table_ddl_shapes() {
             .table(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).null())
             .to_string(QueryBuilder),
-        Table::alter()
+        Table::rename_column()
             .table(Glyph::Table)
-            .rename_column(Glyph::Aspect, Alias::new("ratio"))
+            .column(Glyph::Aspect, Alias::new("ratio"))
             .to_string(QueryBuilder),
         Table::alter()
             .table(Glyph::Table)
@@ -579,7 +586,7 @@ fn sweep_schema_object_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    every `ColumnType` that has a PostgreSQL spelling
-// [spec:pgorm:def:sql.render.ddl.types+2/test]
+// [spec:pgorm:def:sql.render.ddl.types+3/test]
 #[test]
 fn sweep_column_type_vocabulary() {
     let types = [
@@ -599,8 +606,12 @@ fn sweep_column_type_vocabulary() {
         ColumnType::TimestampWithTimeZone,
         ColumnType::Time,
         ColumnType::Date,
-        ColumnType::Interval(None, None),
-        ColumnType::Interval(Some(PgInterval::YearToMonth), None),
+        ColumnType::Interval(IntervalSpec::Any(None)),
+        ColumnType::Interval(IntervalSpec::Any(Some(IntervalPrecision::P6))),
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::YearToMonth)),
+        ColumnType::Interval(IntervalSpec::Fields(PgInterval::MinuteToSecond(Some(
+            IntervalPrecision::P2,
+        )))),
         ColumnType::Bytea,
         ColumnType::Bit(None),
         ColumnType::Bit(Some(8)),
@@ -628,7 +639,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators/test]
+// [spec:pgorm:def:sql.render.operators+1/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [

@@ -573,7 +573,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
 > rejects. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+1]
+> [spec:pgorm:sem:codegen.ddl.types+2]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare, and
@@ -582,7 +582,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `SmallInteger`/`Integer`/`BigInteger`, `float4`/`float8` → `Float`/`Double`,
 > `numeric` → `Decimal`, `timestamp` → `Timestamp`,
 > `timestamptz` → `TimestampWithTimeZone`,
-> `time` → `Time`, `date` → `Date`, `interval` → `Interval(None, None)`,
+> `time` → `Time`, `date` → `Date`, `interval` → `Interval(Any(None))`,
 > `bool` → `Boolean`, `money` → `Money`, `bytea` → `Bytea`, `bit` → `Bit`,
 > `varbit` → `VarBit`, `json` → `Json`, `jsonb` → `JsonBinary`, `uuid` → `Uuid`,
 > `inet`/`cidr`/`macaddr`/`ltree` → `Inet`/`Cidr`/`MacAddr`/`LTree`,
@@ -597,7 +597,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > bound wraps the element type in `Array`; only one unsized `[]` is accepted.
 >
 > The map is close to a bijection because the forward contract
-> (`[spec:pgorm:req:sql.ddl.column-types+2]`) no longer spells one Postgres
+> (`[spec:pgorm:req:sql.ddl.column-types+3]`) no longer spells one Postgres
 > type under several names: `bytea`, `timestamp`, `smallint` and `money` each
 > have exactly one `ColumnType` to come back to, so `Bytea`, `Timestamp`,
 > `SmallInteger` and `Money` are recovered rather than chosen from a set. Where

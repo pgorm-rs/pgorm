@@ -2,7 +2,7 @@ use super::{Enums, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
-use pgorm_query::{Alias, ColumnType, RcOrArc, SeaRc, StringLen};
+use pgorm_query::{Alias, ColumnType, IntervalSpec, RcOrArc, SeaRc, StringLen};
 
 /// A column's type together with the auto-increment fact the `serial` family
 /// carries in its spelling rather than in a constraint.
@@ -15,7 +15,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+1]
+// [spec:pgorm:sem:codegen.ddl.types+2]
 pub(super) fn column_kind(
     type_name: &TypeName,
     enums: &Enums,
@@ -78,7 +78,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+1]
+// [spec:pgorm:sem:codegen.ddl.types+2]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
@@ -126,7 +126,7 @@ fn named_type(
         ("timestamptz", []) => ColumnType::TimestampWithTimeZone,
         ("time", []) => ColumnType::Time,
         ("date", []) => ColumnType::Date,
-        ("interval", []) => ColumnType::Interval(None, None),
+        ("interval", []) => ColumnType::Interval(IntervalSpec::Any(None)),
         ("bool" | "boolean", []) => ColumnType::Boolean,
         ("money", []) => ColumnType::Money,
         ("bytea", []) => ColumnType::Bytea,

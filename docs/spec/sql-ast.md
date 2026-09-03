@@ -96,11 +96,16 @@ today, including panicking edges and deliberate failsafes.
 > `from_values` MUST panic when given an empty tuple list (`assert!` on the
 > collected rows); there is no non-panicking variant.
 
-> [spec:pgorm:req:sql.ast.select.join]
-> Joins MUST accumulate as `JoinExpr { join, table, on, lateral }` entries. The
-> generic `join(JoinType, table, condition)` accepts `JoinType::Join`,
-> `CrossJoin`, `InnerJoin`, `LeftJoin`, `RightJoin`, or `FullOuterJoin`, with
-> named shorthands `cross_join`, `left_join`, `right_join`, `inner_join`, and
+> [spec:pgorm:req:sql.ast.select.join+1]
+> Joins MUST accumulate as `JoinExpr { join, table, lateral }` entries, where
+> `join` is a `JoinKind` that carries the constraint with the join it belongs
+> to: `Qualified(JoinType, JoinOn)` for a join with an `ON` clause, and `Cross`
+> for the one join PostgreSQL takes without one. `JoinType` therefore names
+> only the constrained joins — `Join`, `InnerJoin`, `LeftJoin`, `RightJoin`,
+> `FullOuterJoin` — and the generic `join(JoinType, table, condition)` cannot
+> spell a cross join, nor `cross_join(table)` a condition
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Named shorthands are
+> `cross_join`, `left_join`, `right_join`, `inner_join`, and
 > `full_outer_join`. `join_as` MUST alias the joined table; `join_subquery` MUST
 > join a `SelectStatement` as an aliased subquery; `join_lateral` MUST do the
 > same with the `lateral` flag set, rendering `JOIN LATERAL`.
@@ -242,13 +247,12 @@ today, including panicking edges and deliberate failsafes.
 > `in_subquery`/`not_in_subquery` MUST build `IN (SELECT ...)` /
 > `NOT IN (SELECT ...)` from a `SelectStatement`.
 
-> [spec:pgorm:def:sql.ast.keywords+1]
+> [spec:pgorm:def:sql.ast.keywords+2]
 > `Keyword` represents bare SQL keywords usable as expressions: `Null`,
 > `CurrentDate`, `CurrentTime`, `CurrentTimestamp`, and `Custom(DynIden)`;
 > `Expr::current_date()`, `Expr::current_time()`, `Expr::current_timestamp()`,
 > and `Expr::custom_keyword(..)` construct them. Identifier helpers: `Alias`
-> wraps an arbitrary string as an identifier, `NullAlias` is an empty
-> identifier, and `Asterisk` expresses `*` — as a bare projection or
+> wraps an arbitrary string as an identifier and `Asterisk` expresses `*` — as a bare projection or
 > table-qualified via `(Table, Asterisk)` rendering `"table".*`. `ColumnRef`
 > spans `Column`, `TableColumn`, `SchemaTableColumn`, `Asterisk`, and
 > `TableAsterisk`; `TableName` spans plain and schema-qualified tables, and

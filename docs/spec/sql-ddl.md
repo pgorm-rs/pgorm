@@ -10,9 +10,10 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including panics and leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+3]
+> [spec:pgorm:req:sql.ddl+4]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
-> (`create`/`alter`/`drop`/`rename`/`truncate`), `Index` (`create`/`drop`),
+> (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
+> (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
 > `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`). Table,
 > index, foreign-key and comment statements
@@ -63,7 +64,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > here: on Postgres a table comment is a statement of its own, built through
 > `[spec:pgorm:req:sql.ddl.comment]`.
 
-> [spec:pgorm:req:sql.ddl.column-def+2]
+> [spec:pgorm:req:sql.ddl.column-def+3]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr, stored }`,
@@ -86,9 +87,19 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > type Postgres has none for. `Comment` specs are skipped entirely — a column
 > comment is a statement of its own (`[spec:pgorm:req:sql.ddl.comment]`).
 > `IntoColumnDef` accepts both `ColumnDef` and `&mut ColumnDef` (via
-> `take()`), enabling the builder-by-reference doctest style.
+> `take()`), enabling the builder-by-reference doctest style; `take()` clones
+> the name rather than swapping in a placeholder identifier, so no empty
+> identifier exists to leak into a rendered column.
+>
+> `Extra` is deliberately verbatim and is the one DDL render that interpolates
+> a caller string unquoted. It exists as the escape hatch for column SQL the
+> `ColumnType`/`ColumnSpec` vocabulary cannot spell, so quoting or escaping it
+> would defeat its only purpose: whatever a caller puts there is emitted as
+> written, and the caller owns its trustworthiness — including whether it
+> parses at all. Anything expressible through the typed setters MUST use them
+> instead.
 
-> [spec:pgorm:req:sql.ddl.column-types+2]
+> [spec:pgorm:req:sql.ddl.column-types+3]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
 > contract, and it is total: every variant has exactly one Postgres spelling
 > and none can fail. It MUST spell: `Char(Some(n))`→`char(n)`,
@@ -98,7 +109,10 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `Double`→`double precision`; `Decimal(Some((p,s)))`→`decimal(p, s)`,
 > `Decimal(None)`→`decimal`; `Timestamp`→`timestamp`;
 > `TimestampWithTimeZone`→`timestamp with time zone`; `Time`→`time`;
-> `Date`→`date`; `Interval(fields, p)`→`interval[ FIELDS][(p)]`;
+> `Date`→`date`; `Interval(Any(None))`→`interval`,
+> `Interval(Any(Some(p)))`→`interval(p)`,
+> `Interval(Fields(f))`→`interval FIELDS`, where a second-bearing field
+> spells its own precision (`SECOND(3)`, `HOUR TO SECOND(3)`);
 > `Bytea`→`bytea`; `Bit(Some(n))`→`bit(n)`, `Bit(None)`→`bit`;
 > `VarBit(n)`→`varbit(n)`; `Boolean`→`bool`; `Money`→`money`; `Json`→`json`;
 > `JsonBinary`→`jsonb`; `Uuid`→`uuid`; `Array(t)`→ recursive element spelling
@@ -107,16 +121,23 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > enum type name; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
-> [spec:pgorm:req:sql.ddl.alter-table]
+> [spec:pgorm:req:sql.ddl.alter-table+1]
 > `TableAlterStatement` collects `TableAlterOption`s: `AddColumn` (with an
-> `if_not_exists` flag), `ModifyColumn`, `RenameColumn`, `DropColumn`,
-> `AddForeignKey` and `DropForeignKey`. Rendering MUST emit a single `ALTER
-> TABLE <table> ` prefix with the options comma-separated: `ADD COLUMN [IF
-> NOT EXISTS ]<column-def>` (same column rendering as create, including the
-> serial substitution for auto-increment); `RENAME COLUMN "a" TO "b"`;
-> `DROP COLUMN "c"`; `ADD CONSTRAINT ... FOREIGN KEY ...` and
+> `if_not_exists` flag), `ModifyColumn`, `DropColumn`, `AddForeignKey` and
+> `DropForeignKey`. Rendering MUST emit a single `ALTER TABLE <table> ` prefix
+> with the options comma-separated: `ADD COLUMN [IF NOT EXISTS ]<column-def>`
+> (same column rendering as create, including the serial substitution for
+> auto-increment); `DROP COLUMN "c"`; `ADD CONSTRAINT ... FOREIGN KEY ...` and
 > `DROP CONSTRAINT "name"` (foreign-key clauses in `Mode::TableAlter`, i.e.
 > without a nested `ALTER TABLE`).
+>
+> A column rename is NOT one of those options. PostgreSQL admits `RENAME` only
+> as the sole action of an `ALTER TABLE`, so it is a statement of its own:
+> `Table::rename_column()` builds a `ColumnRenameStatement` (`table(t)`,
+> `column(from, to)`) rendering `ALTER TABLE <table> RENAME COLUMN "a" TO
+> "b"`, and `TableStatement::RenameColumn` carries it. A rename listed beside
+> an `ADD COLUMN` therefore does not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`).
 >
 > `ModifyColumn` decomposes into per-aspect Postgres actions: when a type is
 > present, `ALTER COLUMN "c" TYPE <type>`; then per spec `ALTER COLUMN "c"
@@ -126,11 +147,14 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > specs are ignored in modify. An alter statement with zero options panics
 > with `No alter option found`.
 
-> [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
+> [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
 > `TableDropStatement` accumulates multiple `TableName`s and MUST render
 > `DROP TABLE [IF EXISTS ]"t1", "t2"[ RESTRICT][ CASCADE]` (`restrict()` and
 > `cascade()` append `TableDropOpt`s in call order). `TableRenameStatement`
-> MUST render `ALTER TABLE <from> RENAME TO <to>`. `TableTruncateStatement`
+> MUST render `ALTER TABLE <from> RENAME TO <to>`, where the source is a
+> `TableName` and the target is a bare `DynIden`: `RENAME TO` cannot move a
+> table between schemas, so a qualified target does not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `TableTruncateStatement`
 > MUST render `TRUNCATE TABLE <table>`; no `CASCADE`/`RESTART IDENTITY`
 > options are exposed.
 
@@ -234,15 +258,15 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `TypeAs` has no other variants (composite/range/base are commented out
 > upstream).
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop]
+> [spec:pgorm:req:sql.ddl.type-alter-drop+1]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
-> otherwise), `RENAME TO 'new'`, or `RENAME VALUE 'old' TO 'new'`. All of
-> these operands — including the `RENAME TO` target, which Postgres actually
-> expects as an identifier — go through the value pipeline and render as
-> single-quoted string literals; this is current behaviour. Unlike the other
-> type builders, `TypeAlterStatement` methods take `self` by value.
+> otherwise), `RENAME TO "new"`, or `RENAME VALUE 'old' TO 'new'`. The enum
+> labels go through the value pipeline and render as single-quoted string
+> literals; the `RENAME TO` target is a type name, not a label, and MUST
+> render as a quoted identifier. Unlike the other type builders,
+> `TypeAlterStatement` methods take `self` by value.
 >
 > `TypeDropStatement` MUST render `DROP TYPE [IF EXISTS ]<name1>, <name2>
 > [ CASCADE|RESTRICT]` with names as quoted (possibly schema-qualified)
@@ -251,13 +275,18 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Extensions
 
-> [spec:pgorm:req:sql.ddl.extension]
+> [spec:pgorm:req:sql.ddl.extension+1]
 > `ExtensionCreateStatement` MUST render `CREATE EXTENSION [IF NOT EXISTS ]
 > <name>[ WITH SCHEMA <schema>][ VERSION <version>][ CASCADE]`, and
 > `ExtensionDropStatement` MUST render `DROP EXTENSION [IF EXISTS ]<name>
-> [ CASCADE][ RESTRICT]`. Name, schema and version are plain `String`s
-> written verbatim — unquoted and unescaped. On drop, `cascade` and
-> `restrict` are independent flags; setting both renders both keywords.
+> [ CASCADE| RESTRICT]`. Name, schema and version are plain `String`s, but
+> they are not written verbatim: name and schema render as quoted identifiers
+> and version as a quoted string literal
+> (`[spec:pgorm:sem:sql.render.ddl.extension+1]`). On drop, `CASCADE` and
+> `RESTRICT` share one `ExtensionDropOpt` slot that `cascade()`/`restrict()`
+> overwrite, so the pair PostgreSQL rejects does not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`); a drop carries no schema or
+> version, because it renders neither.
 > `PgLTree` is a ready-made `Iden` rendering `ltree` (usable as an extension
 > name via `From<PgLTree> for String`); the ltree column type itself is
 > `ColumnType::LTree`.
@@ -276,7 +305,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > serial substitution is likewise total: `auto_increment()` on a type outside
 > the integer trio renders the declared type rather than panicking with
 > `... doesn't support auto increment`
-> (`[spec:pgorm:req:sql.ddl.column-def+2]`). Neither guard is a `Result`; both
+> (`[spec:pgorm:req:sql.ddl.column-def+3]`). Neither guard is a `Result`; both
 > are closed by making the renderer's match exhaustive over spellings that
 > exist.
 >

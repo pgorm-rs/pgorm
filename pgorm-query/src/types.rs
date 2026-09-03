@@ -8,7 +8,7 @@ pub use std::sync::Arc as RcOrArc;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
-// [spec:pgorm:def:sql.types+1]
+// [spec:pgorm:def:sql.types+2]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
@@ -64,7 +64,7 @@ impl Clone for SeaRc<dyn Iden> {
     }
 }
 
-// [spec:pgorm:def:sql.types+1]
+// [spec:pgorm:def:sql.types+2]
 impl PartialEq for SeaRc<dyn Iden> {
     fn eq(&self, other: &Self) -> bool {
         let (self_vtable, other_vtable) = unsafe {
@@ -104,7 +104,7 @@ impl fmt::Debug for dyn Iden {
 
 /// Column references
 // [spec:pgorm:def:sql.types.column-ref]
-// [spec:pgorm:def:sql.ast.keywords+1]
+// [spec:pgorm:def:sql.ast.keywords+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(DynIden),
@@ -208,14 +208,14 @@ pub trait IntoFromItem {
 }
 
 /// Unary operator
-// [spec:pgorm:def:sql.types.opers]
+// [spec:pgorm:def:sql.types.opers+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
-// [spec:pgorm:def:sql.types.opers]
+// [spec:pgorm:def:sql.types.opers+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -242,7 +242,6 @@ pub enum BinOper {
     LShift,
     RShift,
     As,
-    Escape,
     ILike,
     NotILike,
     Matches,
@@ -270,15 +269,27 @@ pub enum BinOper {
     Custom(&'static str),
 }
 
-/// Join types
+/// Join types that carry an `ON` constraint
+// [spec:pgorm:req:sql.ast.select.join+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {
     Join,
-    CrossJoin,
     InnerJoin,
     LeftJoin,
     RightJoin,
     FullOuterJoin,
+}
+
+/// A join and the constraint it carries.
+///
+/// `CROSS JOIN` is the one join PostgreSQL takes without an `ON` clause and
+/// every other join requires one, so the two travel together: a constrained
+/// cross join and an unconstrained inner join both fail to construct.
+// [spec:pgorm:req:sql.ast.select.join+1]
+#[derive(Debug, Clone, PartialEq)]
+pub enum JoinKind {
+    Cross,
+    Qualified(JoinType, JoinOn),
 }
 
 /// Nulls order
@@ -297,7 +308,7 @@ pub struct OrderExpr {
 }
 
 /// Join on types
-// [spec:pgorm:req:sql.render.joins+1]
+// [spec:pgorm:req:sql.render.joins+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum JoinOn {
     Condition(Box<ConditionHolder>),
@@ -315,10 +326,6 @@ pub enum Order {
 /// Helper for create name alias
 #[derive(Debug, Clone)]
 pub struct Alias(String);
-
-/// Null Alias
-#[derive(Default, Debug, Copy, Clone)]
-pub struct NullAlias;
 
 /// Asterisk ("*")
 ///
@@ -361,7 +368,7 @@ pub struct NullAlias;
 pub struct Asterisk;
 
 /// SQL Keywords
-// [spec:pgorm:def:sql.ast.keywords+1]
+// [spec:pgorm:def:sql.ast.keywords+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,
@@ -372,7 +379,7 @@ pub enum Keyword {
 }
 
 /// Like Expression
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LikeExpr {
     pub(crate) pattern: String,
     pub(crate) escape: Option<char>,
@@ -446,14 +453,14 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+1]
+// [spec:pgorm:def:sql.types+2]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
         SeaRc::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+1]
+// [spec:pgorm:def:sql.types+2]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
         SeaRc::new(Alias::new(self))
@@ -681,16 +688,6 @@ impl Iden for Alias {
     }
 }
 
-impl NullAlias {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Iden for NullAlias {
-    fn unquoted(&self, _s: &mut dyn fmt::Write) {}
-}
-
 impl LikeExpr {
     pub fn new<T>(pattern: T) -> Self
     where
@@ -740,7 +737,7 @@ mod tests {
         assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+1/test]
+    // [spec:pgorm:def:sql.types+2/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -755,7 +752,7 @@ mod tests {
         assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+1/test]
+    // [spec:pgorm:def:sql.types+2/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

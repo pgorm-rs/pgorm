@@ -6,6 +6,7 @@
 //! - Table Alter, see [`TableAlterStatement`]
 //! - Table Drop, see [`TableDropStatement`]
 //! - Table Rename, see [`TableRenameStatement`]
+//! - Column Rename, see [`ColumnRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
 use crate::QueryBuilder;
@@ -25,7 +26,7 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl+3]
+// [spec:pgorm:req:sql.ddl+4]
 #[derive(Debug)]
 pub struct Table;
 
@@ -38,6 +39,7 @@ pub enum TableStatement {
     Alter(TableAlterStatement),
     Drop(TableDropStatement),
     Rename(TableRenameStatement),
+    RenameColumn(ColumnRenameStatement),
     Truncate(TableTruncateStatement),
 }
 
@@ -62,6 +64,11 @@ impl Table {
         TableRenameStatement::new()
     }
 
+    /// Construct column [`ColumnRenameStatement`]
+    pub fn rename_column() -> ColumnRenameStatement {
+        ColumnRenameStatement::new()
+    }
+
     /// Construct table [`TableTruncateStatement`]
     pub fn truncate() -> TableTruncateStatement {
         TableTruncateStatement::new()
@@ -76,6 +83,7 @@ impl TableStatement {
             Self::Alter(stat) => stat.build(table_builder),
             Self::Drop(stat) => stat.build(table_builder),
             Self::Rename(stat) => stat.build(table_builder),
+            Self::RenameColumn(stat) => stat.build(table_builder),
             Self::Truncate(stat) => stat.build(table_builder),
         }
     }
@@ -87,6 +95,7 @@ impl TableStatement {
             Self::Alter(stat) => stat.build_any(table_builder),
             Self::Drop(stat) => stat.build_any(table_builder),
             Self::Rename(stat) => stat.build_any(table_builder),
+            Self::RenameColumn(stat) => stat.build_any(table_builder),
             Self::Truncate(stat) => stat.build_any(table_builder),
         }
     }
@@ -98,6 +107,7 @@ impl TableStatement {
             Self::Alter(stat) => stat.to_string(table_builder),
             Self::Drop(stat) => stat.to_string(table_builder),
             Self::Rename(stat) => stat.to_string(table_builder),
+            Self::RenameColumn(stat) => stat.to_string(table_builder),
             Self::Truncate(stat) => stat.to_string(table_builder),
         }
     }

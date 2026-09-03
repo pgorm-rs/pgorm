@@ -1,7 +1,8 @@
 use crate::{
     extension::{
-        ExtensionCreateStatement, ExtensionDropStatement, TypeAlterAddOpt, TypeAlterOpt,
-        TypeAlterStatement, TypeAs, TypeCreateStatement, TypeDropOpt, TypeDropStatement, TypeRef,
+        ExtensionCreateStatement, ExtensionDropOpt, ExtensionDropStatement, TypeAlterAddOpt,
+        TypeAlterOpt, TypeAlterStatement, TypeAs, TypeCreateStatement, TypeDropOpt,
+        TypeDropStatement, TypeRef,
     },
     *,
 };
@@ -515,6 +516,20 @@ impl QueryBuilder {
             SimpleExpr::Constant(val) => {
                 self.prepare_constant(val, sql);
             }
+            SimpleExpr::LikePattern(like) => {
+                self.prepare_like_expr(like, sql);
+            }
+        }
+    }
+
+    /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
+    /// `LIKE` / `ILIKE`.
+    // [spec:pgorm:def:sql.render.operators+1]
+    fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
+        self.prepare_value(&like.pattern.clone().into(), sql);
+        if let Some(escape) = like.escape {
+            write!(sql, " ESCAPE ").unwrap();
+            self.prepare_constant(&escape.into(), sql);
         }
     }
 
@@ -575,7 +590,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+1] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+2] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -597,12 +612,15 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.joins+1]
+    // [spec:pgorm:req:sql.render.joins+2]
     fn prepare_join_expr(&self, join_expr: &JoinExpr, sql: &mut dyn SqlWriter) {
-        self.prepare_join_type(&join_expr.join, sql);
+        match &join_expr.join {
+            JoinKind::Cross => write!(sql, "CROSS JOIN").unwrap(),
+            JoinKind::Qualified(join_type, _) => self.prepare_join_type(join_type, sql),
+        }
         write!(sql, " ").unwrap();
         self.prepare_join_from_item(join_expr, sql);
-        if let Some(on) = &join_expr.on {
+        if let JoinKind::Qualified(_, on) = &join_expr.join {
             self.prepare_join_on(on, sql);
         }
     }
@@ -674,7 +692,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+1] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -686,7 +704,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators]
+    // [spec:pgorm:def:sql.render.operators+1]
     fn prepare_bin_oper_common(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -716,7 +734,6 @@ impl QueryBuilder {
                 BinOper::LShift => "<<",
                 BinOper::RShift => ">>",
                 BinOper::As => "AS",
-                BinOper::Escape => "ESCAPE",
                 BinOper::Custom(raw) => raw,
                 BinOper::ILike => "ILIKE",
                 BinOper::NotILike => "NOT ILIKE",
@@ -947,7 +964,6 @@ impl QueryBuilder {
             "{}",
             match join_type {
                 JoinType::Join => "JOIN",
-                JoinType::CrossJoin => "CROSS JOIN",
                 JoinType::InnerJoin => "INNER JOIN",
                 JoinType::LeftJoin => "LEFT JOIN",
                 JoinType::RightJoin => "RIGHT JOIN",
@@ -958,7 +974,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`JoinOn`] into SQL statement.
-    // [spec:pgorm:req:sql.render.joins+1]
+    // [spec:pgorm:req:sql.render.joins+2]
     fn prepare_join_on(&self, join_on: &JoinOn, sql: &mut dyn SqlWriter) {
         match join_on {
             JoinOn::Condition(c) => self.prepare_condition(c, "ON", sql),
@@ -1319,18 +1335,18 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`Frame`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+1] (frame bounds; no space between $N and PRECEDING/FOLLOWING)
+    // [spec:pgorm:req:sql.render.window+2] (frame bounds)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
             Frame::Preceding(v) => {
                 self.prepare_value(&v.into(), sql);
-                write!(sql, "PRECEDING").unwrap();
+                write!(sql, " PRECEDING").unwrap();
             }
             Frame::CurrentRow => write!(sql, "CURRENT ROW").unwrap(),
             Frame::Following(v) => {
                 self.prepare_value(&v.into(), sql);
-                write!(sql, "FOLLOWING").unwrap();
+                write!(sql, " FOLLOWING").unwrap();
             }
             Frame::UnboundedFollowing => write!(sql, "UNBOUNDED FOLLOWING").unwrap(),
         }
@@ -1339,7 +1355,7 @@ impl QueryBuilder {
     #[doc(hidden)]
     /// Translate a [`WindowStatement`] into the parenthesized window
     /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
-    // [spec:pgorm:req:sql.render.window+1]
+    // [spec:pgorm:req:sql.render.window+2]
     fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         write!(sql, "( ").unwrap();
         self.prepare_window_statement(window, sql);
@@ -1348,7 +1364,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+1]
+    // [spec:pgorm:req:sql.render.window+2]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();
@@ -1436,18 +1452,11 @@ impl QueryBuilder {
             && right.is_binary()
             && matches!(right.get_bin_oper(), Some(&BinOper::And));
 
-        // Due to representation of trinary op like/not like with optional arg escape as nested binary ops.
-        let drop_right_escape_hack = op_as_oper.is_like()
-            && right.is_binary()
-            && matches!(right.get_bin_oper(), Some(&BinOper::Escape));
-
         // Due to custom representation of casting AS datatype
         let drop_right_as_hack = (op == &BinOper::As) && matches!(right, SimpleExpr::Custom(_));
 
-        let right_paren = !drop_right_higher_precedence
-            && !drop_right_escape_hack
-            && !drop_right_between_hack
-            && !drop_right_as_hack;
+        let right_paren =
+            !drop_right_higher_precedence && !drop_right_between_hack && !drop_right_as_hack;
         if right_paren {
             write!(sql, "(").unwrap();
         }
@@ -1500,7 +1509,7 @@ impl QueryBuilder {
     // COMMON
     // START: impl that ought not be here
     // [spec:pgorm:sem:sql.ddl.panics+2]
-    // [spec:pgorm:def:sql.render.ddl.types+2] (serial family for auto-increment columns)
+    // [spec:pgorm:def:sql.render.ddl.types+3] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
             Some(serial) => write!(sql, "{serial}").unwrap(),
@@ -1528,7 +1537,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.column-def+2]
+    // [spec:pgorm:req:sql.ddl.column-def+3]
     fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
     where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
@@ -1557,8 +1566,8 @@ impl QueryBuilder {
         self.prepare_column_def_common(column_def, sql, f);
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types+2]
-    // [spec:pgorm:def:sql.render.ddl.types+2]
+    // [spec:pgorm:req:sql.ddl.column-types+3]
+    // [spec:pgorm:def:sql.render.ddl.types+3]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1586,13 +1595,14 @@ impl QueryBuilder {
                 ColumnType::TimestampWithTimeZone => "timestamp with time zone".into(),
                 ColumnType::Time => "time".into(),
                 ColumnType::Date => "date".into(),
-                ColumnType::Interval(fields, precision) => {
+                ColumnType::Interval(spec) => {
                     let mut typ = "interval".to_string();
-                    if let Some(fields) = fields {
-                        write!(typ, " {fields}").unwrap();
-                    }
-                    if let Some(precision) = precision {
-                        write!(typ, "({precision})").unwrap();
+                    match spec {
+                        IntervalSpec::Any(None) => {}
+                        IntervalSpec::Any(Some(precision)) => {
+                            write!(typ, "({precision})").unwrap();
+                        }
+                        IntervalSpec::Fields(fields) => write!(typ, " {fields}").unwrap(),
                     }
                     typ
                 }
@@ -1635,7 +1645,7 @@ impl QueryBuilder {
         ""
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table]
+    // [spec:pgorm:req:sql.ddl.alter-table+1]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1733,12 +1743,6 @@ impl QueryBuilder {
                         false
                     });
                 }
-                TableAlterOption::RenameColumn(from_name, to_name) => {
-                    write!(sql, "RENAME COLUMN ").unwrap();
-                    from_name.prepare(sql.as_writer(), self.quote());
-                    write!(sql, " TO ").unwrap();
-                    to_name.prepare(sql.as_writer(), self.quote());
-                }
                 TableAlterOption::DropColumn(column_name) => {
                     write!(sql, "DROP COLUMN ").unwrap();
                     column_name.prepare(sql.as_writer(), self.quote());
@@ -1767,7 +1771,7 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
     pub(crate) fn prepare_table_rename_statement(
         &self,
         rename: &TableRenameStatement,
@@ -1779,7 +1783,28 @@ impl QueryBuilder {
         }
         write!(sql, " RENAME TO ").unwrap();
         if let Some(to_name) = &rename.to_name {
-            self.prepare_table_name(to_name, sql);
+            to_name.prepare(sql.as_writer(), self.quote());
+        }
+    }
+
+    /// Translate [`ColumnRenameStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.ddl.alter-table+1]
+    pub(crate) fn prepare_column_rename_statement(
+        &self,
+        rename: &ColumnRenameStatement,
+        sql: &mut dyn SqlWriter,
+    ) {
+        write!(sql, "ALTER TABLE ").unwrap();
+        if let Some(table) = &rename.table {
+            self.prepare_table_name(table, sql);
+        }
+        write!(sql, " RENAME COLUMN ").unwrap();
+        if let Some(from_name) = &rename.from_name {
+            from_name.prepare(sql.as_writer(), self.quote());
+        }
+        write!(sql, " TO ").unwrap();
+        if let Some(to_name) = &rename.to_name {
+            to_name.prepare(sql.as_writer(), self.quote());
         }
     }
 
@@ -1894,7 +1919,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+1]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
     pub(crate) fn prepare_table_drop_statement(
         &self,
         drop: &TableDropStatement,
@@ -2320,7 +2345,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.render.ddl.enum-type] (ALTER TYPE label operands parameterized)
+    // [spec:pgorm:req:sql.render.ddl.enum-type+1] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2343,7 +2368,7 @@ impl QueryBuilder {
             }
             TypeAlterOpt::Rename(new_name) => {
                 write!(sql, " RENAME TO ").unwrap();
-                self.prepare_value(&new_name.to_string().into(), sql);
+                new_name.prepare(sql.as_writer(), self.quote());
             }
             TypeAlterOpt::RenameValue(existing, new_name) => {
                 write!(sql, " RENAME VALUE ").unwrap();
@@ -2355,7 +2380,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:req:sql.ddl.type-enum]
-    // [spec:pgorm:req:sql.render.ddl.enum-type]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+1]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,
@@ -2411,7 +2436,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+1]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
@@ -2450,8 +2475,8 @@ impl QueryBuilder {
     }
 
     // EXTENSION
-    // [spec:pgorm:req:sql.ddl.extension]
-    // [spec:pgorm:sem:sql.render.ddl.extension] (CREATE EXTENSION; strings interpolated raw)
+    // [spec:pgorm:req:sql.ddl.extension+1]
+    // [spec:pgorm:sem:sql.render.ddl.extension+1] (CREATE EXTENSION)
     pub(crate) fn prepare_extension_create_statement(
         &self,
         create: &ExtensionCreateStatement,
@@ -2463,14 +2488,18 @@ impl QueryBuilder {
             write!(sql, "IF NOT EXISTS ").unwrap()
         }
 
-        write!(sql, "{}", create.name).unwrap();
+        self.prepare_extension_ident(&create.name, sql);
 
         if let Some(schema) = create.schema.as_ref() {
-            write!(sql, " WITH SCHEMA {}", schema).unwrap();
+            write!(sql, " WITH SCHEMA ").unwrap();
+            self.prepare_extension_ident(schema, sql);
         }
 
         if let Some(version) = create.version.as_ref() {
-            write!(sql, " VERSION {}", version).unwrap();
+            write!(sql, " VERSION ").unwrap();
+            let mut literal = String::new();
+            self.write_string_quoted(version, &mut literal);
+            write!(sql, "{literal}").unwrap();
         }
 
         if create.cascade {
@@ -2478,7 +2507,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:sem:sql.render.ddl.extension] (DROP EXTENSION; strings interpolated raw)
+    // [spec:pgorm:sem:sql.render.ddl.extension+1] (DROP EXTENSION)
     pub(crate) fn prepare_extension_drop_statement(
         &self,
         drop: &ExtensionDropStatement,
@@ -2490,15 +2519,19 @@ impl QueryBuilder {
             write!(sql, "IF EXISTS ").unwrap();
         }
 
-        write!(sql, "{}", drop.name).unwrap();
+        self.prepare_extension_ident(&drop.name, sql);
 
-        if drop.cascade {
-            write!(sql, " CASCADE").unwrap();
+        match drop.option {
+            Some(ExtensionDropOpt::Cascade) => write!(sql, " CASCADE").unwrap(),
+            Some(ExtensionDropOpt::Restrict) => write!(sql, " RESTRICT").unwrap(),
+            None => {}
         }
+    }
 
-        if drop.restrict {
-            write!(sql, " RESTRICT").unwrap();
-        }
+    /// Write an extension name or schema as a quoted identifier.
+    // [spec:pgorm:sem:sql.render.ddl.extension+1]
+    fn prepare_extension_ident(&self, ident: &str, sql: &mut dyn SqlWriter) {
+        Alias::new(ident).prepare(sql.as_writer(), self.quote());
     }
 
     // [spec:pgorm:def:sql.render.precedence]
@@ -2579,6 +2612,7 @@ pub(crate) fn common_inner_expr_well_known_greater_precedence(
         | SimpleExpr::Value(_)
         | SimpleExpr::Keyword(_)
         | SimpleExpr::Case(_)
+        | SimpleExpr::LikePattern(_)
         | SimpleExpr::SubQuery(_, _) => true,
         SimpleExpr::Binary(_, inner_oper, _) => {
             let inner_oper: Oper = (*inner_oper).into();

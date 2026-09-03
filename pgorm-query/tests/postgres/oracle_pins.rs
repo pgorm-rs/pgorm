@@ -1,22 +1,23 @@
-//! Renders the PostgreSQL grammar rejects today.
+//! Renders the PostgreSQL grammar rejects today, and the ones it used to.
 //!
 //! Each pin asserts the rejection rather than hiding it, so the defect is
 //! documented and the pin fails loudly — "oracle pin is stale" — the moment the
 //! plan node named in its comment lands and the render becomes valid. Sites that
 //! produce these renders are marked with `assert_eq_unparsed!` in the test suite.
+//! A pin whose defect is fixed stays here as the positive assertion it became,
+//! so the render that was once rejected is held to the grammar instead.
 
 use super::*;
 use crate::oracle::{assert_parses, assert_rejected};
 use pgorm_query::extension::{Extension, Type};
 
-// No plan node yet. `sql.render.window` pins the missing space as a known
-// limitation of the frame renderer: the bound value is written immediately
-// against the keyword, so PostgreSQL lexes `2PRECEDING` as trailing junk after a
-// numeric literal.
+// Fixed by plan node `bug.oracle-findings`: the frame renderer writes a space
+// between the bound value and the keyword, so the offset reads as an offset
+// rather than as trailing junk after a numeric literal.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window+1/test]
+// [spec:pgorm:req:sql.render.window+2/test]
 #[test]
-fn oracle_pins_window_frame_offset_spacing() {
+fn window_frame_offset_renders_spaced() {
     let sql = Query::select()
         .from(Char::Table)
         .expr_window(
@@ -27,9 +28,8 @@ fn oracle_pins_window_frame_offset_spacing() {
         )
         .to_string(QueryBuilder);
 
-    assert!(sql.contains("ROWS 2PRECEDING"));
-    assert!(assert_rejected(&sql).contains("2PRECEDING"));
-    assert_parses(&sql.replace("2PRECEDING", "2 PRECEDING"));
+    assert!(sql.contains("ROWS 2 PRECEDING"));
+    assert_parses(&sql);
 }
 
 // Follow-up: narrow the four `expr_window*` constructors from `Into<SimpleExpr>`
@@ -130,115 +130,137 @@ fn oracle_pins_update_delete_order_limit() {
     assert!(assert_rejected(&delete).contains("ORDER"));
 }
 
-// No plan node yet. Every join carries a constraint through the same
-// `prepare_join_on` hook, and an empty condition renders `ON TRUE` rather than
-// nothing, so a CROSS JOIN always gains an ON clause PostgreSQL forbids.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: the constraint travels inside
+// `JoinKind`, so a cross join carries none to render and `JoinType` no longer
+// spells one.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.joins+1/test]
+// [spec:pgorm:req:sql.render.joins+2/test]
+// [spec:pgorm:req:sql.ast.select.join+1/test]
 #[test]
-fn oracle_pins_cross_join_on_clause() {
+fn cross_join_renders_without_on_clause() {
     let sql = Query::select()
         .column(Char::Id)
         .from(Char::Table)
-        .join(JoinType::CrossJoin, Font::Table, Condition::all())
+        .cross_join(Font::Table)
         .to_string(QueryBuilder);
 
-    assert!(sql.contains(r#"CROSS JOIN "font" ON TRUE"#));
-    assert!(assert_rejected(&sql).contains("ON"));
+    assert_eq!(sql, r#"SELECT "id" FROM "character" CROSS JOIN "font""#);
+    assert_parses(&sql);
 }
 
-// No plan node yet. ALTER TABLE options are joined with commas, but PostgreSQL
-// admits RENAME only as the sole action of the statement.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL admits RENAME only as
+// the sole action of an ALTER TABLE, so a column rename is a statement of its
+// own and cannot be listed beside an ADD COLUMN.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.alter-table/test]
+// [spec:pgorm:req:sql.ddl.alter-table+1/test]
 #[test]
-fn oracle_pins_alter_table_multi_action() {
-    let sql = Table::alter()
+fn column_rename_is_its_own_statement() {
+    let added = Table::alter()
         .table(Font::Table)
         .add_column(ColumnDef::new(Alias::new("new_col")).integer())
-        .rename_column(Font::Name, Alias::new("name_new"))
+        .to_string(QueryBuilder);
+    let renamed = Table::rename_column()
+        .table(Font::Table)
+        .column(Font::Name, Alias::new("name_new"))
         .to_string(QueryBuilder);
 
-    assert!(sql.contains(", RENAME COLUMN"));
-    assert!(assert_rejected(&sql).contains("RENAME"));
+    assert_eq!(
+        renamed,
+        r#"ALTER TABLE "font" RENAME COLUMN "name" TO "name_new""#
+    );
+    assert_parses(&added);
+    assert_parses(&renamed);
 }
 
-// No plan node yet. The rename target is rendered through the same qualified
-// table reference as the source, but PostgreSQL's RENAME TO takes a bare name —
-// the new table stays in the schema it is already in.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: the target is a `DynIden` rather
+// than a `TableName`, so the qualified form a rename cannot honour — the table
+// stays in the schema it is already in — no longer typechecks.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+1/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
 #[test]
-fn oracle_pins_table_rename_qualified_target() {
+fn table_rename_target_is_bare_name() {
     let sql = Table::rename()
-        .table(
-            (Alias::new("schema"), Font::Table),
-            (Alias::new("schema"), Alias::new("font_new")),
-        )
+        .table((Alias::new("schema"), Font::Table), Alias::new("font_new"))
         .to_string(QueryBuilder);
 
-    assert!(sql.ends_with(r#"RENAME TO "schema"."font_new""#));
-    assert_rejected(&sql);
-    assert_parses(&sql.replace(r#"TO "schema"."font_new""#, r#"TO "font_new""#));
+    assert_eq!(sql, r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#);
+    assert_parses(&sql);
 }
 
-// No plan node yet. `ALTER TYPE … RENAME TO` routes its operand through the enum
-// label path, so the new type name is emitted as a string literal where the
-// grammar wants an identifier.
+// Fixed by plan node `bug.oracle-findings`: the `RENAME TO` target is a type
+// name, not an enum label, so it leaves the value pipeline and renders as the
+// quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+1/test]
 #[test]
-fn oracle_pins_alter_type_rename_literal() {
+fn alter_type_rename_emits_identifier() {
     let sql = Type::alter()
         .name(Font::Table)
         .rename_to(Alias::new("typeface"))
         .to_string(QueryBuilder);
 
-    assert!(sql.ends_with("RENAME TO 'typeface'"));
-    assert!(assert_rejected(&sql).contains("'typeface'"));
-    assert_parses(&sql.replace("'typeface'", r#""typeface""#));
+    assert_eq!(sql, r#"ALTER TYPE "font" RENAME TO "typeface""#);
+    assert_parses(&sql);
 }
 
-// Fixed by plan node `unrep.mysql-purge` in spirit: the interval renderer appends
-// a precision to the field spelling, but PostgreSQL takes a precision only on the
-// trailing second, as `interval hour to second(p)`.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL takes a precision only
+// where the trailing field is SECOND, so the precision rides on the
+// second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.ddl.types+2/test]
+// [spec:pgorm:def:sql.render.ddl.types+3/test]
+// [spec:pgorm:def:sql.types.column-type+3/test]
 #[test]
-fn oracle_pins_interval_field_precision() {
-    let sql = Table::create()
+fn interval_precision_rides_on_seconds() {
+    let hour = Table::create()
         .table(Glyph::Table)
-        .col(ColumnDef::new(Glyph::Aspect).interval(Some(PgInterval::Hour), Some(43)))
+        .col(ColumnDef::new(Glyph::Aspect).interval(IntervalSpec::Fields(PgInterval::Hour)))
+        .to_string(QueryBuilder);
+    let seconds = Table::create()
+        .table(Glyph::Table)
+        .col(ColumnDef::new(Glyph::Aspect).interval(IntervalSpec::Fields(
+            PgInterval::HourToSecond(Some(IntervalPrecision::P3)),
+        )))
         .to_string(QueryBuilder);
 
-    assert!(sql.contains("interval HOUR(43)"));
-    assert_rejected(&sql);
-    assert_parses(&sql.replace("HOUR(43)", "HOUR"));
+    assert!(hour.contains("interval HOUR"));
+    assert!(seconds.contains("interval HOUR TO SECOND(3)"));
+    assert_eq!(IntervalPrecision::new(43), None);
+    assert_parses(&hour);
+    assert_parses(&seconds);
 }
 
-// No plan node yet. CASCADE and RESTRICT are independent flags on DROP EXTENSION
-// and both are emitted when both are set; PostgreSQL takes at most one.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL takes at most one drop
+// behaviour, so the two spellings share one slot and the later call wins.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.extension/test]
+// [spec:pgorm:req:sql.ddl.extension+1/test]
 #[test]
-fn oracle_pins_extension_cascade_restrict() {
+fn extension_drop_takes_one_behaviour() {
     let sql = Extension::drop()
         .name("ltree")
         .cascade()
         .restrict()
         .to_string(QueryBuilder);
 
-    assert!(sql.ends_with("CASCADE RESTRICT"));
-    assert!(assert_rejected(&sql).contains("RESTRICT"));
+    assert_eq!(sql, r#"DROP EXTENSION "ltree" RESTRICT"#);
+    assert_parses(&sql);
 }
 
-// Caller responsibility, pinned by `sql.render.ddl.extension`: extension name,
-// schema and version, and `ColumnDef::extra`, are interpolated raw. Untrusted or
-// merely unlucky strings render SQL no grammar accepts.
+// Half fixed by plan node `bug.oracle-findings`: the extension name and schema
+// route through identifier quoting and the version through the string-literal
+// escape, so neither an odd version nor an embedded quote escapes the grammar.
+// `ColumnDef::extra` stays raw by design — it is the escape hatch for column SQL
+// the type vocabulary cannot spell, documented as caller responsibility by
+// `sql.ddl.column-def`, so it keeps its pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:sem:sql.render.ddl.extension/test]
+// [spec:pgorm:sem:sql.render.ddl.extension+1/test]
+// [spec:pgorm:req:sql.ddl.column-def+3/test]
 #[test]
-fn oracle_pins_raw_interpolated_strings() {
+fn oracle_pins_extra_interpolated_raw() {
     let version = Extension::create()
         .name("ltree")
         .version("v0.1.0")
@@ -255,43 +277,48 @@ fn oracle_pins_raw_interpolated_strings() {
         )
         .to_string(QueryBuilder);
 
-    assert_rejected(&version);
-    assert_rejected(&injected);
+    assert_eq!(version, r#"CREATE EXTENSION "ltree" VERSION 'v0.1.0'"#);
+    assert_eq!(injected, r#"CREATE EXTENSION "pg""weird ext""#);
+    assert_parses(&version);
+    assert_parses(&injected);
     assert!(assert_rejected(&extra).contains("ANYTHING"));
 }
 
-// No plan node yet. `NullAlias` renders an empty quoted identifier, and PostgreSQL
-// rejects a zero-length delimited identifier.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: `NullAlias` existed only as a
+// placeholder inside `ColumnDef::take`, which now clones the name, so the empty
+// identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.render.ident-quoting/test]
+// [spec:pgorm:def:sql.ast.keywords+2/test]
 #[test]
-fn oracle_pins_empty_identifier_alias() {
+fn alias_identifiers_are_never_empty() {
     let sql = Query::select()
-        .expr_as(Expr::col(Glyph::Aspect), NullAlias::new())
+        .expr_as(Expr::col(Glyph::Aspect), Alias::new("ratio"))
         .from(Glyph::Table)
         .to_string(QueryBuilder);
+    let taken = ColumnDef::new(Glyph::Id).integer().take();
 
-    assert!(sql.contains(r#"AS """#));
-    assert_rejected(&sql);
+    assert_eq!(sql, r#"SELECT "aspect" AS "ratio" FROM "glyph""#);
+    assert_eq!(taken.get_column_name(), "id");
+    assert_parses(&sql);
 }
 
-// No plan node yet. `BinOper::Escape` is a free-standing operator in the lexicon,
-// but ESCAPE is grammatical only as the tail of a LIKE / ILIKE pattern.
+// Fixed by plan node `bug.oracle-findings`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: ESCAPE left the operator lexicon
+// for `SimpleExpr::LikePattern`, the one place the grammar admits it, so it can
+// no longer be applied to two arbitrary operands.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.operators/test]
+// [spec:pgorm:def:sql.render.operators+1/test]
+// [spec:pgorm:def:sql.types.opers+1/test]
 #[test]
-fn oracle_pins_escape_outside_like() {
+fn escape_renders_only_inside_like() {
     let sql = Query::select()
-        .expr(Expr::col(Glyph::Aspect).binary(BinOper::Escape, Expr::val(1)))
+        .expr(Expr::col(Glyph::Image).like(LikeExpr::new("a%").escape('\\')))
         .to_string(QueryBuilder);
 
-    assert!(sql.contains("ESCAPE"));
-    assert_rejected(&sql);
-    assert_parses(
-        &Query::select()
-            .expr(Expr::col(Glyph::Image).like(LikeExpr::new("a%").escape('\\')))
-            .to_string(QueryBuilder),
-    );
+    assert!(sql.contains(r#"LIKE 'a%' ESCAPE E'\\'"#));
+    assert_parses(&sql);
 }
 
 // The oracle's ceiling, recorded rather than pinned: this render is grammatical,

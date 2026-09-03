@@ -59,7 +59,7 @@ fn schema_sql_generates_one_file_per_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+1/test]    the type spellings map onto the
+// [spec:pgorm:sem:codegen.ddl.types+2/test]    the type spellings map onto the
 // ColumnType vocabulary, serial included
 #[test]
 fn column_types_map_through_the_vocabulary() {
@@ -307,7 +307,7 @@ fn unsupported_column_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+1/test]    a type spelling outside the
+// [spec:pgorm:sem:codegen.ddl.types+2/test]    a type spelling outside the
 // vocabulary is named, and so is a modifier the vocabulary cannot hold
 #[test]
 fn unsupported_types_are_named() {
@@ -436,7 +436,7 @@ fn rendered_ddl_round_trips_through_the_bridge() {
     assert_eq!(round_tripped.files, direct.files);
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+1/test]    the types that once shared a
+// [spec:pgorm:sem:codegen.ddl.types+2/test]    the types that once shared a
 // spelling with another variant now each recover themselves
 #[test]
 fn one_spelling_one_variant_round_trips() {
