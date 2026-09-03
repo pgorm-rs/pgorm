@@ -6,15 +6,25 @@ use super::common::*;
 
 /// Create an index for an existing table
 ///
+/// An index indexes at least one column, in both the standalone and the
+/// `CREATE TABLE`-embedded position, so the first one is taken by the
+/// constructor and `col` appends the rest: the empty column list PostgreSQL
+/// rejects has nowhere to come from.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// Index::create().name("idx-glyph-aspect").table(Glyph::Table);
+/// ```
+///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create(Glyph::Aspect)
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col(Glyph::Aspect)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -26,11 +36,10 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create(Glyph::Aspect)
 ///     .if_not_exists()
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col(Glyph::Aspect)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -42,10 +51,9 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create((Glyph::Aspect, 128))
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col((Glyph::Aspect, 128))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -57,10 +65,9 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create((Glyph::Aspect, IndexOrder::Desc))
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col((Glyph::Aspect, IndexOrder::Desc))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -72,10 +79,9 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create((Glyph::Image, IndexOrder::Asc))
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col((Glyph::Image, IndexOrder::Asc))
 ///     .col((Glyph::Aspect, IndexOrder::Desc))
 ///     .unique()
 ///     .to_owned();
@@ -89,10 +95,9 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create()
+/// let index = Index::create((Glyph::Aspect, 64, IndexOrder::Asc))
 ///     .name("idx-glyph-aspect")
 ///     .table(Glyph::Table)
-///     .col((Glyph::Aspect, 64, IndexOrder::Asc))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -100,8 +105,8 @@ use super::common::*;
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+2]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.index-create+3]
+#[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: Option<TableName>,
     pub(crate) index: TableIndex,
@@ -121,7 +126,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+2]
+// [spec:pgorm:req:sql.ddl.index-create+3]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -134,7 +139,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+2]
+// [spec:pgorm:req:sql.ddl.index-create+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -163,9 +168,21 @@ pub enum IndexType {
 }
 
 impl IndexCreateStatement {
-    /// Construct a new [`IndexCreateStatement`]
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct a new [`IndexCreateStatement`] over its first column
+    pub fn new<C>(col: C) -> Self
+    where
+        C: IntoIndexColumn,
+    {
+        let mut index = TableIndex::new();
+        index.col(col.into_index_column());
+        Self {
+            table: None,
+            index,
+            kind: IndexKind::default(),
+            nulls_not_distinct: false,
+            index_type: None,
+            if_not_exists: false,
+        }
     }
 
     /// Create index if index not exists
@@ -192,7 +209,7 @@ impl IndexCreateStatement {
         self
     }
 
-    /// Add index column
+    /// Add a further index column, after the one the constructor took
     pub fn col<C>(&mut self, col: C) -> &mut Self
     where
         C: IntoIndexColumn,
@@ -259,15 +276,13 @@ impl IndexCreateStatement {
         &self.index
     }
 
+    /// Clone this statement out of a builder chain.
+    ///
+    /// Unlike the other DDL builders this copies rather than moves: moving the
+    /// columns out would leave a column-less index behind, which is the very
+    /// state this type exists to rule out.
     pub fn take(&mut self) -> Self {
-        Self {
-            table: self.table.take(),
-            index: self.index.take(),
-            kind: self.kind,
-            nulls_not_distinct: self.nulls_not_distinct,
-            index_type: self.index_type.take(),
-            if_not_exists: self.if_not_exists,
-        }
+        self.clone()
     }
 }
 

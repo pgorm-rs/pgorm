@@ -14,8 +14,7 @@ fn every_ddl_entry_point_is_reachable() {
             .starts_with("CREATE TABLE")
     );
     assert!(
-        Table::alter()
-            .table(Glyph::Table)
+        Table::alter(Glyph::Table)
             .drop_column(Glyph::Id)
             .to_string(QueryBuilder)
             .starts_with("ALTER TABLE")
@@ -40,10 +39,9 @@ fn every_ddl_entry_point_is_reachable() {
     );
 
     assert!(
-        Index::create()
+        Index::create(Glyph::Id)
             .name("idx")
             .table(Glyph::Table)
-            .col(Glyph::Id)
             .to_string(QueryBuilder)
             .starts_with("CREATE INDEX")
     );
@@ -137,7 +135,7 @@ fn schema_statement_builder_trio_agrees() {
         r#"CREATE TABLE "glyph" ( "id" integer )"#,
     );
     assert_trio(
-        Table::alter().table(Glyph::Table).drop_column(Glyph::Id),
+        &Table::alter(Glyph::Table).drop_column(Glyph::Id),
         r#"ALTER TABLE "glyph" DROP COLUMN "id""#,
     );
     assert_trio(Table::drop().table(Glyph::Table), r#"DROP TABLE "glyph""#);
@@ -150,10 +148,7 @@ fn schema_statement_builder_trio_agrees() {
         r#"TRUNCATE TABLE "glyph""#,
     );
     assert_trio(
-        Index::create()
-            .name("idx")
-            .table(Glyph::Table)
-            .col(Glyph::Id),
+        Index::create(Glyph::Id).name("idx").table(Glyph::Table),
         r#"CREATE INDEX "idx" ON "glyph" ("id")"#,
     );
     assert_trio(Index::drop().name("idx"), r#"DROP INDEX "idx""#);
@@ -185,12 +180,7 @@ fn table_statement_wrapper_dispatches() {
                 .col(ColumnDef::new(Glyph::Id).integer())
                 .to_owned(),
         ),
-        TableStatement::Alter(
-            Table::alter()
-                .table(Glyph::Table)
-                .drop_column(Glyph::Id)
-                .to_owned(),
-        ),
+        TableStatement::Alter(Table::alter(Glyph::Table).drop_column(Glyph::Id).to_owned()),
         TableStatement::Drop(Table::drop().table(Glyph::Table).to_owned()),
         TableStatement::Rename(
             Table::rename()
@@ -266,10 +256,9 @@ fn ddl_identifiers_are_double_quoted() {
         r#"CREATE TABLE "he""llo" ( "wor""ld" integer )"#
     );
     assert_eq!(
-        Index::create()
+        Index::create(Glyph::Id)
             .name("idx")
             .table((Alias::new("schema"), Glyph::Table))
-            .col(Glyph::Id)
             .to_string(QueryBuilder),
         r#"CREATE INDEX "idx" ON "schema"."glyph" ("id")"#
     );
@@ -291,15 +280,14 @@ fn ddl_index_and_constraint_names_escape_quotes() {
         Table::create()
             .table(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer())
-            .index(Index::create().name(r#"i"dx"#).unique().col(Glyph::Id))
+            .index(Index::create(Glyph::Id).name(r#"i"dx"#).unique())
             .to_string(QueryBuilder),
         r#"CREATE TABLE "glyph" ( "id" integer, CONSTRAINT "i""dx" UNIQUE ("id") )"#
     );
     assert_eq!(
-        Index::create()
+        Index::create(Glyph::Id)
             .name(r#"i"dx"#)
             .table(Glyph::Table)
-            .col(Glyph::Id)
             .to_string(QueryBuilder),
         r#"CREATE INDEX "i""dx" ON "glyph" ("id")"#
     );
@@ -323,8 +311,7 @@ fn ddl_index_and_constraint_names_escape_quotes() {
         r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
     );
     assert_eq!(
-        Table::alter()
-            .table(Char::Table)
+        Table::alter(Char::Table)
             .drop_foreign_key(Alias::new(r#"f"k"#))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#

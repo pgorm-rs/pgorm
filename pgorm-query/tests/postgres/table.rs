@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+4/test]
+// [spec:pgorm:req:sql.ddl.create-table+5/test]
 // [spec:pgorm:req:sql.ddl.column-def+3/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+3/test]
@@ -304,12 +304,11 @@ fn create_15() {
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
             .index(
-                Index::create()
+                Index::create(Glyph::Aspect)
                     .unique()
                     .nulls_not_distinct()
                     .name("idx-glyph-aspect-image")
                     .table(Glyph::Table)
-                    .col(Glyph::Aspect)
                     .col(Glyph::Image)
             )
             .to_string(QueryBuilder),
@@ -367,12 +366,11 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+1/test]
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]
 #[test]
 fn alter_1() {
     assert_eq!(
-        Table::alter()
-            .table(Font::Table)
+        Table::alter(Font::Table)
             .add_column(
                 ColumnDef::new(Alias::new("new_col"))
                     .integer()
@@ -384,12 +382,11 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+1/test]
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]
 #[test]
 fn alter_2() {
     assert_eq!(
-        Table::alter()
-            .table(Font::Table)
+        Table::alter(Font::Table)
             .modify_column(
                 ColumnDef::new(Alias::new("new_col"))
                     .big_integer()
@@ -419,8 +416,7 @@ fn alter_3() {
 #[test]
 fn alter_4() {
     assert_eq!(
-        Table::alter()
-            .table(Font::Table)
+        Table::alter(Font::Table)
             .drop_column(Alias::new("new_column"))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "font" DROP COLUMN "new_column""#
@@ -438,19 +434,12 @@ fn alter_5() {
     );
 }
 
-#[test]
-#[should_panic(expected = "No alter option found")]
-fn alter_6() {
-    Table::alter().to_string(QueryBuilder);
-}
-
-// [spec:pgorm:req:sql.ddl.alter-table+1/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
     assert_eq!(
-        Table::alter()
-            .table(Font::Table)
+        Table::alter(Font::Table)
             .add_column(ColumnDef::new(Alias::new("new_col")).integer())
             .drop_column(Font::Name)
             .to_string(QueryBuilder),
@@ -461,8 +450,7 @@ fn alter_7() {
 #[test]
 fn alter_8() {
     assert_eq!(
-        Table::alter()
-            .table(Font::Table)
+        Table::alter(Font::Table)
             .modify_column(ColumnDef::new(Font::Language).null())
             .to_string(QueryBuilder),
         [
@@ -477,8 +465,7 @@ fn alter_8() {
 fn alter_9() {
     // https://dbfiddle.uk/98Vd8pmn
     assert_eq!(
-        Table::alter()
-            .table(Glyph::Table)
+        Table::alter(Glyph::Table)
             .modify_column(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
@@ -503,8 +490,7 @@ fn alter_9() {
 fn alter_10() {
     // https://dbfiddle.uk/BeiZPvBe
     assert_eq!(
-        Table::alter()
-            .table(Glyph::Table)
+        Table::alter(Glyph::Table)
             .add_column(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
@@ -564,8 +550,7 @@ fn create_with_check_constraint() {
 #[test]
 fn alter_with_check_constraint() {
     assert_eq!(
-        Table::alter()
-            .table(Glyph::Table)
+        Table::alter(Glyph::Table)
             .add_column(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
@@ -602,7 +587,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+4/test]
+// [spec:pgorm:req:sql.ddl.create-table+5/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: &mut IndexCreateStatement| {
@@ -622,9 +607,8 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     ]
     .join(" ");
     let index = || {
-        Index::create()
+        Index::create(Glyph::Id)
             .name("pk-glyph")
-            .col(Glyph::Id)
             .col(Glyph::Image)
             .to_owned()
     };
@@ -632,4 +616,20 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     assert_eq!(table(&mut index()), expected);
     assert_eq!(table(index().primary()), expected);
     assert_eq!(table(index().unique()), expected);
+}
+
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]    take copies, so the source keeps its actions
+#[test]
+fn alter_take_leaves_the_source_whole() {
+    let mut alter = Table::alter(Font::Table).drop_column(Font::Name);
+    let taken = alter.take();
+
+    assert_eq!(
+        taken.to_string(QueryBuilder),
+        r#"ALTER TABLE "font" DROP COLUMN "name""#
+    );
+    assert_eq!(
+        alter.to_string(QueryBuilder),
+        r#"ALTER TABLE "font" DROP COLUMN "name""#
+    );
 }

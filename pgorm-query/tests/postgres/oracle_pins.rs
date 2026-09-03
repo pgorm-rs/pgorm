@@ -63,7 +63,7 @@ fn over_attaches_only_to_function_calls() {
 // to come from: nothing but the caller's own `extra` string can follow the
 // closing parenthesis. Deletion-proof, so there is no rejection left to pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+4/test]
+// [spec:pgorm:req:sql.ddl.create-table+5/test]
 #[test]
 fn create_table_renders_no_trailing_options() {
     let sql = Table::create()
@@ -159,11 +159,10 @@ fn cross_join_renders_without_on_clause() {
 // the sole action of an ALTER TABLE, so a column rename is a statement of its
 // own and cannot be listed beside an ADD COLUMN.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.alter-table+1/test]
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]
 #[test]
 fn column_rename_is_its_own_statement() {
-    let added = Table::alter()
-        .table(Font::Table)
+    let added = Table::alter(Font::Table)
         .add_column(ColumnDef::new(Alias::new("new_col")).integer())
         .to_string(QueryBuilder);
     let renamed = Table::rename_column()
@@ -340,4 +339,70 @@ fn oracle_records_parse_valid_defects() {
 
     assert_eq!(empty_select_list, r#"SELECT  FROM "glyph""#);
     assert_parses(&empty_select_list);
+}
+
+// Fixed by plan node `unrep.ddl-empty-builders`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL parses neither an
+// action-less `ALTER TABLE` nor an empty index column list, so `Table::alter`
+// yields a `PendingTableAlter` that only an action turns into a statement, and
+// `Index::create` takes the first column. The `No alter option found` panic went
+// with the state it guarded — the strings below have no builder left to produce
+// them.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.alter-table+2/test]
+// [spec:pgorm:req:sql.ddl.index-create+3/test]
+// [spec:pgorm:sem:sql.ddl.panics+4/test]
+#[test]
+fn empty_ddl_collections_do_not_construct() {
+    let altered = Table::alter(Font::Table)
+        .drop_column(Font::Name)
+        .to_string(QueryBuilder);
+    let indexed = Index::create(Glyph::Aspect)
+        .name("idx")
+        .table(Glyph::Table)
+        .to_string(QueryBuilder);
+
+    assert_eq!(altered, r#"ALTER TABLE "font" DROP COLUMN "name""#);
+    assert_eq!(indexed, r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#);
+    assert_parses(&altered);
+    assert_parses(&indexed);
+    assert!(assert_rejected(r#"ALTER TABLE "font""#).contains("end of input"));
+    assert_rejected(r#"CREATE INDEX "idx" ON "glyph" ()"#);
+    assert_rejected(r#"CREATE TABLE "glyph" ( "id" integer, PRIMARY KEY () )"#);
+}
+
+// The oracle's verdict on the third member of the empty-builder family, recorded
+// rather than designed out: `CREATE TABLE t ()` is valid PostgreSQL — a table
+// with no attributes is a real table — so a column-less create statement stays
+// buildable and is documented by `sql.ddl.create-table` instead.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.create-table+5/test]
+#[test]
+fn create_table_with_no_columns_is_valid() {
+    let sql = Table::create().table(Glyph::Table).to_string(QueryBuilder);
+
+    assert_eq!(sql, r#"CREATE TABLE "glyph" (  )"#);
+    assert_parses(&sql);
+}
+
+// No plan node yet, and a different axis from the empty collections above: a
+// create-table or create-index never given a target renders the name's absence,
+// which PostgreSQL rejects at the parenthesis that follows. `ALTER TABLE` is out
+// of reach of this because `Table::alter` takes the table.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.index-create+3/test]
+#[test]
+fn oracle_pins_ddl_without_a_target() {
+    let table = Table::create()
+        .col(ColumnDef::new(Glyph::Id).integer())
+        .to_string(QueryBuilder);
+    let index = Index::create(Glyph::Aspect)
+        .name("idx")
+        .to_string(QueryBuilder);
+
+    assert!(table.starts_with("CREATE TABLE  ("));
+    assert!(index.starts_with(r#"CREATE INDEX "idx" ON  ("#));
+    assert_rejected(&table);
+    assert_rejected(&index);
 }

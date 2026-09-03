@@ -1764,12 +1764,11 @@ fn column_pairs_keep_the_two_sides_equal() {
 fn relation_def_converts_to_foreign_key_forms() {
     use pgorm_query::{
         Alias, ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder,
-        SchemaStatementBuilder, TableAlterStatement, TableForeignKey, TableName,
+        SchemaStatementBuilder, Table, TableForeignKey, TableName,
     };
 
     let alter = |fk: &mut TableForeignKey| {
-        TableAlterStatement::new()
-            .table(baker::Entity)
+        Table::alter(baker::Entity)
             .add_foreign_key(fk)
             .to_string(QueryBuilder)
     };

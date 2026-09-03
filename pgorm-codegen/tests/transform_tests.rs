@@ -134,7 +134,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
                 .not_null()
                 .to_owned(),
         )
-        .primary_key(Index::create().col(Alias::new("missing")))
+        .primary_key(&mut Index::create(Alias::new("missing")))
         .to_owned();
 
     assert_transform_error(
@@ -254,10 +254,9 @@ fn transform_marks_columns_from_single_column_unique_index() {
                 .index(&mut unique_index("vendor", "name"))
                 // a multi-column unique index marks nothing
                 .index(
-                    &mut Index::create()
+                    &mut Index::create(Alias::new("region"))
                         .name("idx_vendor_region_tier")
                         .table(Alias::new("vendor"))
-                        .col(Alias::new("region"))
                         .col(Alias::new("tier"))
                         .unique()
                         .to_owned(),
@@ -297,11 +296,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
                         .not_null()
                         .to_owned(),
                 )
-                .primary_key(
-                    Index::create()
-                        .col(Alias::new("cake_id"))
-                        .col(Alias::new("filling_id")),
-                )
+                .primary_key(Index::create(Alias::new("cake_id")).col(Alias::new("filling_id")))
                 .to_owned(),
         ],
         expanded(),

@@ -483,15 +483,12 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::alter()
-//!     .table(Character::Table)
-//!     .add_column(
-//!         ColumnDef::new(Alias::new("new_col"))
-//!             .integer()
-//!             .not_null()
-//!             .default(100),
-//!     )
-//!     .to_owned();
+//! let table = Table::alter(Character::Table).add_column(
+//!     ColumnDef::new(Alias::new("new_col"))
+//!         .integer()
+//!         .not_null()
+//!         .default(100),
+//! );
 //!
 //! assert_eq!(
 //!     table.to_string(QueryBuilder),
@@ -574,10 +571,9 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let index = Index::create()
+//! let index = Index::create(Character::Id)
 //!     .name("idx-character-id")
 //!     .table(Character::Table)
-//!     .col(Character::Id)
 //!     .to_owned();
 //!
 //! assert_eq!(

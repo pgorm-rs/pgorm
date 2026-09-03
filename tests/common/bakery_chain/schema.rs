@@ -211,9 +211,8 @@ where
                 .not_null(),
         )
         .primary_key(
-            Index::create()
+            Index::create(cakes_bakers::Column::CakeId)
                 .name("pk-cakes_bakers")
-                .col(cakes_bakers::Column::CakeId)
                 .col(cakes_bakers::Column::BakerId),
         )
         .foreign_key(

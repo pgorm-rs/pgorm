@@ -4,32 +4,103 @@ use crate::{
 };
 use inherent::inherent;
 
+/// A table awaiting its first alter action.
+///
+/// PostgreSQL has no spelling for an `ALTER TABLE` that does nothing, so this is
+/// what [`Table::alter`] returns: naming the table is not yet a statement. Each
+/// action method consumes it and yields a [`TableAlterStatement`], which carries
+/// the table and at least one action for the rest of its life.
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::alter(Font::Table).to_string(QueryBuilder);
+/// ```
+///
+/// [`Table::alter`]: crate::Table::alter
+// [spec:pgorm:req:sql.ddl.alter-table+2]
+#[derive(Debug, Clone)]
+pub struct PendingTableAlter {
+    table: TableName,
+}
+
+impl PendingTableAlter {
+    pub(crate) fn new(table: TableName) -> Self {
+        Self { table }
+    }
+
+    fn with(self, option: TableAlterOption) -> TableAlterStatement {
+        TableAlterStatement {
+            table: self.table,
+            options: vec![option],
+        }
+    }
+
+    /// Add a column to an existing table
+    pub fn add_column<C: IntoColumnDef>(self, column_def: C) -> TableAlterStatement {
+        self.with(TableAlterOption::add_column(column_def, false))
+    }
+
+    /// Try add a column to an existing table if it does not exists
+    pub fn add_column_if_not_exists<C: IntoColumnDef>(self, column_def: C) -> TableAlterStatement {
+        self.with(TableAlterOption::add_column(column_def, true))
+    }
+
+    /// Modify a column in an existing table
+    pub fn modify_column<C: IntoColumnDef>(self, column_def: C) -> TableAlterStatement {
+        self.with(TableAlterOption::ModifyColumn(column_def.into_column_def()))
+    }
+
+    /// Drop a column from an existing table
+    pub fn drop_column<T>(self, col_name: T) -> TableAlterStatement
+    where
+        T: IntoIden,
+    {
+        self.with(TableAlterOption::DropColumn(col_name.into_iden()))
+    }
+
+    /// Add a foreign key to existing table
+    pub fn add_foreign_key(self, foreign_key: &TableForeignKey) -> TableAlterStatement {
+        self.with(TableAlterOption::AddForeignKey(foreign_key.to_owned()))
+    }
+
+    /// Drop a foreign key from existing table
+    pub fn drop_foreign_key<T>(self, name: T) -> TableAlterStatement
+    where
+        T: IntoIden,
+    {
+        self.with(TableAlterOption::DropForeignKey(name.into_iden()))
+    }
+}
+
 /// Alter a table
+///
+/// A statement of this type always names a table and always carries at least one
+/// action: it is reachable only by choosing an action on a
+/// [`PendingTableAlter`], so the `ALTER TABLE "font"` PostgreSQL rejects has no
+/// constructor.
 ///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// let table = Table::alter()
-///     .table(Font::Table)
-///     .add_column(
-///         ColumnDef::new(Alias::new("new_col"))
-///             .integer()
-///             .not_null()
-///             .default(100),
-///     )
-///     .to_owned();
+/// let table = Table::alter(Font::Table).add_column(
+///     ColumnDef::new(Alias::new("new_col"))
+///         .integer()
+///         .not_null()
+///         .default(100),
+/// );
 ///
 /// assert_eq!(
 ///     table.to_string(QueryBuilder),
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+1]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.alter-table+2]
+#[derive(Debug, Clone)]
 pub struct TableAlterStatement {
-    pub(crate) table: Option<TableName>,
+    pub(crate) table: TableName,
     pub(crate) options: Vec<TableAlterOption>,
 }
 
@@ -47,7 +118,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+1]
+// [spec:pgorm:req:sql.ddl.alter-table+2]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
@@ -57,21 +128,16 @@ pub enum TableAlterOption {
     DropForeignKey(DynIden),
 }
 
+impl TableAlterOption {
+    fn add_column<C: IntoColumnDef>(column_def: C, if_not_exists: bool) -> Self {
+        Self::AddColumn(AddColumnOption {
+            column: column_def.into_column_def(),
+            if_not_exists,
+        })
+    }
+}
+
 impl TableAlterStatement {
-    /// Construct alter table statement
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set table name
-    pub fn table<T>(&mut self, table: T) -> &mut Self
-    where
-        T: IntoTableName,
-    {
-        self.table = Some(table.into_table_name());
-        self
-    }
-
     /// Add a column to an existing table
     ///
     /// # Examples
@@ -79,8 +145,8 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter()
-    ///     .table(Font::Table)
+    /// let table = Table::alter(Font::Table)
+    ///     .drop_column(Alias::new("old_col"))
     ///     .add_column(
     ///         ColumnDef::new(Alias::new("new_col"))
     ///             .integer()
@@ -91,16 +157,15 @@ impl TableAlterStatement {
     ///
     /// assert_eq!(
     ///     table.to_string(QueryBuilder),
-    ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
+    ///     [
+    ///         r#"ALTER TABLE "font" DROP COLUMN "old_col","#,
+    ///         r#"ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#,
+    ///     ]
+    ///     .join(" ")
     /// );
     /// ```
     pub fn add_column<C: IntoColumnDef>(&mut self, column_def: C) -> &mut Self {
-        self.options
-            .push(TableAlterOption::AddColumn(AddColumnOption {
-                column: column_def.into_column_def(),
-                if_not_exists: false,
-            }));
-        self
+        self.add_alter_option(TableAlterOption::add_column(column_def, false))
     }
 
     /// Try add a column to an existing table if it does not exists
@@ -110,15 +175,12 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter()
-    ///     .table(Font::Table)
-    ///     .add_column_if_not_exists(
-    ///         ColumnDef::new(Alias::new("new_col"))
-    ///             .integer()
-    ///             .not_null()
-    ///             .default(100),
-    ///     )
-    ///     .to_owned();
+    /// let table = Table::alter(Font::Table).add_column_if_not_exists(
+    ///     ColumnDef::new(Alias::new("new_col"))
+    ///         .integer()
+    ///         .not_null()
+    ///         .default(100),
+    /// );
     ///
     /// assert_eq!(
     ///     table.to_string(QueryBuilder),
@@ -126,12 +188,7 @@ impl TableAlterStatement {
     /// );
     /// ```
     pub fn add_column_if_not_exists<C: IntoColumnDef>(&mut self, column_def: C) -> &mut Self {
-        self.options
-            .push(TableAlterOption::AddColumn(AddColumnOption {
-                column: column_def.into_column_def(),
-                if_not_exists: true,
-            }));
-        self
+        self.add_alter_option(TableAlterOption::add_column(column_def, true))
     }
 
     /// Modify a column in an existing table
@@ -141,14 +198,11 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter()
-    ///     .table(Font::Table)
-    ///     .modify_column(
-    ///         ColumnDef::new(Alias::new("new_col"))
-    ///             .big_integer()
-    ///             .default(999),
-    ///     )
-    ///     .to_owned();
+    /// let table = Table::alter(Font::Table).modify_column(
+    ///     ColumnDef::new(Alias::new("new_col"))
+    ///         .big_integer()
+    ///         .default(999),
+    /// );
     ///
     /// assert_eq!(
     ///     table.to_string(QueryBuilder),
@@ -171,10 +225,7 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter()
-    ///     .table(Font::Table)
-    ///     .drop_column(Alias::new("new_column"))
-    ///     .to_owned();
+    /// let table = Table::alter(Font::Table).drop_column(Alias::new("new_column"));
     ///
     /// assert_eq!(
     ///     table.to_string(QueryBuilder),
@@ -217,8 +268,7 @@ impl TableAlterStatement {
     ///     .on_update(ForeignKeyAction::Cascade)
     ///     .to_owned();
     ///
-    /// let table = Table::alter()
-    ///     .table(Character::Table)
+    /// let table = Table::alter(Character::Table)
     ///     .add_foreign_key(&foreign_key_char)
     ///     .add_foreign_key(&foreign_key_font)
     ///     .to_owned();
@@ -248,8 +298,7 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter()
-    ///     .table(Character::Table)
+    /// let table = Table::alter(Character::Table)
     ///     .drop_foreign_key(Alias::new("FK_character_glyph"))
     ///     .drop_foreign_key(Alias::new("FK_character_font"))
     ///     .to_owned();
@@ -276,11 +325,13 @@ impl TableAlterStatement {
         self
     }
 
+    /// Clone this statement out of a builder chain.
+    ///
+    /// Unlike the other DDL builders this copies rather than moves: moving the
+    /// options out would leave an action-less `ALTER TABLE` behind, which is the
+    /// very state this type exists to rule out.
     pub fn take(&mut self) -> Self {
-        Self {
-            table: self.table.take(),
-            options: std::mem::take(&mut self.options),
-        }
+        self.clone()
     }
 }
 

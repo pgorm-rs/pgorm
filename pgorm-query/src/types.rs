@@ -165,7 +165,7 @@ pub trait IntoColumnRef {
 /// Table::truncate().table(Glyph::Table.into_named_table().alias(Alias::new("g")));
 /// ```
 // [spec:pgorm:def:sql.types.table-ref+2]
-// [spec:pgorm:sem:sql.ddl.panics+3/test]    the DDL-position panics are gone because the shapes
+// [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableName {

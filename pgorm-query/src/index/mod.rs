@@ -25,9 +25,12 @@ pub enum IndexStatement {
 }
 
 impl Index {
-    /// Construct index [`IndexCreateStatement`]
-    pub fn create() -> IndexCreateStatement {
-        IndexCreateStatement::new()
+    /// Construct index [`IndexCreateStatement`] over its first column
+    pub fn create<C>(col: C) -> IndexCreateStatement
+    where
+        C: IntoIndexColumn,
+    {
+        IndexCreateStatement::new(col)
     }
 
     /// Construct index [`IndexDropStatement`]

@@ -272,12 +272,11 @@ fn column(
             // unique index, and that index is where the entity model reads
             // uniqueness from — a `ColumnSpec::UniqueKey` would be discarded.
             ConstrType::ConstrUnique => {
-                let mut index = Index::create();
+                let mut index = Index::create(Alias::new(column_name));
                 if !constraint.conname.is_empty() {
                     index.name(constraint.conname.as_str());
                 }
                 index.table(target.clone());
-                index.col(Alias::new(column_name));
                 index.unique();
                 if constraint.nulls_not_distinct {
                     index.nulls_not_distinct();
@@ -339,10 +338,11 @@ fn table_constraint(
         kind @ (ConstrType::ConstrPrimary | ConstrType::ConstrUnique) => {
             let columns = types::idents(&constraint.keys)
                 .ok_or_else(|| on("a constraint over computed keys"))?;
-            if columns.is_empty() {
+            let mut columns = columns.into_iter();
+            let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
-            }
-            let mut index = Index::create();
+            };
+            let mut index = Index::create(Alias::new(first));
             if !constraint.conname.is_empty() {
                 index.name(constraint.conname.as_str());
             }

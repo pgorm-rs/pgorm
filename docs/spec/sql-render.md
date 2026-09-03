@@ -342,7 +342,7 @@ an ideal Postgres renderer would emit.
 > alias is bound. Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
 > a value-bearing reference never reaches them
-> (`[spec:pgorm:sem:sql.ddl.panics+2]`).
+> (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
 ## CTEs
 

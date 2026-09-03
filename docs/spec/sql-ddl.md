@@ -8,7 +8,7 @@ statements (`pgorm-query/src/extension.rs`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
 implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
-behaviour, including panics and leftovers from the multi-backend ancestry.
+behaviour, including the leftovers from the multi-backend ancestry.
 
 > [spec:pgorm:req:sql.ddl+4]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
@@ -34,7 +34,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+4]
+> [spec:pgorm:req:sql.ddl.create-table+5]
 > `TableCreateStatement` composes a table name (`table()`, any
 > `IntoTableName`), ordered `ColumnDef`s (`col()`, which stamps the table ref
 > onto each column), table-level indexes (`index()` and `primary_key()` — the
@@ -49,7 +49,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
 > ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+2]`) and `NULLS NOT
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+3]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis only
@@ -63,6 +63,12 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `comment` is stored and exposed via `get_comment()` but is not rendered
 > here: on Postgres a table comment is a statement of its own, built through
 > `[spec:pgorm:req:sql.ddl.comment]`.
+>
+> A statement with no columns renders `CREATE TABLE <table> (  )`, and that is
+> deliberately left buildable: PostgreSQL accepts a table with no columns, so
+> the empty body is odd rather than invalid and gets documented rather than
+> forbidden. Unlike an empty alter or an empty index column list, there is no
+> unparseable render here for a type to prevent.
 
 > [spec:pgorm:req:sql.ddl.column-def+3]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
@@ -121,10 +127,22 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > enum type name; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
-> [spec:pgorm:req:sql.ddl.alter-table+1]
-> `TableAlterStatement` collects `TableAlterOption`s: `AddColumn` (with an
-> `if_not_exists` flag), `ModifyColumn`, `DropColumn`, `AddForeignKey` and
-> `DropForeignKey`. Rendering MUST emit a single `ALTER TABLE <table> ` prefix
+> [spec:pgorm:req:sql.ddl.alter-table+2]
+> `TableAlterStatement` names one table and collects `TableAlterOption`s:
+> `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
+> `AddForeignKey` and `DropForeignKey`. Both the table and a first option are
+> structural rather than checked: `Table::alter(table)` yields a
+> `PendingTableAlter`, which is a named table and nothing more — it implements no
+> build path and cannot render — and each of its six action methods consumes it
+> and returns the statement, whose own methods append the rest. PostgreSQL parses
+> neither `ALTER TABLE "font"` nor `ALTER TABLE ADD COLUMN ...`, and neither MUST
+> be constructible (`[dec:pgorm:invalid-states-unrepresentable]`); the
+> `No alter option found` panic that stood in for the first of those is gone, and
+> MUST NOT return. `take()` copies rather than moves for the same reason: moving
+> the options out would leave the action-less statement this type exists to rule
+> out.
+>
+> Rendering MUST emit a single `ALTER TABLE <table> ` prefix
 > with the options comma-separated: `ADD COLUMN [IF NOT EXISTS ]<column-def>`
 > (same column rendering as create, including the serial substitution for
 > auto-increment); `DROP COLUMN "c"`; `ADD CONSTRAINT ... FOREIGN KEY ...` and
@@ -144,8 +162,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > DROP NOT NULL` (for `Null`), `SET NOT NULL`, `SET DEFAULT <expr>`,
 > `ADD UNIQUE ("c")`, `ADD PRIMARY KEY ("c")`, `CHECK (<expr>)` or the
 > `Extra` string, comma-separated. `AutoIncrement`, `Generated` and `Comment`
-> specs are ignored in modify. An alter statement with zero options panics
-> with `No alter option found`.
+> specs are ignored in modify.
 
 > [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
 > `TableDropStatement` accumulates multiple `TableName`s and MUST render
@@ -185,10 +202,19 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+2]
+> [spec:pgorm:req:sql.ddl.index-create+3]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
-> `index_type` and `if_not_exists` flags. `IndexKind` is the closed set
+> `index_type` and `if_not_exists` flags. Its column list MUST be non-empty by
+> construction: `Index::create(col)` and `IndexCreateStatement::new(col)` take
+> the first column and `col()` appends the rest, in the pattern
+> `[spec:pgorm:def:sql.ast.with+1]` uses for CTEs, and `take()` copies rather
+> than moves so no column-less husk is left behind. PostgreSQL rejects an empty
+> column list in every position this statement reaches — standalone
+> `CREATE INDEX ... ()` and the embedded `PRIMARY KEY ()` and `UNIQUE ()` of
+> `[spec:pgorm:req:sql.ddl.create-table+5]` alike — so the state is unreachable
+> rather than checked (`[dec:pgorm:invalid-states-unrepresentable]`). `IndexKind`
+> is the closed set
 > `Plain | Unique | PrimaryKey`, so what an index constrains is one state and
 > never a combination: `primary()` and `unique()` each set the kind outright,
 > replacing whatever was set before, and an index is never both a primary key
@@ -204,7 +230,7 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+4]`.
+> `[spec:pgorm:req:sql.ddl.create-table+5]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
@@ -293,13 +319,18 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 
 ## Panics and unsupported forms
 
-> [spec:pgorm:sem:sql.ddl.panics+3]
-> DDL building is panic-based rather than error-based at its one remaining
-> edge: an empty `TableAlterStatement` panics with `No alter option found`.
-> There is no `Result`-returning DDL build path.
+> [spec:pgorm:sem:sql.ddl.panics+4]
+> DDL building does not panic. Every `prepare_*` path over a constructible
+> statement runs to a rendered string, so the absence of a `Result`-returning
+> DDL build path costs a caller nothing: there is no failure for one to carry.
+> The last edge was the empty `TableAlterStatement`, which panicked with
+> `No alter option found`; it is closed by construction rather than converted to
+> an error, because a statement with no action is not a statement
+> (`[spec:pgorm:req:sql.ddl.alter-table+2]`). It MUST NOT come back, in that
+> form or as a `Result`.
 >
-> Column type and auto-increment shape are no longer among them, and MUST NOT
-> return to them. `ColumnType` carries no variant without a Postgres spelling
+> Column type and auto-increment shape were panics of their own, and MUST NOT
+> come back either. `ColumnType` carries no variant without a Postgres spelling
 > — `Year` is gone with the enum entry that produced the `Year is not
 > available in Postgres.` panic — so `prepare_column_type` is total. The
 > serial substitution is likewise total: `auto_increment()` on a type outside
@@ -309,8 +340,8 @@ behaviour, including panics and leftovers from the multi-backend ancestry.
 > are closed by making the renderer's match exhaustive over spellings that
 > exist.
 >
-> Table reference shape is no longer among them, and MUST NOT return to
-> them. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
+> Table reference shape was the third, and MUST NOT come back
+> either. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
 > and foreign-key targets and comment targets take a `TableName`
 > (`[spec:pgorm:def:sql.types.table-ref+2]`), which has no form the renderer
 > could refuse. The five `Not supported` panics and the `TableRef with values

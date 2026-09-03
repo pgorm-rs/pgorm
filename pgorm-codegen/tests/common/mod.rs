@@ -255,10 +255,9 @@ pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement 
 /// A single-column unique index over `column`, which the transformer reads to
 /// mark the column unique.
 pub fn unique_index(table: &str, column: &str) -> pgorm_query::IndexCreateStatement {
-    Index::create()
+    Index::create(Alias::new(column))
         .name(format!("idx_{table}_{column}"))
         .table(Alias::new(table))
-        .col(Alias::new(column))
         .unique()
         .to_owned()
 }

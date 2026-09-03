@@ -49,7 +49,7 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+4]
+// [spec:pgorm:req:sql.ddl.create-table+5]
 #[derive(Default, Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: Option<TableName>,
@@ -123,7 +123,7 @@ impl TableCreateStatement {
     ///     .table(Glyph::Table)
     ///     .col(ColumnDef::new(Glyph::Id).integer().not_null())
     ///     .col(ColumnDef::new(Glyph::Image).string().not_null())
-    ///     .primary_key(Index::create().col(Glyph::Id).col(Glyph::Image));
+    ///     .primary_key(Index::create(Glyph::Id).col(Glyph::Image));
     ///
     /// assert_eq!(
     ///     statement.to_string(QueryBuilder),

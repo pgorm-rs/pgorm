@@ -278,7 +278,7 @@ including panic semantics and quirks inherited from sea-query.
 > list or function call in a DDL or DML position is a type error rather than a
 > render-time panic or a statement PostgreSQL rejects; an alias in a DDL
 > position is a type error for the same reason
-> (`[spec:pgorm:sem:sql.ddl.panics+2]`).
+> (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
 > [spec:pgorm:def:sql.types.opers+1]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary

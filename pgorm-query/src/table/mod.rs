@@ -9,7 +9,7 @@
 //! - Column Rename, see [`ColumnRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
-use crate::QueryBuilder;
+use crate::{QueryBuilder, types::IntoTableName};
 
 mod alter;
 mod column;
@@ -49,9 +49,16 @@ impl Table {
         TableCreateStatement::new()
     }
 
-    /// Construct table [`TableAlterStatement`]
-    pub fn alter() -> TableAlterStatement {
-        TableAlterStatement::new()
+    /// Name the table a [`TableAlterStatement`] will alter.
+    ///
+    /// Choosing an action on the returned [`PendingTableAlter`] is what produces
+    /// the statement: PostgreSQL has no spelling for an `ALTER TABLE` with no
+    /// action, so naming the table alone renders nothing.
+    pub fn alter<T>(table: T) -> PendingTableAlter
+    where
+        T: IntoTableName,
+    {
+        PendingTableAlter::new(table.into_table_name())
     }
 
     /// Construct table [`TableDropStatement`]

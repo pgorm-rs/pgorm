@@ -1502,7 +1502,7 @@ impl QueryBuilder {
 
     // COMMON
     // START: impl that ought not be here
-    // [spec:pgorm:sem:sql.ddl.panics+3]
+    // [spec:pgorm:sem:sql.ddl.panics+4]
     // [spec:pgorm:def:sql.render.ddl.types+3] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
@@ -1639,20 +1639,15 @@ impl QueryBuilder {
         ""
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+1]
+    // [spec:pgorm:req:sql.ddl.alter-table+2]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        if alter.options.is_empty() {
-            panic!("No alter option found")
-        };
         write!(sql, "ALTER TABLE ").unwrap();
-        if let Some(table) = &alter.table {
-            self.prepare_table_name(table, sql);
-            write!(sql, " ").unwrap();
-        }
+        self.prepare_table_name(&alter.table, sql);
+        write!(sql, " ").unwrap();
 
         alter.options.iter().fold(true, |first, option| {
             if !first {
@@ -1782,7 +1777,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+1]
+    // [spec:pgorm:req:sql.ddl.alter-table+2]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1803,7 +1798,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+4]
+    // [spec:pgorm:req:sql.ddl.create-table+5]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -2026,7 +2021,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+2]
+    // [spec:pgorm:req:sql.ddl.index-create+3]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,

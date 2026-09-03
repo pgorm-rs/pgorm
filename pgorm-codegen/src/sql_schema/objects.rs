@@ -4,7 +4,9 @@ use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
-use pgorm_query::{Alias, Index, IndexCreateStatement, IndexOrder, IndexType};
+use pgorm_query::{
+    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _,
+};
 
 /// A `CREATE TYPE ... AS ENUM` as the name and values a column of that type
 /// carries into `ColumnType::Enum`.
@@ -59,23 +61,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
         return Err(on("an exclusion operator"));
     }
 
-    let mut index = Index::create();
-    if !stmt.idxname.is_empty() {
-        index.name(stmt.idxname.as_str());
-    }
-    index.table(Alias::new(table.as_str()));
-    if stmt.if_not_exists {
-        index.if_not_exists();
-    }
-    if stmt.nulls_not_distinct {
-        index.nulls_not_distinct();
-    }
-    if stmt.unique {
-        index.unique();
-    }
-    if let Some(index_type) = index_type(&stmt.access_method) {
-        index.index_type(index_type);
-    }
+    let mut columns = Vec::with_capacity(stmt.index_params.len());
     for node in &stmt.index_params {
         let Some(NodeEnum::IndexElem(element)) = &node.node else {
             return Err(on("an index element"));
@@ -93,15 +79,37 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
             return Err(on("a NULLS FIRST or NULLS LAST clause"));
         }
         let column = Alias::new(element.name.as_str());
-        match SortByDir::try_from(element.ordering) {
-            Ok(SortByDir::SortbyDefault) => index.col(column),
-            Ok(SortByDir::SortbyAsc) => index.col((column, IndexOrder::Asc)),
-            Ok(SortByDir::SortbyDesc) => index.col((column, IndexOrder::Desc)),
+        columns.push(match SortByDir::try_from(element.ordering) {
+            Ok(SortByDir::SortbyDefault) => column.into_index_column(),
+            Ok(SortByDir::SortbyAsc) => (column, IndexOrder::Asc).into_index_column(),
+            Ok(SortByDir::SortbyDesc) => (column, IndexOrder::Desc).into_index_column(),
             _ => return Err(on("an index column ordering")),
-        };
+        });
     }
-    if index.get_index_spec().get_column_names().is_empty() {
+
+    let mut columns = columns.into_iter();
+    let Some(first) = columns.next() else {
         return Err(on("an index over no columns"));
+    };
+    let mut index = Index::create(first);
+    if !stmt.idxname.is_empty() {
+        index.name(stmt.idxname.as_str());
+    }
+    index.table(Alias::new(table.as_str()));
+    if stmt.if_not_exists {
+        index.if_not_exists();
+    }
+    if stmt.nulls_not_distinct {
+        index.nulls_not_distinct();
+    }
+    if stmt.unique {
+        index.unique();
+    }
+    if let Some(index_type) = index_type(&stmt.access_method) {
+        index.index_type(index_type);
+    }
+    for column in columns {
+        index.col(column);
     }
     Ok(ParsedIndex {
         table,

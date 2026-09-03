@@ -111,7 +111,7 @@ impl Schema {
     ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
     /// };
     /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
-    /// use pgorm_query::{QueryBuilder, TableAlterStatement};
+    /// use pgorm_query::{QueryBuilder, Table};
     ///
     /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     /// #[pgorm(table_name = "posts")]
@@ -133,10 +133,8 @@ impl Schema {
     ///
     /// let schema = Schema::new();
     ///
-    /// let mut alter_table = TableAlterStatement::new()
-    ///     .table(Entity)
-    ///     .add_column(&mut schema.get_column_def::<Entity>(Column::Title))
-    ///     .take();
+    /// let alter_table = Table::alter(Entity)
+    ///     .add_column(&mut schema.get_column_def::<Entity>(Column::Title));
     /// assert_eq!(
     ///     alter_table.to_string(QueryBuilder),
     ///     r#"ALTER TABLE "posts" ADD COLUMN "title" varchar NOT NULL"#
@@ -200,10 +198,10 @@ where
         if !column_def.indexed {
             continue;
         }
-        let stmt = Index::create()
-            .name(format!("idx-{}-{}", entity.to_string(), column.to_string()))
+        let name = format!("idx-{}-{}", entity.to_string(), column.to_string());
+        let stmt = Index::create(column)
+            .name(name)
             .table(entity.table_ref())
-            .col(column)
             .to_owned();
         vec.push(stmt)
     }
@@ -246,11 +244,14 @@ where
     }
 
     if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
-        let mut idx_pk = Index::create();
-        for primary_key in E::PrimaryKey::iter() {
-            idx_pk.col(primary_key);
+        let mut primary_keys = E::PrimaryKey::iter();
+        if let Some(first) = primary_keys.next() {
+            let mut idx_pk = Index::create(first);
+            for primary_key in primary_keys {
+                idx_pk.col(primary_key);
+            }
+            stmt.primary_key(idx_pk.name(format!("pk-{}", entity.to_string())).primary());
         }
-        stmt.primary_key(idx_pk.name(format!("pk-{}", entity.to_string())).primary());
     }
 
     for relation in E::Relation::iter() {
@@ -336,9 +337,8 @@ mod tests {
                     .not_null(),
             )
             .primary_key(
-                Index::create()
+                Index::create(cake_filling_price::Column::CakeId)
                     .name("pk-cake_filling_price")
-                    .col(cake_filling_price::Column::CakeId)
                     .col(cake_filling_price::Column::FillingId)
                     .primary(),
             )
@@ -371,20 +371,18 @@ mod tests {
         let stmts = schema.create_index_from_entity(indexes::Entity);
         assert_eq!(stmts.len(), 2);
 
-        let idx: IndexCreateStatement = Index::create()
+        let idx: IndexCreateStatement = Index::create(indexes::Column::Index1Attr)
             .name("idx-indexes-index1_attr")
             .table(indexes::Entity.table_ref())
-            .col(indexes::Column::Index1Attr)
             .to_owned();
         assert_eq!(
             stmts[0].to_string(QueryBuilder),
             idx.to_string(QueryBuilder)
         );
 
-        let idx: IndexCreateStatement = Index::create()
+        let idx: IndexCreateStatement = Index::create(indexes::Column::Index2Attr)
             .name("idx-indexes-index2_attr")
             .table(indexes::Entity.table_ref())
-            .col(indexes::Column::Index2Attr)
             .to_owned();
         assert_eq!(
             stmts[1].to_string(QueryBuilder),

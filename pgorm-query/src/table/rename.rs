@@ -91,7 +91,7 @@ impl SchemaStatementBuilder for TableRenameStatement {
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+1]
+// [spec:pgorm:req:sql.ddl.alter-table+2]
 #[derive(Default, Debug, Clone)]
 pub struct ColumnRenameStatement {
     pub(crate) table: Option<TableName>,

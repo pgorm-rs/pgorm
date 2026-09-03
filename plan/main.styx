@@ -2085,6 +2085,13 @@ children (
                         kind @note
                         text "From tableref-split's judgment call: \"No alter option found\" (query_builder panic on a zero-option TableAlterStatement) needs a typestate builder — Table::alter() cannot return a renderable empty statement, option-adders transition the state — and the same statement-built-empty defect afflicts TableCreateStatement (no columns) and IndexCreateStatement (no columns). One node for the DDL-builder family; ~36 call sites for alter alone. sql.ddl.alter-table pins the current panic. Follows the CTE-builders precedent (complete constructors, WithClause non-empty pattern)."
                     }
+
+                    {
+                        at 2026-09-03T12:10:00.314613Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

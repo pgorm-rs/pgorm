@@ -19,10 +19,9 @@ impl MigrationTrait for Migration {
             .to_owned();
         tx.execute(&table.build(QueryBuilder), &[]).await?;
 
-        let index = Index::create()
+        let index = Index::create(Cake::Name)
             .name("cake_name_index")
             .table(Cake::Table)
-            .col(Cake::Name)
             .to_owned();
         tx.execute(&index.build(QueryBuilder), &[]).await?;
 
