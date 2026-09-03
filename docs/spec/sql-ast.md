@@ -391,7 +391,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+1]
+> [spec:pgorm:def:sql.ast.window-statement+2]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, `partition_by_custom`, and the `OverStatement` trait's
 > `partition_by_columns`/`partition_by_customs`), ORDER BY expressions (shared
@@ -409,16 +409,17 @@ today, including panicking edges and deliberate failsafes.
 > rendering a `WINDOW "w" AS ( ... )` clause. The statement holds at most one
 > named window; a second `window()` call replaces the first.
 >
-> All four `expr_window*` constructors take `T: Into<SimpleExpr>`, so a window
-> can be attached to any expression — but PostgreSQL accepts `OVER` only after
-> a function call, so every windowed projection whose expression is not a
-> `SimpleExpr::FunctionCall` is a constructible AST with no valid rendering.
-> The signature, not the renderer, is what admits it, so closing the gap is
-> type-level work: narrowing the four constructors to `FunctionCall` (per
-> `[dec:pgorm:invalid-states-unrepresentable]`) is an API break tracked
-> separately and pinned by `oracle_pins_over_on_a_bare_expression`. Until
-> then the invalid combination is representable and MUST be understood as a
-> caller obligation, not a rendering guarantee.
+> PostgreSQL accepts `OVER` only after a function call, so all four
+> `expr_window*` constructors MUST take the windowed expression as a
+> `FunctionCall` rather than anything convertible to `SimpleExpr` (per
+> `[dec:pgorm:invalid-states-unrepresentable]`): a windowed column reference,
+> arithmetic expression, `CASE` or `CAST` does not typecheck, so the AST with
+> no valid rendering has no constructor. `SelectExpr`'s expression and window
+> are therefore read-only after construction — `expr()` and `window()` read
+> them, `SelectExpr::new`/`new_as` build the windowless forms, and the four
+> constructors are the only source of a windowed one — so the pairing cannot
+> be taken apart by mutating a projection in place. The alias stays writable:
+> renaming a projection cannot invalidate the pairing.
 
 ## CASE expressions
 

@@ -100,11 +100,10 @@ where
                 Alias::new(format!("r{}", l.link().len() - 1)).into_iden(),
                 col.into_iden(),
             ));
-            select_two.query().expr(SelectExpr {
-                expr: col.select_as(expr),
-                alias: Some(SeaRc::new(Alias::new(alias))),
-                window: None,
-            });
+            select_two.query().expr(SelectExpr::new_as(
+                col.select_as(expr),
+                SeaRc::new(Alias::new(alias)),
+            ));
         }
         select_two
     }
@@ -145,11 +144,10 @@ where
                 Alias::new(format!("r{}", l.link().len() - 1)).into_iden(),
                 col.into_iden(),
             ));
-            select_two_many.query().expr(SelectExpr {
-                expr: col.select_as(expr),
-                alias: Some(SeaRc::new(Alias::new(alias))),
-                window: None,
-            });
+            select_two_many.query().expr(SelectExpr::new_as(
+                col.select_as(expr),
+                SeaRc::new(Alias::new(alias)),
+            ));
         }
         select_two_many
     }

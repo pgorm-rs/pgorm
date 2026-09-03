@@ -304,7 +304,7 @@ an ideal Postgres renderer would emit.
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
 
-> [spec:pgorm:req:sql.render.window+2]
+> [spec:pgorm:req:sql.render.window+3]
 > A window specification is never emitted bare: `prepare_window_spec` wraps it
 > in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
 > way a specification reaches the sink. Both spelling sites therefore agree —
@@ -314,12 +314,13 @@ an ideal Postgres renderer would emit.
 > by name instead renders ` OVER "name"`, with any projection alias following
 > the window in either form (` OVER … AS "alias"`).
 >
-> `OVER` MUST only be attached to a projection whose expression renders as a
-> function call (`SimpleExpr::FunctionCall`, i.e. the `Func::…` constructors),
-> because that is the only production PostgreSQL's grammar allows it after; a
-> windowed column reference, arithmetic expression, `CASE` or `CAST` is
-> rejected by the grammar no matter how it is spelled. The AST does not yet
-> enforce this — see `sql.ast.window-statement`.
+> `OVER` reaches the sink only after a projection whose expression is a
+> `SimpleExpr::FunctionCall`, because that is the only production PostgreSQL's
+> grammar allows it after; a windowed column reference, arithmetic expression,
+> `CASE` or `CAST` is rejected by the grammar no matter how it is spelled. The
+> renderer carries no guard for this and MUST NOT grow one — the projection it
+> would reject is not constructible (`sql.ast.window-statement`), so a guard
+> would be dead code standing in for a type.
 >
 > Within the parentheses a specification renders `PARTITION BY expr, …`, then
 > ` ORDER BY ` order-exprs, then the frame clause: ` RANGE ` or ` ROWS `,

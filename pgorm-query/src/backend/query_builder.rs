@@ -590,7 +590,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+2] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+3] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -1335,7 +1335,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`Frame`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+2] (frame bounds)
+    // [spec:pgorm:req:sql.render.window+3] (frame bounds)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
@@ -1355,7 +1355,7 @@ impl QueryBuilder {
     #[doc(hidden)]
     /// Translate a [`WindowStatement`] into the parenthesized window
     /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
-    // [spec:pgorm:req:sql.render.window+2]
+    // [spec:pgorm:req:sql.render.window+3]
     fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         write!(sql, "( ").unwrap();
         self.prepare_window_statement(window, sql);
@@ -1364,7 +1364,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+2]
+    // [spec:pgorm:req:sql.render.window+3]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();

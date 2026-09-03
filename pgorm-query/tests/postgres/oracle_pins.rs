@@ -15,7 +15,7 @@ use pgorm_query::extension::{Extension, Type};
 // between the bound value and the keyword, so the offset reads as an offset
 // rather than as trailing junk after a numeric literal.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window+2/test]
+// [spec:pgorm:req:sql.render.window+3/test]
 #[test]
 fn window_frame_offset_renders_spaced() {
     let sql = Query::select()
@@ -32,25 +32,30 @@ fn window_frame_offset_renders_spaced() {
     assert_parses(&sql);
 }
 
-// Follow-up: narrow the four `expr_window*` constructors from `Into<SimpleExpr>`
-// to `FunctionCall`, per [dec:pgorm:invalid-states-unrepresentable]. No plan node
-// yet — it is an API break, not a render fix. PostgreSQL allows OVER only after a
-// function call, so a windowed column reference stays constructible in the AST
-// with no valid rendering, and no change to the renderer can close it.
+// Fixed by plan node `unrep.over-function`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: the four `expr_window*`
+// constructors take a `FunctionCall`, the only production PostgreSQL admits
+// `OVER` after, so a windowed column reference no longer typechecks. The
+// rejection it used to be pinned to is proved by the `compile_fail` doctest on
+// `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.ast.window-statement+1/test]
+// [spec:pgorm:def:sql.ast.window-statement+2/test]
+// [spec:pgorm:req:sql.render.window+3/test]
 #[test]
-fn oracle_pins_over_on_a_bare_expression() {
+fn over_attaches_only_to_function_calls() {
     let sql = Query::select()
         .from(Char::Table)
         .expr_window(
-            Expr::col(Char::Character),
+            Func::count(Expr::col(Char::Id)),
             WindowStatement::partition_by(Char::FontSize),
         )
         .to_string(QueryBuilder);
 
-    assert!(sql.starts_with(r#"SELECT "character" OVER ("#));
-    assert!(assert_rejected(&sql).contains("OVER"));
+    assert_eq!(
+        sql,
+        r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
+    );
+    assert_parses(&sql);
 }
 
 // The MySQL-era table options (`ENGINE=`, `COLLATE=`, `DEFAULT CHARSET=`) have

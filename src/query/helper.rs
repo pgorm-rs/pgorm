@@ -94,11 +94,10 @@ pub trait QuerySelect: Sized {
         C: IntoSimpleExpr,
         I: IntoIdentity,
     {
-        self.query().expr(SelectExpr {
-            expr: col.into_simple_expr(),
-            alias: Some(SeaRc::new(alias.into_identity())),
-            window: None,
-        });
+        self.query().expr(SelectExpr::new_as(
+            col.into_simple_expr(),
+            SeaRc::new(alias.into_identity()),
+        ));
         self.into_projected()
     }
 

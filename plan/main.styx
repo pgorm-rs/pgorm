@@ -2058,12 +2058,20 @@ children (
             {
                 id unrep.over-function
                 title "OVER attaches only to function calls: narrow the four expr_window constructors"
+                sealed true
                 log (
                     {
                         at 2026-09-02T19:53:43.21024Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From bug.window-position's grammar probe: PG accepts OVER only after func_application — COUNT(x)/my_func(x) parse; bare columns, arithmetic, CASE and CAST are rejected at OVER. The renderer is correct; the four expr_window* constructors' T: Into<SimpleExpr> signatures admit the invalid state. Narrow to FunctionCall (breaking). Pinned by oracle_pins_over_on_a_bare_expression in oracle_pins.rs — flip when fixed. sql.render.window+1 and sql.ast.window-statement+1 state the gap and name this follow-up."
+                    }
+
+                    {
+                        at 2026-09-03T11:59:42.299581Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

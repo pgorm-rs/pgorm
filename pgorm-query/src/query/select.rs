@@ -4,7 +4,7 @@ use crate::{
     backend::QueryBuilder,
     expr::*,
     prepare::*,
-    query::{OrderedStatement, condition::*},
+    query::{OrderedStatement, condition::*, select_expr::*},
     types::*,
     value::*,
 };
@@ -57,24 +57,6 @@ pub enum SelectDistinct {
     DistinctOn(Vec<ColumnRef>),
 }
 
-/// Window type in [`SelectExpr`]
-// [spec:pgorm:def:sql.ast.window-statement+1]
-#[derive(Debug, Clone, PartialEq)]
-pub enum WindowSelectType {
-    /// Name in [`SelectStatement`]
-    Name(DynIden),
-    /// Inline query in [`SelectExpr`]
-    Query(WindowStatement),
-}
-
-/// Select expression used in select statement
-#[derive(Debug, Clone, PartialEq)]
-pub struct SelectExpr {
-    pub expr: SimpleExpr,
-    pub alias: Option<DynIden>,
-    pub window: Option<WindowSelectType>,
-}
-
 /// Join expression used in select statement
 // [spec:pgorm:req:sql.ast.select.join+1]
 #[derive(Debug, Clone, PartialEq)]
@@ -117,19 +99,6 @@ pub enum UnionType {
     Distinct,
     Except,
     All,
-}
-
-impl<T> From<T> for SelectExpr
-where
-    T: Into<SimpleExpr>,
-{
-    fn from(expr: T) -> Self {
-        SelectExpr {
-            expr: expr.into(),
-            alias: None,
-            window: None,
-        }
-    }
 }
 
 impl SelectStatement {
@@ -549,11 +518,7 @@ impl SelectStatement {
         T: Into<SimpleExpr>,
         A: IntoIden,
     {
-        self.expr(SelectExpr {
-            expr: expr.into(),
-            alias: Some(alias.into_iden()),
-            window: None,
-        });
+        self.expr(SelectExpr::new_as(expr, alias));
         self
     }
 
@@ -577,12 +542,24 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
     /// );
     /// ```
-    pub fn expr_window<T>(&mut self, expr: T, window: WindowStatement) -> &mut Self
-    where
-        T: Into<SimpleExpr>,
-    {
+    ///
+    /// PostgreSQL admits `OVER` only after a function call, so a column
+    /// reference is not a windowed expression and does not typecheck as one:
+    ///
+    /// ```compile_fail,E0308
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// Query::select()
+    ///     .from(Char::Table)
+    ///     .expr_window(
+    ///         Expr::col(Char::Character),
+    ///         WindowStatement::partition_by(Char::FontSize),
+    ///     );
+    /// ```
+    // [spec:pgorm:def:sql.ast.window-statement+2]
+    pub fn expr_window(&mut self, func: FunctionCall, window: WindowStatement) -> &mut Self {
         self.expr(SelectExpr {
-            expr: expr.into(),
+            expr: func.into(),
             alias: None,
             window: Some(WindowSelectType::Query(window)),
         });
@@ -610,13 +587,18 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    pub fn expr_window_as<T, A>(&mut self, expr: T, window: WindowStatement, alias: A) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+2]
+    pub fn expr_window_as<A>(
+        &mut self,
+        func: FunctionCall,
+        window: WindowStatement,
+        alias: A,
+    ) -> &mut Self
     where
-        T: Into<SimpleExpr>,
         A: IntoIden,
     {
         self.expr(SelectExpr {
-            expr: expr.into(),
+            expr: func.into(),
             alias: Some(alias.into_iden()),
             window: Some(WindowSelectType::Query(window)),
         });
@@ -644,13 +626,13 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    pub fn expr_window_name<T, W>(&mut self, expr: T, window: W) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+2]
+    pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
     where
-        T: Into<SimpleExpr>,
         W: IntoIden,
     {
         self.expr(SelectExpr {
-            expr: expr.into(),
+            expr: func.into(),
             alias: None,
             window: Some(WindowSelectType::Name(window.into_iden())),
         });
@@ -675,14 +657,19 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    pub fn expr_window_name_as<T, W, A>(&mut self, expr: T, window: W, alias: A) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+2]
+    pub fn expr_window_name_as<W, A>(
+        &mut self,
+        func: FunctionCall,
+        window: W,
+        alias: A,
+    ) -> &mut Self
     where
-        T: Into<SimpleExpr>,
         A: IntoIden,
         W: IntoIden,
     {
         self.expr(SelectExpr {
-            expr: expr.into(),
+            expr: func.into(),
             alias: Some(alias.into_iden()),
             window: Some(WindowSelectType::Name(window.into_iden())),
         });

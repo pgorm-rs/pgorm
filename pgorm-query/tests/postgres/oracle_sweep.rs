@@ -273,7 +273,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window+2/test]
+// [spec:pgorm:req:sql.render.window+3/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {
@@ -761,12 +761,11 @@ fn oracle_pairs_text_and_grammar_checks() {
 #[test]
 #[should_panic(expected = "PostgreSQL rejected")]
 fn oracle_shim_fires_on_a_string() {
-    let rendered = Query::select()
-        .from(Char::Table)
-        .expr_window(
-            Expr::col(Char::Character),
-            WindowStatement::partition_by(Char::FontSize),
-        )
+    let rendered = Query::update()
+        .table(Glyph::Table)
+        .value(Glyph::Aspect, 1)
+        .order_by(Glyph::Id, Order::Asc)
+        .limit(1)
         .to_string(QueryBuilder);
     crate::oracle::assert_eq!(rendered, rendered.clone());
 }

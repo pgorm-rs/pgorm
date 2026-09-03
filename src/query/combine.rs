@@ -58,7 +58,7 @@ where
                     // itself after has no `A_`/`B_` name to take, so it is
                     // left as written: it belongs to neither model, and
                     // neither model's decode looks for it.
-                    let col = match &sel.expr {
+                    let col = match sel.expr() {
                         SimpleExpr::Column(col_ref) => named_column(col_ref),
                         SimpleExpr::AsEnum(_, simple_expr) => match simple_expr.as_ref() {
                             SimpleExpr::Column(col_ref) => named_column(col_ref),
@@ -155,11 +155,10 @@ where
 {
     for col in <F::Column as Iterable>::iter() {
         let alias = format!("{}{}", SelectB.as_str(), col.as_str());
-        selector.query().expr(SelectExpr {
-            expr: col.select_as(col.into_expr()),
-            alias: Some(SeaRc::new(Alias::new(alias))),
-            window: None,
-        });
+        selector.query().expr(SelectExpr::new_as(
+            col.select_as(col.into_expr()),
+            SeaRc::new(Alias::new(alias)),
+        ));
     }
 }
 
