@@ -198,7 +198,7 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+2]
+> [spec:pgorm:def:sql.render.operators+3]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`, `IN`,
 > `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `AS`. Comparison: `=`, `<>`,
@@ -208,19 +208,26 @@ an ideal Postgres renderer would emit.
 > (WordSimilarity), `<<%` (StrictWordSimilarity), `<->`
 > (SimilarityDistance), `<<->` (WordSimilarityDistance), `<<<->`
 > (StrictWordSimilarityDistance), `->` (GetJsonField), `->>` (CastJsonField),
-> `~` (Regex), `~*` (RegexCaseInsensitive), and pgvector's `<->`
-> (EuclideanDistance), `<#>` (NegativeInnerProduct), `<=>` (CosineDistance).
+> `#>` (GetJsonPath), `#>>` (CastJsonPath), `?` (HasJsonKey), `?|`
+> (HasAnyJsonKeys), `?&` (HasAllJsonKeys), `~` (Regex), `~*`
+> (RegexCaseInsensitive), and pgvector's `<->` (EuclideanDistance), `<#>`
+> (NegativeInnerProduct), `<=>` (CosineDistance).
 > `BinOper::Custom(raw)` emits its raw string verbatim. Note the deliberate
 > lexeme collisions: `%` serves both Mod and Similarity, `<->` both
 > SimilarityDistance and EuclideanDistance. The only unary operator is
 > `UnOper::Not` → `NOT`.
+>
+> The `?` family's lexemes are operator text like any other and carry no
+> placeholder meaning: parameters are numbered `$N`
+> (`sql.render.placeholders`), so a rendered `?` reaches the server as the
+> JSON operator it is and nothing in the client rewrites it.
 >
 > `ESCAPE` is not an operator: it is grammatical only as the tail of a `LIKE`
 > / `ILIKE` pattern, so it renders from `SimpleExpr::LikePattern` — the
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence]
+> [spec:pgorm:def:sql.render.precedence+1]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -230,9 +237,12 @@ an ideal Postgres renderer would emit.
 > operator is a comparison, BETWEEN, IN, LIKE, or logical operator; or the
 > inner expression is a comparison, IN, LIKE, or IS binary and the outer
 > operator is logical (`AND`/`OR`/`NOT`). The Postgres-specific extension also
-> treats an inner `@>`, `<@`, `%` (similarity), `<%`, `<<%`, or `@@`
-> comparison as higher precedence than a logical outer operator. All other
-> combinations are considered unknown and keep their parentheses.
+> treats an inner `@>`, `<@`, `%` (similarity), `<%`, `<<%`, `@@`, `?`, `?|`,
+> or `?&` comparison as higher precedence than a logical outer operator — the
+> membership of that set is "returns boolean", which is why the JSON existence
+> operators join it and the JSON *accessors* (`->`, `->>`, `#>`, `#>>`, which
+> return JSON or text) do not. All other combinations are considered unknown
+> and keep their parentheses.
 
 > [spec:pgorm:req:sql.render.parens]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by

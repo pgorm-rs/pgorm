@@ -221,7 +221,7 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
-> [spec:pgorm:req:sql.ast.expr.operators]
+> [spec:pgorm:req:sql.ast.expr.operators+1]
 > `Expr` and `SimpleExpr` MUST provide combinators that produce `Binary`/`Unary`
 > nodes: comparisons `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, plus
 > `equals`/`not_equals` for column-to-column comparison; arithmetic `add`,
@@ -232,16 +232,20 @@ today, including panicking edges and deliberate failsafes.
 > render an `ESCAPE` clause whose character is an inline constant — and
 > `concat` (`||`).
 >
-> PostgreSQL-specific operators MUST be available: full-text `matches` (`@@`),
-> containment `contains` (`@>`) and `contained` (`<@`), JSON access
-> `get_json_field` (`->`) and `cast_json_field` (`->>`). The escape hatch
-> `binary(op, rhs)` accepts any `BinOper`, whose variants further include
-> regex (`~`, `~*`), trigram similarity and distance operators, pgvector
-> distance operators, `Overlap`, and `Custom(&'static str)` for arbitrary
-> operator text. Casts are expressed with `cast_as` (`CAST(expr AS type)`) and
-> `as_enum`; aggregate shorthands `max`, `min`, `sum`, `count`,
-> `count_distinct`, and `if_null` wrap the expression in the corresponding
-> function call.
+> PostgreSQL-specific operators MUST be available: full-text `matches` (`@@`)
+> and containment `contains` (`@>`) / `contained` (`<@`). Containment and
+> `concat` are type-general rather than string-specific — PostgreSQL defines
+> one `@>`, one `<@` and one `||` across arrays, ranges, `tsquery` and `jsonb`
+> alike — so these three combinators MUST also serve as the JSON containment
+> and merge tests, and `sql.ast.expr.json` MUST NOT name duplicates of them.
+> The escape hatch `binary(op, rhs)` accepts any `BinOper`, whose variants
+> further include regex (`~`, `~*`), trigram similarity and distance operators,
+> pgvector distance operators, `Overlap`, and `Custom(&'static str)` for
+> arbitrary operator text. Casts are expressed with `cast_as`
+> (`CAST(expr AS type)`) and `as_enum`; aggregate shorthands `max`, `min`,
+> `sum`, `count`, `count_distinct`, and `if_null` wrap the expression in the
+> corresponding function call. JSON field, path and key-existence access is
+> `sql.ast.expr.json`.
 
 > [spec:pgorm:req:sql.ast.expr.in+1]
 > `is_in`/`is_not_in` MUST build an `IN`/`NOT IN` over a `Tuple` of the given
@@ -292,6 +296,56 @@ today, including panicking edges and deliberate failsafes.
 > `ANY`/`SOME`/`ALL` are quantifiers over the right operand of a comparison, not
 > functions: `Func::any`/`some`/`all` render SQL only in that position, and are
 > the escape hatch for the operators these two do not name.
+
+> [spec:pgorm:req:sql.ast.expr.json]
+> `Expr` MUST provide the JSON *operator* vocabulary as typed combinators:
+> field access `get_json_field` (`->`) and `cast_json_field` (`->>`), path
+> access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), and key existence
+> `has_json_key` (`?`), `has_any_json_keys` (`?|`) and `has_all_json_keys`
+> (`?&`). They live in a child module of `expr` rather than in `Expr`'s main
+> block, as the membership family does.
+>
+> The boundary is operators, not functions. PostgreSQL's `jsonb_*` calls —
+> `jsonb_set`, `jsonb_build_object`, `jsonb_array_elements`, `jsonb_typeof` and
+> the rest — are ordinary function applications a caller already spells with
+> `Func::cust`, and naming each one here would be a second, worse function-call
+> syntax. The operators pgorm does not name (`-` and `#-` key/path deletion,
+> the jsonpath operators `@?` and `@@`) stay reachable through `binary` with
+> `BinOper::Custom`; only `@@` has a variant, shared with full-text `matches`.
+>
+> Containment (`@>`, `<@`) and concatenation (`||`) MUST NOT be duplicated
+> here: PostgreSQL defines one operator each across every type that has them,
+> so `contains`, `contained` and `concat` from `sql.ast.expr.operators` are
+> already the JSON forms, and a JSON-specific alias would be a second name for
+> the identical AST node.
+>
+> `get_json_path`, `cast_json_path`, `has_any_json_keys` and
+> `has_all_json_keys` MUST gather their operand collection into a single
+> `text[]` `Value::Array` via `Value::array`, exactly as `sql.ast.expr.eq-any`
+> does: the operators take `text[]` and nothing else, so path depth and key
+> count vary without varying the statement text. The element bound MUST be
+> `Into<String>`, and `has_json_key`'s key bound likewise, rather than the
+> `Into<SimpleExpr>` the two field accessors take. The asymmetry is the
+> operators' own: `->` selects an object key by text *or* an array element by
+> integer, so its right operand is any expression, while `jsonb ? integer` is
+> not an operator PostgreSQL defines, so a numeric key MUST fail to compile
+> instead of reaching the server.
+>
+> Empty collections MUST NOT be special-cased; each operator already carries
+> the right vacuous truth. `?|` over an empty key list is false for every
+> operand (no key of none can be present) and `?&` is true for every operand —
+> the same asymmetry `eq_any`/`ne_all` carry, and the reason neither needs
+> `sql.ast.expr.in`'s constant fall-backs. An empty `#>` path selects the
+> document itself.
+>
+> The family's operand typing is PostgreSQL's, not pgorm's, and pgorm does not
+> paper over it: `#>` and `#>>` apply to `json` and `jsonb` alike, while the
+> `?` family is `jsonb`-only, so a `json` operand needs an explicit `cast_as`.
+> `->>` and `#>>` return `text`, which ends a chain — no JSON operator applies
+> to their result. Because these combinators return `SimpleExpr` and
+> `SimpleExpr` carries no JSON methods, drilling in more than one step means
+> re-entering the builder with `Expr::expr`; `#>` exists so that the common
+> multi-step path needs one node instead of a nest of them.
 
 > [spec:pgorm:def:sql.ast.keywords+2]
 > `Keyword` represents bare SQL keywords usable as expressions: `Null`,

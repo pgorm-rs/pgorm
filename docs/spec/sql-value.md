@@ -289,7 +289,7 @@ including panic semantics and quirks inherited from sea-query.
 > position is a type error for the same reason
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
-> [spec:pgorm:def:sql.types.opers+1]
+> [spec:pgorm:def:sql.types.opers+2]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
 > operator vocabulary: logical `And`/`Or`; pattern `Like`/`NotLike` plus
 > Postgres `ILike`/`NotILike`; `Is`/`IsNot`; `In`/`NotIn`;
@@ -299,13 +299,20 @@ including panic semantics and quirks inherited from sea-query.
 > full-text/containment `Matches`, `Contains`, `Contained`; `Concatenate`,
 > `Overlap`; pg_trgm similarity operators (`Similarity`, `WordSimilarity`,
 > `StrictWordSimilarity` and their `*Distance` forms); JSON access
-> `GetJsonField` (`->`) and `CastJsonField` (`->>`); regex `Regex` (`~`) and
+> `GetJsonField` (`->`), `CastJsonField` (`->>`), `GetJsonPath` (`#>`) and
+> `CastJsonPath` (`#>>`); JSON key existence `HasJsonKey` (`?`),
+> `HasAnyJsonKeys` (`?|`) and `HasAllJsonKeys` (`?&`); regex `Regex` (`~`) and
 > `RegexCaseInsensitive` (`~*`); pgvector distances `EuclideanDistance`,
 > `NegativeInnerProduct`, `CosineDistance`; and an escape hatch
 > `Custom(&'static str)`. There is no `Escape` operator: `ESCAPE` is
 > grammatical only as the tail of a `LIKE` pattern, so it belongs to
 > `SimpleExpr::LikePattern` and cannot be applied to two arbitrary operands
 > (`[dec:pgorm:invalid-states-unrepresentable]`).
+>
+> JSON containment and merge get no variants of their own: `Contains`,
+> `Contained` and `Concatenate` already render `@>`, `<@` and `||`, which are
+> the operators PostgreSQL defines for `jsonb` as well as for arrays and
+> ranges (`sql.ast.expr.operators`).
 
 ## Column type vocabulary
 

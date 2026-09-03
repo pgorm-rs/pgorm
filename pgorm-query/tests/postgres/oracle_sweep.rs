@@ -92,6 +92,16 @@ fn sweep_expression_shapes() {
         Expr::col(Glyph::Tokens).get_json_field("a"),
         Expr::col(Glyph::Tokens).cast_json_field("b"),
         Expr::col(Glyph::Image).concat(Expr::val("x")),
+        Expr::col(Glyph::Tokens).get_json_path(["a", "b"]),
+        Expr::col(Glyph::Tokens).cast_json_path(["a", "b"]),
+        Expr::col(Glyph::Tokens).get_json_path(Vec::<String>::new()),
+        Expr::col(Glyph::Tokens).has_json_key("a"),
+        Expr::col(Glyph::Tokens).has_any_json_keys(["a", "b"]),
+        Expr::col(Glyph::Tokens).has_all_json_keys(["a", "b"]),
+        Expr::col(Glyph::Tokens).has_any_json_keys(Vec::<String>::new()),
+        Expr::col(Glyph::Tokens)
+            .has_json_key("a")
+            .and(Expr::col(Glyph::Tokens).has_all_json_keys(["b"])),
         SimpleExpr::Unary(UnOper::Not, Box::new(Expr::col(Glyph::Id).eq(1))),
         Expr::exists(base()),
         Expr::col(Glyph::Id).eq(Expr::any(base())),
@@ -583,7 +593,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+2/test]
+// [spec:pgorm:def:sql.render.operators+3/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [

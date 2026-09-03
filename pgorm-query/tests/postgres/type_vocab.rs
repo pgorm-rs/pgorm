@@ -302,7 +302,7 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+1/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+2/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -313,7 +313,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+1/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+2/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -362,6 +362,11 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::StrictWordSimilarityDistance, "<<<->"),
         (BinOper::GetJsonField, "->"),
         (BinOper::CastJsonField, "->>"),
+        (BinOper::GetJsonPath, "#>"),
+        (BinOper::CastJsonPath, "#>>"),
+        (BinOper::HasJsonKey, "?"),
+        (BinOper::HasAnyJsonKeys, "?|"),
+        (BinOper::HasAllJsonKeys, "?&"),
         (BinOper::Regex, "~"),
         (BinOper::RegexCaseInsensitive, "~*"),
         (BinOper::EuclideanDistance, "<->"),

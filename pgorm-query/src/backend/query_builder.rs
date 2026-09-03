@@ -456,7 +456,7 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+2]
+    // [spec:pgorm:def:sql.render.operators+3]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
         if let Some(escape) = like.escape {
@@ -618,7 +618,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+2] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+3] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -630,7 +630,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+2]
+    // [spec:pgorm:def:sql.render.operators+3]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -676,6 +676,11 @@ impl QueryBuilder {
                 BinOper::StrictWordSimilarityDistance => "<<<->",
                 BinOper::GetJsonField => "->",
                 BinOper::CastJsonField => "->>",
+                BinOper::GetJsonPath => "#>",
+                BinOper::CastJsonPath => "#>>",
+                BinOper::HasJsonKey => "?",
+                BinOper::HasAnyJsonKeys => "?|",
+                BinOper::HasAllJsonKeys => "?&",
                 BinOper::Regex => "~",
                 BinOper::RegexCaseInsensitive => "~*",
                 BinOper::EuclideanDistance => "<->",
@@ -2373,7 +2378,7 @@ impl QueryBuilder {
         Alias::new(ident).prepare(sql.as_writer(), self.quote());
     }
 
-    // [spec:pgorm:def:sql.render.precedence]
+    // [spec:pgorm:def:sql.render.precedence+1]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2413,6 +2418,9 @@ fn is_pg_comparison(b: &BinOper) -> bool {
             | BinOper::WordSimilarity
             | BinOper::StrictWordSimilarity
             | BinOper::Matches
+            | BinOper::HasJsonKey
+            | BinOper::HasAnyJsonKeys
+            | BinOper::HasAllJsonKeys
     )
 }
 
@@ -2433,7 +2441,7 @@ impl SubQueryStatement {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence] (backend-independent portion of the elision table)
+// [spec:pgorm:def:sql.render.precedence+1] (backend-independent portion of the elision table)
 pub(crate) fn common_inner_expr_well_known_greater_precedence(
     inner: &SimpleExpr,
     outer_oper: &Oper,

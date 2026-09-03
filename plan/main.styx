@@ -830,7 +830,6 @@ children (
                 id infra.prepared-api
                 title "Design: typed prepared-statement API, or confirm the statement cache suffices"
                 kind @feat
-                sealed true
                 log (
                     {
                         at 2026-09-03T18:46:56.709955Z
@@ -2481,6 +2480,14 @@ children (
             {
                 id ergo.jsonb-vocab
                 title "JSONB operator vocabulary beyond the arrows: #>, #>>, existence, containment"
+                log (
+                    {
+                        at 2026-09-03T20:48:38.413406Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

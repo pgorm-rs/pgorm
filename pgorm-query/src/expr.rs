@@ -6,6 +6,8 @@
 
 use crate::{func::*, query::*, types::*, value::*};
 
+#[path = "expr_json.rs"]
+mod json;
 #[path = "expr_membership.rs"]
 mod membership;
 
@@ -1007,7 +1009,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators]
+    // [spec:pgorm:req:sql.ast.expr.operators+1]
     pub fn binary<O, T>(self, op: O, right: T) -> SimpleExpr
     where
         O: Into<BinOper>,
@@ -1424,6 +1426,10 @@ impl Expr {
 
     /// Express an postgres concatenate (`||`) expression.
     ///
+    /// `||` concatenates strings, arrays and `jsonb` documents alike, so this
+    /// is also the JSON merge operator and the JSON operator family carries no
+    /// duplicate of it.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1473,7 +1479,12 @@ impl Expr {
         self.bin_op(BinOper::Matches, expr)
     }
 
-    /// Express an postgres fulltext search contains (`@>`) expression.
+    /// Express a postgres containment (`@>`) expression.
+    ///
+    /// One operator serves every type PostgreSQL defines containment for —
+    /// arrays, ranges, `tsquery`, and `jsonb` — so this is also the JSON
+    /// containment test and the JSON operator family carries no duplicate of
+    /// it. A `jsonb` right operand is any `serde_json::Value`.
     ///
     /// # Examples
     ///
@@ -1481,15 +1492,14 @@ impl Expr {
     /// use pgorm_query::{*, tests_cfg::*};
     ///
     /// let query = Query::select()
-    ///     .columns([Font::Name, Font::Variant, Font::Language])
-    ///     .from(Font::Table)
-    ///     .and_where(Expr::val("a & b").contains("a b"))
-    ///     .and_where(Expr::col(Font::Name).contains("a b"))
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::UserData).contains(json!({ "a": 1 })))
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a & b' @> 'a b' AND "name" @> 'a b'"#
+    ///     r#"SELECT "id" FROM "character" WHERE "user_data" @> E'{\"a\":1}'"#
     /// );
     /// ```
     pub fn contains<T>(self, expr: T) -> SimpleExpr
@@ -1499,7 +1509,8 @@ impl Expr {
         self.bin_op(BinOper::Contains, expr)
     }
 
-    /// Express an postgres fulltext search contained (`<@`) expression.
+    /// Express a postgres containment (`<@`) expression, with the operands the
+    /// other way round from [`Expr::contains`].
     ///
     /// # Examples
     ///
@@ -1507,15 +1518,14 @@ impl Expr {
     /// use pgorm_query::{*, tests_cfg::*};
     ///
     /// let query = Query::select()
-    ///     .columns([Font::Name, Font::Variant, Font::Language])
-    ///     .from(Font::Table)
-    ///     .and_where(Expr::val("a & b").contained("a b"))
-    ///     .and_where(Expr::col(Font::Name).contained("a b"))
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::UserData).contained(json!({ "a": 1, "b": 2 })))
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a & b' <@ 'a b' AND "name" <@ 'a b'"#
+    ///     r#"SELECT "id" FROM "character" WHERE "user_data" <@ E'{\"a\":1,\"b\":2}'"#
     /// );
     /// ```
     pub fn contained<T>(self, expr: T) -> SimpleExpr
@@ -1556,56 +1566,6 @@ impl Expr {
         L: IntoLikeExpr,
     {
         self.like_like(BinOper::NotILike, like.into_like_expr())
-    }
-
-    /// Express a postgres retrieves JSON field as JSON value (`->`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::select()
-    ///     .column(Font::Variant)
-    ///     .from(Font::Table)
-    ///     .and_where(Expr::col(Font::Variant).get_json_field("a"))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"SELECT "variant" FROM "font" WHERE "variant" -> 'a'"#
-    /// );
-    /// ```
-    pub fn get_json_field<T>(self, right: T) -> SimpleExpr
-    where
-        T: Into<SimpleExpr>,
-    {
-        self.bin_op(BinOper::GetJsonField, right)
-    }
-
-    /// Express a postgres retrieves JSON field and casts it to an appropriate SQL type (`->>`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::select()
-    ///     .column(Font::Variant)
-    ///     .from(Font::Table)
-    ///     .and_where(Expr::col(Font::Variant).cast_json_field("a"))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"SELECT "variant" FROM "font" WHERE "variant" ->> 'a'"#
-    /// );
-    /// ```
-    pub fn cast_json_field<T>(self, right: T) -> SimpleExpr
-    where
-        T: Into<SimpleExpr>,
-    {
-        self.bin_op(BinOper::CastJsonField, right)
     }
 }
 
@@ -1944,7 +1904,7 @@ impl SimpleExpr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators]
+    // [spec:pgorm:req:sql.ast.expr.operators+1]
     pub fn binary<O, T>(self, op: O, right: T) -> Self
     where
         O: Into<BinOper>,
@@ -1992,6 +1952,10 @@ impl SimpleExpr {
     }
 
     /// Express an postgres concatenate (`||`) expression.
+    ///
+    /// `||` concatenates strings, arrays and `jsonb` documents alike, so this
+    /// is also the JSON merge operator and the JSON operator family carries no
+    /// duplicate of it.
     ///
     /// # Examples
     ///

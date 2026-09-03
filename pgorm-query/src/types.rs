@@ -281,14 +281,14 @@ pub trait IntoFromItem {
 }
 
 /// Unary operator
-// [spec:pgorm:def:sql.types.opers+1]
+// [spec:pgorm:def:sql.types.opers+2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
-// [spec:pgorm:def:sql.types.opers+1]
+// [spec:pgorm:def:sql.types.opers+2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -332,6 +332,16 @@ pub enum BinOper {
     GetJsonField,
     /// `->>`. Retrieves JSON field and casts it to an appropriate SQL type.
     CastJsonField,
+    /// `#>`. Retrieves the JSON value at a `text[]` path.
+    GetJsonPath,
+    /// `#>>`. Retrieves the value at a `text[]` path as text.
+    CastJsonPath,
+    /// `?`. Whether a top-level key or string element exists.
+    HasJsonKey,
+    /// `?|`. Whether any key in a `text[]` list exists.
+    HasAnyJsonKeys,
+    /// `?&`. Whether every key in a `text[]` list exists.
+    HasAllJsonKeys,
     /// `~` Regex operator.
     Regex,
     /// `~*`. Regex operator with case insensitive matching.

@@ -1070,7 +1070,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators/test]
+// [spec:pgorm:req:sql.ast.expr.operators+1/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1806,7 +1806,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+2/test]
+// [spec:pgorm:def:sql.render.operators+3/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -1993,7 +1993,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators/test]
+// [spec:pgorm:req:sql.ast.expr.operators+1/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2021,6 +2021,155 @@ fn cast_json_field_bin_oper() {
             r#"SELECT "character" FROM "character" WHERE "character" ->> $1"#.to_owned(),
             Values(vec!["test".into()])
         )
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.json/test]    a path of any depth is one `text[]`
+// parameter, so the statement text does not vary with it
+#[test]
+fn json_path_operators_take_one_text_array() {
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(
+                Expr::expr(Expr::col(Char::UserData).get_json_path(["a", "b"])).is_not_null()
+            )
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE ("user_data" #> ARRAY ['a','b']) IS NOT NULL"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::expr(Expr::col(Char::UserData).cast_json_path(["a"])).eq("x"))
+            .build(),
+        (
+            r#"SELECT "id" FROM "character" WHERE ("user_data" #>> $1) = $2"#.to_owned(),
+            Values(vec![Value::array(["a".to_owned()]), "x".into()])
+        )
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.json/test]    the existence family's three lexemes,
+// and the single-key form's text operand
+#[test]
+fn json_key_existence_operators_render() {
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_json_key("a"))
+            .build(),
+        (
+            r#"SELECT "id" FROM "character" WHERE "user_data" ? $1"#.to_owned(),
+            Values(vec!["a".into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_any_json_keys(["a", "b"]))
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE "user_data" ?| ARRAY ['a','b']"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_all_json_keys(["a", "b"]))
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE "user_data" ?& ARRAY ['a','b']"#
+    );
+}
+
+// [spec:pgorm:def:sql.render.precedence+1/test]    the existence operators return
+// boolean, so a logical outer operator drops their parentheses the way it does
+// for `@>`; the accessors return JSON or text and keep theirs
+#[test]
+fn json_existence_drops_parens_under_and() {
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(
+                Expr::col(Char::UserData)
+                    .has_json_key("a")
+                    .and(Expr::col(Char::UserData).has_all_json_keys(["b", "c"]))
+            )
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE "user_data" ? 'a' AND "user_data" ?& ARRAY ['b','c']"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::expr(Expr::col(Char::UserData).get_json_path(["a"])).is_null())
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE ("user_data" #> ARRAY ['a']) IS NULL"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.json/test]    an empty key list is not special-cased:
+// it is a typed empty array, and the statement text is the same at every cardinality
+#[test]
+fn empty_json_key_list_is_typed_array() {
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_any_json_keys(Vec::<String>::new()))
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE "user_data" ?| ARRAY []::text[]"#
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_all_json_keys(Vec::<String>::new()))
+            .build()
+            .0,
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).has_all_json_keys(["a", "b"]))
+            .build()
+            .0
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.operators+1/test]    `@>`, `<@` and `||` are one
+// operator each across every type that has them, so the JSON family names no
+// duplicate: these are already the JSON containment and merge tests
+#[test]
+fn containment_and_concat_serve_json_operands() {
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(Expr::col(Char::UserData).contains(json!({ "a": 1 })))
+            .build(),
+        (
+            r#"SELECT "id" FROM "character" WHERE "user_data" @> $1"#.to_owned(),
+            Values(vec![json!({ "a": 1 }).into()])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Char::Id)
+            .from(Char::Table)
+            .and_where(
+                Expr::expr(Expr::col(Char::UserData).concat(json!({ "b": 2 }))).is_not_null()
+            )
+            .to_string(),
+        r#"SELECT "id" FROM "character" WHERE ("user_data" || E'{\"b\":2}') IS NOT NULL"#
     );
 }
 
@@ -2078,7 +2227,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence/test]
+// [spec:pgorm:def:sql.render.precedence+1/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
