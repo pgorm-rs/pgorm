@@ -2289,12 +2289,20 @@ children (
                 id unrep.dml-order-limit
                 title "UPDATE and DELETE carry no ORDER BY or LIMIT: PG rejects both"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-03T18:36:35.808361Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From the campaign's residual pin oracle_pins_update_delete_order_limit (oracle_pins.rs): UpdateStatement and DeleteStatement render ORDER BY and LIMIT when populated, and PostgreSQL rejects both on UPDATE and DELETE — a sea-query MySQL-ism. Remove the surface: the order/limit storage and builder methods leave the two statements (check how OrderedStatement is wired into them, and the ORM's UpdateMany/DeleteMany + any QueryOrder/QueryTrait plumbing that exposes order_by/limit on update/delete paths). Flip the pin to compile_fail proofs + positive renders. Bumps sql.render.update-delete (the pinned prose), sql.ast.update, sql.ast.delete."
+                    }
+
+                    {
+                        at 2026-09-03T18:51:23.167071Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

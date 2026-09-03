@@ -370,7 +370,7 @@ fn sweep_insert_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    UPDATE and DELETE
-// [spec:pgorm:req:sql.render.update-delete/test]
+// [spec:pgorm:req:sql.render.update-delete+1/test]
 #[test]
 fn sweep_update_and_delete_shapes() {
     sweep([
@@ -706,11 +706,12 @@ fn oracle_pairs_text_and_grammar_checks() {
 #[test]
 #[should_panic(expected = "PostgreSQL rejected")]
 fn oracle_shim_fires_on_a_string() {
-    let rendered = Query::update()
-        .table(Glyph::Table)
-        .value(Glyph::Aspect, 1)
-        .order_by(Glyph::Id, Order::Asc)
-        .limit(1)
+    let rendered = Table::create(Glyph::Table)
+        .col(
+            ColumnDef::new(Glyph::Id)
+                .integer()
+                .extra("ANYTHING I WANT TO SAY".to_owned()),
+        )
         .to_string();
     crate::oracle::assert_eq!(rendered, rendered.clone());
 }

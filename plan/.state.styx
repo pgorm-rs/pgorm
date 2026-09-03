@@ -310,6 +310,7 @@ derived_priorities (
 
 assertions (
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
+    {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
     {id bug.ident-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:00:40.269307Z}
     {id bug.insert-empty-model, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:55:49.663561Z}
@@ -348,11 +349,15 @@ assertions (
     {id pgparse.oracle, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:06:45.622062Z}
     {id pgparse.sql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:54:19.194709Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}
+    {id polish.deps-latest, kind @complete, author "brendan@necessary.nu", at 2026-09-03T17:00:56.136197Z}
+    {id polish.drop-issues, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:05:00.588306Z}
+    {id polish.drop-vendor-dirs, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:20:11.658061Z}
     {id polish.error-dead-code, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:21:39.370499Z}
     {id polish.gates, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:56.935942Z}
     {id polish.instructions, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:25:30.26102Z}
     {id polish.pool-tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:18:45.917955Z}
     {id polish.sea-bae, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:38:01.86798Z}
+    {id polish.version-unify, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:42:04.066056Z}
     {id polish.warnings, kind @complete, author "brendan@necessary.nu", at 2026-09-02T10:36:09.331931Z}
     {id repair.cursor-tosql, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:16:54.2968Z}
     {id repair.doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:16:51.409375Z}
@@ -361,11 +366,13 @@ assertions (
     {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
+    {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
     {id unrep.condition-chain, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:20:22.136562Z}
     {id unrep.cte-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:04:04.408634Z}
     {id unrep.cursor-arity, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:12:23.476753Z}
     {id unrep.ddl-empty-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:10:00.314613Z}
     {id unrep.ddl-table-target, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:51:34.310713Z}
+    {id unrep.dml-order-limit, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:51:23.167071Z}
     {id unrep.dml-target, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:03:57.088938Z}
     {id unrep.index-kind, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:42:47.735762Z}
     {id unrep.mysql-purge, kind @complete, author "brendan@necessary.nu", at 2026-09-02T22:09:57.329153Z}
@@ -384,12 +391,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
-    {id polish.deps-latest, kind @complete, author "brendan@necessary.nu", at 2026-09-03T17:00:56.136197Z}
-    {id polish.drop-issues, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:05:00.588306Z}
-    {id polish.drop-vendor-dirs, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:20:11.658061Z}
-    {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
-    {id polish.version-unify, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:42:04.066056Z}
 )
 
 impl_evidence (

@@ -388,7 +388,7 @@ pub enum JoinOn {
 }
 
 /// Ordering options
-// [spec:pgorm:req:sql.ast.order]
+// [spec:pgorm:req:sql.ast.order+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     Asc,

@@ -91,14 +91,14 @@ an ideal Postgres renderer would emit.
 > `values[N-1]`). Each parameter occurrence gets a fresh number; the renderer
 > never deduplicates equal values into a shared placeholder.
 
-> [spec:pgorm:req:sql.render.param-vs-inline]
+> [spec:pgorm:req:sql.render.param-vs-inline+1]
 > `SimpleExpr::Value` MUST be rendered through `SqlWriter::push_param` (a `$N`
 > placeholder in the `build()` path), while `SimpleExpr::Constant` MUST always
 > be rendered inline via `value_to_string`, regardless of sink. `LIMIT` and
-> `OFFSET` amounts on SELECT, and `LIMIT` on UPDATE/DELETE, are stored as
-> `Value`s and MUST be parameterized (` LIMIT $N`, ` OFFSET $N`). The values in
-> an `Order::Field` ordering (see `sql.render.select-order`) are inlined via
-> `value_to_string` even in parameterized mode.
+> `OFFSET` amounts on SELECT — the only statement that carries either — are
+> stored as `Value`s and MUST be parameterized (` LIMIT $N`, ` OFFSET $N`). The
+> values in an `Order::Field` ordering (see `sql.render.select-order`) are
+> inlined via `value_to_string` even in parameterized mode.
 
 > [spec:pgorm:req:sql.render.cast-param-type]
 > A `SimpleExpr::Value` in the left operand of a `BinOper::As` — the operand of
@@ -406,13 +406,15 @@ an ideal Postgres renderer would emit.
 > expressions. The pre-source `prepare_output` hook (SQL Server `OUTPUT`
 > heritage) is a no-op in this backend.
 
-> [spec:pgorm:req:sql.render.update-delete]
+> [spec:pgorm:req:sql.render.update-delete+1]
 > `UPDATE ` renders the table, ` SET ` with comma-separated `"col" = expr`
-> assignments, then WHERE, ORDER BY, ` LIMIT $N`, and RETURNING. `DELETE `
-> renders `FROM ` and the table, then WHERE, ORDER BY, ` LIMIT $N`, and
-> RETURNING. Note that ORDER BY and LIMIT are rendered on UPDATE/DELETE when
-> populated even though PostgreSQL does not accept them — the builder does not
-> guard against producing them.
+> assignments, then WHERE and RETURNING. `DELETE ` renders `FROM ` and the
+> table, then WHERE and RETURNING. Neither renders ORDER BY or LIMIT:
+> PostgreSQL accepts neither on a write statement, and per `sql.ast.update`
+> and `sql.ast.delete` the two statements hold nothing to render them from, so
+> the renderer has no invalid clause to guard against. Row selection that needs
+> an order or a limit is expressed by the caller as a subquery filter over a
+> SELECT, which carries both.
 
 ## Custom expressions
 

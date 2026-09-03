@@ -1,11 +1,6 @@
 use crate::{
     AnyWithClause, QueryStatementBuilder, ReturningClause, SubQueryStatement, WithQuery,
-    backend::QueryBuilder,
-    expr::*,
-    prepare::*,
-    query::{OrderedStatement, condition::*},
-    types::*,
-    value::*,
+    backend::QueryBuilder, expr::*, prepare::*, query::condition::*, types::*, value::*,
 };
 use inherent::inherent;
 
@@ -27,14 +22,60 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1.23, "image" = '123' WHERE "id" = 1"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ast.update+1]
+///
+/// PostgreSQL admits neither `ORDER BY` nor `LIMIT` on an UPDATE, so the
+/// statement carries neither and an ordered update does not typecheck:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Query::update()
+///     .table(Glyph::Table)
+///     .value(Glyph::Aspect, 1)
+///     .order_by(Glyph::Id, Order::Asc);
+/// ```
+///
+/// nor a limited one:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Query::update()
+///     .table(Glyph::Table)
+///     .value(Glyph::Aspect, 1)
+///     .limit(1);
+/// ```
+///
+/// Both belong to the SELECT that chooses the rows, so an update over an
+/// ordered, limited set is spelled as a subquery filter:
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let query = Query::update()
+///     .table(Glyph::Table)
+///     .value(Glyph::Aspect, 1)
+///     .and_where(Expr::col(Glyph::Id).in_subquery(
+///         Query::select()
+///             .column(Glyph::Id)
+///             .from(Glyph::Table)
+///             .order_by(Glyph::Id, Order::Asc)
+///             .limit(1)
+///             .take(),
+///     ))
+///     .to_owned();
+///
+/// assert_eq!(
+///     query.to_string(),
+///     r#"UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
+/// );
+/// ```
+// [spec:pgorm:req:sql.ast.update+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
     pub(crate) table: Option<NamedTable>,
     pub(crate) values: Vec<(DynIden, Box<SimpleExpr>)>,
     pub(crate) r#where: ConditionHolder,
-    pub(crate) orders: Vec<OrderExpr>,
-    pub(crate) limit: Option<Value>,
     pub(crate) returning: Option<ReturningClause>,
 }
 
@@ -66,7 +107,7 @@ impl UpdateStatement {
     /// # Examples
     ///
     /// See [`UpdateStatement::values`]
-    // [spec:pgorm:req:sql.ast.update+1]
+    // [spec:pgorm:req:sql.ast.update+2]
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
@@ -96,7 +137,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.update+1]
+    // [spec:pgorm:req:sql.ast.update+2]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,
@@ -134,12 +175,6 @@ impl UpdateStatement {
         T: Into<SimpleExpr>,
     {
         self.values.push((col.into_iden(), Box::new(value.into())));
-        self
-    }
-
-    /// Limit number of updated rows.
-    pub fn limit(&mut self, limit: u64) -> &mut Self {
-        self.limit = Some(limit.into());
         self
     }
 
@@ -282,54 +317,6 @@ impl std::fmt::Display for UpdateStatement {
         QueryBuilder.prepare_update_statement(self, &mut sql);
         f.write_str(&sql)
     }
-}
-
-#[inherent]
-impl OrderedStatement for UpdateStatement {
-    pub fn add_order_by(&mut self, order: OrderExpr) -> &mut Self {
-        self.orders.push(order);
-        self
-    }
-
-    pub fn clear_order_by(&mut self) -> &mut Self {
-        self.orders = Vec::new();
-        self
-    }
-    pub fn order_by<T>(&mut self, col: T, order: Order) -> &mut Self
-    where
-        T: IntoColumnRef;
-
-    pub fn order_by_expr(&mut self, expr: SimpleExpr, order: Order) -> &mut Self;
-    pub fn order_by_customs<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order)>;
-    pub fn order_by_columns<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: IntoColumnRef,
-        I: IntoIterator<Item = (T, Order)>;
-    pub fn order_by_with_nulls<T>(
-        &mut self,
-        col: T,
-        order: Order,
-        nulls: NullOrdering,
-    ) -> &mut Self
-    where
-        T: IntoColumnRef;
-    pub fn order_by_expr_with_nulls(
-        &mut self,
-        expr: SimpleExpr,
-        order: Order,
-        nulls: NullOrdering,
-    ) -> &mut Self;
-    pub fn order_by_customs_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order, NullOrdering)>;
-    pub fn order_by_columns_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: IntoColumnRef,
-        I: IntoIterator<Item = (T, Order, NullOrdering)>;
 }
 
 #[inherent]

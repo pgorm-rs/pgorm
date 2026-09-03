@@ -288,7 +288,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UpdateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete] (UPDATE half)
+    // [spec:pgorm:req:sql.render.update-delete+1] (UPDATE half)
     pub(crate) fn prepare_update_statement(
         &self,
         update: &UpdateStatement,
@@ -317,37 +317,11 @@ impl QueryBuilder {
 
         self.prepare_condition(&update.r#where, "WHERE", sql);
 
-        self.prepare_update_order_by(update, sql);
-
-        self.prepare_update_limit(update, sql);
-
         self.prepare_returning(&update.returning, sql);
     }
 
-    /// Translate ORDER BY expression in [`UpdateStatement`].
-    fn prepare_update_order_by(&self, update: &UpdateStatement, sql: &mut dyn SqlWriter) {
-        if !update.orders.is_empty() {
-            write!(sql, " ORDER BY ").unwrap();
-            update.orders.iter().fold(true, |first, expr| {
-                if !first {
-                    write!(sql, ", ").unwrap();
-                }
-                self.prepare_order_expr(expr, sql);
-                false
-            });
-        }
-    }
-
-    /// Translate LIMIT expression in [`UpdateStatement`].
-    fn prepare_update_limit(&self, update: &UpdateStatement, sql: &mut dyn SqlWriter) {
-        if let Some(limit) = &update.limit {
-            write!(sql, " LIMIT ").unwrap();
-            sql.push_param(limit.clone());
-        }
-    }
-
     /// Translate [`DeleteStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete] (DELETE half)
+    // [spec:pgorm:req:sql.render.update-delete+1] (DELETE half)
     pub(crate) fn prepare_delete_statement(
         &self,
         delete: &DeleteStatement,
@@ -364,33 +338,7 @@ impl QueryBuilder {
 
         self.prepare_condition(&delete.r#where, "WHERE", sql);
 
-        self.prepare_delete_order_by(delete, sql);
-
-        self.prepare_delete_limit(delete, sql);
-
         self.prepare_returning(&delete.returning, sql);
-    }
-
-    /// Translate ORDER BY expression in [`DeleteStatement`].
-    fn prepare_delete_order_by(&self, delete: &DeleteStatement, sql: &mut dyn SqlWriter) {
-        if !delete.orders.is_empty() {
-            write!(sql, " ORDER BY ").unwrap();
-            delete.orders.iter().fold(true, |first, expr| {
-                if !first {
-                    write!(sql, ", ").unwrap();
-                }
-                self.prepare_order_expr(expr, sql);
-                false
-            });
-        }
-    }
-
-    /// Translate LIMIT expression in [`DeleteStatement`].
-    fn prepare_delete_limit(&self, delete: &DeleteStatement, sql: &mut dyn SqlWriter) {
-        if let Some(limit) = &delete.limit {
-            write!(sql, " LIMIT ").unwrap();
-            sql.push_param(limit.clone());
-        }
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
@@ -444,7 +392,7 @@ impl QueryBuilder {
                 sel.prepare_statement(sql);
                 write!(sql, ")").unwrap();
             }
-            // [spec:pgorm:req:sql.render.param-vs-inline]
+            // [spec:pgorm:req:sql.render.param-vs-inline+1]
             SimpleExpr::Value(val) => {
                 sql.push_param(val.clone());
             }
@@ -982,7 +930,7 @@ impl QueryBuilder {
     }
 
     /// Write [`Value`] inline.
-    // [spec:pgorm:req:sql.render.param-vs-inline] (Constant is always rendered inline)
+    // [spec:pgorm:req:sql.render.param-vs-inline+1] (Constant is always rendered inline)
     fn prepare_constant(&self, value: &Value, sql: &mut dyn SqlWriter) {
         let string = self.value_to_string(value);
         write!(sql, "{string}").unwrap();

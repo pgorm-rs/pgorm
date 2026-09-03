@@ -135,14 +135,16 @@ today, including panicking edges and deliberate failsafes.
 
 ## Ordering
 
-> [spec:pgorm:req:sql.ast.order]
-> `SelectStatement`, `UpdateStatement`, `DeleteStatement`, and `WindowStatement`
-> share the `OrderedStatement` trait. Order expressions MUST accumulate in call
-> order via `order_by` (column + `Order`), `order_by_expr`, `order_by_customs`
-> (raw string rendered verbatim as `SimpleExpr::Custom`), `order_by_columns`,
-> and the `*_with_nulls` variants which attach a `NullOrdering` (`First`/`Last`)
-> rendered as `NULLS FIRST`/`NULLS LAST`. `clear_order_by` MUST remove all
-> accumulated order expressions.
+> [spec:pgorm:req:sql.ast.order+1]
+> `SelectStatement` and `WindowStatement` — the two statements PostgreSQL
+> admits an ORDER BY on — share the `OrderedStatement` trait; the write
+> statements do not implement it, per `sql.ast.update` and `sql.ast.delete`.
+> Order expressions MUST accumulate in call order via `order_by` (column +
+> `Order`), `order_by_expr`, `order_by_customs` (raw string rendered verbatim
+> as `SimpleExpr::Custom`), `order_by_columns`, and the `*_with_nulls` variants
+> which attach a `NullOrdering` (`First`/`Last`) rendered as `NULLS
+> FIRST`/`NULLS LAST`. `clear_order_by` MUST remove all accumulated order
+> expressions.
 >
 > `Order` MUST support `Asc`, `Desc`, and `Field(Values)`; the `Field` variant
 > renders a `CASE WHEN col=v_i THEN i ... ELSE n END` expression implementing
@@ -348,7 +350,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## UPDATE and DELETE statements
 
-> [spec:pgorm:req:sql.ast.update+1]
+> [spec:pgorm:req:sql.ast.update+2]
 > `UpdateStatement` MUST accumulate SET assignments in call order as
 > `(column, expression)` pairs: `values(pairs)` pushes many, `value(col, expr)`
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
@@ -357,18 +359,28 @@ today, including panicking edges and deliberate failsafes.
 > `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
-> (per `sql.ast.condition.holder`), ORDER BY
-> expressions, an optional LIMIT, and an optional `ReturningClause`.
+> (per `sql.ast.condition.holder`), and an optional `ReturningClause`.
 > `get_values` MUST expose the accumulated assignment pairs for inspection.
+>
+> The statement MUST NOT carry ORDER BY expressions or a LIMIT: PostgreSQL
+> admits neither on an UPDATE. `UpdateStatement` therefore does not implement
+> `OrderedStatement` and has no `limit` method, so neither clause can be built
+> to be rendered; an update over an ordered, limited set of rows is expressed
+> by the caller as a subquery filter (`WHERE id IN (SELECT .. ORDER BY ..
+> LIMIT ..)`).
 
-> [spec:pgorm:def:sql.ast.delete+1]
+> [spec:pgorm:def:sql.ast.delete+2]
 > `DeleteStatement` is the DELETE AST node: a target table set by
 > `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
-> bound — a WHERE `ConditionHolder` shared with the condition rules, ORDER
-> BY expressions, an optional LIMIT, and an optional `ReturningClause`. Like
-> the other write statements it can be prefixed with a WITH clause via
-> `with(..)`, producing a `WithQuery`.
+> bound — a WHERE `ConditionHolder` shared with the condition rules, and an
+> optional `ReturningClause`. Like the other write statements it can be
+> prefixed with a WITH clause via `with(..)`, producing a `WithQuery`.
+>
+> As with `sql.ast.update`, the statement MUST NOT carry ORDER BY expressions
+> or a LIMIT — PostgreSQL admits neither on a DELETE — so it implements no
+> `OrderedStatement` and offers no `limit`, and an ordered or limited delete is
+> written as a subquery filter over a SELECT.
 
 ## WITH clauses and CTEs
 

@@ -114,27 +114,47 @@ fn on_conflict_renders_only_valid_shapes() {
     assert_parses(&updated);
 }
 
-// No plan node yet. `sql.render.update-delete` pins the behaviour: ORDER BY and
-// LIMIT are rendered on UPDATE and DELETE when populated, and PostgreSQL accepts
-// neither.
+// Fixed by plan node `unrep.dml-order-limit`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL admits ORDER BY and
+// LIMIT on neither UPDATE nor DELETE, so the two statements carry neither and
+// implement no `OrderedStatement`. The renders this pin held no longer build —
+// the `compile_fail` doctests on `UpdateStatement` and `DeleteStatement` prove
+// it — leaving the shape the grammar does accept, with the ordering and the
+// limit where they belong: the SELECT that chooses the rows.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.update-delete/test]
+// [spec:pgorm:req:sql.render.update-delete+1/test]
+// [spec:pgorm:req:sql.ast.update+2/test]
+// [spec:pgorm:def:sql.ast.delete+2/test]
 #[test]
-fn oracle_pins_update_delete_order_limit() {
+fn writes_take_order_and_limit_by_subquery() {
+    let rows = || {
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .order_by(Glyph::Id, Order::Asc)
+            .limit(1)
+            .take()
+    };
     let update = Query::update()
         .table(Glyph::Table)
         .value(Glyph::Aspect, 1)
-        .order_by(Glyph::Id, Order::Asc)
-        .limit(1)
+        .and_where(Expr::col(Glyph::Id).in_subquery(rows()))
         .to_string();
     let delete = Query::delete()
         .from_table(Glyph::Table)
-        .order_by(Glyph::Id, Order::Asc)
-        .limit(1)
+        .and_where(Expr::col(Glyph::Id).in_subquery(rows()))
         .to_string();
 
-    assert!(assert_rejected(&update).contains("ORDER"));
-    assert!(assert_rejected(&delete).contains("ORDER"));
+    assert_eq!(
+        update,
+        r#"UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
+    );
+    assert_eq!(
+        delete,
+        r#"DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
+    );
+    assert_parses(&update);
+    assert_parses(&delete);
 }
 
 // Fixed by plan node `bug.oracle-findings`, at the type level per
