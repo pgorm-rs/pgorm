@@ -95,7 +95,7 @@ where
 // [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding
 // through `SelectModel`, i.e. `SelectorTrait::from_raw_query_result` with an
 // empty prefix
-// [spec:pgorm:sem:macros.derive.from-query-result/test]    field-named reads, generics, and `skip`
+// [spec:pgorm:sem:macros.derive.from-query-result+1/test]    field-named reads, generics, and `skip`
 #[pgorm_macros::test]
 async fn from_query_result_derive() -> Result<(), Error> {
     let ctx = TestContext::new("derive_tests_from_query_result").await;

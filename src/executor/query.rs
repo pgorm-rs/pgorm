@@ -2,7 +2,7 @@ use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error as _;
 
 /// Defines the result of a query operation on a Model
-// [spec:pgorm:def:exec.decode+1]
+// [spec:pgorm:def:exec.decode+2]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct QueryResult {
@@ -10,7 +10,7 @@ pub struct QueryResult {
 }
 
 /// An interface to get a value from the query result
-// [spec:pgorm:def:exec.decode+1]
+// [spec:pgorm:def:exec.decode+2]
 pub trait TryGetable: Sized {
     /// Get a value from the query result with an RowIndex
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -31,6 +31,21 @@ pub trait TryGetable: Sized {
     /// Get a value from the query result based on the order in the select expressions
     fn try_get_by_index(res: &QueryResult, index: usize) -> Result<Self, TryGetError> {
         Self::try_get_by(res, index)
+    }
+
+    /// Whether a column of PostgreSQL type `ty` can be decoded into this type.
+    ///
+    /// This answers what `FromSql::accepts` answers for the type the decode
+    /// actually reads, and is what
+    /// [`VerifyStatement::verify`](crate::VerifyStatement::verify) checks a
+    /// statement's result columns against. The default is permissive — an
+    /// implementation that does not override it accepts every column type — so
+    /// a decode path pgorm cannot see is left unreported rather than guessed
+    /// at.
+    // [spec:pgorm:sem:exec.verify.accepts]    the type-acceptance hook
+    fn accepts(ty: &Type) -> bool {
+        let _ = ty;
+        true
     }
 }
 
@@ -143,6 +158,11 @@ impl<T: TryGetable> TryGetable for Option<T> {
             Err(e) => Err(e),
         }
     }
+
+    // [spec:pgorm:sem:exec.verify.accepts]    the payload's acceptance, not the column's nullability
+    fn accepts(ty: &Type) -> bool {
+        T::accepts(ty)
+    }
 }
 
 // [spec:pgorm:def:exec.decode.types+1]
@@ -156,6 +176,11 @@ macro_rules! try_getable_all {
             ) -> Result<Self, TryGetError> {
                 let result: Result<$type, _> = res.row.try_get(idx);
                 result.map_err(TryGetError::postgres)
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]
+            fn accepts(ty: &Type) -> bool {
+                <$type as FromSql>::accepts(ty)
             }
         }
     };
@@ -172,6 +197,11 @@ macro_rules! try_getable_date_time {
             ) -> Result<Self, TryGetError> {
                 let result: $type = res.row.try_get(idx).map_err(TryGetError::postgres)?;
                 Ok(result)
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]
+            fn accepts(ty: &Type) -> bool {
+                <$type as FromSql>::accepts(ty)
             }
         }
     };
@@ -221,6 +251,11 @@ impl TryGetable for Decimal {
         let result: Decimal = res.row.try_get(idx).map_err(TryGetError::postgres)?;
         Ok(result)
     }
+
+    // [spec:pgorm:sem:exec.verify.accepts]
+    fn accepts(ty: &Type) -> bool {
+        <Decimal as FromSql>::accepts(ty)
+    }
 }
 
 use pgorm_query::{IpNetwork, MacAddress, Values, Vector};
@@ -246,6 +281,11 @@ macro_rules! try_getable_uuid {
                     .try_get(idx)
                     .map_err(|e| TryGetError::postgres(e).into());
                 res.map($conversion_fn)
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]    the uuid actually read
+            fn accepts(ty: &Type) -> bool {
+                <uuid::Uuid as FromSql>::accepts(ty)
             }
         }
     };
@@ -317,6 +357,11 @@ impl TryGetable for IpNetwork {
         let result: InetSql = res.row.try_get(idx).map_err(TryGetError::postgres)?;
         Ok(result.0)
     }
+
+    // [spec:pgorm:sem:exec.verify.accepts]    the newtype that reads the wire format
+    fn accepts(ty: &Type) -> bool {
+        <InetSql as FromSql>::accepts(ty)
+    }
 }
 
 // [spec:pgorm:def:exec.decode.types+1]
@@ -328,6 +373,11 @@ impl TryGetable for MacAddress {
         let result: MacAddrSql = res.row.try_get(idx).map_err(TryGetError::postgres)?;
         Ok(result.0)
     }
+
+    // [spec:pgorm:sem:exec.verify.accepts]    the newtype that reads the wire format
+    fn accepts(ty: &Type) -> bool {
+        <MacAddrSql as FromSql>::accepts(ty)
+    }
 }
 
 // [spec:pgorm:def:exec.decode.types+1]
@@ -337,6 +387,11 @@ impl TryGetable for Vector {
         idx: I,
     ) -> Result<Self, TryGetError> {
         res.row.try_get(idx).map_err(TryGetError::postgres)
+    }
+
+    // [spec:pgorm:sem:exec.verify.accepts]
+    fn accepts(ty: &Type) -> bool {
+        <Vector as FromSql>::accepts(ty)
     }
 }
 
@@ -349,6 +404,11 @@ impl TryGetable for u32 {
     ) -> Result<Self, TryGetError> {
         let result: Result<Oid, _> = res.row.try_get(idx);
         result.map_err(TryGetError::postgres)
+    }
+
+    // [spec:pgorm:sem:exec.verify.accepts]    `OID`, not `INT4`
+    fn accepts(ty: &Type) -> bool {
+        <Oid as FromSql>::accepts(ty)
     }
 }
 
@@ -374,6 +434,11 @@ mod postgres_array {
                 ) -> Result<Self, TryGetError> {
                     let result: Vec<$type> = res.row.try_get(idx).map_err(TryGetError::postgres)?;
                     Ok(result)
+                }
+
+                // [spec:pgorm:sem:exec.verify.accepts]
+                fn accepts(ty: &Type) -> bool {
+                    <Vec<$type> as FromSql>::accepts(ty)
                 }
             }
         };
@@ -425,6 +490,11 @@ mod postgres_array {
                         res.row.try_get(idx).map_err(TryGetError::postgres)?;
                     Ok(res.into_iter().map($conversion_fn).collect())
                 }
+
+                // [spec:pgorm:sem:exec.verify.accepts]
+                fn accepts(ty: &Type) -> bool {
+                    <Vec<uuid::Uuid> as FromSql>::accepts(ty)
+                }
             }
         };
     }
@@ -453,6 +523,11 @@ mod postgres_array {
         ) -> Result<Self, TryGetError> {
             let result: Vec<Oid> = res.row.try_get(idx).map_err(TryGetError::postgres)?;
             Ok(result)
+        }
+
+        // [spec:pgorm:sem:exec.verify.accepts]    `OID[]`, not `INT4[]`
+        fn accepts(ty: &Type) -> bool {
+            <Vec<Oid> as FromSql>::accepts(ty)
         }
     }
 }
@@ -667,6 +742,11 @@ where
         index: I,
     ) -> Result<Self, TryGetError> {
         T::try_get_from_json(res, index)
+    }
+
+    // [spec:pgorm:sem:exec.verify.accepts]    the `Json<T>` wrapper's own types
+    fn accepts(ty: &Type) -> bool {
+        *ty == Type::JSON || *ty == Type::JSONB
     }
 }
 

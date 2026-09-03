@@ -1073,7 +1073,7 @@ impl FromQueryResult for PrefixProbe {
     }
 }
 
-// [spec:pgorm:def:entity.traits.from-query-result+1/test]    `from_query_result`
+// [spec:pgorm:def:entity.traits.from-query-result+2/test]    `from_query_result`
 // instantiates a type from a row under a column-name prefix,
 // `from_query_result_optional` turns any decode error into `Ok(None)` and
 // discards the error, `find_by_statement` runs raw SQL into typed rows, and

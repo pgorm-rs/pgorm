@@ -1,17 +1,20 @@
 use self::util::GetMeta;
+use super::util::spell_type;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    Data, DataStruct, Fields, Generics, Meta, ext::IdentExt, punctuated::Punctuated, token::Comma,
+    Data, DataStruct, Fields, Generics, Meta, Type, ext::IdentExt, punctuated::Punctuated,
+    token::Comma,
 };
 
 pub struct FromQueryResultItem {
     pub skip: bool,
     pub ident: Ident,
+    pub ty: Type,
 }
 impl ToTokens for FromQueryResultItem {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Self { ident, skip } = self;
+        let Self { ident, skip, .. } = self;
         if *skip {
             tokens.extend(quote! {
                 #ident: std::default::Default::default(),
@@ -25,8 +28,27 @@ impl ToTokens for FromQueryResultItem {
     }
 }
 
+impl FromQueryResultItem {
+    /// The column this field reads, as an `ExpectedColumn`, or `None` for a
+    /// skipped field, which reads no column at all.
+    // [spec:pgorm:sem:macros.derive.from-query-result+1]    the reflected column
+    fn expected_column(&self) -> Option<TokenStream> {
+        if self.skip {
+            return None;
+        }
+
+        let Self { ident, ty, .. } = self;
+        let name = ident.unraw().to_string();
+        let rust_type = spell_type(ty);
+
+        Some(quote! {
+            pgorm::ExpectedColumn::new(#name, #rust_type, <#ty as pgorm::TryGetable>::accepts)
+        })
+    }
+}
+
 /// Method to derive a [QueryResult](pgorm::QueryResult)
-// [spec:pgorm:sem:macros.derive.from-query-result]
+// [spec:pgorm:sem:macros.derive.from-query-result+1]
 pub fn expand_derive_from_query_result(
     ident: Ident,
     data: Data,
@@ -57,9 +79,14 @@ pub fn expand_derive_from_query_result(
                 }
             }
         }
+        let ty = parsed_field.ty;
         let ident = format_ident!("{}", parsed_field.ident.unwrap().to_string());
-        field.push(FromQueryResultItem { skip, ident });
+        field.push(FromQueryResultItem { skip, ident, ty });
     }
+    let expected: Vec<TokenStream> = field
+        .iter()
+        .filter_map(FromQueryResultItem::expected_column)
+        .collect();
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     Ok(quote!(
@@ -69,6 +96,12 @@ pub fn expand_derive_from_query_result(
                 Ok(Self {
                     #(#field)*
                 })
+            }
+
+            fn expected_columns() -> std::option::Option<std::vec::Vec<pgorm::ExpectedColumn>> {
+                std::option::Option::Some(std::vec![
+                    #(#expected),*
+                ])
             }
         }
     ))

@@ -1,7 +1,7 @@
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
-use quote::format_ident;
-use syn::{Field, Ident, Meta, punctuated::Punctuated, token::Comma};
+use quote::{ToTokens, format_ident};
+use syn::{Field, Ident, Meta, Type, punctuated::Punctuated, token::Comma};
 
 pub(crate) fn field_not_ignored(field: &Field) -> bool {
     for attr in field.attrs.iter() {
@@ -29,6 +29,21 @@ pub(crate) fn field_not_ignored(field: &Field) -> bool {
 
 pub(crate) fn format_field_ident(field: Field) -> Ident {
     format_ident!("{}", field.ident.unwrap().to_string())
+}
+
+/// A field's type as written, rendered without the spaces tokenisation leaves
+/// between its parts, so a diagnostic spells `Option<i32>` rather than
+/// `Option < i32 >`.
+// [spec:pgorm:def:exec.verify]    the `rust_type` an `ExpectedColumn` carries
+pub(crate) fn spell_type(ty: &Type) -> String {
+    ty.to_token_stream()
+        .to_string()
+        .replace(" ::", "::")
+        .replace(":: ", "::")
+        .replace(" <", "<")
+        .replace("< ", "<")
+        .replace(" >", ">")
+        .replace(" ,", ",")
 }
 
 pub(crate) fn trim_starting_raw_identifier<T>(string: T) -> String

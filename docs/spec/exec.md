@@ -9,14 +9,17 @@ These rules capture what the code does today, including known gaps.
 
 ## Decoding (`exec.decode`)
 
-> [spec:pgorm:def:exec.decode+1]
+> [spec:pgorm:def:exec.decode+2]
 > `QueryResult` is a `#[repr(transparent)]` wrapper around a single
 > `tokio_postgres::Row`. Values are extracted through the `TryGetable`
 > trait, which has three entry points: `try_get_by` (any
 > `tokio_postgres::row::RowIndex`, i.e. a column name or ordinal),
 > `try_get` (a prefix plus column name, concatenated as `{pre}{col}` with
 > no separator; an empty prefix uses the bare column name), and
-> `try_get_by_index` (ordinal position in the select list).
+> `try_get_by_index` (ordinal position in the select list). Its fourth
+> method extracts nothing: `accepts` asks which PostgreSQL types the
+> implementing type can decode, for use before a row exists
+> (`exec.verify.accepts`).
 >
 > `QueryResult` re-exposes these as `try_get_by`, `try_get`,
 > `try_get_by_index`, `try_get_many`, and `try_get_many_by_index`, each
@@ -142,6 +145,102 @@ These rules capture what the code does today, including known gaps.
 > `serde_json::Value`, the chrono types, `Decimal`,
 > `uuid::Uuid`, and tuples of arity 2 through 12 — unconditionally
 > returns `Error::ConvertFromU64`.
+
+## Statement verification (`exec.verify`)
+
+> [spec:pgorm:def:exec.verify]
+> `VerifyStatement::verify::<M>(sql)` (`src/executor/verify.rs`) prepares
+> `sql` on the connection and checks the result columns PostgreSQL
+> describes against the columns `M` reports. It is implemented for
+> `DatabaseConnection` and `DatabaseTransaction`, and by a blanket impl for
+> every reference to an implementor; `M` is any `FromQueryResult + 'static`
+> type, the `'static` bound being what naming the target in an error costs.
+> The metric wrappers (`metric.layer`) do not implement it — verification is
+> not a statement they have anything to report about — so an instrumented
+> caller verifies on the `inner()` connection.
+> The statement is prepared through `prepare`, not `prepare_cached`, and
+> dropped, so verifying neither reuses nor seeds a cached statement.
+>
+> `FromQueryResult::expected_columns` answers `Option<Vec<ExpectedColumn>>`
+> — one entry per column the type reads, in read order. An
+> `ExpectedColumn` carries the column `name`, the `rust_type` spelling of
+> the field decoding it, and that type's acceptance function
+> (`exec.verify.accepts`). Every reported name MUST appear among the
+> statement's result columns, and each matched column's PostgreSQL type
+> MUST satisfy `accepts`. The first failure of either test is returned and
+> the remaining columns are not examined. Names are matched bare — the
+> empty prefix `find_by_statement` decodes with — against the first result
+> column of that name, which is the one `Row::try_get` would read.
+>
+> Nothing is executed, so the check costs one prepare round trip and no
+> rows: it answers for a statement whose result set is empty exactly as it
+> does for one with data, which is the point. A statement the server
+> refuses to prepare at all fails as `Error::Postgres` before any column is
+> compared.
+
+> [spec:pgorm:sem:exec.verify.accepts]
+> `TryGetable::accepts(ty)` answers whether a column of PostgreSQL type
+> `ty` can be decoded into the implementing Rust type. Every built-in impl
+> delegates to the `FromSql::accepts` of the type its decode actually
+> reads, so acceptance and decoding cannot disagree: the
+> `exec.decode.types` scalars and the `exec.decode.array` vectors delegate
+> to themselves, the uuid format wrappers to `uuid::Uuid`, `u32` to `Oid`
+> (`exec.decode.u32-oid`), `IpNetwork` and `MacAddress` to the private
+> `InetSql` and `MacAddrSql` newtypes, and the `TryGetableFromJson` blanket
+> impl accepts `JSON` and `JSONB`. `Option<T>` delegates to `T`: a nullable
+> field accepts exactly what its payload accepts, and nullability plays no
+> part (`exec.verify.limits`).
+>
+> The trait's default answers `true`. An implementation that does not
+> override it — a `DeriveActiveEnum` mapping, a `DeriveValueType` newtype,
+> the `TryGetableArray`-backed `Vec<T>`, or any hand-written impl —
+> therefore accepts every column type, and verification reports nothing
+> about that field rather than guessing at a decode path it cannot see.
+
+> [spec:pgorm:req:exec.verify.errors]
+> A failed verification MUST name what to change. `Error::Verify` wraps
+> `VerifyError`, whose variants are distinct rather than one message
+> shape: `ColumnMissing` carries the target, the column it reads, and the
+> columns the statement does return; `ColumnType` carries the target, the
+> column, the Rust type it decodes into, and the PostgreSQL type the
+> statement returns for it; `Unreflected` carries the target
+> (`exec.verify.manual`). The target is `std::any::type_name::<M>()`.
+> `VerifyError` is `#[non_exhaustive]`, and verification returns these
+> rather than panicking, per `[dec:pgorm:no-panic]`.
+
+> [spec:pgorm:req:exec.verify.manual]
+> `FromQueryResult::expected_columns` defaults to `None`, so a hand-written
+> impl reports no columns. Verifying such a target MUST answer
+> `VerifyError::Unreflected` rather than `Ok(())`: a decode pgorm cannot
+> see into is unverifiable, and answering `Ok` would claim more than the
+> evidence supports. A hand-written impl opts back in by overriding
+> `expected_columns`. Both derives generate it
+> (`macros.derive.from-query-result`, `macros.derive.model`), so derived
+> targets — plain structs, entity `Model`s, and `DerivePartialModel`
+> structs, which derive `FromQueryResult` alongside it — are verifiable
+> without further work.
+
+> [spec:pgorm:req:exec.verify.limits]
+> Verification checks column names and type acceptance, and MUST NOT be
+> read as checking more.
+>
+> Nullability is out. PostgreSQL's describe answer carries no NOT NULL
+> flag for a result column, so a `T` field is not reported for a column
+> that can be NULL, nor an `Option<T>` field for one that cannot; a NULL
+> arriving in a non-`Option` field remains `exec.decode.null`'s error at
+> decode time. Parameters are out: `verify` binds no values, and a
+> parameter-count mismatch already fails at Bind on every execution rather
+> than only once rows exist. Row counts and query semantics are out.
+>
+> Columns the statement returns but the target does not read are not an
+> error: reading a subset is a legitimate projection. Prefixed decoding is
+> out — only the empty prefix is checked, so the `SelectA`/`SelectB`
+> prefixes of `SelectTwoModel` (`exec.crud`) and the tuple targets of
+> `TryGetableMany` (`exec.decode.many`), which are not `FromQueryResult`
+> types at all, have no verification path. A pass is therefore not a proof
+> that decoding will succeed; it closes the specific hole where an empty
+> result set hides a target that names a column the statement does not
+> return, or reads one into a type that cannot decode it.
 
 ## CRUD execution (`exec.crud`)
 

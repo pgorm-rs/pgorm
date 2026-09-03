@@ -122,7 +122,7 @@ impl pgorm::IdenStatic for CustomColumn {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.model+2/test]    ModelTrait::get / set
+// [spec:pgorm:sem:macros.derive.model+3/test]    ModelTrait::get / set
 #[test]
 fn derive_model_get_and_set_walk_the_columns() {
     let mut model = cake::Model {
@@ -155,7 +155,7 @@ fn derive_model_get_and_set_walk_the_columns() {
     assert_eq!(model.scratch, 42);
 }
 
-// [spec:pgorm:sem:macros.derive.model+2/test]    ignored fields have no match arm
+// [spec:pgorm:sem:macros.derive.model+3/test]    ignored fields have no match arm
 #[test]
 #[should_panic(expected = "field does not exist on Model")]
 fn derive_model_get_panics_on_unmatched_column() {
@@ -167,7 +167,7 @@ fn derive_model_get_panics_on_unmatched_column() {
     let _ = model.get(cake::Column::Table);
 }
 
-// [spec:pgorm:sem:macros.derive.model+2/test]    ignored fields have no match arm
+// [spec:pgorm:sem:macros.derive.model+3/test]    ignored fields have no match arm
 #[test]
 fn derive_model_set_errs_on_unmatched_column() {
     let mut model = cake::Model {
@@ -181,7 +181,7 @@ fn derive_model_set_errs_on_unmatched_column() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.model+2/test]    the FromQueryResult half, and the entity override
+// [spec:pgorm:sem:macros.derive.model+3/test]    the FromQueryResult half, and the entity override
 #[test]
 fn derive_model_from_query_result_and_entity_override() {
     fn assert_from_query_result<T: FromQueryResult>() {}

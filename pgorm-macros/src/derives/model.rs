@@ -1,7 +1,7 @@
 use super::{
     attributes::derive_attr,
     util::{
-        escape_rust_keyword, field_not_ignored, parse_derived_ident, parse_enum_name,
+        escape_rust_keyword, field_not_ignored, parse_derived_ident, parse_enum_name, spell_type,
         trim_starting_raw_identifier,
     },
 };
@@ -20,6 +20,7 @@ struct DeriveModel {
     column_idents: Vec<syn::Ident>,
     entity_ident: syn::Ident,
     field_idents: Vec<syn::Ident>,
+    field_types: Vec<syn::Type>,
     ident: syn::Ident,
     ignore_attrs: Vec<bool>,
 }
@@ -45,6 +46,8 @@ impl DeriveModel {
             .iter()
             .map(|field| field.ident.as_ref().unwrap().clone())
             .collect();
+
+        let field_types = fields.iter().map(|field| field.ty.clone()).collect();
 
         let column_idents = fields
             .iter()
@@ -85,6 +88,7 @@ impl DeriveModel {
             column_idents,
             entity_ident,
             field_idents,
+            field_types,
             ident,
             ignore_attrs,
         })
@@ -120,6 +124,24 @@ impl DeriveModel {
             })
             .collect();
 
+        // [spec:pgorm:sem:macros.derive.model+3]    the reflected column shape
+        let expected_columns: Vec<TokenStream> = column_idents
+            .iter()
+            .zip(&self.field_types)
+            .zip(&self.ignore_attrs)
+            .filter(|(_, ignore)| !**ignore)
+            .map(|((column_ident, field_type), _)| {
+                let rust_type = spell_type(field_type);
+                quote! {
+                    pgorm::ExpectedColumn::new(
+                        pgorm::IdenStatic::as_str(&<<Self as pgorm::ModelTrait>::Entity as pgorm::entity::EntityTrait>::Column::#column_ident),
+                        #rust_type,
+                        <#field_type as pgorm::TryGetable>::accepts,
+                    )
+                }
+            })
+            .collect();
+
         quote!(
             #[automatically_derived]
             impl pgorm::FromQueryResult for #ident {
@@ -127,6 +149,12 @@ impl DeriveModel {
                     Ok(Self {
                         #(#field_idents: #field_values),*
                     })
+                }
+
+                fn expected_columns() -> std::option::Option<std::vec::Vec<pgorm::ExpectedColumn>> {
+                    std::option::Option::Some(std::vec![
+                        #(#expected_columns),*
+                    ])
                 }
             }
         )
@@ -186,7 +214,7 @@ impl DeriveModel {
 }
 
 /// Method to derive an ActiveModel
-// [spec:pgorm:sem:macros.derive.model+2]
+// [spec:pgorm:sem:macros.derive.model+3]
 pub fn expand_derive_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
     match DeriveModel::new(input) {

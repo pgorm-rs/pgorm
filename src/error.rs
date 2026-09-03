@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+4]
+// [spec:pgorm:def:error.model+5]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -53,9 +53,59 @@ pub enum Error {
     /// May be the table is empty or the record does not exist
     #[error("None of the records are updated")]
     RecordNotUpdated,
+    /// A decode target does not match the statement it would decode
+    #[error("Verification Error: {0}")]
+    Verify(#[from] VerifyError),
     /// A custom error
     #[error("Custom Error: {0}")]
     Custom(String),
+}
+
+/// Why a `FromQueryResult` target does not match the statement it would decode,
+/// as reported by [`VerifyStatement::verify`](crate::VerifyStatement::verify).
+///
+/// Each variant names the target, the column at fault, and what the statement
+/// says about that column, so the message identifies the field to change
+/// without a second lookup.
+// [spec:pgorm:req:exec.verify.errors]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VerifyError {
+    /// The target reads a column the statement does not return
+    #[error(
+        "`{target}` reads column `{column}`, which the statement does not return; it returns: {returned}"
+    )]
+    ColumnMissing {
+        /// The decode target being verified
+        target: &'static str,
+        /// The column name the target looks up
+        column: &'static str,
+        /// The column names the statement does return, in order
+        returned: String,
+    },
+    /// The statement returns the column, but its PostgreSQL type is not one the
+    /// field's Rust type can decode
+    #[error(
+        "`{target}` decodes column `{column}` as `{rust_type}`, which cannot read PostgreSQL type `{pg_type}`"
+    )]
+    ColumnType {
+        /// The decode target being verified
+        target: &'static str,
+        /// The column name the target looks up
+        column: &'static str,
+        /// The Rust type the target decodes the column into
+        rust_type: &'static str,
+        /// The PostgreSQL type the statement returns for that column
+        pg_type: String,
+    },
+    /// The target reports no columns, so there is nothing to check it against
+    #[error(
+        "`{target}` reports no columns: a hand-written `FromQueryResult` impl that does not override `expected_columns` cannot be verified"
+    )]
+    Unreflected {
+        /// The decode target being verified
+        target: &'static str,
+    },
 }
 
 /// The result of a fallible pgorm operation, defaulting to [`Error`].
@@ -72,7 +122,7 @@ pub enum Error {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+4]    crate-root Result alias
+// [spec:pgorm:def:error.model+5]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -84,7 +134,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+4]    Display-string equality
+// [spec:pgorm:def:error.model+5]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

@@ -853,6 +853,57 @@ children (
                     }
                 )
             }
+
+            {
+                id infra.statement-cache
+                title "Route ConnectionTrait through the statement cache: evict-once on 0A000, bounded keys"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-03T20:37:59.772606Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implements [dec:pgorm:prepared-statement-reuse] (probe evidence on spike/prepared-api, prototype in its src/main.rs): the six extended-protocol ConnectionTrait methods resolve SqlText::sql_text() through the connection's existing StatementCache (prepare_cached); a passed tokio_postgres::Statement (sql_text() None) goes through untouched. Three concerns in one node: (1) routing — three impls in src/database/db_connection.rs; (2) invalidation — on SQLSTATE 0A000 (cached plan must not change result type, the one hazard reuse introduces; probed: search_path changes and table recreation are re-planned fine by PG) evict the key via StatementCaches::remove and re-prepare ONCE, second failure surfaces; (3) bound — capacity cap with eviction plus a ManagerConfig opt-out (key space is unbounded: 25 IN-list arities = 25 entries; Clean recycling deliberately keeps entries). Measured 2.30x on real ORM queries at 4ms RTT; misses linear in pool size not query count. Spec: bump conn.pool.statement-cache (its cache-is-opt-in paragraph becomes false) and conn.pool.conn-trait; new rules for invalidate + bound. Note eq-any's paved road exists partly for this: eq_any keeps one SQL text across list cardinalities."
+                    }
+                )
+            }
+
+            {
+                id infra.statement-verify
+                title "Prepare-time verification of a decode target against Statement::columns()"
+                kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T20:38:02.624426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From [dec:pgorm:prepared-statement-reuse]'s probe 2: a FromQueryResult target with a wrong column type or naming a nonexistent column decodes Ok(vec![]) whenever the query matches zero rows — the bug ships and detonates when data appears. Statement::columns() + FromSql::accepts catches all of it at prepare time regardless of row count, and params() covers parameter mismatches. Build verify as a utility (not a handle type): verify::<M>(conn, sql) -> Result<(), Error>. Needs a column-shape reflection hook on FromQueryResult (name + a type-acceptance check per column), derive-generated in pgorm-macros. Fallible boundary returns Error per [dec:pgorm:no-panic]."
+                    }
+
+                    {
+                        at 2026-09-03T21:19:44.577055Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id infra.statement-identity
+                title "Foreign statements stop typechecking: ConnectionTrait narrows to a sealed text bound"
+                kind @refactor
+                deps (infra.statement-cache)
+                log (
+                    {
+                        at 2026-09-03T20:38:05.185382Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The SQLSTATE 26000 hole from [dec:pgorm:prepared-statement-reuse]'s probe 3(ii): ConnectionTrait accepts a tokio_postgres::Statement prepared on another connection; it compiles and fails at runtime. Operator direction (2026-09-03): important to fix. Design discussion settled on structural removal over stamping: once infra.statement-cache routes text through the per-connection cache, no caller has a reason to pass a raw Statement — so narrow ConnectionTrait's bound from ToStatement to a sealed text-like trait (SqlText-shaped) and the invalid state stops existing. Stamping (wrapping Statement with origin-connection identity, runtime-checked) and type-level branding (invariant lifetimes) were considered and rejected as weaker/heavier per the [dec:pgorm:invalid-states-unrepresentable] ladder: unrepresentable > typed error > runtime check. Bumps conn.pool.conn-trait and retires the sem rule pinning the foreign-Statement behavior if one was added."
+                    }
+                )
+            }
         )
     }
 
@@ -2533,6 +2584,36 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ergo.with-carry
+                title "SelectStatement carries its WITH clause; every ORM decode path inherits CTEs"
+                kind @feat
+                deps (ergo.orm-bridge)
+                log (
+                    {
+                        at 2026-09-03T20:38:08.113507Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implements ergo.orm-bridge's verdict (probes on spike/orm-bridge, 8/8 green; full design in that node's decision log). Core: with: Option<AnyWithClause> field on SelectStatement in pgorm-query, rendered as an unconditional prefix in prepare_select_statement (live-PG-verified legal in every nesting position); WithQuery's consuming path and inertness end. ORM: QuerySelect default methods with_cte/with_recursive_cte/join_lateral/join_lateral_on_true/window/window_expr_as/union (LATERAL/WINDOW/UNION are in-place SelectStatement mutations — combinators only, no decode change). Entry points: Selector::from_select::<M>(SelectStatement) (gap G1) and SelectorRaw::into_tuple (gap G2 — the landing pad for ergo.pipeline-v1's SQL output). Watch: the untyped-$n recursive-anchor hazard (E42883/E22021 probed live; only cast_as annotates a placeholder) gets its own rule sql.render.placeholder-typing documenting the caller obligation. Eight proposed rules drafted in the orm-bridge agent report (query.build.with family, exec.crud.selector-entry); bumps query.build.modifiers and exec.crud.select. Estimate 1.5-2.5 days, no breaking signatures."
+                    }
+                )
+            }
+
+            {
+                id ergo.pipeline-v1
+                title "PRQL-shaped pipeline API v1 over prqlc's PL AST, feature-gated"
+                kind @feat
+                deps (ergo.pipeline-api ergo.with-carry)
+                log (
+                    {
+                        at 2026-09-03T20:38:11.989438Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implements ergo.pipeline-api's BUILD verdict (spike on spike/pipeline-api at fdc19dc0; full architecture in that node's decision log). Typed pipeline -> prqlc PL AST -> pl_to_rq -> rq_to_sql(Dialect::Postgres) behind an adapter module owning every prqlc import (~20 pr:: items pinned; prqlc exact-pinned, default-features off). Feature-gated off-by-default (sql-macro pattern). v1 vocabulary: from/filter/group+aggregate/sort/take/join (explicit conditions), window functions + frames, take-range, case, in-array, null handling, casts. Columns table-qualified by construction via col(table, column) from Iden metadata; PRQL stdlib-name collisions (closed set) are a typed error; take is i64 by value (PRQL refuses a parameterized LIMIT); params minted by a binder inside Pipeline so cross-pipeline mixing cannot construct; all failures Error at the fallible into_sql boundary. Output (String, Values) lands on SelectorRaw / into_tuple — dep on ergo.with-carry for those entry points. Early probe: schema-qualified table names (default_db prefix behavior). Hold every emitted SQL to the pg_query oracle + golden files; live-PG integration tests. Estimate ~1 week."
                     }
                 )
             }

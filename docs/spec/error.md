@@ -6,13 +6,15 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+4]
+> [spec:pgorm:def:error.model+5]
 > `Error` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
 > its `Display` includes the server `DbError` detail when present) and
 > `Pool(pgorm_pool::PoolError)` (produced by `DatabasePool::get`; pool
-> exhaustion and acquisition timeouts surface here). The remaining variants
+> exhaustion and acquisition timeouts surface here). `Verify(VerifyError)`
+> converts in the same way from the statement-verification failures of
+> `exec.verify.errors`. The remaining variants
 > are constructed by pgorm itself: `Conversion { from, into, source }`,
 > `Query(RuntimeError)`, `ConvertFromU64(&'static str)`, `UnpackInsertId`,
 > `PrimaryKeyNotSet`, `AttrNotSet(String)`, `Type(String)`,
@@ -32,7 +34,7 @@ it.
 > admitting a foreign error type, as the transaction closures do.
 >
 > Every public name in this taxonomy MUST be spelled in full: `Error`,
-> `RuntimeError`, `ColumnFromStrError`, `SqlError`, and pgorm-query's
+> `RuntimeError`, `ColumnFromStrError`, `SqlError`, `VerifyError`, and pgorm-query's
 > `ValueTypeError` / `ValueTupleError`. An `Err`-abbreviated spelling MUST NOT
 > be reintroduced, and no alias is kept behind for a superseded one. A variant
 > name MUST NOT restate its enum: the conversion failure is `Error::Conversion`

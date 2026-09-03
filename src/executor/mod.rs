@@ -6,6 +6,7 @@ mod paginator;
 mod query;
 mod select;
 mod update;
+mod verify;
 
 pub use cursor::*;
 pub use delete::*;
@@ -15,3 +16,4 @@ pub use paginator::*;
 pub use query::*;
 pub use select::*;
 pub use update::*;
+pub use verify::*;

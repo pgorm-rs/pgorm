@@ -173,13 +173,16 @@ they describe what the macros generate and reject today, including known limitat
 > delegate to `default_as_str`) — this is the escape hatch for non-snake-case column
 > names. Note that neither derive adds `EnumIter`; callers derive it alongside.
 
-> [spec:pgorm:sem:macros.derive.model+2]
+> [spec:pgorm:sem:macros.derive.model+3]
 > `DeriveModel` (named-field structs only; otherwise a compile error) generates two
 > impls. `FromQueryResult`: each field is read with
 > `row.try_get(pre, Column::<Variant>.as_str())`, where the variant name follows the
 > same trim/UpperCamelCase/keyword-escape/`enum_name` rules as
 > `[spec:pgorm:sem:macros.derive.entity-model.casing+1]`; `#[pgorm(ignore)]` fields are
-> filled with `Default::default()` instead. `ModelTrait`: `get` clones the field and
+> filled with `Default::default()` instead. `expected_columns` reports the same
+> column names, each paired with its field type's spelling and that type's
+> `TryGetable::accepts`, so an entity model can be checked against a raw statement
+> (`exec.verify`); ignored fields read no column and are left out. `ModelTrait`: `get` clones the field and
 > converts it `.into()` a `Value`; `set` converts through `ValueType::try_from` and
 > assigns, answering `Error::Type("value does not match the type of {Model} field
 > {field}")` when the value is of another type. Ignored fields have no match arm, so
@@ -301,12 +304,20 @@ they describe what the macros generate and reject today, including known limitat
 > every meta item in a `#[pgorm(...)]` list, so only the last recognised key of the last
 > attribute takes effect and the both-keys guard is unreachable in practice.
 
-> [spec:pgorm:sem:macros.derive.from-query-result]
+> [spec:pgorm:sem:macros.derive.from-query-result+1]
 > `FromQueryResult` (named-field structs only; generics supported) implements
 > `from_query_result(row, pre)` by `row.try_get(pre, "<field>")` for each field, using
 > the un-rawed field identifier as the column name; fields marked `#[pgorm(skip)]` are
 > filled with `Default::default()`. The skip flag is recomputed for every meta item in
 > an attribute list, so `skip` is only honoured as the last (or sole) item.
+>
+> It also implements `expected_columns`, reporting one `ExpectedColumn` per read field
+> in declaration order: the same un-rawed identifier, the field type as written (with
+> the spaces tokenisation leaves between its parts removed, so `Option<i32>` rather
+> than `Option < i32 >`), and `<FieldType as TryGetable>::accepts`. Skipped fields read
+> no column and are left out, so a skipped field is not required of the statement
+> (`exec.verify`). The acceptance function is taken from the field type, so a generic
+> field reports the accepts of whatever `TryGetable` the caller's bound resolves to.
 >
 > `FromJsonQueryResult` performs no input validation at all (only the identifier is
 > used). It generates the `TryGetableFromJson` marker; `From<T> for Value` serialising

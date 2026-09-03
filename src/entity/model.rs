@@ -1,6 +1,7 @@
 use crate::{
     ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, DeleteResult, EntityTrait, Error,
-    IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select, SelectModel, SelectorRaw,
+    ExpectedColumn, IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select,
+    SelectModel, SelectorRaw,
 };
 use async_trait::async_trait;
 pub use pgorm_query::Value;
@@ -52,7 +53,7 @@ pub trait ModelTrait: Clone + Send + Debug {
 }
 
 /// A Trait for implementing a [QueryResult]
-// [spec:pgorm:def:entity.traits.from-query-result+1]
+// [spec:pgorm:def:entity.traits.from-query-result+2]
 pub trait FromQueryResult: Sized {
     /// Instantiate a Model from a [QueryResult]
     fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error>;
@@ -63,7 +64,28 @@ pub trait FromQueryResult: Sized {
         Ok(Self::from_query_result(res, pre).ok())
     }
 
+    /// The columns [`from_query_result`](FromQueryResult::from_query_result)
+    /// reads, in the order it reads them, or [`None`] when this type does not
+    /// report them.
+    ///
+    /// The `FromQueryResult` derive fills this in from the struct's fields —
+    /// skipped fields read no column and are left out — so that
+    /// [`VerifyStatement::verify`](crate::VerifyStatement::verify) can check a
+    /// statement's result columns against the type before a row exists. The
+    /// default answers [`None`]: a hand-written implementation decodes by means
+    /// only it knows, so it is reported as unverifiable rather than treated as
+    /// verified. Overriding this method opts such an implementation back in.
+    // [spec:pgorm:def:exec.verify]    the column-shape reflection hook
+    fn expected_columns() -> Option<Vec<ExpectedColumn>> {
+        None
+    }
+
     /// Run a raw statement and decode every row into `Self`.
+    ///
+    /// A statement that returns no rows decodes into an empty `Vec` whatever
+    /// `Self` looks like, so a mismatched target only fails once data arrives.
+    /// [`VerifyStatement::verify`](crate::VerifyStatement::verify) checks the
+    /// same statement against `Self` at prepare time instead.
     ///
     /// ```no_run
     /// # #[cfg(feature = "macros")]
