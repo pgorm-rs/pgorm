@@ -22,7 +22,7 @@ pub use pgvector::Vector;
 use crate::{ColumnType, QueryBuilder, StringLen};
 
 /// [`Value`] types variant for Postgres array
-// [spec:pgorm:def:sql.value.array+3]
+// [spec:pgorm:def:sql.value.array+4]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -744,7 +744,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
-// [spec:pgorm:def:sql.value.array+3]
+// [spec:pgorm:def:sql.value.array+4]
 pub mod with_array {
     use super::*;
     use crate::RcOrArc;
@@ -1037,6 +1037,24 @@ impl Value {
 }
 
 impl Value {
+    /// One array value gathered from homogeneous elements.
+    ///
+    /// The element type tag is read from `V` rather than from the elements, so
+    /// an empty iterator still names its element type: an untagged empty array
+    /// has no inline spelling PostgreSQL can type, and no element to infer one
+    /// from.
+    // [spec:pgorm:def:sql.value.array+4]
+    pub fn array<V, I>(values: I) -> Self
+    where
+        V: Into<Value> + ValueType,
+        I: IntoIterator<Item = V>,
+    {
+        Self::Array(
+            V::array_type(),
+            Some(Box::new(values.into_iter().map(Into::into).collect())),
+        )
+    }
+
     pub fn is_array(&self) -> bool {
         matches!(self, Self::Array(_, _))
     }
@@ -1854,7 +1872,7 @@ mod tests {
         assert_eq!(out.to_string(), num);
     }
 
-    // [spec:pgorm:def:sql.value.array+3/test]
+    // [spec:pgorm:def:sql.value.array+4/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
@@ -1863,7 +1881,7 @@ mod tests {
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
-    // [spec:pgorm:def:sql.value.array+3/test]
+    // [spec:pgorm:def:sql.value.array+4/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);
@@ -1871,7 +1889,7 @@ mod tests {
         assert_eq!(out, None);
     }
 
-    // [spec:pgorm:def:sql.value.array+3/test]
+    // [spec:pgorm:def:sql.value.array+4/test]
     #[test]
     fn vector_has_an_array_type_tag() {
         assert_eq!(<Vector as ValueType>::array_type(), ArrayType::Vector);

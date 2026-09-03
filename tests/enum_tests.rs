@@ -211,7 +211,7 @@ mod casts {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:entity.traits.column.enum-cast/test]    on read, `select_as` /
+// [spec:pgorm:sem:entity.traits.column.enum-cast+1/test]    on read, `select_as` /
 // `select_enum_as` casts an enum column to `text` — `text[]` when the column is
 // an `Array` of an enum — and leaves non-enum columns alone; on write,
 // `save_as` / `save_enum_as` casts the value to the enum's database type name,
@@ -314,7 +314,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
     );
 }
 
-// [spec:pgorm:sem:entity.traits.column.enum-cast/test]    the special case:
+// [spec:pgorm:sem:entity.traits.column.enum-cast+1/test]    the special case:
 // under `with-json` + `postgres-array`, saving into a `Json` / `JsonBinary`
 // column flattens a `Value::Array` of JSON values into a single `Value::Json`
 // array value instead of applying an enum cast
@@ -342,7 +342,7 @@ fn json_column_flattens_json_array_without_cast() {
     assert_eq!(expr_sql(untouched), r#"E'{\"k\":\"v\"}'"#);
 }
 
-// [spec:pgorm:sem:entity.traits.column.enum-cast/test]    the casts survive a
+// [spec:pgorm:sem:entity.traits.column.enum-cast+1/test]    the casts survive a
 // real round trip: values written through the enum cast read back as the
 // original variants
 #[pgorm_macros::test]

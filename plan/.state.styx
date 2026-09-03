@@ -325,6 +325,9 @@ assertions (
     {id decide.schema-comments, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:38:16.477006Z}
     {id decide.statement, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:07.694429Z}
     {id decide.turso, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:54:51.122793Z}
+    {id ergo.eq-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:19:37.671298Z}
+    {id ergo.orm-bridge, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:22.67587Z}
+    {id ergo.pipeline-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:19.821969Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
     {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
@@ -393,8 +396,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id ergo.pipeline-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:19.821969Z}
-    {id ergo.orm-bridge, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:22.67587Z}
 )
 
 impl_evidence (

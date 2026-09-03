@@ -757,18 +757,27 @@ impl Func {
         FunctionCall::new(Function::TsRankCd).args([vector.into(), query.into()])
     }
 
-    /// Call `ANY` function. Postgres only.
+    /// `ANY` over an array. Postgres only.
+    ///
+    /// A quantifier, not a function: it is SQL only as the right operand of a
+    /// comparison, and PostgreSQL rejects it anywhere else. Reach for
+    /// [`Expr::eq_any`] for the equality case, which is the one worth a name;
+    /// this is the escape hatch for the other operators.
     ///
     /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let query = Query::select().expr(Func::any(vec![0, 1])).to_owned();
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::SizeW).gt(Func::any(vec![0, 1])))
+    ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT ANY(ARRAY [0,1])"#
+    ///     r#"SELECT "id" FROM "character" WHERE "size_w" > ANY(ARRAY [0,1])"#
     /// );
     /// ```
     pub fn any<T>(expr: T) -> FunctionCall
@@ -778,18 +787,23 @@ impl Func {
         FunctionCall::new(Function::Any).arg(expr)
     }
 
-    /// Call `SOME` function. Postgres only.
+    /// `SOME` over an array, PostgreSQL's synonym for [`Func::any`]. Postgres
+    /// only, and likewise valid only after a comparison operator.
     ///
     /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let query = Query::select().expr(Func::some(vec![0, 1])).to_owned();
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::SizeW).gt(Func::some(vec![0, 1])))
+    ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT SOME(ARRAY [0,1])"#
+    ///     r#"SELECT "id" FROM "character" WHERE "size_w" > SOME(ARRAY [0,1])"#
     /// );
     /// ```
     pub fn some<T>(expr: T) -> FunctionCall
@@ -799,18 +813,23 @@ impl Func {
         FunctionCall::new(Function::Some).arg(expr)
     }
 
-    /// Call `ALL` function. Postgres only.
+    /// `ALL` over an array. Postgres only, and likewise valid only after a
+    /// comparison operator. Reach for [`Expr::ne_all`] for the inequality case.
     ///
     /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let query = Query::select().expr(Func::all(vec![0, 1])).to_owned();
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::SizeW).gt(Func::all(vec![0, 1])))
+    ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT ALL(ARRAY [0,1])"#
+    ///     r#"SELECT "id" FROM "character" WHERE "size_w" > ALL(ARRAY [0,1])"#
     /// );
     /// ```
     pub fn all<T>(expr: T) -> FunctionCall

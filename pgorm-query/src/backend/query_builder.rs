@@ -983,7 +983,7 @@ impl QueryBuilder {
 
     /// Convert a SQL value into syntax-specific string
     // [spec:pgorm:sem:sql.value.render]
-    // [spec:pgorm:def:sql.render.value-literals+1]
+    // [spec:pgorm:def:sql.render.value-literals+2]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {
@@ -1041,6 +1041,10 @@ impl QueryBuilder {
             }
             Value::Decimal(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Uuid(Some(v)) => write!(s, "'{v}'").unwrap(),
+            Value::Array(ty, Some(v)) if v.is_empty() => match ty.source_type_name() {
+                Some(element) => write!(s, "ARRAY []::{element}[]").unwrap(),
+                None => write!(s, "ARRAY []").unwrap(),
+            },
             Value::Array(_, Some(v)) => write!(
                 s,
                 "ARRAY [{}]",

@@ -249,7 +249,7 @@ pub async fn empty_in_and_not_in_filter_asymmetry() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:def:sql.render.value-literals+1/test]    against a live server: an
+// [spec:pgorm:def:sql.render.value-literals+2/test]    against a live server: an
 // inline char literal parses and comes back as the char it was rendered from
 #[pgorm_macros::test]
 pub async fn char_literal_round_trips_through_server() {

@@ -569,3 +569,33 @@ fn empty_enum_and_shell_type_are_valid() {
     assert_parses(&empty);
     assert_rejected(r#"CREATE TYPE "font_family" AS ENUM"#);
 }
+
+// `ANY` / `SOME` / `ALL` are quantifiers over the right operand of a comparison,
+// not functions, so `Func::any`'s render is only SQL once something compares to
+// it: PostgreSQL rejects the bare projection at the quantifier itself. Nothing
+// to fix — the comparison is the whole construct — so this pin records the
+// boundary that `eq_any` / `ne_all` keep callers on the right side of.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ast.expr.eq-any/test]
+#[test]
+fn quantifiers_are_valid_only_after_a_comparison() {
+    let compared = Query::select()
+        .column(Glyph::Id)
+        .from(Glyph::Table)
+        .and_where(Expr::col(Glyph::Aspect).eq_any([1, 2]))
+        .to_string();
+
+    assert_eq!(
+        compared,
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = ANY(ARRAY [1,2])"#
+    );
+    assert_parses(&compared);
+
+    let bare = Query::select()
+        .expr(Func::any(Value::array([1, 2])))
+        .from(Glyph::Table)
+        .to_string();
+
+    assert_eq!(bare, r#"SELECT ANY(ARRAY [1,2]) FROM "glyph""#);
+    assert_rejected(&bare);
+}

@@ -307,6 +307,96 @@ fn filter_accumulates_and_accepts_trees() {
     );
 }
 
+// [spec:pgorm:def:entity.traits.column+1/test]    `eq_any` / `ne_all` spend one
+// parameter on the whole list, so the statement text is the same at every
+// cardinality, where `is_in` / `is_not_in` spend one per element
+#[test]
+fn eq_any_filters_through_one_parameter() {
+    let built = |e: SimpleExpr| cake::Entity::find().filter(e).as_query().build();
+
+    assert_eq!(
+        built(cake::Column::Id.eq_any([4, 5])),
+        (
+            r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY($1)"#
+                .to_owned(),
+            Values(vec![Value::array([4, 5])])
+        )
+    );
+    assert_eq!(
+        built(cake::Column::Id.ne_all([4, 5])),
+        (
+            r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" <> ALL($1)"#
+                .to_owned(),
+            Values(vec![Value::array([4, 5])])
+        )
+    );
+
+    // The list length does not reach the SQL, so an empty list is the same
+    // statement as any other and needs no constant fall-back.
+    assert_eq!(
+        built(cake::Column::Id.eq_any(Vec::<i32>::new())).0,
+        built(cake::Column::Id.eq_any((1..=100).collect::<Vec<i32>>())).0
+    );
+
+    assert_eq!(
+        cake::Entity::find()
+            .filter(cake::Column::Id.eq_any(Vec::<i32>::new()))
+            .as_query()
+            .to_string(),
+        r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY(ARRAY []::int4[])"#
+    );
+}
+
+// [spec:pgorm:sem:entity.traits.column.enum-cast+1/test]    an enum column casts
+// the whole array parameter to `{enum_name}[]`, where the per-element operators
+// cast each element to `{enum_name}`
+#[test]
+fn eq_any_casts_enum_arrays_as_a_whole() {
+    assert_eq!(
+        lunch_set::Entity::find()
+            .filter(lunch_set::Column::Tea.eq_any([Tea::EverydayTea, Tea::BreakfastTea]))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "lunch_set"."id", "lunch_set"."name", CAST("lunch_set"."tea" AS text)"#,
+            r#"FROM "lunch_set""#,
+            r#"WHERE "lunch_set"."tea" = ANY(CAST(ARRAY ['EverydayTea','BreakfastTea'] AS tea[]))"#,
+        ]
+        .join(" ")
+    );
+
+    // Parameterized, the cast operand is pinned to the array's own element type
+    // per `sql.render.cast-param-type`, so the driver writes text where the
+    // server expects text and the outer cast resolves the enum.
+    assert_eq!(
+        lunch_set::Entity::find()
+            .filter(lunch_set::Column::Tea.eq_any([Tea::EverydayTea, Tea::BreakfastTea]))
+            .as_query()
+            .build()
+            .0,
+        [
+            r#"SELECT "lunch_set"."id", "lunch_set"."name", CAST("lunch_set"."tea" AS text)"#,
+            r#"FROM "lunch_set""#,
+            r#"WHERE "lunch_set"."tea" = ANY(CAST($1::text[] AS tea[]))"#,
+        ]
+        .join(" ")
+    );
+
+    // A non-enum column is left untouched.
+    assert_eq!(
+        lunch_set::Entity::find()
+            .filter(lunch_set::Column::Name.eq_any(["Set A".to_owned()]))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "lunch_set"."id", "lunch_set"."name", CAST("lunch_set"."tea" AS text)"#,
+            r#"FROM "lunch_set""#,
+            r#"WHERE "lunch_set"."name" = ANY(ARRAY ['Set A'])"#,
+        ]
+        .join(" ")
+    );
+}
+
 // [spec:pgorm:sem:query.build.filter/test]    `belongs_to` emits one equality
 // per primary-key column of the model's entity; `belongs_to_tbl_alias`
 // qualifies the same columns with a table alias

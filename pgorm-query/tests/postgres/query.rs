@@ -1115,7 +1115,7 @@ fn select_62() {
 
 // [spec:pgorm:def:sql.ast.insert+1/test]
 // [spec:pgorm:req:sql.render.insert/test]
-// [spec:pgorm:def:sql.render.value-literals+1/test]
+// [spec:pgorm:def:sql.render.value-literals+2/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_2() {
@@ -2576,6 +2576,113 @@ fn empty_in_2() {
             .and_where(Expr::col(Glyph::Aspect).is_not_in([1, 2]))
             .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" NOT IN (1, 2)"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.eq-any/test]    `eq_any` spends one
+// placeholder whatever the list length, so the SQL text a statement cache keys
+// on no longer varies with cardinality the way `IN` makes it
+#[test]
+fn eq_any_binds_one_array_parameter() {
+    let query = |aspects: Vec<i32>| {
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).eq_any(aspects))
+            .to_owned()
+    };
+
+    assert_eq!(
+        query(vec![1, 2, 3]).build(),
+        (
+            r#"SELECT "id" FROM "glyph" WHERE "aspect" = ANY($1)"#.to_owned(),
+            Values(vec![Value::array([1, 2, 3])])
+        )
+    );
+
+    // Two elements and twenty render the same statement; `IN` renders neither
+    // the same as the other.
+    assert_eq!(
+        query(vec![1, 2]).build().0,
+        query((1..=20).collect()).build().0
+    );
+    assert_ne!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_in([1, 2]))
+            .build()
+            .0,
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_in([1, 2, 3]))
+            .build()
+            .0
+    );
+
+    assert_eq!(
+        query(vec![1, 2, 3]).to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = ANY(ARRAY [1,2,3])"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.eq-any/test]    the negation is spelled
+// `<> ALL`, the shape PostgreSQL's own parser gives `NOT IN`, rather than a
+// `NOT` wrapped around `= ANY`
+#[test]
+fn ne_all_negates_with_one_parameter() {
+    let query = Query::select()
+        .column(Glyph::Id)
+        .from(Glyph::Table)
+        .and_where(Expr::col(Glyph::Aspect).ne_all([1, 2, 3]))
+        .to_owned();
+
+    assert_eq!(
+        query.build(),
+        (
+            r#"SELECT "id" FROM "glyph" WHERE "aspect" <> ALL($1)"#.to_owned(),
+            Values(vec![Value::array([1, 2, 3])])
+        )
+    );
+    assert_eq!(
+        query.to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" <> ALL(ARRAY [1,2,3])"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.eq-any/test]    an empty list needs no
+// constant fall-back: an empty array carries the vacuous truth of the predicate
+// natively, where an empty `IN` has to be rewritten
+#[test]
+fn empty_list_stays_an_array_parameter() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).eq_any(Vec::<i32>::new()))
+            .build(),
+        (
+            r#"SELECT "id" FROM "glyph" WHERE "aspect" = ANY($1)"#.to_owned(),
+            Values(vec![Value::array(Vec::<i32>::new())])
+        )
+    );
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).eq_any(Vec::<i32>::new()))
+            .to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" = ANY(ARRAY []::int4[])"#
+    );
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).ne_all(Vec::<i32>::new()))
+            .to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" <> ALL(ARRAY []::int4[])"#
     );
 }
 

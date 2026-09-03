@@ -258,6 +258,41 @@ today, including panicking edges and deliberate failsafes.
 > `in_subquery`/`not_in_subquery` MUST build `IN (SELECT ...)` /
 > `NOT IN (SELECT ...)` from a `SelectStatement`.
 
+> [spec:pgorm:req:sql.ast.expr.eq-any]
+> `eq_any`/`ne_all` MUST build the same membership tests over a *single array
+> parameter*: `eq_any` the comparison `= ANY(<array>)` and `ne_all` its
+> complement `<> ALL(<array>)`, with the operand collection gathered into one
+> `Value::Array` by `Value::array` rather than spread across a `Tuple`. They are
+> the paved road beside `is_in`/`is_not_in`, which stay: `IN` spends one
+> placeholder per element, so each list length is distinct SQL text that a
+> per-connection prepared-statement cache must hold separately, and a long
+> enough list reaches PostgreSQL's 65535-parameter limit. Prefer `is_in` for a
+> short literal list written into the query, and `eq_any` when the length varies
+> at runtime.
+>
+> The operand type MUST be bound `Into<Value> + ValueType`, not `Into<Value>`
+> alone: the array's element tag is read from the Rust type, so an empty list is
+> still a typed array (see `sql.value.array`).
+>
+> The negation MUST be spelled `<> ALL`, not `NOT (… = ANY …)`. The two are
+> equivalent under three-valued logic — a NULL element makes both NULL, as it
+> makes `NOT IN` NULL — so the choice is which shape reaches the planner, and
+> PostgreSQL's own parser settles it: it reads `x NOT IN (…)` as an `A_Expr` of
+> kind `AEXPR_IN` whose operator name is `<>`, the same operator-level negation
+> `x <> ALL(…)` parses to (`AEXPR_OP_ALL`, name `<>`), where `NOT (x = ANY(…))`
+> parses to a `BoolExpr` wrapped around a second node.
+>
+> An empty collection MUST NOT be special-cased. Unlike `IN`, an array
+> comparison over an empty array is valid SQL carrying the right vacuous truth
+> on its own: `= ANY` over an empty array is false for every operand and `<>
+> ALL` true for every operand, NULL operands included — the same asymmetry
+> `sql.ast.expr.in`'s two constant fall-backs exist to reproduce. The statement
+> text is therefore identical at every cardinality, including zero.
+>
+> `ANY`/`SOME`/`ALL` are quantifiers over the right operand of a comparison, not
+> functions: `Func::any`/`some`/`all` render SQL only in that position, and are
+> the escape hatch for the operators these two do not name.
+
 > [spec:pgorm:def:sql.ast.keywords+2]
 > `Keyword` represents bare SQL keywords usable as expressions: `Null`,
 > `CurrentDate`, `CurrentTime`, `CurrentTimestamp`, and `Custom(DynIden)`;

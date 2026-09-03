@@ -631,7 +631,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+1/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`

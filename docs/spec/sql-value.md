@@ -66,7 +66,7 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array+3]`).
+> `[spec:pgorm:def:sql.value.array+4]`).
 
 > [spec:pgorm:def:sql.value.value-type+3]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
@@ -119,7 +119,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Arrays
 
-> [spec:pgorm:def:sql.value.array+3]
+> [spec:pgorm:def:sql.value.array+4]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
 > chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
@@ -137,6 +137,15 @@ including panic semantics and quirks inherited from sea-query.
 > `ValueTypeError` rather than panicking.
 > `ValueType::column_type()` for `Vec<T>` is
 > `ColumnType::Array(Arc::new(T::column_type()))`.
+>
+> `Value::array(values)` gathers any `IntoIterator` of `V: Into<Value> +
+> ValueType` into one `Value::Array`, taking the element tag from
+> `V::array_type()` rather than from the elements. Reading the tag from the Rust
+> type is what makes an empty collection representable: an untagged empty array
+> has no element to infer a type from, and so no inline spelling PostgreSQL can
+> resolve. It is the constructor behind the array-parameter predicates
+> (`[spec:pgorm:req:sql.ast.expr.eq-any]`) and, unlike `From<Vec<T>>`, needs no
+> `NotU8` bound, the caller having already named the element type.
 
 ## Value tuples
 

@@ -95,6 +95,49 @@ fn display_renders_a_postgres_literal() {
     );
 }
 
+// [spec:pgorm:def:sql.render.value-literals+2/test]    an empty array literal
+// carries a cast to its element type: PostgreSQL rejects a bare `ARRAY []` with
+// "cannot determine type of empty array", there being no element to infer from
+#[test]
+fn empty_array_literal_names_element_type() {
+    assert_eq!(
+        Value::array(Vec::<i32>::new()).to_string(),
+        "ARRAY []::int4[]"
+    );
+    assert_eq!(
+        Value::array(Vec::<String>::new()).to_string(),
+        "ARRAY []::text[]"
+    );
+
+    // `Json` binds as either `json` or `jsonb`, so its arrays have no single
+    // element type to name and the untypeable spelling is all there is.
+    assert_eq!(
+        Value::Array(ArrayType::Json, Some(Box::new(vec![]))).to_string(),
+        "ARRAY []"
+    );
+
+    // A NULL array is still the bare keyword, and a populated one is unchanged.
+    assert_eq!(Value::Array(ArrayType::Int, None).to_string(), "NULL");
+    assert_eq!(Value::array([1, 2]).to_string(), "ARRAY [1,2]");
+}
+
+// [spec:pgorm:def:sql.value.array+4/test]    `Value::array` tags the element
+// type from `V`, not from the elements, so an empty list is still typed
+#[test]
+fn value_array_tags_element_type_from_rust() {
+    assert_eq!(
+        Value::array([1i32, 2]),
+        Value::Array(
+            ArrayType::Int,
+            Some(Box::new(vec![Value::Int(Some(1)), Value::Int(Some(2))]))
+        )
+    );
+    assert_eq!(
+        Value::array(Vec::<Uuid>::new()),
+        Value::Array(ArrayType::Uuid, Some(Box::new(vec![])))
+    );
+}
+
 // [spec:pgorm:def:sql.value+1/test]    the two surviving unsigned variants
 #[test]
 fn unsigned_variants_carry_oid_and_limit_counts() {
@@ -288,7 +331,7 @@ fn to_json_maps_scalars_natively() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+1/test]    a char renders as its whole
+// [spec:pgorm:def:sql.render.value-literals+2/test]    a char renders as its whole
 // UTF-8 text, quoted and escaped exactly like a one-character string
 #[test]
 fn char_renders_whole_scalar_not_low_byte() {
@@ -302,7 +345,7 @@ fn char_renders_whole_scalar_not_low_byte() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+1/test]    the char literals the renderer
+// [spec:pgorm:def:sql.render.value-literals+2/test]    the char literals the renderer
 // emits are ones the PostgreSQL grammar accepts
 #[test]
 fn char_literals_parse_as_postgres_literals() {

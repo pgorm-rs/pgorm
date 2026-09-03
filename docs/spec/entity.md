@@ -49,7 +49,7 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column]
+> [spec:pgorm:def:entity.traits.column+1]
 > `ColumnTrait: IdenStatic + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
@@ -57,10 +57,14 @@ explicit limitations.
 > `ne`, `gt`, `gte`, `lt`, `lte`; range `between` / `not_between`; pattern matching
 > `like`, `not_like`, and the sugar `starts_with` (`s%`), `ends_with` (`%s`),
 > `contains` (`%s%`); aggregates `max`, `min`, `sum`, `count`; null checks `is_null`,
-> `is_not_null`, `if_null`; set membership `is_in` / `is_not_in` and subqueries
+> `is_not_null`, `if_null`; set membership `is_in` / `is_not_in`, its
+> array-parameter counterpart `eq_any` / `ne_all`
+> (`[spec:pgorm:req:sql.ast.expr.eq-any]`), and subqueries
 > `in_subquery` / `not_in_subquery`; plus `into_expr` and `into_returning_expr`.
 > The comparison and set-membership operators pass their values through `save_as`, so
-> enum-typed columns compare against properly cast values.
+> enum-typed columns compare against properly cast values; `eq_any` / `ne_all` pass
+> their single array value through `save_array_as` instead, the whole array being one
+> operand.
 >
 > `ColumnType` is a re-export of `pgorm_query::ColumnType`; the crate's own `ColumnType`
 > enum was dropped and `ColumnTypeTrait` (`def()`, `get_enum_name()`) bridges a
@@ -76,7 +80,7 @@ explicit limitations.
 > (the latter accepting arbitrary expressions). `get_column_type()` and `is_null()`
 > expose the type and nullability for introspection.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+1]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -85,6 +89,14 @@ explicit limitations.
 > case under the `with-json` + `postgres-array` features, saving into a `Json` /
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.
+>
+> `save_array_as` is the array counterpart of `save_as`, for the operands that are one
+> array value rather than one value per element: it casts to `{enum_name}[]` when the
+> column's type is an enum or an array of one, and leaves every other column untouched.
+> It does not take the JSON-flattening path — flattening an array into a scalar would
+> destroy the operand `= ANY` needs. A column that overrides `save_as` with a cast of
+> its own, as `#[pgorm(save_as = "…")]` generates, MUST override this too if its array
+> comparisons are to carry the matching cast; the default knows only the enum case.
 
 > [spec:pgorm:def:entity.traits.primary-key+1]
 > `PrimaryKeyTrait: IdenStatic + Iterable` (`src/entity/primary_key.rs`) defines an

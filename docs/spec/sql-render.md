@@ -161,7 +161,7 @@ an ideal Postgres renderer would emit.
 > followed by `0 b t z n r` maps back to the control character; any other
 > escaped character maps to itself).
 
-> [spec:pgorm:def:sql.render.value-literals+1]
+> [spec:pgorm:def:sql.render.value-literals+2]
 > `value_to_string` defines the inline literal syntax per `Value` variant:
 >
 > Every `None` variant of every `Value` type renders as the bare keyword
@@ -182,8 +182,16 @@ an ideal Postgres renderer would emit.
 >
 > `Array(_, Some(v))` renders `ARRAY [e1,e2,…]` — the keyword `ARRAY`, a
 > space, then square brackets containing each element recursively rendered by
-> `value_to_string`, joined by `,` with no spaces. `Vector(Some(v))` renders as
-> a quoted pgvector literal `'[f1,f2,…]'`.
+> `value_to_string`, joined by `,` with no spaces. An *empty* array MUST carry a
+> cast naming its element type — `ARRAY []::int4[]`, the name taken from
+> `ArrayType::source_type_name` — because there is no element for PostgreSQL to
+> infer a type from and it rejects the bare `ARRAY []` with "cannot determine
+> type of empty array". The grammar accepts that bare form, so no render oracle
+> can catch it (`sql.render.oracle` is syntax-only) and the live-server suite is
+> the only witness. The `Json` and `Vector` element tags have no single type
+> name to pin (see `sql.render.cast-param-type`), so their empty arrays keep the
+> untypeable spelling. `Vector(Some(v))` renders as a quoted pgvector literal
+> `'[f1,f2,…]'`.
 >
 > `Keyword` expressions render as bare `NULL`, `CURRENT_DATE`, `CURRENT_TIME`,
 > or `CURRENT_TIMESTAMP`; `Keyword::Custom` is written unquoted.

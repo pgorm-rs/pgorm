@@ -2453,6 +2453,14 @@ children (
             {
                 id ergo.eq-any
                 title "Array-parameter predicates: col = ANY($1) as the paved road beside is_in"
+                log (
+                    {
+                        at 2026-09-03T20:19:37.671298Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
@@ -2463,7 +2471,6 @@ children (
             {
                 id ergo.orm-bridge
                 title "Design: the typed bridge from CTE/LATERAL/window/union statements into ORM decode"
-                sealed true
                 log (
                     {
                         at 2026-09-03T20:17:03.719503Z
@@ -2484,7 +2491,6 @@ children (
             {
                 id ergo.pipeline-api
                 title "Design + spike: a PRQL-shaped pipeline Select API backed by prqlc's relational IR"
-                sealed true
                 log (
                     {
                         at 2026-09-03T19:07:08.485824Z

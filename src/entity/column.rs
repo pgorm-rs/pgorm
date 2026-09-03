@@ -1,6 +1,7 @@
 use crate::{EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
 use pgorm_query::{
-    Alias, BinOper, DynIden, Expr, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
+    Alias, BinOper, DynIden, Expr, Func, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
+    ValueType,
 };
 use std::str::FromStr;
 
@@ -69,7 +70,7 @@ macro_rules! bind_subquery_func {
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column]
+// [spec:pgorm:def:entity.traits.column+1]
 pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -241,6 +242,57 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     bind_vec_func!(is_in);
     bind_vec_func!(is_not_in);
 
+    /// Membership against one array parameter, the PostgreSQL-idiomatic
+    /// counterpart of [`ColumnTrait::is_in`]. See [`pgorm_query::Expr::eq_any`]
+    /// for when each applies; the short of it is that `is_in` suits a short
+    /// literal list and `eq_any` a list whose length varies at runtime, because
+    /// `eq_any` renders the same SQL text — and so reuses the same cached
+    /// statement — for every length.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .filter(cake::Column::Id.eq_any([2, 3]))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY(ARRAY [2,3])"#
+    /// );
+    /// ```
+    fn eq_any<V, I>(&self, v: I) -> SimpleExpr
+    where
+        V: Into<Value> + ValueType,
+        I: IntoIterator<Item = V>,
+    {
+        let array = self.save_array_as(Expr::val(Value::array(v)));
+        Expr::col((self.entity_name(), *self)).eq(Func::any(array))
+    }
+
+    /// Non-membership against one array parameter, the complement of
+    /// [`ColumnTrait::eq_any`]. See [`pgorm_query::Expr::ne_all`] for why the
+    /// negation is spelled `<> ALL` rather than `NOT (… = ANY …)`.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .filter(cake::Column::Id.ne_all([2, 3]))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" <> ALL(ARRAY [2,3])"#
+    /// );
+    /// ```
+    fn ne_all<V, I>(&self, v: I) -> SimpleExpr
+    where
+        V: Into<Value> + ValueType,
+        I: IntoIterator<Item = V>,
+    {
+        let array = self.save_array_as(Expr::val(Value::array(v)));
+        Expr::col((self.entity_name(), *self)).ne(Func::all(array))
+    }
+
     bind_subquery_func!(in_subquery);
     bind_subquery_func!(not_in_subquery);
 
@@ -262,7 +314,7 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         cast_enum_as(expr, self, |col, _, col_type| {
             let type_name = match col_type {
@@ -279,9 +331,27 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
         self.save_enum_as(val)
     }
 
+    /// Cast an array of values into the column's array type for database
+    /// storage, the array counterpart of [`ColumnTrait::save_as`]: an enum
+    /// column takes `{enum_name}[]`, and every other column is left untouched.
+    ///
+    /// A column that overrides `save_as` with a cast of its own — what
+    /// `#[pgorm(save_as = "…")]` generates — should override this too, with the
+    /// array spelling of the same type.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
+    fn save_array_as(&self, val: Expr) -> SimpleExpr {
+        let col_def = self.def();
+        match col_def.get_enum_name() {
+            Some(enum_name) => {
+                val.as_enum(Alias::new(format!("{}[]", enum_name.to_string())).into_iden())
+            }
+            None => val.into(),
+        }
+    }
+
     /// Cast value of an enum column as enum type; do nothing if `self` is not an enum.
     /// Will also transform `Array(Vec<Json>)` into `Json(Vec<Json>)` if the column type is `Json`.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         cast_enum_as(val, self, |col, enum_name, col_type| {
             let type_name = match col_type {
