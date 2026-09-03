@@ -1282,6 +1282,12 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.version-unify
+                title "Every workspace crate is version 0.2.0"
+                kind @build
+            }
         )
     }
 
@@ -1621,6 +1627,42 @@ children (
 
                     {
                         at 2026-09-02T19:15:03.593799Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id bug.error-idiom
+                title "The error type is Error, not DbErr: idiomatic naming across the error family"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-03T18:36:40.532368Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator: \"DbErr should just be Error\" — the Err-suffixed family predates the fork and reads as SeaORM, not Rust. DbErr -> Error (crate root export), RuntimeErr -> RuntimeError, ColumnFromStrErr -> ColumnFromStrError, SqlErr -> SqlError; pgorm-query's ValueTupleErr -> ValueTupleError. Variant TryIntoErr -> a non-redundant name (Error::TryIntoErr reads stuttery). Add the idiomatic pub type Result<T, E = Error> alias at the crate root. Renames are outright per delete-don't-deprecate: no aliases left behind. Macros generate paths naming the old types — sweep pgorm-macros' quote! bodies. Every spec rule body naming DbErr changes and therefore bumps + re-pins (error.model family normatively; count the prose mentions across docs/spec first)."
+                    }
+                )
+            }
+
+            {
+                id bug.crate-metadata
+                title "Crate metadata tells the truth: READMEs, keywords, URLs describe pgorm"
+                kind @docs
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T18:37:48.540629Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T18:41:14.563922Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
@@ -2223,6 +2265,34 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id unrep.dml-order-limit
+                title "UPDATE and DELETE carry no ORDER BY or LIMIT: PG rejects both"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-03T18:36:35.808361Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From the campaign's residual pin oracle_pins_update_delete_order_limit (oracle_pins.rs): UpdateStatement and DeleteStatement render ORDER BY and LIMIT when populated, and PostgreSQL rejects both on UPDATE and DELETE — a sea-query MySQL-ism. Remove the surface: the order/limit storage and builder methods leave the two statements (check how OrderedStatement is wired into them, and the ORM's UpdateMany/DeleteMany + any QueryOrder/QueryTrait plumbing that exposes order_by/limit on update/delete paths). Flip the pin to compile_fail proofs + positive renders. Bumps sql.render.update-delete (the pinned prose), sql.ast.update, sql.ast.delete."
+                    }
+                )
+            }
+
+            {
+                id unrep.foreign-key-shape
+                title "TableForeignKey names its tables and columns by construction; type/extension name holes close"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-03T18:36:38.385477Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From ddl-table-target's residual pin oracle_pins_ddl_targets_left_open: TableForeignKey/ForeignKeyCreateStatement is the last DDL builder that can render targetless or empty — its from-table renders only standalone, and its two column lists (referencing columns, referenced columns) are the empty-collection axis; PG additionally requires the two lists be the same length, so the natural carrier is a paired non-empty structure (ColumnPairs precedent). Also in the pin: the type/extension name holes — CREATE TYPE with no name, CREATE EXTENSION \"\" (empty string renders), CREATE TYPE t AS ENUM with no values; sql.ddl.type-enum, sql.ddl.type-alter-drop, sql.ddl.extension carry the documentation-only bumps from ddl-table-target and get the real closure here. Oracle arbitrates each; flip the pin."
                     }
                 )
             }

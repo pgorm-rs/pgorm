@@ -6,9 +6,9 @@ edition = "2024"
 description = "Derive macro for pgorm-query's Iden trait"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/pgorm-query"
-repository = "https://github.com/SeaQL/sea-query"
+repository = "https://github.com/pgorm-rs/pgorm"
 categories = [ "database" ]
-keywords = [ "database", "sql", "mysql", "postgres", "sqlite" ]
+keywords = ["database", "sql", "postgres"]
 rust-version = "1.88"
 
 [lib]

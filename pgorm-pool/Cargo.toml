@@ -4,10 +4,10 @@ version = "0.14.1"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
-description = "Dead simple async pool for tokio-postgres"
+description = "Connection pool for tokio-postgres, vendored from deadpool-postgres for pgorm"
 keywords = ["async", "database", "pool", "postgres"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/bikeshedder/deadpool"
+repository = "https://github.com/pgorm-rs/pgorm"
 readme = "README.md"
 
 [package.metadata.docs.rs]

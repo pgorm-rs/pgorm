@@ -6,7 +6,7 @@ name = "pgorm"
 version = "0.1.0"
 authors = []
 edition = "2024"
-description = "🐚 An async & dynamic ORM for Rust"
+description = "An async ORM for PostgreSQL"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/pgorm"
 repository = "https://github.com/pgorm-rs/pgorm"
@@ -50,9 +50,7 @@ pgorm-sql-macro = { version = "0.1.0", path = "pgorm-sql-macro", optional = true
 pgorm-query.workspace = true
 strum = { version = "0.28", default-features = false }
 serde_json = { version = "1.0.151", default-features = false, optional = true }
-# sqlx = { version = "0.7", default-features = false, optional = true }
 uuid = { version = "1.26", default-features = false, optional = true }
-# ouroboros = { version = "0.17", default-features = false }
 url = { version = "2.5", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 bytes = "1.12"
@@ -99,7 +97,3 @@ postgres-array = []
 pgorm-internal = []
 runtime-tokio = []
 tests-cfg = []
-
-# This allows us to develop using a local version of sea-query
-# [patch.crates-io]
-# pgorm-query = { path = "../sea-query" }

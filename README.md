@@ -10,7 +10,14 @@ A fork of [SeaORM](https://github.com/SeaQL/sea-orm) focused entirely on Postgre
 - More effective use of statements (you pass the arguments with the statement so it is prepared properly)
 - All Postgres-specific functionality is expected to be present
 - Significant performance and stability gains
-- Pared-back migrations: `pgorm-migration` is a minimal up-only runner with no down migrations or rollback (its future is under review)
+- Invalid SQL is a compile error where the type system can make it one: the
+  query and DDL builders refuse to construct statements PostgreSQL would
+  reject, and the render paths do not panic
+- Every rendered statement in the test suite is validated against the real
+  PostgreSQL grammar via libpg_query; the same parser backs the optional
+  `sql!` macro (compile-time checking of raw SQL) and query fingerprinting
+  in the metrics layer
+- Pared-back migrations: `pgorm-migration` is a minimal up-only runner with no down migrations or rollback
 - Scoped transactions
 - Opt-in metrics layer in `pgorm::metric` — wrap a pool to instrument it, pay nothing if you don't (see [METRICS.md](METRICS.md))
 - From<...> implementation for ActiveValue fields (less `ActiveValue::Set(...)`, more `.into()`)
