@@ -2,13 +2,13 @@
 
 `src/pipeline/` provides a typed, relation-to-relation query builder in the
 shape of a [PRQL](https://prql-lang.org) pipeline, compiled to PostgreSQL SQL
-through prqlc's intermediate representations. The whole module sits behind the
-off-by-default `pipeline` cargo feature. Rules are grouped under
+through prqlc's intermediate representations. The pipeline is a permanent part
+of the crate, compiled in every build. Rules are grouped under
 `[spec:pgorm:req:pipeline]`.
 
 ## Architecture
 
-> [spec:pgorm:def:pipeline.adapter]
+> [spec:pgorm:def:pipeline.adapter+1]
 > The pipeline lowers typed Rust construction directly into prqlc's PL AST —
 > no PRQL text round-trip — and compiles it with `pl_to_rq` followed by
 > `rq_to_sql` targeting `Dialect::Postgres`, producing a single SQL string
@@ -20,11 +20,11 @@ off-by-default `pipeline` cargo feature. Rules are grouped under
 > The PL AST is not a stable API, so the boundary is confined: every `prqlc`
 > import in the workspace lives in the private `src/pipeline/adapter.rs`, the
 > dependency is pinned exact (`prqlc = "=0.13.14"`, `default-features =
-> false`, `optional = true`), and no prqlc type appears in the public API. A
-> compiler bump is absorbed by rewriting the adapter alone. The `pipeline`
-> feature MUST stay out of the default set and prqlc MUST NOT appear in any
-> other workspace crate's dependencies: only builds that opt in pay the
-> compile.
+> false`), and no prqlc type appears in the public API. A compiler bump is
+> absorbed by rewriting the adapter alone. prqlc is a plain dependency of the
+> root crate by operator decision — the pipeline is part of the permanent
+> story, and every build pays its compile, the same posture as `pg_query` —
+> but it MUST NOT appear in any other workspace crate's dependencies.
 
 ## Surface
 

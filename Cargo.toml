@@ -15,7 +15,7 @@ keywords = ["async", "orm", "postgres"]
 rust-version = "1.88"
 
 [package.metadata.docs.rs]
-features = ["default", "debug-print", "postgres-array", "pgorm-internal", "tests-cfg", "sql-macro", "metrics-fingerprint", "pipeline"]
+features = ["default", "debug-print", "postgres-array", "pgorm-internal", "tests-cfg", "sql-macro", "metrics-fingerprint"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
@@ -47,7 +47,11 @@ rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-fea
 pg_query = "6.2.0"
 pgorm-macros = { version = "0.2.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
 pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro", optional = true }
-prqlc = { version = "=0.13.14", default-features = false, optional = true }
+# The PRQL compiler behind pgorm::pipeline. Pure Rust but a heavyweight
+# compile; a permanent dependency by decision, like pg_query above. The pin
+# is exact: the PL AST is not a stable API, and the adapter module is
+# written against this one version.
+prqlc = { version = "=0.13.14", default-features = false }
 pgorm-query.workspace = true
 strum = { version = "0.28", default-features = false }
 serde_json = { version = "1.0.151", default-features = false, optional = true }
@@ -90,11 +94,6 @@ sql-macro = ["dep:pgorm-sql-macro"]
 # that want query identities in their metrics pay for it. libpg_query itself is
 # linked either way (see `pg_query` above).
 metrics-fingerprint = []
-# Off by default: brings the PRQL-shaped `pipeline` module into scope. prqlc is
-# a heavyweight compile (tens of seconds cold), so only builds that use the
-# pipeline API pay for it. The pin is exact: the PL AST is not a stable API,
-# and the adapter module is written against this one version.
-pipeline = ["dep:prqlc"]
 with-json = ["serde_json", "chrono?/serde", "uuid?/serde"]
 with-chrono = ["chrono"]
 with-rust_decimal = ["rust_decimal"]

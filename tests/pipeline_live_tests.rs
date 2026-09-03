@@ -1,4 +1,3 @@
-#![cfg(feature = "pipeline")]
 #![allow(unused_imports, dead_code)]
 
 //! The pipeline API against a live server, with bound parameters.

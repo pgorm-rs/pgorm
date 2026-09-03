@@ -12,9 +12,8 @@
 //! The pipeline lowers typed Rust construction directly into prqlc's PL AST
 //! (no PRQL text round-trip), then through `pl_to_rq` and `rq_to_sql` with
 //! the PostgreSQL dialect. Every prqlc import lives in the private `adapter`
-//! module, and the dependency is pinned exact; the whole module sits behind
-//! the off-by-default `pipeline` feature, so builds that do not opt in do not
-//! compile prqlc at all.
+//! module, and the dependency is pinned exact. The pipeline is a permanent
+//! part of the crate: prqlc is a plain dependency, compiled in every build.
 //!
 //! ```
 //! use pgorm::pipeline::{Pipeline, col, count_rows, sum};
@@ -51,7 +50,7 @@
 //! leak into a different pipeline. Everything fallible — reserved-alias
 //! screening, prqlc's resolution — surfaces as a typed [`PipelineError`]
 //! from [`Pipeline::into_sql`] or the terminal methods; nothing panics.
-// [spec:pgorm:def:pipeline.adapter]
+// [spec:pgorm:def:pipeline.adapter+1]
 
 mod adapter;
 mod binder;

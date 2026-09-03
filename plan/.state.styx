@@ -405,6 +405,7 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
+    {id ergo.pipeline-permanent, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:58:54.622702Z}
 )
 
 impl_evidence (

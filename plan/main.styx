@@ -2656,6 +2656,29 @@ children (
                     }
                 )
             }
+
+            {
+                id ergo.pipeline-permanent
+                title "The pipeline is permanent: feature gate removed, prqlc a plain dependency"
+                kind @build
+                deps (ergo.pipeline-v1)
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T22:53:06.436418Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T22:58:54.622702Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 )
