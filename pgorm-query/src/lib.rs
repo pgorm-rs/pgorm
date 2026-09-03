@@ -467,8 +467,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::create()
-//!     .table(Character::Table)
+//! let table = Table::create(Character::Table)
 //!     .col(ColumnDef::new(Character::Id).integer().not_null())
 //!     .col(ColumnDef::new(Character::Character).string().not_null())
 //!     .to_owned();
@@ -500,9 +499,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::drop()
-//!     .table(Character::Table)
-//!     .to_owned();
+//! let table = Table::drop(Character::Table);
 //!
 //! assert_eq!(
 //!     table.to_string(QueryBuilder),
@@ -514,9 +511,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::rename()
-//!     .table(Character::Table, Alias::new("character_new"))
-//!     .to_owned();
+//! let table = Table::rename(Character::Table, Alias::new("character_new"));
 //!
 //! assert_eq!(
 //!     table.to_string(QueryBuilder),
@@ -528,7 +523,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::truncate().table(Character::Table).to_owned();
+//! let table = Table::truncate(Character::Table);
 //!
 //! assert_eq!(
 //!     table.to_string(QueryBuilder),
@@ -556,10 +551,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let foreign_key = ForeignKey::drop()
-//!     .name("FK_character_id")
-//!     .table(Character::Table)
-//!     .to_owned();
+//! let foreign_key = ForeignKey::drop(Character::Table, "FK_character_id");
 //!
 //! assert_eq!(
 //!     foreign_key.to_string(QueryBuilder),
@@ -571,9 +563,8 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let index = Index::create(Character::Id)
+//! let index = Index::create(Character::Table, Character::Id)
 //!     .name("idx-character-id")
-//!     .table(Character::Table)
 //!     .to_owned();
 //!
 //! assert_eq!(
@@ -586,8 +577,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let index = Index::drop()
-//!     .name("idx-character-id")
+//! let index = Index::drop("idx-character-id")
 //!     .table(Character::Table)
 //!     .to_owned();
 //!

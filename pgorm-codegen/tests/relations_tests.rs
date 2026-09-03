@@ -12,8 +12,7 @@ fn bare(table: &str) -> TableCreateStatement {
 
 /// `cake` with a self-referencing `base_id`.
 fn self_referencing_cake() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("cake"))
+    Table::create(Alias::new("cake"))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("base_id")).integer().to_owned())
         .foreign_key(
@@ -25,8 +24,7 @@ fn self_referencing_cake() -> TableCreateStatement {
 }
 
 fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new(name))
+    Table::create(Alias::new(name))
         .col(
             ColumnDef::new(Alias::new(left.1))
                 .integer()
@@ -55,8 +53,7 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
 }
 
 fn basket_with_two_fruit_keys() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("basket"))
+    Table::create(Alias::new("basket"))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
         .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
@@ -153,8 +150,7 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
                         .to_owned(),
                 ],
             ),
-            Table::create()
-                .table(Alias::new("fruit"))
+            Table::create(Alias::new("fruit"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
@@ -184,8 +180,8 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
 // appear only when the FK declared an action, and cover all five actions
 #[test]
 fn foreign_key_actions_render_only_when_declared() {
-    let mut audit = Table::create();
-    audit.table(Alias::new("audit")).col(serial_pk("id"));
+    let mut audit = Table::create(Alias::new("audit"));
+    audit.col(serial_pk("id"));
 
     let cases = [
         ("restrict", ForeignKeyAction::Restrict, "Restrict"),
@@ -248,8 +244,7 @@ fn inverse_relations_render_without_from_and_to() {
     let has_one = generate(
         vec![
             bare("users"),
-            Table::create()
-                .table(Alias::new("profile"))
+            Table::create(Alias::new("profile"))
                 .col(
                     ColumnDef::new(Alias::new("user_id"))
                         .integer()
@@ -344,8 +339,7 @@ fn conjunct_shadowed_relations_lose_their_plain_related_impl() {
     let generated = generate(
         vec![
             bare("users"),
-            Table::create()
-                .table(Alias::new("bills"))
+            Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
                 .foreign_key(
@@ -464,8 +458,7 @@ fn seaography_adds_def_for_relations_without_related_impl() {
     let shadowed = generate(
         vec![
             bare("users"),
-            Table::create()
-                .table(Alias::new("bills"))
+            Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
                 .foreign_key(

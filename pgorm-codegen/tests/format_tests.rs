@@ -61,8 +61,7 @@ fn compact_model_attribute_and_empty_relation_enum() {
 fn compact_field_attribute_parts_assembled_in_fixed_order() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("ledger"))
+            Table::create(Alias::new("ledger"))
                 .col(
                     ColumnDef::new_with_type(
                         Alias::new("camelCase"),
@@ -168,8 +167,7 @@ fn compact_fields_without_applicable_parts_carry_no_attribute() {
 fn compact_model_assembles_derives_attributes_fields_in_order() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("cake"))
+            Table::create(Alias::new("cake"))
                 .col(serial_pk("id"))
                 // not snake_case: the raw DB name is preserved by `column_name`
                 .col(
@@ -321,8 +319,7 @@ fn expanded_entity_name_carries_schema_name_when_configured() {
 fn expanded_column_def_chains_null_unique_enum_type() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("task"))
+            Table::create(Alias::new("task"))
                 .col(serial_pk("id"))
                 .col(typed_null("note", ColumnType::Text))
                 .col(typed("email", ColumnType::String(StringLen::None)))

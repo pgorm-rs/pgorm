@@ -162,8 +162,7 @@ pub fn serial_pk(name: &str) -> ColumnDef {
 
 /// `cake`: serial pk + nullable text name.
 pub fn cake() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("cake"))
+    Table::create(Alias::new("cake"))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("name")).text().to_owned())
         .to_owned()
@@ -171,8 +170,7 @@ pub fn cake() -> TableCreateStatement {
 
 /// `fruit`: serial pk, not-null name, nullable `cake_id` FK to `cake`.
 pub fn fruit() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("fruit"))
+    Table::create(Alias::new("fruit"))
         .col(serial_pk("id"))
         .col(
             ColumnDef::new(Alias::new("name"))
@@ -193,8 +191,7 @@ pub fn fruit() -> TableCreateStatement {
 
 /// `filling`: serial pk + not-null name.
 pub fn filling() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("filling"))
+    Table::create(Alias::new("filling"))
         .col(serial_pk("id"))
         .col(
             ColumnDef::new(Alias::new("name"))
@@ -208,8 +205,7 @@ pub fn filling() -> TableCreateStatement {
 /// `cake_filling`: the classic junction table — two FK columns that together
 /// form the primary key.
 pub fn cake_filling() -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new("cake_filling"))
+    Table::create(Alias::new("cake_filling"))
         .col(
             ColumnDef::new(Alias::new("cake_id"))
                 .integer()
@@ -244,8 +240,7 @@ pub fn cake_schema() -> Vec<TableCreateStatement> {
 
 /// A single table built from an explicit column list.
 pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement {
-    let mut stmt = Table::create();
-    stmt.table(Alias::new(table));
+    let mut stmt = Table::create(Alias::new(table));
     for column in columns {
         stmt.col(column);
     }
@@ -255,9 +250,8 @@ pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement 
 /// A single-column unique index over `column`, which the transformer reads to
 /// mark the column unique.
 pub fn unique_index(table: &str, column: &str) -> pgorm_query::IndexCreateStatement {
-    Index::create(Alias::new(column))
+    Index::create(Alias::new(table), Alias::new(column))
         .name(format!("idx_{table}_{column}"))
-        .table(Alias::new(table))
         .unique()
         .to_owned()
 }

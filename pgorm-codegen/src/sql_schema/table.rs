@@ -51,8 +51,7 @@ pub(super) fn build(
         column_comments,
     } = attachments;
 
-    let mut create = Table::create();
-    create.table(target.clone());
+    let mut create = Table::create(target.clone());
     if stmt.if_not_exists {
         create.if_not_exists();
     }
@@ -272,11 +271,10 @@ fn column(
             // unique index, and that index is where the entity model reads
             // uniqueness from — a `ColumnSpec::UniqueKey` would be discarded.
             ConstrType::ConstrUnique => {
-                let mut index = Index::create(Alias::new(column_name));
+                let mut index = Index::create(target.clone(), Alias::new(column_name));
                 if !constraint.conname.is_empty() {
                     index.name(constraint.conname.as_str());
                 }
-                index.table(target.clone());
                 index.unique();
                 if constraint.nulls_not_distinct {
                     index.nulls_not_distinct();
@@ -342,11 +340,10 @@ fn table_constraint(
             let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
             };
-            let mut index = Index::create(Alias::new(first));
+            let mut index = Index::create(target.clone(), Alias::new(first));
             if !constraint.conname.is_empty() {
                 index.name(constraint.conname.as_str());
             }
-            index.table(target.clone());
             for column in columns {
                 index.col(Alias::new(column));
             }

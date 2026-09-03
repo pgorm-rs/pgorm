@@ -2,43 +2,40 @@ use inherent::inherent;
 
 use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 
-/// Drop a table
+/// Truncate a table
+///
+/// The table is taken by the constructor: `TRUNCATE TABLE` has no spelling
+/// without one, so a statement that never names its target does not construct.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::truncate().to_string(QueryBuilder);
+/// ```
 ///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// let table = Table::truncate().table(Font::Table).to_owned();
+/// let table = Table::truncate(Font::Table);
 ///
-/// assert_eq!(
-///     table.to_string(QueryBuilder),
-///     r#"TRUNCATE TABLE "font""#
-/// );
+/// assert_eq!(table.to_string(QueryBuilder), r#"TRUNCATE TABLE "font""#);
 /// ```
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+#[derive(Debug, Clone)]
 pub struct TableTruncateStatement {
-    pub(crate) table: Option<TableName>,
+    pub(crate) table: TableName,
 }
 
 impl TableTruncateStatement {
-    /// Construct truncate table statement
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set table name
-    pub fn table<T>(&mut self, table: T) -> &mut Self
+    /// Construct truncate table statement over the table it empties
+    pub fn new<T>(table: T) -> Self
     where
         T: IntoTableName,
     {
-        self.table = Some(table.into_table_name());
-        self
-    }
-
-    pub fn take(&mut self) -> Self {
         Self {
-            table: self.table.take(),
+            table: table.into_table_name(),
         }
     }
 }

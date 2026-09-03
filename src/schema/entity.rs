@@ -199,9 +199,8 @@ where
             continue;
         }
         let name = format!("idx-{}-{}", entity.to_string(), column.to_string());
-        let stmt = Index::create(column)
+        let stmt = Index::create(entity.table_ref(), column)
             .name(name)
-            .table(entity.table_ref())
             .to_owned();
         vec.push(stmt)
     }
@@ -232,7 +231,7 @@ pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
 {
-    let mut stmt = TableCreateStatement::new();
+    let mut stmt = TableCreateStatement::new(entity.table_ref());
 
     if let Some(comment) = entity.comment() {
         stmt.comment(comment);
@@ -246,7 +245,7 @@ where
     if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
         let mut primary_keys = E::PrimaryKey::iter();
         if let Some(first) = primary_keys.next() {
-            let mut idx_pk = Index::create(first);
+            let mut idx_pk = Index::create(entity.table_ref(), first);
             for primary_key in primary_keys {
                 idx_pk.col(primary_key);
             }
@@ -262,7 +261,7 @@ where
         stmt.foreign_key(&mut relation.into());
     }
 
-    stmt.table(entity.table_ref()).take()
+    stmt.take()
 }
 
 // [spec:pgorm:sem:schema.from-entity+2]    column + primary-key projection
@@ -313,14 +312,12 @@ mod tests {
             schema
                 .create_table_from_entity(CakeFillingPrice)
                 .to_string(QueryBuilder),
-            get_cake_filling_price_stmt()
-                .table(CakeFillingPrice.table_ref())
-                .to_string(QueryBuilder)
+            get_cake_filling_price_stmt().to_string(QueryBuilder)
         );
     }
 
     fn get_cake_filling_price_stmt() -> TableCreateStatement {
-        Table::create()
+        Table::create(CakeFillingPrice.table_ref())
             .col(
                 ColumnDef::new(cake_filling_price::Column::CakeId)
                     .integer()
@@ -337,10 +334,13 @@ mod tests {
                     .not_null(),
             )
             .primary_key(
-                Index::create(cake_filling_price::Column::CakeId)
-                    .name("pk-cake_filling_price")
-                    .col(cake_filling_price::Column::FillingId)
-                    .primary(),
+                Index::create(
+                    CakeFillingPrice.table_ref(),
+                    cake_filling_price::Column::CakeId,
+                )
+                .name("pk-cake_filling_price")
+                .col(cake_filling_price::Column::FillingId)
+                .primary(),
             )
             .foreign_key(
                 ForeignKeyCreateStatement::new()
@@ -363,27 +363,25 @@ mod tests {
             schema
                 .create_table_from_entity(indexes::Entity)
                 .to_string(QueryBuilder),
-            get_indexes_stmt()
-                .table(indexes::Entity.table_ref())
-                .to_string(QueryBuilder)
+            get_indexes_stmt().to_string(QueryBuilder)
         );
 
         let stmts = schema.create_index_from_entity(indexes::Entity);
         assert_eq!(stmts.len(), 2);
 
-        let idx: IndexCreateStatement = Index::create(indexes::Column::Index1Attr)
-            .name("idx-indexes-index1_attr")
-            .table(indexes::Entity.table_ref())
-            .to_owned();
+        let idx: IndexCreateStatement =
+            Index::create(indexes::Entity.table_ref(), indexes::Column::Index1Attr)
+                .name("idx-indexes-index1_attr")
+                .to_owned();
         assert_eq!(
             stmts[0].to_string(QueryBuilder),
             idx.to_string(QueryBuilder)
         );
 
-        let idx: IndexCreateStatement = Index::create(indexes::Column::Index2Attr)
-            .name("idx-indexes-index2_attr")
-            .table(indexes::Entity.table_ref())
-            .to_owned();
+        let idx: IndexCreateStatement =
+            Index::create(indexes::Entity.table_ref(), indexes::Column::Index2Attr)
+                .name("idx-indexes-index2_attr")
+                .to_owned();
         assert_eq!(
             stmts[1].to_string(QueryBuilder),
             idx.to_string(QueryBuilder)
@@ -391,7 +389,7 @@ mod tests {
     }
 
     fn get_indexes_stmt() -> TableCreateStatement {
-        Table::create()
+        Table::create(indexes::Entity.table_ref())
             .col(
                 ColumnDef::new(indexes::Column::IndexesId)
                     .integer()

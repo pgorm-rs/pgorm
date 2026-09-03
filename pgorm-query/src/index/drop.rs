@@ -1,16 +1,26 @@
 use inherent::inherent;
 
-use crate::{QueryBuilder, SchemaStatementBuilder, TableIndex, types::*};
+use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 
 /// Drop an index for an existing table
+///
+/// The index name is taken by the constructor, being the whole of what
+/// `DROP INDEX` names. The table is optional and contributes only its schema:
+/// PostgreSQL scopes indexes to a schema rather than to a table, and accepts a
+/// bare `DROP INDEX "name"`.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// Index::drop().table(Character::Table);
+/// ```
 ///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::drop()
-///     .name("idx-character-id")
+/// let index = Index::drop("idx-character-id")
 ///     .table(Character::Table)
 ///     .to_owned();
 ///
@@ -19,30 +29,28 @@ use crate::{QueryBuilder, SchemaStatementBuilder, TableIndex, types::*};
 ///     r#"DROP INDEX "idx-character-id""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-drop+1]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.index-drop+2]
+#[derive(Debug, Clone)]
 pub struct IndexDropStatement {
     pub(crate) table: Option<TableName>,
-    pub(crate) index: TableIndex,
+    pub(crate) name: DynIden,
     pub(crate) if_exists: bool,
 }
 
 impl IndexDropStatement {
-    /// Construct a new [`IndexDropStatement`]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set index name
-    pub fn name<T>(&mut self, name: T) -> &mut Self
+    /// Construct a new [`IndexDropStatement`] over the index it drops
+    pub fn new<T>(name: T) -> Self
     where
         T: IntoIden,
     {
-        self.index.name(name);
-        self
+        Self {
+            table: None,
+            name: name.into_iden(),
+            if_exists: false,
+        }
     }
 
-    /// Set target table
+    /// Set the schema-bearing target table
     pub fn table<T>(&mut self, table: T) -> &mut Self
     where
         T: IntoTableName,

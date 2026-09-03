@@ -7,13 +7,21 @@ use crate::{
 
 /// Create a table
 ///
+/// The table is taken by the constructor: `CREATE TABLE` has no spelling without
+/// one, so a statement that never names its target does not construct.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::create().col(ColumnDef::new(Glyph::Id).integer());
+/// ```
+///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let table = Table::create()
-///     .table(Char::Table)
+/// let table = Table::create(Char::Table)
 ///     .if_not_exists()
 ///     .comment("table's comment")
 ///     .col(ColumnDef::new(Char::Id).integer().not_null().auto_increment().primary_key())
@@ -49,10 +57,10 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+5]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.create-table+6]
+#[derive(Debug, Clone)]
 pub struct TableCreateStatement {
-    pub(crate) table: Option<TableName>,
+    pub(crate) table: TableName,
     pub(crate) columns: Vec<ColumnDef>,
     pub(crate) indexes: Vec<IndexCreateStatement>,
     pub(crate) foreign_keys: Vec<ForeignKeyCreateStatement>,
@@ -63,23 +71,26 @@ pub struct TableCreateStatement {
 }
 
 impl TableCreateStatement {
-    /// Construct create table statement
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct create table statement over the table it creates
+    pub fn new<T>(table: T) -> Self
+    where
+        T: IntoTableName,
+    {
+        Self {
+            table: table.into_table_name(),
+            columns: Vec::new(),
+            indexes: Vec::new(),
+            foreign_keys: Vec::new(),
+            if_not_exists: false,
+            check: Vec::new(),
+            comment: None,
+            extra: None,
+        }
     }
 
     /// Create table if table not exists
     pub fn if_not_exists(&mut self) -> &mut Self {
         self.if_not_exists = true;
-        self
-    }
-
-    /// Set table name
-    pub fn table<T>(&mut self, table: T) -> &mut Self
-    where
-        T: IntoTableName,
-    {
-        self.table = Some(table.into_table_name());
         self
     }
 
@@ -95,7 +106,7 @@ impl TableCreateStatement {
     /// Add a new table column
     pub fn col<C: IntoColumnDef>(&mut self, column: C) -> &mut Self {
         let mut column = column.into_column_def();
-        column.table.clone_from(&self.table);
+        column.table = Some(self.table.clone());
         self.columns.push(column);
         self
     }
@@ -106,8 +117,14 @@ impl TableCreateStatement {
     }
 
     /// Add a table-level index expression to the create statement
+    ///
+    /// The index is restamped onto this statement's table, as `col()` restamps
+    /// each column: an embedded index constrains the table it sits inside and
+    /// cannot name another.
     pub fn index(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
-        self.indexes.push(index.take());
+        let mut index = index.take();
+        index.table = self.table.clone();
+        self.indexes.push(index);
         self
     }
 
@@ -118,12 +135,11 @@ impl TableCreateStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let mut statement = Table::create();
+    /// let mut statement = Table::create(Glyph::Table);
     /// statement
-    ///     .table(Glyph::Table)
     ///     .col(ColumnDef::new(Glyph::Id).integer().not_null())
     ///     .col(ColumnDef::new(Glyph::Image).string().not_null())
-    ///     .primary_key(Index::create(Glyph::Id).col(Glyph::Image));
+    ///     .primary_key(Index::create(Glyph::Table, Glyph::Id).col(Glyph::Image));
     ///
     /// assert_eq!(
     ///     statement.to_string(QueryBuilder),
@@ -140,6 +156,7 @@ impl TableCreateStatement {
     pub fn primary_key(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
         let mut index = index.take();
         index.kind = IndexKind::PrimaryKey;
+        index.table = self.table.clone();
         self.indexes.push(index);
         self
     }
@@ -150,8 +167,8 @@ impl TableCreateStatement {
         self
     }
 
-    pub fn get_table_name(&self) -> Option<&TableName> {
-        self.table.as_ref()
+    pub fn get_table_name(&self) -> &TableName {
+        &self.table
     }
 
     pub fn get_columns(&self) -> &Vec<ColumnDef> {
@@ -174,8 +191,7 @@ impl TableCreateStatement {
     /// Example for PostgresSQL [Citus](https://github.com/citusdata/citus) extension:
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    /// let table = Table::create()
-    ///     .table(Char::Table)
+    /// let table = Table::create(Char::Table)
     ///     .col(
     ///         ColumnDef::new(Char::Id)
     ///             .uuid()
@@ -217,9 +233,13 @@ impl TableCreateStatement {
         self.extra.as_ref()
     }
 
+    /// Clone this statement out of a builder chain.
+    ///
+    /// The table is copied rather than moved: moving it out would leave the
+    /// targetless statement this type exists to rule out.
     pub fn take(&mut self) -> Self {
         Self {
-            table: self.table.take(),
+            table: self.table.clone(),
             columns: std::mem::take(&mut self.columns),
             indexes: std::mem::take(&mut self.indexes),
             foreign_keys: std::mem::take(&mut self.foreign_keys),

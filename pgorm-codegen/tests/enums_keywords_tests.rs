@@ -248,8 +248,7 @@ fn keyword_table_names_escaped_in_index_and_prelude() {
 fn non_snake_case_names_preserved_by_column_name() {
     let schema = || {
         vec![
-            Table::create()
-                .table(Alias::new("cake"))
+            Table::create(Alias::new("cake"))
                 .col(serial_pk("id"))
                 .col(
                     ColumnDef::new_with_type(Alias::new("bakedAt"), ColumnType::Integer)

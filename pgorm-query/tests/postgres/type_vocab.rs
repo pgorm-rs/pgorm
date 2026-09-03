@@ -430,8 +430,7 @@ fn serial_spelling_covers_the_integer_trio() {
 #[test]
 fn auto_increment_without_serial_form_renders_type() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).uuid().auto_increment())
             .to_string(QueryBuilder),
         r#"CREATE TABLE "glyph" ( "id" uuid )"#

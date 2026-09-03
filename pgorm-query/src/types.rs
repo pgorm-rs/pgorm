@@ -134,7 +134,7 @@ pub trait IntoColumnRef {
 ///
 /// let name = (Alias::new("public"), Glyph::Table).into_table_name();
 /// assert_eq!(
-///     Table::truncate().table(name.clone()).to_string(QueryBuilder),
+///     Table::truncate(name.clone()).to_string(QueryBuilder),
 ///     r#"TRUNCATE TABLE "public"."glyph""#
 /// );
 /// assert_eq!(
@@ -153,7 +153,7 @@ pub trait IntoColumnRef {
 ///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
 ///     Alias::new("q").into_iden(),
 /// );
-/// Table::truncate().table(sub);
+/// Table::truncate(sub);
 /// ```
 ///
 /// Nor does an aliased table: binding an alias makes it a [`NamedTable`], and
@@ -162,7 +162,7 @@ pub trait IntoColumnRef {
 /// ```compile_fail,E0277
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// Table::truncate().table(Glyph::Table.into_named_table().alias(Alias::new("g")));
+/// Table::truncate(Glyph::Table.into_named_table().alias(Alias::new("g")));
 /// ```
 // [spec:pgorm:def:sql.types.table-ref+2]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes

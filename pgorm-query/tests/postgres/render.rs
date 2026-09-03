@@ -58,9 +58,7 @@ fn the_single_backend_renders_every_statement_kind() {
 
     // DDL goes through the very same builder.
     assert_eq!(
-        Table::truncate()
-            .table(Glyph::Table)
-            .to_string(QueryBuilder),
+        Table::truncate(Glyph::Table).to_string(QueryBuilder),
         r#"TRUNCATE TABLE "glyph""#
     );
 
@@ -101,7 +99,7 @@ fn ddl_targets_have_no_unrenderable_shape() {
         Glyph::Table.into_table_name(),
         (Alias::new("public"), Glyph::Table).into_table_name(),
     ] {
-        let sql = Table::truncate().table(name).to_string(QueryBuilder);
+        let sql = Table::truncate(name).to_string(QueryBuilder);
         assert!(sql.starts_with("TRUNCATE TABLE "), "{sql}");
     }
 }

@@ -6,8 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr> {
-        let table = Table::create()
-            .table(Cake::Table)
+        let table = Table::create(Cake::Table)
             .col(
                 ColumnDef::new(Cake::Id)
                     .integer()
@@ -19,9 +18,8 @@ impl MigrationTrait for Migration {
             .to_owned();
         tx.execute(&table.build(QueryBuilder), &[]).await?;
 
-        let index = Index::create(Cake::Name)
+        let index = Index::create(Cake::Table, Cake::Name)
             .name("cake_name_index")
-            .table(Cake::Table)
             .to_owned();
         tx.execute(&index.build(QueryBuilder), &[]).await?;
 

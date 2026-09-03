@@ -62,8 +62,7 @@ pub async fn create_log_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(applog::Entity)
+    let stmt = pgorm_query::Table::create(applog::Entity)
         .comment("app logs")
         .col(
             ColumnDef::new(applog::Column::Id)
@@ -100,8 +99,7 @@ pub async fn create_metadata_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(metadata::Entity)
+    let stmt = pgorm_query::Table::create(metadata::Entity)
         .col(
             ColumnDef::new(metadata::Column::Uuid)
                 .uuid()
@@ -123,8 +121,7 @@ pub async fn create_repository_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(repository::Entity)
+    let stmt = pgorm_query::Table::create(repository::Entity)
         .col(
             ColumnDef::new(repository::Column::Id)
                 .string()
@@ -147,8 +144,7 @@ pub async fn create_self_join_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(self_join::Entity)
+    let stmt = pgorm_query::Table::create(self_join::Entity)
         .col(
             ColumnDef::new(self_join::Column::Uuid)
                 .uuid()
@@ -177,8 +173,7 @@ where
     let mut primary_key_col = ColumnDef::new(byte_primary_key::Column::Id);
     primary_key_col.bytea();
 
-    let stmt = pgorm_query::Table::create()
-        .table(byte_primary_key::Entity)
+    let stmt = pgorm_query::Table::create(byte_primary_key::Entity)
         .col(primary_key_col.not_null().primary_key())
         .col(
             ColumnDef::new(byte_primary_key::Column::Value)
@@ -194,8 +189,7 @@ pub async fn create_active_enum_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(active_enum::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(active_enum::Entity.table_ref())
         .col(
             ColumnDef::new(active_enum::Column::Id)
                 .integer()
@@ -218,8 +212,7 @@ pub async fn create_active_enum_child_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(active_enum_child::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(active_enum_child::Entity.table_ref())
         .col(
             ColumnDef::new(active_enum_child::Column::Id)
                 .integer()
@@ -255,8 +248,7 @@ pub async fn create_satellites_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(satellite::Entity)
+    let stmt = pgorm_query::Table::create(satellite::Entity)
         .col(
             ColumnDef::new(satellite::Column::Id)
                 .integer()
@@ -290,8 +282,7 @@ pub async fn create_transaction_log_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(transaction_log::Entity)
+    let stmt = pgorm_query::Table::create(transaction_log::Entity)
         .col(
             ColumnDef::new(transaction_log::Column::Id)
                 .integer()
@@ -328,8 +319,7 @@ pub async fn create_insert_default_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(insert_default::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(insert_default::Entity.table_ref())
         .col(
             ColumnDef::new(insert_default::Column::Id)
                 .integer()
@@ -346,8 +336,7 @@ pub async fn create_json_vec_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(json_vec::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(json_vec::Entity.table_ref())
         .col(
             ColumnDef::new(json_vec::Column::Id)
                 .integer()
@@ -365,8 +354,7 @@ pub async fn create_json_struct_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(json_struct::Entity)
+    let stmt = pgorm_query::Table::create(json_struct::Entity)
         .col(
             ColumnDef::new(json_struct::Column::Id)
                 .integer()
@@ -390,8 +378,7 @@ pub async fn create_json_string_vec_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(JsonStringVec.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(JsonStringVec.table_ref())
         .col(
             ColumnDef::new(json_vec_derive::json_string_vec::Column::Id)
                 .integer()
@@ -409,8 +396,7 @@ pub async fn create_json_struct_vec_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(JsonStructVec.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(JsonStructVec.table_ref())
         .col(
             ColumnDef::new(json_vec_derive::json_struct_vec::Column::Id)
                 .integer()
@@ -435,8 +421,7 @@ where
     db.execute("CREATE EXTENSION IF NOT EXISTS citext", &[])
         .await?;
 
-    let stmt = pgorm_query::Table::create()
-        .table(collection::Entity)
+    let stmt = pgorm_query::Table::create(collection::Entity)
         .col(
             ColumnDef::new(collection::Column::Id)
                 .integer()
@@ -502,8 +487,7 @@ pub async fn create_pi_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(pi::Entity)
+    let stmt = pgorm_query::Table::create(pi::Entity)
         .col(
             ColumnDef::new(pi::Column::Id)
                 .integer()
@@ -526,8 +510,7 @@ pub async fn create_event_trigger_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(event_trigger::Entity)
+    let stmt = pgorm_query::Table::create(event_trigger::Entity)
         .col(
             ColumnDef::new(event_trigger::Column::Id)
                 .integer()
@@ -549,8 +532,7 @@ pub async fn create_uuid_fmt_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(uuid_fmt::Entity)
+    let stmt = pgorm_query::Table::create(uuid_fmt::Entity)
         .col(
             ColumnDef::new(uuid_fmt::Column::Id)
                 .integer()
@@ -584,8 +566,7 @@ pub async fn create_edit_log_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = pgorm_query::Table::create()
-        .table(edit_log::Entity)
+    let stmt = pgorm_query::Table::create(edit_log::Entity)
         .col(
             ColumnDef::new(edit_log::Column::Id)
                 .integer()
@@ -604,8 +585,7 @@ pub async fn create_teas_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(teas::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(teas::Entity.table_ref())
         .col(
             ColumnDef::new(teas::Column::Id)
                 .enumeration(TeaEnum, [TeaVariant::EverydayTea, TeaVariant::BreakfastTea])
@@ -623,8 +603,7 @@ pub async fn create_categories_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(categories::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(categories::Entity.table_ref())
         .col(
             ColumnDef::new(categories::Column::Id)
                 .integer()
@@ -644,8 +623,7 @@ pub async fn create_binary_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(binary::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(binary::Entity.table_ref())
         .col(
             ColumnDef::new(binary::Column::Id)
                 .integer()
@@ -669,8 +647,7 @@ pub async fn create_bits_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let create_table_stmt = pgorm_query::Table::create()
-        .table(bits::Entity.table_ref())
+    let create_table_stmt = pgorm_query::Table::create(bits::Entity.table_ref())
         .col(
             ColumnDef::new(bits::Column::Id)
                 .integer()
@@ -728,8 +705,7 @@ where
         },
     ];
     for entity in entities {
-        let create_table_stmt = pgorm_query::Table::create()
-            .table(entity.table_ref())
+        let create_table_stmt = pgorm_query::Table::create(entity.table_ref())
             .col(
                 ColumnDef::new(Column::Id)
                     .integer()
@@ -750,8 +726,7 @@ pub async fn create_value_type_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let general_stmt = pgorm_query::Table::create()
-        .table(value_type::value_type_general::Entity)
+    let general_stmt = pgorm_query::Table::create(value_type::value_type_general::Entity)
         .col(
             ColumnDef::new(value_type::value_type_general::Column::Id)
                 .integer()
@@ -772,8 +747,7 @@ pub async fn create_value_type_postgres_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let postgres_stmt = pgorm_query::Table::create()
-        .table(value_type::value_type_pg::Entity)
+    let postgres_stmt = pgorm_query::Table::create(value_type::value_type_pg::Entity)
         .col(
             ColumnDef::new(value_type::value_type_pg::Column::Id)
                 .integer()

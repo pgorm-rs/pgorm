@@ -32,11 +32,14 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+3]
+> [spec:pgorm:sem:codegen.entity.transform+4]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. The table name is unpacked from either `TableName`
-> form (`Table` and `SchemaTable`, the schema discarded); a statement with no
-> table name yields `Error::TransformError("Table name should not be empty")`.
+> form (`Table` and `SchemaTable`, the schema discarded); every statement has
+> one, so the read cannot fail and the
+> `TransformError("Table name should not be empty")` that stood in for the
+> nameless case is gone with the state it guarded
+> (`[spec:pgorm:req:sql.ddl.create-table+6]`), and MUST NOT come back.
 >
 > Per column: `auto_increment` and `not_null` come from the presence of the
 > matching `ColumnSpec` on the column definition; a column with no

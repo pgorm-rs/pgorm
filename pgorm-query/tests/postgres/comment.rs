@@ -84,9 +84,7 @@ fn comment_and_ddl_share_one_table_name() {
         r#"COMMENT ON TABLE "public"."glyph" IS 'shared'"#
     );
     assert_eq!(
-        Table::truncate()
-            .table(name.clone())
-            .to_string(QueryBuilder),
+        Table::truncate(name.clone()).to_string(QueryBuilder),
         r#"TRUNCATE TABLE "public"."glyph""#
     );
     assert_eq!(

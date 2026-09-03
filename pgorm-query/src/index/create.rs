@@ -6,15 +6,17 @@ use super::common::*;
 
 /// Create an index for an existing table
 ///
-/// An index indexes at least one column, in both the standalone and the
-/// `CREATE TABLE`-embedded position, so the first one is taken by the
-/// constructor and `col` appends the rest: the empty column list PostgreSQL
-/// rejects has nowhere to come from.
+/// An index indexes at least one column of exactly one table, in both the
+/// standalone and the `CREATE TABLE`-embedded position, so both are taken by the
+/// constructor and `col` appends the remaining columns: neither the empty column
+/// list nor the missing `ON` target PostgreSQL rejects has anywhere to come from.
+/// The index name stays optional, because PostgreSQL derives one when it is
+/// absent.
 ///
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// Index::create().name("idx-glyph-aspect").table(Glyph::Table);
+/// Index::create(Glyph::Aspect).name("idx-glyph-aspect");
 /// ```
 ///
 /// # Examples
@@ -22,9 +24,8 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create(Glyph::Aspect)
+/// let index = Index::create(Glyph::Table, Glyph::Aspect)
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -36,10 +37,9 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create(Glyph::Aspect)
+/// let index = Index::create(Glyph::Table, Glyph::Aspect)
 ///     .if_not_exists()
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -51,9 +51,8 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create((Glyph::Aspect, 128))
+/// let index = Index::create(Glyph::Table, (Glyph::Aspect, 128))
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -65,9 +64,8 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create((Glyph::Aspect, IndexOrder::Desc))
+/// let index = Index::create(Glyph::Table, (Glyph::Aspect, IndexOrder::Desc))
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -79,9 +77,8 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create((Glyph::Image, IndexOrder::Asc))
+/// let index = Index::create(Glyph::Table, (Glyph::Image, IndexOrder::Asc))
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .col((Glyph::Aspect, IndexOrder::Desc))
 ///     .unique()
 ///     .to_owned();
@@ -95,9 +92,8 @@ use super::common::*;
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create((Glyph::Aspect, 64, IndexOrder::Asc))
+/// let index = Index::create(Glyph::Table, (Glyph::Aspect, 64, IndexOrder::Asc))
 ///     .name("idx-glyph-aspect")
-///     .table(Glyph::Table)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -105,10 +101,10 @@ use super::common::*;
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+3]
+// [spec:pgorm:req:sql.ddl.index-create+4]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
-    pub(crate) table: Option<TableName>,
+    pub(crate) table: TableName,
     pub(crate) index: TableIndex,
     pub(crate) kind: IndexKind,
     pub(crate) nulls_not_distinct: bool,
@@ -126,7 +122,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+3]
+// [spec:pgorm:req:sql.ddl.index-create+4]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -139,7 +135,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+3]
+// [spec:pgorm:req:sql.ddl.index-create+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -168,15 +164,16 @@ pub enum IndexType {
 }
 
 impl IndexCreateStatement {
-    /// Construct a new [`IndexCreateStatement`] over its first column
-    pub fn new<C>(col: C) -> Self
+    /// Construct a new [`IndexCreateStatement`] over its table and first column
+    pub fn new<T, C>(table: T, col: C) -> Self
     where
+        T: IntoTableName,
         C: IntoIndexColumn,
     {
         let mut index = TableIndex::new();
         index.col(col.into_index_column());
         Self {
-            table: None,
+            table: table.into_table_name(),
             index,
             kind: IndexKind::default(),
             nulls_not_distinct: false,
@@ -197,15 +194,6 @@ impl IndexCreateStatement {
         T: IntoIden,
     {
         self.index.name(name);
-        self
-    }
-
-    /// Set target table
-    pub fn table<T>(&mut self, table: T) -> &mut Self
-    where
-        T: IntoTableName,
-    {
-        self.table = Some(table.into_table_name());
         self
     }
 
@@ -276,11 +264,14 @@ impl IndexCreateStatement {
         &self.index
     }
 
+    pub fn get_table_name(&self) -> &TableName {
+        &self.table
+    }
+
     /// Clone this statement out of a builder chain.
     ///
-    /// Unlike the other DDL builders this copies rather than moves: moving the
-    /// columns out would leave a column-less index behind, which is the very
-    /// state this type exists to rule out.
+    /// This copies rather than moves: moving the table or the columns out would
+    /// leave the targetless, column-less index this type exists to rule out.
     pub fn take(&mut self) -> Self {
         self.clone()
     }

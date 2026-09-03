@@ -91,11 +91,10 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let Some(first) = columns.next() else {
         return Err(on("an index over no columns"));
     };
-    let mut index = Index::create(first);
+    let mut index = Index::create(Alias::new(table.as_str()), first);
     if !stmt.idxname.is_empty() {
         index.name(stmt.idxname.as_str());
     }
-    index.table(Alias::new(table.as_str()));
     if stmt.if_not_exists {
         index.if_not_exists();
     }

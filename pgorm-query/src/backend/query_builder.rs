@@ -1619,7 +1619,7 @@ impl QueryBuilder {
         ""
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+2]
+    // [spec:pgorm:req:sql.ddl.alter-table+3]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1717,13 +1717,8 @@ impl QueryBuilder {
                     column_name.prepare(sql.as_writer(), self.quote());
                 }
                 TableAlterOption::DropForeignKey(name) => {
-                    let mut foreign_key = TableForeignKey::new();
-                    foreign_key.name(name.clone());
-                    let drop = ForeignKeyDropStatement {
-                        foreign_key,
-                        table: None,
-                    };
-                    self.prepare_foreign_key_drop_statement_internal(&drop, sql, Mode::TableAlter);
+                    write!(sql, "DROP CONSTRAINT ").unwrap();
+                    name.prepare(sql.as_writer(), self.quote());
                 }
                 TableAlterOption::AddForeignKey(foreign_key) => {
                     let create = ForeignKeyCreateStatement {
@@ -1740,45 +1735,35 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
     pub(crate) fn prepare_table_rename_statement(
         &self,
         rename: &TableRenameStatement,
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "ALTER TABLE ").unwrap();
-        if let Some(from_name) = &rename.from_name {
-            self.prepare_table_name(from_name, sql);
-        }
+        self.prepare_table_name(&rename.from_name, sql);
         write!(sql, " RENAME TO ").unwrap();
-        if let Some(to_name) = &rename.to_name {
-            to_name.prepare(sql.as_writer(), self.quote());
-        }
+        rename.to_name.prepare(sql.as_writer(), self.quote());
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+2]
+    // [spec:pgorm:req:sql.ddl.alter-table+3]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "ALTER TABLE ").unwrap();
-        if let Some(table) = &rename.table {
-            self.prepare_table_name(table, sql);
-        }
+        self.prepare_table_name(&rename.table, sql);
         write!(sql, " RENAME COLUMN ").unwrap();
-        if let Some(from_name) = &rename.from_name {
-            from_name.prepare(sql.as_writer(), self.quote());
-        }
+        rename.from_name.prepare(sql.as_writer(), self.quote());
         write!(sql, " TO ").unwrap();
-        if let Some(to_name) = &rename.to_name {
-            to_name.prepare(sql.as_writer(), self.quote());
-        }
+        rename.to_name.prepare(sql.as_writer(), self.quote());
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+5]
+    // [spec:pgorm:req:sql.ddl.create-table+6]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1788,9 +1773,7 @@ impl QueryBuilder {
 
         self.prepare_create_table_if_not_exists(create, sql);
 
-        if let Some(table_name) = &create.table {
-            self.prepare_table_name(table_name, sql);
-        }
+        self.prepare_table_name(&create.table, sql);
 
         write!(sql, " ( ").unwrap();
         let mut first = true;
@@ -1888,7 +1871,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
     pub(crate) fn prepare_table_drop_statement(
         &self,
         drop: &TableDropStatement,
@@ -1933,10 +1916,7 @@ impl QueryBuilder {
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "TRUNCATE TABLE ").unwrap();
-
-        if let Some(table) = &truncate.table {
-            self.prepare_table_name(table, sql);
-        }
+        self.prepare_table_name(&truncate.table, sql);
     }
 
     /// Translate the check constraint into SQL statement
@@ -2001,7 +1981,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+3]
+    // [spec:pgorm:req:sql.ddl.index-create+4]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -2025,9 +2005,7 @@ impl QueryBuilder {
         }
 
         write!(sql, " ON ").unwrap();
-        if let Some(table) = &create.table {
-            self.prepare_table_name(table, sql);
-        }
+        self.prepare_table_name(&create.table, sql);
 
         self.prepare_index_type(&create.index_type, sql);
         write!(sql, " ").unwrap();
@@ -2038,7 +2016,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.index-drop+1]
+    // [spec:pgorm:req:sql.ddl.index-drop+2]
     pub(crate) fn prepare_index_drop_statement(
         &self,
         drop: &IndexDropStatement,
@@ -2054,9 +2032,7 @@ impl QueryBuilder {
             schema.prepare(sql.as_writer(), self.quote());
             write!(sql, ".").unwrap();
         }
-        if let Some(name) = &drop.index.name {
-            name.prepare(sql.as_writer(), self.quote());
-        }
+        drop.name.prepare(sql.as_writer(), self.quote());
     }
 
     fn prepare_index_type(&self, col_index_type: &Option<IndexType>, sql: &mut dyn SqlWriter) {
@@ -2106,27 +2082,20 @@ impl QueryBuilder {
 
     // FOREIGN KEY
 
-    fn prepare_foreign_key_drop_statement_internal(
+    /// Translate [`ForeignKeyDropStatement`] into SQL statement.
+    // [spec:pgorm:req:sql.ddl.foreign-key+2]
+    pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
         sql: &mut dyn SqlWriter,
-        mode: Mode,
     ) {
-        if mode == Mode::Alter {
-            write!(sql, "ALTER TABLE ").unwrap();
-            if let Some(table) = &drop.table {
-                self.prepare_table_name(table, sql);
-            }
-            write!(sql, " ").unwrap();
-        }
-
-        write!(sql, "DROP CONSTRAINT ").unwrap();
-        if let Some(name) = &drop.foreign_key.name {
-            name.prepare(sql.as_writer(), self.quote());
-        }
+        write!(sql, "ALTER TABLE ").unwrap();
+        self.prepare_table_name(&drop.table, sql);
+        write!(sql, " DROP CONSTRAINT ").unwrap();
+        drop.name.prepare(sql.as_writer(), self.quote());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+1]
+    // [spec:pgorm:req:sql.ddl.foreign-key+2]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2199,15 +2168,6 @@ impl QueryBuilder {
         sql: &mut dyn SqlWriter,
     ) {
         self.prepare_foreign_key_create_statement_internal(create, sql, Mode::Alter)
-    }
-
-    /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    pub(crate) fn prepare_foreign_key_drop_statement(
-        &self,
-        drop: &ForeignKeyDropStatement,
-        sql: &mut dyn SqlWriter,
-    ) {
-        self.prepare_foreign_key_drop_statement_internal(drop, sql, Mode::Alter)
     }
 
     /// Translate [`ForeignKeyAction`] into SQL statement.
@@ -2358,7 +2318,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum]
+    // [spec:pgorm:req:sql.ddl.type-enum+1]
     // [spec:pgorm:req:sql.render.ddl.enum-type+1]
     pub(crate) fn prepare_type_create_statement(
         &self,
@@ -2415,7 +2375,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+1]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+2]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
@@ -2454,7 +2414,7 @@ impl QueryBuilder {
     }
 
     // EXTENSION
-    // [spec:pgorm:req:sql.ddl.extension+1]
+    // [spec:pgorm:req:sql.ddl.extension+2]
     // [spec:pgorm:sem:sql.render.ddl.extension+1] (CREATE EXTENSION)
     pub(crate) fn prepare_extension_create_statement(
         &self,

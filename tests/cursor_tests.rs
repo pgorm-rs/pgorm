@@ -998,8 +998,7 @@ async fn cursor_over_network_types() -> Result<(), DbErr> {
     let ip_col = Alias::new("ip");
     let mac_col = Alias::new("mac");
 
-    let create = Table::create()
-        .table(Entity)
+    let create = Table::create(Entity)
         .col(
             ColumnDef::new(Column::Id)
                 .integer()

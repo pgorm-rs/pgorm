@@ -4,51 +4,47 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 
 /// Rename a table
 ///
+/// Both names are taken by the constructor: a rename that names neither end has
+/// no PostgreSQL spelling, so it does not construct.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::rename().to_string(QueryBuilder);
+/// ```
+///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// let table = Table::rename()
-///     .table(Font::Table, Alias::new("font_new"))
-///     .to_owned();
+/// let table = Table::rename(Font::Table, Alias::new("font_new"));
 ///
 /// assert_eq!(
 ///     table.to_string(QueryBuilder),
 ///     r#"ALTER TABLE "font" RENAME TO "font_new""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+#[derive(Debug, Clone)]
 pub struct TableRenameStatement {
-    pub(crate) from_name: Option<TableName>,
-    pub(crate) to_name: Option<DynIden>,
+    pub(crate) from_name: TableName,
+    pub(crate) to_name: DynIden,
 }
 
 impl TableRenameStatement {
-    /// Construct rename table statement
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set old and new table name.
+    /// Construct rename table statement from the old and new table name.
     ///
     /// The new name is a bare identifier: `RENAME TO` leaves the table in the
     /// schema it is already in, so a qualified target does not construct.
-    pub fn table<T, R>(&mut self, from_name: T, to_name: R) -> &mut Self
+    pub fn new<T, R>(from_name: T, to_name: R) -> Self
     where
         T: IntoTableName,
         R: IntoIden,
     {
-        self.from_name = Some(from_name.into_table_name());
-        self.to_name = Some(to_name.into_iden());
-        self
-    }
-
-    pub fn take(&mut self) -> Self {
         Self {
-            from_name: self.from_name.take(),
-            to_name: self.to_name.take(),
+            from_name: from_name.into_table_name(),
+            to_name: to_name.into_iden(),
         }
     }
 }
@@ -76,60 +72,51 @@ impl SchemaStatementBuilder for TableRenameStatement {
 /// column rename is a statement of its own rather than an option that could be
 /// listed beside `ADD COLUMN` or `DROP COLUMN`.
 ///
+/// All three names are taken by the constructor: none of them has a spelling the
+/// grammar can do without, so a partly-named rename does not construct.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::rename_column().to_string(QueryBuilder);
+/// ```
+///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// let table = Table::rename_column()
-///     .table(Font::Table)
-///     .column(Alias::new("new_col"), Alias::new("new_column"))
-///     .to_owned();
+/// let table = Table::rename_column(
+///     Font::Table,
+///     Alias::new("new_col"),
+///     Alias::new("new_column"),
+/// );
 ///
 /// assert_eq!(
 ///     table.to_string(QueryBuilder),
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+2]
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.alter-table+3]
+#[derive(Debug, Clone)]
 pub struct ColumnRenameStatement {
-    pub(crate) table: Option<TableName>,
-    pub(crate) from_name: Option<DynIden>,
-    pub(crate) to_name: Option<DynIden>,
+    pub(crate) table: TableName,
+    pub(crate) from_name: DynIden,
+    pub(crate) to_name: DynIden,
 }
 
 impl ColumnRenameStatement {
-    /// Construct rename column statement
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the table the column belongs to
-    pub fn table<T>(&mut self, table: T) -> &mut Self
+    /// Construct rename column statement from the table and the two column names
+    pub fn new<T, F, R>(table: T, from_name: F, to_name: R) -> Self
     where
         T: IntoTableName,
-    {
-        self.table = Some(table.into_table_name());
-        self
-    }
-
-    /// Set old and new column name
-    pub fn column<T, R>(&mut self, from_name: T, to_name: R) -> &mut Self
-    where
-        T: IntoIden,
+        F: IntoIden,
         R: IntoIden,
     {
-        self.from_name = Some(from_name.into_iden());
-        self.to_name = Some(to_name.into_iden());
-        self
-    }
-
-    pub fn take(&mut self) -> Self {
         Self {
-            table: self.table.take(),
-            from_name: self.from_name.take(),
-            to_name: self.to_name.take(),
+            table: table.into_table_name(),
+            from_name: from_name.into_iden(),
+            to_name: to_name.into_iden(),
         }
     }
 }

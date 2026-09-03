@@ -16,8 +16,7 @@ const HEADER: &str = concat!(
 
 fn vendor_schema() -> Vec<pgorm_query::TableCreateStatement> {
     vec![
-        Table::create()
-            .table(Alias::new("vendor"))
+        Table::create(Alias::new("vendor"))
             .col(serial_pk("id"))
             .col(
                 ColumnDef::new(Alias::new("name"))
@@ -100,9 +99,14 @@ fn entity_model_carries_column_relation_and_pk_facts() {
 // [spec:pgorm:def:codegen.entity/test]    errors are the two-variant `Error` enum
 #[test]
 fn errors_are_the_two_variant_error_enum() {
-    let nameless = Table::create().col(serial_pk("id")).to_owned();
-    match EntityTransformer::transform(vec![nameless]) {
-        Err(Error::TransformError(msg)) => assert_eq!(msg, "Table name should not be empty"),
+    let untyped = Table::create(Alias::new("cake"))
+        .col(ColumnDef::new(Alias::new("id")))
+        .to_owned();
+    match EntityTransformer::transform(vec![untyped]) {
+        Err(Error::TransformError(msg)) => assert_eq!(
+            msg,
+            "table `cake` column `id`: column type should not be empty"
+        ),
         other => panic!("expected Error::TransformError, got {other:?}"),
     }
 

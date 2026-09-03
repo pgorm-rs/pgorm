@@ -7,8 +7,7 @@ async fn create_table(db: &DbConn, stmt: &TableCreateStatement) -> Result<ExecRe
 }
 
 pub async fn create_post_table(db: &DbConn) -> Result<ExecResult, DbErr> {
-    let stmt = pgorm_query::Table::create()
-        .table(super::post::Entity)
+    let stmt = pgorm_query::Table::create(super::post::Entity)
         .if_not_exists()
         .col(
             ColumnDef::new(super::post::Column::Id)

@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 use pgorm_query::extension::{Extension, PgLTree};
 
-// [spec:pgorm:req:sql.ddl.extension+1/test]    every part of the CREATE EXTENSION grammar
+// [spec:pgorm:req:sql.ddl.extension+2/test]    every part of the CREATE EXTENSION grammar
 #[test]
 fn create_1() {
     assert_eq!(
@@ -11,7 +11,7 @@ fn create_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+1/test]
+// [spec:pgorm:req:sql.ddl.extension+2/test]
 #[test]
 fn create_2() {
     assert_eq!(
@@ -26,7 +26,7 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+1/test]    `PgLTree` is a ready-made `Iden` rendering `ltree`,
+// [spec:pgorm:req:sql.ddl.extension+2/test]    `PgLTree` is a ready-made `Iden` rendering `ltree`,
 // usable as an extension name through `From<PgLTree> for String`
 #[test]
 fn create_3() {
@@ -38,15 +38,14 @@ fn create_3() {
 
     // The matching column type is `ColumnType::LTree`.
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Tokens).ltree())
             .to_string(QueryBuilder),
         r#"CREATE TABLE "glyph" ( "tokens" ltree )"#
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+1/test]    on drop, `cascade` and `restrict` share one slot,
+// [spec:pgorm:req:sql.ddl.extension+2/test]    on drop, `cascade` and `restrict` share one slot,
 // so the last call wins and the pair PostgreSQL rejects cannot be built
 #[test]
 fn drop_1() {

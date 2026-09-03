@@ -302,8 +302,7 @@ impl ColumnDef {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::create()
-    ///     .table(Char::Table)
+    /// let table = Table::create(Char::Table)
     ///     .col(ColumnDef::new(Char::FontId).integer().default(12i32))
     ///     .col(
     ///         ColumnDef::new(Char::CreatedAt)
@@ -427,8 +426,7 @@ impl ColumnDef {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     /// assert_eq!(
-    ///     Table::create()
-    ///         .table(Glyph::Table)
+    ///     Table::create(Glyph::Table)
     ///         .col(
     ///             ColumnDef::new(Alias::new("I1"))
     ///                 .interval(IntervalSpec::Any(None))
@@ -603,8 +601,7 @@ impl ColumnDef {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     /// assert_eq!(
-    ///     Table::create()
-    ///         .table(Glyph::Table)
+    ///     Table::create(Glyph::Table)
     ///         .col(
     ///             ColumnDef::new(Glyph::Id)
     ///                 .integer()
@@ -633,8 +630,7 @@ impl ColumnDef {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     /// assert_eq!(
-    ///     Table::create()
-    ///         .table(Glyph::Table)
+    ///     Table::create(Glyph::Table)
     ///         .col(
     ///             ColumnDef::new(Glyph::Id)
     ///                 .integer()
@@ -668,8 +664,7 @@ impl ColumnDef {
     /// Some extra options in custom string
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    /// let table = Table::create()
-    ///     .table(Char::Table)
+    /// let table = Table::create(Char::Table)
     ///     .col(
     ///         ColumnDef::new(Char::Id)
     ///             .uuid()

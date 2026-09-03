@@ -31,8 +31,7 @@ async fn main() -> Result<(), DbErr> {
 async fn setup_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
     use pgorm_query::{ColumnDef, Table};
 
-    let stmt = Table::create()
-        .table(cake::Entity)
+    let stmt = Table::create(cake::Entity)
         .col(
             ColumnDef::new(cake::Column::Id)
                 .integer()

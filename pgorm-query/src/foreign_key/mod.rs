@@ -13,6 +13,8 @@ pub use common::*;
 pub use create::*;
 pub use drop::*;
 
+use crate::types::{IntoIden, IntoTableName};
+
 /// Shorthand for constructing any foreign key statement
 #[derive(Debug, Clone)]
 pub struct ForeignKey;
@@ -32,8 +34,12 @@ impl ForeignKey {
         ForeignKeyCreateStatement::new()
     }
 
-    /// Construct foreign key [`ForeignKeyDropStatement`]
-    pub fn drop() -> ForeignKeyDropStatement {
-        ForeignKeyDropStatement::new()
+    /// Construct foreign key [`ForeignKeyDropStatement`] over its table and constraint
+    pub fn drop<T, N>(table: T, name: N) -> ForeignKeyDropStatement
+    where
+        T: IntoTableName,
+        N: IntoIden,
+    {
+        ForeignKeyDropStatement::new(table, name)
     }
 }

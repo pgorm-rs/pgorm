@@ -240,7 +240,7 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3]
+// [spec:pgorm:sem:codegen.entity.transform+4]
 impl TryFrom<&TableForeignKey> for Relation {
     type Error = Error;
 

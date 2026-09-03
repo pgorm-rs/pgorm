@@ -410,12 +410,11 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .if_not_exists()
             .col(
                 ColumnDef::new(Glyph::Id)
@@ -431,7 +430,12 @@ fn sweep_table_ddl_shapes() {
                     .json_binary()
                     .check(Expr::col(Glyph::Aspect).gt(0)),
             )
-            .index(&mut Index::create(Glyph::Id).name("glyph_pk").primary().take())
+            .index(
+                &mut Index::create(Glyph::Table, Glyph::Id)
+                    .name("glyph_pk")
+                    .primary()
+                    .take(),
+            )
             .foreign_key(
                 &mut ForeignKey::create()
                     .from(Glyph::Table, Glyph::Id)
@@ -440,8 +444,7 @@ fn sweep_table_ddl_shapes() {
                     .take(),
             )
             .to_string(QueryBuilder),
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
@@ -457,9 +460,7 @@ fn sweep_table_ddl_shapes() {
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).null())
             .to_string(QueryBuilder),
-        Table::rename_column()
-            .table(Glyph::Table)
-            .column(Glyph::Aspect, Alias::new("ratio"))
+        Table::rename_column(Glyph::Table, Glyph::Aspect, Alias::new("ratio"))
             .to_string(QueryBuilder),
         Table::alter(Glyph::Table)
             .drop_column(Glyph::Aspect)
@@ -467,19 +468,13 @@ fn sweep_table_ddl_shapes() {
         Table::alter(Char::Table)
             .drop_foreign_key(Alias::new("fk"))
             .to_string(QueryBuilder),
-        Table::rename()
-            .table(Glyph::Table, Alias::new("glyph_old"))
-            .to_string(QueryBuilder),
-        Table::truncate()
-            .table(Glyph::Table)
-            .to_string(QueryBuilder),
-        Table::drop()
-            .table(Glyph::Table)
+        Table::rename(Glyph::Table, Alias::new("glyph_old")).to_string(QueryBuilder),
+        Table::truncate(Glyph::Table).to_string(QueryBuilder),
+        Table::drop(Glyph::Table)
             .if_exists()
             .cascade()
             .to_string(QueryBuilder),
-        Table::drop()
-            .table(Glyph::Table)
+        Table::drop(Glyph::Table)
             .table(Font::Table)
             .restrict()
             .to_string(QueryBuilder),
@@ -487,33 +482,29 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+3/test]
+// [spec:pgorm:req:sql.ddl.index-create+4/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([
-        Index::create(Glyph::Aspect)
+        Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .table(Glyph::Table)
             .to_string(QueryBuilder),
-        Index::create(Glyph::Aspect)
+        Index::create((Alias::new("public"), Glyph::Table), Glyph::Aspect)
             .if_not_exists()
             .unique()
             .nulls_not_distinct()
             .name("idx")
-            .table((Alias::new("public"), Glyph::Table))
             .col(Glyph::Image)
             .to_string(QueryBuilder),
-        Index::create(Glyph::Tokens)
+        Index::create(Glyph::Table, Glyph::Tokens)
             .name("idx")
-            .table(Glyph::Table)
             .index_type(IndexType::FullText)
             .to_string(QueryBuilder),
-        Index::create(Glyph::Aspect)
+        Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .table(Glyph::Table)
             .index_type(IndexType::Hash)
             .to_string(QueryBuilder),
-        Index::drop().name("idx").to_string(QueryBuilder),
+        Index::drop("idx").to_string(QueryBuilder),
         ForeignKey::create()
             .name("fk")
             .from(Char::Table, Char::FontId)
@@ -521,10 +512,7 @@ fn sweep_schema_object_ddl_shapes() {
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::NoAction)
             .to_string(QueryBuilder),
-        ForeignKey::drop()
-            .name("fk")
-            .table(Char::Table)
-            .to_string(QueryBuilder),
+        ForeignKey::drop(Char::Table, "fk").to_string(QueryBuilder),
         Type::create()
             .as_enum(Alias::new("tea"))
             .values([Alias::new("breakfast"), Alias::new("earl grey")])
@@ -614,8 +602,7 @@ fn sweep_column_type_vocabulary() {
     ];
 
     sweep(types.into_iter().map(|column_type| {
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new_with_type(Alias::new("c"), column_type))
             .to_string(QueryBuilder)
     }));
@@ -729,9 +716,7 @@ fn oracle_pairs_text_and_grammar_checks() {
         r#"SELECT "id" FROM "glyph""#,
     );
     assert_query_eq(
-        &Table::truncate()
-            .table(Glyph::Table)
-            .to_string(QueryBuilder),
+        &Table::truncate(Glyph::Table).to_string(QueryBuilder),
         r#"TRUNCATE TABLE "glyph""#,
     );
 }

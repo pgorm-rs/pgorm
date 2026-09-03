@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.foreign-key+1/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -40,14 +40,11 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.foreign-key+1/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
 #[test]
 fn drop_1() {
     assert_eq!(
-        ForeignKey::drop()
-            .name("FK_2e303c3a712662f1fc2a4d0aad6")
-            .table(Char::Table)
-            .to_string(QueryBuilder),
+        ForeignKey::drop(Char::Table, "FK_2e303c3a712662f1fc2a4d0aad6").to_string(QueryBuilder),
         r#"ALTER TABLE "character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
     );
 }
@@ -55,10 +52,11 @@ fn drop_1() {
 #[test]
 fn drop_2() {
     assert_eq!(
-        ForeignKey::drop()
-            .name("FK_2e303c3a712662f1fc2a4d0aad6")
-            .table((Alias::new("schema"), Char::Table))
-            .to_string(QueryBuilder),
+        ForeignKey::drop(
+            (Alias::new("schema"), Char::Table),
+            "FK_2e303c3a712662f1fc2a4d0aad6"
+        )
+        .to_string(QueryBuilder),
         r#"ALTER TABLE "schema"."character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
     );
 }

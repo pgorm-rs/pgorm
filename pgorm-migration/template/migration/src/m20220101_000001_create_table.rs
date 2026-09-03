@@ -7,8 +7,7 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     // Replace the sample below with your own migration scripts.
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr> {
-        let table = Table::create()
-            .table(Post::Table)
+        let table = Table::create(Post::Table)
             .if_not_exists()
             .col(
                 ColumnDef::new(Post::Id)

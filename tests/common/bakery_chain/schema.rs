@@ -21,8 +21,7 @@ pub async fn create_bakery_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(bakery::Entity)
+    let stmt = Table::create(bakery::Entity)
         .col(
             ColumnDef::new(bakery::Column::Id)
                 .integer()
@@ -45,8 +44,7 @@ pub async fn create_baker_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(baker::Entity)
+    let stmt = Table::create(baker::Entity)
         .col(
             ColumnDef::new(baker::Column::Id)
                 .integer()
@@ -78,8 +76,7 @@ pub async fn create_customer_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(customer::Entity)
+    let stmt = Table::create(customer::Entity)
         .col(
             ColumnDef::new(customer::Column::Id)
                 .integer()
@@ -98,8 +95,7 @@ pub async fn create_order_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(order::Entity)
+    let stmt = Table::create(order::Entity)
         .col(
             ColumnDef::new(order::Column::Id)
                 .integer()
@@ -146,8 +142,7 @@ pub async fn create_lineitem_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(lineitem::Entity)
+    let stmt = Table::create(lineitem::Entity)
         .col(
             ColumnDef::new(lineitem::Column::Id)
                 .integer()
@@ -198,8 +193,7 @@ pub async fn create_cakes_bakers_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(cakes_bakers::Entity)
+    let stmt = Table::create(cakes_bakers::Entity)
         .col(
             ColumnDef::new(cakes_bakers::Column::CakeId)
                 .integer()
@@ -211,7 +205,7 @@ where
                 .not_null(),
         )
         .primary_key(
-            Index::create(cakes_bakers::Column::CakeId)
+            Index::create(cakes_bakers::Entity, cakes_bakers::Column::CakeId)
                 .name("pk-cakes_bakers")
                 .col(cakes_bakers::Column::BakerId),
         )
@@ -238,8 +232,7 @@ pub async fn create_cake_table<C>(db: &C) -> Result<u64, DbErr>
 where
     C: ConnectionTrait,
 {
-    let stmt = Table::create()
-        .table(cake::Entity)
+    let stmt = Table::create(cake::Entity)
         .col(
             ColumnDef::new(cake::Column::Id)
                 .integer()

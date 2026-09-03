@@ -55,7 +55,7 @@ impl Extension {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+1]
+// [spec:pgorm:req:sql.ddl.extension+2]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensionCreateStatement {
     pub(crate) name: String,
@@ -135,7 +135,7 @@ impl ExtensionCreateStatement {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+1]
+// [spec:pgorm:req:sql.ddl.extension+2]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensionDropStatement {
     pub(crate) name: String,
@@ -151,7 +151,7 @@ pub struct ExtensionDropStatement {
 ///
 /// PostgreSQL takes one of `CASCADE` and `RESTRICT`, never both, so the two
 /// spellings share one slot.
-// [spec:pgorm:req:sql.ddl.extension+1]
+// [spec:pgorm:req:sql.ddl.extension+2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtensionDropOpt {
     Cascade,
@@ -440,7 +440,7 @@ where
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-enum]
+// [spec:pgorm:req:sql.ddl.type-enum+1]
 #[derive(Debug, Clone, Default)]
 pub struct TypeCreateStatement {
     pub(crate) name: Option<TypeRef>,
@@ -464,7 +464,7 @@ pub struct TypeDropStatement {
     pub(crate) if_exists: bool,
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+1]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+2]
 #[derive(Debug, Clone, Default)]
 pub struct TypeAlterStatement {
     pub(crate) name: Option<TypeRef>,

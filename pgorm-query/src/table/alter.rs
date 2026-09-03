@@ -18,7 +18,7 @@ use inherent::inherent;
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+2]
+// [spec:pgorm:req:sql.ddl.alter-table+3]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -97,7 +97,7 @@ impl PendingTableAlter {
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+2]
+// [spec:pgorm:req:sql.ddl.alter-table+3]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: TableName,
@@ -118,7 +118,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+2]
+// [spec:pgorm:req:sql.ddl.alter-table+3]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),

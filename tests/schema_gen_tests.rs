@@ -212,7 +212,7 @@ fn create_table_from_entity_projects_columns() {
     // Table ref comes from `entity.table_ref()`, hence schema-qualified.
     assert_eq!(
         stmt.get_table_name(),
-        Some(&widget::Entity.table_ref()),
+        &widget::Entity.table_ref(),
         "the statement targets the entity's table ref"
     );
     assert_eq!(
@@ -428,7 +428,7 @@ fn create_index_from_entity_uses_table_ref() {
     let table = schema.create_table_from_entity(widget::Entity);
     assert_eq!(
         table.get_table_name(),
-        Some(&widget::Entity.table_ref()),
+        &widget::Entity.table_ref(),
         "index and table projections agree on the target ref"
     );
 

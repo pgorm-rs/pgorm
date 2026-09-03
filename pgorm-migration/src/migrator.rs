@@ -6,9 +6,7 @@ use std::time::SystemTime;
 use tracing::info;
 
 use super::{MigrationTrait, seaql_migrations};
-use pgorm::pgorm_query::{
-    self, ColumnDef, IntoIden, Order, Query, QueryBuilder, SelectStatement, Table,
-};
+use pgorm::pgorm_query::{ColumnDef, IntoIden, Order, Query, QueryBuilder, SelectStatement, Table};
 use pgorm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,
     DynIden, EntityTrait, FromQueryResult, Iterable, TransactionTrait,
@@ -153,8 +151,7 @@ pub trait MigratorTrait: Send {
     /// Create migration table `seaql_migrations` in the database
     // [spec:pgorm:def:migration.runner]    self-provisioning ledger under migration_table_name()
     async fn install(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
-        let stmt = Table::create()
-            .table_name(Self::migration_table_name())
+        let stmt = Table::create(Self::migration_table_name())
             .if_not_exists()
             .col(
                 ColumnDef::new(seaql_migrations::Column::Version)
@@ -267,15 +264,6 @@ impl QueryTable for SelectStatement {
 
     fn table_name(mut self, table_name: DynIden) -> SelectStatement {
         self.from(table_name);
-        self
-    }
-}
-
-impl QueryTable for pgorm_query::TableCreateStatement {
-    type Statement = pgorm_query::TableCreateStatement;
-
-    fn table_name(mut self, table_name: DynIden) -> pgorm_query::TableCreateStatement {
-        self.table(table_name);
         self
     }
 }

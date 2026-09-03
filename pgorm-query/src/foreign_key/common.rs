@@ -1,7 +1,7 @@
 use crate::types::*;
 
 /// Specification of a foreign key
-// [spec:pgorm:req:sql.ddl.foreign-key+1]
+// [spec:pgorm:req:sql.ddl.foreign-key+2]
 #[derive(Default, Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<DynIden>,

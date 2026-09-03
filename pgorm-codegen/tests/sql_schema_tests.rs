@@ -172,7 +172,7 @@ fn schema_qualified_table_names_are_kept() {
     let tables = parse_schema(SQL).expect("schema should parse");
     let table = tables.first().expect("the task table");
 
-    let Some(TableName::SchemaTable(schema, name)) = table.get_table_name() else {
+    let TableName::SchemaTable(schema, name) = table.get_table_name() else {
         panic!("the task table should carry its schema");
     };
     assert_eq!(schema.to_string(), "app");
@@ -190,7 +190,7 @@ fn comments_are_folded_into_their_table() {
     let tables = parse_schema(SCHEMA).expect("schema should parse");
     let task = tables.get(1).expect("the task table");
 
-    let Some(TableName::Table(name)) = task.get_table_name() else {
+    let TableName::Table(name) = task.get_table_name() else {
         panic!("the task table should be a plain table name");
     };
     assert_eq!(name.to_string(), "task");

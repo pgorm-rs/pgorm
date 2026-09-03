@@ -256,8 +256,7 @@ fn expanded_pk_value_type_is_type_or_tuple() {
 fn expanded_pk_auto_increment_looks_at_every_column() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("ticket"))
+            Table::create(Alias::new("ticket"))
                 .col(
                     ColumnDef::new_with_type(Alias::new("code"), ColumnType::Text)
                         .not_null()

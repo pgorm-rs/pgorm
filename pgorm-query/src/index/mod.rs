@@ -13,6 +13,8 @@ pub use common::*;
 pub use create::*;
 pub use drop::*;
 
+use crate::types::{IntoIden, IntoTableName};
+
 /// Shorthand for constructing any index statement
 #[derive(Debug, Clone)]
 pub struct Index;
@@ -25,16 +27,20 @@ pub enum IndexStatement {
 }
 
 impl Index {
-    /// Construct index [`IndexCreateStatement`] over its first column
-    pub fn create<C>(col: C) -> IndexCreateStatement
+    /// Construct index [`IndexCreateStatement`] over its table and first column
+    pub fn create<T, C>(table: T, col: C) -> IndexCreateStatement
     where
+        T: IntoTableName,
         C: IntoIndexColumn,
     {
-        IndexCreateStatement::new(col)
+        IndexCreateStatement::new(table, col)
     }
 
-    /// Construct index [`IndexDropStatement`]
-    pub fn drop() -> IndexDropStatement {
-        IndexDropStatement::new()
+    /// Construct index [`IndexDropStatement`] over the index it drops
+    pub fn drop<T>(name: T) -> IndexDropStatement
+    where
+        T: IntoIden,
+    {
+        IndexDropStatement::new(name)
     }
 }

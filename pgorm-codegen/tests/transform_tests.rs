@@ -12,8 +12,7 @@ use pgorm_query::{
 };
 
 fn fk(from_table: &str, from_col: &str, to_table: &str, to_col: &str) -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new(from_table))
+    Table::create(Alias::new(from_table))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new(from_col)).integer().to_owned())
         .foreign_key(
@@ -28,7 +27,7 @@ fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    one Entity per input
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    one Entity per input
 // statement, held in a BTreeMap so every output is ordered by table name
 #[test]
 fn transform_builds_entity_per_statement_ordered_by_name() {
@@ -52,7 +51,7 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    the table name is unpacked
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    the table name is unpacked
 // from every `TableName` form
 #[test]
 fn transform_unpacks_the_table_name_from_every_form() {
@@ -65,8 +64,7 @@ fn transform_unpacks_the_table_name_from_every_form() {
     ];
 
     for table_name in names {
-        let stmt = Table::create()
-            .table(table_name.clone())
+        let stmt = Table::create(table_name.clone())
             .col(serial_pk("id"))
             .to_owned();
         let generated = generate(vec![stmt], Opts::default());
@@ -78,24 +76,11 @@ fn transform_unpacks_the_table_name_from_every_form() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a statement with no table
-// name is a `TransformError`
-#[test]
-fn transform_rejects_a_statement_without_a_table_name() {
-    let err = EntityTransformer::transform(vec![Table::create().col(serial_pk("id")).to_owned()])
-        .expect_err("a nameless table should not transform");
-    match err {
-        Error::TransformError(msg) => assert_eq!(msg, "Table name should not be empty"),
-        other => panic!("expected a TransformError, got {other:?}"),
-    }
-}
-
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a column with no
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a column with no
 // `ColumnType` is a `TransformError` naming the table and the column
 #[test]
 fn transform_rejects_a_column_without_column_type() {
-    let untyped = Table::create()
-        .table(Alias::new("cake"))
+    let untyped = Table::create(Alias::new("cake"))
         .col(ColumnDef::new(Alias::new("id")))
         .to_owned();
 
@@ -105,12 +90,11 @@ fn transform_rejects_a_column_without_column_type() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a foreign key with no
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a foreign key with no
 // referenced table is a `TransformError`, not an unwrap on `None`
 #[test]
 fn transform_rejects_foreign_key_without_ref_table() {
-    let dangling = Table::create()
-        .table(Alias::new("fruit"))
+    let dangling = Table::create(Alias::new("fruit"))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
         .foreign_key(ForeignKey::create().from(Alias::new("fruit"), Alias::new("cake_id")))
@@ -122,19 +106,21 @@ fn transform_rejects_foreign_key_without_ref_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a primary-key index naming
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a primary-key index naming
 // a column the table does not have is a `TransformError`
 #[test]
 fn transform_rejects_primary_key_over_unknown_column() {
-    let mismatched = Table::create()
-        .table(Alias::new("cake"))
+    let mismatched = Table::create(Alias::new("cake"))
         .col(
             ColumnDef::new(Alias::new("id"))
                 .integer()
                 .not_null()
                 .to_owned(),
         )
-        .primary_key(&mut Index::create(Alias::new("missing")))
+        .primary_key(&mut Index::create(
+            Alias::new("cake"),
+            Alias::new("missing"),
+        ))
         .to_owned();
 
     assert_transform_error(
@@ -143,7 +129,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a DB name with no Rust
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a DB name with no Rust
 // identifier form is a `TransformError` naming what it came from
 #[test]
 fn transform_rejects_names_without_identifier_form() {
@@ -175,7 +161,7 @@ fn assert_transform_error(stmts: Vec<TableCreateStatement>, expected: &str) {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    `auto_increment`,
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    `auto_increment`,
 // `not_null` and `unique` come from the matching `ColumnSpec`
 #[test]
 fn transform_reads_column_specs_off_the_column_definition() {
@@ -224,14 +210,13 @@ fn transform_reads_column_specs_off_the_column_definition() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a single-column unique index
 // over exactly that column also marks it unique
 #[test]
 fn transform_marks_columns_from_single_column_unique_index() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("vendor"))
+            Table::create(Alias::new("vendor"))
                 .col(serial_pk("id"))
                 .col(
                     ColumnDef::new(Alias::new("name"))
@@ -254,9 +239,8 @@ fn transform_marks_columns_from_single_column_unique_index() {
                 .index(&mut unique_index("vendor", "name"))
                 // a multi-column unique index marks nothing
                 .index(
-                    &mut Index::create(Alias::new("region"))
+                    &mut Index::create(Alias::new("vendor"), Alias::new("region"))
                         .name("idx_vendor_region_tier")
-                        .table(Alias::new("vendor"))
                         .col(Alias::new("tier"))
                         .unique()
                         .to_owned(),
@@ -273,7 +257,7 @@ fn transform_marks_columns_from_single_column_unique_index() {
     assert_not_contains(vendor, "#[pgorm(unique)] pub tier: String,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    primary keys come from
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    primary keys come from
 // `ColumnSpec::PrimaryKey` and are extended by a table-level primary-key index
 #[test]
 fn transform_collects_pks_from_specs_and_table_indexes() {
@@ -282,8 +266,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
 
     let by_index = generate(
         vec![
-            Table::create()
-                .table(Alias::new("cake_filling"))
+            Table::create(Alias::new("cake_filling"))
                 .col(
                     ColumnDef::new(Alias::new("cake_id"))
                         .integer()
@@ -296,7 +279,10 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
                         .not_null()
                         .to_owned(),
                 )
-                .primary_key(Index::create(Alias::new("cake_id")).col(Alias::new("filling_id")))
+                .primary_key(
+                    Index::create(Alias::new("cake_filling"), Alias::new("cake_id"))
+                        .col(Alias::new("filling_id")),
+                )
                 .to_owned(),
         ],
         expanded(),
@@ -311,7 +297,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    every enum column registers
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    every enum column registers
 // an `ActiveEnum` keyed by enum name, deduplicated across tables and looked
 // through `Array`
 #[test]
@@ -359,7 +345,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
     assert!(position_of(enums, "pub enum Mood") < position_of(enums, "pub enum Tea"));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    foreign keys become
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    foreign keys become
 // `BelongsTo` relations that keep their columns, referenced columns and
 // on_update / on_delete actions
 #[test]
@@ -381,8 +367,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
                         .to_owned(),
                 ],
             ),
-            Table::create()
-                .table(Alias::new("fruit"))
+            Table::create(Alias::new("fruit"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
@@ -413,7 +398,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    a relation onto its own
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    a relation onto its own
 // table is flagged self-referencing
 #[test]
 fn transform_flags_self_referencing_relations() {
@@ -428,7 +413,7 @@ fn transform_flags_self_referencing_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    several FKs onto the same
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    several FKs onto the same
 // target take 1-based `num_suffix`es in declaration order; a lone FK keeps 0
 #[test]
 fn transform_numbers_repeated_fks_to_same_table() {
@@ -436,8 +421,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
         vec![
             bare("fruit"),
             bare("cake"),
-            Table::create()
-                .table(Alias::new("basket"))
+            Table::create(Alias::new("basket"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
@@ -496,7 +480,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
     assert_not_contains(basket, "Cake1,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+3/test]    relations are sorted by
+// [spec:pgorm:sem:codegen.entity.transform+4/test]    relations are sorted by
 // referenced table name and conjunct relations by target name
 #[test]
 fn transform_sorts_relations_and_conjunct_relations() {
@@ -525,8 +509,7 @@ fn transform_sorts_relations_and_conjunct_relations() {
 }
 
 fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateStatement {
-    Table::create()
-        .table(Alias::new(name))
+    Table::create(Alias::new(name))
         .col(
             ColumnDef::new(Alias::new(left.1))
                 .integer()
@@ -575,8 +558,7 @@ fn inverse_has_one_for_unique_foreign_key() {
     let generated = generate(
         vec![
             cake(),
-            Table::create()
-                .table(Alias::new("fruit"))
+            Table::create(Alias::new("fruit"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .index(&mut unique_index("fruit", "cake_id"))
@@ -603,8 +585,7 @@ fn inverse_has_one_for_whole_primary_key_fk() {
     let generated = generate(
         vec![
             bare("users"),
-            Table::create()
-                .table(Alias::new("profile"))
+            Table::create(Alias::new("profile"))
                 .col(
                     ColumnDef::new(Alias::new("user_id"))
                         .integer()
@@ -645,8 +626,7 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
     let suffixed = generate(
         vec![
             bare("fruit"),
-            Table::create()
-                .table(Alias::new("basket"))
+            Table::create(Alias::new("basket"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
@@ -673,8 +653,7 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
 fn inverse_dropped_when_target_already_relates_back() {
     let generated = generate(
         vec![
-            Table::create()
-                .table(Alias::new("users"))
+            Table::create(Alias::new("users"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("bill_id")).integer().to_owned())
                 .foreign_key(
@@ -683,8 +662,7 @@ fn inverse_dropped_when_target_already_relates_back() {
                         .to(Alias::new("bills"), Alias::new("id")),
                 )
                 .to_owned(),
-            Table::create()
-                .table(Alias::new("bills"))
+            Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
                 .foreign_key(

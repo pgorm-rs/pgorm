@@ -9,7 +9,10 @@
 //! - Column Rename, see [`ColumnRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
-use crate::{QueryBuilder, types::IntoTableName};
+use crate::{
+    QueryBuilder,
+    types::{IntoIden, IntoTableName},
+};
 
 mod alter;
 mod column;
@@ -44,9 +47,12 @@ pub enum TableStatement {
 }
 
 impl Table {
-    /// Construct table [`TableCreateStatement`]
-    pub fn create() -> TableCreateStatement {
-        TableCreateStatement::new()
+    /// Construct table [`TableCreateStatement`] over the table it creates
+    pub fn create<T>(table: T) -> TableCreateStatement
+    where
+        T: IntoTableName,
+    {
+        TableCreateStatement::new(table)
     }
 
     /// Name the table a [`TableAlterStatement`] will alter.
@@ -61,24 +67,39 @@ impl Table {
         PendingTableAlter::new(table.into_table_name())
     }
 
-    /// Construct table [`TableDropStatement`]
-    pub fn drop() -> TableDropStatement {
-        TableDropStatement::new()
+    /// Construct table [`TableDropStatement`] over its first table
+    pub fn drop<T>(table: T) -> TableDropStatement
+    where
+        T: IntoTableName,
+    {
+        TableDropStatement::new(table)
     }
 
-    /// Construct table [`TableRenameStatement`]
-    pub fn rename() -> TableRenameStatement {
-        TableRenameStatement::new()
+    /// Construct table [`TableRenameStatement`] from the old and new name
+    pub fn rename<T, R>(from_name: T, to_name: R) -> TableRenameStatement
+    where
+        T: IntoTableName,
+        R: IntoIden,
+    {
+        TableRenameStatement::new(from_name, to_name)
     }
 
-    /// Construct column [`ColumnRenameStatement`]
-    pub fn rename_column() -> ColumnRenameStatement {
-        ColumnRenameStatement::new()
+    /// Construct column [`ColumnRenameStatement`] over a table and two column names
+    pub fn rename_column<T, F, R>(table: T, from_name: F, to_name: R) -> ColumnRenameStatement
+    where
+        T: IntoTableName,
+        F: IntoIden,
+        R: IntoIden,
+    {
+        ColumnRenameStatement::new(table, from_name, to_name)
     }
 
-    /// Construct table [`TableTruncateStatement`]
-    pub fn truncate() -> TableTruncateStatement {
-        TableTruncateStatement::new()
+    /// Construct table [`TableTruncateStatement`] over the table it empties
+    pub fn truncate<T>(table: T) -> TableTruncateStatement
+    where
+        T: IntoTableName,
+    {
+        TableTruncateStatement::new(table)
     }
 }
 

@@ -63,11 +63,10 @@ fn over_attaches_only_to_function_calls() {
 // to come from: nothing but the caller's own `extra` string can follow the
 // closing parenthesis. Deletion-proof, so there is no rejection left to pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 #[test]
 fn create_table_renders_no_trailing_options() {
-    let sql = Table::create()
-        .table(Glyph::Table)
+    let sql = Table::create(Glyph::Table)
         .col(ColumnDef::new(Glyph::Id).integer())
         .to_string(QueryBuilder);
 
@@ -162,15 +161,13 @@ fn cross_join_renders_without_on_clause() {
 // the sole action of an ALTER TABLE, so a column rename is a statement of its
 // own and cannot be listed beside an ADD COLUMN.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]
 #[test]
 fn column_rename_is_its_own_statement() {
     let added = Table::alter(Font::Table)
         .add_column(ColumnDef::new(Alias::new("new_col")).integer())
         .to_string(QueryBuilder);
-    let renamed = Table::rename_column()
-        .table(Font::Table)
-        .column(Font::Name, Alias::new("name_new"))
+    let renamed = Table::rename_column(Font::Table, Font::Name, Alias::new("name_new"))
         .to_string(QueryBuilder);
 
     assert_eq!(
@@ -186,11 +183,10 @@ fn column_rename_is_its_own_statement() {
 // than a `TableName`, so the qualified form a rename cannot honour — the table
 // stays in the schema it is already in — no longer typechecks.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 #[test]
 fn table_rename_target_is_bare_name() {
-    let sql = Table::rename()
-        .table((Alias::new("schema"), Font::Table), Alias::new("font_new"))
+    let sql = Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new"))
         .to_string(QueryBuilder);
 
     assert_eq!(sql, r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#);
@@ -201,7 +197,7 @@ fn table_rename_target_is_bare_name() {
 // name, not an enum label, so it leaves the value pipeline and renders as the
 // quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+1/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+2/test]
 #[test]
 fn alter_type_rename_emits_identifier() {
     let sql = Type::alter()
@@ -222,12 +218,10 @@ fn alter_type_rename_emits_identifier() {
 // [spec:pgorm:def:sql.types.column-type+3/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
-    let hour = Table::create()
-        .table(Glyph::Table)
+    let hour = Table::create(Glyph::Table)
         .col(ColumnDef::new(Glyph::Aspect).interval(IntervalSpec::Fields(PgInterval::Hour)))
         .to_string(QueryBuilder);
-    let seconds = Table::create()
-        .table(Glyph::Table)
+    let seconds = Table::create(Glyph::Table)
         .col(ColumnDef::new(Glyph::Aspect).interval(IntervalSpec::Fields(
             PgInterval::HourToSecond(Some(IntervalPrecision::P3)),
         )))
@@ -244,7 +238,7 @@ fn interval_precision_rides_on_seconds() {
 // [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL takes at most one drop
 // behaviour, so the two spellings share one slot and the later call wins.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.extension+1/test]
+// [spec:pgorm:req:sql.ddl.extension+2/test]
 #[test]
 fn extension_drop_takes_one_behaviour() {
     let sql = Extension::drop()
@@ -275,8 +269,7 @@ fn oracle_pins_extra_interpolated_raw() {
     let injected = Extension::create()
         .name(r#"pg"weird ext"#)
         .to_string(QueryBuilder);
-    let extra = Table::create()
-        .table(Glyph::Table)
+    let extra = Table::create(Glyph::Table)
         .col(
             ColumnDef::new(Glyph::Id)
                 .integer()
@@ -358,17 +351,16 @@ fn oracle_records_parse_valid_defects() {
 // with the state it guarded — the strings below have no builder left to produce
 // them.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]
-// [spec:pgorm:req:sql.ddl.index-create+3/test]
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]
+// [spec:pgorm:req:sql.ddl.index-create+4/test]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]
 #[test]
 fn empty_ddl_collections_do_not_construct() {
     let altered = Table::alter(Font::Table)
         .drop_column(Font::Name)
         .to_string(QueryBuilder);
-    let indexed = Index::create(Glyph::Aspect)
+    let indexed = Index::create(Glyph::Table, Glyph::Aspect)
         .name("idx")
-        .table(Glyph::Table)
         .to_string(QueryBuilder);
 
     assert_eq!(altered, r#"ALTER TABLE "font" DROP COLUMN "name""#);
@@ -385,33 +377,113 @@ fn empty_ddl_collections_do_not_construct() {
 // with no attributes is a real table — so a column-less create statement stays
 // buildable and is documented by `sql.ddl.create-table` instead.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 #[test]
 fn create_table_with_no_columns_is_valid() {
-    let sql = Table::create().table(Glyph::Table).to_string(QueryBuilder);
+    let sql = Table::create(Glyph::Table).to_string(QueryBuilder);
 
     assert_eq!(sql, r#"CREATE TABLE "glyph" (  )"#);
     assert_parses(&sql);
 }
 
-// No plan node yet, and a different axis from the empty collections above: a
-// create-table or create-index never given a target renders the name's absence,
-// which PostgreSQL rejects at the parenthesis that follows. `ALTER TABLE` is out
-// of reach of this because `Table::alter` takes the table.
+// Fixed by plan node `unrep.ddl-table-target`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: every DDL statement whose render
+// names a target takes that target in its constructor, so the absent name
+// PostgreSQL rejects at the token after it has nowhere to come from. The
+// `compile_fail` doctests on each statement type prove the constructors refuse.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
-// [spec:pgorm:req:sql.ddl.index-create+3/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-drop+2/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
 #[test]
-fn oracle_pins_ddl_without_a_target() {
-    let table = Table::create()
-        .col(ColumnDef::new(Glyph::Id).integer())
-        .to_string(QueryBuilder);
-    let index = Index::create(Glyph::Aspect)
-        .name("idx")
-        .to_string(QueryBuilder);
+fn ddl_targets_are_taken_by_construction() {
+    let rendered = [
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer())
+            .to_string(QueryBuilder),
+        Table::drop(Glyph::Table).to_string(QueryBuilder),
+        Table::truncate(Glyph::Table).to_string(QueryBuilder),
+        Table::rename(Glyph::Table, Alias::new("g")).to_string(QueryBuilder),
+        Table::rename_column(Glyph::Table, Glyph::Id, Alias::new("gid")).to_string(QueryBuilder),
+        Index::create(Glyph::Table, Glyph::Aspect)
+            .name("idx")
+            .to_string(QueryBuilder),
+        Index::drop("idx").to_string(QueryBuilder),
+        ForeignKey::drop(Char::Table, "fk").to_string(QueryBuilder),
+    ];
 
-    assert!(table.starts_with("CREATE TABLE  ("));
-    assert!(index.starts_with(r#"CREATE INDEX "idx" ON  ("#));
-    assert_rejected(&table);
-    assert_rejected(&index);
+    for sql in &rendered {
+        assert_parses(sql);
+    }
+    assert_rejected(r#"CREATE TABLE  ( "id" integer )"#);
+    assert_rejected("DROP TABLE ");
+    assert_rejected("TRUNCATE TABLE ");
+    assert_rejected(r#"ALTER TABLE  RENAME TO "g""#);
+    assert_rejected(r#"ALTER TABLE "glyph" RENAME COLUMN  TO "gid""#);
+    assert_rejected(r#"CREATE INDEX "idx" ON  ("aspect")"#);
+    assert_rejected("DROP INDEX ");
+    assert_rejected(r#"ALTER TABLE  DROP CONSTRAINT "fk""#);
+}
+
+// The two targets the oracle says PostgreSQL does not need, recorded rather than
+// required: an index name is derived by the server when `CREATE INDEX` omits it,
+// and `DROP INDEX` names a schema-scoped index rather than a table, so both stay
+// optional where the rest of the family moved into the constructor.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-drop+2/test]
+#[test]
+fn index_name_and_drop_table_stay_optional() {
+    let unnamed = Index::create(Glyph::Table, Glyph::Aspect).to_string(QueryBuilder);
+    let untabled = Index::drop("idx").to_string(QueryBuilder);
+
+    assert_eq!(unnamed, r#"CREATE INDEX  ON "glyph" ("aspect")"#);
+    assert_eq!(untabled, r#"DROP INDEX "idx""#);
+    assert_parses(&unnamed);
+    assert_parses(&untabled);
+}
+
+// No plan node yet, and the residual of `unrep.ddl-table-target`: the foreign-key
+// and type/extension builders still carry their targets as fields a caller may
+// never fill. A foreign key's own table is rendered only standalone, and its two
+// column lists are the empty-collection axis rather than this one, so closing it
+// is a redesign of `TableForeignKey` rather than a constructor argument; the type
+// and extension statements name a type rather than a table, and `AS ENUM` drops
+// the parentheses the grammar wants when the value list is empty.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
+// [spec:pgorm:req:sql.ddl.type-enum+1/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+2/test]
+// [spec:pgorm:req:sql.ddl.extension+2/test]
+#[test]
+fn oracle_pins_ddl_targets_left_open() {
+    let no_ref_table = ForeignKey::create()
+        .name("fk")
+        .from(Char::Table, Char::FontId)
+        .to_string(QueryBuilder);
+    let no_from_table = ForeignKey::create()
+        .to(Font::Table, Font::Id)
+        .to_string(QueryBuilder);
+    let no_type_name = Type::create().to_string(QueryBuilder);
+    let no_enum_values = Type::create()
+        .as_enum(Alias::new("font_family"))
+        .to_string(QueryBuilder);
+    let no_extension_name = Extension::create().to_string(QueryBuilder);
+
+    assert!(no_ref_table.ends_with("REFERENCES  ()"));
+    assert!(no_from_table.starts_with("ALTER TABLE  ADD FOREIGN KEY ()"));
+    assert_eq!(no_type_name, "CREATE TYPE ");
+    assert_eq!(no_enum_values, r#"CREATE TYPE "font_family" AS ENUM"#);
+    assert_eq!(no_extension_name, r#"CREATE EXTENSION """#);
+    assert_rejected(&no_ref_table);
+    assert_rejected(&no_from_table);
+    assert_rejected(&no_type_name);
+    assert_rejected(&no_enum_values);
+    assert_rejected(&no_extension_name);
+    assert_rejected(&Type::drop().to_string(QueryBuilder));
+    assert_rejected(&Type::alter().to_string(QueryBuilder));
+    assert_rejected(&Extension::drop().to_string(QueryBuilder));
 }

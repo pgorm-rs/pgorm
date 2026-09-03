@@ -1,14 +1,13 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 // [spec:pgorm:req:sql.ddl.column-def+3/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+3/test]
 fn create_1() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Id)
                     .integer()
@@ -33,8 +32,7 @@ fn create_1() {
 #[test]
 fn create_2() {
     assert_eq!(
-        Table::create()
-            .table(Font::Table)
+        Table::create(Font::Table)
             .col(
                 ColumnDef::new(Font::Id)
                     .integer()
@@ -61,8 +59,7 @@ fn create_2() {
 #[test]
 fn create_3() {
     assert_eq!(
-        Table::create()
-            .table(Char::Table)
+        Table::create(Char::Table)
             .if_not_exists()
             .col(
                 ColumnDef::new(Char::Id)
@@ -109,8 +106,7 @@ fn create_3() {
 #[test]
 fn create_4() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
             .to_string(QueryBuilder),
         r#"CREATE TABLE "glyph" ( "image" aspect )"#
@@ -121,8 +117,7 @@ fn create_4() {
 #[test]
 fn create_5() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
             .to_string(QueryBuilder),
@@ -139,8 +134,7 @@ fn create_5() {
 #[test]
 fn create_6() {
     assert_eq_unparsed!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Id)
                     .integer()
@@ -160,8 +154,7 @@ fn create_6() {
 #[test]
 fn create_7() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .interval(IntervalSpec::Any(None))
@@ -180,8 +173,7 @@ fn create_7() {
 #[test]
 fn create_8() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .interval(IntervalSpec::Fields(PgInterval::YearToMonth))
@@ -200,8 +192,7 @@ fn create_8() {
 #[test]
 fn create_9() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .interval(IntervalSpec::Any(Some(IntervalPrecision::P4)))
@@ -222,8 +213,7 @@ fn create_9() {
 #[test]
 fn create_10() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .interval(IntervalSpec::Fields(PgInterval::HourToSecond(Some(
@@ -244,8 +234,7 @@ fn create_10() {
 #[test]
 fn create_11() {
     assert_eq!(
-        Table::create()
-            .table(Char::Table)
+        Table::create(Char::Table)
             .col(
                 ColumnDef::new(Char::CreatedAt)
                     .timestamp_with_time_zone()
@@ -265,8 +254,7 @@ fn create_11() {
 #[test]
 fn create_12() {
     assert_eq!(
-        Table::create()
-            .table(BinaryType::Table)
+        Table::create(BinaryType::Table)
             .col(ColumnDef::new(BinaryType::BinaryLen).bytea())
             .col(ColumnDef::new(BinaryType::Binary).bytea())
             .to_string(QueryBuilder),
@@ -283,8 +271,7 @@ fn create_12() {
 #[test]
 fn create_14() {
     assert_eq!(
-        Table::create()
-            .table((Alias::new("schema"), Glyph::Table))
+        Table::create((Alias::new("schema"), Glyph::Table))
             .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
             .to_string(QueryBuilder),
         [
@@ -299,16 +286,14 @@ fn create_14() {
 #[test]
 fn create_15() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
             .index(
-                Index::create(Glyph::Aspect)
+                Index::create(Glyph::Table, Glyph::Aspect)
                     .unique()
                     .nulls_not_distinct()
                     .name("idx-glyph-aspect-image")
-                    .table(Glyph::Table)
                     .col(Glyph::Image)
             )
             .to_string(QueryBuilder),
@@ -323,12 +308,11 @@ fn create_15() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 #[test]
 fn drop_1() {
     assert_eq!(
-        Table::drop()
-            .table(Glyph::Table)
+        Table::drop(Glyph::Table)
             .table(Char::Table)
             .cascade()
             .to_string(QueryBuilder),
@@ -339,8 +323,7 @@ fn drop_1() {
 #[test]
 fn drop_2() {
     assert_eq!(
-        Table::drop()
-            .table((Alias::new("schema1"), Glyph::Table))
+        Table::drop((Alias::new("schema1"), Glyph::Table))
             .table((Alias::new("schema2"), Char::Table))
             .cascade()
             .to_string(QueryBuilder),
@@ -351,7 +334,7 @@ fn drop_2() {
 #[test]
 fn truncate_1() {
     assert_eq!(
-        Table::truncate().table(Font::Table).to_string(QueryBuilder),
+        Table::truncate(Font::Table).to_string(QueryBuilder),
         r#"TRUNCATE TABLE "font""#
     );
 }
@@ -359,14 +342,12 @@ fn truncate_1() {
 #[test]
 fn truncate_2() {
     assert_eq!(
-        Table::truncate()
-            .table((Alias::new("schema"), Font::Table))
-            .to_string(QueryBuilder),
+        Table::truncate((Alias::new("schema"), Font::Table)).to_string(QueryBuilder),
         r#"TRUNCATE TABLE "schema"."font""#
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -382,7 +363,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -405,9 +386,7 @@ fn alter_2() {
 #[test]
 fn alter_3() {
     assert_eq!(
-        Table::rename_column()
-            .table(Font::Table)
-            .column(Alias::new("new_col"), Alias::new("new_column"))
+        Table::rename_column(Font::Table, Alias::new("new_col"), Alias::new("new_column"))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
     );
@@ -426,15 +405,17 @@ fn alter_4() {
 #[test]
 fn alter_5() {
     assert_eq!(
-        Table::rename_column()
-            .table((Alias::new("schema"), Font::Table))
-            .column(Alias::new("new_col"), Alias::new("new_column"))
-            .to_string(QueryBuilder),
+        Table::rename_column(
+            (Alias::new("schema"), Font::Table),
+            Alias::new("new_col"),
+            Alias::new("new_column")
+        )
+        .to_string(QueryBuilder),
         r#"ALTER TABLE "schema"."font" RENAME COLUMN "new_col" TO "new_column""#
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -508,13 +489,11 @@ fn alter_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+2/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 #[test]
 fn rename_1() {
     assert_eq!(
-        Table::rename()
-            .table(Font::Table, Alias::new("font_new"))
-            .to_string(QueryBuilder),
+        Table::rename(Font::Table, Alias::new("font_new")).to_string(QueryBuilder),
         r#"ALTER TABLE "font" RENAME TO "font_new""#
     );
 }
@@ -522,8 +501,7 @@ fn rename_1() {
 #[test]
 fn rename_2() {
     assert_eq!(
-        Table::rename()
-            .table((Alias::new("schema"), Font::Table), Alias::new("font_new"))
+        Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new"))
             .to_string(QueryBuilder),
         r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#
     );
@@ -532,8 +510,7 @@ fn rename_2() {
 #[test]
 fn create_with_check_constraint() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Id)
                     .integer()
@@ -566,8 +543,7 @@ fn alter_with_check_constraint() {
 #[test]
 fn create_16() {
     assert_eq!(
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Id)
                     .integer()
@@ -587,12 +563,11 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: &mut IndexCreateStatement| {
-        Table::create()
-            .table(Glyph::Table)
+        Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer().not_null())
             .col(ColumnDef::new(Glyph::Image).string().not_null())
             .primary_key(index)
@@ -607,7 +582,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     ]
     .join(" ");
     let index = || {
-        Index::create(Glyph::Id)
+        Index::create(Glyph::Table, Glyph::Id)
             .name("pk-glyph")
             .col(Glyph::Image)
             .to_owned()
@@ -618,7 +593,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     assert_eq!(table(index().unique()), expected);
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+2/test]    take copies, so the source keeps its actions
+// [spec:pgorm:req:sql.ddl.alter-table+3/test]    take copies, so the source keeps its actions
 #[test]
 fn alter_take_leaves_the_source_whole() {
     let mut alter = Table::alter(Font::Table).drop_column(Font::Name);
