@@ -23,6 +23,10 @@ pub mod error;
 mod executor;
 /// Holds types and methods to perform metric collection
 pub mod metric;
+/// A PRQL-shaped pipeline query API (off-by-default `pipeline` feature)
+#[cfg(feature = "pipeline")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pipeline")))]
+pub mod pipeline;
 /// Holds types and methods to perform queries
 pub mod query;
 /// Holds types that defines the schemas of an Entity
