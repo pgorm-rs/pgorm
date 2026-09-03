@@ -1260,6 +1260,28 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.drop-vendor-dirs
+                title "Remove the sea-orm reference clone and the scratch examples dir"
+                kind @chore
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T18:19:15.29055Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T18:20:11.658061Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 
