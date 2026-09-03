@@ -830,12 +830,27 @@ children (
                 id infra.prepared-api
                 title "Design: typed prepared-statement API, or confirm the statement cache suffices"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-03T18:46:56.709955Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator question (2026-09-03): is there any actual PostgreSQL benefit to a first-class Statement type? Established baseline: the old SeaORM Statement was multi-backend vestige, correctly deleted; ConnectionTrait is generic over tokio-postgres ToStatement so a prepared tokio_postgres::Statement already passes; pgorm-pool's per-connection statement cache already gives prepare-once-reuse keyed by SQL text. The open design question is a TYPED surface — e.g. conn.prepare::<M>(sql) returning a handle that carries model/param types from Describe metadata. Core constraint to weigh: tokio-postgres Statements are per-connection objects, so a typed handle either pins a pooled connection (fights the pool) or wraps the cache lookup (types without a held handle). Possible sweeteners: parameter type-checking at prepare time, avoiding re-describe, pipelining, and pairing with the sql! macro (libpg_query already validates the text; a typed handle could carry the inferred shape). Deliverable is a design verdict first — build only if the value beats the cache's transparency; \"the cache suffices\" is an acceptable outcome, recorded as a decision."
+                    }
+
+                    {
+                        at 2026-09-03T20:24:31.622416Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Probe verdict: the node's premise was false — the statement cache does NOT give prepare-once-reuse today, because nothing calls it: all three ConnectionTrait impls delegate straight to tokio_postgres (fresh server-side statement per call, Drop queues Close+Sync), and DatabaseConnection's pooled object is crate-private so no caller can reach prepare_cached either. Measured on a counting wire proxy: every ORM query pays 3 syncs (Parse+Describe / Bind+Execute / Close) where 1 suffices; routing through the existing cache is 2.30x on real ORM queries at 4ms RTT; cache misses are linear in pool size, not query count. A typed handle buys ~10% over cache routing and starves the pool (measured 502ms timeout at max_size=2 with two pinned handles); ConnectionTrait already accepts a foreign-connection Statement that fails at runtime with SQLSTATE 26000 (recorded as a representable-invalid-state candidate). Verdict (b): wire the six extended-protocol ConnectionTrait methods through prepare_cached on the existing SqlText seam (Statement passes through untouched); evict-and-retry-once on SQLSTATE 0A000 (the one hazard reuse introduces — probed: search_path and table-recreation are handled by PG's plan cache, only result-type-changing DDL trips it); bound the cache (25 IN-list arities = 25 entries, and Clean recycling keeps them); optionally a verify::<M> utility from Statement::columns() — the only thing that catches a wrong FromQueryResult target when the query returns zero rows, which today decodes Ok(vec![]) and ships. Four implementing nodes sketched in the agent report; AKM record at [dec:pgorm:prepared-statement-reuse]. Spike archived on the node's branch."
+                    }
+
+                    {
+                        at 2026-09-03T20:25:06.421353Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
