@@ -119,7 +119,7 @@ Without the feature pgorm pulls in no parser and `fingerprint()` is always `None
 `fingerprint()` returns an `Option` and never fails a query. `None` means one of three things, and does not say which:
 
 - the feature is off;
-- the statement carries no text — you passed an already-prepared `tokio_postgres::Statement`, which keeps its server-side name but not the SQL it came from;
+- there is no statement to parse — the hook is reporting a transaction verb, `begin` or `rollback`, rather than a query;
 - libpg_query would not parse the text. Raw SQL your server accepts can still be text this parser rejects. The statement executes and is reported as usual; only its identity is missing.
 
 Fingerprints are computed when you ask, not when the context is built, so a collector that ignores them costs nothing. Because computing one is a parse, answers are memoized process-wide by statement text — rejections included — in an `RwLock<HashMap>` capped at 1024 distinct texts. Past the cap the memo stops admitting new entries rather than evicting, so a query whose text is rebuilt per call (an `IN` list sized by its input, a generated migration script) is re-parsed rather than retained forever. Statement *shapes* are a fixed set well under the cap; per-call text is the thing worth not keeping.

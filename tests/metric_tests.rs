@@ -18,7 +18,6 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tokio_postgres::{Statement, ToStatement};
 use tracing::{
     Event, Level, Subscriber,
     field::{Field, Visit},
@@ -246,7 +245,7 @@ pub async fn query_opt_reports_one_row_or_zero() -> Result<(), Error> {
 }
 
 // [spec:pgorm:req:metric.layer.delegate+4/test]    a cache hit is still a reported call
-// [spec:pgorm:def:conn.pool.conn-trait+5/test]    the wrapper inherits the routing it delegates to
+// [spec:pgorm:def:conn.pool.conn-trait+6/test]    the wrapper inherits the routing it delegates to
 #[pgorm_macros::test]
 pub async fn cached_statements_still_report_each_call() -> Result<(), Error> {
     const SQL: &str = "SELECT id FROM widget WHERE id = 1";
@@ -561,21 +560,20 @@ pub async fn wrappers_expose_inner_and_metrics() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.sql-text+1/test]    what each statement form answers
+// [spec:pgorm:def:conn.sql-text+2/test]    what each statement form answers
 #[pgorm_macros::test]
 pub async fn sql_text_answers_with_the_statement_text() {
     let owned = "SELECT id FROM widget WHERE id = $1".to_owned();
 
-    assert_eq!("SELECT 1".sql_text(), Some("SELECT 1"));
-    assert_eq!(owned.sql_text(), Some(owned.as_str()));
+    assert_eq!("SELECT 1".sql_text(), "SELECT 1");
+    assert_eq!(owned.sql_text(), owned.as_str());
 
-    // The bound `ConnectionTrait` puts on its statement, satisfied by every
-    // type `ToStatement` admits — a prepared `Statement` included, which
-    // answers `None` and has no constructor to exercise it through.
-    fn assert_statement_bound<T: ?Sized + ToStatement + SqlText + Send + Sync>() {}
+    // The bound `ConnectionTrait` puts on its statement. A prepared
+    // `Statement` falls outside it, which the `compile_fail` doctest on
+    // `ConnectionTrait` holds.
+    fn assert_statement_bound<T: ?Sized + SqlText + Sync>() {}
     assert_statement_bound::<str>();
     assert_statement_bound::<String>();
-    assert_statement_bound::<Statement>();
 }
 
 // [spec:pgorm:req:metric.fingerprint/test]    the hooks see the statement they report on

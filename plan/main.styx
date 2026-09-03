@@ -903,12 +903,20 @@ children (
                 title "Foreign statements stop typechecking: ConnectionTrait narrows to a sealed text bound"
                 kind @refactor
                 deps (infra.statement-cache)
+                sealed true
                 log (
                     {
                         at 2026-09-03T20:38:05.185382Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "The SQLSTATE 26000 hole from [dec:pgorm:prepared-statement-reuse]'s probe 3(ii): ConnectionTrait accepts a tokio_postgres::Statement prepared on another connection; it compiles and fails at runtime. Operator direction (2026-09-03): important to fix. Design discussion settled on structural removal over stamping: once infra.statement-cache routes text through the per-connection cache, no caller has a reason to pass a raw Statement — so narrow ConnectionTrait's bound from ToStatement to a sealed text-like trait (SqlText-shaped) and the invalid state stops existing. Stamping (wrapping Statement with origin-connection identity, runtime-checked) and type-level branding (invariant lifetimes) were considered and rejected as weaker/heavier per the [dec:pgorm:invalid-states-unrepresentable] ladder: unrepresentable > typed error > runtime check. Bumps conn.pool.conn-trait and retires the sem rule pinning the foreign-Statement behavior if one was added."
+                    }
+
+                    {
+                        at 2026-09-03T22:04:27.327139Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

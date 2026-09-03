@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use fingerprint::FingerprintSuffix;
 use std::time::{Duration, Instant};
 use tokio_postgres::{
-    Row, RowStream, ToStatement,
+    Row, RowStream,
     types::{BorrowToSql, ToSql},
 };
 
@@ -297,20 +297,20 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "execute", statement.sql_text(),
+        report!(self, "execute", Some(statement.sql_text()),
             self.connection.execute(statement, params).await, rows => Some(*rows))
     }
 
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        report!(self, "execute_raw", statement.sql_text(),
+        report!(self, "execute_raw", Some(statement.sql_text()),
             self.connection.execute_raw(statement, params).await, rows => Some(*rows))
     }
 
@@ -320,9 +320,9 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_one", statement.sql_text(),
+        report!(self, "query_one", Some(statement.sql_text()),
             self.connection.query_one(statement, params).await, _ => Some(1))
     }
 
@@ -332,9 +332,9 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_opt", statement.sql_text(),
+        report!(self, "query_opt", Some(statement.sql_text()),
             self.connection.query_opt(statement, params).await, row => Some(if row.is_some() { 1 } else { 0 }))
     }
 
@@ -344,21 +344,21 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_all", statement.sql_text(),
+        report!(self, "query_all", Some(statement.sql_text()),
             self.connection.query_all(statement, params).await, rows => Some(rows.len() as u64))
     }
 
     // [spec:pgorm:sem:exec.stream.decode+1]    row count unknown at stream creation
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        report!(self, "query_raw", statement.sql_text(),
+        report!(self, "query_raw", Some(statement.sql_text()),
             self.connection.query_raw(statement, params).await, _ => None)
     }
 
@@ -450,20 +450,20 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
 impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "execute", statement.sql_text(),
+        report!(self, "execute", Some(statement.sql_text()),
             open_transaction!(self).execute(statement, params).await, rows => Some(*rows))
     }
 
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        report!(self, "execute_raw", statement.sql_text(),
+        report!(self, "execute_raw", Some(statement.sql_text()),
             open_transaction!(self).execute_raw(statement, params).await, rows => Some(*rows))
     }
 
@@ -473,9 +473,9 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_one", statement.sql_text(),
+        report!(self, "query_one", Some(statement.sql_text()),
             open_transaction!(self).query_one(statement, params).await, _ => Some(1))
     }
 
@@ -485,9 +485,9 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_opt", statement.sql_text(),
+        report!(self, "query_opt", Some(statement.sql_text()),
             open_transaction!(self).query_opt(statement, params).await, row => Some(if row.is_some() { 1 } else { 0 }))
     }
 
@@ -497,21 +497,21 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
-        report!(self, "query_all", statement.sql_text(),
+        report!(self, "query_all", Some(statement.sql_text()),
             open_transaction!(self).query_all(statement, params).await, rows => Some(rows.len() as u64))
     }
 
     // [spec:pgorm:sem:exec.stream.decode+1]    row count unknown at stream creation
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        report!(self, "query_raw", statement.sql_text(),
+        report!(self, "query_raw", Some(statement.sql_text()),
             open_transaction!(self).query_raw(statement, params).await, _ => None)
     }
 

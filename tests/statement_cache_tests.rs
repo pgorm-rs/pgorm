@@ -25,8 +25,8 @@ async fn prepared_count(db: &DatabaseConnection, sql: &str) -> Result<i64, Error
     Ok(row.get(0))
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    one Parse per connection, not per call
-// [spec:pgorm:def:conn.pool.conn-trait+5/test]    the text-carrying statement routes through the cache
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    one Parse per connection, not per call
+// [spec:pgorm:def:conn.pool.conn-trait+6/test]    the text-carrying statement routes through the cache
 #[pgorm_macros::test]
 async fn repeated_queries_reuse_one_prepared_statement() -> Result<(), Error> {
     let ctx = TestContext::new("reuse_one_prepared_stmtcache").await;
@@ -51,7 +51,7 @@ async fn repeated_queries_reuse_one_prepared_statement() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate/test]    DDL that changes the result type
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    DDL that changes the result type
 #[pgorm_macros::test]
 async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     let ctx = TestContext::new("added_column_reprepares_stmtcache").await;
@@ -88,7 +88,7 @@ async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate/test]    exactly one retry, then the error
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    exactly one retry, then the error
 #[pgorm_macros::test]
 async fn a_second_stale_plan_error_surfaces() -> Result<(), Error> {
     let ctx = TestContext::new("second_stale_plan_stmtcache").await;
@@ -131,7 +131,7 @@ async fn a_second_stale_plan_error_surfaces() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+5/test]    a transaction routes through its connection's cache
+// [spec:pgorm:def:conn.pool.conn-trait+6/test]    a transaction routes through its connection's cache
 #[pgorm_macros::test]
 async fn transaction_shares_the_connection_cache() -> Result<(), Error> {
     let ctx = TestContext::new("txn_shares_cache_stmtcache").await;
@@ -157,7 +157,7 @@ async fn transaction_shares_the_connection_cache() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate/test]    ROLLBACK does not discard a Parse
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    ROLLBACK does not discard a Parse
 #[pgorm_macros::test]
 async fn rolled_back_transaction_keeps_its_statements() -> Result<(), Error> {
     let ctx = TestContext::new("rolled_back_keeps_stmtcache").await;
@@ -183,7 +183,7 @@ async fn rolled_back_transaction_keeps_its_statements() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+5/test]    the simple-query path prepares nothing
+// [spec:pgorm:def:conn.pool.conn-trait+6/test]    the simple-query path prepares nothing
 #[pgorm_macros::test]
 async fn batch_execute_prepares_nothing() -> Result<(), Error> {
     let ctx = TestContext::new("batch_prepares_nothing_stmtcache").await;

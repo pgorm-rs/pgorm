@@ -4,7 +4,7 @@ use crate::{ConnectionTrait, RetryableError, SqlText, TransactionTrait, error::*
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
-    IsolationLevel, RowStream, ToStatement,
+    IsolationLevel, RowStream,
     error::SqlState,
     types::{BorrowToSql, ToSql},
 };
@@ -13,43 +13,32 @@ use tokio_postgres::{
 /// if PostgreSQL rejects the cached plan.
 ///
 /// `$owner` is whatever holds the cache — a pooled client or a transaction on
-/// one. A statement that still carries its SQL text (`conn.sql-text`) is
-/// resolved through the cache, so the same text is parsed once per connection
-/// rather than once per call; a prepared [`Statement`](tokio_postgres::Statement)
-/// answers `None` and is passed through untouched, since there is no text to
-/// key a cache entry on and it is already prepared.
+/// one. Every statement carries its SQL text (`conn.sql-text`), so every one is
+/// resolved through the cache and the same text is parsed once per connection
+/// rather than once per call; there is no second path.
 ///
-/// `$call` is written once and expanded against both, which type-checks in each
-/// arm because every method it can wrap is generic over `ToStatement`. It is
-/// expanded a third time for the retry, so it must be replayable: only the
-/// methods whose parameters are a reusable `&[&dyn ToSql]` slice can use this
-/// macro.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate]    evict, re-prepare, retry once
+/// `$call` is expanded twice, once per attempt, so it must be replayable: only
+/// the methods whose parameters are a reusable `&[&dyn ToSql]` slice can use
+/// this macro.
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    evict, re-prepare, retry once
 macro_rules! cached {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
-        match $statement.sql_text() {
-            None => {
-                let $prepared = $statement;
+        let sql = $statement.sql_text();
+        let cached = owner.prepare_cached(sql).await?;
+        let outcome = {
+            let $prepared = &cached;
+            $call
+        };
+
+        match outcome {
+            Err(error) if is_stale_cached_plan(&error) => {
+                drop(owner.statement_cache.remove(sql, &[]));
+                let reprepared = owner.prepare_cached(sql).await?;
+                let $prepared = &reprepared;
                 Ok($call?)
             }
-            Some(sql) => {
-                let cached = owner.prepare_cached(sql).await?;
-                let outcome = {
-                    let $prepared = &cached;
-                    $call
-                };
-
-                match outcome {
-                    Err(error) if is_stale_cached_plan(&error) => {
-                        drop(owner.statement_cache.remove(sql, &[]));
-                        let reprepared = owner.prepare_cached(sql).await?;
-                        let $prepared = &reprepared;
-                        Ok($call?)
-                    }
-                    outcome => Ok(outcome?),
-                }
-            }
+            outcome => Ok(outcome?),
         }
     }};
 }
@@ -61,31 +50,24 @@ macro_rules! cached {
 /// demand a `Send` bound the trait does not carry — so a rejected plan is
 /// evicted, which makes the next call re-prepare, and the error is returned as
 /// it stands.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate]    evict without a retry
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    evict without a retry
 macro_rules! cached_once {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
-        match $statement.sql_text() {
-            None => {
-                let $prepared = $statement;
-                Ok($call?)
-            }
-            Some(sql) => {
-                let cached = owner.prepare_cached(sql).await?;
-                let outcome = {
-                    let $prepared = &cached;
-                    $call
-                };
+        let sql = $statement.sql_text();
+        let cached = owner.prepare_cached(sql).await?;
+        let outcome = {
+            let $prepared = &cached;
+            $call
+        };
 
-                if let Err(error) = &outcome
-                    && is_stale_cached_plan(error)
-                {
-                    drop(owner.statement_cache.remove(sql, &[]));
-                }
-
-                Ok(outcome?)
-            }
+        if let Err(error) = &outcome
+            && is_stale_cached_plan(error)
+        {
+            drop(owner.statement_cache.remove(sql, &[]));
         }
+
+        Ok(outcome?)
     }};
 }
 
@@ -97,7 +79,7 @@ macro_rules! cached_once {
 /// which is localized, so a statement rejected on its own merits is retried
 /// once as well; it fails identically the second time, at the cost of one round
 /// trip on a call that was already failing.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate]    the SQLSTATE that means "re-prepare"
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    the SQLSTATE that means "re-prepare"
 fn is_stale_cached_plan(error: &tokio_postgres::Error) -> bool {
     error.code() == Some(&SqlState::FEATURE_NOT_SUPPORTED)
 }
@@ -451,7 +433,7 @@ impl ConnectionTrait for &DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -462,7 +444,7 @@ impl ConnectionTrait for &DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
@@ -479,7 +461,7 @@ impl ConnectionTrait for &DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<tokio_postgres::Row, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -493,7 +475,7 @@ impl ConnectionTrait for &DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -507,7 +489,7 @@ impl ConnectionTrait for &DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -517,7 +499,7 @@ impl ConnectionTrait for &DatabaseConnection {
 
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
@@ -533,13 +515,13 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+5]    cache-routing impls
+// [spec:pgorm:def:conn.pool.conn-trait+6]    cache-routing impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -550,7 +532,7 @@ impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
@@ -567,7 +549,7 @@ impl ConnectionTrait for DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<tokio_postgres::Row, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -581,7 +563,7 @@ impl ConnectionTrait for DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -595,7 +577,7 @@ impl ConnectionTrait for DatabaseConnection {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(&self.0, statement, |prepared| self
             .0
@@ -606,7 +588,7 @@ impl ConnectionTrait for DatabaseConnection {
     // [spec:pgorm:def:exec.stream+1]    pooled-client row stream
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
@@ -627,7 +609,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     // #[instrument(level = "trace")]
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(self.tx(), statement, |prepared| self
             .tx()
@@ -638,7 +620,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     // #[instrument(level = "trace")]
     async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
@@ -655,7 +637,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<tokio_postgres::Row, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(self.tx(), statement, |prepared| self
             .tx()
@@ -669,7 +651,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(self.tx(), statement, |prepared| self
             .tx()
@@ -683,7 +665,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
     {
         cached!(self.tx(), statement, |prepared| self
             .tx()
@@ -694,7 +676,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     // [spec:pgorm:def:exec.stream+1]    in-transaction row stream
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
-        T: ?Sized + ToStatement + SqlText + Send + Sync,
+        T: ?Sized + SqlText + Sync,
         P: BorrowToSql,
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,

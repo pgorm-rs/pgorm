@@ -42,10 +42,10 @@ impl fmt::Display for QueryFingerprint {
 /// view, valid only for the duration of the hook call; a collector that keeps
 /// anything must copy it out.
 ///
-/// [`sql`](Self::sql) is `None` when the caller passed an already-prepared
-/// `tokio_postgres::Statement`, which no longer carries its text
-/// (`conn.sql-text`), and for the two hooks that report a transaction verb
-/// (`"begin"`, `"rollback"`) rather than a statement.
+/// [`sql`](Self::sql) is `Some` for every statement operation — a statement is
+/// its text and nothing else (`conn.sql-text`) — and `None` only for the two
+/// hooks that report a transaction verb (`"begin"`, `"rollback"`), where there
+/// is no statement to name.
 // [spec:pgorm:req:metric.fingerprint]
 #[derive(Clone, Copy, Debug)]
 pub struct QueryContext<'a> {
@@ -78,8 +78,9 @@ impl<'a> QueryContext<'a> {
     ///
     /// It cannot be had for three distinct reasons, and they are deliberately
     /// not distinguished: the `metrics-fingerprint` feature is off, and no
-    /// parser is linked in; the statement carries no text to parse; or
-    /// libpg_query rejected the text. That last case is not an error — raw SQL
+    /// parser is linked in; there is no statement to parse, as for a
+    /// transaction verb; or libpg_query rejected the text. That last case is
+    /// not an error — raw SQL
     /// PostgreSQL's own grammar accepts may still be text this parser will not
     /// reduce to a tree, and such a statement executes normally. Metrics simply
     /// cannot name it.

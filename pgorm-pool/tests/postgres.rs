@@ -92,7 +92,7 @@ async fn session_setting(client: &Client, name: &str) -> String {
         .get(0)
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    prepare_cached inserts on a miss and the statement is usable
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    prepare_cached inserts on a miss and the statement is usable
 #[tokio::test]
 async fn basic() {
     let pool = create_pool();
@@ -104,7 +104,7 @@ async fn basic() {
     assert_eq!(client.statement_cache.size(), 1);
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    prepare_typed_cached binds the declared parameter types
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    prepare_typed_cached binds the declared parameter types
 #[tokio::test]
 async fn prepare_typed_cached() {
     let pool = create_pool();
@@ -129,7 +129,7 @@ async fn prepare_typed_error() {
     assert!(client.query(&stmt, &[&42i32]).await.is_err());
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    a statement cached inside a transaction lands in the client's cache
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    a statement cached inside a transaction lands in the client's cache
 #[tokio::test]
 async fn transaction_1() {
     let pool = create_pool();
@@ -145,7 +145,7 @@ async fn transaction_1() {
     assert_eq!(client.statement_cache.size(), 1);
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    a statement cached on the client is reusable inside its transaction
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    a statement cached on the client is reusable inside its transaction
 #[tokio::test]
 async fn transaction_2() {
     let pool = create_pool();
@@ -238,7 +238,7 @@ fn _use_generic_client(_client: &impl tokio_postgres::GenericClient) {
     // nop
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    per-connection clear()
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    per-connection clear()
 #[tokio::test]
 async fn statement_cache_clear() {
     let pool = create_pool();
@@ -250,7 +250,7 @@ async fn statement_cache_clear() {
     assert!(client.statement_cache.size() == 0);
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    the manager-level registry clears every live cache
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    the manager-level registry clears every live cache
 // [spec:pgorm:sem:conn.pool.lifecycle/test]    each created connection gets a fresh cache, registered with the manager
 #[tokio::test]
 async fn statement_caches_clear() {
@@ -486,7 +486,7 @@ async fn recycle_custom_discard_all_deallocates() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    the cache key is (query text, parameter types)
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    the cache key is (query text, parameter types)
 #[tokio::test]
 async fn statement_cache_keys_include_param_types() {
     const SQL: &str = "SELECT $1::int8";
@@ -586,7 +586,7 @@ async fn disabled_cache_stores_nothing() {
     drop((first, second));
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    a hit returns the cached statement instead of preparing again
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    a hit returns the cached statement instead of preparing again
 #[tokio::test]
 async fn statement_cache_hit_avoids_reparse() {
     const CACHED: &str = "SELECT 'cached-parse'";
@@ -613,7 +613,7 @@ async fn statement_cache_hit_avoids_reparse() {
     drop((first, second, third, fourth));
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    the registry removes one statement across every live cache
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    the registry removes one statement across every live cache
 #[tokio::test]
 async fn statement_caches_remove_one_statement() {
     let pool = create_pool();
@@ -634,7 +634,7 @@ async fn statement_caches_remove_one_statement() {
     assert!(client0.statement_cache.remove("SELECT 2;", &[]).is_some());
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    tokio-postgres's own statement paths never consult it
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    tokio-postgres's own statement paths never consult it
 #[tokio::test]
 async fn plain_query_bypasses_statement_cache() {
     let pool = create_pool();
@@ -655,7 +655,7 @@ async fn plain_query_bypasses_statement_cache() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.statement-cache+1/test]    nested transactions and savepoints share the owning client's cache
+// [spec:pgorm:sem:conn.pool.statement-cache+2/test]    nested transactions and savepoints share the owning client's cache
 #[tokio::test]
 async fn savepoint_shares_client_statement_cache() {
     let pool = create_pool();

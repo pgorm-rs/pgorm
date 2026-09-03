@@ -23,12 +23,12 @@ alternatives (
 )
 consequences {
     accepted (
-        "ConnectionTrait's six extended-protocol methods resolve SqlText::sql_text() through the connection's StatementCache; a prepared Statement, which answers None, passes through untouched. Measured 2.30x on real ORM queries at a 4ms round trip."
+        "ConnectionTrait's six extended-protocol methods resolve SqlText::sql_text() through the connection's StatementCache; since infra.statement-identity sealed the bound to str/String there is no second route. Measured 2.30x on real ORM queries at a 4ms round trip."
         "Reuse introduces one failure mode the re-prepare-every-time path lacks: SQLSTATE 0A000, cached plan must not change result type, after DDL that alters a result column. The cache evicts and re-prepares once; a second failure surfaces to the caller."
         "The cache key space is unbounded — variable-arity IN lists alone produced 25 entries for one logical query — so the cache carries a capacity bound and an opt-out."
         "Prepare-time verification of a FromQueryResult target against Statement::columns() is offered as a utility, not as a handle type. It is the only thing that catches a wrong target when the query returns no rows, which today returns Ok(vec![]) and ships."
     )
-    deferred ("A typed handle remains open for the sql! macro, where libpg_query already validates the text at compile time and could carry an inferred row shape; that is the case where the handle earns the ceremony. The cross-connection Statement hole (SQLSTATE 26000) is a separate invalid-states candidate.")
+    deferred ("A typed handle remains open for the sql! macro, where libpg_query already validates the text at compile time and could carry an inferred row shape; that is the case where the handle earns the ceremony. The cross-connection Statement hole (SQLSTATE 26000) was closed by infra.statement-identity: ConnectionTrait no longer accepts a Statement at all.")
 }
 edges {
     related_to ([dec:pgorm:invalid-states-unrepresentable])
