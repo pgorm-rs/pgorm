@@ -77,15 +77,19 @@
 //!    framework (Rocket) that pgorm does not depend on.
 //!
 //! ```ignore
+//! use std::num::NonZeroU64;
+//!
+//! const DEFAULT_PER_PAGE: NonZeroU64 = NonZeroU64::new(10).unwrap();
+//!
 //! #[get("/?<page>&<posts_per_page>")]
 //! async fn list(
 //!     conn: Connection<Db>,
-//!     page: Option<usize>,
-//!     per_page: Option<usize>,
+//!     page: Option<u64>,
+//!     per_page: Option<NonZeroU64>,
 //! ) -> Template {
 //!     // Set page number and items per page
 //!     let page = page.unwrap_or(1);
-//!     let per_page = per_page.unwrap_or(10);
+//!     let per_page = per_page.unwrap_or(DEFAULT_PER_PAGE);
 //!
 //!     // Setup paginator
 //!     let paginator = Post::find()

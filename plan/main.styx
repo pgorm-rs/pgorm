@@ -1510,7 +1510,6 @@ children (
                 id bug.oracle-findings
                 title "Fix the nine rendering defects the conformance oracle found beyond the audit"
                 deps (bug.ident-escaping)
-                sealed true
                 log (
                     {
                         at 2026-09-02T16:08:40.705111Z
@@ -1927,6 +1926,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: the textbook case — paginate(db, page_size) asserts page_size != 0 at both construction sites (src/executor/paginator.rs:230, :250) and the rule exec.paginator.page-size currently states a zero page size \"is never a recoverable DbErr\" (that sentence is the fix's whole spec cost). NonZeroU64 removes the assert AND the compute_pages_number division hazard; field already pub(crate). Breaking but mechanical (PaginatorTrait signatures). Deps on nopanic.paginator-raw for the shared file. S."
+                    }
+
+                    {
+                        at 2026-09-03T11:39:36.700129Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

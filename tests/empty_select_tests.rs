@@ -14,6 +14,11 @@ use pgorm::{
 };
 use pgorm_query::SelectStatement;
 use pretty_assertions::assert_eq;
+use std::num::NonZeroU64;
+
+/// Any non-zero size reaches the guard; the paginator never gets far enough to
+/// page anything.
+const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(10).expect("page size is non-zero");
 
 #[pgorm_macros::test]
 async fn main() {
@@ -112,7 +117,7 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     assert_empty_select_list(
         empty_projection()
             .into_tuple::<i32>()
-            .paginate(db, 10)
+            .paginate(db, PAGE_SIZE)
             .fetch()
             .await
             .expect_err("fetch over an empty select list"),
@@ -182,7 +187,7 @@ pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
         .select_only()
         .column(bakery::Column::Id)
         .into_tuple::<i32>()
-        .paginate(db, 10)
+        .paginate(db, PAGE_SIZE)
         .fetch()
         .await
         .expect("fetch over a re-populated select list");

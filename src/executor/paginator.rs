@@ -9,6 +9,7 @@ use pgorm_query::{Alias, Expr, QueryBuilder, SelectStatement, Value};
 use std::{
     fmt::{self, Write as _},
     marker::PhantomData,
+    num::NonZeroU64,
     pin::Pin,
 };
 use tokio_postgres::types::ToSql;
@@ -28,7 +29,7 @@ where
 {
     pub(crate) query: Result<SelectStatement, String>,
     pub(crate) page: u64,
-    pub(crate) page_size: u64,
+    pub(crate) page_size: NonZeroU64,
     pub(crate) db: &'db C,
     pub(crate) selector: PhantomData<S>,
 }
@@ -63,14 +64,14 @@ where
     /// Fetch a specific page; page index starts from zero
     // [spec:pgorm:sem:exec.paginator.fetch+1]
     pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
-        let offset = self.page_size.checked_mul(page).ok_or_else(|| {
+        let offset = self.page_size.get().checked_mul(page).ok_or_else(|| {
             DbErr::Query(RuntimeErr::Internal(format!(
                 "page {page} at page size {} is past the largest representable offset",
                 self.page_size
             )))
         })?;
         let mut query = self.query()?.clone();
-        query.limit(self.page_size).offset(offset);
+        query.limit(self.page_size.get()).offset(offset);
         let (stmt, values) = query.build(QueryBuilder);
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
@@ -155,14 +156,16 @@ where
     /// Yields `None` once a page comes back empty.
     ///
     /// ```no_run
+    /// # use std::num::NonZeroU64;
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
+    /// # const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(50).unwrap();
     /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// let db = pool.get().await?;
     ///
     /// let mut cake_pages = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
-    ///     .paginate(&db, 50);
+    ///     .paginate(&db, PAGE_SIZE);
     ///
     /// while let Some(cakes) = cake_pages.fetch_and_next().await? {
     ///     // Do something on cakes: Vec<cake::Model>
@@ -181,15 +184,17 @@ where
     /// Convert self into an async stream
     ///
     /// ```no_run
+    /// # use std::num::NonZeroU64;
     /// # use futures::TryStreamExt;
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
+    /// # const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(50).unwrap();
     /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
     /// let db = pool.get().await?;
     ///
     /// let mut cake_stream = cake::Entity::find()
     ///     .order_by_asc(cake::Column::Id)
-    ///     .paginate(&db, 50)
+    ///     .paginate(&db, PAGE_SIZE)
     ///     .into_stream();
     ///
     /// while let Some(cakes) = cake_stream.try_next().await? {
@@ -219,14 +224,37 @@ where
     type Selector: SelectorTrait + Send + Sync + 'db;
 
     /// Paginate the result of a select operation.
-    fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, Self::Selector>;
+    ///
+    /// A zero page size — which would make every page empty and leave the
+    /// page count undefined — is not a value this can be called with:
+    ///
+    /// ```compile_fail,E0308
+    /// # use pgorm::{entity::prelude::*, tests_cfg::cake, DatabaseConnection, PaginatorTrait};
+    /// # fn example(db: &DatabaseConnection) {
+    /// cake::Entity::find().paginate(db, 0);
+    /// # }
+    /// ```
+    ///
+    /// A page size known at compile time is checked there, once:
+    ///
+    /// ```
+    /// # use std::num::NonZeroU64;
+    /// # use pgorm::{entity::prelude::*, tests_cfg::cake, DatabaseConnection, PaginatorTrait};
+    /// const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(50).unwrap();
+    ///
+    /// # fn example(db: &DatabaseConnection) {
+    /// cake::Entity::find().paginate(db, PAGE_SIZE);
+    /// # }
+    /// ```
+    // [spec:pgorm:req:exec.paginator.page-size+1/test]
+    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector>;
 
     /// Perform a count on the paginated results
     async fn count(self, db: &'db C) -> Result<u64, DbErr>
     where
         Self: Send + Sized,
     {
-        self.paginate(db, 1).num_items().await
+        self.paginate(db, NonZeroU64::MIN).num_items().await
     }
 }
 
@@ -237,9 +265,8 @@ where
 {
     type Selector = S;
 
-    // [spec:pgorm:req:exec.paginator.page-size]
-    fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
-        assert!(page_size != 0, "page_size should not be zero");
+    // [spec:pgorm:req:exec.paginator.page-size+1]
+    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
             query: Ok(self.query),
             page: 0,
@@ -256,10 +283,9 @@ where
     S: SelectorTrait + Send + Sync + 'db,
 {
     type Selector = S;
-    // [spec:pgorm:req:exec.paginator.page-size]
+    // [spec:pgorm:req:exec.paginator.page-size+1]
     // [spec:pgorm:sem:exec.paginator.raw+1]
-    fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, S> {
-        assert!(page_size != 0, "page_size should not be zero");
+    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
             query: wrap_raw_select(&self.stmt, self.values.0),
             page: 0,
@@ -387,7 +413,7 @@ where
 {
     type Selector = SelectModel<M>;
 
-    fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, Self::Selector> {
+    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector> {
         self.into_model().paginate(db, page_size)
     }
 }
@@ -402,7 +428,7 @@ where
 {
     type Selector = SelectTwoModel<M, N>;
 
-    fn paginate(self, db: &'db C, page_size: u64) -> Paginator<'db, C, Self::Selector> {
+    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector> {
         self.into_model().paginate(db, page_size)
     }
 }

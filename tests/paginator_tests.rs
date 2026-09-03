@@ -10,6 +10,7 @@ use pgorm::{
 };
 use pgorm_query::{Value, Values};
 use pretty_assertions::assert_eq;
+use std::num::NonZeroU64;
 
 const BAKERIES: [(&str, f64); 7] = [
     ("Alpha Bakery", 1.0),
@@ -39,10 +40,16 @@ fn names(models: &[bakery::Model]) -> Vec<&str> {
     models.iter().map(|m| m.name.as_str()).collect()
 }
 
+/// A page size written as a literal. Library code needs no such helper — the
+/// `NonZeroU64` is the check — so the one `expect` is confined to here.
+fn page_size(size: u64) -> NonZeroU64 {
+    NonZeroU64::new(size).expect("page size is non-zero")
+}
+
 const RAW_ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDER BY "id" ASC"#;
 
 // [spec:pgorm:def:exec.paginator+1/test]    paginate is reachable from every
-// selector shape, and `count` is `paginate(db, 1).num_items()`
+// selector shape, and `count` pages at `NonZeroU64::MIN`
 // [spec:pgorm:sem:exec.paginator.fetch+1/test]    zero-indexed pages, an
 // independent page cursor, and `next` advancing without fetching
 #[pgorm_macros::test]
@@ -54,7 +61,7 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
 
     let mut paginator = Bakery::find()
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
 
     // Pages are zero-indexed and the trailing page is partial.
     assert_eq!(
@@ -93,7 +100,7 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
         .column(bakery::Column::Name)
         .order_by_asc(bakery::Column::Id)
         .into_tuple::<String>()
-        .paginate(&db, 2)
+        .paginate(&db, page_size(2))
         .fetch_page(1)
         .await?;
     assert_eq!(names_only, ["Charlie Bakery", "Delta Bakery"]);
@@ -102,18 +109,21 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
     let joined: Vec<(bakery::Model, Option<baker::Model>)> = Bakery::find()
         .find_also_related(Baker)
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 2)
+        .paginate(&db, page_size(2))
         .fetch_page(0)
         .await?;
     assert_eq!(joined.len(), 2);
     assert_eq!(joined[0].1, None);
 
-    // `count` is defined as `paginate(db, 1).num_items()`.
+    // `count` is `num_items` over a paginator of page size one.
     assert_eq!(Bakery::find().count(&db).await?, 7);
 
     // A page whose offset would not fit a `u64` is refused before any SQL is
     // built, rather than wrapping to a small offset or panicking on overflow.
-    let overflowing = Bakery::find().paginate(&db, u64::MAX).fetch_page(2).await;
+    let overflowing = Bakery::find()
+        .paginate(&db, NonZeroU64::MAX)
+        .fetch_page(2)
+        .await;
     assert!(
         matches!(&overflowing, Err(DbErr::Query(_))),
         "unexpected result: {overflowing:?}"
@@ -140,7 +150,7 @@ async fn paginator_count() -> Result<(), DbErr> {
     let db = ctx.db.get().await?;
 
     // Zero items yield zero pages.
-    let empty = Bakery::find().paginate(&db, 3);
+    let empty = Bakery::find().paginate(&db, page_size(3));
     assert_eq!(empty.num_items().await?, 0);
     assert_eq!(empty.num_pages().await?, 0);
 
@@ -149,7 +159,7 @@ async fn paginator_count() -> Result<(), DbErr> {
     // A partial trailing page still counts as a page: 7 items / 3 == 3 pages.
     let paginator = Bakery::find()
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
     assert_eq!(paginator.num_items().await?, 7);
     assert_eq!(paginator.num_pages().await?, 3);
 
@@ -161,8 +171,20 @@ async fn paginator_count() -> Result<(), DbErr> {
     assert_eq!(number_of_pages, 3);
 
     // An exact multiple does not gain a trailing page.
-    assert_eq!(Bakery::find().paginate(&db, 7).num_pages().await?, 1);
-    assert_eq!(Bakery::find().paginate(&db, 1).num_pages().await?, 7);
+    assert_eq!(
+        Bakery::find()
+            .paginate(&db, page_size(7))
+            .num_pages()
+            .await?,
+        1
+    );
+    assert_eq!(
+        Bakery::find()
+            .paginate(&db, page_size(1))
+            .num_pages()
+            .await?,
+        7
+    );
 
     // The count subquery drops limit, offset and ORDER BY, so a query that
     // would return two rows still counts every matching row.
@@ -170,7 +192,7 @@ async fn paginator_count() -> Result<(), DbErr> {
         .order_by_desc(bakery::Column::Id)
         .limit(2)
         .offset(1)
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
     assert_eq!(windowed.fetch_page(0).await?.len(), 3);
     assert_eq!(windowed.num_items().await?, 7);
 
@@ -203,7 +225,7 @@ async fn paginator_iterate() -> Result<(), DbErr> {
 
     let mut paginator = Bakery::find()
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
 
     let mut pages = Vec::new();
     while let Some(page) = paginator.fetch_and_next().await? {
@@ -217,7 +239,7 @@ async fn paginator_iterate() -> Result<(), DbErr> {
     // query returning zero rows before termination is detected.
     let mut exact = Bakery::find()
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 7);
+        .paginate(&db, page_size(7));
     assert_eq!(exact.fetch_and_next().await?.map(|p| p.len()), Some(7));
     assert_eq!(exact.fetch_and_next().await?.map(|p| p.len()), None);
     assert_eq!(exact.cur_page(), 2);
@@ -225,7 +247,7 @@ async fn paginator_iterate() -> Result<(), DbErr> {
     // `into_stream` yields one item per non-empty page and then ends.
     let streamed: Vec<Vec<bakery::Model>> = Bakery::find()
         .order_by_asc(bakery::Column::Id)
-        .paginate(&db, 3)
+        .paginate(&db, page_size(3))
         .into_stream()
         .try_collect()
         .await?;
@@ -237,49 +259,6 @@ async fn paginator_iterate() -> Result<(), DbErr> {
         names(&streamed.concat()),
         BAKERIES.map(|(name, _)| name).to_vec()
     );
-
-    drop(db);
-    ctx.delete().await;
-
-    Ok(())
-}
-
-// [spec:pgorm:req:exec.paginator.page-size/test]    a zero page size panics
-// rather than returning a `DbErr`, on both `paginate` implementations
-#[pgorm_macros::test]
-async fn paginator_rejects_zero_page_size() -> Result<(), DbErr> {
-    let ctx = TestContext::new("paginator_tests_zero_page_size").await;
-    create_tables(&ctx.db).await?;
-    let db = ctx.db.get().await?;
-
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-
-    let selector = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = Bakery::find().paginate(&db, 0);
-    }));
-
-    let raw = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = Bakery::find()
-            .from_raw_sql(RAW_ALL.to_owned(), Values(Vec::new()))
-            .paginate(&db, 0);
-    }));
-
-    std::panic::set_hook(hook);
-
-    for payload in [selector, raw] {
-        let payload = payload.expect_err("a zero page size must panic");
-        let message = payload
-            .downcast_ref::<String>()
-            .map(String::as_str)
-            .or_else(|| payload.downcast_ref::<&str>().copied())
-            .unwrap_or_default()
-            .to_owned();
-        assert!(
-            message.contains("page_size should not be zero"),
-            "unexpected panic payload: {message}"
-        );
-    }
 
     drop(db);
     ctx.delete().await;
@@ -301,7 +280,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
     // No bind values: the statement is wrapped with `Expr::cust`.
     let mut paginator = Bakery::find()
         .from_raw_sql(RAW_ALL.to_owned(), Values(Vec::new()))
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
 
     assert_eq!(
         names(&paginator.fetch_page(0).await?),
@@ -320,7 +299,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
                 .to_owned(),
             Values(vec![Value::Double(Some(4.0))]),
         )
-        .paginate(&db, 2);
+        .paginate(&db, page_size(2));
 
     assert_eq!(filtered.num_items().await?, 3);
     assert_eq!(
@@ -337,7 +316,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
             format!(r#"WITH t AS ({RAW_ALL}) SELECT * FROM t ORDER BY "id" ASC"#),
             Values(Vec::new()),
         )
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
     assert_eq!(cte.num_items().await?, 7);
     assert_eq!(cte.num_pages().await?, 3);
     assert_eq!(
@@ -350,7 +329,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
     // whitespace, a leading comment and a terminating `;` all page fine.
     let decorated = Bakery::find()
         .from_raw_sql(format!("  -- the lot\n  {RAW_ALL} ; "), Values(Vec::new()))
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
     assert_eq!(decorated.num_items().await?, 7);
     assert_eq!(names(&decorated.fetch_page(2).await?), ["Golf Bakery"]);
 
@@ -358,7 +337,7 @@ async fn paginator_raw() -> Result<(), DbErr> {
     // of colliding with them, so a statement that already limits still pages.
     let capped = Bakery::find()
         .from_raw_sql(format!(r#"{RAW_ALL} LIMIT 4"#), Values(Vec::new()))
-        .paginate(&db, 3);
+        .paginate(&db, page_size(3));
     assert_eq!(capped.num_items().await?, 4);
     assert_eq!(names(&capped.fetch_page(1).await?), ["Delta Bakery"]);
 
@@ -397,7 +376,7 @@ async fn paginator_raw_rejects_non_select() -> Result<(), DbErr> {
     for (stmt, expected) in cases {
         let paginator = Bakery::find()
             .from_raw_sql(stmt.to_owned(), Values(Vec::new()))
-            .paginate(&db, 3);
+            .paginate(&db, page_size(3));
 
         for reported in [
             paginator.fetch_page(0).await.err(),

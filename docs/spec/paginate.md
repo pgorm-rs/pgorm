@@ -202,10 +202,15 @@ including the remaining gaps in parameter binding.
 > `PinBoxStream` is the pinned boxed stream alias returned by
 > `into_stream`.
 
-> [spec:pgorm:req:exec.paginator.page-size]
-> `page_size` MUST be non-zero. Both the `Selector` and `SelectorRaw`
-> `paginate` implementations assert this and panic with "page_size
-> should not be zero"; a zero page size is never a recoverable `DbErr`.
+> [spec:pgorm:req:exec.paginator.page-size+1]
+> `page_size` is a `NonZeroU64` — in the `paginate` signature and in the
+> `Paginator` field it is stored in — so a zero page size is not a value
+> a caller can supply and not a state the paginator can hold. There is
+> no assertion to trip, no panic to catch and no `DbErr` to recover:
+> zero is rejected by the compiler at the call site. The page-count
+> division of `[spec:pgorm:sem:exec.paginator.count]` is therefore total
+> by construction, and `PaginatorTrait::count` names its page size of
+> one as `NonZeroU64::MIN` rather than a literal the type would refuse.
 
 > [spec:pgorm:sem:exec.paginator.fetch+1]
 > `fetch_page(page)` executes a clone of the query with

@@ -313,6 +313,7 @@ assertions (
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
     {id bug.ident-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:00:40.269307Z}
     {id bug.insert-empty-model, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:55:49.663561Z}
+    {id bug.oracle-findings, kind @complete, author "brendan@necessary.nu", at 2026-09-02T23:13:32.053159Z}
     {id bug.query-doctests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:32:50.012368Z}
     {id bug.relation-pairing, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:11:36.703806Z}
     {id bug.test-harness, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:15:03.593799Z}
@@ -365,6 +366,7 @@ assertions (
     {id unrep.cursor-arity, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:12:23.476753Z}
     {id unrep.index-kind, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:42:47.735762Z}
     {id unrep.mysql-purge, kind @complete, author "brendan@necessary.nu", at 2026-09-02T22:09:57.329153Z}
+    {id unrep.page-size, kind @complete, author "brendan@necessary.nu", at 2026-09-03T11:39:36.700129Z}
     {id unrep.save-intent, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:58:52.648048Z}
     {id unrep.select-only, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:10:14.926388Z}
     {id unrep.tableref-split, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:47:05.432653Z}
@@ -377,7 +379,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id bug.oracle-findings, kind @complete, author "brendan@necessary.nu", at 2026-09-02T23:13:32.053159Z}
 )
 
 impl_evidence (
