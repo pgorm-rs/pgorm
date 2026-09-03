@@ -535,11 +535,14 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let foreign_key = ForeignKey::create()
-//!     .name("FK_character_id")
-//!     .from(Character::Table, Character::Id)
-//!     .to(Character::Table, Character::Id)
-//!     .to_owned();
+//! let foreign_key = ForeignKey::create(
+//!     Character::Table,
+//!     Character::Id,
+//!     Character::Table,
+//!     Character::Id,
+//! )
+//! .name("FK_character_id")
+//! .to_owned();
 //!
 //! assert_eq!(
 //!     foreign_key.to_string(),

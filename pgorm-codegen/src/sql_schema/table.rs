@@ -35,7 +35,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 }
 
 /// Bridge one `CREATE TABLE` into the statement the transformer reads.
-// [spec:pgorm:sem:codegen.ddl.tables]
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
@@ -180,7 +180,7 @@ fn reject_table_features(
 /// A `RangeVar` as the table name a DDL statement targets. Postgres has no
 /// cross-database reference to render, so a catalog-qualified name is refused
 /// rather than quietly reduced to its schema and table.
-// [spec:pgorm:sem:codegen.ddl.tables]
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
     let table = Alias::new(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
@@ -204,7 +204,7 @@ struct Column {
     foreign_key: Option<ForeignKeyCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables]
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 fn column(
     def: &PgColumnDef,
     target: &TableName,
@@ -285,12 +285,13 @@ fn column(
                 if foreign_key.is_some() {
                     return Err(on("a second REFERENCES clause"));
                 }
-                let mut created = ForeignKey::create();
-                named(&mut created, constraint);
-                created.from_tbl(target.clone());
-                created.from_col(Alias::new(column_name));
-                references(&mut created, constraint, &context, at)?;
-                foreign_key = Some(created.take());
+                foreign_key = Some(references(
+                    constraint,
+                    target,
+                    &[column_name.to_owned()],
+                    &context,
+                    at,
+                )?);
             }
             other => return Err(on(constraint_kind(other))),
         }
@@ -322,7 +323,7 @@ enum TableConstraint {
     ForeignKey(Box<ForeignKeyCreateStatement>),
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables]
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 fn table_constraint(
     constraint: &Constraint,
     target: &TableName,
@@ -363,27 +364,24 @@ fn table_constraint(
             if columns.is_empty() {
                 return Err(on("a foreign key over no columns"));
             }
-            let mut created = ForeignKey::create();
-            named(&mut created, constraint);
-            created.from_tbl(target.clone());
-            for column in columns {
-                created.from_col(Alias::new(column));
-            }
-            references(&mut created, constraint, &context, at)?;
-            Ok(TableConstraint::ForeignKey(Box::new(created.take())))
+            Ok(TableConstraint::ForeignKey(Box::new(references(
+                constraint, target, &columns, &context, at,
+            )?)))
         }
         other => Err(on(constraint_kind(other))),
     }
 }
 
-/// The referenced side of a foreign key: table, columns and actions.
-// [spec:pgorm:sem:codegen.ddl.tables]
+/// A foreign key over `columns` of `target`, with the referenced table, columns
+/// and actions the constraint declares.
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 fn references(
-    created: &mut ForeignKeyCreateStatement,
     constraint: &Constraint,
+    target: &TableName,
+    columns: &[String],
     context: &str,
     at: usize,
-) -> Result<(), Error> {
+) -> Result<ForeignKeyCreateStatement, Error> {
     let Some(pktable) = constraint.pktable.as_ref() else {
         return Err(unsupported(
             format!("a foreign key naming no table on {context}"),
@@ -398,6 +396,16 @@ fn references(
             at,
         ));
     }
+    if columns.len() != ref_columns.len() {
+        return Err(unresolved(
+            format!(
+                "a foreign key mapping {} columns onto {} on {context}",
+                columns.len(),
+                ref_columns.len()
+            ),
+            at,
+        ));
+    }
     if !matches!(constraint.fk_matchtype.as_str(), "" | "s") {
         return Err(unsupported(format!("a MATCH clause on {context}"), at));
     }
@@ -407,22 +415,36 @@ fn references(
             at,
         ));
     }
-    created.to_tbl(table_target(pktable, context, at)?);
-    for column in ref_columns {
-        created.to_col(Alias::new(column));
+    let ref_table = table_target(pktable, context, at)?;
+    let mut pairs = columns.iter().zip(ref_columns.iter());
+    let Some((column, ref_column)) = pairs.next() else {
+        return Err(unresolved(
+            format!("a foreign key over no columns on {context}"),
+            at,
+        ));
+    };
+    let mut created = ForeignKey::create(
+        target.clone(),
+        Alias::new(column.as_str()),
+        ref_table,
+        Alias::new(ref_column.as_str()),
+    );
+    for (column, ref_column) in pairs {
+        created.col(Alias::new(column.as_str()), Alias::new(ref_column.as_str()));
     }
+    named(&mut created, constraint);
     if let Some(action) = action(&constraint.fk_upd_action, "UPDATE", context, at)? {
         created.on_update(action);
     }
     if let Some(action) = action(&constraint.fk_del_action, "DELETE", context, at)? {
         created.on_delete(action);
     }
-    Ok(())
+    Ok(created.take())
 }
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no
 /// entity meaning, so it reads as no action declared.
-// [spec:pgorm:sem:codegen.ddl.tables]
+// [spec:pgorm:sem:codegen.ddl.tables+1]
 fn action(
     code: &str,
     clause: &str,

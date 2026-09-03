@@ -3,20 +3,24 @@ use core::fmt;
 use crate::{DynIden, Iden, IntoIden, PgInterval, QueryBuilder, SqlWriter};
 
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
-///
-/// # Exampl
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Extension;
 
 impl Extension {
-    /// Creates a new [`ExtensionCreateStatement`]
-    pub fn create() -> ExtensionCreateStatement {
-        ExtensionCreateStatement::new()
+    /// Creates a new [`ExtensionCreateStatement`] over the extension it creates
+    pub fn create<T>(name: T) -> ExtensionCreateStatement
+    where
+        T: IntoIden,
+    {
+        ExtensionCreateStatement::new(name)
     }
 
-    /// Creates a new [`ExtensionDropStatement`]
-    pub fn drop() -> ExtensionDropStatement {
-        ExtensionDropStatement::new()
+    /// Creates a new [`ExtensionDropStatement`] over the extension it drops
+    pub fn drop<T>(name: T) -> ExtensionDropStatement
+    where
+        T: IntoIden,
+    {
+        ExtensionDropStatement::new(name)
     }
 }
 
@@ -39,8 +43,7 @@ impl Extension {
 /// use pgorm_query::{extension::Extension, *};
 ///
 /// assert_eq!(
-///     Extension::create()
-///         .name("ltree")
+///     Extension::create("ltree")
 ///         .schema("public")
 ///         .version("v0.1.0")
 ///         .cascade()
@@ -50,15 +53,25 @@ impl Extension {
 /// );
 /// ```
 ///
+/// The extension name is taken by the constructor, because a statement that
+/// never names one renders the zero-length delimited identifier PostgreSQL
+/// rejects (`[dec:pgorm:invalid-states-unrepresentable]`):
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{extension::Extension, *};
+///
+/// Extension::create().schema("public");
+/// ```
+///
 /// # References
 ///
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+2]
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+// [spec:pgorm:req:sql.ddl.extension+3]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionCreateStatement {
-    pub(crate) name: String,
+    pub(crate) name: DynIden,
     pub(crate) schema: Option<String>,
     pub(crate) version: Option<String>,
 
@@ -70,14 +83,18 @@ pub struct ExtensionCreateStatement {
 }
 
 impl ExtensionCreateStatement {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the name of the extension to be created.
-    pub fn name<T: Into<String>>(&mut self, name: T) -> &mut Self {
-        self.name = name.into();
-        self
+    /// Construct a new statement over the extension it creates
+    pub fn new<T>(name: T) -> Self
+    where
+        T: IntoIden,
+    {
+        Self {
+            name: name.into_iden(),
+            schema: None,
+            version: None,
+            if_not_exists: false,
+            cascade: false,
+        }
     }
 
     /// Uses "WITH SCHEMA" on Create Extension Statement.
@@ -121,13 +138,18 @@ impl ExtensionCreateStatement {
 /// use pgorm_query::{extension::Extension, *};
 ///
 /// assert_eq!(
-///     Extension::drop()
-///         .name("ltree")
-///         .cascade()
-///         .if_exists()
-///         .to_string(),
+///     Extension::drop("ltree").cascade().if_exists().to_string(),
 ///     r#"DROP EXTENSION IF EXISTS "ltree" CASCADE"#
 /// );
+/// ```
+///
+/// The extension name is taken by the constructor, for the reason it is on
+/// [`ExtensionCreateStatement`]:
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{extension::Extension, *};
+///
+/// Extension::drop().if_exists();
 /// ```
 ///
 /// # References
@@ -135,10 +157,10 @@ impl ExtensionCreateStatement {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+2]
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+// [spec:pgorm:req:sql.ddl.extension+3]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionDropStatement {
-    pub(crate) name: String,
+    pub(crate) name: DynIden,
 
     /// Conditional to execute query based on existance of the extension.
     pub(crate) if_exists: bool,
@@ -151,7 +173,7 @@ pub struct ExtensionDropStatement {
 ///
 /// PostgreSQL takes one of `CASCADE` and `RESTRICT`, never both, so the two
 /// spellings share one slot.
-// [spec:pgorm:req:sql.ddl.extension+2]
+// [spec:pgorm:req:sql.ddl.extension+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtensionDropOpt {
     Cascade,
@@ -159,14 +181,16 @@ pub enum ExtensionDropOpt {
 }
 
 impl ExtensionDropStatement {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the name of the extension to be dropped.
-    pub fn name<T: Into<String>>(&mut self, name: T) -> &mut Self {
-        self.name = name.into();
-        self
+    /// Construct a new statement over the extension it drops
+    pub fn new<T>(name: T) -> Self
+    where
+        T: IntoIden,
+    {
+        Self {
+            name: name.into_iden(),
+            if_exists: false,
+            option: None,
+        }
     }
 
     /// Uses "IF EXISTS" on Drop Extension Statement.
@@ -218,15 +242,14 @@ mod test {
 
     #[test]
     fn creates_a_stmt_for_create_extension() {
-        let create_extension_stmt = Extension::create()
-            .name(PgLTree)
+        let create_extension_stmt = Extension::create(PgLTree)
             .schema("public")
             .version("v0.1.0")
             .cascade()
             .if_not_exists()
             .to_owned();
 
-        assert_eq!(create_extension_stmt.name, "ltree");
+        assert_eq!(create_extension_stmt.name.to_string(), "ltree");
         assert_eq!(create_extension_stmt.schema, Some("public".to_string()));
         assert_eq!(create_extension_stmt.version, Some("v0.1.0".to_string()));
         assert!(create_extension_stmt.cascade);
@@ -235,14 +258,13 @@ mod test {
 
     #[test]
     fn creates_a_stmt_for_drop_extension() {
-        let drop_extension_stmt = Extension::drop()
-            .name(PgLTree)
+        let drop_extension_stmt = Extension::drop(PgLTree)
             .cascade()
             .if_exists()
             .restrict()
             .to_owned();
 
-        assert_eq!(drop_extension_stmt.name, "ltree");
+        assert_eq!(drop_extension_stmt.name.to_string(), "ltree");
         assert!(drop_extension_stmt.if_exists);
         assert_eq!(drop_extension_stmt.option, Some(ExtensionDropOpt::Restrict));
     }
@@ -428,35 +450,90 @@ where
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-enum+1]
-#[derive(Debug, Clone, Default)]
+/// Create a type
+///
+/// The type name is taken by [`Type::create`], because `CREATE TYPE ` is
+/// rejected at the token after it (`[dec:pgorm:invalid-states-unrepresentable]`):
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{extension::Type, tests_cfg::*, *};
+///
+/// Type::create().values([Font::Name]);
+/// ```
+///
+/// The name alone is a shell type, which PostgreSQL accepts; `as_enum` and
+/// `values` make it an enumeration, and the parenthesised value list is always
+/// rendered once it is one, because `CREATE TYPE "t" AS ENUM ()` is an accepted
+/// spelling of the empty enum while `CREATE TYPE "t" AS ENUM` is not a
+/// statement at all.
+// [spec:pgorm:req:sql.ddl.type-enum+2]
+#[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
-    pub(crate) name: Option<TypeRef>,
+    pub(crate) name: TypeRef,
     pub(crate) as_type: Option<TypeAs>,
-    pub(crate) values: Vec<DynIden>,
 }
 
+/// What a `CREATE TYPE` defines, when it defines more than a shell type.
+// [spec:pgorm:req:sql.ddl.type-enum+2]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
     // Composite,
-    Enum,
+    /// `AS ENUM (..)`, carrying its labels: the marker and the values are one
+    /// fact, so no value list survives without the `AS ENUM` that renders it.
+    Enum(Vec<DynIden>),
     /* Range,
      * Base,
      * Array, */
 }
 
-#[derive(Debug, Clone, Default)]
+/// Drop one or more types
+///
+/// The first name is taken by [`Type::drop`] and every further one is appended,
+/// so the name list is non-empty: PostgreSQL rejects `DROP TYPE ` at end of
+/// input (`[dec:pgorm:invalid-states-unrepresentable]`).
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{extension::Type, *};
+///
+/// Type::drop().if_exists();
+/// ```
+// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+#[derive(Debug, Clone)]
 pub struct TypeDropStatement {
-    pub(crate) names: Vec<TypeRef>,
+    pub(crate) first: TypeRef,
+    pub(crate) rest: Vec<TypeRef>,
     pub(crate) option: Option<TypeDropOpt>,
     pub(crate) if_exists: bool,
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+2]
-#[derive(Debug, Clone, Default)]
+/// A type awaiting its first alter option.
+///
+/// PostgreSQL has no spelling for an `ALTER TYPE` that does nothing, so this is
+/// what [`Type::alter`] returns: naming the type is not yet a statement. Each
+/// option method consumes it and yields a [`TypeAlterStatement`].
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{extension::Type, tests_cfg::*, *};
+///
+/// Type::alter(Font::Table).to_string();
+/// ```
+// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+#[derive(Debug, Clone)]
+pub struct PendingTypeAlter {
+    name: TypeRef,
+}
+
+/// Alter a type
+///
+/// A statement of this type always names a type and always carries exactly one
+/// option: it is reachable only by choosing an option on a
+/// [`PendingTypeAlter`], so the `ALTER TYPE "font"` PostgreSQL rejects has no
+/// constructor.
+// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+#[derive(Debug, Clone)]
 pub struct TypeAlterStatement {
-    pub(crate) name: Option<TypeRef>,
-    pub(crate) option: Option<TypeAlterOpt>,
+    pub(crate) name: TypeRef,
+    pub(crate) option: TypeAlterOpt,
 }
 
 #[derive(Debug, Clone)]
@@ -479,28 +556,63 @@ pub enum TypeAlterAddOpt {
 }
 
 impl Type {
-    /// Construct type [`TypeCreateStatement`]
-    pub fn create() -> TypeCreateStatement {
-        TypeCreateStatement::new()
+    /// Construct type [`TypeCreateStatement`] over the type it creates
+    pub fn create<T>(name: T) -> TypeCreateStatement
+    where
+        T: IntoTypeRef,
+    {
+        TypeCreateStatement::new(name)
     }
 
-    /// Construct type [`TypeDropStatement`]
-    pub fn drop() -> TypeDropStatement {
-        TypeDropStatement::new()
+    /// Construct type [`TypeDropStatement`] over the first type it drops
+    pub fn drop<T>(name: T) -> TypeDropStatement
+    where
+        T: IntoTypeRef,
+    {
+        TypeDropStatement::new(name)
     }
 
-    /// Construct type [`TypeAlterStatement`]
-    pub fn alter() -> TypeAlterStatement {
-        TypeAlterStatement::new()
+    /// Name the type a [`TypeAlterStatement`] will alter
+    pub fn alter<T>(name: T) -> PendingTypeAlter
+    where
+        T: IntoTypeRef,
+    {
+        PendingTypeAlter::new(name)
     }
 }
 
 impl TypeCreateStatement {
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct a new statement over the type it creates
+    pub fn new<T>(name: T) -> Self
+    where
+        T: IntoTypeRef,
+    {
+        Self {
+            name: name.into_type_ref(),
+            as_type: None,
+        }
     }
 
-    /// Create enum as custom type
+    /// Define the type as an enumeration, whose values are appended by
+    /// [`TypeCreateStatement::values`]
+    ///
+    /// ```
+    /// use pgorm_query::{*, extension::Type, tests_cfg::*};
+    ///
+    /// assert_eq!(
+    ///     Type::create(Font::Table).as_enum().to_string(),
+    ///     r#"CREATE TYPE "font" AS ENUM ()"#
+    /// );
+    /// ```
+    pub fn as_enum(&mut self) -> &mut Self {
+        if self.as_type.is_none() {
+            self.as_type = Some(TypeAs::Enum(Vec::new()));
+        }
+        self
+    }
+
+    /// Append enum values, defining the type as an enumeration if it is not one
+    /// already
     ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
@@ -529,40 +641,40 @@ impl TypeCreateStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::create()
-    ///         .as_enum(FontFamily::Type)
+    ///     Type::create(FontFamily::Type)
     ///         .values([FontFamily::Serif, FontFamily::Sans, FontFamily::Monospace])
     ///         .to_string(),
     ///     r#"CREATE TYPE "font_family" AS ENUM ('serif', 'sans', 'monospace')"#
     /// );
     /// ```
-    pub fn as_enum<T>(&mut self, name: T) -> &mut Self
-    where
-        T: IntoTypeRef,
-    {
-        self.name = Some(name.into_type_ref());
-        self.as_type = Some(TypeAs::Enum);
-        self
-    }
-
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,
         I: IntoIterator<Item = T>,
     {
-        for v in values.into_iter() {
-            self.values.push(v.into_iden());
+        self.as_enum();
+        if let Some(TypeAs::Enum(existing)) = self.as_type.as_mut() {
+            existing.extend(values.into_iter().map(IntoIden::into_iden));
         }
         self
     }
 }
 
 impl TypeDropStatement {
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct a new statement over the first type it drops
+    pub fn new<T>(name: T) -> Self
+    where
+        T: IntoTypeRef,
+    {
+        Self {
+            first: name.into_type_ref(),
+            rest: Vec::new(),
+            option: None,
+            if_exists: false,
+        }
     }
 
-    /// Drop a type
+    /// Drop a further type
     ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
@@ -576,11 +688,7 @@ impl TypeDropStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::drop()
-    ///         .if_exists()
-    ///         .name(FontFamily)
-    ///         .restrict()
-    ///         .to_string(),
+    ///     Type::drop(FontFamily).if_exists().restrict().to_string(),
     ///     r#"DROP TYPE IF EXISTS "font_family" RESTRICT"#
     /// );
     /// ```
@@ -588,11 +696,11 @@ impl TypeDropStatement {
     where
         T: IntoTypeRef,
     {
-        self.names.push(name.into_type_ref());
+        self.rest.push(name.into_type_ref());
         self
     }
 
-    /// Drop multiple types
+    /// Drop further types
     ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
@@ -614,12 +722,9 @@ impl TypeDropStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::drop()
+    ///     Type::drop(SeaRc::new(KycStatus::Type) as DynIden)
     ///         .if_exists()
-    ///         .names([
-    ///             SeaRc::new(KycStatus::Type) as DynIden,
-    ///             SeaRc::new(FontFamily::Type) as DynIden,
-    ///         ])
+    ///         .names([SeaRc::new(FontFamily::Type) as DynIden])
     ///         .cascade()
     ///         .to_string(),
     ///     r#"DROP TYPE IF EXISTS "kyc_status", "font_family" CASCADE"#
@@ -630,10 +735,14 @@ impl TypeDropStatement {
         T: IntoTypeRef,
         I: IntoIterator<Item = T>,
     {
-        for n in names.into_iter() {
-            self.names.push(n.into_type_ref());
-        }
+        self.rest
+            .extend(names.into_iter().map(IntoTypeRef::into_type_ref));
         self
+    }
+
+    /// The types dropped, in declaration order, of which there is at least one
+    pub fn names_iter(&self) -> impl Iterator<Item = &TypeRef> {
+        std::iter::once(&self.first).chain(self.rest.iter())
     }
 
     /// Set `IF EXISTS`
@@ -655,12 +764,24 @@ impl TypeDropStatement {
     }
 }
 
-impl TypeAlterStatement {
-    pub fn new() -> Self {
-        Self::default()
+impl PendingTypeAlter {
+    fn new<T>(name: T) -> Self
+    where
+        T: IntoTypeRef,
+    {
+        Self {
+            name: name.into_type_ref(),
+        }
     }
 
-    /// Change the definition of a type
+    fn with(self, option: TypeAlterOpt) -> TypeAlterStatement {
+        TypeAlterStatement {
+            name: self.name,
+            option,
+        }
+    }
+
+    /// Add an enum value
     ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
@@ -689,95 +810,80 @@ impl TypeAlterStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::alter()
-    ///         .name(FontFamily::Type)
+    ///     Type::alter(FontFamily::Type)
     ///         .add_value(Alias::new("cursive"))
     ///         .to_string(),
     ///     r#"ALTER TYPE "font_family" ADD VALUE 'cursive'"#
     /// );
     /// ```
-    pub fn name<T>(mut self, name: T) -> Self
-    where
-        T: IntoTypeRef,
-    {
-        self.name = Some(name.into_type_ref());
-        self
-    }
-
-    pub fn add_value<T>(self, value: T) -> Self
+    pub fn add_value<T>(self, value: T) -> TypeAlterStatement
     where
         T: IntoIden,
     {
-        self.alter_option(TypeAlterOpt::Add(value.into_iden(), None))
+        self.with(TypeAlterOpt::Add(value.into_iden(), None))
     }
 
+    /// Rename the type
+    pub fn rename_to<T>(self, name: T) -> TypeAlterStatement
+    where
+        T: IntoIden,
+    {
+        self.with(TypeAlterOpt::Rename(name.into_iden()))
+    }
+
+    /// Rename an enum value
+    ///
+    /// ```
+    /// use pgorm_query::{*, extension::Type, tests_cfg::*};
+    ///
+    /// assert_eq!(
+    ///     Type::alter(Font::Table)
+    ///         .rename_value(Alias::new("variant"), Alias::new("language"))
+    ///         .to_string(),
+    ///     r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
+    /// )
+    /// ```
+    pub fn rename_value<T, V>(self, existing: T, new_name: V) -> TypeAlterStatement
+    where
+        T: IntoIden,
+        V: IntoIden,
+    {
+        self.with(TypeAlterOpt::RenameValue(
+            existing.into_iden(),
+            new_name.into_iden(),
+        ))
+    }
+}
+
+impl TypeAlterStatement {
     /// Add a enum value before an existing value
     ///
     /// ```
     /// use pgorm_query::{*, extension::Type, tests_cfg::*};
     ///
     /// assert_eq!(
-    ///     Type::alter()
-    ///         .name(Font::Table)
+    ///     Type::alter(Font::Table)
     ///         .add_value(Alias::new("weight"))
     ///         .before(Font::Variant)
     ///         .to_string(),
     ///     r#"ALTER TYPE "font" ADD VALUE 'weight' BEFORE 'variant'"#
     /// )
     /// ```
+    #[must_use]
     pub fn before<T>(mut self, value: T) -> Self
     where
         T: IntoIden,
     {
-        if let Some(option) = self.option {
-            self.option = Some(option.before(value));
-        }
+        self.option = self.option.before(value);
         self
     }
 
+    #[must_use]
     pub fn after<T>(mut self, value: T) -> Self
     where
         T: IntoIden,
     {
-        if let Some(option) = self.option {
-            self.option = Some(option.after(value));
-        }
-        self
-    }
-
-    pub fn rename_to<T>(self, name: T) -> Self
-    where
-        T: IntoIden,
-    {
-        self.alter_option(TypeAlterOpt::Rename(name.into_iden()))
-    }
-
-    /// Rename a enum value
-    ///
-    /// ```
-    /// use pgorm_query::{*, extension::Type, tests_cfg::*};
-    ///
-    /// assert_eq!(
-    ///     Type::alter()
-    ///         .name(Font::Table)
-    ///         .rename_value(Alias::new("variant"), Alias::new("language"))
-    ///         .to_string(),
-    ///     r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
-    /// )
-    /// ```
-    pub fn rename_value<T, V>(self, existing: T, new_name: V) -> Self
-    where
-        T: IntoIden,
-        V: IntoIden,
-    {
-        self.alter_option(TypeAlterOpt::RenameValue(
-            existing.into_iden(),
-            new_name.into_iden(),
-        ))
-    }
-
-    fn alter_option(mut self, option: TypeAlterOpt) -> Self {
-        self.option = Some(option);
+        self.option = self.option.after(value);
         self
     }
 }

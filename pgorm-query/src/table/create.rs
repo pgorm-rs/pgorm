@@ -28,10 +28,8 @@ use crate::{
 ///     .col(ColumnDef::new(Char::SizeH).integer().not_null())
 ///     .col(ColumnDef::new(Char::FontId).integer().default(Value::Int(None)))
 ///     .foreign_key(
-///         ForeignKey::create()
+///         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
 ///             .name("FK_2e303c3a712662f1fc2a4d0aad6")
-///             .from(Char::Table, Char::FontId)
-///             .to(Font::Table, Font::Id)
 ///             .on_delete(ForeignKeyAction::Cascade)
 ///             .on_update(ForeignKeyAction::Cascade)
 ///     )
@@ -159,8 +157,14 @@ impl TableCreateStatement {
     }
 
     /// Add a foreign key
+    ///
+    /// The key is restamped onto this statement's table, as `col()` and
+    /// `index()` restamp each column and index: an embedded key constrains the
+    /// table it sits inside and cannot name another.
     pub fn foreign_key(&mut self, foreign_key: &mut ForeignKeyCreateStatement) -> &mut Self {
-        self.foreign_keys.push(foreign_key.take());
+        let mut foreign_key = foreign_key.take();
+        foreign_key.foreign_key.retarget(self.table.clone());
+        self.foreign_keys.push(foreign_key);
         self
     }
 

@@ -32,7 +32,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+4]
+> [spec:pgorm:sem:codegen.entity.transform+5]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. The table name is unpacked from either `TableName`
 > form (`Table` and `SchemaTable`, the schema discarded); every statement has
@@ -69,9 +69,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > (`codegen.entity.keywords`); that every primary-key name is the name of a
 > column of its own table, else
 > ``TransformError("table `<table>`: primary key column `<column>` is not a
-> column of the table")``; and that every foreign key names a referenced
-> table, else ``TransformError("table `<table>` foreign key on `<columns>`:
-> referenced table should not be empty")``. Validation runs over the final
+> column of the table")``. Every foreign key names a referenced table, so that
+> read cannot fail and the
+> ``TransformError("... referenced table should not be empty")`` that stood in
+> for the tableless case is gone with the state it guarded
+> (`[spec:pgorm:req:sql.ddl.foreign-key+3]`), and MUST NOT come back: the
+> conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
+> Validation runs over the final
 > entities, after inverse and conjunct relations are synthesised, so the
 > derived relations are covered too. The `format_ident!` and column-lookup
 > sites downstream of the gate are therefore internal invariants, not
@@ -531,7 +535,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > the same entity files as the statements themselves. One documented asymmetry:
 > a column carrying `ColumnSpec::UniqueKey`, which `transform` discards on the
 > statement path (`codegen.entity.transform`) but which the bridge preserves as
-> the unique index Postgres creates for it (`codegen.ddl.tables`), so the
+> the unique index Postgres creates for it (`codegen.ddl.tables+1`), so the
 > round trip yields a `unique` the statement path drops.
 
 > [spec:pgorm:req:codegen.ddl.unsupported]
@@ -615,7 +619,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables]
+> [spec:pgorm:sem:codegen.ddl.tables+1]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -638,7 +642,11 @@ compiling the C parser falls on people generating entities and on nobody else.
 > primary-key and unique indexes, keeping the constraint name and
 > `NULLS NOT DISTINCT`; a table-level `FOREIGN KEY` becomes a foreign key with
 > its columns, referenced table and referenced columns, and both forms keep the
-> constraint name. Referential actions map `RESTRICT`, `CASCADE`, `SET NULL` and
+> constraint name. A foreign key whose two column lists differ in length is a
+> named rejection rather than a truncated key — the pairs are what the bridged
+> statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key+3]`), and
+> Postgres itself rejects the mismatch at parse analysis.
+> Referential actions map `RESTRICT`, `CASCADE`, `SET NULL` and
 > `SET DEFAULT` onto `ForeignKeyAction`. `NO ACTION` reads as no action
 > declared: the grammar fills that same code in when a foreign key declares
 > nothing, the two are indistinguishable in the parse tree, and it is

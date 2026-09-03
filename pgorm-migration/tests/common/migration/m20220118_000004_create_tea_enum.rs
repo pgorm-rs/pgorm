@@ -6,8 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
-        let create = Type::create()
-            .as_enum(Tea::Enum)
+        let create = Type::create(Tea::Enum)
             .values([Tea::EverydayTea, Tea::BreakfastTea])
             .to_owned();
         tx.execute(&create.to_string(), &[]).await?;

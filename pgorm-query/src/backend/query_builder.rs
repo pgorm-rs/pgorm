@@ -2001,7 +2001,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+2]
+    // [spec:pgorm:req:sql.ddl.foreign-key+3]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -2013,7 +2013,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer(), self.quote());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+2]
+    // [spec:pgorm:req:sql.ddl.foreign-key+3]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2022,9 +2022,7 @@ impl QueryBuilder {
     ) {
         if mode == Mode::Alter {
             write!(sql, "ALTER TABLE ").unwrap();
-            if let Some(table) = &create.foreign_key.table {
-                self.prepare_table_name(table, sql);
-            }
+            self.prepare_table_name(&create.foreign_key.table, sql);
             write!(sql, " ").unwrap();
         }
 
@@ -2039,7 +2037,7 @@ impl QueryBuilder {
         }
 
         write!(sql, "FOREIGN KEY (").unwrap();
-        create.foreign_key.columns.iter().fold(true, |first, col| {
+        create.foreign_key.columns().fold(true, |first, (col, _)| {
             if !first {
                 write!(sql, ", ").unwrap();
             }
@@ -2049,23 +2047,17 @@ impl QueryBuilder {
         write!(sql, ")").unwrap();
 
         write!(sql, " REFERENCES ").unwrap();
-        if let Some(ref_table) = &create.foreign_key.ref_table {
-            self.prepare_table_name(ref_table, sql);
-        }
+        self.prepare_table_name(&create.foreign_key.ref_table, sql);
         write!(sql, " ").unwrap();
 
         write!(sql, "(").unwrap();
-        create
-            .foreign_key
-            .ref_columns
-            .iter()
-            .fold(true, |first, col| {
-                if !first {
-                    write!(sql, ", ").unwrap();
-                }
-                col.prepare(sql.as_writer(), self.quote());
-                false
-            });
+        create.foreign_key.columns().fold(true, |first, (_, col)| {
+            if !first {
+                write!(sql, ", ").unwrap();
+            }
+            col.prepare(sql.as_writer(), self.quote());
+            false
+        });
         write!(sql, ")").unwrap();
 
         if let Some(foreign_key_action) = &create.foreign_key.on_delete {
@@ -2179,15 +2171,20 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
+    // [spec:pgorm:req:sql.ddl.type-enum+2]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
-        write!(
-            sql,
-            "{}",
-            match as_type {
-                TypeAs::Enum => "ENUM",
+        match as_type {
+            TypeAs::Enum(values) => {
+                write!(sql, "ENUM (").unwrap();
+                for (count, val) in values.iter().enumerate() {
+                    if count > 0 {
+                        write!(sql, ", ").unwrap();
+                    }
+                    sql.push_param(val.to_string().into());
+                }
+                write!(sql, ")").unwrap();
             }
-        )
-        .unwrap()
+        }
     }
 
     fn prepare_drop_type_opt(&self, opt: &TypeDropOpt, sql: &mut dyn SqlWriter) {
@@ -2236,7 +2233,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+1]
+    // [spec:pgorm:req:sql.ddl.type-enum+2]
     // [spec:pgorm:req:sql.render.ddl.enum-type+1]
     pub(crate) fn prepare_type_create_statement(
         &self,
@@ -2245,29 +2242,15 @@ impl QueryBuilder {
     ) {
         write!(sql, "CREATE TYPE ").unwrap();
 
-        if let Some(name) = &create.name {
-            self.prepare_type_ref(name, sql);
-        }
+        self.prepare_type_ref(&create.name, sql);
 
         if let Some(as_type) = &create.as_type {
             write!(sql, " AS ").unwrap();
             self.prepare_create_as_type(as_type, sql);
         }
-
-        if !create.values.is_empty() {
-            write!(sql, " (").unwrap();
-
-            for (count, val) in create.values.iter().enumerate() {
-                if count > 0 {
-                    write!(sql, ", ").unwrap();
-                }
-                sql.push_param(val.to_string().into());
-            }
-
-            write!(sql, ")").unwrap();
-        }
     }
 
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+3]
     pub(crate) fn prepare_type_drop_statement(
         &self,
         drop: &TypeDropStatement,
@@ -2279,7 +2262,7 @@ impl QueryBuilder {
             write!(sql, "IF EXISTS ").unwrap();
         }
 
-        drop.names.iter().fold(true, |first, name| {
+        drop.names_iter().fold(true, |first, name| {
             if !first {
                 write!(sql, ", ").unwrap();
             }
@@ -2293,21 +2276,15 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+2]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+3]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "ALTER TYPE ").unwrap();
-
-        if let Some(name) = &alter.name {
-            self.prepare_type_ref(name, sql);
-        }
-
-        if let Some(option) = &alter.option {
-            self.prepare_alter_type_opt(option, sql)
-        }
+        self.prepare_type_ref(&alter.name, sql);
+        self.prepare_alter_type_opt(&alter.option, sql);
     }
 
     /// Translate [`TypeRef`] into SQL statement.
@@ -2332,7 +2309,7 @@ impl QueryBuilder {
     }
 
     // EXTENSION
-    // [spec:pgorm:req:sql.ddl.extension+2]
+    // [spec:pgorm:req:sql.ddl.extension+3]
     // [spec:pgorm:sem:sql.render.ddl.extension+1] (CREATE EXTENSION)
     pub(crate) fn prepare_extension_create_statement(
         &self,
@@ -2345,7 +2322,7 @@ impl QueryBuilder {
             write!(sql, "IF NOT EXISTS ").unwrap()
         }
 
-        self.prepare_extension_ident(&create.name, sql);
+        create.name.prepare(sql.as_writer(), self.quote());
 
         if let Some(schema) = create.schema.as_ref() {
             write!(sql, " WITH SCHEMA ").unwrap();
@@ -2364,6 +2341,7 @@ impl QueryBuilder {
         }
     }
 
+    // [spec:pgorm:req:sql.ddl.extension+3]
     // [spec:pgorm:sem:sql.render.ddl.extension+1] (DROP EXTENSION)
     pub(crate) fn prepare_extension_drop_statement(
         &self,
@@ -2376,7 +2354,7 @@ impl QueryBuilder {
             write!(sql, "IF EXISTS ").unwrap();
         }
 
-        self.prepare_extension_ident(&drop.name, sql);
+        drop.name.prepare(sql.as_writer(), self.quote());
 
         match drop.option {
             Some(ExtensionDropOpt::Cascade) => write!(sql, " CASCADE").unwrap(),

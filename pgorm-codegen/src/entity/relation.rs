@@ -240,39 +240,20 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4]
-impl TryFrom<&TableForeignKey> for Relation {
-    type Error = Error;
-
-    fn try_from(tbl_fk: &TableForeignKey) -> Result<Self, Self::Error> {
-        let columns = tbl_fk.get_columns();
-        let ref_table = match tbl_fk.get_ref_table() {
-            Some(table_ref) => table_ref.table().to_string(),
-            None => {
-                let context = match columns.as_slice() {
-                    [] => "foreign key".to_owned(),
-                    columns => format!("foreign key on `{}`", columns.join("`, `")),
-                };
-                return Err(Error::TransformError(format!(
-                    "{context}: referenced table should not be empty"
-                )));
-            }
-        };
-        let ref_columns = tbl_fk.get_ref_columns();
-        let rel_type = RelationType::BelongsTo;
-        let on_delete = tbl_fk.get_on_delete();
-        let on_update = tbl_fk.get_on_update();
-        Ok(Self {
-            ref_table,
-            columns,
-            ref_columns,
-            rel_type,
-            on_delete,
-            on_update,
+// [spec:pgorm:sem:codegen.entity.transform+5]
+impl From<&TableForeignKey> for Relation {
+    fn from(tbl_fk: &TableForeignKey) -> Self {
+        Self {
+            ref_table: tbl_fk.get_ref_table().table().to_string(),
+            columns: tbl_fk.get_columns(),
+            ref_columns: tbl_fk.get_ref_columns(),
+            rel_type: RelationType::BelongsTo,
+            on_delete: tbl_fk.get_on_delete(),
+            on_update: tbl_fk.get_on_update(),
             self_referencing: false,
             num_suffix: 0,
             impl_related: true,
-        })
+        }
     }
 }
 

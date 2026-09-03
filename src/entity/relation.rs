@@ -448,39 +448,49 @@ where
     }
 }
 
-macro_rules! set_foreign_key_stmt {
-    ( $relation: ident, $foreign_key: ident ) => {
-        let mut from_cols: Vec<String> = Vec::new();
-        for (from, to) in $relation.columns {
-            from_cols.push(from.to_string());
-            $foreign_key.from_col(from);
-            $foreign_key.to_col(to);
+/// Build a foreign key of `$ty` from `$relation`.
+///
+/// A [`RelationDef`]'s column pairs are non-empty and balanced, which is exactly
+/// what a foreign key is built from, so the conversion is total.
+macro_rules! foreign_key_from_relation {
+    ( $relation: ident, $ty: ty ) => {{
+        let from_tbl = unpack_table_ref(&$relation.from_tbl);
+        let to_tbl = unpack_table_ref(&$relation.to_tbl);
+        let (from, to) = $relation.columns.first();
+        let mut foreign_key = <$ty>::new(
+            from_tbl.clone(),
+            SeaRc::clone(from),
+            to_tbl,
+            SeaRc::clone(to),
+        );
+        for (from, to) in $relation.columns.iter().skip(1) {
+            foreign_key.col(SeaRc::clone(from), SeaRc::clone(to));
         }
         if let Some(action) = $relation.on_delete {
-            $foreign_key.on_delete(action);
+            foreign_key.on_delete(action);
         }
         if let Some(action) = $relation.on_update {
-            $foreign_key.on_update(action);
+            foreign_key.on_update(action);
         }
         let name = if let Some(name) = $relation.fk_name {
             name
         } else {
-            let from_tbl = unpack_table_ref(&$relation.from_tbl);
+            let from_cols: Vec<String> = $relation
+                .columns
+                .iter()
+                .map(|(from, _)| from.to_string())
+                .collect();
             format!("fk-{}-{}", from_tbl.to_string(), from_cols.join("-"))
         };
-        $foreign_key.name(name);
-    };
+        foreign_key.name(name);
+        foreign_key
+    }};
 }
 
-// [spec:pgorm:req:entity.relation.fk+2]
+// [spec:pgorm:req:entity.relation.fk+3]
 impl From<RelationDef> for ForeignKeyCreateStatement {
     fn from(relation: RelationDef) -> Self {
-        let mut foreign_key_stmt = Self::new();
-        set_foreign_key_stmt!(relation, foreign_key_stmt);
-        foreign_key_stmt
-            .from_tbl(unpack_table_ref(&relation.from_tbl))
-            .to_tbl(unpack_table_ref(&relation.to_tbl))
-            .take()
+        foreign_key_from_relation!(relation, Self)
     }
 }
 
@@ -509,15 +519,10 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```
-// [spec:pgorm:req:entity.relation.fk+2]
+// [spec:pgorm:req:entity.relation.fk+3]
 impl From<RelationDef> for TableForeignKey {
     fn from(relation: RelationDef) -> Self {
-        let mut foreign_key = Self::new();
-        set_foreign_key_stmt!(relation, foreign_key);
-        foreign_key
-            .from_tbl(unpack_table_ref(&relation.from_tbl))
-            .to_tbl(unpack_table_ref(&relation.to_tbl))
-            .take()
+        foreign_key_from_relation!(relation, Self)
     }
 }
 

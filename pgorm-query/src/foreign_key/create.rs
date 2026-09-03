@@ -1,16 +1,35 @@
 use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 
-/// Create a foreign key constraint for an existing table. Unsupported by Sqlite
+/// Create a foreign key constraint for an existing table
+///
+/// The two tables and the first `(column, referenced column)` pair are taken by
+/// [`ForeignKey::create`], because PostgreSQL rejects every render that leaves
+/// one of them out; further pairs are appended with
+/// [`ForeignKeyCreateStatement::col`]. A half-named key does not construct:
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// ForeignKey::create().name("FK_character_font");
+/// ```
+///
+/// and neither does one that names the referencing side alone:
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// ForeignKey::create(Char::Table, Char::FontId);
+/// ```
+///
+/// [`ForeignKey::create`]: crate::ForeignKey::create
 ///
 /// # Examples
 ///
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let foreign_key = ForeignKey::create()
+/// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
 ///     .name("FK_character_font")
-///     .from(Char::Table, Char::FontId)
-///     .to(Font::Table, Font::Id)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -27,10 +46,9 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let foreign_key = ForeignKey::create()
+/// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Glyph::Table, Char::FontId)
 ///     .name("FK_character_glyph")
-///     .from(Char::Table, (Char::FontId, Char::Id))
-///     .to(Glyph::Table, (Char::FontId, Glyph::Id))
+///     .col(Char::Id, Glyph::Id)
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -46,11 +64,14 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let foreign_key = ForeignKey::create()
-///     .name("FK_character_id")
-///     .from(Character::Table, Character::Id)
-///     .to(Character::Table, Character::Id)
-///     .to_owned();
+/// let foreign_key = ForeignKey::create(
+///     Character::Table,
+///     Character::Id,
+///     Character::Table,
+///     Character::Id,
+/// )
+/// .name("FK_character_id")
+/// .to_owned();
 ///
 /// assert_eq!(
 ///     foreign_key.to_string(),
@@ -61,28 +82,41 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let foreign_key = ForeignKey::create()
-///     .name("FK_character_id")
-///     .from(Character::Table, Character::Id)
-///     .to(Character::Table, Character::Id)
-///     .on_delete(ForeignKeyAction::Cascade)
-///     .on_update(ForeignKeyAction::Cascade)
-///     .to_owned();
+/// let foreign_key = ForeignKey::create(
+///     Character::Table,
+///     Character::Id,
+///     Character::Table,
+///     Character::Id,
+/// )
+/// .name("FK_character_id")
+/// .on_delete(ForeignKeyAction::Cascade)
+/// .on_update(ForeignKeyAction::Cascade)
+/// .to_owned();
 ///
 /// assert_eq!(
 ///     foreign_key.to_string(),
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-#[derive(Default, Debug, Clone)]
+// [spec:pgorm:req:sql.ddl.foreign-key+3]
+#[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
 }
 
 impl ForeignKeyCreateStatement {
-    /// Construct a new [`ForeignKeyCreateStatement`]
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct a new [`ForeignKeyCreateStatement`] over the two tables it
+    /// relates and the first `(column, referenced column)` pair it maps
+    pub fn new<T, C, R, S>(table: T, column: C, ref_table: R, ref_column: S) -> Self
+    where
+        T: IntoTableName,
+        C: IntoIden,
+        R: IntoTableName,
+        S: IntoIden,
+    {
+        Self {
+            foreign_key: TableForeignKey::new(table, column, ref_table, ref_column),
+        }
     }
 
     /// Set foreign key name
@@ -94,65 +128,14 @@ impl ForeignKeyCreateStatement {
         self
     }
 
-    /// Set key table and columns
-    pub fn from<T, C>(&mut self, table: T, columns: C) -> &mut Self
+    /// Map a further column onto a further referenced column, as a composite
+    /// key requires
+    pub fn col<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
     where
-        T: IntoTableName,
-        C: IdenList,
+        C: IntoIden,
+        S: IntoIden,
     {
-        self.foreign_key.from_tbl(table);
-        for col in columns.into_iter() {
-            self.foreign_key.from_col(col);
-        }
-        self
-    }
-
-    /// Set referencing table and columns
-    pub fn to<T, C>(&mut self, table: T, columns: C) -> &mut Self
-    where
-        T: IntoTableName,
-        C: IdenList,
-    {
-        self.foreign_key.to_tbl(table);
-        for col in columns.into_iter() {
-            self.foreign_key.to_col(col);
-        }
-        self
-    }
-
-    /// Set key table
-    pub fn from_tbl<T>(&mut self, table: T) -> &mut Self
-    where
-        T: IntoTableName,
-    {
-        self.foreign_key.from_tbl(table);
-        self
-    }
-
-    /// Set referencing table
-    pub fn to_tbl<R>(&mut self, ref_table: R) -> &mut Self
-    where
-        R: IntoTableName,
-    {
-        self.foreign_key.to_tbl(ref_table);
-        self
-    }
-
-    /// Add key column
-    pub fn from_col<T>(&mut self, column: T) -> &mut Self
-    where
-        T: IntoIden,
-    {
-        self.foreign_key.from_col(column);
-        self
-    }
-
-    /// Add referencing column
-    pub fn to_col<R>(&mut self, ref_column: R) -> &mut Self
-    where
-        R: IntoIden,
-    {
-        self.foreign_key.to_col(ref_column);
+        self.foreign_key.col(column, ref_column);
         self
     }
 

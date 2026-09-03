@@ -375,6 +375,7 @@ assertions (
     {id unrep.ddl-table-target, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:51:34.310713Z}
     {id unrep.dml-order-limit, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:51:23.167071Z}
     {id unrep.dml-target, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:03:57.088938Z}
+    {id unrep.foreign-key-shape, kind @complete, author "brendan@necessary.nu", at 2026-09-03T19:34:09.497725Z}
     {id unrep.index-kind, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:42:47.735762Z}
     {id unrep.mysql-purge, kind @complete, author "brendan@necessary.nu", at 2026-09-02T22:09:57.329153Z}
     {id unrep.on-conflict, kind @complete, author "brendan@necessary.nu", at 2026-09-03T12:30:54.760131Z}

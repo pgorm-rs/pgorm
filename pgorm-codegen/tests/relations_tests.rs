@@ -15,11 +15,12 @@ fn self_referencing_cake() -> TableCreateStatement {
     Table::create(Alias::new("cake"))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("base_id")).integer().to_owned())
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("cake"), Alias::new("base_id"))
-                .to(Alias::new("cake"), Alias::new("id")),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new("cake"),
+            Alias::new("base_id"),
+            Alias::new("cake"),
+            Alias::new("id"),
+        ))
         .to_owned()
 }
 
@@ -39,16 +40,18 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
                 .primary_key()
                 .to_owned(),
         )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new(name), Alias::new(left.1))
-                .to(Alias::new(left.0), Alias::new("id")),
-        )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new(name), Alias::new(right.1))
-                .to(Alias::new(right.0), Alias::new("id")),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new(name),
+            Alias::new(left.1),
+            Alias::new(left.0),
+            Alias::new("id"),
+        ))
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new(name),
+            Alias::new(right.1),
+            Alias::new(right.0),
+            Alias::new("id"),
+        ))
         .to_owned()
 }
 
@@ -57,16 +60,18 @@ fn basket_with_two_fruit_keys() -> TableCreateStatement {
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
         .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("basket"), Alias::new("fruit_id1"))
-                .to(Alias::new("fruit"), Alias::new("id")),
-        )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("basket"), Alias::new("fruit_id2"))
-                .to(Alias::new("fruit"), Alias::new("id")),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new("basket"),
+            Alias::new("fruit_id1"),
+            Alias::new("fruit"),
+            Alias::new("id"),
+        ))
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new("basket"),
+            Alias::new("fruit_id2"),
+            Alias::new("fruit"),
+            Alias::new("id"),
+        ))
         .to_owned()
 }
 
@@ -155,12 +160,13 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
                 .foreign_key(
-                    ForeignKey::create()
-                        .from(
-                            Alias::new("fruit"),
-                            (Alias::new("cake_id"), Alias::new("cake_kind")),
-                        )
-                        .to(Alias::new("cake"), (Alias::new("id"), Alias::new("kind"))),
+                    ForeignKey::create(
+                        Alias::new("fruit"),
+                        Alias::new("cake_id"),
+                        Alias::new("cake"),
+                        Alias::new("id"),
+                    )
+                    .col(Alias::new("cake_kind"), Alias::new("kind")),
                 )
                 .to_owned(),
         ],
@@ -195,21 +201,25 @@ fn foreign_key_actions_render_only_when_declared() {
         let column = format!("{target}_id");
         audit.col(ColumnDef::new(Alias::new(&column)).integer().to_owned());
         audit.foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("audit"), Alias::new(&column))
-                .to(Alias::new(*target), Alias::new("id"))
-                .on_delete(*action)
-                .on_update(*action),
+            ForeignKey::create(
+                Alias::new("audit"),
+                Alias::new(&column),
+                Alias::new(*target),
+                Alias::new("id"),
+            )
+            .on_delete(*action)
+            .on_update(*action),
         );
         schema.push(bare(target));
     }
     // one more FK with no declared action at all
     audit.col(ColumnDef::new(Alias::new("plain_id")).integer().to_owned());
-    audit.foreign_key(
-        ForeignKey::create()
-            .from(Alias::new("audit"), Alias::new("plain_id"))
-            .to(Alias::new("plain"), Alias::new("id")),
-    );
+    audit.foreign_key(&mut ForeignKey::create(
+        Alias::new("audit"),
+        Alias::new("plain_id"),
+        Alias::new("plain"),
+        Alias::new("id"),
+    ));
     schema.push(bare("plain"));
     schema.push(audit);
 
@@ -252,11 +262,12 @@ fn inverse_relations_render_without_from_and_to() {
                         .primary_key()
                         .to_owned(),
                 )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("profile"), Alias::new("user_id"))
-                        .to(Alias::new("users"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("profile"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),
@@ -342,11 +353,12 @@ fn conjunct_shadowed_relations_lose_their_plain_related_impl() {
             Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("bills"), Alias::new("user_id"))
-                        .to(Alias::new("users"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("bills"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
             junction("users_votes", ("users", "user_id"), ("bills", "bill_id")),
         ],
@@ -461,11 +473,12 @@ fn seaography_adds_def_for_relations_without_related_impl() {
             Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("bills"), Alias::new("user_id"))
-                        .to(Alias::new("users"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("bills"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
             junction("users_votes", ("users", "user_id"), ("bills", "bill_id")),
         ],

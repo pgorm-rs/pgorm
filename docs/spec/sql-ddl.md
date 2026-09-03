@@ -296,62 +296,64 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+2]
-> `TableForeignKey` holds an optional constraint name, the owning and
-> referenced table refs, parallel column/ref-column lists, and optional
-> `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
+> [spec:pgorm:req:sql.ddl.foreign-key+3]
+> `TableForeignKey` holds the owning and referenced table names, a non-empty
+> list of `(column, referenced column)` pairs, an optional constraint name, and
+> optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
 > `Cascade`→`CASCADE`, `SetNull`→`SET NULL`, `NoAction`→`NO ACTION`,
-> `SetDefault`→`SET DEFAULT`). `ForeignKeyCreateStatement` wraps one
-> `TableForeignKey` with `from(table, cols)`/`to(table, cols)` accepting
-> `IdenList` tuples for composite keys.
+> `SetDefault`→`SET DEFAULT`). `TableForeignKey::new(table, column, ref_table,
+> ref_column)` — reached from a statement as `ForeignKey::create(..)` — takes
+> both tables and the first pair, and `col(column, ref_column)` appends further
+> pairs; there is no setter for either table and no constructor taking a column
+> list, because PostgreSQL rejects `ALTER TABLE  ADD FOREIGN KEY`,
+> `FOREIGN KEY ()`, `REFERENCES  ()` and `REFERENCES "t" ()` alike
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Holding the two sides as one
+> list of pairs also makes the arity mismatch unrepresentable — a render the
+> grammar accepts and only parse analysis rejects, so no oracle could have
+> caught it. `take()` copies the tables and the first pair rather than moving
+> them, as `ColumnDef::take` copies the column name.
 >
 > The standalone statement MUST render `ALTER TABLE <from> ADD [CONSTRAINT
 > "name" ]FOREIGN KEY (cols) REFERENCES <to> (ref-cols)[ ON DELETE <action>]
 > [ ON UPDATE <action>]`; inside `CREATE TABLE` the same clause renders
 > without the `ALTER TABLE`/`ADD` prefix, and inside `ALTER TABLE` options
-> only the `ALTER TABLE` prefix is dropped. `ForeignKeyDropStatement` MUST
+> only the `ALTER TABLE` prefix is dropped. On the `CREATE TABLE` path the key
+> is restamped onto the owning table by `TableCreateStatement::foreign_key`, as
+> an embedded index is by `index()`: an embedded key constrains the table it
+> sits inside and MUST NOT name another. `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`; both halves are taken by
-> `ForeignKey::drop(table, name)` and neither has a setter, because PostgreSQL
-> rejects the render that omits either
-> (`[dec:pgorm:invalid-states-unrepresentable]`). It holds the constraint name
+> `ForeignKey::drop(table, name)` and neither has a setter, for the same reason.
+> It holds the constraint name
 > directly rather than a whole `TableForeignKey`, and renders through its own
 > `prepare_foreign_key_drop_statement`; the `DROP CONSTRAINT` clause of an
 > `ALTER TABLE` option is written by the alter renderer instead of borrowing
 > this statement. Foreign-key table targets are `TableName`s, so both forms
 > render and no other shape is constructible.
->
-> `ForeignKeyCreateStatement` and the `TableForeignKey` it wraps are the
-> residual: their two tables and two column lists are all optional fields, so
-> `REFERENCES  ()` and `ALTER TABLE  ADD FOREIGN KEY ()` — both of which
-> PostgreSQL rejects — remain constructible. The owning table is rendered only
-> in the standalone position (`CREATE TABLE` and `ALTER TABLE` embeddings drop
-> it), and the column lists are the empty-collection axis rather than the
-> missing-target one, so closing this is a redesign of `TableForeignKey` rather
-> than a constructor argument. It is pinned by
-> `oracle_pins_ddl_targets_left_open` until then.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+1]
-> `TypeCreateStatement` (via `Type::create()`) supports exactly one shape:
-> `as_enum(name)` sets the type ref and `TypeAs::Enum`, and `values(iter)`
-> appends variant idens. It MUST render `CREATE TYPE <name> AS ENUM
-> ('v1', 'v2', ...)` — the type name is a quoted identifier (`TypeRef`
+> [spec:pgorm:req:sql.ddl.type-enum+2]
+> `TypeCreateStatement` takes its type name in `Type::create(name)`, because
+> `CREATE TYPE ` is rejected at end of input and a nameless statement
+> therefore MUST NOT construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). The name alone MUST render
+> `CREATE TYPE <name>`, which PostgreSQL accepts as a shell type. `as_enum()`
+> makes it an enumeration and `values(iter)` appends labels, implying
+> `as_enum()` when it has not been called — the marker and the labels are one
+> field (`TypeAs::Enum(Vec<DynIden>)`), so no label list survives without the
+> `AS ENUM` that renders it. An enumeration MUST render `CREATE TYPE <name> AS
+> ENUM (<labels>)` with the parentheses always present, empty list included:
+> `CREATE TYPE "t" AS ENUM ()` is an accepted spelling of the empty enum, and
+> it was the missing parentheses — `CREATE TYPE "t" AS ENUM` — that PostgreSQL
+> rejected. The type name is a quoted identifier (`TypeRef`
 > supports `Type`, `SchemaType` and `DatabaseSchemaType` dotted forms) while
-> the variants pass through the value pipeline, i.e. single-quoted string
+> the labels pass through the value pipeline, i.e. single-quoted string
 > literals in `to_string` builds and bind parameters in parameterised builds.
 > `TypeAs` has no other variants (composite/range/base are commented out
 > upstream).
->
-> Both the name and the value list are optional fields, and PostgreSQL rejects
-> the renders that leave either out: `CREATE TYPE ` at end of input, and
-> `CREATE TYPE "t" AS ENUM` — the parenthesised list is skipped entirely when
-> `values` is empty, rather than rendering the `()` an empty enum is spelled
-> with. Both are recorded rather than closed, being a type name rather than a
-> table target; `oracle_pins_ddl_targets_left_open` holds them.
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop+2]
-> `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by one
+> [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+> `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
 > otherwise), `RENAME TO "new"`, or `RENAME VALUE 'old' TO 'new'`. The enum
@@ -360,37 +362,42 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > render as a quoted identifier. Unlike the other type builders,
 > `TypeAlterStatement` methods take `self` by value.
 >
+> `Type::alter(name)` yields a `PendingTypeAlter` rather than a statement, and
+> each option method consumes it into a `TypeAlterStatement` carrying the name
+> and that one option: PostgreSQL rejects both `ALTER TYPE ` and `ALTER TYPE
+> "t"` with no option, so neither the nameless nor the option-less form MUST be
+> constructible (`[dec:pgorm:invalid-states-unrepresentable]`), the same
+> `PendingTableAlter` shape `Table::alter` uses.
+>
 > `TypeDropStatement` MUST render `DROP TYPE [IF EXISTS ]<name1>, <name2>
 > [ CASCADE|RESTRICT]` with names as quoted (possibly schema-qualified)
 > identifiers; `cascade()` and `restrict()` overwrite the same option slot,
-> so the last call wins.
->
-> Neither statement requires its name: `ALTER TYPE `, `ALTER TYPE "t"` with no
-> option, and `DROP TYPE ` with no names all build and are all rejected by
-> PostgreSQL. Recorded, not closed, alongside
-> `[spec:pgorm:req:sql.ddl.type-enum+1]`.
+> so the last call wins. `Type::drop(name)` takes the first name and `name()` /
+> `names()` append further ones, so the list is non-empty by construction and
+> the `DROP TYPE ` PostgreSQL rejects at end of input does not build.
 
 ## Extensions
 
-> [spec:pgorm:req:sql.ddl.extension+2]
+> [spec:pgorm:req:sql.ddl.extension+3]
 > `ExtensionCreateStatement` MUST render `CREATE EXTENSION [IF NOT EXISTS ]
 > <name>[ WITH SCHEMA <schema>][ VERSION <version>][ CASCADE]`, and
 > `ExtensionDropStatement` MUST render `DROP EXTENSION [IF EXISTS ]<name>
-> [ CASCADE| RESTRICT]`. Name, schema and version are plain `String`s, but
-> they are not written verbatim: name and schema render as quoted identifiers
-> and version as a quoted string literal
+> [ CASCADE| RESTRICT]`. The name is a `DynIden` taken by
+> `Extension::create(name)` / `Extension::drop(name)` and has no setter: it used
+> to default to the empty `String`, which renders as the zero-length delimited
+> identifier `""` PostgreSQL rejects, so a statement that never names an
+> extension MUST NOT construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). An explicitly empty
+> identifier remains the caller's own to avoid, as `Alias::new("")` is
+> everywhere else in the crate. Schema and version stay plain `String`s, and
+> none of the three is written verbatim: name and schema render as quoted
+> identifiers and version as a quoted string literal
 > (`[spec:pgorm:sem:sql.render.ddl.extension+1]`). On drop, `CASCADE` and
 > `RESTRICT` share one `ExtensionDropOpt` slot that `cascade()`/`restrict()`
-> overwrite, so the pair PostgreSQL rejects does not construct
-> (`[dec:pgorm:invalid-states-unrepresentable]`); a drop carries no schema or
-> version, because it renders neither.
-> The extension name defaults to the empty `String`, which renders as the
-> zero-length delimited identifier `""` PostgreSQL rejects; like the type
-> statements, this is recorded by `oracle_pins_ddl_targets_left_open` rather
-> than closed here.
-> `PgLTree` is a ready-made `Iden` rendering `ltree` (usable as an extension
-> name via `From<PgLTree> for String`); the ltree column type itself is
-> `ColumnType::LTree`.
+> overwrite, so the pair PostgreSQL rejects does not construct; a drop carries
+> no schema or version, because it renders neither.
+> `PgLTree` is a ready-made `Iden` rendering `ltree` (usable directly as an
+> extension name); the ltree column type itself is `ColumnType::LTree`.
 
 ## Panics and unsupported forms
 

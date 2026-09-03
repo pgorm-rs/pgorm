@@ -170,8 +170,7 @@ where
             ColumnType::Enum { name, .. } => name,
             _ => unreachable!(),
         };
-        let drop_type_stmt = Type::drop()
-            .name(SeaRc::clone(name))
+        let drop_type_stmt = Type::drop(SeaRc::clone(name))
             .if_exists()
             .cascade()
             .to_owned();

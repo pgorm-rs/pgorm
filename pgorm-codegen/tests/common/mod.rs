@@ -180,11 +180,14 @@ pub fn fruit() -> TableCreateStatement {
         )
         .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
         .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("fruit"), Alias::new("cake_id"))
-                .to(Alias::new("cake"), Alias::new("id"))
-                .on_delete(ForeignKeyAction::Cascade)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                Alias::new("fruit"),
+                Alias::new("cake_id"),
+                Alias::new("cake"),
+                Alias::new("id"),
+            )
+            .on_delete(ForeignKeyAction::Cascade)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .to_owned()
 }
@@ -220,16 +223,18 @@ pub fn cake_filling() -> TableCreateStatement {
                 .primary_key()
                 .to_owned(),
         )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("cake_filling"), Alias::new("cake_id"))
-                .to(Alias::new("cake"), Alias::new("id")),
-        )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new("cake_filling"), Alias::new("filling_id"))
-                .to(Alias::new("filling"), Alias::new("id")),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new("cake_filling"),
+            Alias::new("cake_id"),
+            Alias::new("cake"),
+            Alias::new("id"),
+        ))
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new("cake_filling"),
+            Alias::new("filling_id"),
+            Alias::new("filling"),
+            Alias::new("id"),
+        ))
         .to_owned()
 }
 

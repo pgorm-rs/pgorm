@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+4]
+    // [spec:pgorm:sem:codegen.entity.transform+5]
     // [spec:pgorm:sem:codegen.entity.transform.inverse]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {
@@ -51,12 +51,11 @@ impl EntityTransformer {
                 columns.push(col);
             }
             let mut ref_table_counts: BTreeMap<String, usize> = BTreeMap::new();
-            let foreign_keys = table_create
+            let foreign_keys: Vec<Relation> = table_create
                 .get_foreign_key_create_stmts()
                 .iter()
-                .map(|fk_create_stmt| Relation::try_from(fk_create_stmt.get_foreign_key()))
-                .collect::<Result<Vec<Relation>, Error>>()
-                .map_err(|err| err.in_table(&table_name))?;
+                .map(|fk_create_stmt| Relation::from(fk_create_stmt.get_foreign_key()))
+                .collect();
             for relation in foreign_keys.iter() {
                 if let Some(count) = ref_table_counts.get_mut(&relation.ref_table) {
                     if *count == 0 {

@@ -105,6 +105,11 @@ impl ColumnPairs {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
 
+    /// The first pair, which every set has.
+    pub fn first(&self) -> &(DynIden, DynIden) {
+        &self.first
+    }
+
     /// The number of pairs, which is at least one.
     pub fn arity(&self) -> usize {
         1 + self.rest.len()

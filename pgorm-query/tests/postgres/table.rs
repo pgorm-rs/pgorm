@@ -78,10 +78,8 @@ fn create_3() {
                     .default(Value::Int(None))
             )
             .foreign_key(
-                ForeignKey::create()
+                ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
                     .name("FK_2e303c3a712662f1fc2a4d0aad6")
-                    .from(Char::Table, Char::FontId)
-                    .to(Font::Table, Font::Id)
                     .on_delete(ForeignKeyAction::Cascade)
                     .on_update(ForeignKeyAction::Cascade)
             )

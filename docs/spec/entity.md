@@ -335,7 +335,7 @@ explicit limitations.
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
 
-> [spec:pgorm:req:entity.relation.fk+2]
+> [spec:pgorm:req:entity.relation.fk+3]
 > A `RelationDef` converts into DDL foreign-key forms via
 > `From<RelationDef> for ForeignKeyCreateStatement` and `for TableForeignKey`
 > (`src/entity/relation.rs`). The conversion maps every pair in `columns` to a
@@ -345,3 +345,9 @@ explicit limitations.
 > `fk-{from_table}-{from_cols joined with '-'}`. Both conversions unpack the table
 > references to bare tables (the schema of a `FromItem`'s `TableName`, and any bound
 > alias, are reduced away by `unpack_table_ref`).
+>
+> Both conversions are total and MUST stay so: a `ColumnPairs` is non-empty and
+> balanced by construction and a foreign key is built from exactly that, so the
+> first pair goes to the constructor and the rest are appended
+> (`[spec:pgorm:req:sql.ddl.foreign-key+3]`). There is no unpaired or empty
+> column set on either side of the conversion for it to fail on.

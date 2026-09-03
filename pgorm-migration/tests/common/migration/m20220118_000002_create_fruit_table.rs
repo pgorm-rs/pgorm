@@ -18,10 +18,8 @@ impl MigrationTrait for Migration {
             .col(ColumnDef::new(Fruit::Name).string().not_null())
             .col(ColumnDef::new(Fruit::CakeId).integer().not_null())
             .foreign_key(
-                ForeignKey::create()
-                    .name("fk-fruit-cake_id")
-                    .from(Fruit::Table, Fruit::CakeId)
-                    .to(Cake::Table, Cake::Id),
+                ForeignKey::create(Fruit::Table, Fruit::CakeId, Cake::Table, Cake::Id)
+                    .name("fk-fruit-cake_id"),
             )
             .to_owned();
         tx.execute(&table.to_string(), &[]).await?;

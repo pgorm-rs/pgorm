@@ -29,9 +29,21 @@ pub enum ForeignKeyStatement {
 }
 
 impl ForeignKey {
-    /// Construct foreign key [`ForeignKeyCreateStatement`]
-    pub fn create() -> ForeignKeyCreateStatement {
-        ForeignKeyCreateStatement::new()
+    /// Construct foreign key [`ForeignKeyCreateStatement`] over the two tables
+    /// it relates and the first `(column, referenced column)` pair it maps
+    pub fn create<T, C, R, S>(
+        table: T,
+        column: C,
+        ref_table: R,
+        ref_column: S,
+    ) -> ForeignKeyCreateStatement
+    where
+        T: IntoTableName,
+        C: IntoIden,
+        R: IntoTableName,
+        S: IntoIden,
+    {
+        ForeignKeyCreateStatement::new(table, column, ref_table, ref_column)
     }
 
     /// Construct foreign key [`ForeignKeyDropStatement`] over its table and constraint

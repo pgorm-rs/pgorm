@@ -424,9 +424,7 @@ fn sweep_table_ddl_shapes() {
                     .take(),
             )
             .foreign_key(
-                &mut ForeignKey::create()
-                    .from(Glyph::Table, Glyph::Id)
-                    .to(Font::Table, Font::Id)
+                &mut ForeignKey::create(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
                     .on_delete(ForeignKeyAction::Cascade)
                     .take(),
             )
@@ -488,48 +486,36 @@ fn sweep_schema_object_ddl_shapes() {
             .index_type(IndexType::Hash)
             .to_string(),
         Index::drop("idx").to_string(),
-        ForeignKey::create()
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
             .name("fk")
-            .from(Char::Table, Char::FontId)
-            .to(Font::Table, Font::Id)
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::NoAction)
             .to_string(),
         ForeignKey::drop(Char::Table, "fk").to_string(),
-        Type::create()
-            .as_enum(Alias::new("tea"))
+        Type::create(Alias::new("tea"))
             .values([Alias::new("breakfast"), Alias::new("earl grey")])
             .to_string(),
-        Type::alter()
-            .name(Alias::new("tea"))
+        Type::alter(Alias::new("tea"))
             .add_value(Alias::new("oolong"))
             .to_string(),
-        Type::alter()
-            .name(Alias::new("tea"))
+        Type::alter(Alias::new("tea"))
             .add_value(Alias::new("oolong"))
             .after(Alias::new("breakfast"))
             .to_string(),
-        Type::alter()
-            .name(Alias::new("tea"))
+        Type::alter(Alias::new("tea"))
             .rename_value(Alias::new("oolong"), Alias::new("wulong"))
             .to_string(),
-        Type::drop()
+        Type::drop(Alias::new("tea"))
             .if_exists()
-            .name(Alias::new("tea"))
             .cascade()
             .to_string(),
-        Extension::create().name("ltree").to_string(),
-        Extension::create()
-            .name("ltree")
+        Extension::create("ltree").to_string(),
+        Extension::create("ltree")
             .schema("public")
             .if_not_exists()
             .cascade()
             .to_string(),
-        Extension::drop()
-            .name("ltree")
-            .if_exists()
-            .cascade()
-            .to_string(),
+        Extension::drop("ltree").if_exists().cascade().to_string(),
         Comment::on_table(Glyph::Table, "one row per glyph").to_string(),
         Comment::on_column(
             (Alias::new("public"), Glyph::Table),

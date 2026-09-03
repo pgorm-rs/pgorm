@@ -19,8 +19,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
 
     let create_enum_stmts = {
         let schema = Schema::new();
-        let enum_create_stmt = Type::create()
-            .as_enum(Alias::new("tea"))
+        let enum_create_stmt = Type::create(Alias::new("tea"))
             .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
             .to_owned();
         assert_eq!(
@@ -152,12 +151,13 @@ where
         .col(ColumnDef::new(self_join::Column::UuidRef).uuid())
         .col(ColumnDef::new(self_join::Column::Time).time())
         .foreign_key(
-            ForeignKeyCreateStatement::new()
-                .name("fk-self_join-uuid_ref")
-                .from_tbl(SelfJoin)
-                .from_col(self_join::Column::UuidRef)
-                .to_tbl(SelfJoin)
-                .to_col(self_join::Column::Uuid),
+            ForeignKeyCreateStatement::new(
+                SelfJoin,
+                self_join::Column::UuidRef,
+                SelfJoin,
+                self_join::Column::Uuid,
+            )
+            .name("fk-self_join-uuid_ref"),
         )
         .to_owned();
 
@@ -230,12 +230,13 @@ where
                 .enumeration(TeaEnum, [TeaVariant::EverydayTea, TeaVariant::BreakfastTea]),
         )
         .foreign_key(
-            ForeignKeyCreateStatement::new()
-                .name("fk-active_enum_child-active_enum")
-                .from_tbl(ActiveEnumChild)
-                .from_col(active_enum_child::Column::ParentId)
-                .to_tbl(ActiveEnum)
-                .to_col(active_enum::Column::Id),
+            ForeignKeyCreateStatement::new(
+                ActiveEnumChild,
+                active_enum_child::Column::ParentId,
+                ActiveEnum,
+                active_enum::Column::Id,
+            )
+            .name("fk-active_enum_child-active_enum"),
         )
         .to_owned();
 

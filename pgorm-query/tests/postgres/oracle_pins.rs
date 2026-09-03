@@ -216,11 +216,10 @@ fn table_rename_target_is_bare_name() {
 // name, not an enum label, so it leaves the value pipeline and renders as the
 // quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+2/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+3/test]
 #[test]
 fn alter_type_rename_emits_identifier() {
-    let sql = Type::alter()
-        .name(Font::Table)
+    let sql = Type::alter(Font::Table)
         .rename_to(Alias::new("typeface"))
         .to_string();
 
@@ -257,14 +256,10 @@ fn interval_precision_rides_on_seconds() {
 // [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL takes at most one drop
 // behaviour, so the two spellings share one slot and the later call wins.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.extension+2/test]
+// [spec:pgorm:req:sql.ddl.extension+3/test]
 #[test]
 fn extension_drop_takes_one_behaviour() {
-    let sql = Extension::drop()
-        .name("ltree")
-        .cascade()
-        .restrict()
-        .to_string();
+    let sql = Extension::drop("ltree").cascade().restrict().to_string();
 
     assert_eq!(sql, r#"DROP EXTENSION "ltree" RESTRICT"#);
     assert_parses(&sql);
@@ -281,11 +276,8 @@ fn extension_drop_takes_one_behaviour() {
 // [spec:pgorm:req:sql.ddl.column-def+3/test]
 #[test]
 fn oracle_pins_extra_interpolated_raw() {
-    let version = Extension::create()
-        .name("ltree")
-        .version("v0.1.0")
-        .to_string();
-    let injected = Extension::create().name(r#"pg"weird ext"#).to_string();
+    let version = Extension::create("ltree").version("v0.1.0").to_string();
+    let injected = Extension::create(r#"pg"weird ext"#).to_string();
     let extra = Table::create(Glyph::Table)
         .col(
             ColumnDef::new(Glyph::Id)
@@ -414,7 +406,7 @@ fn create_table_with_no_columns_is_valid() {
 // [spec:pgorm:req:sql.ddl.index-drop+2/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 // [spec:pgorm:req:sql.ddl.alter-table+3/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+3/test]
 #[test]
 fn ddl_targets_are_taken_by_construction() {
     let rendered = [
@@ -463,42 +455,117 @@ fn index_name_and_drop_table_stay_optional() {
     assert_parses(&untabled);
 }
 
-// No plan node yet, and the residual of `unrep.ddl-table-target`: the foreign-key
-// and type/extension builders still carry their targets as fields a caller may
-// never fill. A foreign key's own table is rendered only standalone, and its two
-// column lists are the empty-collection axis rather than this one, so closing it
-// is a redesign of `TableForeignKey` rather than a constructor argument; the type
-// and extension statements name a type rather than a table, and `AS ENUM` drops
-// the parentheses the grammar wants when the value list is empty.
+// Fixed by plan node `unrep.foreign-key-shape`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: a foreign key names both tables
+// and at least one `(column, referenced column)` pair by construction, and its
+// two column lists are one list of pairs, so `ALTER TABLE  ADD FOREIGN KEY ()`
+// and `REFERENCES  ()` have no fields left to come from. An embedded key is
+// restamped onto the table it sits inside, as an embedded index is. The
+// `compile_fail` doctests on `ForeignKeyCreateStatement` prove the constructor
+// refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+2/test]
-// [spec:pgorm:req:sql.ddl.type-enum+1/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+2/test]
-// [spec:pgorm:req:sql.ddl.extension+2/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+3/test]
+// [spec:pgorm:req:sql.ddl.create-table+6/test]
 #[test]
-fn oracle_pins_ddl_targets_left_open() {
-    let no_ref_table = ForeignKey::create()
+fn foreign_keys_name_two_tables_and_a_pair() {
+    let standalone = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
         .name("fk")
-        .from(Char::Table, Char::FontId)
         .to_string();
-    let no_from_table = ForeignKey::create().to(Font::Table, Font::Id).to_string();
-    let no_type_name = Type::create().to_string();
-    let no_enum_values = Type::create()
-        .as_enum(Alias::new("font_family"))
+    let composite = ForeignKey::create(Char::Table, Char::FontId, Glyph::Table, Glyph::Id)
+        .col(Char::Id, Glyph::Aspect)
         .to_string();
-    let no_extension_name = Extension::create().to_string();
+    let mut create = Table::create(Char::Table);
+    create
+        .col(ColumnDef::new(Char::FontId).integer())
+        .foreign_key(&mut ForeignKey::create(
+            Font::Table,
+            Char::FontId,
+            Font::Table,
+            Font::Id,
+        ));
+    let embedded = create.to_string();
 
-    assert!(no_ref_table.ends_with("REFERENCES  ()"));
-    assert!(no_from_table.starts_with("ALTER TABLE  ADD FOREIGN KEY ()"));
-    assert_eq!(no_type_name, "CREATE TYPE ");
-    assert_eq!(no_enum_values, r#"CREATE TYPE "font_family" AS ENUM"#);
-    assert_eq!(no_extension_name, r#"CREATE EXTENSION """#);
-    assert_rejected(&no_ref_table);
-    assert_rejected(&no_from_table);
-    assert_rejected(&no_type_name);
-    assert_rejected(&no_enum_values);
-    assert_rejected(&no_extension_name);
-    assert_rejected(&Type::drop().to_string());
-    assert_rejected(&Type::alter().to_string());
-    assert_rejected(&Extension::drop().to_string());
+    assert_eq!(
+        standalone,
+        r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
+    );
+    assert!(
+        composite.contains(r#"FOREIGN KEY ("font_id", "id") REFERENCES "glyph" ("id", "aspect")"#)
+    );
+    assert_eq!(
+        create.get_foreign_key_create_stmts()[0]
+            .get_foreign_key()
+            .get_table(),
+        &Char::Table.into_table_name()
+    );
+    assert_parses(&standalone);
+    assert_parses(&composite);
+    assert_parses(&embedded);
+    assert_rejected(r#"ALTER TABLE  ADD FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#);
+    assert_rejected(r#"ALTER TABLE "character" ADD FOREIGN KEY () REFERENCES "font" ("id")"#);
+    assert_rejected(r#"ALTER TABLE "character" ADD FOREIGN KEY ("font_id") REFERENCES  ()"#);
+    assert_rejected(r#"ALTER TABLE "character" ADD FOREIGN KEY ("font_id") REFERENCES "font" ()"#);
+    // The oracle's ceiling on this family: mismatched arity is grammatical and
+    // only parse analysis rejects it, so the paired carrier — not the parser —
+    // is what closes it.
+    assert_parses(
+        r#"ALTER TABLE "character" ADD FOREIGN KEY ("font_id", "id") REFERENCES "font" ("id")"#,
+    );
+}
+
+// Fixed by plan node `unrep.foreign-key-shape`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: every type and extension
+// statement takes its name in the constructor, `Type::drop` takes the first of
+// its names, and `Type::alter` yields a `PendingTypeAlter` that only an option
+// turns into a statement — so the nameless renders, the empty `DROP TYPE` list
+// and the option-less `ALTER TYPE` PostgreSQL rejects have nowhere to come
+// from. The `compile_fail` doctests on each statement type prove it.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.type-enum+2/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+3/test]
+// [spec:pgorm:req:sql.ddl.extension+3/test]
+#[test]
+fn type_and_extension_names_are_taken() {
+    let rendered = [
+        Type::create(Alias::new("font_family"))
+            .values([Alias::new("serif")])
+            .to_string(),
+        Type::drop(Alias::new("font_family")).to_string(),
+        Type::alter(Alias::new("font_family"))
+            .add_value(Alias::new("sans"))
+            .to_string(),
+        Extension::create("ltree").to_string(),
+        Extension::drop("ltree").to_string(),
+    ];
+
+    for sql in &rendered {
+        assert_parses(sql);
+    }
+    assert_rejected("CREATE TYPE ");
+    assert_rejected("DROP TYPE ");
+    assert_rejected("ALTER TYPE ");
+    assert_rejected(r#"ALTER TYPE "font_family""#);
+    assert_rejected(r#"CREATE EXTENSION """#);
+    assert_rejected(r#"DROP EXTENSION """#);
+}
+
+// The two renders of this family the oracle accepts, recorded rather than
+// designed out: `CREATE TYPE "t" AS ENUM ()` is a real empty enumeration and
+// `CREATE TYPE "t"` a real shell type. It was the missing parentheses, not the
+// missing values, that PostgreSQL rejected, so the list is always parenthesised
+// once the type is an enum and both accepted shapes stay buildable.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:req:sql.ddl.type-enum+2/test]
+#[test]
+fn empty_enum_and_shell_type_are_valid() {
+    let shell = Type::create(Alias::new("font_family")).to_string();
+    let empty = Type::create(Alias::new("font_family"))
+        .as_enum()
+        .to_string();
+
+    assert_eq!(shell, r#"CREATE TYPE "font_family""#);
+    assert_eq!(empty, r#"CREATE TYPE "font_family" AS ENUM ()"#);
+    assert_parses(&shell);
+    assert_parses(&empty);
+    assert_rejected(r#"CREATE TYPE "font_family" AS ENUM"#);
 }

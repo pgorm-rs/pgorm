@@ -242,24 +242,16 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let foreign_key_char = TableForeignKey::new()
-    ///     .name("FK_character_glyph")
-    ///     .from_tbl(Char::Table)
-    ///     .from_col(Char::FontId)
-    ///     .from_col(Char::Id)
-    ///     .to_tbl(Glyph::Table)
-    ///     .to_col(Char::FontId)
-    ///     .to_col(Char::Id)
-    ///     .on_delete(ForeignKeyAction::Cascade)
-    ///     .on_update(ForeignKeyAction::Cascade)
-    ///     .to_owned();
+    /// let foreign_key_char =
+    ///     TableForeignKey::new(Char::Table, Char::FontId, Glyph::Table, Char::FontId)
+    ///         .name("FK_character_glyph")
+    ///         .col(Char::Id, Char::Id)
+    ///         .on_delete(ForeignKeyAction::Cascade)
+    ///         .on_update(ForeignKeyAction::Cascade)
+    ///         .to_owned();
     ///
-    /// let foreign_key_font = TableForeignKey::new()
+    /// let foreign_key_font = TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id)
     ///     .name("FK_character_font")
-    ///     .from_tbl(Char::Table)
-    ///     .from_col(Char::FontId)
-    ///     .to_tbl(Font::Table)
-    ///     .to_col(Font::Id)
     ///     .on_delete(ForeignKeyAction::Cascade)
     ///     .on_update(ForeignKeyAction::Cascade)
     ///     .to_owned();

@@ -15,11 +15,12 @@ fn fk(from_table: &str, from_col: &str, to_table: &str, to_col: &str) -> TableCr
     Table::create(Alias::new(from_table))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new(from_col)).integer().to_owned())
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new(from_table), Alias::new(from_col))
-                .to(Alias::new(to_table), Alias::new(to_col)),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new(from_table),
+            Alias::new(from_col),
+            Alias::new(to_table),
+            Alias::new(to_col),
+        ))
         .to_owned()
 }
 
@@ -27,7 +28,7 @@ fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    one Entity per input
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    one Entity per input
 // statement, held in a BTreeMap so every output is ordered by table name
 #[test]
 fn transform_builds_entity_per_statement_ordered_by_name() {
@@ -51,7 +52,7 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    the table name is unpacked
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    the table name is unpacked
 // from every `TableName` form
 #[test]
 fn transform_unpacks_the_table_name_from_every_form() {
@@ -76,7 +77,7 @@ fn transform_unpacks_the_table_name_from_every_form() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a column with no
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    a column with no
 // `ColumnType` is a `TransformError` naming the table and the column
 #[test]
 fn transform_rejects_a_column_without_column_type() {
@@ -90,23 +91,7 @@ fn transform_rejects_a_column_without_column_type() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a foreign key with no
-// referenced table is a `TransformError`, not an unwrap on `None`
-#[test]
-fn transform_rejects_foreign_key_without_ref_table() {
-    let dangling = Table::create(Alias::new("fruit"))
-        .col(serial_pk("id"))
-        .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-        .foreign_key(ForeignKey::create().from(Alias::new("fruit"), Alias::new("cake_id")))
-        .to_owned();
-
-    assert_transform_error(
-        vec![dangling],
-        "table `fruit` foreign key on `cake_id`: referenced table should not be empty",
-    );
-}
-
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a primary-key index naming
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    a primary-key index naming
 // a column the table does not have is a `TransformError`
 #[test]
 fn transform_rejects_primary_key_over_unknown_column() {
@@ -129,7 +114,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a DB name with no Rust
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    a DB name with no Rust
 // identifier form is a `TransformError` naming what it came from
 #[test]
 fn transform_rejects_names_without_identifier_form() {
@@ -161,7 +146,7 @@ fn assert_transform_error(stmts: Vec<TableCreateStatement>, expected: &str) {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    `auto_increment`,
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    `auto_increment`,
 // `not_null` and `unique` come from the matching `ColumnSpec`
 #[test]
 fn transform_reads_column_specs_off_the_column_definition() {
@@ -210,7 +195,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    a single-column unique index
 // over exactly that column also marks it unique
 #[test]
 fn transform_marks_columns_from_single_column_unique_index() {
@@ -257,7 +242,7 @@ fn transform_marks_columns_from_single_column_unique_index() {
     assert_not_contains(vendor, "#[pgorm(unique)] pub tier: String,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    primary keys come from
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    primary keys come from
 // `ColumnSpec::PrimaryKey` and are extended by a table-level primary-key index
 #[test]
 fn transform_collects_pks_from_specs_and_table_indexes() {
@@ -297,7 +282,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    every enum column registers
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    every enum column registers
 // an `ActiveEnum` keyed by enum name, deduplicated across tables and looked
 // through `Array`
 #[test]
@@ -345,7 +330,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
     assert!(position_of(enums, "pub enum Mood") < position_of(enums, "pub enum Tea"));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    foreign keys become
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    foreign keys become
 // `BelongsTo` relations that keep their columns, referenced columns and
 // on_update / on_delete actions
 #[test]
@@ -372,14 +357,15 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
                 .foreign_key(
-                    ForeignKey::create()
-                        .from(
-                            Alias::new("fruit"),
-                            (Alias::new("cake_id"), Alias::new("cake_kind")),
-                        )
-                        .to(Alias::new("cake"), (Alias::new("id"), Alias::new("kind")))
-                        .on_update(ForeignKeyAction::Cascade)
-                        .on_delete(ForeignKeyAction::SetNull),
+                    ForeignKey::create(
+                        Alias::new("fruit"),
+                        Alias::new("cake_id"),
+                        Alias::new("cake"),
+                        Alias::new("id"),
+                    )
+                    .col(Alias::new("cake_kind"), Alias::new("kind"))
+                    .on_update(ForeignKeyAction::Cascade)
+                    .on_delete(ForeignKeyAction::SetNull),
                 )
                 .to_owned(),
         ],
@@ -398,7 +384,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    a relation onto its own
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    a relation onto its own
 // table is flagged self-referencing
 #[test]
 fn transform_flags_self_referencing_relations() {
@@ -413,7 +399,7 @@ fn transform_flags_self_referencing_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    several FKs onto the same
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    several FKs onto the same
 // target take 1-based `num_suffix`es in declaration order; a lone FK keeps 0
 #[test]
 fn transform_numbers_repeated_fks_to_same_table() {
@@ -426,21 +412,24 @@ fn transform_numbers_repeated_fks_to_same_table() {
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("basket"), Alias::new("fruit_id1"))
-                        .to(Alias::new("fruit"), Alias::new("id")),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("basket"), Alias::new("fruit_id2"))
-                        .to(Alias::new("fruit"), Alias::new("id")),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("basket"), Alias::new("cake_id"))
-                        .to(Alias::new("cake"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("basket"),
+                    Alias::new("fruit_id1"),
+                    Alias::new("fruit"),
+                    Alias::new("id"),
+                ))
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("basket"),
+                    Alias::new("fruit_id2"),
+                    Alias::new("fruit"),
+                    Alias::new("id"),
+                ))
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("basket"),
+                    Alias::new("cake_id"),
+                    Alias::new("cake"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),
@@ -480,7 +469,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
     assert_not_contains(basket, "Cake1,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+4/test]    relations are sorted by
+// [spec:pgorm:sem:codegen.entity.transform+5/test]    relations are sorted by
 // referenced table name and conjunct relations by target name
 #[test]
 fn transform_sorts_relations_and_conjunct_relations() {
@@ -524,16 +513,18 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
                 .primary_key()
                 .to_owned(),
         )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new(name), Alias::new(left.1))
-                .to(Alias::new(left.0), Alias::new("id")),
-        )
-        .foreign_key(
-            ForeignKey::create()
-                .from(Alias::new(name), Alias::new(right.1))
-                .to(Alias::new(right.0), Alias::new("id")),
-        )
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new(name),
+            Alias::new(left.1),
+            Alias::new(left.0),
+            Alias::new("id"),
+        ))
+        .foreign_key(&mut ForeignKey::create(
+            Alias::new(name),
+            Alias::new(right.1),
+            Alias::new(right.0),
+            Alias::new("id"),
+        ))
         .to_owned()
 }
 
@@ -562,11 +553,12 @@ fn inverse_has_one_for_unique_foreign_key() {
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .index(&mut unique_index("fruit", "cake_id"))
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("fruit"), Alias::new("cake_id"))
-                        .to(Alias::new("cake"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("fruit"),
+                    Alias::new("cake_id"),
+                    Alias::new("cake"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),
@@ -593,11 +585,12 @@ fn inverse_has_one_for_whole_primary_key_fk() {
                         .primary_key()
                         .to_owned(),
                 )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("profile"), Alias::new("user_id"))
-                        .to(Alias::new("users"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("profile"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),
@@ -630,16 +623,18 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("basket"), Alias::new("fruit_id1"))
-                        .to(Alias::new("fruit"), Alias::new("id")),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("basket"), Alias::new("fruit_id2"))
-                        .to(Alias::new("fruit"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("basket"),
+                    Alias::new("fruit_id1"),
+                    Alias::new("fruit"),
+                    Alias::new("id"),
+                ))
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("basket"),
+                    Alias::new("fruit_id2"),
+                    Alias::new("fruit"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),
@@ -656,20 +651,22 @@ fn inverse_dropped_when_target_already_relates_back() {
             Table::create(Alias::new("users"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("bill_id")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("users"), Alias::new("bill_id"))
-                        .to(Alias::new("bills"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("users"),
+                    Alias::new("bill_id"),
+                    Alias::new("bills"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
             Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(Alias::new("bills"), Alias::new("user_id"))
-                        .to(Alias::new("users"), Alias::new("id")),
-                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("bills"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
                 .to_owned(),
         ],
         Opts::default(),

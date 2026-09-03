@@ -104,7 +104,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -116,7 +116,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -152,7 +152,7 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables/test]    a column-level UNIQUE becomes the
+// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a column-level UNIQUE becomes the
 // index Postgres creates for it, which is where the entity model reads unique
 #[test]
 fn column_unique_constraint_marks_the_column() {
@@ -164,7 +164,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -480,8 +480,7 @@ fn enum_and_unique_index_round_trip() {
         task.index(&mut unique_index("task", "code"));
         vec![task.take()]
     };
-    let enum_type = Type::create()
-        .as_enum(alias("task_state"))
+    let enum_type = Type::create(alias("task_state"))
         .values(vec![alias("open"), alias("done")])
         .to_string();
     let text = statements()

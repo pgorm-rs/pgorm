@@ -43,10 +43,8 @@ fn every_ddl_entry_point_is_reachable() {
     assert!(Index::drop("idx").to_string().starts_with("DROP INDEX"));
 
     assert!(
-        ForeignKey::create()
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
             .name("fk")
-            .from(Char::Table, Char::FontId)
-            .to(Font::Table, Font::Id)
             .to_string()
             .starts_with("ALTER TABLE")
     );
@@ -57,35 +55,30 @@ fn every_ddl_entry_point_is_reachable() {
     );
 
     assert!(
-        Type::create()
-            .as_enum(Alias::new("tea"))
+        Type::create(Alias::new("tea"))
             .values([Alias::new("green")])
             .to_string()
             .starts_with("CREATE TYPE")
     );
     assert!(
-        Type::alter()
-            .name(Alias::new("tea"))
+        Type::alter(Alias::new("tea"))
             .add_value(Alias::new("black"))
             .to_string()
             .starts_with("ALTER TYPE")
     );
     assert!(
-        Type::drop()
-            .name(Alias::new("tea"))
+        Type::drop(Alias::new("tea"))
             .to_string()
             .starts_with("DROP TYPE")
     );
 
     assert!(
-        Extension::create()
-            .name("ltree")
+        Extension::create("ltree")
             .to_string()
             .starts_with("CREATE EXTENSION")
     );
     assert!(
-        Extension::drop()
-            .name("ltree")
+        Extension::drop("ltree")
             .to_string()
             .starts_with("DROP EXTENSION")
     );
@@ -131,10 +124,7 @@ fn ddl_statements_render_through_display() {
     );
     assert_renders(&Index::drop("idx"), r#"DROP INDEX "idx""#);
     assert_renders(
-        ForeignKey::create()
-            .name("fk")
-            .from(Char::Table, Char::FontId)
-            .to(Font::Table, Font::Id),
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id).name("fk"),
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
     );
     assert_renders(
@@ -227,10 +217,8 @@ fn ddl_identifiers_are_double_quoted() {
         r#"CREATE INDEX "idx" ON "schema"."glyph" ("id")"#
     );
     assert_eq!(
-        ForeignKey::create()
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
             .name("fk")
-            .from(Char::Table, Char::FontId)
-            .to(Font::Table, Font::Id)
             .to_string(),
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
     );
@@ -259,10 +247,8 @@ fn ddl_index_and_constraint_names_escape_quotes() {
     );
     assert_eq!(Index::drop(r#"i"dx"#).to_string(), r#"DROP INDEX "i""dx""#);
     assert_eq!(
-        ForeignKey::create()
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
             .name(r#"f"k"#)
-            .from(Char::Table, Char::FontId)
-            .to(Font::Table, Font::Id)
             .to_string(),
         r#"ALTER TABLE "character" ADD CONSTRAINT "f""k" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
     );

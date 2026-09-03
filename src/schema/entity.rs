@@ -166,8 +166,7 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<Type
         return None;
     };
     Some(
-        Type::create()
-            .as_enum(name.clone())
+        Type::create(name.clone())
             .values(variants.clone())
             .to_owned(),
     )
@@ -342,14 +341,17 @@ mod tests {
                 .primary(),
             )
             .foreign_key(
-                ForeignKeyCreateStatement::new()
-                    .name("fk-cake_filling_price-cake_id-filling_id")
-                    .from_tbl(CakeFillingPrice)
-                    .from_col(cake_filling_price::Column::CakeId)
-                    .from_col(cake_filling_price::Column::FillingId)
-                    .to_tbl(CakeFilling)
-                    .to_col(cake_filling::Column::CakeId)
-                    .to_col(cake_filling::Column::FillingId),
+                ForeignKeyCreateStatement::new(
+                    CakeFillingPrice,
+                    cake_filling_price::Column::CakeId,
+                    CakeFilling,
+                    cake_filling::Column::CakeId,
+                )
+                .col(
+                    cake_filling_price::Column::FillingId,
+                    cake_filling::Column::FillingId,
+                )
+                .name("fk-cake_filling_price-cake_id-filling_id"),
             )
             .to_owned()
     }

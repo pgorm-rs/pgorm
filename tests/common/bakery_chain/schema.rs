@@ -60,12 +60,15 @@ where
         )
         .col(ColumnDef::new(baker::Column::BakeryId).integer())
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-baker-bakery_id")
-                .from(baker::Entity, baker::Column::BakeryId)
-                .to(bakery::Entity, bakery::Column::Id)
-                .on_delete(ForeignKeyAction::SetNull)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                baker::Entity,
+                baker::Column::BakeryId,
+                bakery::Entity,
+                bakery::Column::Id,
+            )
+            .name("fk-baker-bakery_id")
+            .on_delete(ForeignKeyAction::SetNull)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .to_owned();
 
@@ -120,18 +123,24 @@ where
                 .not_null(),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-order-bakery_id")
-                .from(order::Entity, order::Column::BakeryId)
-                .to(bakery::Entity, bakery::Column::Id),
+            ForeignKey::create(
+                order::Entity,
+                order::Column::BakeryId,
+                bakery::Entity,
+                bakery::Column::Id,
+            )
+            .name("fk-order-bakery_id"),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-order-customer_id")
-                .from(order::Entity, order::Column::CustomerId)
-                .to(customer::Entity, customer::Column::Id)
-                .on_delete(ForeignKeyAction::Cascade)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                order::Entity,
+                order::Column::CustomerId,
+                customer::Entity,
+                customer::Column::Id,
+            )
+            .name("fk-order-customer_id")
+            .on_delete(ForeignKeyAction::Cascade)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .to_owned();
 
@@ -171,18 +180,24 @@ where
                 .not_null(),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-lineitem-order_id")
-                .from(lineitem::Entity, lineitem::Column::OrderId)
-                .to(order::Entity, order::Column::Id)
-                .on_delete(ForeignKeyAction::Cascade)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                lineitem::Entity,
+                lineitem::Column::OrderId,
+                order::Entity,
+                order::Column::Id,
+            )
+            .name("fk-lineitem-order_id")
+            .on_delete(ForeignKeyAction::Cascade)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-lineitem-cake_id")
-                .from(lineitem::Entity, lineitem::Column::CakeId)
-                .to(cake::Entity, cake::Column::Id),
+            ForeignKey::create(
+                lineitem::Entity,
+                lineitem::Column::CakeId,
+                cake::Entity,
+                cake::Column::Id,
+            )
+            .name("fk-lineitem-cake_id"),
         )
         .to_owned();
 
@@ -210,18 +225,24 @@ where
                 .col(cakes_bakers::Column::BakerId),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-cakes_bakers-cake_id")
-                .from(cakes_bakers::Entity, cakes_bakers::Column::CakeId)
-                .to(cake::Entity, cake::Column::Id)
-                .on_delete(ForeignKeyAction::Cascade)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                cakes_bakers::Entity,
+                cakes_bakers::Column::CakeId,
+                cake::Entity,
+                cake::Column::Id,
+            )
+            .name("fk-cakes_bakers-cake_id")
+            .on_delete(ForeignKeyAction::Cascade)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-cakes_bakers-baker_id")
-                .from(cakes_bakers::Entity, cakes_bakers::Column::BakerId)
-                .to(baker::Entity, baker::Column::Id),
+            ForeignKey::create(
+                cakes_bakers::Entity,
+                cakes_bakers::Column::BakerId,
+                baker::Entity,
+                baker::Column::Id,
+            )
+            .name("fk-cakes_bakers-baker_id"),
         )
         .to_owned();
 
@@ -248,12 +269,15 @@ where
         )
         .col(ColumnDef::new(cake::Column::BakeryId).integer())
         .foreign_key(
-            ForeignKey::create()
-                .name("fk-cake-bakery_id")
-                .from(cake::Entity, cake::Column::BakeryId)
-                .to(bakery::Entity, bakery::Column::Id)
-                .on_delete(ForeignKeyAction::SetNull)
-                .on_update(ForeignKeyAction::Cascade),
+            ForeignKey::create(
+                cake::Entity,
+                cake::Column::BakeryId,
+                bakery::Entity,
+                bakery::Column::Id,
+            )
+            .name("fk-cake-bakery_id")
+            .on_delete(ForeignKeyAction::SetNull)
+            .on_update(ForeignKeyAction::Cascade),
         )
         .col(
             ColumnDef::new(cake::Column::GlutenFree)

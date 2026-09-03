@@ -21,7 +21,7 @@ pub struct Entity {
 impl Entity {
     /// Everything the writer derives from this entity's DB names, checked while
     /// the caller can still be handed the failure.
-    // [spec:pgorm:sem:codegen.entity.transform+4]
+    // [spec:pgorm:sem:codegen.entity.transform+5]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let table = self.table_name.as_str();

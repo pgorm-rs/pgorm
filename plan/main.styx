@@ -825,6 +825,20 @@ children (
                     }
                 )
             }
+
+            {
+                id infra.prepared-api
+                title "Design: typed prepared-statement API, or confirm the statement cache suffices"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-03T18:46:56.709955Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator question (2026-09-03): is there any actual PostgreSQL benefit to a first-class Statement type? Established baseline: the old SeaORM Statement was multi-backend vestige, correctly deleted; ConnectionTrait is generic over tokio-postgres ToStatement so a prepared tokio_postgres::Statement already passes; pgorm-pool's per-connection statement cache already gives prepare-once-reuse keyed by SQL text. The open design question is a TYPED surface — e.g. conn.prepare::<M>(sql) returning a handle that carries model/param types from Describe metadata. Core constraint to weigh: tokio-postgres Statements are per-connection objects, so a typed handle either pins a pooled connection (fights the pool) or wraps the cache lookup (types without a held handle). Possible sweeteners: parameter type-checking at prepare time, avoiding re-describe, pipelining, and pairing with the sql! macro (libpg_query already validates the text; a typed handle could carry the inferred shape). Deliverable is a design verdict first — build only if the value beats the cache's transparency; \"the cache suffices\" is an acceptable outcome, recorded as a decision."
+                    }
+                )
+            }
         )
     }
 
@@ -2319,12 +2333,20 @@ children (
                 id unrep.foreign-key-shape
                 title "TableForeignKey names its tables and columns by construction; type/extension name holes close"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-03T18:36:38.385477Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From ddl-table-target's residual pin oracle_pins_ddl_targets_left_open: TableForeignKey/ForeignKeyCreateStatement is the last DDL builder that can render targetless or empty — its from-table renders only standalone, and its two column lists (referencing columns, referenced columns) are the empty-collection axis; PG additionally requires the two lists be the same length, so the natural carrier is a paired non-empty structure (ColumnPairs precedent). Also in the pin: the type/extension name holes — CREATE TYPE with no name, CREATE EXTENSION \"\" (empty string renders), CREATE TYPE t AS ENUM with no values; sql.ddl.type-enum, sql.ddl.type-alter-drop, sql.ddl.extension carry the documentation-only bumps from ddl-table-target and get the real closure here. Oracle arbitrates each; flip the pin."
+                    }
+
+                    {
+                        at 2026-09-03T19:34:09.497725Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -2417,6 +2439,41 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id ergo
+        title "PostgreSQL ergonomics: paved roads for patterns competent SQL writers reach for"
+        kind @feat
+        children (
+            {
+                id ergo.eq-any
+                title "Array-parameter predicates: col = ANY($1) as the paved road beside is_in"
+            }
+
+            {
+                id ergo.jsonb-vocab
+                title "JSONB operator vocabulary beyond the arrows: #>, #>>, existence, containment"
+            }
+
+            {
+                id ergo.orm-bridge
+                title "Design: the typed bridge from CTE/LATERAL/window/union statements into ORM decode"
+            }
+
+            {
+                id ergo.pipeline-api
+                title "Design + spike: a PRQL-shaped pipeline Select API backed by prqlc's relational IR"
+                log (
+                    {
+                        at 2026-09-03T19:07:08.485824Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator direction (2026-09-03): not a prql! string macro — a Rust \"Select API shape\" mirroring PRQL's pipeline semantics, backed by prqlc, because relation->relation transforms make composition sound by construction (any fn(Pipeline) -> Pipeline is a reusable scope; prqlc's lowering places clauses and nests subqueries/CTEs automatically — filter-after-aggregate becomes HAVING, filter-after-window wraps, stages become CTEs). Architecture: construct prqlc's PL/RQ IR directly from entity metadata (no PRQL text round-trip), emit via its Postgres backend, hold output to the libpg_query oracle in tests. Three probes gate the design, in order: (1) parameter binding — can RQ carry opaque $N placeholder expressions so Values stay out of the SQL text; if not cleanly, the fallback of reimplementing PRQL's lowering over pgorm-query is the expensive path and probably kills it; (2) IR stability — PL/RQ are unstable API, so pin prqlc and own an adapter layer; (3) output-shape typing — v1 terminates via the existing name-matched into_model/into_tuple decode (upgrade path is ergo.orm-bridge; full type-level row tracking is out of scope). Deliverable: a spike answering the three probes plus a design verdict; build only after the verdict. Subsumes the earlier prql!-macro idea (a text macro can fall out as a byproduct if wanted)."
                     }
                 )
             }
