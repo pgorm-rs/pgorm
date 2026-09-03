@@ -39,7 +39,7 @@ impl Delete {
     ///
     /// Model
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::Model {
@@ -48,13 +48,13 @@ impl Delete {
     ///     })
     ///     .expect("the primary key is set")
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
     /// );
     /// ```
     /// ActiveModel
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
@@ -63,7 +63,7 @@ impl Delete {
     ///     })
     ///     .expect("the primary key is set")
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
     /// );
     /// ```
@@ -98,13 +98,13 @@ impl Delete {
     /// Delete many ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     Delete::many(fruit::Entity)
     ///         .filter(fruit::Column::Name.contains("Apple"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```
@@ -204,7 +204,6 @@ where
 mod tests {
     use crate::tests_cfg::{cake, fruit};
     use crate::{entity::*, query::*};
-    use pgorm_query::QueryBuilder;
 
     #[test]
     fn delete_1() {
@@ -215,7 +214,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
         );
         assert_eq!(
@@ -225,7 +224,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#,
         );
     }
@@ -236,7 +235,7 @@ mod tests {
             Delete::many(fruit::Entity)
                 .filter(fruit::Column::Name.contains("Cheese"))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Cheese%'"#,
         );
     }

@@ -1327,13 +1327,13 @@ pub async fn composite_join_constrains_both_columns() -> Result<(), DbErr> {
     assert!(
         joined
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .contains(r#"ON "composite_child"."parent_region" = "composite_parent"."region" AND "#)
     );
     assert!(
         joined
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .contains(r#""composite_child"."parent_code" = "composite_parent"."code""#)
     );
 
@@ -1448,7 +1448,7 @@ fn relation_trait_and_ownership_direction() {
     assert_eq!(
         <bakery::Entity as Related<baker::Entity>>::find_related()
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details", "baker"."bakery_id""#,
             r#"FROM "baker""#,
@@ -1462,7 +1462,7 @@ fn relation_trait_and_ownership_direction() {
     assert_eq!(
         <baker::Entity as Related<cake::Entity>>::find_related()
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name", "cake"."price", "cake"."bakery_id", "cake"."gluten_free", "cake"."serial""#,
             r#"FROM "cake""#,
@@ -1539,7 +1539,7 @@ fn relation_def_record_and_combinators() {
         baker::Entity::find()
             .join(JoinType::LeftJoin, aliased)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details", "baker"."bakery_id""#,
             r#"FROM "baker""#,
@@ -1558,7 +1558,7 @@ fn relation_def_record_and_combinators() {
     let sql_once = bakery::Entity::find()
         .join(JoinType::LeftJoin, once)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
     assert!(sql_once.contains(r#""bakery"."id" > 10"#));
 
     let twice = baker::Relation::Bakery
@@ -1576,7 +1576,7 @@ fn relation_def_record_and_combinators() {
     let sql_twice = bakery::Entity::find()
         .join(JoinType::LeftJoin, twice)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
     assert!(sql_twice.contains(r#""bakery"."id" < 99"#));
     assert!(
         !sql_twice.contains(r#""bakery"."id" > 10"#),
@@ -1597,7 +1597,7 @@ fn relation_def_record_and_combinators() {
         bakery::Entity::find()
             .join(JoinType::LeftJoin, rel)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .split_once(" ON ")
             .expect("an ON clause")
             .1
@@ -1763,15 +1763,12 @@ fn column_pairs_keep_the_two_sides_equal() {
 #[test]
 fn relation_def_converts_to_foreign_key_forms() {
     use pgorm_query::{
-        Alias, ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder,
-        SchemaStatementBuilder, Table, TableForeignKey, TableName,
+        Alias, ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder, Table,
+        TableForeignKey, TableName,
     };
 
-    let alter = |fk: &mut TableForeignKey| {
-        Table::alter(baker::Entity)
-            .add_foreign_key(fk)
-            .to_string(QueryBuilder)
-    };
+    let alter =
+        |fk: &mut TableForeignKey| Table::alter(baker::Entity).add_foreign_key(fk).to_string();
 
     // With an explicit `fk_name`, that name is used verbatim.
     let named: RelationDef = RelationDef::from(
@@ -1781,7 +1778,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     );
     let stmt: ForeignKeyCreateStatement = named.into();
     assert_eq!(
-        stmt.to_string(QueryBuilder),
+        stmt.to_string(),
         [
             r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-custom-name""#,
             r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id")"#,
@@ -1799,7 +1796,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     );
     let stmt: ForeignKeyCreateStatement = derived.into();
     assert_eq!(
-        stmt.to_string(QueryBuilder),
+        stmt.to_string(),
         [
             r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-baker-bakery_id""#,
             r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id")"#,
@@ -1817,7 +1814,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     );
     let stmt: ForeignKeyCreateStatement = composite.into();
     assert_eq!(
-        stmt.to_string(QueryBuilder),
+        stmt.to_string(),
         [
             r#"ALTER TABLE "cakes_bakers" ADD CONSTRAINT "fk-cakes_bakers-cake_id-baker_id""#,
             r#"FOREIGN KEY ("cake_id", "baker_id") REFERENCES "cakes_bakers" ("cake_id", "baker_id")"#,
@@ -1863,7 +1860,7 @@ fn relation_def_converts_to_foreign_key_forms() {
     };
     let stmt: ForeignKeyCreateStatement = qualified.into();
     assert_eq!(
-        stmt.to_string(QueryBuilder),
+        stmt.to_string(),
         [
             r#"ALTER TABLE "child" ADD CONSTRAINT "fk-child-parent_id""#,
             r#"FOREIGN KEY ("parent_id") REFERENCES "parent" ("id")"#,
@@ -1913,10 +1910,7 @@ fn linked_chain_aliasing_and_conditions() {
     // `find_linked` reverses it: the last hop's source becomes `r0` joined to
     // the unaliased target table, then r1 joins r0, and so on.
     assert_eq!(
-        baker::BakedForCustomer
-            .find_linked()
-            .as_query()
-            .to_string(QueryBuilder),
+        baker::BakedForCustomer.find_linked().as_query().to_string(),
         [
             r#"SELECT "customer"."id", "customer"."name", "customer"."notes""#,
             r#"FROM "customer""#,
@@ -1940,16 +1934,13 @@ fn linked_chain_aliasing_and_conditions() {
     assert!(
         bob.find_linked(baker::BakedForCustomer)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .ends_with(r#"WHERE "r4"."id" = 1"#)
     );
 
     // A hop's `on_condition` is added to that hop's join condition, alongside
     // the generated column equality rather than replacing it.
-    let sql = FilteredBakerCakes
-        .find_linked()
-        .as_query()
-        .to_string(QueryBuilder);
+    let sql = FilteredBakerCakes.find_linked().as_query().to_string();
     assert_eq!(
         sql,
         [

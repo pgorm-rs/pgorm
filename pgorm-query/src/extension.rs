@@ -45,7 +45,7 @@ impl Extension {
 ///         .version("v0.1.0")
 ///         .cascade()
 ///         .if_not_exists()
-///         .to_string(QueryBuilder),
+///         .to_string(),
 ///     r#"CREATE EXTENSION IF NOT EXISTS "ltree" WITH SCHEMA "public" VERSION 'v0.1.0' CASCADE"#
 /// );
 /// ```
@@ -125,7 +125,7 @@ impl ExtensionCreateStatement {
 ///         .name("ltree")
 ///         .cascade()
 ///         .if_exists()
-///         .to_string(QueryBuilder),
+///         .to_string(),
 ///     r#"DROP EXTENSION IF EXISTS "ltree" CASCADE"#
 /// );
 /// ```
@@ -191,31 +191,19 @@ impl ExtensionDropStatement {
 macro_rules! impl_extension_statement_builder {
     ( $struct_name: ident, $func_name: ident ) => {
         impl $struct_name {
-            pub fn build_ref(&self, extension_builder: &QueryBuilder) -> String {
-                let mut sql = String::with_capacity(256);
-                self.build_collect_ref(extension_builder, &mut sql)
-            }
-
-            pub fn build_collect(
-                &self,
-                extension_builder: QueryBuilder,
-                sql: &mut dyn SqlWriter,
-            ) -> String {
-                self.build_collect_ref(&extension_builder, sql)
-            }
-
-            pub fn build_collect_ref(
-                &self,
-                extension_builder: &QueryBuilder,
-                sql: &mut dyn SqlWriter,
-            ) -> String {
-                extension_builder.$func_name(self, sql);
+            /// Build the SQL statement into the given sink, returning the sink's text
+            pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String {
+                QueryBuilder.$func_name(self, sql);
                 sql.to_string()
             }
+        }
 
-            /// Build corresponding SQL statement and return SQL string
-            pub fn to_string(&self, extension_builder: QueryBuilder) -> String {
-                self.build_ref(&extension_builder)
+        // [spec:pgorm:req:sql.ddl+5] (the one rendering an extension statement has)
+        impl fmt::Display for $struct_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut sql = String::with_capacity(256);
+                QueryBuilder.$func_name(self, &mut sql);
+                f.write_str(&sql)
             }
         }
     };
@@ -544,7 +532,7 @@ impl TypeCreateStatement {
     ///     Type::create()
     ///         .as_enum(FontFamily::Type)
     ///         .values([FontFamily::Serif, FontFamily::Sans, FontFamily::Monospace])
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"CREATE TYPE "font_family" AS ENUM ('serif', 'sans', 'monospace')"#
     /// );
     /// ```
@@ -592,7 +580,7 @@ impl TypeDropStatement {
     ///         .if_exists()
     ///         .name(FontFamily)
     ///         .restrict()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"DROP TYPE IF EXISTS "font_family" RESTRICT"#
     /// );
     /// ```
@@ -633,7 +621,7 @@ impl TypeDropStatement {
     ///             SeaRc::new(FontFamily::Type) as DynIden,
     ///         ])
     ///         .cascade()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"DROP TYPE IF EXISTS "kyc_status", "font_family" CASCADE"#
     /// );
     /// ```
@@ -704,7 +692,7 @@ impl TypeAlterStatement {
     ///     Type::alter()
     ///         .name(FontFamily::Type)
     ///         .add_value(Alias::new("cursive"))
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"ALTER TYPE "font_family" ADD VALUE 'cursive'"#
     /// );
     /// ```
@@ -733,7 +721,7 @@ impl TypeAlterStatement {
     ///         .name(Font::Table)
     ///         .add_value(Alias::new("weight"))
     ///         .before(Font::Variant)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"ALTER TYPE "font" ADD VALUE 'weight' BEFORE 'variant'"#
     /// )
     /// ```
@@ -773,7 +761,7 @@ impl TypeAlterStatement {
     ///     Type::alter()
     ///         .name(Font::Table)
     ///         .rename_value(Alias::new("variant"), Alias::new("language"))
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
     /// )
     /// ```
@@ -825,31 +813,19 @@ impl TypeAlterOpt {
 macro_rules! impl_type_statement_builder {
     ( $struct_name: ident, $func_name: ident ) => {
         impl $struct_name {
-            pub fn build_ref(&self, type_builder: &QueryBuilder) -> String {
-                let mut sql = String::with_capacity(256);
-                self.build_collect_ref(type_builder, &mut sql)
-            }
-
-            pub fn build_collect(
-                &self,
-                type_builder: QueryBuilder,
-                sql: &mut dyn SqlWriter,
-            ) -> String {
-                self.build_collect_ref(&type_builder, sql)
-            }
-
-            pub fn build_collect_ref(
-                &self,
-                type_builder: &QueryBuilder,
-                sql: &mut dyn SqlWriter,
-            ) -> String {
-                type_builder.$func_name(self, sql);
+            /// Build the SQL statement into the given sink, returning the sink's text
+            pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String {
+                QueryBuilder.$func_name(self, sql);
                 sql.to_string()
             }
+        }
 
-            /// Build corresponding SQL statement and return SQL string
-            pub fn to_string(&self, type_builder: QueryBuilder) -> String {
-                self.build_ref(&type_builder)
+        // [spec:pgorm:req:sql.ddl+5] (the one rendering a type statement has)
+        impl fmt::Display for $struct_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut sql = String::with_capacity(256);
+                QueryBuilder.$func_name(self, &mut sql);
+                f.write_str(&sql)
             }
         }
     };

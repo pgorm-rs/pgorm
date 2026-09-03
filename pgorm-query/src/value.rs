@@ -1810,10 +1810,7 @@ mod tests {
 
         let formatted = "2020-01-01 02:02:02 +08:00";
 
-        assert_eq!(
-            query.to_string(QueryBuilder),
-            format!("SELECT '{formatted}'")
-        );
+        assert_eq!(query.to_string(), format!("SELECT '{formatted}'"));
     }
 
     // [spec:pgorm:def:sql.value.conversions+1/test]

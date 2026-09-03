@@ -1032,7 +1032,7 @@ async fn cursor_over_network_types() -> Result<(), DbErr> {
             ])
             .values_panic([(*id).into(), (*label).into(), ip.into(), mac.into()])
             .to_owned()
-            .build(QueryBuilder);
+            .build();
         let bound: Vec<ValueHolder> = values.into_iter().map(ValueHolder).collect();
         let params: Vec<&(dyn ToSql + Sync)> =
             bound.iter().map(|v| v as &(dyn ToSql + Sync)).collect();

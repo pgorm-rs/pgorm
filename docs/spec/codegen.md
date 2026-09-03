@@ -506,7 +506,7 @@ plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
 build-time tool nothing links into a running application, so the cost of
 compiling the C parser falls on people generating entities and on nobody else.
 
-> [spec:pgorm:def:codegen.ddl]
+> [spec:pgorm:def:codegen.ddl+1]
 > `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
 > parses DDL text with `pg_query::parse` and returns one statement per
 > `CREATE TABLE`, in file order, with every other statement it read folded into
@@ -526,7 +526,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > is refused there, by name, rather than here.
 >
 > The bridge is the inverse of the DDL builder: statements built with
-> `pgorm-query` and rendered through `SchemaStatementBuilder`
+> `pgorm-query` and rendered through their `Display`
 > (`sql.ddl.create-table`, `sql.ddl.type-enum`) MUST, when parsed back, generate
 > the same entity files as the statements themselves. One documented asymmetry:
 > a column carrying `ColumnSpec::UniqueKey`, which `transform` discards on the

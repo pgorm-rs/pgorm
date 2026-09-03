@@ -42,14 +42,14 @@ pub trait QuerySelect: Sized {
 
     /// Add a select column
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column(cake::Column::Name)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -57,14 +57,14 @@ pub trait QuerySelect: Sized {
     /// Enum column will be casted into text
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::lunch_set};
+    /// use pgorm::{entity::*, query::*, tests_cfg::lunch_set};
     ///
     /// assert_eq!(
     ///     lunch_set::Entity::find()
     ///         .select_only()
     ///         .column(lunch_set::Column::Tea)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
     /// );
     /// ```
@@ -78,14 +78,14 @@ pub trait QuerySelect: Sized {
 
     /// Add a select column with alias
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column_as(cake::Column::Id.count(), "count")
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COUNT("cake"."id") AS "count" FROM "cake""#
     /// );
     /// ```
@@ -104,14 +104,14 @@ pub trait QuerySelect: Sized {
     /// Select columns
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .columns([cake::Column::Id, cake::Column::Name])
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -119,7 +119,7 @@ pub trait QuerySelect: Sized {
     /// Conditionally select all columns expect a specific column
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -129,7 +129,7 @@ pub trait QuerySelect: Sized {
     ///             _ => true,
     ///         }))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -137,14 +137,14 @@ pub trait QuerySelect: Sized {
     /// Enum column will be casted into text
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::lunch_set};
+    /// use pgorm::{entity::*, query::*, tests_cfg::lunch_set};
     ///
     /// assert_eq!(
     ///     lunch_set::Entity::find()
     ///         .select_only()
     ///         .columns([lunch_set::Column::Name, lunch_set::Column::Tea])
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "lunch_set"."name", CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
     /// );
     /// ```
@@ -166,13 +166,13 @@ pub trait QuerySelect: Sized {
     /// Add an offset expression. Passing in None would remove the offset.
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .offset(10)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" OFFSET 10"#
     /// );
     ///
@@ -181,7 +181,7 @@ pub trait QuerySelect: Sized {
     ///         .offset(Some(10))
     ///         .offset(Some(20))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" OFFSET 20"#
     /// );
     ///
@@ -190,7 +190,7 @@ pub trait QuerySelect: Sized {
     ///         .offset(10)
     ///         .offset(None)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -209,13 +209,13 @@ pub trait QuerySelect: Sized {
     /// Add a limit expression. Passing in None would remove the limit.
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .limit(10)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 10"#
     /// );
     ///
@@ -224,7 +224,7 @@ pub trait QuerySelect: Sized {
     ///         .limit(Some(10))
     ///         .limit(Some(20))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 20"#
     /// );
     ///
@@ -233,7 +233,7 @@ pub trait QuerySelect: Sized {
     ///         .limit(10)
     ///         .limit(None)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -251,7 +251,7 @@ pub trait QuerySelect: Sized {
 
     /// Add a group by column
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -259,7 +259,7 @@ pub trait QuerySelect: Sized {
     ///         .column(cake::Column::Name)
     ///         .group_by(cake::Column::Name)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."name" FROM "cake" GROUP BY "cake"."name""#
     /// );
     ///
@@ -270,7 +270,7 @@ pub trait QuerySelect: Sized {
     ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
     ///         .group_by(cake::Column::Name)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COUNT("cake"."id") AS "count", SUM("cake"."id") AS "sum_of_id" FROM "cake" GROUP BY "cake"."name""#
     /// );
     /// ```
@@ -284,14 +284,14 @@ pub trait QuerySelect: Sized {
 
     /// Add an AND HAVING expression
     /// ```
-    /// use pgorm::{pgorm_query::{Alias, Expr, QueryBuilder}, entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{pgorm_query::{Alias, Expr}, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .having(cake::Column::Id.eq(4))
     ///         .having(cake::Column::Id.eq(5))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" HAVING "cake"."id" = 4 AND "cake"."id" = 5"#
     /// );
     ///
@@ -303,7 +303,7 @@ pub trait QuerySelect: Sized {
     ///         .group_by(cake::Column::Name)
     ///         .having(Expr::col(Alias::new("count")).gt(6))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COUNT("cake"."id") AS "count", SUM("cake"."id") AS "sum_of_id" FROM "cake" GROUP BY "cake"."name" HAVING "count" > 6"#
     /// );
     /// ```
@@ -317,7 +317,7 @@ pub trait QuerySelect: Sized {
 
     /// Add a DISTINCT expression
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -331,7 +331,7 @@ pub trait QuerySelect: Sized {
     ///         )
     ///         .distinct()
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT DISTINCT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
@@ -342,7 +342,7 @@ pub trait QuerySelect: Sized {
 
     /// Add a DISTINCT ON expression
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -356,7 +356,7 @@ pub trait QuerySelect: Sized {
     ///         )
     ///         .distinct_on([(cake::Entity, cake::Column::Name)])
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT DISTINCT ON ("cake"."name") "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
@@ -457,14 +457,14 @@ pub trait QuerySelect: Sized {
     /// Add an expression to the select expression list.
     /// ```
     /// use pgorm::pgorm_query::Expr;
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .expr(Expr::col((cake::Entity, cake::Column::Id)))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id" FROM "cake""#
     /// );
     /// ```
@@ -479,7 +479,7 @@ pub trait QuerySelect: Sized {
     /// Add select expressions from vector of [`SelectExpr`].
     /// ```
     /// use pgorm::pgorm_query::Expr;
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -489,7 +489,7 @@ pub trait QuerySelect: Sized {
     ///             Expr::col((cake::Entity, cake::Column::Name)),
     ///         ])
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     /// );
     /// ```
@@ -507,7 +507,7 @@ pub trait QuerySelect: Sized {
     /// Select column.
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -516,7 +516,7 @@ pub trait QuerySelect: Sized {
     ///             "name_upper"
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
@@ -535,7 +535,7 @@ pub trait QuerySelect: Sized {
     ///
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -544,7 +544,7 @@ pub trait QuerySelect: Sized {
     ///             "name_upper"
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
     /// );
     /// ```
@@ -561,14 +561,14 @@ pub trait QuerySelect: Sized {
     ///
     /// ```
     /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .tbl_col_as((cake::Entity, cake::Column::Name), "cake_name")
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#
     /// );
     /// ```
@@ -596,14 +596,14 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by(cake::Column::Id, Order::Asc)
     ///         .order_by(cake::Column::Name, Order::Desc)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC, "cake"."name" DESC"#
     /// );
     /// ```
@@ -617,13 +617,13 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression (ascending)
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_asc(cake::Column::Id)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC"#
     /// );
     /// ```
@@ -638,13 +638,13 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression (descending)
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_desc(cake::Column::Id)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" DESC"#
     /// );
     /// ```
@@ -659,14 +659,14 @@ pub trait QueryOrder: Sized {
 
     /// Add an order_by expression with nulls ordering option
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// use pgorm_query::NullOrdering;
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .order_by_with_nulls(cake::Column::Id, Order::Asc, NullOrdering::First)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC NULLS FIRST"#
     /// );
     /// ```
@@ -692,21 +692,21 @@ pub trait QueryFilter: Sized {
 
     /// Add an AND WHERE expression
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.eq(4))
     ///         .filter(cake::Column::Id.eq(5))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 4 AND "cake"."id" = 5"#
     /// );
     /// ```
     ///
     /// Add a condition tree.
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -716,7 +716,7 @@ pub trait QueryFilter: Sized {
     ///                 .add(cake::Column::Id.eq(5))
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 4 OR "cake"."id" = 5"#
     /// );
     /// ```
@@ -724,13 +724,13 @@ pub trait QueryFilter: Sized {
     /// Like above, but using the `IN` operator.
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.is_in([4, 5]))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" IN (4, 5)"#
     /// );
     /// ```
@@ -739,21 +739,21 @@ pub trait QueryFilter: Sized {
     /// a single array parameter instead of one placeholder per element.
     ///
     /// ```
-    /// use pgorm::pgorm_query::{Expr, Func, QueryBuilder};
+    /// use pgorm::pgorm_query::{Expr, Func};
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(Expr::col((cake::Entity, cake::Column::Id)).eq(Func::any(vec![4, 5])))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = ANY(ARRAY [4,5])"#
     /// );
     /// ```
     ///
     /// Add a runtime-built condition tree.
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -770,14 +770,14 @@ pub trait QueryFilter: Sized {
     ///     cake::Entity::find()
     ///         .filter(conditions)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     ///
     /// Add a runtime-built condition tree, functional-way.
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     /// struct Input {
     ///     name: Option<String>,
     /// }
@@ -791,14 +791,14 @@ pub trait QueryFilter: Sized {
     ///             Condition::all().add_option(input.name.map(|n| cake::Column::Name.contains(&n)))
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
     ///
     /// A slightly more complex example.
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake, pgorm_query::{Expr, QueryBuilder}};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake, pgorm_query::Expr};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -817,19 +817,19 @@ pub trait QueryFilter: Sized {
     ///                 )
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE (NOT (1 = 1 AND 2 = 2)) AND (3 = 3 OR 4 = 4)"#
     /// );
     /// ```
     /// Use a pgorm_query expression
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::{Expr, QueryBuilder}, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, pgorm_query::Expr, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     fruit::Entity::find()
     ///         .filter(Expr::col(fruit::Column::CakeId).is_null())
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit" WHERE "cake_id" IS NULL"#
     /// );
     /// ```

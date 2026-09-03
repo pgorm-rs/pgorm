@@ -14,7 +14,7 @@ fn window_1() {
         Query::select()
             .from(Char::Table)
             .expr_window(counted(), WindowStatement::partition_by(Char::FontSize))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
     );
 
@@ -30,7 +30,7 @@ fn window_1() {
                     .take(),
                 Alias::new("C")
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size", "size_w", "size_h", "font_id" ) AS "C""#,
@@ -56,7 +56,7 @@ fn window_2() {
                     .take(),
                 Alias::new("C")
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ORDER BY "id" ASC, "size_w" DESC ) AS "C""#,
@@ -73,7 +73,7 @@ fn window_2() {
                 counted(),
                 WindowStatement::new().order_by(Char::Id, Order::Asc).take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT COUNT("id") OVER (  ORDER BY "id" ASC ) FROM "character""#
     );
 
@@ -82,7 +82,7 @@ fn window_2() {
         Query::select()
             .from(Char::Table)
             .expr_window(counted(), WindowStatement::new())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT COUNT("id") OVER (  ) FROM "character""#
     );
 }
@@ -102,7 +102,7 @@ fn window_3() {
                     .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
                     .take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS UNBOUNDED PRECEDING )"#,
@@ -124,7 +124,7 @@ fn window_3() {
                     )
                     .take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING )"#,
@@ -148,7 +148,7 @@ fn window_3() {
                     .frame_start(FrameType::Rows, Frame::CurrentRow)
                     .take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS CURRENT ROW )"#,
@@ -171,7 +171,7 @@ fn window_4() {
                     .frame_between(FrameType::Rows, Frame::Preceding(2), Frame::Following(3))
                     .take()
             )
-            .build(QueryBuilder),
+            .build(),
         (
             [
                 r#"SELECT COUNT("id") OVER ("#,
@@ -193,7 +193,7 @@ fn window_4() {
                     .frame_start(FrameType::Rows, Frame::Preceding(2))
                     .take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER ("#,
             r#"PARTITION BY "font_size" ROWS 2 PRECEDING )"#,
@@ -217,7 +217,7 @@ fn window_5() {
                 Alias::new("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w" FROM "character""#,
             r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
@@ -233,7 +233,7 @@ fn window_5() {
                 Alias::new("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character""#,
             r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,
@@ -255,7 +255,7 @@ fn window_6() {
                 WindowStatement::partition_by(Char::FontSize)
             )
             .window(Alias::new("w2"), WindowStatement::partition_by(Char::SizeW))
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w2" FROM "character""#,
             r#"WINDOW "w2" AS ( PARTITION BY "size_w" )"#,
@@ -295,7 +295,7 @@ fn window_clause_precedes_order_limit_lock() {
             .order_by(Char::Id, Order::Asc)
             .limit(5)
             .offset(2)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w" FROM "character""#,
             r#"GROUP BY "font_size" HAVING "size_w" > 1"#,
@@ -314,7 +314,7 @@ fn window_clause_precedes_order_limit_lock() {
                 WindowStatement::partition_by(Char::FontSize)
             )
             .lock(LockType::Update)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w" FROM "character""#,
             r#"WINDOW "w" AS ( PARTITION BY "font_size" ) FOR UPDATE"#,
@@ -340,7 +340,7 @@ fn window_clause_precedes_union() {
                 Query::select().column(Char::Id).from(Char::Table).take()
             )
             .order_by(Char::Id, Order::Asc)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w" FROM "character""#,
             r#"WINDOW "w" AS ( PARTITION BY "font_size" )"#,

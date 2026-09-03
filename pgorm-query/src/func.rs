@@ -125,7 +125,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MY_FUNCTION('hello')"#
     /// );
     /// ```
@@ -147,7 +147,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::max(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT MAX("id") FROM "character""#
     /// );
     /// ```
@@ -169,7 +169,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::min(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT MIN("id") FROM "character""#
     /// );
     /// ```
@@ -191,7 +191,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::sum(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT SUM("id") FROM "character""#
     /// );
     /// ```
@@ -213,7 +213,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::avg(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT AVG("id") FROM "character""#
     /// );
     /// ```
@@ -235,7 +235,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::abs(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT ABS("id") FROM "character""#
     /// );
     /// ```
@@ -257,7 +257,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::count(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COUNT("id") FROM "character""#
     /// );
     /// ```
@@ -279,7 +279,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::count_distinct(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COUNT(DISTINCT "id") FROM "character""#
     /// );
     /// ```
@@ -301,7 +301,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::char_length(Expr::col(Character::Character)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT CHAR_LENGTH("character") FROM "character""#
     /// );
     /// ```
@@ -326,7 +326,7 @@ impl Func {
     ///             Expr::val("default")
     ///         ))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT COALESCE("character", 'default') FROM "character""#
     /// );
     /// ```
@@ -352,7 +352,7 @@ impl Func {
     ///             Alias::new("TEXT")
     ///         ))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT CAST("id" AS TEXT) FROM "character""#
     /// );
     /// ```
@@ -385,7 +385,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COALESCE("size_w", "size_h", 12) FROM "character""#
     /// );
     /// ```
@@ -407,7 +407,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::lower(Expr::col(Character::Character)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT LOWER("character") FROM "character""#
     /// );
     /// ```
@@ -429,7 +429,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::upper(Expr::col(Character::Character)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT UPPER("character") FROM "character""#
     /// );
     /// ```
@@ -451,7 +451,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::bit_and(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT BIT_AND("id") FROM "character""#
     /// );
     /// ```
@@ -473,7 +473,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::bit_or(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT BIT_OR("id") FROM "character""#
     /// );
     /// ```
@@ -495,7 +495,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::round(Expr::col(Character::Id)))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT ROUND("id") FROM "character""#
     /// );
     /// ```
@@ -520,7 +520,7 @@ impl Func {
     ///             2
     ///         ))
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT ROUND("id", 2) FROM "character""#
     /// );
     /// ```
@@ -543,7 +543,7 @@ impl Func {
     ///     Query::select()
     ///         .expr(Func::random())
     ///         .from(Character::Table)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT RANDOM() FROM "character""#
     /// );
     /// ```
@@ -566,7 +566,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT TO_TSQUERY('a & b')"#
     /// );
     /// ```
@@ -598,7 +598,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT TO_TSVECTOR('a b')"#
     /// );
     /// ```
@@ -630,7 +630,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT PHRASETO_TSQUERY('a b')"#
     /// );
     /// ```
@@ -662,7 +662,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT PLAINTO_TSQUERY('a b')"#
     /// );
     /// ```
@@ -694,7 +694,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT WEBSEARCH_TO_TSQUERY('a b')"#
     /// );
     /// ```
@@ -723,7 +723,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT TS_RANK('a b', 'a&b')"#
     /// );
     /// ```
@@ -746,7 +746,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT TS_RANK_CD('a b', 'a&b')"#
     /// );
     /// ```
@@ -767,7 +767,7 @@ impl Func {
     /// let query = Query::select().expr(Func::any(vec![0, 1])).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT ANY(ARRAY [0,1])"#
     /// );
     /// ```
@@ -788,7 +788,7 @@ impl Func {
     /// let query = Query::select().expr(Func::some(vec![0, 1])).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT SOME(ARRAY [0,1])"#
     /// );
     /// ```
@@ -809,7 +809,7 @@ impl Func {
     /// let query = Query::select().expr(Func::all(vec![0, 1])).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT ALL(ARRAY [0,1])"#
     /// );
     /// ```
@@ -832,7 +832,7 @@ impl Func {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT STARTS_WITH('123', '1')"#
     /// );
     /// ```
@@ -854,7 +854,7 @@ impl Func {
     /// let query = Query::select().expr(Func::gen_random_uuid()).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT GEN_RANDOM_UUID()"#
     /// );
     /// ```

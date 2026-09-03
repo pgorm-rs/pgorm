@@ -109,7 +109,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 1"#
     /// );
     /// ```
@@ -124,7 +124,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" = 1"#
     /// );
     /// ```
@@ -151,7 +151,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE ("size_w", 100) < (500, 100)"#
     /// );
     /// ```
@@ -180,7 +180,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 AND 2.5 AND '3'"#
     /// );
     /// ```
@@ -205,7 +205,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE COALESCE("size_w", 0) > 2"#
     /// );
     /// ```
@@ -220,7 +220,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE LOWER("character") IN ('a', 'b')"#
     /// );
     /// ```
@@ -248,7 +248,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 AND 2.5 AND '3'"#
     /// );
     /// ```
@@ -273,7 +273,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 = 1"#
     /// );
     /// ```
@@ -299,7 +299,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "id" = 1 AND (6 = 2 * 3)"#
     /// );
     /// ```
@@ -310,7 +310,7 @@ impl Expr {
     ///     .expr(Expr::cust_with_values("6 = $1 * $2", [2, 3]))
     ///     .to_owned();
     ///
-    /// assert_eq!(query.to_string(QueryBuilder), r#"SELECT 6 = 2 * 3"#);
+    /// assert_eq!(query.to_string(), r#"SELECT 6 = 2 * 3"#);
     /// ```
     /// Postgres only: use `$$` to escape `$`
     /// ```
@@ -320,7 +320,7 @@ impl Expr {
     ///     .expr(Expr::cust_with_values("$1 $$ $2", ["a", "b"]))
     ///     .to_owned();
     ///
-    /// assert_eq!(query.to_string(QueryBuilder), r#"SELECT 'a' $ 'b'"#);
+    /// assert_eq!(query.to_string(), r#"SELECT 'a' $ 'b'"#);
     /// ```
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -330,7 +330,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT data @? ('hello'::JSONPATH)"#
     /// );
     /// ```
@@ -359,7 +359,7 @@ impl Expr {
     ///     .expr(Expr::val(1).add(2))
     ///     .expr(Expr::cust_with_expr("data @? ($1::JSONPATH)", "hello"))
     ///     .to_owned();
-    /// let (sql, values) = query.build(QueryBuilder);
+    /// let (sql, values) = query.build();
     ///
     /// assert_eq!(sql, r#"SELECT $1 + $2, data @? ($3::JSONPATH)"#);
     /// assert_eq!(
@@ -378,7 +378,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT json_agg(DISTINCT "character")"#
     /// );
     /// ```
@@ -414,7 +414,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 'What!' = 'Nothing' AND "id" = 1"#
     /// );
     /// ```
@@ -440,7 +440,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 'Morning' <> 'Good' AND "id" <> 1"#
     /// );
     /// ```
@@ -466,7 +466,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -492,7 +492,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -517,7 +517,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" > 2"#
     /// );
     /// ```
@@ -542,7 +542,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" >= 2"#
     /// );
     /// ```
@@ -567,7 +567,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" < 2"#
     /// );
     /// ```
@@ -592,7 +592,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" <= 2"#
     /// );
     /// ```
@@ -617,7 +617,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 + 1 = 2"#
     /// );
     /// ```
@@ -643,7 +643,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 - 1 = 2"#
     /// );
     /// ```
@@ -669,7 +669,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 * 1 = 2"#
     /// );
     /// ```
@@ -695,7 +695,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 / 1 = 2"#
     /// );
     /// ```
@@ -721,7 +721,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 % 1 = 2"#
     /// );
     /// ```
@@ -747,7 +747,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 << 1 = 2"#
     /// );
     /// ```
@@ -773,7 +773,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 >> 1 = 2"#
     /// );
     /// ```
@@ -799,7 +799,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" BETWEEN 1 AND 10"#
     /// );
     /// ```
@@ -824,7 +824,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" NOT BETWEEN 1 AND 10"#
     /// );
     /// ```
@@ -859,7 +859,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."character" LIKE E'Ours\'%'"#
     /// );
     /// ```
@@ -876,7 +876,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."character" LIKE '|_Our|_' ESCAPE '|'"#
     /// );
     /// ```
@@ -903,7 +903,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" IS NULL"#
     /// );
     /// ```
@@ -926,7 +926,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."ascii" IS TRUE"#
     /// );
     /// ```
@@ -951,7 +951,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."size_w" IS NOT NULL"#
     /// );
     /// ```
@@ -974,7 +974,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."ascii" IS NOT TRUE"#
     /// );
     /// ```
@@ -1000,7 +1000,7 @@ impl Expr {
     ///     ])
     ///     .to_owned();
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
@@ -1027,7 +1027,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE NOT "character"."size_w" IS NULL"#
     /// );
     /// ```
@@ -1049,7 +1049,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("character"."size_w") FROM "character""#
     /// );
     /// ```
@@ -1070,7 +1070,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MIN("character"."size_w") FROM "character""#
     /// );
     /// ```
@@ -1091,7 +1091,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT SUM("character"."size_w") FROM "character""#
     /// );
     /// ```
@@ -1112,7 +1112,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("character"."size_w") FROM "character""#
     /// );
     /// ```
@@ -1133,7 +1133,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT(DISTINCT "character"."size_w") FROM "character""#
     /// );
     /// ```
@@ -1154,7 +1154,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COALESCE("character"."size_w", 0) FROM "character""#
     /// );
     /// ```
@@ -1179,7 +1179,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE "character"."size_w" IN (1, 2, 3)"#
     /// );
     /// ```
@@ -1194,7 +1194,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'b'"#
     /// );
     /// ```
@@ -1230,7 +1230,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font_id" FROM "character" WHERE ("character", "font_id") IN ((1, '1'), (2, '2'))"#
     /// );
     /// ```
@@ -1264,7 +1264,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE "character"."size_w" NOT IN (1, 2, 3)"#
     /// );
     /// ```
@@ -1279,7 +1279,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE 'a' = 'a'"#
     /// );
     /// ```
@@ -1313,7 +1313,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" IN (SELECT 3 + 2 * 2)"#
     /// );
     /// ```
@@ -1345,7 +1345,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" NOT IN (SELECT 3 + 2 * 2)"#
     /// );
     /// ```
@@ -1372,7 +1372,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT EXISTS(SELECT "id" FROM "character") AS "character_exists", EXISTS(SELECT "id" FROM "glyph") AS "glyph_exists""#
     /// );
     /// ```
@@ -1399,7 +1399,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE "id" = ANY(SELECT "id" FROM "character")"#
     /// );
     /// ```
@@ -1426,7 +1426,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "id" FROM "character" WHERE "id" <> SOME(SELECT "id" FROM "character")"#
     /// );
     /// ```
@@ -1458,7 +1458,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CAST("font_size" AS text) FROM "character""#
     /// );
     ///
@@ -1469,7 +1469,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "character" ("font_size") VALUES (CAST('large' AS FontSizeEnum))"#
     /// );
     /// ```
@@ -1500,7 +1500,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT (CASE WHEN ("glyph"."aspect" IN (2, 4)) THEN TRUE ELSE FALSE END) AS "is_even" FROM "glyph""#
     /// );
     /// ```
@@ -1524,7 +1524,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CAST('1' AS integer)"#
     /// );
     /// ```
@@ -1546,7 +1546,7 @@ impl Expr {
     /// let query = Query::select().expr(Expr::current_date()).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CURRENT_DATE"#
     /// );
     /// ```
@@ -1564,7 +1564,7 @@ impl Expr {
     /// let query = Query::select().expr(Expr::current_time()).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CURRENT_TIME"#
     /// );
     /// ```
@@ -1582,7 +1582,7 @@ impl Expr {
     /// let query = Query::select().expr(Expr::current_timestamp()).to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CURRENT_TIMESTAMP"#
     /// );
     /// ```
@@ -1602,7 +1602,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT test"#
     /// );
     /// ```
@@ -1627,7 +1627,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a' || 'b' || 'c' || 'd'"#
     /// );
     /// ```
@@ -1653,7 +1653,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a & b' @@ 'a b' AND "name" @@ 'a b'"#
     /// );
     /// ```
@@ -1679,7 +1679,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a & b' @> 'a b' AND "name" @> 'a b'"#
     /// );
     /// ```
@@ -1705,7 +1705,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a & b' <@ 'a b' AND "name" <@ 'a b'"#
     /// );
     /// ```
@@ -1730,7 +1730,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "character"."character" ILIKE E'Ours\'%'"#
     /// );
     /// ```
@@ -1763,7 +1763,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" -> 'a'"#
     /// );
     /// ```
@@ -1788,7 +1788,7 @@ impl Expr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" ->> 'a'"#
     /// );
     /// ```
@@ -1869,7 +1869,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "size_w" FROM "character" WHERE NOT "size_w" = 1"#
     /// );
     /// ```
@@ -1895,7 +1895,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE ("size_w" = 1 AND "size_h" = 2) OR ("size_w" = 3 AND "size_h" = 4)"#
     /// );
     /// ```
@@ -1918,7 +1918,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE ("size_w" = 1 OR "size_h" = 2) AND ("size_w" = 3 OR "size_h" = 4)"#
     /// );
     /// ```
@@ -1940,7 +1940,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 'What!' = 'Nothing'"#
     /// );
     /// ```
@@ -1965,7 +1965,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 'Morning' <> 'Good'"#
     /// );
     /// ```
@@ -1993,7 +1993,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("size_w") + MAX("size_h") FROM "character""#
     /// );
     /// ```
@@ -2022,7 +2022,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("size_w") * MAX("size_h") FROM "character""#
     /// );
     /// ```
@@ -2051,7 +2051,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("size_w") / MAX("size_h") FROM "character""#
     /// );
     /// ```
@@ -2080,7 +2080,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("size_w") - MIN("size_w") FROM "character""#
     /// );
     /// ```
@@ -2104,7 +2104,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT CAST('1' AS integer)"#
     /// );
     /// ```
@@ -2131,7 +2131,7 @@ impl SimpleExpr {
     ///     ])
     ///     .to_owned();
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
@@ -2158,7 +2158,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE CAST("character"."font_id" AS TEXT) LIKE 'a%'"#
     /// );
     /// ```
@@ -2196,7 +2196,7 @@ impl SimpleExpr {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name", "variant", "language" FROM "font" WHERE 'a' || 'b' || 'c' || 'd'"#
     /// );
     /// ```

@@ -18,12 +18,14 @@ an ideal Postgres renderer would emit.
 > writes `unwrap()`, and unsupported AST shapes abort via `panic!` /
 > `unimplemented!` rather than returning errors.
 
-> [spec:pgorm:def:sql.render.writer+1]
+> [spec:pgorm:def:sql.render.writer+2]
 > `SqlWriter` (`prepare.rs`) is the output sink trait for rendering:
-> `fmt::Write + ToString` plus `push_param(value, query_builder)` and
-> `push_param_source_typed(value, query_builder)`, whose default body is
+> `fmt::Write + ToString` plus `push_param(value)` and
+> `push_param_source_typed(value)`, whose default body is
 > `push_param` and which only sinks that emit placeholders override (see
-> `sql.render.cast-param-type`). Two sinks exist:
+> `sql.render.cast-param-type`). Neither takes a `QueryBuilder` argument: the
+> builder is a stateless unit struct, so a sink that needs it names it
+> directly. Two sinks exist:
 >
 > `String` implements `SqlWriter` by rendering each parameter inline —
 > `push_param` appends `QueryBuilder::value_to_string(&value)` — producing a
@@ -188,8 +190,8 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+1]
-> `prepare_bin_oper_common` defines the operator lexicon. Logical/predicate:
+> [spec:pgorm:def:sql.render.operators+2]
+> `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`, `IN`,
 > `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `AS`. Comparison: `=`, `<>`,
 > `<`, `>`, `<=`, `>=`. Arithmetic: `+`, `-`, `*`, `/`, `%`. Shift: `<<`,
@@ -429,8 +431,8 @@ an ideal Postgres renderer would emit.
 
 ## Parameter injection
 
-> [spec:pgorm:sem:sql.render.inject]
-> `inject_parameters(sql, params, query_builder)` (`prepare.rs`) converts a
+> [spec:pgorm:sem:sql.render.inject+1]
+> `inject_parameters(sql, params)` (`prepare.rs`) converts a
 > parameterized SQL string back into inline SQL: it tokenizes the input and,
 > for each `$` punctuation token immediately followed by an unquoted token
 > that parses as `usize` `N`, replaces the pair with

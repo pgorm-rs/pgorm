@@ -11,7 +11,7 @@ fn create_1() {
             .to(Font::Table, Font::Id)
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "character" ADD CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#,
             r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
@@ -30,7 +30,7 @@ fn create_2() {
             .to(Font::Table, Font::Id)
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "schema"."character" ADD CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#,
             r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
@@ -44,7 +44,7 @@ fn create_2() {
 #[test]
 fn drop_1() {
     assert_eq!(
-        ForeignKey::drop(Char::Table, "FK_2e303c3a712662f1fc2a4d0aad6").to_string(QueryBuilder),
+        ForeignKey::drop(Char::Table, "FK_2e303c3a712662f1fc2a4d0aad6").to_string(),
         r#"ALTER TABLE "character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
     );
 }
@@ -56,7 +56,7 @@ fn drop_2() {
             (Alias::new("schema"), Char::Table),
             "FK_2e303c3a712662f1fc2a4d0aad6"
         )
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"ALTER TABLE "schema"."character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
     );
 }

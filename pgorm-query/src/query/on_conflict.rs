@@ -21,7 +21,7 @@ use crate::{Condition, ConditionHolder, DynIden, IntoCondition, IntoIden, Simple
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"INSERT INTO "glyph" ("aspect") VALUES ('abcd') ON CONFLICT ("id") DO NOTHING"#
 /// );
 /// ```
@@ -194,7 +194,7 @@ impl OnConflict {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("aspect") VALUES ('abcd') ON CONFLICT DO NOTHING"#
     /// );
     /// ```
@@ -219,7 +219,7 @@ impl OnConflict {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
     ///         r#"ON CONFLICT ("id", "aspect") DO UPDATE SET "image" = "excluded"."image""#,
@@ -252,7 +252,7 @@ impl OnConflict {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"INSERT INTO "glyph" ("aspect", "image")"#,
     ///         r#"VALUES ('abcd', 3.1415)"#,
@@ -353,7 +353,7 @@ impl ConflictTarget {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
     ///         r#"ON CONFLICT ("id") WHERE "glyph"."aspect" IS NULL"#,
@@ -464,7 +464,7 @@ impl ConflictUpdate {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
     ///         r#"ON CONFLICT ("id") DO UPDATE SET"#,
@@ -529,7 +529,7 @@ impl ConflictUpdate {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
     ///         r#"ON CONFLICT ("id") DO UPDATE SET "image" = 1 + 2"#,

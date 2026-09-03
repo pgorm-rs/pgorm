@@ -9,10 +9,7 @@
 //! - Column Rename, see [`ColumnRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
-use crate::{
-    QueryBuilder,
-    types::{IntoIden, IntoTableName},
-};
+use crate::types::{IntoIden, IntoTableName};
 
 mod alter;
 mod column;
@@ -29,7 +26,7 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl+4]
+// [spec:pgorm:req:sql.ddl+5]
 #[derive(Debug)]
 pub struct Table;
 
@@ -103,40 +100,16 @@ impl Table {
     }
 }
 
-impl TableStatement {
-    /// Build corresponding SQL statement for certain database backend and return SQL string
-    pub fn build(&self, table_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the wrapper dispatches the one rendering to its variant)
+impl std::fmt::Display for TableStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Create(stat) => stat.build(table_builder),
-            Self::Alter(stat) => stat.build(table_builder),
-            Self::Drop(stat) => stat.build(table_builder),
-            Self::Rename(stat) => stat.build(table_builder),
-            Self::RenameColumn(stat) => stat.build(table_builder),
-            Self::Truncate(stat) => stat.build(table_builder),
-        }
-    }
-
-    /// Build corresponding SQL statement for certain database backend and return SQL string
-    pub fn build_any(&self, table_builder: &QueryBuilder) -> String {
-        match self {
-            Self::Create(stat) => stat.build_any(table_builder),
-            Self::Alter(stat) => stat.build_any(table_builder),
-            Self::Drop(stat) => stat.build_any(table_builder),
-            Self::Rename(stat) => stat.build_any(table_builder),
-            Self::RenameColumn(stat) => stat.build_any(table_builder),
-            Self::Truncate(stat) => stat.build_any(table_builder),
-        }
-    }
-
-    /// Build corresponding SQL statement for certain database backend and return SQL string
-    pub fn to_string(&self, table_builder: QueryBuilder) -> String {
-        match self {
-            Self::Create(stat) => stat.to_string(table_builder),
-            Self::Alter(stat) => stat.to_string(table_builder),
-            Self::Drop(stat) => stat.to_string(table_builder),
-            Self::Rename(stat) => stat.to_string(table_builder),
-            Self::RenameColumn(stat) => stat.to_string(table_builder),
-            Self::Truncate(stat) => stat.to_string(table_builder),
+            Self::Create(stat) => stat.fmt(f),
+            Self::Alter(stat) => stat.fmt(f),
+            Self::Drop(stat) => stat.fmt(f),
+            Self::Rename(stat) => stat.fmt(f),
+            Self::RenameColumn(stat) => stat.fmt(f),
+            Self::Truncate(stat) => stat.fmt(f),
         }
     }
 }

@@ -1,6 +1,5 @@
 use crate::{
-    AnyWithClause, QueryStatementBuilder, QueryStatementWriter, ReturningClause, SubQueryStatement,
-    WithQuery,
+    AnyWithClause, QueryStatementBuilder, ReturningClause, SubQueryStatement, WithQuery,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -24,7 +23,7 @@ use inherent::inherent;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"UPDATE "glyph" SET "aspect" = 1.23, "image" = '123' WHERE "id" = 1"#
 /// );
 /// ```
@@ -59,7 +58,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" AS "g" SET "aspect" = 1.23 WHERE "g"."id" = 1"#
     /// );
     /// ```
@@ -93,7 +92,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
@@ -125,7 +124,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" SET "aspect" = 60 * 24 * 24, "image" = '24B0E11951B03B07F8300FD003983F03F0780060'"#
     /// );
     /// ```
@@ -159,7 +158,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m' RETURNING "id""#
     /// );
     /// ```
@@ -184,7 +183,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m' RETURNING "id""#
     /// );
     /// ```
@@ -211,7 +210,7 @@ impl UpdateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m' RETURNING *"#
     /// );
     /// ```
@@ -245,7 +244,7 @@ impl UpdateStatement {
     ///     let query = update.with(with_clause);
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph" WHERE "image" LIKE '0%') UPDATE "glyph" SET "aspect" = 60 * 24 * 24 WHERE "id" IN (SELECT "id" FROM "cte")"#
     /// );
     /// ```
@@ -264,31 +263,25 @@ impl UpdateStatement {
 
 #[inherent]
 impl QueryStatementBuilder for UpdateStatement {
-    pub fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_update_statement(self, sql);
+    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
+        QueryBuilder.prepare_update_statement(self, sql);
     }
 
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::UpdateStatement(self)
     }
 
-    pub fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values);
-    pub fn build_collect_any(
-        &self,
-        query_builder: &QueryBuilder,
-        sql: &mut dyn SqlWriter,
-    ) -> String;
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-#[inherent]
-impl QueryStatementWriter for UpdateStatement {
-    pub fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_update_statement(self, sql);
+// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+impl std::fmt::Display for UpdateStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_update_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String;
-    pub fn build(&self, query_builder: QueryBuilder) -> (String, Values);
-    pub fn to_string(&self, query_builder: QueryBuilder) -> String;
 }
 
 #[inherent]

@@ -1,8 +1,4 @@
-use crate::{
-    ColumnDef, IntoColumnDef, SchemaStatementBuilder, TableForeignKey, backend::QueryBuilder,
-    types::*,
-};
-use inherent::inherent;
+use crate::{ColumnDef, IntoColumnDef, TableForeignKey, backend::QueryBuilder, types::*};
 
 /// A table awaiting its first alter action.
 ///
@@ -14,7 +10,7 @@ use inherent::inherent;
 /// ```compile_fail,E0599
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// Table::alter(Font::Table).to_string(QueryBuilder);
+/// Table::alter(Font::Table).to_string();
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
@@ -93,7 +89,7 @@ impl PendingTableAlter {
 /// );
 ///
 /// assert_eq!(
-///     table.to_string(QueryBuilder),
+///     table.to_string(),
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
@@ -156,7 +152,7 @@ impl TableAlterStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"ALTER TABLE "font" DROP COLUMN "old_col","#,
     ///         r#"ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#,
@@ -183,7 +179,7 @@ impl TableAlterStatement {
     /// );
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     r#"ALTER TABLE "font" ADD COLUMN IF NOT EXISTS "new_col" integer NOT NULL DEFAULT 100"#
     /// );
     /// ```
@@ -205,7 +201,7 @@ impl TableAlterStatement {
     /// );
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"ALTER TABLE "font""#,
     ///         r#"ALTER COLUMN "new_col" TYPE bigint,"#,
@@ -228,7 +224,7 @@ impl TableAlterStatement {
     /// let table = Table::alter(Font::Table).drop_column(Alias::new("new_column"));
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     r#"ALTER TABLE "font" DROP COLUMN "new_column""#
     /// );
     /// ```
@@ -274,7 +270,7 @@ impl TableAlterStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"ALTER TABLE "character""#,
     ///         r#"ADD CONSTRAINT "FK_character_glyph""#,
@@ -304,7 +300,7 @@ impl TableAlterStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"ALTER TABLE "character""#,
     ///         r#"DROP CONSTRAINT "FK_character_glyph","#,
@@ -335,19 +331,11 @@ impl TableAlterStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for TableAlterStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for TableAlterStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_alter_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_table_alter_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_alter_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

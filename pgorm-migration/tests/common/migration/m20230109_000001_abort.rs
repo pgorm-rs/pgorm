@@ -11,7 +11,7 @@ impl MigrationTrait for Migration {
             .columns([Cake::Name])
             .values_panic(["Battenberg".into()])
             .to_owned();
-        tx.execute(&insert.to_string(QueryBuilder), &[]).await?;
+        tx.execute(&insert.to_string(), &[]).await?;
 
         Err(DbErr::Custom("Abort migration".to_owned()))
     }

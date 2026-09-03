@@ -15,7 +15,7 @@ use pretty_assertions::assert_eq;
 fn expr_sql(e: SimpleExpr) -> String {
     Query::select()
         .expr(e)
-        .to_string(QueryBuilder)
+        .to_string()
         .strip_prefix("SELECT ")
         .expect("select statement")
         .to_owned()
@@ -275,7 +275,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
         casts::Entity::find()
             .filter(e)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .split_once(" WHERE ")
             .expect("a WHERE clause")
             .1
@@ -305,7 +305,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
             payload: ActiveValue::Set(serde_json::json!({"k": "v"})),
         })
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         [
             r#"INSERT INTO "casts" ("tea", "teas", "name", "payload")"#,
             r#"VALUES (CAST('BreakfastTea' AS tea), CAST(ARRAY ['EverydayTea'] AS tea[]), 'plain', E'{\"k\":\"v\"}')"#,
@@ -354,12 +354,10 @@ async fn enum_cast_round_trip() -> Result<(), DbErr> {
 
     let schema = Schema::new();
     for stmt in schema.create_enum_from_entity(casts::Entity) {
-        db.execute(&stmt.to_string(QueryBuilder), &[]).await?;
+        db.execute(&stmt.to_string(), &[]).await?;
     }
     db.execute(
-        &schema
-            .create_table_from_entity(casts::Entity)
-            .build(QueryBuilder),
+        &schema.create_table_from_entity(casts::Entity).to_string(),
         &[],
     )
     .await?;

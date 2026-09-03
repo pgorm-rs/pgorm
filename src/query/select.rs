@@ -292,14 +292,14 @@ where
     /// [`SelectCustom<E>`] state.
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column(cake::Column::Name)
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."name" FROM "cake""#
     /// );
     /// ```

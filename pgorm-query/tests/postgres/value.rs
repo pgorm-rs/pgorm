@@ -110,7 +110,7 @@ fn unsigned_variants_carry_oid_and_limit_counts() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .limit(10)
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "id" FROM "glyph" LIMIT $1"#.to_owned(),
             Values(vec![Value::BigUnsigned(Some(10))])
@@ -315,7 +315,7 @@ fn char_literals_parse_as_postgres_literals() {
         assert_eq!(
             Query::select()
                 .expr(Value::Char(Some(character)))
-                .to_string(QueryBuilder),
+                .to_string(),
             expected
         );
     }

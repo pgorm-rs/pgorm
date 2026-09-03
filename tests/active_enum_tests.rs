@@ -10,7 +10,7 @@ use pgorm::{
     DatabaseConnection, QueryTrait,
     entity::prelude::*,
     entity::*,
-    pgorm_query::{BinOper, Expr, QueryBuilder, QueryStatementWriter},
+    pgorm_query::{BinOper, Expr},
 };
 use pretty_assertions::assert_eq;
 
@@ -109,7 +109,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     let select_with_tea_in =
         Entity::find().filter(Column::Tea.is_in([Tea::EverydayTea, Tea::BreakfastTea]));
     assert_eq!(
-        select_with_tea_in.as_query().to_string(QueryBuilder),
+        select_with_tea_in.as_query().to_string(),
         [
             r#"SELECT "active_enum"."id","#,
             r#""active_enum"."category","#,
@@ -139,7 +139,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
         .filter(Column::Tea.is_not_in([Tea::BreakfastTea]));
 
     assert_eq!(
-        select_with_tea_not_in.as_query().to_string(QueryBuilder),
+        select_with_tea_not_in.as_query().to_string(),
         [
             r#"SELECT "active_enum"."id","#,
             r#""active_enum"."category","#,
@@ -589,7 +589,6 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), DbEr
 mod tests {
     use super::*;
     pub use pgorm::QueryTrait;
-    pub use pgorm::pgorm_query::{QueryBuilder, QueryStatementWriter};
     pub use pretty_assertions::assert_eq;
 
     #[test]
@@ -602,7 +601,7 @@ mod tests {
         };
         let select = active_enum_model.find_related(ActiveEnumChild);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", CAST("active_enum_child"."tea" AS text)"#,
                 r#"FROM "active_enum_child""#,
@@ -614,7 +613,7 @@ mod tests {
 
         let select = ActiveEnumEntity::find().find_also_related(ActiveEnumChild);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
                 r#""active_enum_child"."id" AS "B_id", "active_enum_child"."parent_id" AS "B_parent_id", "active_enum_child"."category" AS "B_category", "active_enum_child"."color" AS "B_color", CAST("active_enum_child"."tea" AS text) AS "B_tea""#,
@@ -635,7 +634,7 @@ mod tests {
         };
         let select = active_enum_model.find_linked(active_enum::ActiveEnumChildLink);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum_child"."id", "active_enum_child"."parent_id", "active_enum_child"."category", "active_enum_child"."color", CAST("active_enum_child"."tea" AS text)"#,
                 r#"FROM "active_enum_child""#,
@@ -647,7 +646,7 @@ mod tests {
 
         let select = ActiveEnumEntity::find().find_also_linked(active_enum::ActiveEnumChildLink);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
                 r#""r0"."id" AS "B_id", "r0"."parent_id" AS "B_parent_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
@@ -669,7 +668,7 @@ mod tests {
         };
         let select = active_enum_child_model.find_related(ActiveEnum);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", CAST("active_enum"."tea" AS text)"#,
                 r#"FROM "active_enum""#,
@@ -681,7 +680,7 @@ mod tests {
 
         let select = ActiveEnumChild::find().find_also_related(ActiveEnum);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
                 r#""active_enum"."id" AS "B_id", "active_enum"."category" AS "B_category", "active_enum"."color" AS "B_color", CAST("active_enum"."tea" AS text) AS "B_tea""#,
@@ -703,7 +702,7 @@ mod tests {
         };
         let select = active_enum_child_model.find_linked(active_enum_child::ActiveEnumLink);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum"."id", "active_enum"."category", "active_enum"."color", CAST("active_enum"."tea" AS text)"#,
                 r#"FROM "active_enum""#,
@@ -715,7 +714,7 @@ mod tests {
 
         let select = ActiveEnumChild::find().find_also_linked(active_enum_child::ActiveEnumLink);
         assert_eq!(
-            select.as_query().to_string(QueryBuilder),
+            select.as_query().to_string(),
             [
                 r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
                 r#""r0"."id" AS "B_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
@@ -736,7 +735,7 @@ mod tests {
             schema
                 .create_enum_from_entity(active_enum::Entity)
                 .iter()
-                .map(|stmt| stmt.to_string(QueryBuilder))
+                .map(|stmt| stmt.to_string())
                 .collect::<Vec<_>>(),
             [r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#.to_owned()]
         );
@@ -745,7 +744,7 @@ mod tests {
             schema
                 .create_enum_from_active_enum::<Tea>()
                 .expect("Tea resolves to ColumnType::Enum")
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
         );
     }

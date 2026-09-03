@@ -901,7 +901,7 @@ mod tests {
         let with_query = select.with(with_clause);
 
         assert_eq!(
-            with_query.to_string(QueryBuilder),
+            with_query.to_string(),
             [
                 r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS"#,
                 r#"(SELECT "id", 1, "next", "value" FROM "table" UNION ALL"#,

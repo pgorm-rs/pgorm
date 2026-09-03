@@ -154,7 +154,7 @@ where
     ///
     /// Model
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::Model {
@@ -162,13 +162,13 @@ where
     ///         name: "Apple Pie".to_owned(),
     ///     })
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
     /// );
     /// ```
     /// ActiveModel
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::one(cake::ActiveModel {
@@ -176,7 +176,7 @@ where
     ///         name: ActiveValue::Set("Apple Pie".to_owned()),
     ///     })
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie')"#,
     /// );
     /// ```
@@ -190,7 +190,7 @@ where
     /// Insert many Model or ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Insert::many([
@@ -204,7 +204,7 @@ where
     ///         }
     ///     ])
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#,
     /// );
     /// ```
@@ -292,7 +292,7 @@ where
     ///
     /// on conflict do nothing
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -302,14 +302,14 @@ where
     ///     cake::Entity::insert(orange)
     ///         .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
     /// );
     /// ```
     ///
     /// on conflict do update
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -321,7 +321,7 @@ where
     ///             OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
     /// );
     /// ```
@@ -358,7 +358,7 @@ where
     /// key to name.
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
     ///     id: ActiveValue::set(2),
@@ -369,7 +369,7 @@ where
     ///     cake::Entity::insert(orange)
     ///         .on_conflict_do_nothing()
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
@@ -521,7 +521,7 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use pgorm_query::{OnConflict, QueryBuilder};
+    use pgorm_query::OnConflict;
 
     use crate::tests_cfg::cake::{self};
     use crate::{ActiveValue, EntityTrait, Insert, IntoActiveModel, QueryTrait};
@@ -535,7 +535,7 @@ mod tests {
                     name: ActiveValue::set("Apple Pie".to_owned()),
                 })
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie')"#,
         );
     }
@@ -549,7 +549,7 @@ mod tests {
                     name: ActiveValue::set("Apple Pie".to_owned()),
                 })
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
         );
     }
@@ -563,7 +563,7 @@ mod tests {
                     name: "Apple Pie".to_owned(),
                 })
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
         );
     }
@@ -583,7 +583,7 @@ mod tests {
                     }
                 ])
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#,
         );
     }
@@ -602,7 +602,7 @@ mod tests {
 
         assert!(insert.ensure_uniform_columns().is_err());
         assert_eq!(
-            insert.as_query().to_string(QueryBuilder),
+            insert.as_query().to_string(),
             r#"INSERT INTO "cake" ("name") VALUES ('Apple')"#,
         );
     }
@@ -618,7 +618,7 @@ mod tests {
             cake::Entity::insert(orange)
                 .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
         );
     }
@@ -636,7 +636,7 @@ mod tests {
                     OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
         );
     }
@@ -671,7 +671,7 @@ mod tests {
         assert_eq!(
             post::Entity::insert(model.into_active_model())
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"INSERT INTO "posts" ("id", "title", "text") VALUES (CAST(1 AS TEXT), 'News wrap up 2022', 'brbrbrrrbrbrbrr...')"#,
         );
     }
@@ -719,7 +719,7 @@ mod tests {
         assert_eq!(
             post::Entity::insert(model.into_active_model())
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"INSERT INTO "posts" ("id_primary", "id_secondary", "title", "text")"#,
                 r#"VALUES (CAST(1 AS TEXT), CAST(1001 AS TEXT), 'News wrap up 2022', 'brbrbrrrbrbrbrr...')"#,

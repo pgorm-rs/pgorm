@@ -1,6 +1,4 @@
-use inherent::inherent;
-
-use crate::{ForeignKeyAction, QueryBuilder, SchemaStatementBuilder, TableForeignKey, types::*};
+use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 
 /// Create a foreign key constraint for an existing table. Unsupported by Sqlite
 ///
@@ -16,7 +14,7 @@ use crate::{ForeignKeyAction, QueryBuilder, SchemaStatementBuilder, TableForeign
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     foreign_key.to_string(QueryBuilder),
+///     foreign_key.to_string(),
 ///     [
 ///         r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_font""#,
 ///         r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
@@ -36,7 +34,7 @@ use crate::{ForeignKeyAction, QueryBuilder, SchemaStatementBuilder, TableForeign
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     foreign_key.to_string(QueryBuilder),
+///     foreign_key.to_string(),
 ///     [
 ///         r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_glyph""#,
 ///         r#"FOREIGN KEY ("font_id", "id") REFERENCES "glyph" ("font_id", "id")"#,
@@ -55,7 +53,7 @@ use crate::{ForeignKeyAction, QueryBuilder, SchemaStatementBuilder, TableForeign
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     foreign_key.to_string(QueryBuilder),
+///     foreign_key.to_string(),
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id")"#
 /// );
 /// ```
@@ -72,7 +70,7 @@ use crate::{ForeignKeyAction, QueryBuilder, SchemaStatementBuilder, TableForeign
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     foreign_key.to_string(QueryBuilder),
+///     foreign_key.to_string(),
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
@@ -181,19 +179,11 @@ impl ForeignKeyCreateStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for ForeignKeyCreateStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for ForeignKeyCreateStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_foreign_key_create_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_foreign_key_create_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_foreign_key_create_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

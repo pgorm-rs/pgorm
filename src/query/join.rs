@@ -159,7 +159,7 @@ mod tests {
     use crate::{
         ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait, RelationTrait,
     };
-    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType, QueryBuilder};
+    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -168,7 +168,7 @@ mod tests {
             cake::Entity::find()
                 .left_join(fruit::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
@@ -184,7 +184,7 @@ mod tests {
                 .inner_join(fruit::Entity)
                 .filter(fruit::Column::Name.contains("cherry"))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"INNER JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
@@ -200,7 +200,7 @@ mod tests {
             fruit::Entity::find()
                 .reverse_join(cake::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
                 r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
@@ -218,7 +218,7 @@ mod tests {
             find_fruit
                 .filter(cake::Column::Id.eq(11))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
                 r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
@@ -239,7 +239,7 @@ mod tests {
             cake_model
                 .find_related(fruit::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
                 r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
@@ -255,7 +255,7 @@ mod tests {
             cake::Entity::find()
                 .left_join(filling::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
@@ -271,7 +271,7 @@ mod tests {
 
         let find_filling: Select<filling::Entity> = cake::Entity::find_related();
         assert_eq!(
-            find_filling.as_query().to_string(QueryBuilder),
+            find_filling.as_query().to_string(),
             [
                 r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id" FROM "filling""#,
                 r#"INNER JOIN "cake_filling" ON "cake_filling"."filling_id" = "filling"."id""#,
@@ -288,7 +288,7 @@ mod tests {
         let find_cake_filling_price: Select<cake_filling_price::Entity> =
             cake_filling::Entity::find_related();
         assert_eq!(
-            find_cake_filling_price.as_query().to_string(QueryBuilder),
+            find_cake_filling_price.as_query().to_string(),
             [
                 r#"SELECT "cake_filling_price"."cake_id", "cake_filling_price"."filling_id", "cake_filling_price"."price""#,
                 r#"FROM "public"."cake_filling_price""#,
@@ -307,7 +307,7 @@ mod tests {
         let find_cake_filling: Select<cake_filling::Entity> =
             cake_filling_price::Entity::find_related();
         assert_eq!(
-            find_cake_filling.as_query().to_string(QueryBuilder),
+            find_cake_filling.as_query().to_string(),
             [
                 r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id""#,
                 r#"FROM "cake_filling""#,
@@ -330,7 +330,7 @@ mod tests {
             cake_model
                 .find_linked(entity_linked::CakeToFilling)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id""#,
                 r#"FROM "filling""#,
@@ -353,7 +353,7 @@ mod tests {
             cake_model
                 .find_linked(entity_linked::CakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "vendor"."id", "vendor"."name""#,
                 r#"FROM "vendor""#,
@@ -372,7 +372,7 @@ mod tests {
             cake::Entity::find()
                 .find_also_linked(entity_linked::CakeToFilling)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""r1"."id" AS "B_id", "r1"."name" AS "B_name", "r1"."vendor_id" AS "B_vendor_id""#,
@@ -390,7 +390,7 @@ mod tests {
             cake::Entity::find()
                 .find_also_linked(entity_linked::CakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -409,7 +409,7 @@ mod tests {
             cake::Entity::find()
                 .join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def())
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
@@ -429,7 +429,7 @@ mod tests {
             cake_model
                 .find_linked(entity_linked::CheeseCakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "vendor"."id", "vendor"."name""#,
                 r#"FROM "vendor""#,
@@ -452,7 +452,7 @@ mod tests {
             cake_model
                 .find_linked(entity_linked::JoinWithoutReverse)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "vendor"."id", "vendor"."name""#,
                 r#"FROM "vendor""#,
@@ -471,7 +471,7 @@ mod tests {
             cake::Entity::find()
                 .find_also_linked(entity_linked::CheeseCakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -490,7 +490,7 @@ mod tests {
             cake::Entity::find()
                 .find_also_linked(entity_linked::JoinWithoutReverse)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
                 [
                     r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                     r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -531,7 +531,7 @@ mod tests {
                 )
                 .join(JoinType::LeftJoin, filling::Relation::Vendor.def())
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
@@ -563,7 +563,7 @@ mod tests {
                     Alias::new("fruit_alias")
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name", "fruit_alias"."name" AS "fruit_name" FROM "cake""#,
                 r#"LEFT JOIN "fruit" AS "fruit_alias" ON "cake"."id" = "fruit_alias"."cake_id" AND "fruit_alias"."name" LIKE '%tropical%'"#,
@@ -593,7 +593,7 @@ mod tests {
                     Alias::new("cake_filling_alias")
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name", "cake_filling_alias"."cake_id" AS "cake_filling_cake_id" FROM "cake""#,
                 r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
@@ -625,7 +625,7 @@ mod tests {
                     Alias::new("cake_filling_alias")
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name", "cake_filling_alias"."cake_id" AS "cake_filling_cake_id" FROM "cake""#,
                 r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id" OR "fruit"."name" LIKE '%tropical%'"#,

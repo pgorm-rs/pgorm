@@ -2060,12 +2060,20 @@ children (
                     unrep.ddl-empty-builders
                     unrep.dml-target
                 )
+                sealed true
                 log (
                     {
                         at 2026-09-02T12:37:48.934815Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: build_any/to_string_any/build_collect_any (~29 sites across schema.rs, table/*, index/*, foreign_key/*, query/*) are sea-query multi-backend vestige — every call passes the single unit-struct QueryBuilder, which carries no state. Collapse to one method per statement and drop the QueryBuilder argument workspace-wide (pgorm-query + root crate + migration call sites + tests). Purely mechanical but the widest churn in the campaign — hence last, deps on tableref-split and mysql-purge. Bumps sql.ast.build, sql.ddl and every rule naming build_any. M."
+                    }
+
+                    {
+                        at 2026-09-03T15:54:19.389968Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -1,58 +1,10 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use crate::{SqlWriter, SqlWriterValues, SubQueryStatement, backend::QueryBuilder, value::Values};
 
-// [spec:pgorm:req:sql.ast.build]
-pub trait QueryStatementBuilder: Debug {
-    /// Build corresponding SQL statement for certain database backend and collect query parameters into a vector
-    fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values) {
-        let (placeholder, numbered) = query_builder.placeholder();
-        let mut sql = SqlWriterValues::new(placeholder, numbered);
-        self.build_collect_any_into(query_builder, &mut sql);
-        sql.into_parts()
-    }
-
-    /// Build corresponding SQL statement for certain database backend and collect query parameters
-    fn build_collect_any(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) -> String {
-        self.build_collect_any_into(query_builder, sql);
-        sql.to_string()
-    }
-
-    /// Build corresponding SQL statement into the SqlWriter for certain database backend and collect query parameters
-    fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter);
-
-    fn into_sub_query_statement(self) -> SubQueryStatement;
-}
-
-// [spec:pgorm:req:sql.ast.build]
-pub trait QueryStatementWriter: QueryStatementBuilder {
-    /// Build corresponding SQL statement for certain database backend and return SQL string
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, tests_cfg::*};
-    ///
-    /// let query = Query::select()
-    ///     .column(Glyph::Aspect)
-    ///     .from(Glyph::Table)
-    ///     .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
-    ///     .order_by(Glyph::Image, Order::Desc)
-    ///     .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
-    ///     .to_string(QueryBuilder);
-    ///
-    /// assert_eq!(
-    ///     query,
-    ///     r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2 ORDER BY "image" DESC, "glyph"."aspect" ASC"#
-    /// );
-    /// ```
-    fn to_string(&self, query_builder: QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        self.build_collect_any_into(&query_builder, &mut sql);
-        sql
-    }
-
-    /// Build corresponding SQL statement for certain database backend and collect query parameters into a vector
+// [spec:pgorm:req:sql.ast.build+1]
+pub trait QueryStatementBuilder: Debug + Display {
+    /// Build the SQL statement, collecting query parameters into a vector
     ///
     /// # Examples
     ///
@@ -65,7 +17,7 @@ pub trait QueryStatementWriter: QueryStatementBuilder {
     ///     .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
     ///     .order_by(Glyph::Image, Order::Desc)
     ///     .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
-    ///     .build(QueryBuilder);
+    ///     .build();
     ///
     /// assert_eq!(
     ///     query,
@@ -76,14 +28,33 @@ pub trait QueryStatementWriter: QueryStatementBuilder {
     ///     Values(vec![Value::Int(Some(0)), Value::Int(Some(2))])
     /// );
     /// ```
-    fn build(&self, query_builder: QueryBuilder) -> (String, Values) {
-        let (placeholder, numbered) = query_builder.placeholder();
+    ///
+    /// The value-inlined rendering is the statement's [`Display`] form:
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .column(Glyph::Aspect)
+    ///     .from(Glyph::Table)
+    ///     .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
+    ///     .order_by(Glyph::Image, Order::Desc)
+    ///     .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
+    ///     .to_string();
+    ///
+    /// assert_eq!(
+    ///     query,
+    ///     r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2 ORDER BY "image" DESC, "glyph"."aspect" ASC"#
+    /// );
+    /// ```
+    fn build(&self) -> (String, Values) {
+        let (placeholder, numbered) = QueryBuilder.placeholder();
         let mut sql = SqlWriterValues::new(placeholder, numbered);
-        self.build_collect_into(query_builder, &mut sql);
+        self.build_collect_into(&mut sql);
         sql.into_parts()
     }
 
-    /// Build corresponding SQL statement for certain database backend and collect query parameters
+    /// Build the SQL statement into the given sink, returning the sink's text
     ///
     /// # Examples
     ///
@@ -102,7 +73,7 @@ pub trait QueryStatementWriter: QueryStatementBuilder {
     /// let mut sql = SqlWriterValues::new(placeholder, numbered);
     ///
     /// assert_eq!(
-    ///     query.build_collect(QueryBuilder, &mut sql),
+    ///     query.build_collect(&mut sql),
     ///     r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", $1) > $2 ORDER BY "image" DESC, "glyph"."aspect" ASC"#
     /// );
     ///
@@ -112,10 +83,13 @@ pub trait QueryStatementWriter: QueryStatementBuilder {
     ///     Values(vec![Value::Int(Some(0)), Value::Int(Some(2))])
     /// );
     /// ```
-    fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String {
-        self.build_collect_into(query_builder, sql);
+    fn build_collect(&self, sql: &mut dyn SqlWriter) -> String {
+        self.build_collect_into(sql);
         sql.to_string()
     }
 
-    fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter);
+    /// Build the SQL statement into the given sink
+    fn build_collect_into(&self, sql: &mut dyn SqlWriter);
+
+    fn into_sub_query_statement(self) -> SubQueryStatement;
 }

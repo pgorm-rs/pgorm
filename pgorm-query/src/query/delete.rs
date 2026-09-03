@@ -1,6 +1,6 @@
 use crate::{
-    AnyWithClause, QueryStatementBuilder, QueryStatementWriter, ReturningClause, SimpleExpr,
-    SubQueryStatement, WithQuery,
+    AnyWithClause, QueryStatementBuilder, ReturningClause, SimpleExpr, SubQueryStatement,
+    WithQuery,
     backend::QueryBuilder,
     prepare::*,
     query::{OrderedStatement, condition::*},
@@ -25,7 +25,7 @@ use inherent::inherent;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"DELETE FROM "glyph" WHERE "id" < 1 OR "id" > 10"#
 /// );
 /// ```
@@ -58,7 +58,7 @@ impl DeleteStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "glyph" WHERE "id" = 1"#
     /// );
     /// ```
@@ -74,7 +74,7 @@ impl DeleteStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
     /// );
     /// ```
@@ -108,7 +108,7 @@ impl DeleteStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING "id""#
     /// );
     /// ```
@@ -131,7 +131,7 @@ impl DeleteStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING "id""#
     /// );
     /// ```
@@ -156,7 +156,7 @@ impl DeleteStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING *"#
     /// );
     /// ```
@@ -189,7 +189,7 @@ impl DeleteStatement {
     ///     let query = update.with(with_clause);
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph" WHERE "image" LIKE '0%') DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "cte")"#
     /// );
     /// ```
@@ -203,31 +203,25 @@ impl DeleteStatement {
 
 #[inherent]
 impl QueryStatementBuilder for DeleteStatement {
-    pub fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_delete_statement(self, sql);
+    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
+        QueryBuilder.prepare_delete_statement(self, sql);
     }
 
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::DeleteStatement(self)
     }
 
-    pub fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values);
-    pub fn build_collect_any(
-        &self,
-        query_builder: &QueryBuilder,
-        sql: &mut dyn SqlWriter,
-    ) -> String;
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-#[inherent]
-impl QueryStatementWriter for DeleteStatement {
-    pub fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_delete_statement(self, sql);
+// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+impl std::fmt::Display for DeleteStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_delete_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String;
-    pub fn build(&self, query_builder: QueryBuilder) -> (String, Values);
-    pub fn to_string(&self, query_builder: QueryBuilder) -> String;
 }
 
 #[inherent]

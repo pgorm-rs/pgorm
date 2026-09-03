@@ -175,19 +175,15 @@ where
             .if_exists()
             .cascade()
             .to_owned();
-        db.execute(&drop_type_stmt.to_string(QueryBuilder), &[])
-            .await?;
+        db.execute(&drop_type_stmt.to_string(), &[]).await?;
     }
 
-    let expect_stmts: Vec<String> = creates
-        .iter()
-        .map(|stmt| stmt.to_string(QueryBuilder))
-        .collect();
+    let expect_stmts: Vec<String> = creates.iter().map(|stmt| stmt.to_string()).collect();
     let schema = Schema::new();
     let create_from_entity_stmts: Vec<String> = schema
         .create_enum_from_entity(entity)
         .iter()
-        .map(|stmt| stmt.to_string(QueryBuilder))
+        .map(|stmt| stmt.to_string())
         .collect();
 
     assert_eq!(expect_stmts, create_from_entity_stmts);
@@ -210,8 +206,8 @@ where
 {
     let schema = Schema::new();
     assert_eq!(
-        schema.create_table_from_entity(entity).build(QueryBuilder),
-        create.build(QueryBuilder)
+        schema.create_table_from_entity(entity).to_string(),
+        create.to_string()
     );
 
     create_table_without_asserts(db, create).await
@@ -224,7 +220,7 @@ pub async fn create_table_without_asserts<C>(
 where
     C: ConnectionTrait,
 {
-    db.execute(&create.build(QueryBuilder), &[]).await
+    db.execute(&create.to_string(), &[]).await
 }
 
 pub fn rust_dec<T: ToString>(v: T) -> rust_decimal::Decimal {

@@ -1,6 +1,4 @@
-use inherent::inherent;
-
-use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
+use crate::{QueryBuilder, types::*};
 
 /// Truncate a table
 ///
@@ -10,7 +8,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// ```compile_fail,E0061
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// Table::truncate().to_string(QueryBuilder);
+/// Table::truncate().to_string();
 /// ```
 ///
 /// # Examples
@@ -20,7 +18,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 ///
 /// let table = Table::truncate(Font::Table);
 ///
-/// assert_eq!(table.to_string(QueryBuilder), r#"TRUNCATE TABLE "font""#);
+/// assert_eq!(table.to_string(), r#"TRUNCATE TABLE "font""#);
 /// ```
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
 #[derive(Debug, Clone)]
@@ -40,19 +38,11 @@ impl TableTruncateStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for TableTruncateStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for TableTruncateStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_truncate_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_table_truncate_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_truncate_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

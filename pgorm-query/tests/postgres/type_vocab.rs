@@ -47,7 +47,7 @@ fn every_column_ref_form_renders() {
             ))
             .column(ColumnRef::Asterisk)
             .column(ColumnRef::TableAsterisk(Glyph::Table.into_iden()))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id", "glyph"."id", "schema"."glyph"."id", *, "glyph".*"#
     );
 }
@@ -198,12 +198,8 @@ fn from_item_qualifier_prefers_the_alias() {
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
-    let rendered = |from_item: FromItem| {
-        Query::select()
-            .column(Asterisk)
-            .from(from_item)
-            .to_string(QueryBuilder)
-    };
+    let rendered =
+        |from_item: FromItem| Query::select().column(Asterisk).from(from_item).to_string();
 
     assert_eq!(
         rendered(Glyph::Table.into_from_item()),
@@ -245,7 +241,7 @@ fn aliased_dml_targets_render() {
             .into_table(target())
             .columns([Glyph::Image])
             .values_panic(["12A".into()])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "schema"."glyph" AS "g" ("image") VALUES ('12A')"#
     );
     assert_eq!(
@@ -253,14 +249,14 @@ fn aliased_dml_targets_render() {
             .table(target())
             .value(Glyph::Aspect, 1.23)
             .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "schema"."glyph" AS "g" SET "aspect" = 1.23 WHERE "g"."id" = 1"#
     );
     assert_eq!(
         Query::delete()
             .from_table(target())
             .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "schema"."glyph" AS "g" WHERE "g"."id" = 1"#
     );
 }
@@ -274,10 +270,7 @@ fn value_producing_from_item_forms_render() {
         Alias::new("sub").into_iden(),
     );
     assert_eq!(
-        Query::select()
-            .column(Asterisk)
-            .from(sub_query)
-            .to_string(QueryBuilder),
+        Query::select().column(Asterisk).from(sub_query).to_string(),
         r#"SELECT * FROM (SELECT "id" FROM "glyph") AS "sub""#
     );
 
@@ -292,7 +285,7 @@ fn value_producing_from_item_forms_render() {
         Query::select()
             .column(Asterisk)
             .from(values_list)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS "v""#
     );
 
@@ -304,7 +297,7 @@ fn value_producing_from_item_forms_render() {
         Query::select()
             .column(Asterisk)
             .from(function_call)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT * FROM generate_series(1) AS "f""#
     );
 }
@@ -315,7 +308,7 @@ fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
 
     assert_eq!(
-        Query::select().expr(not_true).to_string(QueryBuilder),
+        Query::select().expr(not_true).to_string(),
         "SELECT NOT TRUE"
     );
 }
@@ -327,7 +320,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     let rendered = |op: BinOper| {
         Query::select()
             .expr(Expr::col(Glyph::Aspect).binary(op, Expr::val(1)))
-            .to_string(QueryBuilder)
+            .to_string()
     };
 
     for (op, lexeme) in [
@@ -387,7 +380,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     assert_eq!(
         Query::select()
             .expr(Expr::col(Glyph::Aspect).binary(BinOper::As, Expr::cust("text")))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" AS text"#
     );
 }
@@ -432,7 +425,7 @@ fn auto_increment_without_serial_form_renders_type() {
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).uuid().auto_increment())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE TABLE "glyph" ( "id" uuid )"#
     );
 }

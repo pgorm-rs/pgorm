@@ -37,7 +37,7 @@ impl Update {
     /// narrow the statement to a single row.
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
@@ -46,7 +46,7 @@ impl Update {
     ///     })
     ///     .expect("the primary key is set")
     ///     .as_query()
-    ///     .to_string(QueryBuilder),
+    ///     .to_string(),
     ///     r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
     /// );
     /// ```
@@ -80,14 +80,14 @@ impl Update {
     /// Update many ActiveModel
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::{Expr, QueryBuilder}, tests_cfg::fruit};
+    /// use pgorm::{entity::*, query::*, pgorm_query::Expr, tests_cfg::fruit};
     ///
     /// assert_eq!(
     ///     Update::many(fruit::Entity)
     ///         .col_expr(fruit::Column::Name, Expr::value("Golden Apple"))
     ///         .filter(fruit::Column::Name.contains("Apple"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"UPDATE "fruit" SET "name" = 'Golden Apple' WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```
@@ -234,7 +234,7 @@ mod tests {
     use crate::ActiveValue::{Set, Unchanged};
     use crate::tests_cfg::{cake, fruit, lunch_set, sea_orm_active_enums::Tea};
     use crate::{entity::*, query::*};
-    use pgorm_query::{Expr, QueryBuilder, Value};
+    use pgorm_query::{Expr, Value};
 
     #[test]
     fn update_1() {
@@ -245,7 +245,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#,
         );
     }
@@ -260,7 +260,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#,
         );
     }
@@ -275,7 +275,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"UPDATE "fruit" SET "cake_id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -287,7 +287,7 @@ mod tests {
                 .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
                 .filter(fruit::Column::Id.eq(2))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"UPDATE "fruit" SET "cake_id" = NULL WHERE "fruit"."id" = 2"#,
         );
     }
@@ -303,7 +303,7 @@ mod tests {
                 })
                 .filter(fruit::Column::Id.eq(2))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"UPDATE "fruit" SET "name" = 'Apple', "cake_id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -318,7 +318,7 @@ mod tests {
                 })
                 .filter(fruit::Column::Id.eq(2))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"UPDATE "fruit" SET "id" = 3 WHERE "fruit"."id" = 2"#,
         );
     }
@@ -333,7 +333,7 @@ mod tests {
                 })
                 .filter(lunch_set::Column::Tea.eq(Tea::BreakfastTea))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"UPDATE "lunch_set" SET "tea" = CAST('EverydayTea' AS tea) WHERE "lunch_set"."tea" = (CAST('BreakfastTea' AS tea))"#,
         );
     }
@@ -348,7 +348,7 @@ mod tests {
             })
             .expect("the primary key is set")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
             r#"UPDATE "lunch_set" SET "tea" = CAST('EverydayTea' AS tea) WHERE "lunch_set"."id" = 1"#,
         );
     }

@@ -47,7 +47,7 @@ async fn main() -> Result<(), DbErr> {
     let returning = Query::returning().exprs(columns.into_iter().map(|c| c.into_returning_expr()));
 
     insert.returning(returning.clone());
-    let (sql, values) = insert.build(QueryBuilder);
+    let (sql, values) = insert.build();
     let bound = holders(values);
     let insert_res = db.query_one(&sql, &params(&bound)).await?;
     let _id: i32 = insert_res.try_get("id")?;
@@ -55,7 +55,7 @@ async fn main() -> Result<(), DbErr> {
     let _profit_margin: f64 = insert_res.try_get("profit_margin")?;
 
     update.returning(returning.clone());
-    let (sql, values) = update.build(QueryBuilder);
+    let (sql, values) = update.build();
     let bound = holders(values);
     let update_res = db.query_one(&sql, &params(&bound)).await?;
     let _id: i32 = update_res.try_get("id")?;

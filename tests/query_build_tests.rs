@@ -54,7 +54,7 @@ where
 fn every_builder_wraps_one_statement() {
     let select: Select<cake::Entity> = cake::Entity::find();
     assert_eq!(
-        select.as_query().to_string(QueryBuilder),
+        select.as_query().to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     );
     let _: SelectStatement = select.into_query();
@@ -69,7 +69,7 @@ fn every_builder_wraps_one_statement() {
 
     let insert: Insert<cake::ActiveModel> = Insert::one(apple());
     assert_eq!(
-        insert.as_query().to_string(QueryBuilder),
+        insert.as_query().to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
     );
     let _: InsertStatement = insert.into_query();
@@ -80,7 +80,7 @@ fn every_builder_wraps_one_statement() {
     let update_one: UpdateOne<cake::ActiveModel> =
         Update::one(apple()).expect("the primary key is set");
     assert_eq!(
-        update_one.as_query().to_string(QueryBuilder),
+        update_one.as_query().to_string(),
         r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#
     );
     let _: UpdateStatement = update_one.into_query();
@@ -88,7 +88,7 @@ fn every_builder_wraps_one_statement() {
     let update_many: UpdateMany<cake::Entity> =
         Update::many(cake::Entity).col_expr(cake::Column::Name, Expr::value("Pie"));
     assert_eq!(
-        update_many.as_query().to_string(QueryBuilder),
+        update_many.as_query().to_string(),
         r#"UPDATE "cake" SET "name" = 'Pie'"#
     );
     let _: UpdateStatement = update_many.into_query();
@@ -96,35 +96,30 @@ fn every_builder_wraps_one_statement() {
     let delete_one: DeleteOne<cake::ActiveModel> =
         Delete::one(apple()).expect("the primary key is set");
     assert_eq!(
-        delete_one.as_query().to_string(QueryBuilder),
+        delete_one.as_query().to_string(),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
     );
     let _: DeleteStatement = delete_one.into_query();
 
     let delete_many: DeleteMany<cake::Entity> = Delete::many(cake::Entity);
-    assert_eq!(
-        delete_many.as_query().to_string(QueryBuilder),
-        r#"DELETE FROM "cake""#
-    );
+    assert_eq!(delete_many.as_query().to_string(), r#"DELETE FROM "cake""#);
     let _: DeleteStatement = delete_many.into_query();
 
     // The same three blanket traits drive all three SELECT builders.
     assert_eq!(
-        narrow(cake::Entity::find())
-            .as_query()
-            .to_string(QueryBuilder),
+        narrow(cake::Entity::find()).as_query().to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC LIMIT 1"#
     );
     assert!(
         narrow(cake::Entity::find().find_also_related(fruit::Entity))
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .ends_with(r#"WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC LIMIT 1"#)
     );
     assert!(
         narrow(cake::Entity::find().find_with_related(fruit::Entity))
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
             .ends_with(
                 r#"WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC, "cake"."id" ASC LIMIT 1"#
             )
@@ -143,13 +138,13 @@ fn select_new_has_only_columns_and_from() {
         ["id", "name"]
     );
     assert_eq!(
-        cake::Entity::find().as_query().to_string(QueryBuilder),
+        cake::Entity::find().as_query().to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     );
 
     // `select_as` casts an enum column to text; the rest pass through.
     assert_eq!(
-        lunch_set::Entity::find().as_query().to_string(QueryBuilder),
+        lunch_set::Entity::find().as_query().to_string(),
         [
             r#"SELECT "lunch_set"."id", "lunch_set"."name","#,
             r#"CAST("lunch_set"."tea" AS text) FROM "lunch_set""#,
@@ -159,9 +154,7 @@ fn select_new_has_only_columns_and_from() {
 
     // The FROM clause is `E::default().table_ref()`, schema included.
     assert_eq!(
-        cake_filling_price::Entity::find()
-            .as_query()
-            .to_string(QueryBuilder),
+        cake_filling_price::Entity::find().as_query().to_string(),
         [
             r#"SELECT "cake_filling_price"."cake_id", "cake_filling_price"."filling_id","#,
             r#""cake_filling_price"."price" FROM "public"."cake_filling_price""#,
@@ -170,7 +163,7 @@ fn select_new_has_only_columns_and_from() {
     );
 
     // No default WHERE / ORDER BY / GROUP BY / LIMIT / OFFSET.
-    let sql = cake::Entity::find().as_query().to_string(QueryBuilder);
+    let sql = cake::Entity::find().as_query().to_string();
     for clause in ["WHERE", "ORDER BY", "GROUP BY", "HAVING", "LIMIT", "OFFSET"] {
         assert!(!sql.contains(clause), "unexpected {clause} in {sql}");
     }
@@ -192,7 +185,7 @@ fn query_trait_exposes_the_statement_four_ways() {
 
     // `as_query` is shared access: the same statement, values inlined.
     assert_eq!(
-        select.as_query().to_string(QueryBuilder),
+        select.as_query().to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 3"#
     );
 
@@ -206,7 +199,7 @@ fn query_trait_exposes_the_statement_four_ways() {
     // `into_query` hands over ownership of that statement.
     let statement: SelectStatement = select.into_query();
     assert_eq!(
-        statement.to_string(QueryBuilder),
+        statement.to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 3 AND "cake"."name" LIKE '%pie%'"#
     );
 }
@@ -222,7 +215,7 @@ fn apply_if_runs_only_on_some() {
             .apply_if(None, QuerySelect::offset::<Option<u64>>)
             .apply_if(None::<i32>, |query, v| query.filter(cake::Column::Id.eq(v)))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 3 LIMIT 100"#
     );
 }
@@ -238,13 +231,13 @@ fn into_simple_expr_accepts_three_shapes() {
 
     let expected =
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."name" ASC"#.to_owned();
-    assert_eq!(by_column.as_query().to_string(QueryBuilder), expected);
-    assert_eq!(by_expr.as_query().to_string(QueryBuilder), expected);
+    assert_eq!(by_column.as_query().to_string(), expected);
+    assert_eq!(by_expr.as_query().to_string(), expected);
     assert_eq!(
         cake::Entity::find()
             .order_by_asc(by_simple)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         expected
     );
 
@@ -253,7 +246,7 @@ fn into_simple_expr_accepts_three_shapes() {
         cake::Entity::find()
             .group_by(cake::Column::Id.count())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" GROUP BY COUNT("cake"."id")"#
     );
 }
@@ -268,7 +261,7 @@ fn filter_accumulates_and_accepts_trees() {
             .filter(cake::Column::Id.eq(4))
             .filter(cake::Column::Id.eq(5))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 4 AND "cake"."id" = 5"#
     );
 
@@ -281,7 +274,7 @@ fn filter_accumulates_and_accepts_trees() {
             )
             .filter(Condition::all().add(cake::Column::Name.contains("cheese")))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"WHERE ("cake"."id" = 4 OR "cake"."id" = 5) AND "cake"."name" LIKE '%cheese%'"#,
@@ -296,7 +289,7 @@ fn filter_accumulates_and_accepts_trees() {
             .filter(Condition::all().add_option(absent.map(|n| cake::Column::Name.contains(&n))))
             .filter(cake::Column::Id.is_in([4, 5]))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" IN (4, 5)"#
     );
 
@@ -305,7 +298,7 @@ fn filter_accumulates_and_accepts_trees() {
         fruit::Entity::find()
             .filter(Expr::col(fruit::Column::CakeId).is_null())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"WHERE "cake_id" IS NULL"#,
@@ -327,7 +320,7 @@ fn belongs_to_filters_every_primary_key_column() {
         fruit::Entity::find()
             .belongs_to(&single)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"WHERE "cake"."id" = 12"#,
@@ -345,7 +338,7 @@ fn belongs_to_filters_every_primary_key_column() {
         filling::Entity::find()
             .belongs_to(&composite)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id" FROM "filling""#,
             r#"WHERE "cake_filling"."cake_id" = 2 AND "cake_filling"."filling_id" = 3"#,
@@ -357,7 +350,7 @@ fn belongs_to_filters_every_primary_key_column() {
         filling::Entity::find()
             .belongs_to_tbl_alias(&composite, "r0")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id" FROM "filling""#,
             r#"WHERE "r0"."cake_id" = 2 AND "r0"."filling_id" = 3"#,
@@ -378,7 +371,7 @@ fn select_list_modifiers_rewrite_the_list() {
             .columns([cake::Column::Id, cake::Column::Name])
             .column_as(cake::Column::Id.count(), "count")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name", COUNT("cake"."id") AS "count""#,
             r#"FROM "cake""#,
@@ -392,7 +385,7 @@ fn select_list_modifiers_rewrite_the_list() {
             .select_only()
             .column(lunch_set::Column::Tea)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
     );
 
@@ -407,7 +400,7 @@ fn select_list_modifiers_rewrite_the_list() {
             )
             .tbl_col_as((cake::Entity, cake::Column::Name), "cake_name")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper","#,
             r#""cake"."name" AS "cake_name" FROM "cake""#,
@@ -422,7 +415,7 @@ fn select_list_modifiers_rewrite_the_list() {
             .select_column(cake::Column::Name)
             .select_column_as(cake::Column::Id, "cake_id")
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."name", "cake"."id" AS "cake_id" FROM "cake""#
     );
 }
@@ -435,10 +428,7 @@ fn select_list_modifiers_rewrite_the_list() {
 fn cleared_select_list_renders_verbatim() {
     let query = cake::Entity::find().select_only();
 
-    assert_eq!(
-        query.as_query().to_string(QueryBuilder),
-        r#"SELECT  FROM "cake""#
-    );
+    assert_eq!(query.as_query().to_string(), r#"SELECT  FROM "cake""#);
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
@@ -451,7 +441,7 @@ fn limit_and_offset_last_call_wins() {
             .limit(10)
             .offset(5)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 10 OFFSET 5"#
     );
 
@@ -462,7 +452,7 @@ fn limit_and_offset_last_call_wins() {
             .offset(Some(1))
             .offset(Some(2))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" LIMIT 20 OFFSET 2"#
     );
 
@@ -473,7 +463,7 @@ fn limit_and_offset_last_call_wins() {
             .limit(None)
             .offset(None)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     );
 }
@@ -491,7 +481,7 @@ fn grouping_distinct_and_locking_clauses() {
             .having(cake::Column::Id.gt(4))
             .having(cake::Column::Id.lt(9))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT COUNT("cake"."id") AS "count" FROM "cake""#,
             r#"GROUP BY "cake"."name" HAVING "cake"."id" > 4 AND "cake"."id" < 9"#,
@@ -500,21 +490,18 @@ fn grouping_distinct_and_locking_clauses() {
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .distinct()
-            .as_query()
-            .to_string(QueryBuilder),
+        cake::Entity::find().distinct().as_query().to_string(),
         r#"SELECT DISTINCT "cake"."id", "cake"."name" FROM "cake""#
     );
     assert_eq!(
         cake::Entity::find()
             .distinct_on([(cake::Entity, cake::Column::Name)])
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT DISTINCT ON ("cake"."name") "cake"."id", "cake"."name" FROM "cake""#
     );
 
-    let locked = |query: Select<cake::Entity>| query.as_query().to_string(QueryBuilder);
+    let locked = |query: Select<cake::Entity>| query.as_query().to_string();
     assert!(locked(cake::Entity::find().lock_shared()).ends_with("FOR SHARE"));
     assert!(locked(cake::Entity::find().lock_exclusive()).ends_with("FOR UPDATE"));
     assert!(
@@ -537,7 +524,7 @@ fn order_by_appends_and_never_dedups() {
             .order_by_asc(cake::Column::Id)
             .order_by_with_nulls(cake::Column::Name, Order::Asc, NullOrdering::First)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake" ORDER BY "cake"."id" ASC,"#,
             r#""cake"."name" DESC, "cake"."id" ASC, "cake"."name" ASC NULLS FIRST"#,
@@ -555,7 +542,7 @@ fn join_direction_and_alias_choice() {
         cake::Entity::find()
             .join(JoinType::LeftJoin, cake::Relation::Fruit.def())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
@@ -567,7 +554,7 @@ fn join_direction_and_alias_choice() {
         fruit::Entity::find()
             .join_rev(JoinType::InnerJoin, cake::Relation::Fruit.def())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
@@ -583,7 +570,7 @@ fn join_direction_and_alias_choice() {
                 cake_filling_price::Relation::CakeFilling.def()
             )
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake_filling"."cake_id", "cake_filling"."filling_id" FROM "cake_filling""#,
             r#"INNER JOIN "cake_filling" ON"#,
@@ -603,7 +590,7 @@ fn join_direction_and_alias_choice() {
                 Alias::new("f")
             )
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"LEFT JOIN "fruit" AS "f" ON "cake"."id" = "f"."cake_id""#,
@@ -618,7 +605,7 @@ fn join_direction_and_alias_choice() {
                 Alias::new("c")
             )
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"LEFT JOIN "cake" AS "c" ON "c"."id" = "fruit"."cake_id""#,
@@ -635,7 +622,7 @@ fn join_condition_type_and_custom_predicate() {
         cake::Entity::find()
             .join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake" LEFT JOIN "fruit" ON"#,
             r#""cake"."id" = "fruit"."cake_id" AND "fruit"."name" LIKE '%tropical%'"#,
@@ -647,7 +634,7 @@ fn join_condition_type_and_custom_predicate() {
         cake::Entity::find()
             .join(JoinType::LeftJoin, cake::Relation::OrTropicalFruit.def())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake" LEFT JOIN "fruit" ON"#,
             r#""cake"."id" = "fruit"."cake_id" OR "fruit"."name" LIKE '%tropical%'"#,
@@ -665,7 +652,7 @@ fn related_helpers_join_via_then_target() {
         cake::Entity::find()
             .left_join(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
@@ -678,7 +665,7 @@ fn related_helpers_join_via_then_target() {
         cake::Entity::find()
             .inner_join(filling::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"INNER JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
@@ -691,7 +678,7 @@ fn related_helpers_join_via_then_target() {
         cake::Entity::find()
             .right_join(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"RIGHT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
@@ -703,7 +690,7 @@ fn related_helpers_join_via_then_target() {
         fruit::Entity::find()
             .reverse_join(cake::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
@@ -723,7 +710,7 @@ fn combine_prefixes_both_column_sets() {
             .left_join(fruit::Entity)
             .select_also(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", "cake"."id" AS "A_B","#,
             r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name","#,
@@ -738,7 +725,7 @@ fn combine_prefixes_both_column_sets() {
         lunch_set::Entity::find()
             .select_also(vendor::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "lunch_set"."id" AS "A_id", "lunch_set"."name" AS "A_name","#,
             r#"CAST("lunch_set"."tea" AS text) AS "A_tea","#,
@@ -757,11 +744,11 @@ fn select_with_orders_by_primary_key() {
     let also = cake::Entity::find()
         .find_also_related(fruit::Entity)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
     let with = cake::Entity::find()
         .find_with_related(fruit::Entity)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert!(!also.contains("ORDER BY"), "{also}");
     assert_eq!(with, format!(r#"{also} ORDER BY "cake"."id" ASC"#));
@@ -772,7 +759,7 @@ fn select_with_orders_by_primary_key() {
             .left_join(fruit::Entity)
             .select_also(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
     );
     assert_eq!(
         with,
@@ -780,14 +767,14 @@ fn select_with_orders_by_primary_key() {
             .left_join(fruit::Entity)
             .select_with(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
     );
 
     // One ORDER BY term per primary-key column.
     let composite = cake_filling::Entity::find()
         .find_with_related(cake_filling_price::Entity)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
     assert!(
         composite
             .ends_with(r#"ORDER BY "cake_filling"."cake_id" ASC, "cake_filling"."filling_id" ASC"#),
@@ -805,7 +792,7 @@ fn find_linked_aliases_every_hop() {
         cake::Entity::find()
             .find_also_linked(entity_linked::CakeToFillingVendor)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
             r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -822,7 +809,7 @@ fn find_linked_aliases_every_hop() {
         cake::Entity::find()
             .find_also_linked(entity_linked::CheeseCakeToFillingVendor)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
             r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -838,14 +825,14 @@ fn find_linked_aliases_every_hop() {
     let with_linked = cake::Entity::find()
         .find_with_linked(entity_linked::CakeToFillingVendor)
         .as_query()
-        .to_string(QueryBuilder);
+        .to_string();
     assert!(!with_linked.contains("ORDER BY"), "{with_linked}");
     assert_eq!(
         with_linked,
         cake::Entity::find()
             .find_also_linked(entity_linked::CakeToFillingVendor)
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
     );
 }
 
@@ -858,7 +845,7 @@ fn combine_leaves_asterisk_unprefixed() {
             .expr(Expr::col(Asterisk))
             .select_also(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", *,"#,
             r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -877,7 +864,7 @@ fn combine_leaves_bare_expression_unprefixed() {
             .expr(Func::upper(Expr::col((cake::Entity, cake::Column::Name))))
             .select_also(fruit::Entity)
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", UPPER("cake"."name"),"#,
             r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -898,7 +885,7 @@ fn insert_new_is_a_default_values_statement() {
     assert_eq!(
         cake::Entity::insert_many(std::iter::empty::<cake::ActiveModel>())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT)"#
     );
 
@@ -908,7 +895,7 @@ fn insert_new_is_a_default_values_statement() {
         name: "Apple Pie".to_owned(),
     });
     assert_eq!(
-        from_model.as_query().to_string(QueryBuilder),
+        from_model.as_query().to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
     );
 
@@ -924,7 +911,7 @@ fn insert_new_is_a_default_values_statement() {
             },
         ])
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#
     );
 }
@@ -939,7 +926,7 @@ fn insert_add_omits_not_set_columns() {
             name: ActiveValue::Set("Apple Pie".to_owned()),
         })
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"INSERT INTO "cake" ("name") VALUES ('Apple Pie')"#
     );
 
@@ -949,7 +936,7 @@ fn insert_add_omits_not_set_columns() {
             name: ActiveValue::Set("Apple Pie".to_owned()),
         })
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (7, 'Apple Pie')"#
     );
 
@@ -961,7 +948,7 @@ fn insert_add_omits_not_set_columns() {
             tea: ActiveValue::Set(Tea::EverydayTea),
         })
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"INSERT INTO "lunch_set" ("name", "tea") VALUES ('Set A', CAST('EverydayTea' AS tea))"#
     );
 }
@@ -974,7 +961,7 @@ fn insert_on_conflict_is_attached_verbatim() {
         cake::Entity::insert(apple())
             .on_conflict(OnConflict::column(cake::Column::Name).update_column(cake::Column::Name))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#,
             r#"ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
@@ -999,7 +986,7 @@ fn insert_many_shares_one_column_list() {
             },
         ])
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"INSERT INTO "cake" ("name") VALUES ('Apple'), ('Orange')"#
     );
 }
@@ -1032,7 +1019,7 @@ fn insert_many_rejects_mismatched_columns() {
     );
 
     assert_eq!(
-        mismatched().as_query().to_string(QueryBuilder),
+        mismatched().as_query().to_string(),
         r#"INSERT INTO "cake" ("name") VALUES ('Apple')"#
     );
 }
@@ -1050,14 +1037,14 @@ fn all_not_set_model_renders_a_default_row() {
     assert_eq!(
         Insert::<cake::ActiveModel>::one(blank())
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT)"#
     );
 
     assert_eq!(
         Insert::<cake::ActiveModel>::many([blank(), blank(), blank()])
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT), (DEFAULT), (DEFAULT)"#
     );
 }
@@ -1092,20 +1079,17 @@ fn insert_many_rejects_a_blank_first_model() {
 // while `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]
 fn try_insert_conversions_and_conflict_clause() {
-    let plain = Insert::one(apple()).as_query().to_string(QueryBuilder);
+    let plain = Insert::one(apple()).as_query().to_string();
 
     assert_eq!(
-        Insert::one(apple())
-            .do_nothing()
-            .as_query()
-            .to_string(QueryBuilder),
+        Insert::one(apple()).do_nothing().as_query().to_string(),
         plain
     );
     assert_eq!(
         Insert::one(apple())
             .on_empty_do_nothing()
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         plain
     );
 
@@ -1113,7 +1097,7 @@ fn try_insert_conversions_and_conflict_clause() {
         Insert::one(apple())
             .on_conflict_do_nothing()
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         format!(r#"{plain} ON CONFLICT ("id") DO NOTHING"#)
     );
 
@@ -1125,7 +1109,7 @@ fn try_insert_conversions_and_conflict_clause() {
         })
         .on_conflict_do_nothing()
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         [
             r#"INSERT INTO "cake_filling" ("cake_id", "filling_id") VALUES (1, 2)"#,
             r#"ON CONFLICT ("cake_id", "filling_id") DO NOTHING"#,
@@ -1145,7 +1129,7 @@ fn update_one_sets_changed_non_key_columns() {
         })
         .expect("the primary key is set")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"UPDATE "cake" SET "name" = 'Apple Pie' WHERE "cake"."id" = 1"#
     );
 
@@ -1159,7 +1143,7 @@ fn update_one_sets_changed_non_key_columns() {
         })
         .expect("the primary key is unchanged, not unset")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"UPDATE "fruit" SET "name" = 'Apple' WHERE "fruit"."id" = 1"#
     );
 
@@ -1173,7 +1157,7 @@ fn update_one_sets_changed_non_key_columns() {
         })
         .expect("both primary-key columns are set")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         [
             r#"UPDATE "public"."cake_filling_price" SET "price" = 1"#,
             r#"WHERE "cake_filling_price"."cake_id" = 1"#,
@@ -1224,7 +1208,7 @@ fn update_many_has_no_implicit_filter() {
                 name: ActiveValue::Set("Pie".to_owned()),
             })
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "cake" SET "id" = 9, "name" = 'Pie'"#
     );
 
@@ -1236,7 +1220,7 @@ fn update_many_has_no_implicit_filter() {
             })
             .filter(cake::Column::Name.contains("Apple"))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "cake" SET "name" = 'Pie' WHERE "cake"."name" LIKE '%Apple%'"#
     );
 
@@ -1245,7 +1229,7 @@ fn update_many_has_no_implicit_filter() {
             .col_expr(fruit::Column::Name, Expr::value("Golden Apple"))
             .filter(fruit::Column::Name.contains("Apple"))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "fruit" SET "name" = 'Golden Apple' WHERE "fruit"."name" LIKE '%Apple%'"#
     );
 }
@@ -1261,7 +1245,7 @@ fn delete_one_filters_by_primary_key_only() {
         })
         .expect("the primary key is set")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
     );
 
@@ -1272,7 +1256,7 @@ fn delete_one_filters_by_primary_key_only() {
         })
         .expect("the primary key is unchanged, not unset")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"DELETE FROM "cake" WHERE "cake"."id" = 1"#
     );
 
@@ -1283,7 +1267,7 @@ fn delete_one_filters_by_primary_key_only() {
         })
         .expect("both primary-key columns are set")
         .as_query()
-        .to_string(QueryBuilder),
+        .to_string(),
         [
             r#"DELETE FROM "cake_filling""#,
             r#"WHERE "cake_filling"."cake_id" = 1 AND "cake_filling"."filling_id" = 2"#,
@@ -1325,9 +1309,7 @@ fn delete_one_errs_on_unset_primary_key() {
 #[test]
 fn delete_many_is_unconstrained_until_filtered() {
     assert_eq!(
-        Delete::many(fruit::Entity)
-            .as_query()
-            .to_string(QueryBuilder),
+        Delete::many(fruit::Entity).as_query().to_string(),
         r#"DELETE FROM "fruit""#
     );
 
@@ -1335,7 +1317,7 @@ fn delete_many_is_unconstrained_until_filtered() {
         Delete::many(fruit::Entity)
             .filter(fruit::Column::Name.contains("Apple"))
             .as_query()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Apple%'"#
     );
 }
@@ -1355,7 +1337,7 @@ fn debug_query_is_a_vestigial_holder() {
     // Both fields are public and hold exactly what was put in them.
     assert_eq!(debug.value, 1);
     assert_eq!(
-        debug.query.as_query().to_string(QueryBuilder),
+        debug.query.as_query().to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
     );
 

@@ -26,14 +26,23 @@ today, including panicking edges and deliberate failsafes.
 > `take()`, which moves the accumulated contents out and leaves the builder in
 > its default (empty) state.
 
-> [spec:pgorm:req:sql.ast.build]
-> Every statement type implements `QueryStatementBuilder` and
-> `QueryStatementWriter`. `build` MUST return the pair `(String, Values)` where
+> [spec:pgorm:req:sql.ast.build+1]
+> Every statement type implements the single `QueryStatementBuilder`, whose
+> `Display` supertrait carries the value-inlined rendering. There is exactly
+> one method per rendering, and no rendering method takes a builder argument:
+> `QueryBuilder` is a stateless unit struct, so a passed one carried no
+> information, and the `*_any` family that existed only to take it by reference
+> — `build_any`, `build_collect_any`, `build_collect_any_into` — is gone along
+> with the `QueryStatementWriter` half of the split.
+>
+> `build()` MUST return the pair `(String, Values)` where
 > ordinary `SimpleExpr::Value` operands are replaced by numbered PostgreSQL
 > placeholders (`$1`, `$2`, ...) — `QueryBuilder::placeholder()` returns
 > `("$", true)` — and the corresponding values are collected in order into
-> `Values`. `to_string` MUST render the same statement with all values inlined
-> as SQL literals instead of placeholders.
+> `Values`. `to_string()`, reached through `Display`, MUST render the same
+> statement with all values inlined as SQL literals instead of placeholders.
+> `build_collect_into(sink)` is the single required method both are written in
+> terms of, and `build_collect(sink)` returns the sink's accumulated text.
 >
 > `SimpleExpr::Constant` operands are always written inline as literals
 > (`prepare_constant`), never parameterised, even under `build`; this is how

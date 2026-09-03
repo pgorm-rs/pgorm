@@ -95,13 +95,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     bind_oper!(lte, SmallerThanOrEqual);
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.between(2, 3))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" BETWEEN 2 AND 3"#
     /// );
     /// ```
@@ -113,13 +113,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Id.not_between(2, 3))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" NOT BETWEEN 2 AND 3"#
     /// );
     /// ```
@@ -131,13 +131,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.like("cheese"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese'"#
     /// );
     /// ```
@@ -149,13 +149,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.not_like("cheese"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" NOT LIKE 'cheese'"#
     /// );
     /// ```
@@ -167,13 +167,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.starts_with("cheese"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese%'"#
     /// );
     /// ```
@@ -186,13 +186,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.ends_with("cheese"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese'"#
     /// );
     /// ```
@@ -205,13 +205,13 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     }
 
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .filter(cake::Column::Name.contains("cheese"))
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
@@ -461,7 +461,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryTrait, tests_cfg::*};
-    use pgorm_query::{Query, QueryBuilder};
+    use pgorm_query::Query;
 
     #[test]
     fn test_in_subquery_1() {
@@ -478,7 +478,7 @@ mod tests {
                     )
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"WHERE "cake"."id" IN (SELECT MAX("cake"."id") FROM "cake")"#,
@@ -502,7 +502,7 @@ mod tests {
                     )
                 )
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
                 r#"WHERE "cake"."id" IN (SELECT "cake_id" FROM "cake_filling")"#,
@@ -1079,14 +1079,14 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().as_query().to_string(QueryBuilder),
+                E::find().as_query().to_string(),
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
                 Update::one(active_model)
                     .expect("the primary key is set")
                     .as_query()
-                    .to_string(QueryBuilder),
+                    .to_string(),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = 2, "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1211,14 +1211,14 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().as_query().to_string(QueryBuilder),
+                E::find().as_query().to_string(),
                 r#"SELECT "hello"."id", "hello"."one1", "hello"."two", "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
                 Update::one(active_model)
                     .expect("the primary key is set")
                     .as_query()
-                    .to_string(QueryBuilder),
+                    .to_string(),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }
@@ -1350,14 +1350,14 @@ mod tests {
             A: ActiveModelTrait<Entity = E>,
         {
             assert_eq!(
-                E::find().as_query().to_string(QueryBuilder),
+                E::find().as_query().to_string(),
                 r#"SELECT "hello"."id", "hello"."one1", CAST("hello"."two" AS integer), "hello"."three3" FROM "hello""#,
             );
             assert_eq!(
                 Update::one(active_model)
                     .expect("the primary key is set")
                     .as_query()
-                    .to_string(QueryBuilder),
+                    .to_string(),
                 r#"UPDATE "hello" SET "one1" = 1, "two" = CAST(2 AS text), "three3" = 3 WHERE "hello"."id" = 1"#,
             );
         }

@@ -12,7 +12,7 @@ fn select_1() {
             .from(Char::Table)
             .limit(10)
             .offset(100)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" LIMIT 10 OFFSET 100"#
     );
 }
@@ -25,7 +25,7 @@ fn select_2() {
             .columns([Char::Character, Char::SizeW, Char::SizeH])
             .from(Char::Table)
             .and_where(Expr::col(Char::SizeW).eq(3))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 3"#
     );
 }
@@ -38,7 +38,7 @@ fn select_3() {
             .from(Char::Table)
             .and_where(Expr::col(Char::SizeW).eq(3))
             .and_where(Expr::col(Char::SizeH).eq(4))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 3 AND "size_h" = 4"#
     );
 }
@@ -56,7 +56,7 @@ fn select_4() {
                     .take(),
                 Alias::new("subglyph")
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM (SELECT "image", "aspect" FROM "glyph") AS "subglyph""#
     );
 }
@@ -69,7 +69,7 @@ fn select_5() {
             .column((Glyph::Table, Glyph::Image))
             .from(Glyph::Table)
             .and_where(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "glyph"."image" FROM "glyph" WHERE "glyph"."aspect" IN (3, 4)"#
     );
 }
@@ -84,7 +84,7 @@ fn select_6() {
             .from(Glyph::Table)
             .group_by_columns([Glyph::Aspect])
             .and_having(Expr::col(Glyph::Aspect).gt(2))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect" HAVING "aspect" > 2"#
     );
 }
@@ -96,7 +96,7 @@ fn select_7() {
             .columns([Glyph::Aspect])
             .from(Glyph::Table)
             .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2"#
     );
 }
@@ -112,7 +112,7 @@ fn select_8() {
                 Font::Table,
                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id""#
     );
 }
@@ -132,7 +132,7 @@ fn select_9() {
                 Glyph::Table,
                 Expr::col((Char::Table, Char::Character)).equals((Glyph::Table, Glyph::Image))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" INNER JOIN "glyph" ON "character"."character" = "glyph"."image""#
     );
 }
@@ -149,7 +149,7 @@ fn select_10() {
                     .equals((Font::Table, Font::Id))
                     .and(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     );
 }
@@ -163,7 +163,7 @@ fn select_11() {
             .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
             .order_by(Glyph::Image, Order::Desc)
             .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2 ORDER BY "image" DESC, "glyph"."aspect" ASC"#
     );
 }
@@ -176,7 +176,7 @@ fn select_12() {
             .from(Glyph::Table)
             .and_where(Expr::expr(Expr::col(Glyph::Aspect).if_null(0)).gt(2))
             .order_by_columns([(Glyph::Id, Order::Asc), (Glyph::Aspect, Order::Desc)])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2 ORDER BY "id" ASC, "aspect" DESC"#
     );
 }
@@ -192,7 +192,7 @@ fn select_13() {
                 ((Glyph::Table, Glyph::Id), Order::Asc),
                 ((Glyph::Table, Glyph::Aspect), Order::Desc),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM "glyph" WHERE COALESCE("aspect", 0) > 2 ORDER BY "glyph"."id" ASC, "glyph"."aspect" DESC"#
     );
 }
@@ -206,7 +206,7 @@ fn select_14() {
             .from(Glyph::Table)
             .group_by_columns([(Glyph::Table, Glyph::Id), (Glyph::Table, Glyph::Aspect)])
             .and_having(Expr::col(Glyph::Aspect).gt(2))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id", "aspect", MAX("image") FROM "glyph" GROUP BY "glyph"."id", "glyph"."aspect" HAVING "aspect" > 2"#
     );
 }
@@ -218,7 +218,7 @@ fn select_15() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(Expr::col(Char::FontId).is_null())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "font_id" IS NULL"#
     );
 }
@@ -231,7 +231,7 @@ fn select_16() {
             .from(Char::Table)
             .and_where(Expr::col(Char::FontId).is_null())
             .and_where(Expr::col(Char::Character).is_not_null())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "font_id" IS NULL AND "character" IS NOT NULL"#
     );
 }
@@ -243,7 +243,7 @@ fn select_17() {
             .columns([(Glyph::Table, Glyph::Image)])
             .from(Glyph::Table)
             .and_where(Expr::col((Glyph::Table, Glyph::Aspect)).between(3, 5))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "glyph"."image" FROM "glyph" WHERE "glyph"."aspect" BETWEEN 3 AND 5"#
     );
 }
@@ -256,7 +256,7 @@ fn select_18() {
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).between(3, 5))
             .and_where(Expr::col(Glyph::Aspect).not_between(8, 10))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect" FROM "glyph" WHERE ("aspect" BETWEEN 3 AND 5) AND ("aspect" NOT BETWEEN 8 AND 10)"#
     );
 }
@@ -268,7 +268,7 @@ fn select_19() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).eq("A"))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "character" = 'A'"#
     );
 }
@@ -280,7 +280,7 @@ fn select_20() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).like("A"))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "character" LIKE 'A'"#
     );
 }
@@ -296,7 +296,7 @@ fn select_21() {
                 Expr::col(Char::Character).like("%B"),
                 Expr::col(Char::Character).like("%C%"),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "character" LIKE 'A%' OR "character" LIKE '%B' OR "character" LIKE '%C%'"#
     );
 }
@@ -323,7 +323,7 @@ fn select_22() {
                             .or(Expr::col(Char::Character).like("G"))
                     )
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE ("character" LIKE 'C' OR ("character" LIKE 'D' AND "character" LIKE 'E')) AND ("character" LIKE 'F' OR "character" LIKE 'G')"#
     );
 }
@@ -335,7 +335,7 @@ fn select_23() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where_option(None)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character""#
     );
 }
@@ -353,7 +353,7 @@ fn select_24() {
                 },
                 |_| ()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "font_id" = 5"#
     );
 }
@@ -369,7 +369,7 @@ fn select_25() {
                     .mul(2)
                     .eq(Expr::col(Char::SizeH).div(2))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "size_w" * 2 = "size_h" / 2"#
     );
 }
@@ -385,7 +385,7 @@ fn select_26() {
                     .mul(2)
                     .eq(Expr::expr(Expr::col(Char::SizeH).div(2)).sub(1))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE ("size_w" + 1) * 2 = ("size_h" / 2) - 1"#
     );
 }
@@ -399,7 +399,7 @@ fn select_27() {
             .and_where(Expr::col(Char::SizeW).eq(3))
             .and_where(Expr::col(Char::SizeH).eq(4))
             .and_where(Expr::col(Char::SizeH).eq(5))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 3 AND "size_h" = 4 AND "size_h" = 5"#
     );
 }
@@ -415,7 +415,7 @@ fn select_28() {
                 Expr::col(Char::SizeH).eq(4),
                 Expr::col(Char::SizeH).eq(5),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 3 OR "size_h" = 4 OR "size_h" = 5"#
     );
 }
@@ -432,7 +432,7 @@ fn select_30() {
                     .add(Expr::col(Char::SizeH).div(3))
                     .eq(4)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE ("size_w" * 2) + ("size_h" / 3) = 4"#
     );
 }
@@ -442,7 +442,7 @@ fn select_31() {
     assert_eq!(
         Query::select()
             .expr((1..10_i32).fold(Expr::value(0), |expr, i| { expr.add(i) }))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9"#
     );
 }
@@ -453,7 +453,7 @@ fn select_32() {
         Query::select()
             .expr_as(Expr::col(Char::Character), Alias::new("C"))
             .from(Char::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" AS "C" FROM "character""#
     );
 }
@@ -468,7 +468,7 @@ fn select_33() {
                 Expr::col(Glyph::Aspect)
                     .in_subquery(Query::select().expr(Expr::cust("3 + 2 * 2")).take())
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "image" FROM "glyph" WHERE "aspect" IN (SELECT 3 + 2 * 2)"#
     );
 }
@@ -490,7 +490,7 @@ fn select_34a() {
                     .and(Expr::col(Glyph::Aspect).lt(18)),
                 Expr::col(Glyph::Aspect).gt(32),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect""#,
             r#"HAVING "aspect" > 2 OR "aspect" < 8"#,
@@ -507,7 +507,7 @@ fn select_35() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .and_where(Expr::col(Glyph::Aspect).is_null())
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -522,7 +522,7 @@ fn select_36() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(Cond::any().add(Expr::col(Glyph::Aspect).is_null()))
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -538,7 +538,7 @@ fn select_37() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(Cond::any().add(Cond::all()).add(Cond::any()))
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(statement, r#"SELECT "id" FROM "glyph" WHERE TRUE OR FALSE"#);
     assert_eq!(values.0, vec![]);
@@ -555,7 +555,7 @@ fn select_37a() {
                 .add(Cond::any().not())
                 .not(),
         )
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -574,7 +574,7 @@ fn select_38() {
                 .add(Expr::col(Glyph::Aspect).is_null())
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -593,7 +593,7 @@ fn select_39() {
                 .add(Expr::col(Glyph::Aspect).is_null())
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -614,7 +614,7 @@ fn select_40() {
                 Expr::col(Glyph::Aspect).lt(8)
             ]
         ])
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -631,7 +631,7 @@ fn select_41() {
             .from(Glyph::Table)
             .group_by_columns([Glyph::Aspect])
             .cond_having(any![Expr::col(Glyph::Aspect).gt(2)])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect" HAVING "aspect" > 2"#
     );
 }
@@ -646,7 +646,7 @@ fn select_42() {
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -661,7 +661,7 @@ fn select_43() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(Cond::all().add_option::<SimpleExpr>(None))
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(statement, r#"SELECT "id" FROM "glyph" WHERE TRUE"#);
 }
@@ -676,7 +676,7 @@ fn select_44() {
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8))),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -695,7 +695,7 @@ fn select_45() {
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -713,7 +713,7 @@ fn select_46() {
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8))),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -732,7 +732,7 @@ fn select_47() {
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -751,7 +751,7 @@ fn select_48() {
                     .lt(Expr::tuple([Expr::value(8), Expr::value(100)])),
             ))),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -773,7 +773,7 @@ fn select_48a() {
                 .in_tuples([(8, String::from("100"))]),
             ))),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -787,7 +787,7 @@ fn select_49() {
     let statement = Query::select()
         .column(Asterisk)
         .from(Char::Table)
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
@@ -803,7 +803,7 @@ fn select_50() {
             Font::Table,
             Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
         )
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -825,7 +825,7 @@ fn select_51() {
                 Order::Asc,
                 NullOrdering::Last
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect""#,
             r#"FROM "glyph""#,
@@ -848,7 +848,7 @@ fn select_52() {
                 (Glyph::Id, Order::Asc, NullOrdering::First),
                 (Glyph::Aspect, Order::Desc, NullOrdering::Last),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect""#,
             r#"FROM "glyph""#,
@@ -875,7 +875,7 @@ fn select_53() {
                     NullOrdering::Last
                 ),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect""#,
             r#"FROM "glyph""#,
@@ -904,7 +904,7 @@ fn select_54() {
                     NullOrdering::Last
                 ),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT DISTINCT ON ("aspect") "aspect""#,
             r#"FROM "glyph""#,
@@ -923,7 +923,7 @@ fn select_55() {
         .from(Char::Table)
         .from(Font::Table)
         .and_where(Expr::col((Font::Table, Font::Id)).equals((Char::Table, Char::FontId)))
-        .to_string(QueryBuilder);
+        .to_string();
 
     assert_eq!(
         statement,
@@ -949,7 +949,7 @@ fn select_56() {
                 ]))
             )
             .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect""#,
             r#"FROM "glyph""#,
@@ -984,7 +984,7 @@ fn select_57() {
                     Value::Int(Some(3))
                 ]))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect""#,
             r#"FROM "glyph""#,
@@ -1015,7 +1015,7 @@ fn select_58() {
         .from(Alias::new("cte"))
         .to_owned();
     assert_eq!(
-        select.with(with_clause).to_string(QueryBuilder),
+        select.with(with_clause).to_string(),
         [
             r#"WITH "cte" AS"#,
             r#"(SELECT "id", "image", "aspect""#,
@@ -1041,12 +1041,12 @@ fn select_59() {
         .to_owned();
 
     assert_eq!(
-        query.to_string(QueryBuilder),
+        query.to_string(),
         r#"SELECT (CASE WHEN ("glyph"."aspect" > 0) THEN 'positive' WHEN ("glyph"."aspect" < 0) THEN 'negative' ELSE 'zero' END) AS "polarity" FROM "glyph""#
     );
 }
 
-// [spec:pgorm:req:sql.ast.build/test]
+// [spec:pgorm:req:sql.ast.build+1/test]
 // [spec:pgorm:req:sql.render.placeholders/test]
 // [spec:pgorm:req:sql.render.param-vs-inline/test]
 // [spec:pgorm:req:sql.render.custom-expr/test]
@@ -1056,12 +1056,12 @@ fn select_60() {
         .column(Character::Id)
         .from(Character::Table)
         .and_where(Expr::col(Character::FontSize).eq(3))
-        .build(QueryBuilder);
+        .build();
 
     let (statement, values) = Query::select()
         .expr(Expr::cust_with_values(&cust_query[7..], cust_values.0))
         .limit(5)
-        .build(QueryBuilder);
+        .build();
 
     assert_eq!(
         statement,
@@ -1078,7 +1078,7 @@ fn select_61() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).like(LikeExpr::new("A").escape('\\')))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" LIKE $1 ESCAPE E'\\'"#
                 .to_owned(),
@@ -1102,7 +1102,7 @@ fn select_62() {
         .from(Alias::new("cte"))
         .to_owned();
     assert_eq!(
-        select.with(with_clause).to_string(QueryBuilder),
+        select.with(with_clause).to_string(),
         [
             r#"WITH "cte" AS"#,
             r#"(SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x")"#,
@@ -1127,7 +1127,7 @@ fn insert_2() {
                 "04108048005887010020060000204E0180400400".into(),
                 3.1415.into(),
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("image", "aspect") VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#
     );
 }
@@ -1144,7 +1144,7 @@ fn insert_3() {
                 3.1415.into(),
             ])
             .values_panic([Value::String(None).into(), 2.1345.into()])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("image", "aspect") VALUES ('04108048005887010020060000204E0180400400', 3.1415), (NULL, 2.1345)"#
     );
 }
@@ -1160,7 +1160,7 @@ fn insert_4() {
                 .unwrap()
                 .naive_utc()
                 .into()])
-            .to_string(QueryBuilder),
+            .to_string(),
         "INSERT INTO \"glyph\" (\"image\") VALUES ('1970-01-01 00:00:00')"
     );
 }
@@ -1173,7 +1173,7 @@ fn insert_5() {
             .into_table(Glyph::Table)
             .columns([Glyph::Image])
             .values_panic([uuid::Uuid::nil().into()])
-            .to_string(QueryBuilder),
+            .to_string(),
         "INSERT INTO \"glyph\" (\"image\") VALUES ('00000000-0000-0000-0000-000000000000')"
     );
 }
@@ -1203,7 +1203,7 @@ fn insert_from_select() {
             )
             .unwrap()
             .to_owned()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("aspect", "image") SELECT "aspect", "image" FROM "glyph" WHERE "image" LIKE '%'"#
     );
 }
@@ -1230,7 +1230,7 @@ fn insert_6() -> error::Result<()> {
         .into_table(Glyph::Table)
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .select_from(select)?;
-    let sql = insert.with(with_clause).to_string(QueryBuilder);
+    let sql = insert.with(with_clause).to_string();
     assert_eq!(
         sql.as_str(),
         [
@@ -1247,7 +1247,7 @@ fn insert_7() {
         Query::insert()
             .into_table(Glyph::Table)
             .or_default_values()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" VALUES (DEFAULT)"#
     );
 }
@@ -1259,7 +1259,7 @@ fn insert_8() {
             .into_table(Glyph::Table)
             .or_default_values()
             .returning_col(Glyph::Id)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" VALUES (DEFAULT) RETURNING "id""#
     );
 }
@@ -1280,7 +1280,7 @@ fn insert_10() {
                 ]
                 .into()
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("aspect", "tokens") VALUES (3.1415, ARRAY ['Token1','Token2','Token3'])"#
     );
 }
@@ -1299,7 +1299,7 @@ fn insert_on_conflict_1() {
                 3.1415.into(),
             ])
             .on_conflict(OnConflict::column(Glyph::Id).update_column(Glyph::Aspect))
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1326,7 +1326,7 @@ fn insert_on_conflict_2() {
                     .update_column(Glyph::Aspect)
                     .update_columns([Glyph::Image])
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1356,7 +1356,7 @@ fn insert_on_conflict_3() {
                     )
                     .values([(Glyph::Image, 3.1415.into())])
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1382,7 +1382,7 @@ fn insert_on_conflict_4() {
                     .and_column(Glyph::Aspect)
                     .value(Glyph::Image, Expr::val(1).add(2))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1412,7 +1412,7 @@ fn insert_on_conflict_5() {
                     )
                     .update_column(Glyph::Image)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1439,7 +1439,7 @@ fn insert_on_conflict_6() {
                     .update_column(Glyph::Aspect)
                     .value(Glyph::Image, Expr::val(1).add(2))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1461,7 +1461,7 @@ fn insert_on_conflict_7() {
                 3.1415.into(),
             ])
             .on_conflict(OnConflict::expr(Expr::col(Glyph::Id)).update_column(Glyph::Aspect))
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1487,7 +1487,7 @@ fn insert_on_conflict_8() {
                     .and_exprs([Expr::col(Glyph::Aspect)])
                     .update_column(Glyph::Aspect)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1513,7 +1513,7 @@ fn insert_on_conflict_9() {
                     .and_expr(Func::lower(Expr::col(Glyph::Tokens)))
                     .update_column(Glyph::Aspect)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('04108048005887010020060000204E0180400400', 3.1415)"#,
@@ -1537,7 +1537,7 @@ fn insert_on_conflict_do_nothing() {
                     .and_column(Glyph::Aspect)
                     .do_nothing()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('abcd', 3.1415)"#,
@@ -1558,7 +1558,7 @@ fn insert_on_conflict_bare_do_nothing() {
             .columns([Glyph::Aspect, Glyph::Image])
             .values_panic(["abcd".into(), 3.1415.into()])
             .on_conflict(OnConflict::do_nothing())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('abcd', 3.1415)"#,
@@ -1583,7 +1583,7 @@ fn insert_on_conflict_both_filters() {
                     .update_column(Glyph::Aspect)
                     .and_where(Expr::col(Glyph::Image).gt(0))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"INSERT INTO "glyph" ("aspect") VALUES (1)"#,
             r#"ON CONFLICT ("id") WHERE "aspect" IS NULL"#,
@@ -1607,7 +1607,7 @@ fn insert_returning_all_columns() {
                 3.1415.into(),
             ])
             .returning(Query::returning().all())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("image", "aspect") VALUES ('04108048005887010020060000204E0180400400', 3.1415) RETURNING *"#
     );
 }
@@ -1624,7 +1624,7 @@ fn insert_returning_specific_columns() {
                 3.1415.into(),
             ])
             .returning(Query::returning().columns([Glyph::Id, Glyph::Image]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"INSERT INTO "glyph" ("image", "aspect") VALUES ('04108048005887010020060000204E0180400400', 3.1415) RETURNING "id", "image""#
     );
 }
@@ -1644,7 +1644,7 @@ fn update_1() {
                 ),
             ])
             .and_where(Expr::col(Glyph::Id).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '24B0E11951B03B07F8300FD003983F03F0780060' WHERE "id" = 1"#
     );
 }
@@ -1660,7 +1660,7 @@ fn update_3() {
                 "24B0E11951B03B07F8300FD003983F03F0780060".into()
             )])
             .and_where(Expr::col(Glyph::Id).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "glyph" SET "aspect" = 60 * 24 * 24, "image" = '24B0E11951B03B07F8300FD003983F03F0780060' WHERE "id" = 1"#
     );
 }
@@ -1678,7 +1678,7 @@ fn update_4() {
             .and_where(Expr::col(Glyph::Id).eq(1))
             .order_by(Glyph::Id, Order::Asc)
             .limit(1)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "glyph" SET "aspect" = "aspect" + 1, "image" = '24B0E11951B03B07F8300FD003983F03F0780060' WHERE "id" = 1 ORDER BY "id" ASC LIMIT 1"#
     );
 }
@@ -1695,7 +1695,7 @@ fn update_returning_all_columns() {
             )])
             .and_where(Expr::col(Glyph::Id).eq(1))
             .returning(Query::returning().all())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "glyph" SET "aspect" = 60 * 24 * 24, "image" = '24B0E11951B03B07F8300FD003983F03F0780060' WHERE "id" = 1 RETURNING *"#
     );
 }
@@ -1712,7 +1712,7 @@ fn update_returning_specified_columns() {
             )])
             .and_where(Expr::col(Glyph::Id).eq(1))
             .returning(Query::returning().columns([Glyph::Id, Glyph::Image]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"UPDATE "glyph" SET "aspect" = 60 * 24 * 24, "image" = '24B0E11951B03B07F8300FD003983F03F0780060' WHERE "id" = 1 RETURNING "id", "image""#
     );
 }
@@ -1725,7 +1725,7 @@ fn delete_1() {
         Query::delete()
             .from_table(Glyph::Table)
             .and_where(Expr::col(Glyph::Id).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "glyph" WHERE "id" = 1"#
     );
 }
@@ -1778,7 +1778,7 @@ fn delete_returning_all_columns() {
             .from_table(Glyph::Table)
             .and_where(Expr::col(Glyph::Id).eq(1))
             .returning(Query::returning().all())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING *"#
     );
 }
@@ -1790,7 +1790,7 @@ fn delete_returning_specific_columns() {
             .from_table(Glyph::Table)
             .and_where(Expr::col(Glyph::Id).eq(1))
             .returning(Query::returning().columns([Glyph::Id, Glyph::Image]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING "id", "image""#
     );
 }
@@ -1802,19 +1802,19 @@ fn delete_returning_specific_exprs() {
             .from_table(Glyph::Table)
             .and_where(Expr::col(Glyph::Id).eq(1))
             .returning(Query::returning().exprs([Expr::col(Glyph::Id), Expr::col(Glyph::Image)]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DELETE FROM "glyph" WHERE "id" = 1 RETURNING "id", "image""#
     );
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+1/test]
+// [spec:pgorm:def:sql.render.operators+2/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::Similarity, Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" % 'serif' FROM "font""#
     );
 }
@@ -1825,7 +1825,7 @@ fn select_pgtrgm_word_similarity() {
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::WordSimilarity, Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" <% 'serif' FROM "font""#
     );
 }
@@ -1836,7 +1836,7 @@ fn select_pgtrgm_strict_word_similarity() {
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::StrictWordSimilarity, Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" <<% 'serif' FROM "font""#
     );
 }
@@ -1847,7 +1847,7 @@ fn select_pgtrgm_similarity_distance() {
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::SimilarityDistance, Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" <-> 'serif' FROM "font""#
     );
 }
@@ -1860,7 +1860,7 @@ fn select_pgtrgm_word_similarity_distance() {
                 Expr::col(Font::Name).binary(BinOper::WordSimilarityDistance, Expr::value("serif"))
             )
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" <<-> 'serif' FROM "font""#
     );
 }
@@ -1874,7 +1874,7 @@ fn select_pgtrgm_strict_word_similarity_distance() {
                     .binary(BinOper::StrictWordSimilarityDistance, Expr::value("serif"))
             )
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" <<<-> 'serif' FROM "font""#
     );
 }
@@ -1885,14 +1885,14 @@ fn select_custom_operator() {
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::Custom("~*"), Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" ~* 'serif' FROM "font""#
     );
     assert_eq!(
         Query::select()
             .expr(Expr::col(Font::Name).binary(BinOper::Custom("~"), Expr::value("serif")))
             .from(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "name" ~ 'serif' FROM "font""#
     );
 }
@@ -1916,7 +1916,7 @@ fn union_1() {
                     .order_by((Font::Table, Font::Id), Order::Asc)
                     .take()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "character" FROM "character" UNION (SELECT "character" FROM "character""#,
             r#"LEFT JOIN "font" ON "character"."font_id" = "font"."id" ORDER BY "font"."id" ASC)"#
@@ -1945,7 +1945,7 @@ fn sub_query_with_fn() {
         .to_owned();
 
     assert_eq!(
-        select.to_string(QueryBuilder),
+        select.to_string(),
         r#"SELECT ARRAY((SELECT * FROM "character"))"#
     );
 }
@@ -1957,7 +1957,7 @@ fn select_array_contains_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::Contains, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" @> $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -1972,7 +1972,7 @@ fn select_array_contained_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::Contained, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" <@ $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -1987,7 +1987,7 @@ fn select_array_overlap_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::Overlap, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" && $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -2003,7 +2003,7 @@ fn get_json_field_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::GetJsonField, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" -> $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -2018,7 +2018,7 @@ fn cast_json_field_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::CastJsonField, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" ->> $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -2033,7 +2033,7 @@ fn regex_bin_oper() {
             .column(Char::Character)
             .from(Char::Table)
             .and_where(Expr::col(Char::Character).binary(BinOper::Regex, Expr::val("test")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" ~ $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -2050,7 +2050,7 @@ fn regex_case_insensitive_bin_oper() {
             .and_where(
                 Expr::col(Char::Character).binary(BinOper::RegexCaseInsensitive, Expr::val("test"))
             )
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "character" FROM "character" WHERE "character" ~* $1"#.to_owned(),
             Values(vec!["test".into()])
@@ -2074,7 +2074,7 @@ fn test_issue_674_nested_logical() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(t_or_t_or_f_and_t)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE (TRUE OR TRUE OR FALSE) AND TRUE"#
     );
 }
@@ -2095,7 +2095,7 @@ fn test_issue_674_nested_comparison() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(t_smaller_than_t_smaller_than_f)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE (100 < 0) < 1"#
     );
 }
@@ -2115,7 +2115,7 @@ fn test_issue_674_and_inside_not() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(not_f_and_t)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE NOT (FALSE AND TRUE)"#
     );
 }
@@ -2130,7 +2130,7 @@ fn test_issue_674_nested_logical_panic() {
             .columns([Char::Character])
             .from(Char::Table)
             .and_where(e)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE TRUE AND (TRUE AND TRUE AND TRUE)"#
     );
 }
@@ -2144,7 +2144,7 @@ fn test_pgvector_select() {
             .and_where(
                 Expr::col(Char::Character).eq(Expr::val(pgvector::Vector::from(vec![1.0, 2.0])))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "character" FROM "character" WHERE "character" = '[1,2]'"#
     );
 }
@@ -2155,7 +2155,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
         Query::select()
             .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT CAST($1::int8 AS BIT(8))"#.to_owned(),
             Values(vec![8i64.into()])
@@ -2165,7 +2165,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
         Query::select()
             .expr(Expr::val(vec!["a".to_owned()]).cast_as(Alias::new("tea[]")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT CAST($1::text[] AS tea[])"#.to_owned(),
             Values(vec![vec!["a".to_owned()].into()])
@@ -2175,7 +2175,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
         Query::select()
             .expr(Expr::val(json!({ "a": 1 })).cast_as(Alias::new("jsonb")))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT CAST($1 AS jsonb)"#.to_owned(),
             Values(vec![json!({ "a": 1 }).into()])
@@ -2189,14 +2189,14 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     assert_eq!(
         Query::select()
             .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT CAST(8 AS BIT(8))"#
     );
 
     assert_eq!(
         Query::select()
             .expr(Expr::col(Char::SizeW).cast_as(Alias::new("text")))
-            .build(QueryBuilder)
+            .build()
             .0,
         r#"SELECT CAST("size_w" AS text)"#
     );
@@ -2212,7 +2212,7 @@ fn keywords_1() {
             .expr(Expr::current_timestamp())
             .expr(Expr::custom_keyword(Alias::new("DEFAULT")))
             .expr(Keyword::Null)
-            .to_string(QueryBuilder),
+            .to_string(),
         "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DEFAULT, NULL"
     );
 }
@@ -2226,7 +2226,7 @@ fn keywords_2() {
             .expr_as(Expr::col(Glyph::Id), Alias::new("an alias"))
             .expr_as(Expr::col(Glyph::Aspect), Alias::new("ratio"))
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" AS "an alias", "aspect" AS "ratio" FROM "glyph""#
     );
 }
@@ -2239,7 +2239,7 @@ fn condition_holder_1() {
         Query::select()
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph""#
     );
 
@@ -2248,7 +2248,7 @@ fn condition_holder_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#
     );
 }
@@ -2265,7 +2265,7 @@ fn condition_holder_2() {
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).eq(1))
             .and_where(Expr::col(Glyph::Aspect).eq(2))
-            .to_string(QueryBuilder),
+            .to_string(),
         expected
     );
 
@@ -2275,7 +2275,7 @@ fn condition_holder_2() {
             .from(Glyph::Table)
             .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
             .and_where(Expr::col(Glyph::Aspect).eq(2))
-            .to_string(QueryBuilder),
+            .to_string(),
         expected
     );
 
@@ -2285,7 +2285,7 @@ fn condition_holder_2() {
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).eq(1))
             .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)))
-            .to_string(QueryBuilder),
+            .to_string(),
         expected
     );
 }
@@ -2305,7 +2305,7 @@ fn condition_holder_3a() {
                 Expr::col(Glyph::Aspect).eq(3),
                 Expr::col(Glyph::Aspect).eq(5)
             ])
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"SELECT "aspect" FROM "glyph" GROUP BY "aspect""#,
             r#"HAVING "aspect" > 1 AND "aspect" < 9"#,
@@ -2329,7 +2329,7 @@ fn condition_holder_4() {
                     .add(Expr::col(Glyph::Aspect).eq(2))
             )
             .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND "aspect" = 2 AND "aspect" = 3"#
     );
 }
@@ -2350,7 +2350,7 @@ fn condition_holder_5() {
                     .add(Expr::col(Glyph::Aspect).eq(2))
                     .add(Expr::col(Glyph::Aspect).eq(3))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND ("aspect" = 2 OR "aspect" = 3)"#
     );
 
@@ -2365,7 +2365,7 @@ fn condition_holder_5() {
                     .add(Expr::col(Glyph::Aspect).eq(2))
             )
             .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE ("aspect" = 1 OR "aspect" = 2) AND "aspect" = 3"#
     );
 }
@@ -2392,7 +2392,7 @@ fn with_clause_renders_each_of_its_ctes() {
                     .from(Alias::new("one"))
                     .take(),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"WITH "one" AS (SELECT "id" FROM "glyph") ,"#,
             r#""two" AS (SELECT "id" FROM "glyph")"#,
@@ -2422,7 +2422,7 @@ fn from_select_names_the_cte_after_its_table() {
                     .from(Alias::new("cte_glyph"))
                     .take(),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"WITH "cte_glyph" ("id", "aspect") AS (SELECT "id", "aspect" FROM "glyph")"#,
             r#"SELECT "id" FROM "cte_glyph""#,
@@ -2448,7 +2448,7 @@ fn recursive_with_clause_renders_its_single_cte() {
             .from(Alias::new("cte"))
             .take()
             .with(RecursiveWithClause::new(recursive_cte()))
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"WITH RECURSIVE "cte" ("id", "depth") AS"#,
             r#"(SELECT "id", 1 FROM "glyph""#,
@@ -2483,7 +2483,7 @@ fn recursive_with_clause_renders_search_and_cycle() {
             .from(Alias::new("cte"))
             .take()
             .with(with_clause)
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"WITH RECURSIVE "cte" ("id", "depth") AS"#,
             r#"(SELECT "id", 1 FROM "glyph""#,
@@ -2528,7 +2528,7 @@ fn empty_in_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_in(Vec::<i32>::new()))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "id" FROM "glyph" WHERE $1 = $2"#.to_owned(),
             Values(vec!["a".into(), "b".into()])
@@ -2540,7 +2540,7 @@ fn empty_in_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_in(Vec::<i32>::new()))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE 'a' = 'b'"#
     );
 }
@@ -2554,7 +2554,7 @@ fn empty_in_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_not_in(Vec::<i32>::new()))
-            .build(QueryBuilder),
+            .build(),
         (
             r#"SELECT "id" FROM "glyph" WHERE $1 = $2"#.to_owned(),
             Values(vec!["a".into(), "a".into()])
@@ -2566,7 +2566,7 @@ fn empty_in_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_not_in(Vec::<i32>::new()))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE 'a' = 'a'"#
     );
 
@@ -2576,7 +2576,7 @@ fn empty_in_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).is_not_in([1, 2]))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" NOT IN (1, 2)"#
     );
 }
@@ -2589,7 +2589,7 @@ fn locking_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .lock(lock)
-            .to_string(QueryBuilder)
+            .to_string()
     };
 
     assert_eq!(
@@ -2615,7 +2615,7 @@ fn locking_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .lock_exclusive()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" FOR UPDATE"#
     );
     assert_eq!(
@@ -2623,7 +2623,7 @@ fn locking_1() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .lock_shared()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" FOR SHARE"#
     );
 }
@@ -2641,7 +2641,7 @@ fn locking_2() {
                 LockType::Update,
                 [Glyph::Table.into_from_item(), Char::Table.into_from_item()]
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph", "character" FOR UPDATE OF "glyph", "character""#
     );
 
@@ -2650,7 +2650,7 @@ fn locking_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" FOR UPDATE NOWAIT"#
     );
 
@@ -2659,7 +2659,7 @@ fn locking_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .lock_with_tables_behavior(LockType::Share, [Glyph::Table], LockBehavior::SkipLocked)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" FOR SHARE OF "glyph" SKIP LOCKED"#
     );
 
@@ -2670,7 +2670,7 @@ fn locking_2() {
             .from(Glyph::Table)
             .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
             .lock_shared()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"SELECT "id" FROM "glyph" FOR SHARE"#
     );
 }

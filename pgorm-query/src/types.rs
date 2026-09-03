@@ -134,11 +134,11 @@ pub trait IntoColumnRef {
 ///
 /// let name = (Alias::new("public"), Glyph::Table).into_table_name();
 /// assert_eq!(
-///     Table::truncate(name.clone()).to_string(QueryBuilder),
+///     Table::truncate(name.clone()).to_string(),
 ///     r#"TRUNCATE TABLE "public"."glyph""#
 /// );
 /// assert_eq!(
-///     Query::select().column(Asterisk).from(name).to_string(QueryBuilder),
+///     Query::select().column(Asterisk).from(name).to_string(),
 ///     r#"SELECT * FROM "public"."glyph""#
 /// );
 /// ```
@@ -197,7 +197,7 @@ pub trait IntoTableName {
 ///     Query::delete()
 ///         .from_table(target)
 ///         .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
-///         .to_string(QueryBuilder),
+///         .to_string(),
 ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
 /// );
 /// ```
@@ -415,7 +415,7 @@ pub struct Alias(String);
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"SELECT * FROM "character""#
 /// );
 /// ```
@@ -433,7 +433,7 @@ pub struct Alias(String);
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"SELECT "character".* FROM "character""#
 /// );
 /// ```
@@ -837,7 +837,7 @@ mod tests {
             .column(Alias::new("hello-World_"))
             .to_owned();
 
-        assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hello-World_""#);
+        assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
     // [spec:pgorm:def:sql.types+2/test]
@@ -845,14 +845,14 @@ mod tests {
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
 
-        assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hel""lo""#);
+        assert_eq!(query.to_string(), r#"SELECT "hel""lo""#);
     }
 
     #[test]
     fn test_quoted_identifier_2() {
         let query = Query::select().column(Alias::new("hel\"\"lo")).to_owned();
 
-        assert_eq!(query.to_string(QueryBuilder), r#"SELECT "hel""""lo""#);
+        assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
     // [spec:pgorm:def:sql.types+2/test]

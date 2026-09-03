@@ -10,7 +10,7 @@ impl MigrationTrait for Migration {
             .as_enum(Tea::Enum)
             .values([Tea::EverydayTea, Tea::BreakfastTea])
             .to_owned();
-        tx.execute(&create.to_string(QueryBuilder), &[]).await?;
+        tx.execute(&create.to_string(), &[]).await?;
 
         Ok(())
     }

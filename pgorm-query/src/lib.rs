@@ -99,7 +99,7 @@
 //!         .from(Character::Table)
 //!         .and_where(Expr::col(Character::Character).like("A"))
 //!         .and_where(Expr::col(Character::Id).is_in([1, 2, 3]))
-//!         .build(QueryBuilder),
+//!         .build(),
 //!     (
 //!         r#"SELECT "character" FROM "character" WHERE "character" LIKE $1 AND "id" IN ($2, $3, $4)"#
 //!             .to_owned(),
@@ -249,7 +249,7 @@
 //!                 .like("D")
 //!                 .and(Expr::col(Character::Character).like("E"))
 //!         )
-//!         .to_string(QueryBuilder),
+//!         .to_string(),
 //!     [
 //!         r#"SELECT "character" FROM "character""#,
 //!         r#"WHERE ("font_size" + 1) * 2 = ("font_size" / 2) - 1"#,
@@ -284,7 +284,7 @@
 //!                         .add(Expr::col(Character::Character).like("A%"))
 //!                 )
 //!         )
-//!         .to_string(QueryBuilder),
+//!         .to_string(),
 //!     [
 //!         r#"SELECT "id" FROM "character""#,
 //!         r#"WHERE"#,
@@ -311,26 +311,26 @@
 //!
 //! ### Statement Builders
 //!
-//! Statements are divided into 2 categories: Query and Schema, and to be serialized into SQL
-//! with [`QueryStatementBuilder`] and [`SchemaStatementBuilder`] respectively.
+//! Statements are divided into 2 categories: Query and Schema.
 //!
-//! Schema statement has the following interface:
+//! A schema statement carries no bind parameters, so it has exactly one rendering — its
+//! [`Display`](std::fmt::Display):
 //!
 //! ```rust
 //! # use pgorm_query::*;
 //! # trait ExampleSchemaBuilder {
-//! fn build(&self, schema_builder: QueryBuilder) -> String;
+//! fn to_string(&self) -> String;
 //! # }
 //! ```
 //!
-//! Query statement has the following interfaces:
+//! A query statement is serialized through [`QueryStatementBuilder`], which offers both:
 //!
 //! ```rust
 //! # use pgorm_query::*;
 //! # trait ExampleQueryBuilder {
-//! fn build(&self, query_builder: QueryBuilder) -> (String, Values);
+//! fn build(&self) -> (String, Values);
 //!
-//! fn to_string(&self, query_builder: QueryBuilder) -> String;
+//! fn to_string(&self) -> String;
 //! # }
 //! ```
 //!
@@ -354,7 +354,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "font_size" IN (3, 4) AND "character" LIKE 'A%'"#
 //! );
 //! ```
@@ -370,7 +370,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"INSERT INTO "character" ("id", "character") VALUES (1, 'A')"#
 //! );
 //! ```
@@ -386,7 +386,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"UPDATE "character" SET "character" = 'A' WHERE "id" = 1"#
 //! );
 //! ```
@@ -405,7 +405,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"DELETE FROM "character" WHERE "id" < 1 OR "id" > 10"#
 //! );
 //! ```
@@ -422,7 +422,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"SELECT SUM("id") FROM "character""#
 //! );
 //! ```
@@ -436,7 +436,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"SELECT CAST('hello' AS MyType)"#
 //! );
 //! ```
@@ -458,7 +458,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     query.to_string(QueryBuilder),
+//!     query.to_string(),
 //!     r#"SELECT MY_FUNCTION('hello')"#
 //! );
 //! ```
@@ -473,7 +473,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     table.to_string(QueryBuilder),
+//!     table.to_string(),
 //!     r#"CREATE TABLE "character" ( "id" integer NOT NULL, "character" varchar NOT NULL )"#
 //! );
 //! ```
@@ -490,7 +490,7 @@
 //! );
 //!
 //! assert_eq!(
-//!     table.to_string(QueryBuilder),
+//!     table.to_string(),
 //!     r#"ALTER TABLE "character" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 //! );
 //! ```
@@ -502,7 +502,7 @@
 //! let table = Table::drop(Character::Table);
 //!
 //! assert_eq!(
-//!     table.to_string(QueryBuilder),
+//!     table.to_string(),
 //!     r#"DROP TABLE "character""#
 //! );
 //! ```
@@ -514,7 +514,7 @@
 //! let table = Table::rename(Character::Table, Alias::new("character_new"));
 //!
 //! assert_eq!(
-//!     table.to_string(QueryBuilder),
+//!     table.to_string(),
 //!     r#"ALTER TABLE "character" RENAME TO "character_new""#
 //! );
 //! ```
@@ -526,7 +526,7 @@
 //! let table = Table::truncate(Character::Table);
 //!
 //! assert_eq!(
-//!     table.to_string(QueryBuilder),
+//!     table.to_string(),
 //!     r#"TRUNCATE TABLE "character""#
 //! );
 //! ```
@@ -542,7 +542,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     foreign_key.to_string(QueryBuilder),
+//!     foreign_key.to_string(),
 //!     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id")"#
 //! );
 //! ```
@@ -554,7 +554,7 @@
 //! let foreign_key = ForeignKey::drop(Character::Table, "FK_character_id");
 //!
 //! assert_eq!(
-//!     foreign_key.to_string(QueryBuilder),
+//!     foreign_key.to_string(),
 //!     r#"ALTER TABLE "character" DROP CONSTRAINT "FK_character_id""#
 //! );
 //! ```
@@ -568,7 +568,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     index.to_string(QueryBuilder),
+//!     index.to_string(),
 //!     r#"CREATE INDEX "idx-character-id" ON "character" ("id")"#
 //! );
 //! ```
@@ -582,7 +582,7 @@
 //!     .to_owned();
 //!
 //! assert_eq!(
-//!     index.to_string(QueryBuilder),
+//!     index.to_string(),
 //!     r#"DROP INDEX "idx-character-id""#
 //! );
 //! ```

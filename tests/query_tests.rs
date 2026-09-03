@@ -261,7 +261,7 @@ pub async fn char_literal_round_trips_through_server() {
     for character in ['a', 'é', '—', '\''] {
         let sql = Query::select()
             .expr(Value::Char(Some(character)))
-            .to_string(QueryBuilder);
+            .to_string();
         let row = db.query_one(sql.as_str(), &[]).await.unwrap();
         let echoed: String = row.get(0);
         assert_eq!(echoed, character.to_string());
@@ -468,7 +468,7 @@ pub async fn named_window_over_a_real_query() -> Result<(), DbErr> {
         )
         .order_by(bakery::Column::Name, Order::Asc)
         .limit(4)
-        .to_string(QueryBuilder);
+        .to_string();
 
     // The window is counted over the whole partition, so LIMIT cannot reach it.
     let rows = db.query_all(&sql, &[]).await?;

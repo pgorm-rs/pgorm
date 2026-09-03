@@ -40,7 +40,7 @@ impl Returning {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "character" WHERE "id" = 1 RETURNING *"#
     /// );
     /// ```
@@ -62,7 +62,7 @@ impl Returning {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "character" WHERE "id" = 1 RETURNING "id""#
     /// );
     /// ```
@@ -87,7 +87,7 @@ impl Returning {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "character" WHERE "id" = 1 RETURNING "id", "character""#
     /// );
     /// ```
@@ -114,7 +114,7 @@ impl Returning {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "character" WHERE "id" = 1 RETURNING "id""#
     /// );
     /// ```
@@ -139,7 +139,7 @@ impl Returning {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"DELETE FROM "character" WHERE "id" = 1 RETURNING "id", "character""#
     /// );
     /// ```

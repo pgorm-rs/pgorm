@@ -1,5 +1,5 @@
 use crate::{ActiveModelTrait, ConnectionTrait, DeleteMany, DeleteOne, EntityTrait, error::*};
-use pgorm_query::{DeleteStatement, QueryBuilder};
+use pgorm_query::DeleteStatement;
 use std::future::Future;
 use tokio_postgres::types::ToSql;
 
@@ -73,7 +73,7 @@ async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, 
 where
     C: ConnectionTrait,
 {
-    let (stmt, values) = query.build(QueryBuilder);
+    let (stmt, values) = query.build();
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
         .iter()

@@ -6,8 +6,7 @@ use crate::{
     error::query_err,
 };
 use pgorm_query::{
-    Condition, DynIden, Expr, Order, QueryBuilder, SeaRc, SelectStatement, SimpleExpr, Value,
-    ValueTuple,
+    Condition, DynIden, Expr, Order, SeaRc, SelectStatement, SimpleExpr, Value, ValueTuple,
 };
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -375,7 +374,7 @@ where
         self.apply_filters()?;
         ensure_select_list(&self.query)?;
 
-        let (stmt, values) = self.query.build(QueryBuilder);
+        let (stmt, values) = self.query.build();
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()

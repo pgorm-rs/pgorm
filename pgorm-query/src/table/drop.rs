@@ -1,6 +1,4 @@
-use inherent::inherent;
-
-use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
+use crate::{QueryBuilder, types::*};
 
 /// Drop a table
 ///
@@ -22,7 +20,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// let table = Table::drop(Glyph::Table).table(Char::Table).to_owned();
 ///
 /// assert_eq!(
-///     table.to_string(QueryBuilder),
+///     table.to_string(),
 ///     r#"DROP TABLE "glyph", "character""#
 /// );
 /// ```
@@ -94,19 +92,11 @@ impl TableDropStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for TableDropStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for TableDropStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_drop_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_table_drop_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_drop_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

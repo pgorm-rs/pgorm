@@ -2,7 +2,7 @@ use crate::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityName, EntityTrait, IntoActiveModel,
     Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne, error::*,
 };
-use pgorm_query::{Query, QueryBuilder, TryFromValueTuple, UpdateStatement};
+use pgorm_query::{Query, TryFromValueTuple, UpdateStatement};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
@@ -84,7 +84,7 @@ impl Updater {
         if self.is_noop() {
             return Ok(UpdateResult::default());
         }
-        let (stmt, values) = self.query.build(QueryBuilder);
+        let (stmt, values) = self.query.build();
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -121,7 +121,7 @@ impl Updater {
             .exprs(Column::<A>::iter().map(|c| c.select_as(c.into_returning_expr())));
         self.query.returning(returning);
 
-        let (stmt, values) = self.query.build(QueryBuilder);
+        let (stmt, values) = self.query.build();
 
         let found: Model<A> = SelectorRaw::<SelectModel<Model<A>>>::from_statement(stmt, values)
             .one(db)
@@ -144,7 +144,7 @@ impl Updater {
 
         self.query.returning(returning);
 
-        let (stmt, values) = self.query.build(QueryBuilder);
+        let (stmt, values) = self.query.build();
 
         let models: Vec<E::Model> =
             SelectorRaw::<SelectModel<E::Model>>::from_statement(stmt, values)

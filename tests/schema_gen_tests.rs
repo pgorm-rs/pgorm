@@ -291,11 +291,9 @@ fn create_table_from_entity_projects_columns() {
         fks.len(),
         1,
         "only the belongs-to relation produces a constraint: {:?}",
-        fks.iter()
-            .map(|fk| fk.to_string(QueryBuilder))
-            .collect::<Vec<_>>()
+        fks.iter().map(|fk| fk.to_string()).collect::<Vec<_>>()
     );
-    let fk = fks[0].to_string(QueryBuilder);
+    let fk = fks[0].to_string();
     assert!(fk.contains("\"factory_id\""), "{fk}");
     assert!(fk.contains("\"factory\""), "{fk}");
     assert!(
@@ -323,7 +321,7 @@ fn create_table_composite_key_emits_index() {
 
     let indexes = stmt.get_indexes();
     assert_eq!(indexes.len(), 1);
-    let rendered = stmt.to_string(QueryBuilder);
+    let rendered = stmt.to_string();
     assert!(rendered.contains("\"pk-widget_tag\""), "{rendered}");
     assert!(rendered.contains("PRIMARY KEY"), "{rendered}");
     assert!(
@@ -341,7 +339,7 @@ fn create_comments_from_entity_emits_statements() {
     let rendered: Vec<String> = schema
         .create_comments_from_entity(widget::Entity)
         .iter()
-        .map(|stmt| stmt.to_string(QueryBuilder))
+        .map(|stmt| stmt.to_string())
         .collect();
     assert_eq!(
         rendered,
@@ -358,7 +356,7 @@ fn create_comments_from_entity_emits_statements() {
         table.get_comment().map(String::as_str),
         Some("one row per widget")
     );
-    let create = table.to_string(QueryBuilder);
+    let create = table.to_string();
     assert!(!create.contains("one row per widget"), "{create}");
     assert!(!create.contains("supplier of record"), "{create}");
 
@@ -366,7 +364,7 @@ fn create_comments_from_entity_emits_statements() {
     let rendered: Vec<String> = schema
         .create_comments_from_entity(quirk::Entity)
         .iter()
-        .map(|stmt| stmt.to_string(QueryBuilder))
+        .map(|stmt| stmt.to_string())
         .collect();
     assert_eq!(
         rendered,
@@ -392,7 +390,7 @@ fn create_index_from_entity_names_indexed_columns() {
     let stmts = schema.create_index_from_entity(widget::Entity);
     assert_eq!(stmts.len(), 1, "only `batch` is flagged `indexed`");
     assert_eq!(
-        stmts[0].to_string(QueryBuilder),
+        stmts[0].to_string(),
         r#"CREATE INDEX "idx-widget-batch" ON "public"."widget" ("batch")"#
     );
 
@@ -401,9 +399,7 @@ fn create_index_from_entity_names_indexed_columns() {
     let table = schema.create_table_from_entity(widget::Entity);
     assert!(flags(column(&table, "code")).unique);
     assert!(
-        !stmts
-            .iter()
-            .any(|stmt| stmt.to_string(QueryBuilder).contains("code")),
+        !stmts.iter().any(|stmt| stmt.to_string().contains("code")),
         "uniqueness is not emitted as a separate index"
     );
 
@@ -422,7 +418,7 @@ fn create_index_from_entity_uses_table_ref() {
     assert_eq!(widget::Entity.schema_name(), Some("public"));
     let qualified = schema.create_index_from_entity(widget::Entity);
     assert_eq!(
-        qualified[0].to_string(QueryBuilder),
+        qualified[0].to_string(),
         r#"CREATE INDEX "idx-widget-batch" ON "public"."widget" ("batch")"#
     );
     let table = schema.create_table_from_entity(widget::Entity);
@@ -435,7 +431,7 @@ fn create_index_from_entity_uses_table_ref() {
     assert_eq!(gadget::Entity.schema_name(), None);
     let bare = schema.create_index_from_entity(gadget::Entity);
     assert_eq!(
-        bare[0].to_string(QueryBuilder),
+        bare[0].to_string(),
         r#"CREATE INDEX "idx-gadget-batch" ON "gadget" ("batch")"#
     );
 }
@@ -446,10 +442,7 @@ fn create_enum_from_entity_emits_per_column() {
     let schema = Schema::new();
 
     let stmts = schema.create_enum_from_entity(widget::Entity);
-    let rendered: Vec<String> = stmts
-        .iter()
-        .map(|stmt| stmt.to_string(QueryBuilder))
-        .collect();
+    let rendered: Vec<String> = stmts.iter().map(|stmt| stmt.to_string()).collect();
     assert_eq!(
         rendered,
         vec![
@@ -474,7 +467,7 @@ fn create_enum_from_active_enum_uses_db_type() {
         schema
             .create_enum_from_active_enum::<widget::Grade>()
             .expect("Grade resolves to ColumnType::Enum")
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE TYPE "widget_grade" AS ENUM ('Gold', 'Silver', 'Bronze')"#
     );
     assert!(matches!(
@@ -510,9 +503,9 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
 
     // One CREATE TYPE per enum column: the duplicate is the caller's problem.
     let enums = schema.create_enum_from_entity(widget::Entity);
-    db.execute(&enums[0].to_string(QueryBuilder), &[]).await?;
+    db.execute(&enums[0].to_string(), &[]).await?;
     let duplicate = db
-        .execute(&enums[1].to_string(QueryBuilder), &[])
+        .execute(&enums[1].to_string(), &[])
         .await
         .expect_err("the second statement re-creates the same type");
     assert!(matches!(duplicate, DbErr::Postgres(_)));
@@ -522,10 +515,10 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         schema.create_table_from_entity(widget::Entity),
         schema.create_table_from_entity(widget_tag::Entity),
     ] {
-        db.execute(&entity_stmt.build(QueryBuilder), &[]).await?;
+        db.execute(&entity_stmt.to_string(), &[]).await?;
     }
     for index in schema.create_index_from_entity(widget::Entity) {
-        let sql = index.to_string(QueryBuilder);
+        let sql = index.to_string();
         assert!(sql.contains(r#"ON "public"."widget""#), "{sql}");
         db.execute(&sql, &[]).await?;
     }
@@ -545,7 +538,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
     );
 
     for comment in schema.create_comments_from_entity(widget::Entity) {
-        db.execute(&comment.build(QueryBuilder), &[]).await?;
+        db.execute(&comment.to_string(), &[]).await?;
     }
     let table_comment: Option<String> = db
         .query_one(
@@ -656,9 +649,7 @@ async fn entity_comments_land_in_pg_description() -> Result<(), DbErr> {
     let schema = Schema::new();
 
     db.execute(
-        &schema
-            .create_table_from_entity(quirk::Entity)
-            .build(QueryBuilder),
+        &schema.create_table_from_entity(quirk::Entity).to_string(),
         &[],
     )
     .await?;
@@ -672,7 +663,7 @@ async fn entity_comments_land_in_pg_description() -> Result<(), DbErr> {
     assert_eq!(after_create, None);
 
     for comment in schema.create_comments_from_entity(quirk::Entity) {
-        db.execute(&comment.build(QueryBuilder), &[]).await?;
+        db.execute(&comment.to_string(), &[]).await?;
     }
 
     let table_comment: Option<String> = db.query_one(TABLE_COMMENT, &[]).await?.get(0);

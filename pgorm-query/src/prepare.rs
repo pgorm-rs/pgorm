@@ -3,26 +3,26 @@
 use crate::*;
 pub use std::fmt::Write;
 
-// [spec:pgorm:def:sql.render.writer+1]
+// [spec:pgorm:def:sql.render.writer+2]
 pub trait SqlWriter: Write + ToString {
-    fn push_param(&mut self, value: Value, query_builder: &QueryBuilder);
+    fn push_param(&mut self, value: Value);
 
     /// Push a parameter that sits where Postgres would infer the placeholder's
     /// type from the surrounding expression rather than from the value being
     /// bound. Sinks that emit placeholders pin the type; sinks that render the
     /// value inline have nothing to pin and fall back to [`Self::push_param`].
     // [spec:pgorm:req:sql.render.cast-param-type]
-    fn push_param_source_typed(&mut self, value: Value, query_builder: &QueryBuilder) {
-        self.push_param(value, query_builder)
+    fn push_param_source_typed(&mut self, value: Value) {
+        self.push_param(value)
     }
 
     fn as_writer(&mut self) -> &mut dyn Write;
 }
 
-// [spec:pgorm:def:sql.render.writer+1] (inline-rendering sink for the to_string() path)
+// [spec:pgorm:def:sql.render.writer+2] (inline-rendering sink for the Display path)
 impl SqlWriter for String {
-    fn push_param(&mut self, value: Value, query_builder: &QueryBuilder) {
-        self.push_str(&query_builder.value_to_string(&value))
+    fn push_param(&mut self, value: Value) {
+        self.push_str(&QueryBuilder.value_to_string(&value))
     }
 
     fn as_writer(&mut self) -> &mut dyn Write {
@@ -71,9 +71,9 @@ impl std::fmt::Display for SqlWriterValues {
 }
 
 // [spec:pgorm:req:sql.render.placeholders] (counter increments then emits $N; value collected)
-// [spec:pgorm:def:sql.render.writer+1]
+// [spec:pgorm:def:sql.render.writer+2]
 impl SqlWriter for SqlWriterValues {
-    fn push_param(&mut self, value: Value, _: &QueryBuilder) {
+    fn push_param(&mut self, value: Value) {
         self.counter += 1;
         if self.numbered {
             let counter = self.counter;
@@ -85,9 +85,9 @@ impl SqlWriter for SqlWriterValues {
     }
 
     // [spec:pgorm:req:sql.render.cast-param-type]
-    fn push_param_source_typed(&mut self, value: Value, query_builder: &QueryBuilder) {
+    fn push_param_source_typed(&mut self, value: Value) {
         let source_type = value.source_type_name();
-        self.push_param(value, query_builder);
+        self.push_param(value);
         if let Some(source_type) = source_type {
             write!(self.string, "::{source_type}").unwrap();
         }
@@ -98,11 +98,12 @@ impl SqlWriter for SqlWriterValues {
     }
 }
 
-// [spec:pgorm:sem:sql.render.inject]
-pub fn inject_parameters<I>(sql: &str, params: I, query_builder: &QueryBuilder) -> String
+// [spec:pgorm:sem:sql.render.inject+1]
+pub fn inject_parameters<I>(sql: &str, params: I) -> String
 where
     I: IntoIterator<Item = Value>,
 {
+    let query_builder = &QueryBuilder;
     let params: Vec<Value> = params.into_iter().collect();
     let tokenizer = Tokenizer::new(sql);
     let tokens: Vec<Token> = tokenizer.iter().collect();
@@ -138,7 +139,7 @@ where
     output.into_iter().collect()
 }
 
-// [spec:pgorm:sem:sql.render.inject/test]
+// [spec:pgorm:sem:sql.render.inject+1/test]
 #[cfg(test)]
 mod tests_postgres {
     use super::*;
@@ -147,11 +148,7 @@ mod tests_postgres {
     #[test]
     fn inject_parameters_5() {
         assert_eq!(
-            inject_parameters(
-                "WHERE A = $1 AND C = $2",
-                ["B".into(), "D".into()],
-                &QueryBuilder
-            ),
+            inject_parameters("WHERE A = $1 AND C = $2", ["B".into(), "D".into()]),
             "WHERE A = 'B' AND C = 'D'"
         );
     }
@@ -159,11 +156,7 @@ mod tests_postgres {
     #[test]
     fn inject_parameters_6() {
         assert_eq!(
-            inject_parameters(
-                "WHERE A = $2 AND C = $1",
-                ["B".into(), "D".into()],
-                &QueryBuilder
-            ),
+            inject_parameters("WHERE A = $2 AND C = $1", ["B".into(), "D".into()]),
             "WHERE A = 'D' AND C = 'B'"
         );
     }
@@ -171,7 +164,7 @@ mod tests_postgres {
     #[test]
     fn inject_parameters_7() {
         assert_eq!(
-            inject_parameters("WHERE A = $1", ["B'C".into()], &QueryBuilder),
+            inject_parameters("WHERE A = $1", ["B'C".into()]),
             "WHERE A = E'B\\'C'"
         );
     }

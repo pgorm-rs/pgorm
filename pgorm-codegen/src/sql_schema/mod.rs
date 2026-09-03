@@ -49,7 +49,7 @@ type Enums = BTreeMap<String, Vec<String>>;
 /// Enum types are resolved into the column types that name them, and indexes
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
-// [spec:pgorm:def:codegen.ddl]
+// [spec:pgorm:def:codegen.ddl+1]
 // [spec:pgorm:req:codegen.ddl.unsupported]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql)
@@ -62,7 +62,7 @@ pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
 /// The whole pipeline: parse, bridge, [`EntityTransformer::transform`],
 /// [`crate::EntityWriter::generate`]. Options are validated first, so an
 /// unusable option is reported before the schema is read.
-// [spec:pgorm:def:codegen.ddl]
+// [spec:pgorm:def:codegen.ddl+1]
 pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<WriterOutput, Error> {
     let context = EntityWriterContext::new(options)?;
     let writer = EntityTransformer::transform(parse_schema(sql)?)?;

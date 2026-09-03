@@ -194,7 +194,7 @@ impl RelationDef {
     ///     query::*,
     ///     tests_cfg::{cake, cake_filling},
     /// };
-    /// use pgorm_query::{Alias, QueryBuilder};
+    /// use pgorm_query::Alias;
     ///
     /// let cf = Alias::new("cf");
     ///
@@ -210,7 +210,7 @@ impl RelationDef {
     ///             cake_filling::Relation::Filling.def().from_alias(cf)
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     [
     ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
     ///         r#"LEFT JOIN "cake_filling" AS "cf" ON "cake"."id" = "cf"."cake_id""#,
@@ -237,7 +237,7 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::QueryBuilder, tests_cfg::{cake, cake_filling}};
+    /// use pgorm::{entity::*, query::*, tests_cfg::{cake, cake_filling}};
     /// use pgorm_query::{Expr, IntoCondition};
     ///
     /// assert_eq!(
@@ -254,7 +254,7 @@ impl RelationDef {
     ///                 })
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     [
     ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
     ///         r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" AND "cake_filling"."cake_id" > 10"#,
@@ -275,7 +275,7 @@ impl RelationDef {
     /// # Examples
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, pgorm_query::QueryBuilder, tests_cfg::{cake, cake_filling}};
+    /// use pgorm::{entity::*, query::*, tests_cfg::{cake, cake_filling}};
     /// use pgorm_query::{Expr, IntoCondition, ConditionType};
     ///
     /// assert_eq!(
@@ -293,7 +293,7 @@ impl RelationDef {
     ///                 })
     ///         )
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     [
     ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
     ///         r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" OR "cake_filling"."cake_id" > 10"#,
@@ -486,7 +486,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{Alias, ConditionType, FromItem, IntoIden, QueryBuilder, Table, TableName};
+/// use pgorm_query::{Alias, ConditionType, FromItem, IntoIden, Table, TableName};
 /// use pgorm::{ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
@@ -505,7 +505,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 /// let alter_table = Table::alter(TableName::Table(Alias::new("foo").into_iden()))
 ///     .add_foreign_key(&relation.into());
 /// assert_eq!(
-///     alter_table.to_string(QueryBuilder),
+///     alter_table.to_string(),
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```

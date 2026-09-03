@@ -7,7 +7,7 @@ use common::*;
 use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
 use pgorm_codegen::{Error, WriterOutput};
 use pgorm_query::extension::Type;
-use pgorm_query::{ColumnSpec, ColumnType, QueryBuilder, TableName};
+use pgorm_query::{ColumnSpec, ColumnType, TableName};
 
 const SCHEMA: &str = include_str!("sql/schema.sql");
 
@@ -39,7 +39,7 @@ fn assert_error(sql: &str, expected: &str) {
     assert_eq!(error(sql), expected);
 }
 
-// [spec:pgorm:def:codegen.ddl/test]    the whole pipeline runs from DDL text:
+// [spec:pgorm:def:codegen.ddl+1/test]    the whole pipeline runs from DDL text:
 // one entity file per CREATE TABLE, plus index, prelude and active enums
 #[test]
 fn schema_sql_generates_one_file_per_table() {
@@ -333,7 +333,7 @@ fn unsupported_types_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl/test]    a type the builder can spell but codegen
+// [spec:pgorm:def:codegen.ddl+1/test]    a type the builder can spell but codegen
 // cannot render passes the bridge and is refused by the transform gate
 #[test]
 fn types_codegen_cannot_render_reach_the_gate() {
@@ -403,7 +403,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl/test]    text the PostgreSQL grammar rejects
+// [spec:pgorm:def:codegen.ddl+1/test]    text the PostgreSQL grammar rejects
 // comes back as the parser's own message
 #[test]
 fn invalid_sql_reports_the_parser_message() {
@@ -418,7 +418,7 @@ fn invalid_sql_reports_the_parser_message() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl/test]    the bridge is the inverse of the DDL
+// [spec:pgorm:def:codegen.ddl+1/test]    the bridge is the inverse of the DDL
 // builder: statements rendered to text and parsed back generate the same
 // entities as the statements themselves
 #[test]
@@ -426,7 +426,7 @@ fn rendered_ddl_round_trips_through_the_bridge() {
     let statements = cake_schema();
     let text = statements
         .iter()
-        .map(|statement| format!("{};", statement.to_string(QueryBuilder)))
+        .map(|statement| format!("{statement};"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -454,7 +454,7 @@ fn one_spelling_one_variant_round_trips() {
     };
     let text = statements()
         .iter()
-        .map(|statement| format!("{};", statement.to_string(QueryBuilder)))
+        .map(|statement| format!("{statement};"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -483,10 +483,10 @@ fn enum_and_unique_index_round_trip() {
     let enum_type = Type::create()
         .as_enum(alias("task_state"))
         .values(vec![alias("open"), alias("done")])
-        .to_string(QueryBuilder);
+        .to_string();
     let text = statements()
         .iter()
-        .map(|statement| format!("{};", statement.to_string(QueryBuilder)))
+        .map(|statement| format!("{statement};"))
         .fold(format!("{enum_type};\n"), |mut text, statement| {
             text.push_str(&statement);
             text

@@ -1,7 +1,6 @@
 use crate::{
-    ColumnRef, DynIden, FromItem, IntoIden, QueryStatementBuilder, QueryStatementWriter,
-    SelectExpr, SelectStatement, SimpleExpr, SqlWriter, SubQueryStatement, Values,
-    {Alias, QueryBuilder},
+    ColumnRef, DynIden, FromItem, IntoIden, QueryStatementBuilder, SelectExpr, SelectStatement,
+    SimpleExpr, SqlWriter, SubQueryStatement, Values, {Alias, QueryBuilder},
 };
 use inherent::inherent;
 
@@ -285,7 +284,7 @@ impl Cycle {
 /// let query = select.with(WithClause::new(common_table_expression));
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "table") SELECT * FROM "cte""#
 /// );
 /// ```
@@ -391,7 +390,7 @@ impl WithClause {
 /// let query = select.with(with_clause);
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) CYCLE "id" SET "looped" USING "traversal_path" SELECT * FROM "cte_traversal""#
 /// );
 /// ```
@@ -493,23 +492,25 @@ impl WithQuery {
     }
 }
 
+#[inherent]
 impl QueryStatementBuilder for WithQuery {
-    fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_with_query(self, sql);
+    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
+        QueryBuilder.prepare_with_query(self, sql);
     }
 
-    fn into_sub_query_statement(self) -> SubQueryStatement {
+    pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::WithStatement(self)
     }
+
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-#[inherent]
-impl QueryStatementWriter for WithQuery {
-    pub fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_with_query(self, sql);
+// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+impl std::fmt::Display for WithQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_with_query(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String;
-    pub fn build(&self, query_builder: QueryBuilder) -> (String, Values);
-    pub fn to_string(&self, query_builder: QueryBuilder) -> String;
 }

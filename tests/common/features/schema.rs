@@ -24,10 +24,8 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
             .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
             .to_owned();
         assert_eq!(
-            enum_create_stmt.to_string(QueryBuilder),
-            schema
-                .create_enum_from_active_enum::<Tea>()?
-                .to_string(QueryBuilder)
+            enum_create_stmt.to_string(),
+            schema.create_enum_from_active_enum::<Tea>()?.to_string()
         );
         vec![enum_create_stmt]
     };

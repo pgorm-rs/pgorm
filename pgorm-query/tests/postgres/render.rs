@@ -32,23 +32,17 @@ fn the_single_backend_renders_every_statement_kind() {
     )));
 
     assert_eq!(
-        select().to_string(QueryBuilder),
+        select().to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#
     );
     assert_eq!(
-        insert.to_string(QueryBuilder),
+        insert.to_string(),
         r#"INSERT INTO "glyph" ("aspect") VALUES (1)"#
     );
+    assert_eq!(update.to_string(), r#"UPDATE "glyph" SET "aspect" = 1"#);
+    assert_eq!(delete.to_string(), r#"DELETE FROM "glyph" WHERE "id" = 1"#);
     assert_eq!(
-        update.to_string(QueryBuilder),
-        r#"UPDATE "glyph" SET "aspect" = 1"#
-    );
-    assert_eq!(
-        delete.to_string(QueryBuilder),
-        r#"DELETE FROM "glyph" WHERE "id" = 1"#
-    );
-    assert_eq!(
-        with.to_string(QueryBuilder),
+        with.to_string(),
         [
             r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = 1)"#,
             r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#,
@@ -58,15 +52,15 @@ fn the_single_backend_renders_every_statement_kind() {
 
     // DDL goes through the very same builder.
     assert_eq!(
-        Table::truncate(Glyph::Table).to_string(QueryBuilder),
+        Table::truncate(Glyph::Table).to_string(),
         r#"TRUNCATE TABLE "glyph""#
     );
 
     // And every one of them can be written into an arbitrary `SqlWriter` sink
-    // through the generic `build_collect_any_into` entry point.
+    // through the generic `build_collect_into` entry point.
     fn collect<S: QueryStatementBuilder>(statement: &S) -> String {
         let mut sql = SqlWriterValues::new("$", true);
-        statement.build_collect_any_into(&QueryBuilder, &mut sql);
+        statement.build_collect_into(&mut sql);
         let (sql, _) = sql.into_parts();
         sql
     }
@@ -99,43 +93,43 @@ fn ddl_targets_have_no_unrenderable_shape() {
         Glyph::Table.into_table_name(),
         (Alias::new("public"), Glyph::Table).into_table_name(),
     ] {
-        let sql = Table::truncate(name).to_string(QueryBuilder);
+        let sql = Table::truncate(name).to_string();
         assert!(sql.starts_with("TRUNCATE TABLE "), "{sql}");
     }
 }
 
-// [spec:pgorm:def:sql.render.writer+1/test]    `String` is the inline-rendering sink: `push_param`
+// [spec:pgorm:def:sql.render.writer+2/test]    `String` is the inline-rendering sink: `push_param`
 // appends the value as a literal, and it takes the default `push_param_source_typed`
 #[test]
 fn string_sink_renders_parameters_inline() {
     let mut sql = String::new();
     write!(sql, "SELECT ").unwrap();
-    sql.push_param(Value::Int(Some(3)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(3)));
     write!(sql, ", ").unwrap();
-    sql.push_param(Value::String(Some(Box::new("a".to_owned()))), &QueryBuilder);
+    sql.push_param(Value::String(Some(Box::new("a".to_owned()))));
     assert_eq!(sql, "SELECT 3, 'a'");
 
     // An inline literal has no wire format to disagree about, so the source-typed
     // push is the plain one.
     let mut typed = String::new();
-    typed.push_param_source_typed(Value::BigInt(Some(8)), &QueryBuilder);
+    typed.push_param_source_typed(Value::BigInt(Some(8)));
     let mut plain = String::new();
-    plain.push_param(Value::BigInt(Some(8)), &QueryBuilder);
+    plain.push_param(Value::BigInt(Some(8)));
     assert_eq!(typed, plain);
     assert_eq!(typed, "8");
 }
 
-// [spec:pgorm:def:sql.render.writer+1/test]    `SqlWriterValues` emits a placeholder and collects
+// [spec:pgorm:def:sql.render.writer+2/test]    `SqlWriterValues` emits a placeholder and collects
 // the value; `into_parts` hands back the `(String, Values)` pair
 #[test]
 fn values_sink_emits_placeholders_and_collects_values() {
     let mut sql = SqlWriterValues::new("$", true);
     write!(sql, "SELECT ").unwrap();
-    sql.push_param(Value::Int(Some(3)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(3)));
     write!(sql, ", ").unwrap();
-    sql.push_param(Value::String(Some(Box::new("a".to_owned()))), &QueryBuilder);
+    sql.push_param(Value::String(Some(Box::new("a".to_owned()))));
     write!(sql, ", ").unwrap();
-    sql.push_param_source_typed(Value::BigInt(Some(8)), &QueryBuilder);
+    sql.push_param_source_typed(Value::BigInt(Some(8)));
 
     // `Display`/`ToString` shows the SQL accumulated so far.
     assert_eq!(sql.to_string(), "SELECT $1, $2, $3::int8");
@@ -152,14 +146,14 @@ fn values_sink_emits_placeholders_and_collects_values() {
     );
 }
 
-// [spec:pgorm:def:sql.render.writer+1/test]    the sink is constructed with a placeholder string
+// [spec:pgorm:def:sql.render.writer+2/test]    the sink is constructed with a placeholder string
 // and a `numbered` flag
 #[test]
 fn values_sink_honours_its_placeholder_and_numbered_flag() {
     let mut sql = SqlWriterValues::new("?", false);
-    sql.push_param(Value::Int(Some(1)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(1)));
     write!(sql, " ").unwrap();
-    sql.push_param(Value::Int(Some(2)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(2)));
     let (rendered, values) = sql.into_parts();
     assert_eq!(rendered, "? ?");
     assert_eq!(
@@ -168,14 +162,14 @@ fn values_sink_honours_its_placeholder_and_numbered_flag() {
     );
 
     let mut sql = SqlWriterValues::new(":", true);
-    sql.push_param(Value::Int(Some(1)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(1)));
     write!(sql, " ").unwrap();
-    sql.push_param(Value::Int(Some(2)), &QueryBuilder);
+    sql.push_param(Value::Int(Some(2)));
     let (rendered, _) = sql.into_parts();
     assert_eq!(rendered, ":1 :2");
 }
 
-// [spec:pgorm:def:sql.render.writer+1/test]    both sinks are usable through `&mut dyn SqlWriter`,
+// [spec:pgorm:def:sql.render.writer+2/test]    both sinks are usable through `&mut dyn SqlWriter`,
 // which is what lets one statement render either way
 #[test]
 fn both_sinks_are_reachable_through_the_trait_object() {
@@ -186,7 +180,7 @@ fn both_sinks_are_reachable_through_the_trait_object() {
 
     let sinks: [&mut dyn SqlWriter; 2] = [&mut inline, &mut collected];
     for sink in sinks {
-        statement.build_collect_any_into(&QueryBuilder, sink);
+        statement.build_collect_into(sink);
     }
 
     assert_eq!(inline, r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#);

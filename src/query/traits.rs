@@ -21,9 +21,8 @@ pub trait QueryTrait {
     ///
     /// Values are never inlined: each one becomes a `$n` placeholder in the
     /// SQL string and an entry in [`Values`], in binding order. Use
-    /// [`as_query`](QueryTrait::as_query) with
-    /// [`to_string`](pgorm_query::QueryStatementWriter::to_string) instead
-    /// when you want a self-contained, value-inlined string to read.
+    /// [`as_query`](QueryTrait::as_query) with `to_string` instead when you
+    /// want a self-contained, value-inlined string to read.
     ///
     /// # Example
     ///
@@ -42,7 +41,7 @@ pub trait QueryTrait {
     /// assert_eq!(values, Values(vec![Value::Int(Some(3))]));
     /// ```
     fn build(&self) -> (String, Values) {
-        self.as_query().build_any(&pgorm_query::QueryBuilder)
+        self.as_query().build()
     }
 
     /// Apply an operation on the [QueryTrait::QueryStatement] if the given `Option<T>` is `Some(_)`
@@ -50,7 +49,7 @@ pub trait QueryTrait {
     /// # Example
     ///
     /// ```
-    /// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -60,7 +59,7 @@ pub trait QueryTrait {
     ///         .apply_if(Some(100), QuerySelect::limit)
     ///         .apply_if(None, QuerySelect::offset::<Option<u64>>) // no-op
     ///         .as_query()
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = 3 LIMIT 100"#
     /// );
     /// ```

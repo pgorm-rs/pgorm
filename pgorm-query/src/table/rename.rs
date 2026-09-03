@@ -1,6 +1,4 @@
-use inherent::inherent;
-
-use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
+use crate::{QueryBuilder, types::*};
 
 /// Rename a table
 ///
@@ -10,7 +8,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// ```compile_fail,E0061
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// Table::rename().to_string(QueryBuilder);
+/// Table::rename().to_string();
 /// ```
 ///
 /// # Examples
@@ -21,7 +19,7 @@ use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
 /// let table = Table::rename(Font::Table, Alias::new("font_new"));
 ///
 /// assert_eq!(
-///     table.to_string(QueryBuilder),
+///     table.to_string(),
 ///     r#"ALTER TABLE "font" RENAME TO "font_new""#
 /// );
 /// ```
@@ -49,21 +47,13 @@ impl TableRenameStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for TableRenameStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for TableRenameStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_rename_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_table_rename_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_rename_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }
 
 /// Rename a column of an existing table
@@ -78,7 +68,7 @@ impl SchemaStatementBuilder for TableRenameStatement {
 /// ```compile_fail,E0061
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// Table::rename_column().to_string(QueryBuilder);
+/// Table::rename_column().to_string();
 /// ```
 ///
 /// # Examples
@@ -93,7 +83,7 @@ impl SchemaStatementBuilder for TableRenameStatement {
 /// );
 ///
 /// assert_eq!(
-///     table.to_string(QueryBuilder),
+///     table.to_string(),
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
@@ -121,19 +111,11 @@ impl ColumnRenameStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for ColumnRenameStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for ColumnRenameStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_column_rename_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_column_rename_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_column_rename_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

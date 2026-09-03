@@ -17,7 +17,7 @@ fn create_1() {
             )
             .col(ColumnDef::new(Glyph::Aspect).double().not_null())
             .col(ColumnDef::new(Glyph::Image).text())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -43,7 +43,7 @@ fn create_2() {
             .col(ColumnDef::new(Font::Name).string().not_null())
             .col(ColumnDef::new(Font::Variant).string_len(255).not_null())
             .col(ColumnDef::new(Font::Language).string_len(255).not_null())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "font" ("#,
             r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -85,7 +85,7 @@ fn create_3() {
                     .on_delete(ForeignKeyAction::Cascade)
                     .on_update(ForeignKeyAction::Cascade)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE IF NOT EXISTS "character" ("#,
             r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -108,7 +108,7 @@ fn create_4() {
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE TABLE "glyph" ( "image" aspect )"#
     );
 }
@@ -120,7 +120,7 @@ fn create_5() {
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""image" json,"#,
@@ -141,7 +141,7 @@ fn create_6() {
                     .not_null()
                     .extra("ANYTHING I WANT TO SAY".to_owned())
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""id" integer NOT NULL ANYTHING I WANT TO SAY"#,
@@ -160,7 +160,7 @@ fn create_7() {
                     .interval(IntervalSpec::Any(None))
                     .not_null()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""aspect" interval NOT NULL"#,
@@ -179,7 +179,7 @@ fn create_8() {
                     .interval(IntervalSpec::Fields(PgInterval::YearToMonth))
                     .not_null()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""aspect" interval YEAR TO MONTH NOT NULL"#,
@@ -198,7 +198,7 @@ fn create_9() {
                     .interval(IntervalSpec::Any(Some(IntervalPrecision::P4)))
                     .not_null()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""aspect" interval(4) NOT NULL"#,
@@ -221,7 +221,7 @@ fn create_10() {
                     ))))
                     .not_null()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""aspect" interval HOUR TO SECOND(3) NOT NULL"#,
@@ -240,7 +240,7 @@ fn create_11() {
                     .timestamp_with_time_zone()
                     .not_null()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "character" ("#,
             r#""created_at" timestamp with time zone NOT NULL"#,
@@ -257,7 +257,7 @@ fn create_12() {
         Table::create(BinaryType::Table)
             .col(ColumnDef::new(BinaryType::BinaryLen).bytea())
             .col(ColumnDef::new(BinaryType::Binary).bytea())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "binary_type" ("#,
             r#""binlen" bytea,"#,
@@ -273,7 +273,7 @@ fn create_14() {
     assert_eq!(
         Table::create((Alias::new("schema"), Glyph::Table))
             .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "schema"."glyph" ("#,
             r#""image" aspect"#,
@@ -296,7 +296,7 @@ fn create_15() {
                     .name("idx-glyph-aspect-image")
                     .col(Glyph::Image)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""image" json,"#,
@@ -315,7 +315,7 @@ fn drop_1() {
         Table::drop(Glyph::Table)
             .table(Char::Table)
             .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP TABLE "glyph", "character" CASCADE"#
     );
 }
@@ -326,7 +326,7 @@ fn drop_2() {
         Table::drop((Alias::new("schema1"), Glyph::Table))
             .table((Alias::new("schema2"), Char::Table))
             .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP TABLE "schema1"."glyph", "schema2"."character" CASCADE"#
     );
 }
@@ -334,7 +334,7 @@ fn drop_2() {
 #[test]
 fn truncate_1() {
     assert_eq!(
-        Table::truncate(Font::Table).to_string(QueryBuilder),
+        Table::truncate(Font::Table).to_string(),
         r#"TRUNCATE TABLE "font""#
     );
 }
@@ -342,7 +342,7 @@ fn truncate_1() {
 #[test]
 fn truncate_2() {
     assert_eq!(
-        Table::truncate((Alias::new("schema"), Font::Table)).to_string(QueryBuilder),
+        Table::truncate((Alias::new("schema"), Font::Table)).to_string(),
         r#"TRUNCATE TABLE "schema"."font""#
     );
 }
@@ -358,7 +358,7 @@ fn alter_1() {
                     .not_null()
                     .default(100)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
     );
 }
@@ -373,7 +373,7 @@ fn alter_2() {
                     .big_integer()
                     .default(999)
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "font""#,
             r#"ALTER COLUMN "new_col" TYPE bigint,"#,
@@ -387,7 +387,7 @@ fn alter_2() {
 fn alter_3() {
     assert_eq!(
         Table::rename_column(Font::Table, Alias::new("new_col"), Alias::new("new_column"))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
     );
 }
@@ -397,7 +397,7 @@ fn alter_4() {
     assert_eq!(
         Table::alter(Font::Table)
             .drop_column(Alias::new("new_column"))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"ALTER TABLE "font" DROP COLUMN "new_column""#
     );
 }
@@ -410,7 +410,7 @@ fn alter_5() {
             Alias::new("new_col"),
             Alias::new("new_column")
         )
-        .to_string(QueryBuilder),
+        .to_string(),
         r#"ALTER TABLE "schema"."font" RENAME COLUMN "new_col" TO "new_column""#
     );
 }
@@ -423,7 +423,7 @@ fn alter_7() {
         Table::alter(Font::Table)
             .add_column(ColumnDef::new(Alias::new("new_col")).integer())
             .drop_column(Font::Name)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"ALTER TABLE "font" ADD COLUMN "new_col" integer, DROP COLUMN "name""#
     );
 }
@@ -433,7 +433,7 @@ fn alter_8() {
     assert_eq!(
         Table::alter(Font::Table)
             .modify_column(ColumnDef::new(Font::Language).null())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "font""#,
             r#"ALTER COLUMN "language" DROP NOT NULL"#,
@@ -455,7 +455,7 @@ fn alter_9() {
                     .unique_key()
                     .primary_key()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "glyph""#,
             r#"ALTER COLUMN "aspect" TYPE integer,"#,
@@ -480,7 +480,7 @@ fn alter_10() {
                     .unique_key()
                     .primary_key()
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"ALTER TABLE "glyph""#,
             r#"ADD COLUMN "aspect" serial NOT NULL UNIQUE PRIMARY KEY"#,
@@ -493,7 +493,7 @@ fn alter_10() {
 #[test]
 fn rename_1() {
     assert_eq!(
-        Table::rename(Font::Table, Alias::new("font_new")).to_string(QueryBuilder),
+        Table::rename(Font::Table, Alias::new("font_new")).to_string(),
         r#"ALTER TABLE "font" RENAME TO "font_new""#
     );
 }
@@ -501,8 +501,7 @@ fn rename_1() {
 #[test]
 fn rename_2() {
     assert_eq!(
-        Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new"))
-            .to_string(QueryBuilder),
+        Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new")).to_string(),
         r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#
     );
 }
@@ -519,7 +518,7 @@ fn create_with_check_constraint() {
             )
             .check(Expr::col(Glyph::Id).lt(20))
             .check(Expr::col(Glyph::Id).ne(15))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE TABLE "glyph" ( "id" integer NOT NULL CHECK ("id" > 10), CHECK ("id" < 20), CHECK ("id" <> 15) )"#,
     );
 }
@@ -535,7 +534,7 @@ fn alter_with_check_constraint() {
                     .default(101)
                     .check(Expr::col(Glyph::Aspect).gt(100))
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"ALTER TABLE "glyph" ADD COLUMN "aspect" integer NOT NULL DEFAULT 101 CHECK ("aspect" > 100)"#,
     );
 }
@@ -552,7 +551,7 @@ fn create_16() {
                     .primary_key()
             )
             .col(ColumnDef::new(Glyph::Tokens).ltree())
-            .to_string(QueryBuilder),
+            .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
             r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -571,7 +570,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
             .col(ColumnDef::new(Glyph::Id).integer().not_null())
             .col(ColumnDef::new(Glyph::Image).string().not_null())
             .primary_key(index)
-            .to_string(QueryBuilder)
+            .to_string()
     };
     let expected = [
         r#"CREATE TABLE "glyph" ("#,
@@ -600,11 +599,11 @@ fn alter_take_leaves_the_source_whole() {
     let taken = alter.take();
 
     assert_eq!(
-        taken.to_string(QueryBuilder),
+        taken.to_string(),
         r#"ALTER TABLE "font" DROP COLUMN "name""#
     );
     assert_eq!(
-        alter.to_string(QueryBuilder),
+        alter.to_string(),
         r#"ALTER TABLE "font" DROP COLUMN "name""#
     );
 }

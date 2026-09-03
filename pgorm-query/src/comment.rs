@@ -10,13 +10,11 @@
 //! - Table comment, see [`Comment::on_table`]
 //! - Column comment, see [`Comment::on_column`]
 
-use inherent::inherent;
-
-use crate::{DynIden, IntoIden, IntoTableName, QueryBuilder, SchemaStatementBuilder, TableName};
+use crate::{DynIden, IntoIden, IntoTableName, QueryBuilder, TableName};
 
 /// Helper for constructing any comment statement
-// [spec:pgorm:req:sql.ddl+4]
-// [spec:pgorm:req:sql.ddl.comment+1]
+// [spec:pgorm:req:sql.ddl+5]
+// [spec:pgorm:req:sql.ddl.comment+2]
 #[derive(Debug)]
 pub struct Comment;
 
@@ -37,12 +35,12 @@ pub enum CommentTarget {
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// assert_eq!(
-///     Comment::on_table(Char::Table, "one row per character").to_string(QueryBuilder),
+///     Comment::on_table(Char::Table, "one row per character").to_string(),
 ///     r#"COMMENT ON TABLE "character" IS 'one row per character'"#
 /// );
 ///
 /// assert_eq!(
-///     Comment::on_column(Char::Table, Char::FontSize, "in points").to_string(QueryBuilder),
+///     Comment::on_column(Char::Table, Char::FontSize, "in points").to_string(),
 ///     r#"COMMENT ON COLUMN "character"."font_size" IS 'in points'"#
 /// );
 /// ```
@@ -55,11 +53,11 @@ pub enum CommentTarget {
 ///
 /// assert_eq!(
 ///     Comment::on_table((Alias::new("public"), Char::Table), "it's a table")
-///         .to_string(QueryBuilder),
+///         .to_string(),
 ///     r#"COMMENT ON TABLE "public"."character" IS 'it''s a table'"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.comment+1]
+// [spec:pgorm:req:sql.ddl.comment+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommentStatement {
     pub(crate) target: CommentTarget,
@@ -105,20 +103,11 @@ impl CommentStatement {
     }
 }
 
-// [spec:pgorm:req:sql.ddl+4]
-#[inherent]
-impl SchemaStatementBuilder for CommentStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for CommentStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(128);
-        schema_builder.prepare_comment_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_comment_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(128);
-        schema_builder.prepare_comment_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

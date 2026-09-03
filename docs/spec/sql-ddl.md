@@ -10,25 +10,33 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+4]
+> [spec:pgorm:req:sql.ddl+5]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
-> `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`). Table,
-> index, foreign-key and comment statements
-> implement `SchemaStatementBuilder` (`build`, `build_any`, `to_string`), all
-> of which delegate to the corresponding `prepare_*` method on the single
-> Postgres `QueryBuilder`; type and extension statements provide equivalent
-> `build_ref`/`build_collect`/`to_string` inherent methods. Every identifier a
+> `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`).
+>
+> A DDL statement always renders into a plain `String` sink and so never
+> carries bind parameters: it has exactly one rendering, and that rendering is
+> its `Display`. Table, index, foreign-key, comment, type and extension
+> statements therefore expose `to_string()` and nothing else, delegating to the
+> corresponding `prepare_*` method on the single Postgres `QueryBuilder`. The
+> `SchemaStatementBuilder` trait and its `build`/`build_any`/`to_string`
+> triplication are gone, as are the `build_ref`/`build_collect_ref` inherent
+> methods on type and extension statements; those two keep a
+> `build_collect(sink)` for callers rendering into a sink they own. No
+> rendering method takes a `QueryBuilder` argument — the builder is a stateless
+> unit struct, so passing one carried no information.
+>
+> Every identifier a
 > DDL statement renders — table, column and type names, and index, constraint
 > and foreign-key names alike — MUST go through `Iden::prepare` and so render
 > double-quoted (quote character `"`, embedded quotes doubled); no identifier
 > is interpolated raw between quote characters. Index and constraint names are
 > held as `DynIden` and accepted as `IntoIden`, so a `&str` or `String` name
 > escapes through `Alias` like any other identifier. `TableStatement` is an
-> enum wrapper carrying its own
-> `build`/`build_any`/`to_string` dispatch methods; `IndexStatement`,
+> enum wrapper whose `Display` dispatches to the variant's own; `IndexStatement`,
 > `ForeignKeyStatement` and `SchemaStatement` are plain wrapper enums whose
 > variants render through the same builders.
 
@@ -197,7 +205,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Comments
 
-> [spec:pgorm:req:sql.ddl.comment+1]
+> [spec:pgorm:req:sql.ddl.comment+2]
 > A comment is a statement of its own on Postgres, not a clause of `CREATE
 > TABLE`, so `CommentStatement` is built separately from the DDL creating the
 > object it describes. `Comment::on_table(table, text)` and
@@ -217,7 +225,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > doubled and nothing else altered — backslashes are literal, so no `E''`
 > prefix is used and the escaping of
 > `[spec:pgorm:req:sql.render.string-escape]` does not apply here. The text is
-> never a bind parameter (`SchemaStatementBuilder` yields SQL alone), so this
+> never a bind parameter (a DDL statement yields SQL alone), so this
 > quoting is the whole injection boundary for comment text.
 
 ## Indexes

@@ -5,7 +5,7 @@ use crate::{
     TryGetableMany, error::*,
 };
 use futures::{Stream, StreamExt};
-use pgorm_query::{QueryBuilder, SelectStatement, Value, Values};
+use pgorm_query::{SelectStatement, Value, Values};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::{hash::Hash, marker::PhantomData};
@@ -704,7 +704,7 @@ where
 
     fn into_selector_raw(self) -> Result<SelectorRaw<S>, DbErr> {
         ensure_select_list(&self.query)?;
-        let (stmt, values) = self.query.build(QueryBuilder);
+        let (stmt, values) = self.query.build();
 
         Ok(SelectorRaw {
             stmt,
@@ -1119,7 +1119,7 @@ where
 mod tests {
     use pgorm::tests_cfg::*;
     use pgorm::{EntityTrait, QueryTrait};
-    use pgorm_query::QueryBuilder;
+
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -1128,7 +1128,7 @@ mod tests {
             Cake::find()
                 .find_also_related(Fruit)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -1145,7 +1145,7 @@ mod tests {
             Cake::find()
                 .find_with_related(Fruit)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -1163,7 +1163,7 @@ mod tests {
             Cake::find()
                 .find_also_linked(entity_linked::CakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
@@ -1182,7 +1182,7 @@ mod tests {
             Cake::find()
                 .find_with_linked(entity_linked::CakeToFillingVendor)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,

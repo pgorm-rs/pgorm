@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use tracing::info;
 
 use super::{MigrationTrait, seaql_migrations};
-use pgorm::pgorm_query::{ColumnDef, IntoIden, Order, Query, QueryBuilder, SelectStatement, Table};
+use pgorm::pgorm_query::{ColumnDef, IntoIden, Order, Query, SelectStatement, Table};
 use pgorm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,
     DynIden, EntityTrait, FromQueryResult, Iterable, TransactionTrait,
@@ -83,7 +83,7 @@ pub trait MigratorTrait: Send {
             .columns(seaql_migrations::Column::iter().map(IntoIden::into_iden))
             .order_by(seaql_migrations::Column::Version, Order::Asc)
             .to_owned();
-        let (stmt, values) = stmt.build(QueryBuilder);
+        let (stmt, values) = stmt.build();
         seaql_migrations::Model::find_by_statement(stmt, values.0)
             .all(db)
             .await
@@ -165,7 +165,7 @@ pub trait MigratorTrait: Send {
                     .not_null(),
             )
             .to_owned();
-        db.execute(&stmt.build(QueryBuilder), &[]).await?;
+        db.execute(&stmt.to_string(), &[]).await?;
         tracing::debug!("Installed");
         Ok(())
     }

@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
             .col(ColumnDef::new(Post::Title).string().not_null())
             .col(ColumnDef::new(Post::Text).string().not_null())
             .to_owned();
-        tx.execute(&table.build(QueryBuilder), &[]).await?;
+        tx.execute(&table.build(), &[]).await?;
 
         Ok(())
     }

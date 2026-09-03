@@ -1,6 +1,4 @@
-use inherent::inherent;
-
-use crate::{QueryBuilder, SchemaStatementBuilder, types::*};
+use crate::{QueryBuilder, types::*};
 
 use super::common::*;
 
@@ -29,7 +27,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect")"#
 /// );
 /// ```
@@ -43,7 +41,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE INDEX IF NOT EXISTS "idx-glyph-aspect" ON "glyph" ("aspect")"#
 /// );
 /// ```
@@ -56,7 +54,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (128))"#
 /// );
 /// ```
@@ -69,7 +67,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" DESC)"#
 /// );
 /// ```
@@ -84,7 +82,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE UNIQUE INDEX "idx-glyph-aspect" ON "glyph" ("image" ASC, "aspect" DESC)"#
 /// );
 /// ```
@@ -97,7 +95,7 @@ use super::common::*;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     index.to_string(QueryBuilder),
+///     index.to_string(),
 ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
 /// );
 /// ```
@@ -277,19 +275,11 @@ impl IndexCreateStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for IndexCreateStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for IndexCreateStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_index_create_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_index_create_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_index_create_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

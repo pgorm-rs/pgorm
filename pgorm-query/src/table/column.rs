@@ -313,7 +313,7 @@ impl ColumnDef {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"CREATE TABLE "character" ("#,
     ///         r#""font_id" integer DEFAULT 12,"#,
@@ -449,7 +449,7 @@ impl ColumnDef {
     ///                 ))))
     ///                 .not_null()
     ///         )
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     [
     ///         r#"CREATE TABLE "glyph" ("#,
     ///         r#""I1" interval NOT NULL,"#,
@@ -610,7 +610,7 @@ impl ColumnDef {
     ///                 .primary_key()
     ///         )
     ///         .col(ColumnDef::new(Glyph::Tokens).ltree())
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     [
     ///         r#"CREATE TABLE "glyph" ("#,
     ///         r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -637,7 +637,7 @@ impl ColumnDef {
     ///                 .not_null()
     ///                 .check(Expr::col(Glyph::Id).gt(10))
     ///         )
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"CREATE TABLE "glyph" ( "id" integer NOT NULL CHECK ("id" > 10) )"#,
     /// );
     /// ```
@@ -680,7 +680,7 @@ impl ColumnDef {
     ///     )
     ///     .to_owned();
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"CREATE TABLE "character" ("#,
     ///         r#""id" uuid DEFAULT gen_random_uuid() PRIMARY KEY NOT NULL,"#,

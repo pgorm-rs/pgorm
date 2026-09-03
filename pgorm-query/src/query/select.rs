@@ -1,6 +1,6 @@
 use crate::{
-    AnyWithClause, FunctionCall, QueryStatementBuilder, QueryStatementWriter, SubQueryStatement,
-    WindowStatement, WithQuery,
+    AnyWithClause, FunctionCall, QueryStatementBuilder, SubQueryStatement, WindowStatement,
+    WithQuery,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -27,7 +27,7 @@ use inherent::inherent;
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
@@ -148,7 +148,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5"#
     /// );
     /// ```
@@ -181,7 +181,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5"#
     /// );
     /// ```
@@ -214,7 +214,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5"#
     /// );
     /// ```
@@ -266,7 +266,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT 42, MAX("id"), 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 FROM "character""#
     /// );
     /// ```
@@ -295,7 +295,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT MAX("id"), 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 FROM "character""#
     /// );
     /// ```
@@ -338,7 +338,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT DISTINCT ON ("character") "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
@@ -355,7 +355,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT DISTINCT ON ("character"."character") "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
@@ -373,7 +373,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
@@ -410,7 +410,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// );
     /// ```
@@ -424,7 +424,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character"."character" FROM "character""#
     /// );
     /// ```
@@ -438,7 +438,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "schema"."character"."character" FROM "character""#
     /// );
     /// ```
@@ -462,7 +462,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// );
     /// ```
@@ -480,7 +480,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character"."character", "character"."size_w", "character"."size_h" FROM "character""#
     /// );
     /// ```
@@ -509,7 +509,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" AS "C" FROM "character""#
     /// );
     /// ```
@@ -538,7 +538,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
     /// );
     /// ```
@@ -583,7 +583,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
@@ -622,7 +622,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
@@ -653,7 +653,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
@@ -689,7 +689,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "font_size" FROM "character""#
     /// );
     /// ```
@@ -703,7 +703,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "font_size" FROM "character"."glyph""#
     /// );
     /// ```
@@ -722,7 +722,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT * FROM "character", "font" WHERE "font"."id" = "character"."font_id""#
     /// );
     /// ```
@@ -746,7 +746,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x""#
     /// );
     /// ```
@@ -780,7 +780,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "char"."character" FROM "character" AS "char""#
     /// );
     /// ```
@@ -796,7 +796,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "alias"."character" FROM "font"."character" AS "alias""#
     /// );
     /// ```
@@ -827,7 +827,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "image" FROM (SELECT "image", "aspect" FROM "glyph") AS "subglyph""#
     /// );
     /// ```
@@ -851,7 +851,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT * FROM RANDOM() AS "func""#
     /// );
     /// ```
@@ -877,7 +877,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT * FROM "font""#
     /// );
     /// ```
@@ -911,7 +911,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" CROSS JOIN "font""#
     /// );
     /// ```
@@ -943,7 +943,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -962,7 +962,7 @@ impl SelectStatement {
     ///         .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -989,7 +989,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -1008,7 +1008,7 @@ impl SelectStatement {
     ///         .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -1035,7 +1035,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" INNER JOIN "font" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -1054,7 +1054,7 @@ impl SelectStatement {
     ///         .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" INNER JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -1081,7 +1081,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" FULL OUTER JOIN "font" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -1100,7 +1100,7 @@ impl SelectStatement {
     ///         .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" FULL OUTER JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -1127,7 +1127,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -1147,7 +1147,7 @@ impl SelectStatement {
     ///         .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -1187,7 +1187,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" AS "f" ON "character"."font_id" = "font"."id""#
     /// );
     ///
@@ -1205,7 +1205,7 @@ impl SelectStatement {
     ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" AS "f" ON "character"."font_id" = "font"."id" AND "character"."font_id" = "font"."id""#
     /// );
     /// ```
@@ -1251,7 +1251,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name" FROM "font" LEFT JOIN (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id""#
     /// );
     ///
@@ -1268,7 +1268,7 @@ impl SelectStatement {
     ///                 .add(Expr::col((Font::Table, Font::Id)).equals((sub_glyph.clone(), Glyph::Id)))
     ///                 .add(Expr::col((Font::Table, Font::Id)).equals((sub_glyph.clone(), Glyph::Id)))
     ///         )
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "name" FROM "font" LEFT JOIN (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id" AND "font"."id" = "sub_glyph"."id""#
     /// );
     /// ```
@@ -1313,7 +1313,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "name" FROM "font" LEFT JOIN LATERAL (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id""#
     /// );
     ///
@@ -1330,7 +1330,7 @@ impl SelectStatement {
     ///                 .add(Expr::col((Font::Table, Font::Id)).equals((sub_glyph.clone(), Glyph::Id)))
     ///                 .add(Expr::col((Font::Table, Font::Id)).equals((sub_glyph.clone(), Glyph::Id)))
     ///         )
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "name" FROM "font" LEFT JOIN LATERAL (SELECT "id" FROM "glyph") AS "sub_glyph" ON "font"."id" = "sub_glyph"."id" AND "font"."id" = "sub_glyph"."id""#
     /// );
     /// ```
@@ -1389,7 +1389,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" GROUP BY "character""#
     /// );
     /// ```
@@ -1408,7 +1408,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" GROUP BY "character"."character""#
     /// );
     /// ```
@@ -1438,7 +1438,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character", "font"."name" FROM "character" RIGHT JOIN "font" ON "character"."font_id" = "font"."id" GROUP BY "character"."character""#
     /// );
     /// ```
@@ -1463,7 +1463,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" GROUP BY "size_w", "size_h""#
     /// );
     /// ```
@@ -1501,7 +1501,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect" HAVING "glyph"."aspect" IN (3, 4) AND ("glyph"."image" LIKE 'A%' OR "glyph"."image" LIKE 'B%')"#
     /// );
     /// ```
@@ -1532,7 +1532,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect" HAVING "aspect" > 2 AND "aspect" < 8"#
     /// );
     /// ```
@@ -1554,7 +1554,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "aspect" FROM "glyph" LIMIT 10"#
     /// );
     /// ```
@@ -1584,7 +1584,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "aspect" FROM "glyph" LIMIT 10 OFFSET 10"#
     /// );
     /// ```
@@ -1614,7 +1614,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE"#
     /// );
     /// ```
@@ -1642,7 +1642,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE OF "glyph""#
     /// );
     /// ```
@@ -1674,7 +1674,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE NOWAIT"#
     /// );
     /// ```
@@ -1702,7 +1702,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE OF "glyph" NOWAIT"#
     /// );
     /// ```
@@ -1739,7 +1739,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR SHARE"#
     /// );
     /// ```
@@ -1762,7 +1762,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE"#
     /// );
     /// ```
@@ -1790,7 +1790,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4)"#
     /// );
     /// ```
@@ -1826,7 +1826,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4) UNION (SELECT "character" FROM "character" WHERE "font_id" = 3)"#
     /// );
     /// ```
@@ -1883,7 +1883,7 @@ impl SelectStatement {
     /// let query = select.with(RecursiveWithClause::new(common_table_expression));
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) SELECT * FROM "cte_traversal""#
     /// );
     /// ```
@@ -1908,7 +1908,7 @@ impl SelectStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
@@ -1923,31 +1923,25 @@ impl SelectStatement {
 
 #[inherent]
 impl QueryStatementBuilder for SelectStatement {
-    pub fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_select_statement(self, sql);
+    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
+        QueryBuilder.prepare_select_statement(self, sql);
     }
 
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::SelectStatement(self)
     }
 
-    pub fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values);
-    pub fn build_collect_any(
-        &self,
-        query_builder: &QueryBuilder,
-        sql: &mut dyn SqlWriter,
-    ) -> String;
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-#[inherent]
-impl QueryStatementWriter for SelectStatement {
-    pub fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_select_statement(self, sql);
+// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+impl std::fmt::Display for SelectStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_select_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String;
-    pub fn build(&self, query_builder: QueryBuilder) -> (String, Values);
-    pub fn to_string(&self, query_builder: QueryBuilder) -> String;
 }
 
 #[inherent]

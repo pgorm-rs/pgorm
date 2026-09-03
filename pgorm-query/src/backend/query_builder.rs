@@ -56,18 +56,6 @@ impl QueryBuilder {
         };
     }
 
-    fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
-        self.prepare_bin_oper_common(bin_oper, sql)
-    }
-
-    fn prepare_query_statement(&self, query: &SubQueryStatement, sql: &mut dyn SqlWriter) {
-        query.prepare_statement(self, sql);
-    }
-
-    fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
-        self.prepare_function_name_common(function, sql)
-    }
-
     // [spec:pgorm:req:sql.render.select-order+1] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
@@ -79,11 +67,6 @@ impl QueryBuilder {
             Some(NullOrdering::Last) => write!(sql, " NULLS LAST").unwrap(),
             Some(NullOrdering::First) => write!(sql, " NULLS FIRST").unwrap(),
         }
-    }
-
-    // [spec:pgorm:req:sql.render.param-vs-inline]
-    fn prepare_value(&self, value: &Value, sql: &mut dyn SqlWriter) {
-        sql.push_param(value.clone(), self as _);
     }
 
     // [spec:pgorm:req:sql.render.string-escape] (single-quote wrapping; E-string when a backslash is present)
@@ -121,7 +104,7 @@ impl QueryBuilder {
         insert: &InsertStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        self.prepare_insert(insert.replace, sql);
+        self.prepare_insert(sql);
 
         if let Some(table) = &insert.table {
             write!(sql, " INTO ").unwrap();
@@ -295,12 +278,12 @@ impl QueryBuilder {
     ) {
         if let Some(limit) = &select.limit {
             write!(sql, " LIMIT ").unwrap();
-            self.prepare_value(limit, sql);
+            sql.push_param(limit.clone());
         }
 
         if let Some(offset) = &select.offset {
             write!(sql, " OFFSET ").unwrap();
-            self.prepare_value(offset, sql);
+            sql.push_param(offset.clone());
         }
     }
 
@@ -359,7 +342,7 @@ impl QueryBuilder {
     fn prepare_update_limit(&self, update: &UpdateStatement, sql: &mut dyn SqlWriter) {
         if let Some(limit) = &update.limit {
             write!(sql, " LIMIT ").unwrap();
-            self.prepare_value(limit, sql);
+            sql.push_param(limit.clone());
         }
     }
 
@@ -406,7 +389,7 @@ impl QueryBuilder {
     fn prepare_delete_limit(&self, delete: &DeleteStatement, sql: &mut dyn SqlWriter) {
         if let Some(limit) = &delete.limit {
             write!(sql, " LIMIT ").unwrap();
-            self.prepare_value(limit, sql);
+            sql.push_param(limit.clone());
         }
     }
 
@@ -458,11 +441,12 @@ impl QueryBuilder {
                     self.prepare_sub_query_oper(oper, sql);
                 }
                 write!(sql, "(").unwrap();
-                self.prepare_query_statement(sel.deref(), sql);
+                sel.prepare_statement(sql);
                 write!(sql, ")").unwrap();
             }
+            // [spec:pgorm:req:sql.render.param-vs-inline]
             SimpleExpr::Value(val) => {
-                self.prepare_value(val, sql);
+                sql.push_param(val.clone());
             }
             SimpleExpr::Values(list) => {
                 write!(sql, "(").unwrap();
@@ -470,7 +454,7 @@ impl QueryBuilder {
                     if !first {
                         write!(sql, ", ").unwrap();
                     }
-                    self.prepare_value(val, sql);
+                    sql.push_param(val.clone());
                     false
                 });
                 write!(sql, ")").unwrap();
@@ -524,9 +508,9 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+1]
+    // [spec:pgorm:def:sql.render.operators+2]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
-        self.prepare_value(&like.pattern.clone().into(), sql);
+        sql.push_param(like.pattern.clone().into());
         if let Some(escape) = like.escape {
             write!(sql, " ESCAPE ").unwrap();
             self.prepare_constant(&escape.into(), sql);
@@ -686,7 +670,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+1] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+2] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -698,8 +682,8 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+1]
-    fn prepare_bin_oper_common(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
+    // [spec:pgorm:def:sql.render.operators+2]
+    fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
             "{}",
@@ -770,7 +754,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`Function`] into SQL statement.
-    fn prepare_function_name_common(&self, function: &Function, sql: &mut dyn SqlWriter) {
+    fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
         if let Function::Custom(iden) = function {
             iden.unquoted(sql.as_writer());
         } else {
@@ -829,7 +813,7 @@ impl QueryBuilder {
 
     pub(crate) fn prepare_with_query(&self, query: &WithQuery, sql: &mut dyn SqlWriter) {
         self.prepare_with_clause(&query.with_clause, sql);
-        self.prepare_query_statement(query.query.deref(), sql);
+        query.query.prepare_statement(sql);
     }
 
     // [spec:pgorm:req:sql.render.cte+1]
@@ -919,7 +903,7 @@ impl QueryBuilder {
 
         write!(sql, "(").unwrap();
 
-        self.prepare_query_statement(cte.query.deref(), sql);
+        cte.query.prepare_statement(sql);
 
         write!(sql, ") ").unwrap();
     }
@@ -939,20 +923,12 @@ impl QueryBuilder {
         }
     }
 
-    fn prepare_insert(&self, replace: bool, sql: &mut dyn SqlWriter) {
-        if replace {
-            write!(sql, "REPLACE").unwrap();
-        } else {
-            write!(sql, "INSERT").unwrap();
-        }
+    fn prepare_insert(&self, sql: &mut dyn SqlWriter) {
+        write!(sql, "INSERT").unwrap();
     }
 
     /// Translate [`JoinType`] into SQL statement.
     fn prepare_join_type(&self, join_type: &JoinType, sql: &mut dyn SqlWriter) {
-        self.prepare_join_type_common(join_type, sql)
-    }
-
-    fn prepare_join_type_common(&self, join_type: &JoinType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
             "{}",
@@ -1025,7 +1001,7 @@ impl QueryBuilder {
                 if !first {
                     write!(sql, ", ").unwrap();
                 }
-                self.prepare_value(&value, sql);
+                sql.push_param(value);
                 false
             });
 
@@ -1059,12 +1035,8 @@ impl QueryBuilder {
 
     /// Convert a SQL value into syntax-specific string
     // [spec:pgorm:sem:sql.value.render]
-    pub(crate) fn value_to_string(&self, v: &Value) -> String {
-        self.value_to_string_common(v)
-    }
-
     // [spec:pgorm:def:sql.render.value-literals+1]
-    fn value_to_string_common(&self, v: &Value) -> String {
+    pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {
             Value::Bool(None)
@@ -1314,12 +1286,12 @@ impl QueryBuilder {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
             Frame::Preceding(v) => {
-                self.prepare_value(&v.into(), sql);
+                sql.push_param(v.into());
                 write!(sql, " PRECEDING").unwrap();
             }
             Frame::CurrentRow => write!(sql, "CURRENT ROW").unwrap(),
             Frame::Following(v) => {
-                self.prepare_value(&v.into(), sql);
+                sql.push_param(v.into());
                 write!(sql, " FOLLOWING").unwrap();
             }
             Frame::UnboundedFollowing => write!(sql, "UNBOUNDED FOLLOWING").unwrap(),
@@ -1403,9 +1375,7 @@ impl QueryBuilder {
         }
         match (op, left) {
             // [spec:pgorm:req:sql.render.cast-param-type]
-            (BinOper::As, SimpleExpr::Value(value)) => {
-                sql.push_param_source_typed(value.clone(), self)
-            }
+            (BinOper::As, SimpleExpr::Value(value)) => sql.push_param_source_typed(value.clone()),
             _ => self.prepare_simple_expr(left, sql),
         }
         if left_paren {
@@ -1841,7 +1811,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`CommentStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.comment+1]
+    // [spec:pgorm:req:sql.ddl.comment+2]
     pub(crate) fn prepare_comment_statement(
         &self,
         statement: &CommentStatement,
@@ -1865,7 +1835,7 @@ impl QueryBuilder {
     }
 
     /// Write comment text as a standard-conforming string literal.
-    // [spec:pgorm:req:sql.ddl.comment+1]
+    // [spec:pgorm:req:sql.ddl.comment+2]
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
         write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
     }
@@ -2292,17 +2262,17 @@ impl QueryBuilder {
                 match placement {
                     Some(add_option) => match add_option {
                         TypeAlterAddOpt::Before(before_value) => {
-                            self.prepare_value(&value.to_string().into(), sql);
+                            sql.push_param(value.to_string().into());
                             write!(sql, " BEFORE ").unwrap();
-                            self.prepare_value(&before_value.to_string().into(), sql);
+                            sql.push_param(before_value.to_string().into());
                         }
                         TypeAlterAddOpt::After(after_value) => {
-                            self.prepare_value(&value.to_string().into(), sql);
+                            sql.push_param(value.to_string().into());
                             write!(sql, " AFTER ").unwrap();
-                            self.prepare_value(&after_value.to_string().into(), sql);
+                            sql.push_param(after_value.to_string().into());
                         }
                     },
-                    None => self.prepare_value(&value.to_string().into(), sql),
+                    None => sql.push_param(value.to_string().into()),
                 }
             }
             TypeAlterOpt::Rename(new_name) => {
@@ -2311,9 +2281,9 @@ impl QueryBuilder {
             }
             TypeAlterOpt::RenameValue(existing, new_name) => {
                 write!(sql, " RENAME VALUE ").unwrap();
-                self.prepare_value(&existing.to_string().into(), sql);
+                sql.push_param(existing.to_string().into());
                 write!(sql, " TO ").unwrap();
-                self.prepare_value(&new_name.to_string().into(), sql);
+                sql.push_param(new_name.to_string().into());
             }
         }
     }
@@ -2343,7 +2313,7 @@ impl QueryBuilder {
                 if count > 0 {
                     write!(sql, ", ").unwrap();
                 }
-                self.prepare_value(&val.to_string().into(), sql);
+                sql.push_param(val.to_string().into());
             }
 
             write!(sql, ")").unwrap();
@@ -2521,14 +2491,14 @@ fn is_ilike(b: &BinOper) -> bool {
 }
 
 impl SubQueryStatement {
-    pub(crate) fn prepare_statement(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
+    pub(crate) fn prepare_statement(&self, sql: &mut dyn SqlWriter) {
         use SubQueryStatement::*;
         match self {
-            SelectStatement(stmt) => query_builder.prepare_select_statement(stmt, sql),
-            InsertStatement(stmt) => query_builder.prepare_insert_statement(stmt, sql),
-            UpdateStatement(stmt) => query_builder.prepare_update_statement(stmt, sql),
-            DeleteStatement(stmt) => query_builder.prepare_delete_statement(stmt, sql),
-            WithStatement(stmt) => query_builder.prepare_with_query(stmt, sql),
+            SelectStatement(stmt) => QueryBuilder.prepare_select_statement(stmt, sql),
+            InsertStatement(stmt) => QueryBuilder.prepare_insert_statement(stmt, sql),
+            UpdateStatement(stmt) => QueryBuilder.prepare_update_statement(stmt, sql),
+            DeleteStatement(stmt) => QueryBuilder.prepare_delete_statement(stmt, sql),
+            WithStatement(stmt) => QueryBuilder.prepare_with_query(stmt, sql),
         }
     }
 }

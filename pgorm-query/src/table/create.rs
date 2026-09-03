@@ -1,8 +1,5 @@
-use inherent::inherent;
-
 use crate::{
-    ColumnDef, IntoColumnDef, QueryBuilder, SchemaStatementBuilder, SimpleExpr, foreign_key::*,
-    index::*, types::*,
+    ColumnDef, IntoColumnDef, QueryBuilder, SimpleExpr, foreign_key::*, index::*, types::*,
 };
 
 /// Create a table
@@ -41,7 +38,7 @@ use crate::{
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     table.to_string(QueryBuilder),
+///     table.to_string(),
 ///     [
 ///         r#"CREATE TABLE IF NOT EXISTS "character" ("#,
 ///             r#""id" serial NOT NULL PRIMARY KEY,"#,
@@ -142,7 +139,7 @@ impl TableCreateStatement {
     ///     .primary_key(Index::create(Glyph::Table, Glyph::Id).col(Glyph::Image));
     ///
     /// assert_eq!(
-    ///     statement.to_string(QueryBuilder),
+    ///     statement.to_string(),
     ///     [
     ///         r#"CREATE TABLE "glyph" ("#,
     ///         r#""id" integer NOT NULL,"#,
@@ -210,7 +207,7 @@ impl TableCreateStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     table.to_string(QueryBuilder),
+    ///     table.to_string(),
     ///     [
     ///         r#"CREATE TABLE "character" ("#,
     ///         r#""id" uuid DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,"#,
@@ -251,19 +248,11 @@ impl TableCreateStatement {
     }
 }
 
-#[inherent]
-impl SchemaStatementBuilder for TableCreateStatement {
-    pub fn build(&self, schema_builder: QueryBuilder) -> String {
+// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+impl std::fmt::Display for TableCreateStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_create_statement(self, &mut sql);
-        sql
+        QueryBuilder.prepare_table_create_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_any(&self, schema_builder: &QueryBuilder) -> String {
-        let mut sql = String::with_capacity(256);
-        schema_builder.prepare_table_create_statement(self, &mut sql);
-        sql
-    }
-
-    pub fn to_string(&self, schema_builder: QueryBuilder) -> String;
 }

@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
                     .to(Cake::Table, Cake::Id),
             )
             .to_owned();
-        tx.execute(&table.build(QueryBuilder), &[]).await?;
+        tx.execute(&table.to_string(), &[]).await?;
 
         Ok(())
     }

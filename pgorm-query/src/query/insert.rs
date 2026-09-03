@@ -1,7 +1,6 @@
 use crate::{
-    AnyWithClause, OnConflict, QueryStatementBuilder, QueryStatementWriter, ReturningClause,
-    SelectStatement, SimpleExpr, SubQueryStatement, Values, WithQuery, backend::QueryBuilder,
-    error::*, prepare::*, types::*,
+    AnyWithClause, OnConflict, QueryStatementBuilder, ReturningClause, SelectStatement, SimpleExpr,
+    SubQueryStatement, Values, WithQuery, backend::QueryBuilder, error::*, prepare::*, types::*,
 };
 use inherent::inherent;
 
@@ -31,14 +30,13 @@ pub(crate) enum InsertValueSource {
 ///     .to_owned();
 ///
 /// assert_eq!(
-///     query.to_string(QueryBuilder),
+///     query.to_string(),
 ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (5.15, '12A'), (4.21, '123')"#
 /// );
 /// ```
 // [spec:pgorm:def:sql.ast.insert+1]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
-    pub(crate) replace: bool,
     pub(crate) table: Option<NamedTable>,
     pub(crate) columns: Vec<DynIden>,
     pub(crate) source: Option<InsertValueSource>,
@@ -68,7 +66,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" AS "g" ("image") VALUES ('12A')"#
     /// );
     /// ```
@@ -120,7 +118,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("aspect", "image") SELECT "aspect", "image" FROM "glyph" WHERE "image" LIKE '0%'"#
     /// );
     /// ```
@@ -142,7 +140,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") SELECT 'hello' WHERE NOT EXISTS(SELECT 'world')"#
     /// );
     /// ```
@@ -182,7 +180,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, CAST('2020-02-02 00:00:00' AS DATE))"#
     /// );
     /// ```
@@ -229,7 +227,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2.1345, '24B'), (5.15, '12A')"#
     /// );
     /// ```
@@ -256,7 +254,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2.1345, '24B'), (5.15, '12A')"#
     /// );
     /// ```
@@ -304,7 +302,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") VALUES ('12A') RETURNING "id""#
     /// );
     /// ```
@@ -328,7 +326,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") VALUES ('12A') RETURNING "id""#
     /// );
     /// ```
@@ -354,7 +352,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") VALUES ('12A') RETURNING *"#
     /// );
     /// ```
@@ -394,7 +392,7 @@ impl InsertStatement {
     ///     let query = insert.with(with_clause);
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"WITH "cte" ("id", "image", "aspect") AS (SELECT "id", "image", "aspect" FROM "glyph") INSERT INTO "glyph" ("id", "image", "aspect") SELECT "id", "image", "aspect" FROM "cte""#
     /// );
     /// ```
@@ -419,7 +417,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" VALUES (DEFAULT)"#
     /// );
     ///
@@ -432,7 +430,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") VALUES ('ABC')"#
     /// );
     /// ```
@@ -455,7 +453,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" VALUES (DEFAULT), (DEFAULT), (DEFAULT)"#
     /// );
     ///
@@ -468,7 +466,7 @@ impl InsertStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     r#"INSERT INTO "glyph" ("image") VALUES ('ABC')"#
     /// );
     /// ```
@@ -480,29 +478,23 @@ impl InsertStatement {
 
 #[inherent]
 impl QueryStatementBuilder for InsertStatement {
-    pub fn build_collect_any_into(&self, query_builder: &QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_insert_statement(self, sql);
+    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
+        QueryBuilder.prepare_insert_statement(self, sql);
     }
 
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::InsertStatement(self)
     }
 
-    pub fn build_any(&self, query_builder: &QueryBuilder) -> (String, Values);
-    pub fn build_collect_any(
-        &self,
-        query_builder: &QueryBuilder,
-        sql: &mut dyn SqlWriter,
-    ) -> String;
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-#[inherent]
-impl QueryStatementWriter for InsertStatement {
-    pub fn build_collect_into(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) {
-        query_builder.prepare_insert_statement(self, sql);
+// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+impl std::fmt::Display for InsertStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_insert_statement(self, &mut sql);
+        f.write_str(&sql)
     }
-
-    pub fn build_collect(&self, query_builder: QueryBuilder, sql: &mut dyn SqlWriter) -> String;
-    pub fn build(&self, query_builder: QueryBuilder) -> (String, Values);
-    pub fn to_string(&self, query_builder: QueryBuilder) -> String;
 }

@@ -594,7 +594,7 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), DbErr> {
     let ctx = TestContext::new("mistyped_primary_key").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     let expected = DbErr::Type(
         "primary key of `mistyped_key` does not match its declared `ValueType`: \
@@ -626,10 +626,7 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), DbErr> {
 // ---------------------------------------------------------------------------
 
 fn sql(expr: pgorm_query::SimpleExpr) -> String {
-    item::Entity::find()
-        .filter(expr)
-        .as_query()
-        .to_string(QueryBuilder)
+    item::Entity::find().filter(expr).as_query().to_string()
 }
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
@@ -752,7 +749,7 @@ fn column_trait_expression_surface() {
             .select_only()
             .column_as(e, "agg")
             .as_query()
-            .to_string(QueryBuilder)
+            .to_string()
     };
     assert_eq!(
         agg(item::Column::Id.max()),
@@ -984,7 +981,7 @@ fn model_trait_get_set_and_identity() {
         profit_margin: 10.4,
     };
     assert_eq!(
-        bakery.find_related(Baker).as_query().to_string(QueryBuilder),
+        bakery.find_related(Baker).as_query().to_string(),
         [
             r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details", "baker"."bakery_id""#,
             r#"FROM "baker""#,
@@ -1003,7 +1000,7 @@ async fn model_trait_delete_runs_through_active_model() -> Result<(), DbErr> {
     let ctx = TestContext::new("model_trait_delete").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(item::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     let apple = item::ActiveModel {
         id: NotSet,
@@ -1086,7 +1083,7 @@ async fn from_query_result_surface() -> Result<(), DbErr> {
     let ctx = TestContext::new("from_query_result_surface").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(item::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     item::Entity::insert_many([
         item::ActiveModel {

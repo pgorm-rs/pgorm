@@ -48,10 +48,9 @@ macro_rules! debug_query_build {
 /// working expansion target. It is retained only for API compatibility.
 ///
 /// Use [`QueryTrait::build`](crate::QueryTrait::build) for the parameterised
-/// statement, or `as_query().to_string(QueryBuilder)` for a value-inlined one:
+/// statement, or `as_query().to_string()` for a value-inlined one:
 ///
 /// ```
-/// use pgorm::pgorm_query::QueryBuilder;
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
@@ -64,7 +63,7 @@ macro_rules! debug_query_build {
 ///     r#"INSERT INTO "cake" ("id", "name") VALUES ($1, $2)"#
 /// );
 /// assert_eq!(
-///     c.as_query().to_string(QueryBuilder),
+///     c.as_query().to_string(),
 ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
 /// );
 /// ```
@@ -86,11 +85,10 @@ macro_rules! debug_query_stmt {
 ///
 /// This macro delegates to [`debug_query_stmt!`], which has no working
 /// expansion target — see that macro's documentation. Use
-/// `as_query().to_string(QueryBuilder)` to render a query with its values
+/// `as_query().to_string()` to render a query with its values
 /// inlined:
 ///
 /// ```
-/// use pgorm::pgorm_query::QueryBuilder;
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
@@ -99,7 +97,7 @@ macro_rules! debug_query_stmt {
 /// });
 ///
 /// assert_eq!(
-///     c.as_query().to_string(QueryBuilder),
+///     c.as_query().to_string(),
 ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
 /// );
 /// ```

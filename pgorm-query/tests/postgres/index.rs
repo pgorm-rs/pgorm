@@ -7,7 +7,7 @@ fn create_1() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx-glyph-aspect")
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect")"#
     );
 }
@@ -19,7 +19,7 @@ fn create_2() {
             .unique()
             .name("idx-glyph-aspect-image")
             .col(Glyph::Image)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "glyph" ("aspect", "image")"#
     );
 }
@@ -30,7 +30,7 @@ fn create_3() {
         Index::create(Glyph::Table, Glyph::Image)
             .full_text()
             .name("idx-glyph-image")
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE INDEX "idx-glyph-image" ON "glyph" USING GIN ("image")"#
     );
 }
@@ -42,7 +42,7 @@ fn create_4() {
             .if_not_exists()
             .full_text()
             .name("idx-glyph-image")
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE INDEX IF NOT EXISTS "idx-glyph-image" ON "glyph" USING GIN ("image")"#
     );
 }
@@ -54,7 +54,7 @@ fn create_5() {
             .unique()
             .name("idx-glyph-aspect-image")
             .col(Glyph::Image)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "schema"."glyph" ("aspect", "image")"#
     );
 }
@@ -68,7 +68,7 @@ fn create_6() {
             .nulls_not_distinct()
             .name("idx-glyph-aspect-image")
             .col(Glyph::Image)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "glyph" ("aspect", "image") NULLS NOT DISTINCT"#
     );
 }
@@ -84,11 +84,11 @@ fn standalone_index_spells_plain_or_unique_only() {
     let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
     let unique = r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#;
 
-    assert_eq!(index().to_string(QueryBuilder), plain);
-    assert_eq!(index().unique().to_string(QueryBuilder), unique);
-    assert_eq!(index().primary().to_string(QueryBuilder), plain);
-    assert_eq!(index().primary().unique().to_string(QueryBuilder), unique);
-    assert_eq!(index().unique().primary().to_string(QueryBuilder), plain);
+    assert_eq!(index().to_string(), plain);
+    assert_eq!(index().unique().to_string(), unique);
+    assert_eq!(index().primary().to_string(), plain);
+    assert_eq!(index().primary().unique().to_string(), unique);
+    assert_eq!(index().unique().primary().to_string(), plain);
 }
 
 // [spec:pgorm:req:sql.ddl.index-create+4/test]
@@ -120,10 +120,10 @@ fn nulls_not_distinct_needs_the_unique_kind() {
     };
     let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
 
-    assert_eq!(index().to_string(QueryBuilder), plain);
-    assert_eq!(index().primary().to_string(QueryBuilder), plain);
+    assert_eq!(index().to_string(), plain);
+    assert_eq!(index().primary().to_string(), plain);
     assert_eq!(
-        index().unique().to_string(QueryBuilder),
+        index().unique().to_string(),
         r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect") NULLS NOT DISTINCT"#
     );
 }
@@ -132,7 +132,7 @@ fn nulls_not_distinct_needs_the_unique_kind() {
 #[test]
 fn drop_1() {
     assert_eq!(
-        Index::drop("idx-glyph-aspect").to_string(QueryBuilder),
+        Index::drop("idx-glyph-aspect").to_string(),
         r#"DROP INDEX "idx-glyph-aspect""#
     );
 }
@@ -143,7 +143,7 @@ fn drop_2() {
     assert_eq!(
         Index::drop("idx-glyph-aspect")
             .table((Alias::new("schema"), Glyph::Table))
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP INDEX "schema"."idx-glyph-aspect""#
     );
 }
@@ -153,7 +153,7 @@ fn drop_3() {
     assert_eq!(
         Index::drop("idx-glyph-aspect")
             .table(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP INDEX "idx-glyph-aspect""#
     );
 }
@@ -167,11 +167,11 @@ fn index_take_leaves_the_source_whole() {
     let taken = index.take();
 
     assert_eq!(
-        taken.to_string(QueryBuilder),
+        taken.to_string(),
         r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#
     );
     assert_eq!(
-        index.to_string(QueryBuilder),
+        index.to_string(),
         r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#
     );
 }

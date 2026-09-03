@@ -166,7 +166,6 @@ where
 mod tests {
     use crate::tests_cfg::{cake, fruit};
     use crate::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
-    use pgorm_query::QueryBuilder;
 
     #[test]
     fn alias_1() {
@@ -175,7 +174,7 @@ mod tests {
                 .column_as(cake::Column::Id, "B")
                 .apply_alias("A_")
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", "cake"."id" AS "A_B" FROM "cake""#,
         );
     }
@@ -187,7 +186,7 @@ mod tests {
                 .left_join(fruit::Entity)
                 .select_also(fruit::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -203,7 +202,7 @@ mod tests {
                 .left_join(fruit::Entity)
                 .select_with(fruit::Entity)
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -222,7 +221,7 @@ mod tests {
                 .filter(cake::Column::Id.eq(1))
                 .filter(fruit::Column::Id.eq(2))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
@@ -241,7 +240,7 @@ mod tests {
                 .filter(cake::Column::Id.eq(1))
                 .filter(fruit::Column::Id.eq(2))
                 .as_query()
-                .to_string(QueryBuilder),
+                .to_string(),
             [
                 r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
                 r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,

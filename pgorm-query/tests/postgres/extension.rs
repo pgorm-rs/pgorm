@@ -6,7 +6,7 @@ use pgorm_query::extension::{Extension, PgLTree};
 #[test]
 fn create_1() {
     assert_eq!(
-        Extension::create().name("ltree").to_string(QueryBuilder),
+        Extension::create().name("ltree").to_string(),
         r#"CREATE EXTENSION "ltree""#
     );
 }
@@ -21,7 +21,7 @@ fn create_2() {
             .version("v0.1.0")
             .cascade()
             .if_not_exists()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE EXTENSION IF NOT EXISTS "ltree" WITH SCHEMA "public" VERSION 'v0.1.0' CASCADE"#
     );
 }
@@ -32,7 +32,7 @@ fn create_2() {
 fn create_3() {
     assert_eq!(Iden::to_string(&PgLTree), "ltree");
     assert_eq!(
-        Extension::create().name(PgLTree).to_string(QueryBuilder),
+        Extension::create().name(PgLTree).to_string(),
         r#"CREATE EXTENSION "ltree""#
     );
 
@@ -40,7 +40,7 @@ fn create_3() {
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Tokens).ltree())
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"CREATE TABLE "glyph" ( "tokens" ltree )"#
     );
 }
@@ -50,7 +50,7 @@ fn create_3() {
 #[test]
 fn drop_1() {
     assert_eq!(
-        Extension::drop().name("ltree").to_string(QueryBuilder),
+        Extension::drop().name("ltree").to_string(),
         r#"DROP EXTENSION "ltree""#
     );
     assert_eq!(
@@ -58,14 +58,11 @@ fn drop_1() {
             .name("ltree")
             .if_exists()
             .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP EXTENSION IF EXISTS "ltree" CASCADE"#
     );
     assert_eq!(
-        Extension::drop()
-            .name("ltree")
-            .restrict()
-            .to_string(QueryBuilder),
+        Extension::drop().name("ltree").restrict().to_string(),
         r#"DROP EXTENSION "ltree" RESTRICT"#
     );
     assert_eq!(
@@ -73,7 +70,7 @@ fn drop_1() {
             .name("ltree")
             .restrict()
             .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
         r#"DROP EXTENSION "ltree" CASCADE"#
     );
 }
@@ -90,7 +87,7 @@ fn extension_strings_are_quoted() {
         .to_owned();
 
     assert_eq!(
-        statement.build_collect(QueryBuilder, &mut sql),
+        statement.build_collect(&mut sql),
         r#"CREATE EXTENSION "pg""weird ext" WITH SCHEMA "my schema" VERSION '1.0; --'"#
     );
     // Nothing was parameterized on the way through a placeholder-emitting sink.
@@ -98,9 +95,7 @@ fn extension_strings_are_quoted() {
     assert_eq!(values, Values(vec![]));
 
     assert_eq!(
-        Extension::drop()
-            .name(r#"pg"weird ext"#)
-            .to_string(QueryBuilder),
+        Extension::drop().name(r#"pg"weird ext"#).to_string(),
         r#"DROP EXTENSION "pg""weird ext""#
     );
 }

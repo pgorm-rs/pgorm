@@ -59,7 +59,6 @@ impl Schema {
     ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
     /// };
     /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
-    /// use pgorm_query::QueryBuilder;
     ///
     /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     /// #[pgorm(table_name = "posts", comment = "one row per post")]
@@ -84,7 +83,7 @@ impl Schema {
     /// let comments: Vec<String> = schema
     ///     .create_comments_from_entity(Entity)
     ///     .iter()
-    ///     .map(|stmt| stmt.to_string(QueryBuilder))
+    ///     .map(|stmt| stmt.to_string())
     ///     .collect();
     ///
     /// assert_eq!(
@@ -111,7 +110,7 @@ impl Schema {
     ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
     /// };
     /// use pgorm_macros::{DeriveEntityModel, DerivePrimaryKey};
-    /// use pgorm_query::{QueryBuilder, Table};
+    /// use pgorm_query::Table;
     ///
     /// #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     /// #[pgorm(table_name = "posts")]
@@ -136,7 +135,7 @@ impl Schema {
     /// let alter_table = Table::alter(Entity)
     ///     .add_column(&mut schema.get_column_def::<Entity>(Column::Title));
     /// assert_eq!(
-    ///     alter_table.to_string(QueryBuilder),
+    ///     alter_table.to_string(),
     ///     r#"ALTER TABLE "posts" ADD COLUMN "title" varchar NOT NULL"#
     /// );
     /// ```
@@ -311,8 +310,8 @@ mod tests {
         assert_eq!(
             schema
                 .create_table_from_entity(CakeFillingPrice)
-                .to_string(QueryBuilder),
-            get_cake_filling_price_stmt().to_string(QueryBuilder)
+                .to_string(),
+            get_cake_filling_price_stmt().to_string()
         );
     }
 
@@ -360,10 +359,8 @@ mod tests {
         let schema = Schema::new();
 
         assert_eq!(
-            schema
-                .create_table_from_entity(indexes::Entity)
-                .to_string(QueryBuilder),
-            get_indexes_stmt().to_string(QueryBuilder)
+            schema.create_table_from_entity(indexes::Entity).to_string(),
+            get_indexes_stmt().to_string()
         );
 
         let stmts = schema.create_index_from_entity(indexes::Entity);
@@ -373,19 +370,13 @@ mod tests {
             Index::create(indexes::Entity.table_ref(), indexes::Column::Index1Attr)
                 .name("idx-indexes-index1_attr")
                 .to_owned();
-        assert_eq!(
-            stmts[0].to_string(QueryBuilder),
-            idx.to_string(QueryBuilder)
-        );
+        assert_eq!(stmts[0].to_string(), idx.to_string());
 
         let idx: IndexCreateStatement =
             Index::create(indexes::Entity.table_ref(), indexes::Column::Index2Attr)
                 .name("idx-indexes-index2_attr")
                 .to_owned();
-        assert_eq!(
-            stmts[1].to_string(QueryBuilder),
-            idx.to_string(QueryBuilder)
-        );
+        assert_eq!(stmts[1].to_string(), idx.to_string());
     }
 
     fn get_indexes_stmt() -> TableCreateStatement {

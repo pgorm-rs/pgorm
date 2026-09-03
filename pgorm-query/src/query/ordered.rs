@@ -24,7 +24,7 @@ pub trait OrderedStatement {
     ///         .and_where(Expr::col(Character::Id).gt(2))
     ///         .order_by(Character::Character, Order::Desc)
     ///         .order_by((Character::Table, Character::Id), Order::Asc)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "id" > 2 ORDER BY "character" DESC, "character"."id" ASC"#
     /// );
     /// ```
@@ -43,7 +43,7 @@ pub trait OrderedStatement {
     ///     .to_owned();
     ///
     /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
+    ///     query.to_string(),
     ///     [
     ///         r#"SELECT "character""#,
     ///         r#"FROM "character""#,
@@ -122,7 +122,7 @@ pub trait OrderedStatement {
     ///         .from(Character::Table)
     ///         .order_by_with_nulls(Character::Character, Order::Desc, NullOrdering::Last)
     ///         .order_by_with_nulls((Character::Table, Character::Id), Order::Asc, NullOrdering::First)
-    ///         .to_string(QueryBuilder),
+    ///         .to_string(),
     ///     r#"SELECT "character" FROM "character" ORDER BY "character" DESC NULLS LAST, "character"."id" ASC NULLS FIRST"#
     /// );
     /// ```

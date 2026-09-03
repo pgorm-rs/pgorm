@@ -26,11 +26,11 @@ fn select() -> SelectStatement {
 }
 
 fn select_and_build() {
-    select().build(QueryBuilder);
+    select().build();
 }
 
 fn select_and_to_string() {
-    select().to_string(QueryBuilder);
+    select().to_string();
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

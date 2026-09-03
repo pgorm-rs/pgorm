@@ -783,7 +783,7 @@ where
     C: ConnectionTrait,
 {
     let stmt = Schema::new().create_table_from_entity(row::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
     Ok(())
 }
 
@@ -916,7 +916,7 @@ async fn manual_key_insert_and_update_are_explicit() -> Result<(), DbErr> {
     let ctx = TestContext::new("manual_key_insert_and_update").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(manual_key::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     // `update` on a key that matches no row reports it rather than creating one.
     let err = manual_key::ActiveModel {
@@ -1041,7 +1041,7 @@ async fn active_model_hook_ordering() -> Result<(), DbErr> {
     let ctx = TestContext::new("active_model_hook_ordering").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(hooked::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     HOOK_LOG.lock().unwrap().clear();
 
@@ -1135,7 +1135,7 @@ async fn active_model_hook_error_aborts() -> Result<(), DbErr> {
     let ctx = TestContext::new("active_model_hook_error_aborts").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(hook_abort::Entity);
-    db.execute(&stmt.build(QueryBuilder), &[]).await?;
+    db.execute(&stmt.to_string(), &[]).await?;
 
     // `insert` aborts before executing.
     let err = hook_abort::ActiveModel {

@@ -17,49 +17,49 @@ fn base() -> SelectStatement {
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([
-        base().to_string(QueryBuilder),
+        base().to_string(),
         Query::select()
             .column(Asterisk)
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::select()
             .distinct()
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::select()
             .distinct_on([Glyph::Aspect])
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::select()
             .expr_as(Expr::col(Glyph::Id), Alias::new("glyph id"))
             .from((Alias::new("public"), Glyph::Table))
-            .to_string(QueryBuilder),
+            .to_string(),
         base()
             .and_where(Expr::col(Glyph::Aspect).gt(1))
             .and_where(Expr::col(Glyph::Image).is_not_null())
             .add_group_by([Expr::col(Glyph::Id).into()])
             .and_having(Expr::col(Glyph::Aspect).lt(9))
-            .to_string(QueryBuilder),
+            .to_string(),
         base()
             .order_by(Glyph::Id, Order::Desc)
             .order_by_with_nulls(Glyph::Aspect, Order::Asc, NullOrdering::First)
             .limit(10)
             .offset(5)
-            .to_string(QueryBuilder),
+            .to_string(),
         base()
             .order_by_with_nulls(
                 Glyph::Id,
                 Order::Field(Values(vec![1.into(), 2.into()])),
                 NullOrdering::Last,
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::select()
             .column((Glyph::Table, Glyph::Id))
             .column((Alias::new("public"), Glyph::Table, Glyph::Aspect))
             .from(Glyph::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
     ]);
 }
 
@@ -100,12 +100,11 @@ fn sweep_expression_shapes() {
         Func::cast_as(Expr::val("1"), Alias::new("int4")).into(),
     ];
 
-    sweep(exprs.into_iter().map(|expr| {
-        Query::select()
-            .expr(expr)
-            .from(Glyph::Table)
-            .to_string(QueryBuilder)
-    }));
+    sweep(
+        exprs
+            .into_iter()
+            .map(|expr| Query::select().expr(expr).from(Glyph::Table).to_string()),
+    );
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the join vocabulary
@@ -131,7 +130,7 @@ fn sweep_join_shapes() {
                     Font::Table,
                     Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
                 )
-                .to_string(QueryBuilder)
+                .to_string()
         })
         .collect();
 
@@ -140,7 +139,7 @@ fn sweep_join_shapes() {
             .column(Char::Id)
             .from(Char::Table)
             .cross_join(Font::Table)
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         Query::select()
@@ -152,7 +151,7 @@ fn sweep_join_shapes() {
                 Alias::new("f"),
                 Expr::col((Char::Table, Char::FontId)).equals((Alias::new("f"), Font::Id)),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         Query::select()
@@ -164,19 +163,19 @@ fn sweep_join_shapes() {
                 Alias::new("sub"),
                 Expr::val(1).eq(1),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         Query::select()
             .column(Glyph::Id)
             .from_subquery(base(), Alias::new("sub"))
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         Query::select()
             .column(Alias::new("column1"))
             .from_values([(1, "a"), (2, "b")], Alias::new("v"))
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         Query::select()
@@ -185,7 +184,7 @@ fn sweep_join_shapes() {
                 Func::cust(Alias::new("generate_series")).arg(1),
                 Alias::new("g"),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
     );
 
     sweep(statements);
@@ -204,7 +203,7 @@ fn sweep_union_and_locking_shapes() {
 
     let mut statements: Vec<String> = unions
         .into_iter()
-        .map(|union| base().union(union, base()).to_string(QueryBuilder))
+        .map(|union| base().union(union, base()).to_string())
         .collect();
 
     let locks = [
@@ -213,26 +212,22 @@ fn sweep_union_and_locking_shapes() {
         LockType::Share,
         LockType::KeyShare,
     ];
-    statements.extend(
-        locks
-            .into_iter()
-            .map(|lock| base().lock(lock).to_string(QueryBuilder)),
-    );
+    statements.extend(locks.into_iter().map(|lock| base().lock(lock).to_string()));
 
     statements.push(
         base()
             .lock_with_tables(LockType::Update, [Glyph::Table])
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         base()
             .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
-            .to_string(QueryBuilder),
+            .to_string(),
     );
     statements.push(
         base()
             .lock_with_tables_behavior(LockType::Share, [Glyph::Table], LockBehavior::SkipLocked)
-            .to_string(QueryBuilder),
+            .to_string(),
     );
 
     sweep(statements);
@@ -256,19 +251,17 @@ fn sweep_cte_shapes() {
     };
 
     sweep([
-        outer().with(WithClause::new(cte())).to_string(QueryBuilder),
+        outer().with(WithClause::new(cte())).to_string(),
         outer()
             .with(WithClause::new(cte().materialized(true).to_owned()))
-            .to_string(QueryBuilder),
+            .to_string(),
         outer()
             .with(WithClause::new(cte().materialized(false).to_owned()))
-            .to_string(QueryBuilder),
+            .to_string(),
         outer()
             .with(WithClause::new(cte()).cte(named("other")).to_owned())
-            .to_string(QueryBuilder),
-        outer()
-            .with(RecursiveWithClause::new(cte()))
-            .to_string(QueryBuilder),
+            .to_string(),
+        outer().with(RecursiveWithClause::new(cte())).to_string(),
     ]);
 }
 
@@ -280,7 +273,7 @@ fn sweep_window_function_shapes() {
         Query::select()
             .from(Char::Table)
             .expr_window(Func::count(Expr::col(Char::Id)), window)
-            .to_string(QueryBuilder)
+            .to_string()
     };
 
     sweep([
@@ -317,7 +310,7 @@ fn sweep_window_function_shapes() {
                 Alias::new("w"),
                 Alias::new("n"),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
     ]);
 }
 
@@ -336,41 +329,35 @@ fn sweep_insert_shapes() {
     };
 
     sweep([
-        insert().to_string(QueryBuilder),
-        insert()
-            .values_panic([2.into(), "b".into()])
-            .to_string(QueryBuilder),
+        insert().to_string(),
+        insert().values_panic([2.into(), "b".into()]).to_string(),
         Query::insert()
             .into_table(Glyph::Table)
             .or_default_values_many(3)
-            .to_string(QueryBuilder),
-        insert()
-            .returning(Query::returning().all())
-            .to_string(QueryBuilder),
+            .to_string(),
+        insert().returning(Query::returning().all()).to_string(),
         insert()
             .returning(Query::returning().columns([Glyph::Id, Glyph::Image]))
-            .to_string(QueryBuilder),
+            .to_string(),
         insert()
             .returning(Query::returning().exprs([Expr::col(Glyph::Id).add(1)]))
-            .to_string(QueryBuilder),
-        insert()
-            .on_conflict(OnConflict::do_nothing())
-            .to_string(QueryBuilder),
+            .to_string(),
+        insert().on_conflict(OnConflict::do_nothing()).to_string(),
         insert()
             .on_conflict(OnConflict::column(Glyph::Id).do_nothing())
-            .to_string(QueryBuilder),
+            .to_string(),
         insert()
             .on_conflict(
                 OnConflict::column(Glyph::Id)
                     .and_column(Glyph::Aspect)
                     .update_column(Glyph::Image),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         insert()
             .on_conflict(
                 OnConflict::column(Glyph::Id).value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1)),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         insert()
             .on_conflict(
                 OnConflict::expr(Func::lower(Expr::col(Glyph::Tokens)))
@@ -378,7 +365,7 @@ fn sweep_insert_shapes() {
                     .update_column(Glyph::Image)
                     .and_where(Expr::col(Glyph::Id).gt(0)),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
     ]);
 }
 
@@ -392,20 +379,20 @@ fn sweep_update_and_delete_shapes() {
             .value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1))
             .values([(Glyph::Image, "a".into())])
             .and_where(Expr::col(Glyph::Id).eq(1))
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::update()
             .table(Glyph::Table)
             .value(Glyph::Aspect, 1)
             .returning(Query::returning().all())
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::delete()
             .from_table(Glyph::Table)
             .and_where(Expr::col(Glyph::Id).is_in([1, 2]))
-            .to_string(QueryBuilder),
+            .to_string(),
         Query::delete()
             .from_table(Glyph::Table)
             .returning(Query::returning().columns([Glyph::Id]))
-            .to_string(QueryBuilder),
+            .to_string(),
     ]);
 }
 
@@ -443,41 +430,37 @@ fn sweep_table_ddl_shapes() {
                     .on_delete(ForeignKeyAction::Cascade)
                     .take(),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         Table::create(Glyph::Table)
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
                     .generated(Expr::val(1), true),
             )
-            .to_string(QueryBuilder),
+            .to_string(),
         Table::alter(Glyph::Table)
             .add_column(ColumnDef::new(Alias::new("added")).integer().not_null())
-            .to_string(QueryBuilder),
+            .to_string(),
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).big_integer())
-            .to_string(QueryBuilder),
+            .to_string(),
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).null())
-            .to_string(QueryBuilder),
-        Table::rename_column(Glyph::Table, Glyph::Aspect, Alias::new("ratio"))
-            .to_string(QueryBuilder),
+            .to_string(),
+        Table::rename_column(Glyph::Table, Glyph::Aspect, Alias::new("ratio")).to_string(),
         Table::alter(Glyph::Table)
             .drop_column(Glyph::Aspect)
-            .to_string(QueryBuilder),
+            .to_string(),
         Table::alter(Char::Table)
             .drop_foreign_key(Alias::new("fk"))
-            .to_string(QueryBuilder),
-        Table::rename(Glyph::Table, Alias::new("glyph_old")).to_string(QueryBuilder),
-        Table::truncate(Glyph::Table).to_string(QueryBuilder),
-        Table::drop(Glyph::Table)
-            .if_exists()
-            .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
+        Table::rename(Glyph::Table, Alias::new("glyph_old")).to_string(),
+        Table::truncate(Glyph::Table).to_string(),
+        Table::drop(Glyph::Table).if_exists().cascade().to_string(),
         Table::drop(Glyph::Table)
             .table(Font::Table)
             .restrict()
-            .to_string(QueryBuilder),
+            .to_string(),
     ]);
 }
 
@@ -488,72 +471,72 @@ fn sweep_schema_object_ddl_shapes() {
     sweep([
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .to_string(QueryBuilder),
+            .to_string(),
         Index::create((Alias::new("public"), Glyph::Table), Glyph::Aspect)
             .if_not_exists()
             .unique()
             .nulls_not_distinct()
             .name("idx")
             .col(Glyph::Image)
-            .to_string(QueryBuilder),
+            .to_string(),
         Index::create(Glyph::Table, Glyph::Tokens)
             .name("idx")
             .index_type(IndexType::FullText)
-            .to_string(QueryBuilder),
+            .to_string(),
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
             .index_type(IndexType::Hash)
-            .to_string(QueryBuilder),
-        Index::drop("idx").to_string(QueryBuilder),
+            .to_string(),
+        Index::drop("idx").to_string(),
         ForeignKey::create()
             .name("fk")
             .from(Char::Table, Char::FontId)
             .to(Font::Table, Font::Id)
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::NoAction)
-            .to_string(QueryBuilder),
-        ForeignKey::drop(Char::Table, "fk").to_string(QueryBuilder),
+            .to_string(),
+        ForeignKey::drop(Char::Table, "fk").to_string(),
         Type::create()
             .as_enum(Alias::new("tea"))
             .values([Alias::new("breakfast"), Alias::new("earl grey")])
-            .to_string(QueryBuilder),
+            .to_string(),
         Type::alter()
             .name(Alias::new("tea"))
             .add_value(Alias::new("oolong"))
-            .to_string(QueryBuilder),
+            .to_string(),
         Type::alter()
             .name(Alias::new("tea"))
             .add_value(Alias::new("oolong"))
             .after(Alias::new("breakfast"))
-            .to_string(QueryBuilder),
+            .to_string(),
         Type::alter()
             .name(Alias::new("tea"))
             .rename_value(Alias::new("oolong"), Alias::new("wulong"))
-            .to_string(QueryBuilder),
+            .to_string(),
         Type::drop()
             .if_exists()
             .name(Alias::new("tea"))
             .cascade()
-            .to_string(QueryBuilder),
-        Extension::create().name("ltree").to_string(QueryBuilder),
+            .to_string(),
+        Extension::create().name("ltree").to_string(),
         Extension::create()
             .name("ltree")
             .schema("public")
             .if_not_exists()
             .cascade()
-            .to_string(QueryBuilder),
+            .to_string(),
         Extension::drop()
             .name("ltree")
             .if_exists()
             .cascade()
-            .to_string(QueryBuilder),
-        Comment::on_table(Glyph::Table, "one row per glyph").to_string(QueryBuilder),
+            .to_string(),
+        Comment::on_table(Glyph::Table, "one row per glyph").to_string(),
         Comment::on_column(
             (Alias::new("public"), Glyph::Table),
             Glyph::Aspect,
             "it's fine",
         )
-        .to_string(QueryBuilder),
+        .to_string(),
     ]);
 }
 
@@ -604,13 +587,13 @@ fn sweep_column_type_vocabulary() {
     sweep(types.into_iter().map(|column_type| {
         Table::create(Glyph::Table)
             .col(ColumnDef::new_with_type(Alias::new("c"), column_type))
-            .to_string(QueryBuilder)
+            .to_string()
     }));
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+1/test]
+// [spec:pgorm:def:sql.render.operators+2/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [
@@ -669,7 +652,7 @@ fn sweep_binary_operator_vocabulary() {
         Query::select()
             .expr(Expr::col(Glyph::Aspect).binary(oper, right))
             .from(Glyph::Table)
-            .to_string(QueryBuilder)
+            .to_string()
     }));
 }
 
@@ -683,26 +666,26 @@ fn sweep_placeholder_builds() {
         .and_where(Expr::col(Glyph::Image).like("a%"))
         .limit(10)
         .offset(2)
-        .build(QueryBuilder);
+        .build();
     let (insert, _) = Query::insert()
         .into_table(Glyph::Table)
         .columns([Glyph::Aspect, Glyph::Image])
         .values_panic([1.into(), "a".into()])
         .on_conflict(OnConflict::column(Glyph::Id).update_column(Glyph::Image))
         .returning(Query::returning().all())
-        .build(QueryBuilder);
+        .build();
     let (update, _) = Query::update()
         .table(Glyph::Table)
         .value(Glyph::Aspect, 1)
         .and_where(Expr::col(Glyph::Id).eq(2))
-        .build(QueryBuilder);
+        .build();
     let (delete, _) = Query::delete()
         .from_table(Glyph::Table)
         .and_where(Expr::col(Glyph::Id).eq(2))
-        .build(QueryBuilder);
+        .build();
     let (cast, _) = Query::select()
         .expr(Func::cast_as(Expr::val(1), Alias::new("text")))
-        .build(QueryBuilder);
+        .build();
 
     sweep([select, insert, update, delete, cast]);
 }
@@ -711,12 +694,9 @@ fn sweep_placeholder_builds() {
 // rendered statement to both its expected spelling and the grammar
 #[test]
 fn oracle_pairs_text_and_grammar_checks() {
+    assert_query_eq(&base().to_string(), r#"SELECT "id" FROM "glyph""#);
     assert_query_eq(
-        &base().to_string(QueryBuilder),
-        r#"SELECT "id" FROM "glyph""#,
-    );
-    assert_query_eq(
-        &Table::truncate(Glyph::Table).to_string(QueryBuilder),
+        &Table::truncate(Glyph::Table).to_string(),
         r#"TRUNCATE TABLE "glyph""#,
     );
 }
@@ -731,7 +711,7 @@ fn oracle_shim_fires_on_a_string() {
         .value(Glyph::Aspect, 1)
         .order_by(Glyph::Id, Order::Asc)
         .limit(1)
-        .to_string(QueryBuilder);
+        .to_string();
     crate::oracle::assert_eq!(rendered, rendered.clone());
 }
 

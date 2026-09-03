@@ -16,12 +16,12 @@ impl MigrationTrait for Migration {
             )
             .col(ColumnDef::new(Cake::Name).string().not_null())
             .to_owned();
-        tx.execute(&table.build(QueryBuilder), &[]).await?;
+        tx.execute(&table.to_string(), &[]).await?;
 
         let index = Index::create(Cake::Table, Cake::Name)
             .name("cake_name_index")
             .to_owned();
-        tx.execute(&index.build(QueryBuilder), &[]).await?;
+        tx.execute(&index.to_string(), &[]).await?;
 
         Ok(())
     }

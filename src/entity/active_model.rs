@@ -22,7 +22,7 @@ pub use ActiveValue::NotSet;
 ///
 /// ```
 /// use pgorm::tests_cfg::{cake, fruit};
-/// use pgorm::{entity::*, pgorm_query::QueryBuilder, query::*};
+/// use pgorm::{entity::*, query::*};
 ///
 /// // The code snipped below does an UPDATE operation on a `ActiveValue`
 /// assert_eq!(
@@ -33,7 +33,7 @@ pub use ActiveValue::NotSet;
 ///     })
 ///     .expect("the primary key is set")
 ///     .as_query()
-///     .to_string(QueryBuilder),
+///     .to_string(),
 ///     r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#
 /// );
 /// ```
