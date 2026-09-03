@@ -1238,6 +1238,28 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.drop-issues
+                title "Delete the inherited sea-orm issue-repro tree"
+                kind @chore
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T18:04:10.497947Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T18:05:00.588306Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 

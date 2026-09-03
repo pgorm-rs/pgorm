@@ -29,7 +29,6 @@ specs ({
         exclude (
             target/**
             sea-orm/**
-            issues/**
             examples/**
         )
     })

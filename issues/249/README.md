@@ -1,1 +1,0 @@
-# Demo of a pure logic crate depending on pgorm with no enabled features

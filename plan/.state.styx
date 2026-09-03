@@ -386,6 +386,7 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
     {id polish.deps-latest, kind @complete, author "brendan@necessary.nu", at 2026-09-03T17:00:56.136197Z}
+    {id polish.drop-issues, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:05:00.588306Z}
 )
 
 impl_evidence (
