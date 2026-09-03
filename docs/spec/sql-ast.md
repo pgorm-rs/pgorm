@@ -261,8 +261,12 @@ today, including panicking edges and deliberate failsafes.
 
 ## INSERT statements
 
-> [spec:pgorm:def:sql.ast.insert]
-> `InsertStatement` is the INSERT AST node: a target table (`into_table`), a
+> [spec:pgorm:def:sql.ast.insert+1]
+> `InsertStatement` is the INSERT AST node: a target table (`into_table`,
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]` — a name
+> with an optional alias, which is the whole of what PostgreSQL's insert target
+> admits, so a subquery, values list or function call cannot be inserted into,
+> and an alias renders as `INSERT INTO "t" AS "a"`), a
 > column list (`columns`, which replaces any previous list), a value source, an
 > optional `OnConflict`, an optional `ReturningClause`, and an optional
 > default-values row count. The value source (`InsertValueSource`) is either
@@ -324,19 +328,24 @@ today, including panicking edges and deliberate failsafes.
 
 ## UPDATE and DELETE statements
 
-> [spec:pgorm:req:sql.ast.update]
+> [spec:pgorm:req:sql.ast.update+1]
 > `UpdateStatement` MUST accumulate SET assignments in call order as
 > `(column, expression)` pairs: `values(pairs)` pushes many, `value(col, expr)`
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::cust` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table`, a WHERE `ConditionHolder` (per `sql.ast.condition.holder`), ORDER BY
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`, so
+> the target is a name with an optional alias and nothing else, rendering
+> `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
+> (per `sql.ast.condition.holder`), ORDER BY
 > expressions, an optional LIMIT, and an optional `ReturningClause`.
 > `get_values` MUST expose the accumulated assignment pairs for inspection.
 
-> [spec:pgorm:def:sql.ast.delete]
+> [spec:pgorm:def:sql.ast.delete+1]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table`, a WHERE `ConditionHolder` shared with the condition rules, ORDER
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`,
+> a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
+> bound — a WHERE `ConditionHolder` shared with the condition rules, ORDER
 > BY expressions, an optional LIMIT, and an optional `ReturningClause`. Like
 > the other write statements it can be prefixed with a WITH clause via
 > `with(..)`, producing a `WithQuery`.

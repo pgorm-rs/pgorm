@@ -9,7 +9,7 @@ use inherent::inherent;
 ///
 /// [`InsertValueSource`] is a node in the expression tree and can represent a raw value set
 /// ('VALUES') or a select query.
-// [spec:pgorm:def:sql.ast.insert]
+// [spec:pgorm:def:sql.ast.insert+1]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum InsertValueSource {
     Values(Vec<Vec<SimpleExpr>>),
@@ -35,11 +35,11 @@ pub(crate) enum InsertValueSource {
 ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (5.15, '12A'), (4.21, '123')"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.insert]
+// [spec:pgorm:def:sql.ast.insert+1]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
     pub(crate) replace: bool,
-    pub(crate) table: Option<Box<FromItem>>,
+    pub(crate) table: Option<NamedTable>,
     pub(crate) columns: Vec<DynIden>,
     pub(crate) source: Option<InsertValueSource>,
     pub(crate) on_conflict: Option<OnConflict>,
@@ -55,14 +55,33 @@ impl InsertStatement {
 
     /// Specify which table to insert into.
     ///
+    /// The target is a name, optionally aliased — the alias is what `ON
+    /// CONFLICT DO UPDATE` refers back to:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table.into_named_table().alias(Alias::new("g")))
+    ///     .columns([Glyph::Image])
+    ///     .values_panic(["12A".into()])
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(QueryBuilder),
+    ///     r#"INSERT INTO "glyph" AS "g" ("image") VALUES ('12A')"#
+    /// );
+    /// ```
+    ///
     /// # Examples
     ///
     /// See [`InsertStatement::values`]
+    // [spec:pgorm:def:sql.ast.insert+1]
     pub fn into_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoFromItem,
+        T: IntoNamedTable,
     {
-        self.table = Some(Box::new(tbl_ref.into_from_item()));
+        self.table = Some(tbl_ref.into_named_table());
         self
     }
 

@@ -909,7 +909,7 @@ pub(crate) fn join_tbl_on_condition(
 /// table it names, or the alias the value-producing forms are bound to.
 pub(crate) fn unpack_table_ref(from_item: &FromItem) -> DynIden {
     match from_item {
-        FromItem::Table(name, _) => SeaRc::clone(name.table()),
+        FromItem::Table(table) => SeaRc::clone(table.name.table()),
         FromItem::SubQuery(_, alias)
         | FromItem::ValuesList(_, alias)
         | FromItem::FunctionCall(_, alias) => SeaRc::clone(alias),

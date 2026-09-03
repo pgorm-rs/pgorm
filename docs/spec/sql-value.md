@@ -235,9 +235,12 @@ including panic semantics and quirks inherited from sea-query.
 > 2-tuple to `TableColumn`, a 3-tuple to `SchemaTableColumn`, the `Asterisk`
 > unit type to `Asterisk`, and `(iden, Asterisk)` to `TableAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+1]
+> [spec:pgorm:def:sql.types.table-ref+2]
 > Table references are split by position, so that a reference which names no
-> table cannot reach a statement that needs one.
+> table cannot reach a statement that needs one. There are three positions,
+> and each takes the widest type its position admits: DDL targets a name,
+> DML targets a name with an optional alias, and a `FROM` clause or join
+> additionally admits the value-producing forms.
 >
 > `TableName` is the DDL-position reference and has exactly two forms:
 > `Table(DynIden)` and `SchemaTable(DynIden, DynIden)`. There is no
@@ -247,22 +250,34 @@ including panic semantics and quirks inherited from sea-query.
 > unchanged. `TableName::table()` returns the table iden;
 > `TableName::schema()` returns the schema iden when the name carries one.
 >
-> `FromItem` is the query-position reference: `Table(TableName,
-> Option<DynIden>)` — a name with an alias bound beside it rather than folded
-> into the variant — plus the three value-producing forms
-> `SubQuery(SelectStatement, alias)`, `ValuesList(Vec<ValueTuple>, alias)` and
-> `FunctionCall(FunctionCall, alias)`, each carrying a mandatory alias.
-> `IntoFromItem` maps a bare iden and a 2-tuple to the unaliased named form,
-> and accepts a `TableName` or a `FromItem` unchanged; `From<TableName> for
-> FromItem` is the same widening as a value conversion. `FromItem::alias(a)`
-> binds or replaces the alias on any form. `FromItem::table_name()` returns
-> the name for the named form and `None` for the value-producing forms;
-> `FromItem::qualifier()` returns the identifier a column of the item is
+> `NamedTable` is the DML-position reference: a struct of a `name: TableName`
+> and an `alias: Option<DynIden>`, which is exactly what PostgreSQL's write
+> statements target. `IntoNamedTable` accepts a `NamedTable` unchanged and
+> widens anything `IntoTableName` accepts — a bare iden, a 2-tuple, a
+> `TableName` — to the unaliased form, so a DML target spelled as a bare name
+> needs no ceremony; `From<TableName> for NamedTable` is the same widening as
+> a value conversion. `NamedTable::alias(a)` binds or replaces the alias, and
+> `NamedTable::qualifier()` returns the identifier a column of the table is
 > qualified by — the bound alias when there is one, otherwise the table iden.
 >
-> Because every DDL target takes `TableName` and every query position takes
-> `FromItem`, an alias, subquery, values list or function call in a DDL
-> position is a type error rather than a render-time panic
+> `FromItem` is the query-position reference: `Table(NamedTable)` — the DML
+> reference reused, so aliasing is expressed in one place — plus the three
+> value-producing forms `SubQuery(SelectStatement, alias)`,
+> `ValuesList(Vec<ValueTuple>, alias)` and `FunctionCall(FunctionCall,
+> alias)`, each carrying a mandatory alias. `IntoFromItem` accepts a
+> `FromItem` unchanged and widens anything `IntoNamedTable` accepts;
+> `From<NamedTable> for FromItem` and `From<TableName> for FromItem` are the
+> same widening as value conversions. `FromItem::alias(a)` binds or replaces
+> the alias on any form. `FromItem::table_name()` returns the name for the
+> named form and `None` for the value-producing forms;
+> `FromItem::qualifier()` returns the identifier a column of the item is
+> qualified by, delegating to `NamedTable::qualifier()` for the named form.
+>
+> Because every DDL target takes `TableName`, every DML target takes
+> `NamedTable` and every query position takes `FromItem`, a subquery, values
+> list or function call in a DDL or DML position is a type error rather than a
+> render-time panic or a statement PostgreSQL rejects; an alias in a DDL
+> position is a type error for the same reason
 > (`[spec:pgorm:sem:sql.ddl.panics+2]`).
 
 > [spec:pgorm:def:sql.types.opers+1]

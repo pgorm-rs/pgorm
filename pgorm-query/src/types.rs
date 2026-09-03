@@ -156,15 +156,16 @@ pub trait IntoColumnRef {
 /// Table::truncate().table(sub);
 /// ```
 ///
-/// Nor does an aliased table, whose alias only means anything in a query:
+/// Nor does an aliased table: binding an alias makes it a [`NamedTable`], and
+/// an alias means nothing to a statement that only names the catalogue entry:
 ///
 /// ```compile_fail,E0277
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// Table::truncate().table(Glyph::Table.into_from_item().alias(Alias::new("g")));
+/// Table::truncate().table(Glyph::Table.into_named_table().alias(Alias::new("g")));
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+1]
-// [spec:pgorm:sem:sql.ddl.panics+2/test]    the DDL-position panics are gone because the shapes
+// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:sem:sql.ddl.panics+3/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableName {
@@ -175,23 +176,95 @@ pub enum TableName {
 }
 
 /// Conversion into the [`TableName`] a DDL statement targets.
-// [spec:pgorm:def:sql.types.table-ref+1]
+// [spec:pgorm:def:sql.types.table-ref+2]
 pub trait IntoTableName {
     /// Consume `self` and produce a [`TableName`]
     fn into_table_name(self) -> TableName;
 }
 
-/// An entry in a `FROM` clause, a join, or the target of a DML statement.
+/// A table name with an optional alias: the target of an `INSERT`, `UPDATE` or
+/// `DELETE`, and the named form of a [`FromItem`].
+///
+/// PostgreSQL's write statements target a relation by name and may bind an
+/// alias to it, and nothing else — so this is the type they take, and the
+/// alias reads back in the statement:
+///
+/// ```
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// let target = Glyph::Table.into_named_table().alias(Alias::new("g"));
+/// assert_eq!(
+///     Query::delete()
+///         .from_table(target)
+///         .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+///         .to_string(QueryBuilder),
+///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
+/// );
+/// ```
+///
+/// The value-producing [`FromItem`] forms name no relation, so none of them
+/// reaches a write target. A subquery does not:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// let sub = FromItem::SubQuery(
+///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
+///     Alias::new("q").into_iden(),
+/// );
+/// Query::insert().into_table(sub);
+/// ```
+///
+/// nor a values list:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// let values = FromItem::ValuesList(
+///     vec![(1i32,).into_value_tuple()],
+///     Alias::new("v").into_iden(),
+/// );
+/// Query::update().table(values);
+/// ```
+///
+/// nor a function call:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// let func = FromItem::FunctionCall(
+///     Func::cust(Alias::new("generate_series")).arg(1i32),
+///     Alias::new("f").into_iden(),
+/// );
+/// Query::delete().from_table(func);
+/// ```
+// [spec:pgorm:def:sql.types.table-ref+2]
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedTable {
+    /// The table this reference names
+    pub name: TableName,
+    /// The alias bound to the name, when one is
+    pub alias: Option<DynIden>,
+}
+
+/// Conversion into the [`NamedTable`] a DML statement targets.
+// [spec:pgorm:def:sql.types.table-ref+2]
+pub trait IntoNamedTable {
+    /// Consume `self` and produce a [`NamedTable`]
+    fn into_named_table(self) -> NamedTable;
+}
+
+/// An entry in a `FROM` clause or a join.
 ///
 /// A named table carries its alias beside it rather than in the variant, so
 /// aliasing is orthogonal to how the name is qualified; the value-producing
 /// forms carry the alias Postgres requires of them.
-// [spec:pgorm:def:sql.types.table-ref+1]
+// [spec:pgorm:def:sql.types.table-ref+2]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FromItem {
-    /// A named table with an optional alias
-    Table(TableName, Option<DynIden>),
+    /// A table name with an optional alias
+    Table(NamedTable),
     /// Subquery with alias
     SubQuery(SelectStatement, DynIden),
     /// Values list with alias
@@ -201,7 +274,7 @@ pub enum FromItem {
 }
 
 /// Conversion into a [`FromItem`].
-// [spec:pgorm:def:sql.types.table-ref+1]
+// [spec:pgorm:def:sql.types.table-ref+2]
 pub trait IntoFromItem {
     /// Consume `self` and produce a [`FromItem`]
     fn into_from_item(self) -> FromItem;
@@ -579,7 +652,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+1]
+// [spec:pgorm:def:sql.types.table-ref+2]
 impl TableName {
     /// The table identifier, without its schema
     pub fn table(&self) -> &DynIden {
@@ -597,47 +670,78 @@ impl TableName {
     }
 }
 
+impl IntoNamedTable for NamedTable {
+    fn into_named_table(self) -> NamedTable {
+        self
+    }
+}
+
+impl<T: 'static> IntoNamedTable for T
+where
+    T: IntoTableName,
+{
+    fn into_named_table(self) -> NamedTable {
+        NamedTable {
+            name: self.into_table_name(),
+            alias: None,
+        }
+    }
+}
+
+// [spec:pgorm:def:sql.types.table-ref+2]
+impl NamedTable {
+    /// Bind an alias to the name, replacing any alias already bound
+    pub fn alias<A>(self, alias: A) -> Self
+    where
+        A: IntoIden,
+    {
+        Self {
+            name: self.name,
+            alias: Some(alias.into_iden()),
+        }
+    }
+
+    /// The identifier a column of this table is qualified by: the alias when
+    /// one is bound, otherwise the table identifier.
+    pub fn qualifier(&self) -> &DynIden {
+        self.alias.as_ref().unwrap_or_else(|| self.name.table())
+    }
+}
+
+impl From<TableName> for NamedTable {
+    fn from(name: TableName) -> Self {
+        Self { name, alias: None }
+    }
+}
+
 impl IntoFromItem for FromItem {
     fn into_from_item(self) -> FromItem {
         self
     }
 }
 
-impl IntoFromItem for TableName {
-    fn into_from_item(self) -> FromItem {
-        FromItem::Table(self, None)
-    }
-}
-
 impl<T: 'static> IntoFromItem for T
 where
-    T: IntoIden,
+    T: IntoNamedTable,
 {
     fn into_from_item(self) -> FromItem {
-        FromItem::Table(TableName::Table(self.into_iden()), None)
+        FromItem::Table(self.into_named_table())
     }
 }
 
-impl<S: 'static, T: 'static> IntoFromItem for (S, T)
-where
-    S: IntoIden,
-    T: IntoIden,
-{
-    fn into_from_item(self) -> FromItem {
-        FromItem::Table(
-            TableName::SchemaTable(self.0.into_iden(), self.1.into_iden()),
-            None,
-        )
+impl From<NamedTable> for FromItem {
+    fn from(table: NamedTable) -> Self {
+        Self::Table(table)
     }
 }
 
 impl From<TableName> for FromItem {
     fn from(name: TableName) -> Self {
-        Self::Table(name, None)
+        Self::Table(name.into())
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+1]
+// [spec:pgorm:def:sql.types.table-ref+2]
 impl FromItem {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
@@ -645,7 +749,7 @@ impl FromItem {
         A: IntoIden,
     {
         match self {
-            Self::Table(table, _) => Self::Table(table, Some(alias.into_iden())),
+            Self::Table(table) => Self::Table(table.alias(alias)),
             Self::SubQuery(statement, _) => Self::SubQuery(statement, alias.into_iden()),
             Self::ValuesList(values, _) => Self::ValuesList(values, alias.into_iden()),
             Self::FunctionCall(func, _) => Self::FunctionCall(func, alias.into_iden()),
@@ -655,7 +759,7 @@ impl FromItem {
     /// The name of the table this item reads, when it names one
     pub fn table_name(&self) -> Option<&TableName> {
         match self {
-            Self::Table(name, _) => Some(name),
+            Self::Table(table) => Some(&table.name),
             Self::SubQuery(_, _) | Self::ValuesList(_, _) | Self::FunctionCall(_, _) => None,
         }
     }
@@ -664,9 +768,8 @@ impl FromItem {
     /// one is bound, otherwise the table identifier.
     pub fn qualifier(&self) -> &DynIden {
         match self {
-            Self::Table(name, None) => name.table(),
-            Self::Table(_, Some(alias))
-            | Self::SubQuery(_, alias)
+            Self::Table(table) => table.qualifier(),
+            Self::SubQuery(_, alias)
             | Self::ValuesList(_, alias)
             | Self::FunctionCall(_, alias) => alias,
         }

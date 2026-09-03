@@ -1481,7 +1481,9 @@ fn relation_trait_and_ownership_direction() {
 #[test]
 fn relation_def_record_and_combinators() {
     use pgorm::{Identity, IntoIdentity, RelationType};
-    use pgorm_query::{Alias, ConditionType, FromItem, IntoCondition, QueryBuilder, TableName};
+    use pgorm_query::{
+        Alias, ConditionType, FromItem, IntoCondition, NamedTable, QueryBuilder, TableName,
+    };
 
     // Start from a definition carrying every optional attribute.
     let def: RelationDef = RelationDef::from(
@@ -1528,7 +1530,7 @@ fn relation_def_record_and_combinators() {
     let aliased = baker::Relation::Bakery.def().from_alias(Alias::new("b2"));
     assert!(matches!(
         &aliased.from_tbl,
-        FromItem::Table(TableName::Table(table), Some(alias))
+        FromItem::Table(NamedTable { name: TableName::Table(table), alias: Some(alias) })
             if table.to_string() == "baker" && alias.to_string() == "b2"
     ));
     // Joining through the re-pointed definition qualifies the source side of
@@ -1844,20 +1846,14 @@ fn relation_def_converts_to_foreign_key_forms() {
     // a bare table on both sides, and the derived name uses the bare name too.
     let qualified = RelationDef {
         rel_type: RelationType::HasOne,
-        from_tbl: FromItem::Table(
-            TableName::SchemaTable(
-                Alias::new("warehouse").into_iden(),
-                Alias::new("child").into_iden(),
-            ),
-            None,
-        ),
-        to_tbl: FromItem::Table(
-            TableName::SchemaTable(
-                Alias::new("warehouse").into_iden(),
-                Alias::new("parent").into_iden(),
-            ),
-            None,
-        ),
+        from_tbl: FromItem::from(TableName::SchemaTable(
+            Alias::new("warehouse").into_iden(),
+            Alias::new("child").into_iden(),
+        )),
+        to_tbl: FromItem::from(TableName::SchemaTable(
+            Alias::new("warehouse").into_iden(),
+            Alias::new("parent").into_iden(),
+        )),
         columns: ColumnPairs::new(Alias::new("parent_id"), Alias::new("id")),
         is_owner: false,
         on_delete: None,

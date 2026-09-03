@@ -29,10 +29,10 @@ use inherent::inherent;
 ///     r#"DELETE FROM "glyph" WHERE "id" < 1 OR "id" > 10"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.delete]
+// [spec:pgorm:def:sql.ast.delete+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
-    pub(crate) table: Option<Box<FromItem>>,
+    pub(crate) table: Option<NamedTable>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) orders: Vec<OrderExpr>,
     pub(crate) limit: Option<Value>,
@@ -62,12 +62,29 @@ impl DeleteStatement {
     ///     r#"DELETE FROM "glyph" WHERE "id" = 1"#
     /// );
     /// ```
+    ///
+    /// The target is a name, optionally aliased:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::delete()
+    ///     .from_table(Glyph::Table.into_named_table().alias(Alias::new("g")))
+    ///     .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(QueryBuilder),
+    ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.delete+1]
     #[allow(clippy::wrong_self_convention)]
     pub fn from_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoFromItem,
+        T: IntoNamedTable,
     {
-        self.table = Some(Box::new(tbl_ref.into_from_item()));
+        self.table = Some(tbl_ref.into_named_table());
         self
     }
 

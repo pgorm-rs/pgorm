@@ -491,8 +491,8 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///
 /// let relation = RelationDef {
 ///     rel_type: RelationType::HasOne,
-///     from_tbl: FromItem::Table(TableName::Table(Alias::new("foo").into_iden()), None),
-///     to_tbl: FromItem::Table(TableName::Table(Alias::new("bar").into_iden()), None),
+///     from_tbl: FromItem::from(TableName::Table(Alias::new("foo").into_iden())),
+///     to_tbl: FromItem::from(TableName::Table(Alias::new("bar").into_iden())),
 ///     columns: ColumnPairs::new(Alias::new("bar_id"), Alias::new("bar_id")),
 ///     is_owner: false,
 ///     on_delete: None,

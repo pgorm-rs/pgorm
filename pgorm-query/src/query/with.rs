@@ -101,12 +101,11 @@ impl CommonTableExpression {
     }
 
     fn derived_table_name(from: &FromItem) -> Option<DynIden> {
-        let FromItem::Table(name, alias) = from else {
+        let FromItem::Table(table) = from else {
             return None;
         };
-        let iden = alias.as_ref().unwrap_or_else(|| name.table());
 
-        Some(Alias::new(format!("cte_{}", iden.to_string())).into_iden())
+        Some(Alias::new(format!("cte_{}", table.qualifier().to_string())).into_iden())
     }
 
     /// Set up the columns of the CTE to match the given [SelectStatement] selected columns.

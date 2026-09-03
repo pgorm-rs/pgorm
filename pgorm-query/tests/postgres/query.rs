@@ -1113,7 +1113,7 @@ fn select_62() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.insert/test]
+// [spec:pgorm:def:sql.ast.insert+1/test]
 // [spec:pgorm:req:sql.render.insert/test]
 // [spec:pgorm:def:sql.render.value-literals+1/test]
 #[test]
@@ -1612,7 +1612,7 @@ fn insert_returning_specific_columns() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.update/test]
+// [spec:pgorm:req:sql.ast.update+1/test]
 #[test]
 // [spec:pgorm:req:sql.render.update-delete/test]
 fn update_1() {
@@ -1700,7 +1700,7 @@ fn update_returning_specified_columns() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.delete/test]
+// [spec:pgorm:def:sql.ast.delete+1/test]
 #[test]
 // [spec:pgorm:req:sql.render.update-delete/test]
 fn delete_1() {

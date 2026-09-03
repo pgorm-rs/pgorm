@@ -125,7 +125,7 @@ impl QueryBuilder {
 
         if let Some(table) = &insert.table {
             write!(sql, " INTO ").unwrap();
-            self.prepare_from_item(table, sql);
+            self.prepare_named_table(table, sql);
         }
 
         if let (Some(num_rows), true, true) = (
@@ -314,7 +314,7 @@ impl QueryBuilder {
         write!(sql, "UPDATE ").unwrap();
 
         if let Some(table) = &update.table {
-            self.prepare_from_item(table, sql);
+            self.prepare_named_table(table, sql);
         }
 
         write!(sql, " SET ").unwrap();
@@ -374,7 +374,7 @@ impl QueryBuilder {
 
         if let Some(table) = &delete.table {
             write!(sql, "FROM ").unwrap();
-            self.prepare_from_item(table, sql);
+            self.prepare_named_table(table, sql);
         }
 
         self.prepare_output(&delete.returning, sql);
@@ -636,13 +636,7 @@ impl QueryBuilder {
     // [spec:pgorm:req:sql.render.subquery+1] (value-bearing from items carry mandatory aliases)
     fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
         match from_item {
-            FromItem::Table(name, alias) => {
-                self.prepare_table_name(name, sql);
-                if let Some(alias) = alias {
-                    write!(sql, " AS ").unwrap();
-                    alias.prepare(sql.as_writer(), self.quote());
-                }
-            }
+            FromItem::Table(table) => self.prepare_named_table(table, sql),
             FromItem::SubQuery(query, alias) => {
                 write!(sql, "(").unwrap();
                 self.prepare_select_statement(query, sql);
@@ -1508,7 +1502,7 @@ impl QueryBuilder {
 
     // COMMON
     // START: impl that ought not be here
-    // [spec:pgorm:sem:sql.ddl.panics+2]
+    // [spec:pgorm:sem:sql.ddl.panics+3]
     // [spec:pgorm:def:sql.render.ddl.types+3] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
@@ -2318,6 +2312,16 @@ impl QueryBuilder {
                 write!(sql, ".").unwrap();
                 table.prepare(sql.as_writer(), self.quote());
             }
+        }
+    }
+
+    /// Translate [`NamedTable`] into SQL statement.
+    // [spec:pgorm:def:sql.types.table-ref+2]
+    fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
+        self.prepare_table_name(&table.name, sql);
+        if let Some(alias) = &table.alias {
+            write!(sql, " AS ").unwrap();
+            alias.prepare(sql.as_writer(), self.quote());
         }
     }
 

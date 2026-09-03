@@ -28,10 +28,10 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1.23, "image" = '123' WHERE "id" = 1"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ast.update]
+// [spec:pgorm:req:sql.ast.update+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
-    pub(crate) table: Option<Box<FromItem>>,
+    pub(crate) table: Option<NamedTable>,
     pub(crate) values: Vec<(DynIden, Box<SimpleExpr>)>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) orders: Vec<OrderExpr>,
@@ -47,15 +47,33 @@ impl UpdateStatement {
 
     /// Specify which table to update.
     ///
+    /// The target is a name, optionally aliased:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::update()
+    ///     .table(Glyph::Table.into_named_table().alias(Alias::new("g")))
+    ///     .value(Glyph::Aspect, 1.23)
+    ///     .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(QueryBuilder),
+    ///     r#"UPDATE "glyph" AS "g" SET "aspect" = 1.23 WHERE "g"."id" = 1"#
+    /// );
+    /// ```
+    ///
     /// # Examples
     ///
     /// See [`UpdateStatement::values`]
+    // [spec:pgorm:req:sql.ast.update+1]
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
-        T: IntoFromItem,
+        T: IntoNamedTable,
     {
-        self.table = Some(Box::new(tbl_ref.into_from_item()));
+        self.table = Some(tbl_ref.into_named_table());
         self
     }
 
@@ -79,7 +97,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.update]
+    // [spec:pgorm:req:sql.ast.update+1]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,

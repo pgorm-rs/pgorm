@@ -4,7 +4,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use pgorm_query::{
-    ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, SimpleExpr, TableName, ValueTuple,
+    ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, NamedTable, SimpleExpr, TableName,
+    ValueTuple,
 };
 use std::{collections::HashMap, str::FromStr};
 
@@ -452,10 +453,14 @@ fn prepare_condition(
 // [spec:pgorm:req:query.loader.table-ref-limitation+2]
 fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, DbErr> {
     match tbl.to_owned() {
-        FromItem::Table(TableName::Table(tbl), None) => Ok((tbl, col.clone()).into_column_ref()),
-        FromItem::Table(TableName::SchemaTable(sch, tbl), None) => {
-            Ok((sch, tbl, col.clone()).into_column_ref())
-        }
+        FromItem::Table(NamedTable {
+            name: TableName::Table(tbl),
+            alias: None,
+        }) => Ok((tbl, col.clone()).into_column_ref()),
+        FromItem::Table(NamedTable {
+            name: TableName::SchemaTable(sch, tbl),
+            alias: None,
+        }) => Ok((sch, tbl, col.clone()).into_column_ref()),
         val => Err(query_err(format!(
             "Loader cannot qualify key column `{}` against table reference {val:?}: only \
              unaliased `FromItem::Table` relation targets are supported",
