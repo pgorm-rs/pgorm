@@ -56,7 +56,7 @@ pub use tokio_postgres;
 
 pub use self::config::{
     ChannelBinding, Config, ConfigError, LoadBalanceHosts, ManagerConfig, RecyclingMethod, SslMode,
-    TargetSessionAttrs,
+    StatementCacheSize, TargetSessionAttrs,
 };
 
 pub use self::generic_client::GenericClient;
@@ -171,7 +171,8 @@ impl managed::Manager for Manager {
 
     async fn create(&self) -> Result<ClientWrapper, Error> {
         let (client, conn_task) = self.connect.connect(&self.pg_config).await?;
-        let client_wrapper = ClientWrapper::new(client, conn_task);
+        let client_wrapper =
+            ClientWrapper::with_cache_size(client, conn_task, self.config.statement_cache);
         self.statement_caches
             .attach(&client_wrapper.statement_cache);
         Ok(client_wrapper)
@@ -256,7 +257,7 @@ where
 
 /// Structure holding a reference to all [`StatementCache`]s and providing
 /// access for clearing all caches and removing single statements from them.
-// [spec:pgorm:sem:conn.pool.statement-cache]    manager-level registry
+// [spec:pgorm:sem:conn.pool.statement-cache+1]    manager-level registry
 #[derive(Default, Debug)]
 pub struct StatementCaches {
     caches: Mutex<Vec<Weak<StatementCache>>>,
@@ -307,7 +308,7 @@ impl fmt::Debug for StatementCache {
 
 // Allows us to use owned keys in a `HashMap`, but still be able to call `get`
 // with borrowed keys instead of allocating them each time.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct StatementCacheKey<'a> {
     query: Cow<'a, str>,
     types: Cow<'a, [Type]>,
@@ -332,17 +333,19 @@ struct StatementCacheKey<'a> {
 /// Normally, you probably want to use the [`ClientWrapper::prepare_cached()`]
 /// and [`ClientWrapper::prepare_typed_cached()`] methods instead (or the
 /// similar ones on [`Transaction`]).
-// [spec:pgorm:sem:conn.pool.statement-cache]
+// [spec:pgorm:sem:conn.pool.statement-cache+1]
 pub struct StatementCache {
     map: RwLock<HashMap<StatementCacheKey<'static>, Statement>>,
     size: AtomicUsize,
+    capacity: StatementCacheSize,
 }
 
 impl StatementCache {
-    fn new() -> Self {
+    fn new(capacity: StatementCacheSize) -> Self {
         Self {
             map: RwLock::new(HashMap::new()),
             size: AtomicUsize::new(0),
+            capacity,
         }
     }
 
@@ -390,16 +393,38 @@ impl StatementCache {
         self.map.read().unwrap().get(&key).map(ToOwned::to_owned)
     }
 
-    /// Inserts a [`Statement`] into this [`StatementCache`].
+    /// Inserts a [`Statement`] into this [`StatementCache`], evicting an
+    /// existing entry first if the cache is already at its capacity.
+    ///
+    /// The victim is whichever entry the map yields first, not the least
+    /// recently used: recency would have to be written on every lookup, turning
+    /// the read lock a cache hit takes today into an exclusive one. What the
+    /// bound is for is stopping unbounded growth, and any victim achieves that.
+    // [spec:pgorm:req:conn.pool.statement-cache.bound]    evict one to make room
     fn insert(&self, query: &str, types: &[Type], stmt: Statement) {
+        let Some(capacity) = self.capacity.limit() else {
+            return;
+        };
         let key = StatementCacheKey {
             query: Cow::Owned(query.to_owned()),
             types: Cow::Owned(types.to_owned()),
         };
-        let mut map = self.map.write().unwrap();
-        if map.insert(key, stmt).is_none() {
-            let _ = self.size.fetch_add(1, Ordering::Relaxed);
-        }
+
+        // The evicted statement is dropped after the guard, because dropping the
+        // last handle to a `Statement` queues a `Close` on the connection.
+        let evicted = {
+            let mut map = self.map.write().unwrap();
+            let victim = if map.len() >= capacity.get() && !map.contains_key(&key) {
+                map.keys().next().cloned()
+            } else {
+                None
+            };
+            let evicted = victim.and_then(|victim| map.remove(&victim));
+            let _ = map.insert(key, stmt);
+            self.size.store(map.len(), Ordering::Relaxed);
+            evicted
+        };
+        drop(evicted);
     }
 
     /// Creates a new prepared [`Statement`] using this [`StatementCache`], if
@@ -413,13 +438,21 @@ impl StatementCache {
     /// Creates a new prepared [`Statement`] with specifying its [`Type`]s
     /// explicitly using this [`StatementCache`], if possible.
     ///
+    /// Under [`StatementCacheSize::Disabled`] nothing is stored or looked up,
+    /// so this is [`tokio_postgres::Client::prepare_typed()`] itself.
+    ///
     /// See [`tokio_postgres::Client::prepare_typed()`].
+    // [spec:pgorm:req:conn.pool.statement-cache.bound]    Disabled prepares afresh
     pub async fn prepare_typed(
         &self,
         client: &PgClient,
         query: &str,
         types: &[Type],
     ) -> Result<Statement, Error> {
+        if self.capacity.limit().is_none() {
+            return client.prepare_typed(query, types).await;
+        }
+
         match self.get(query, types) {
             Some(statement) => Ok(statement),
             None => {
@@ -447,13 +480,26 @@ pub struct ClientWrapper {
 
 impl ClientWrapper {
     /// Create a new [`ClientWrapper`] instance using the given
-    /// [`tokio_postgres::Client`] and handle to the connection task.
+    /// [`tokio_postgres::Client`] and handle to the connection task, with a
+    /// statement cache of the default size.
     #[must_use]
     pub fn new(client: PgClient, conn_task: JoinHandle<()>) -> Self {
+        Self::with_cache_size(client, conn_task, StatementCacheSize::default())
+    }
+
+    /// [`ClientWrapper::new`] with the size of the connection's
+    /// [`StatementCache`] chosen explicitly, as [`ManagerConfig`] does.
+    // [spec:pgorm:req:conn.pool.statement-cache.bound]    per-connection capacity
+    #[must_use]
+    pub fn with_cache_size(
+        client: PgClient,
+        conn_task: JoinHandle<()>,
+        cache_size: StatementCacheSize,
+    ) -> Self {
         Self {
             client,
             conn_task,
-            statement_cache: Arc::new(StatementCache::new()),
+            statement_cache: Arc::new(StatementCache::new(cache_size)),
         }
     }
 

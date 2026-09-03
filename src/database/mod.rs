@@ -6,7 +6,9 @@ pub use db_connection::*;
 pub use tokio_postgres::{Config, IsolationLevel};
 
 use crate::error::Error;
-use pgorm_pool::{BuildError, Manager, ManagerConfig, Pool, PoolBuilder, RecyclingMethod};
+use pgorm_pool::{
+    BuildError, Manager, ManagerConfig, Pool, PoolBuilder, RecyclingMethod, StatementCacheSize,
+};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio_postgres::NoTls;
 
@@ -30,6 +32,7 @@ pub fn connect(config: Config) -> DatabasePool {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
         tag: None,
+        statement_cache: StatementCacheSize::default(),
     };
     let mgr = Manager::from_config(config, NoTls, mgr_config);
     let pool = Pool::builder(mgr)
@@ -54,6 +57,7 @@ pub fn connect_with_builder(
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
         tag: None,
+        statement_cache: StatementCacheSize::default(),
     };
     let mgr = Manager::from_config(config, NoTls, mgr_config);
     build(Pool::builder(mgr))
@@ -81,6 +85,7 @@ pub fn connect_multi_with_builder(
             let mgr_config = ManagerConfig {
                 recycling_method: RecyclingMethod::Fast,
                 tag: Some(key),
+                statement_cache: StatementCacheSize::default(),
             };
 
             let mgr = Manager::from_config(config.clone(), NoTls, mgr_config);

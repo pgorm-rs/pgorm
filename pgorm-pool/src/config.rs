@@ -3,6 +3,7 @@
 use std::{
     env, fmt,
     net::IpAddr,
+    num::NonZeroUsize,
     str::FromStr,
     sync::{
         Arc,
@@ -383,10 +384,58 @@ impl RecyclingMethod {
     }
 }
 
-/// Configuration object for a [`Manager`].
+/// How many prepared statements one connection's
+/// [`StatementCache`](super::StatementCache) may hold.
 ///
-/// This currently only makes it possible to specify which [`RecyclingMethod`]
-/// should be used when retrieving existing objects from the [`Pool`].
+/// The key space is the SQL text, and one logical query can produce many texts:
+/// an `IN` list rendered with a placeholder per element is a different text at
+/// every arity. A cache that grew with it would hold server-side prepared
+/// statements the connection never uses again, so the size is capped and
+/// insertion into a full cache evicts to make room.
+///
+/// There is deliberately no unbounded variant — that is the growth this type
+/// exists to stop, and a caller who wants an effectively unlimited cache can
+/// say so with a large [`Bounded`](StatementCacheSize::Bounded). A zero bound
+/// is unrepresentable for the same reason: it would be
+/// [`Disabled`](StatementCacheSize::Disabled) spelled a second way.
+// [spec:pgorm:req:conn.pool.statement-cache.bound]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+pub enum StatementCacheSize {
+    /// Hold at most this many statements per connection.
+    Bounded(NonZeroUsize),
+
+    /// Cache nothing: every statement is prepared afresh and closed when the
+    /// last handle to it drops, as if no cache existed.
+    Disabled,
+}
+
+/// The default bound, an order of magnitude above the worst measured spread of
+/// one logical query (25 texts, from 25 `IN`-list arities), and small enough
+/// that even a large pool keeps its server-side statement count in the low
+/// thousands.
+const DEFAULT_STATEMENT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(256) {
+    Some(size) => size,
+    None => NonZeroUsize::MIN,
+};
+
+// [spec:pgorm:req:conn.pool.statement-cache.bound]    the default bound
+impl Default for StatementCacheSize {
+    fn default() -> Self {
+        Self::Bounded(DEFAULT_STATEMENT_CACHE_SIZE)
+    }
+}
+
+impl StatementCacheSize {
+    /// The cap, or `None` when nothing is to be cached.
+    pub(crate) fn limit(self) -> Option<NonZeroUsize> {
+        match self {
+            Self::Bounded(limit) => Some(limit),
+            Self::Disabled => None,
+        }
+    }
+}
+
+/// Configuration object for a [`Manager`].
 ///
 /// [`Manager`]: super::Manager
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -397,6 +446,11 @@ pub struct ManagerConfig {
     /// Tag
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+
+    /// How many prepared statements each connection caches, and whether it
+    /// caches at all. See [`StatementCacheSize`].
+    #[serde(default)]
+    pub statement_cache: StatementCacheSize,
 }
 
 static DEFAULT_TAG_COUNT: AtomicUsize = AtomicUsize::new(0);

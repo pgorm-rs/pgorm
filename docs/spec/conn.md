@@ -85,7 +85,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > intentionally omits `DEALLOCATE ALL`/`DISCARD PLANS` so cached prepared
 > statements survive recycling; `Custom(sql)` runs caller-provided SQL.
 
-> [spec:pgorm:sem:conn.pool.statement-cache]
+> [spec:pgorm:sem:conn.pool.statement-cache+1]
 > Each `ClientWrapper` carries an `Arc<StatementCache>` keyed by `(query text,
 > parameter types)`. `prepare_cached` / `prepare_typed_cached` return the
 > cached `tokio_postgres::Statement` on hit and prepare-then-insert on miss.
@@ -94,14 +94,112 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > holds weak references to every live cache and supports `clear()` and
 > `remove(query, types)` across all pooled connections.
 >
-> The cache is opt-in: pgorm's `ConnectionTrait` methods pass statements
-> straight to `tokio_postgres` (which prepares internally per call site) and do
-> not consult the `StatementCache`; only callers invoking `prepare_cached` /
-> `prepare_typed_cached` on the wrapper types benefit from it.
+> The cache is on the ordinary execution path, not beside it: every
+> `ConnectionTrait` method that carries SQL text resolves it through the cache
+> (`conn.pool.conn-trait`), so one text is parsed once per connection rather
+> than once per call. What still bypasses it is `tokio_postgres`'s own
+> statement surface — `Client::query`, `Transaction::execute` and their
+> siblings prepare an unnamed statement per call and consult nothing — which is
+> what pgorm-pool's `Client`/`Transaction` expose by `Deref` and what a caller
+> reaching past `ConnectionTrait` gets.
+>
+> A cached statement outlives the call that prepared it. That is the point, and
+> two things follow from it: the cache is capacity-bounded
+> (`conn.pool.statement-cache.bound`), because the key space is not, and a
+> cached plan can be invalidated by DDL under it
+> (`conn.pool.statement-cache.invalidate`).
+
+> [spec:pgorm:req:conn.pool.statement-cache.bound]
+> A `StatementCache` MUST be bounded. Its key space is the SQL text, and one
+> logical query spreads across many texts — an `IN` list rendered with a
+> placeholder per element is a different text at every arity, 25 of them for one
+> measured query — while every entry is a live server-side prepared statement
+> that `Fast` and `Clean` recycling both deliberately keep
+> (`conn.pool.recycle`). Unbounded, the cache would hold statements the
+> connection will never run again for as long as the connection lives.
+>
+> `ManagerConfig::statement_cache: StatementCacheSize` carries the bound, per
+> connection: `Bounded(NonZeroUsize)`, defaulting to 256, or `Disabled`. There
+> is deliberately no unbounded variant — that is the growth the type exists to
+> stop, and a caller wanting an effectively unlimited cache says so with a large
+> `Bounded` — and no zero bound, which would be `Disabled` spelled a second way.
+> The default is an order of magnitude above the worst measured spread of a
+> single query and keeps even a large pool's server-side statement count in the
+> low thousands.
+>
+> Inserting into a full cache MUST evict an existing entry before inserting, and
+> MUST NOT panic or refuse. The victim is whichever entry the map yields first,
+> not the least recently used: recency would have to be written on every lookup,
+> making the read lock a cache hit takes today an exclusive one, and the bound
+> exists to stop growth rather than to maximise the hit rate. Re-inserting a key
+> the cache already holds replaces it and evicts nothing.
+>
+> `Disabled` stores and looks up nothing, so `prepare_cached` is
+> `prepare_typed` itself: every call parses its own statement and closes it when
+> the last handle drops, which is the behaviour that predates the routing of
+> `conn.pool.conn-trait`. It is the opt-out for a caller who would rather pay
+> the parse than reason about a plan cached across DDL.
+>
+> Evicting a statement — like disabling the cache, and like recycling with SQL
+> that deallocates — drops pgorm's last handle to it only once the caller has
+> dropped the rows it produced, because a `tokio_postgres::Row` holds the
+> statement it was decoded against. The `Close` reaches the server when that
+> happens, not when the entry leaves the map.
+>
+> pgorm's own `connect`, `connect_with_builder` and `connect_multi_with_builder`
+> (`conn.pool`, `conn.pool.multi`) build their `Manager` themselves and always
+> take the default; reaching the knob means constructing a `pgorm_pool::Manager`
+> directly, as custom TLS does.
+
+> [spec:pgorm:req:conn.pool.statement-cache.invalidate]
+> Reusing a prepared statement admits one failure that preparing afresh does
+> not: PostgreSQL raises SQLSTATE `0A000` — *cached plan must not change result
+> type* — when a statement's plan is revalidated and the result it would now
+> produce no longer matches the description the client was given. DDL under a
+> live cache entry is how that happens: `SELECT *` over a table that gained a
+> column, or a projection whose column changed type. Three neighbouring cases
+> were probed and are NOT hazards. PostgreSQL re-plans two of them itself:
+> changing `search_path` so the same text resolves to a different table, and
+> dropping and recreating the table a cached statement names. The third is a
+> statement first prepared inside a transaction that then rolls back — the cache
+> is the connection's, shared with every transaction on it (`conn.tx`), so this
+> would leave an entry naming a statement the rollback had discarded. It does
+> not: a statement parsed over the extended protocol is not undone by
+> `ROLLBACK`, and the cached entry keeps working.
+>
+> When a statement resolved through the cache fails with `0A000`, pgorm MUST
+> evict that key and re-prepare it exactly once, then execute again. A second
+> `0A000` MUST reach the caller as the `Error::Postgres` it is: the recovery is
+> a single retry, never a loop, because a plan that is stale twice running is
+> not a plan going stale.
+>
+> Only the four methods whose parameters are a reusable `&[&(dyn ToSql + Sync)]`
+> slice can retry. `execute_raw` and `query_raw` take an `IntoIterator` consumed
+> by the first attempt, which is not `Clone` and cannot be held across the retry
+> without a `Send` bound `ConnectionTrait` does not carry, so they evict the
+> rejected key and return the error — which leaves the next call to re-prepare,
+> making the recovery one call later rather than absent. A statement passed as
+> an already-prepared `tokio_postgres::Statement` is never cache-resolved
+> (`conn.sql-text`), so it is never retried; there is no text to prepare again
+> from.
+>
+> `0A000` is also PostgreSQL's generic *feature not supported*, and nothing but
+> the message text — which is localized — separates the two. A statement
+> rejected on its own merits is therefore retried once as well and fails
+> identically, costing one round trip on a call that was already failing. That
+> is preferred to matching on prose.
+>
+> One case is out of reach of this rule rather than absent from it. A recycling
+> method whose SQL deallocates — `Custom("DISCARD ALL")`, which is exactly what
+> `Clean` avoids (`conn.pool.recycle`) — drops every server-side statement while
+> the cache keeps naming them, and the next use fails with SQLSTATE `26000`,
+> which is not retried. pgorm's own pools recycle with `Fast`, so they cannot
+> reach it; a caller assembling a `Manager` with such a method should pair it
+> with `StatementCacheSize::Disabled`.
 
 ## Statement execution surface
 
-> [spec:pgorm:def:conn.sql-text]
+> [spec:pgorm:def:conn.sql-text+1]
 > `SqlText` answers `fn sql_text(&self) -> Option<&str>` for a statement.
 > `ToStatement` is sealed by tokio-postgres and admits exactly three types: a
 > `str` and a `String` are the SQL, and answer with themselves; a prepared
@@ -111,13 +209,17 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > papered over.
 >
 > The trait exists so that code generic over `T: ToStatement` can look at the
-> SQL at all — `metric.fingerprint` is the only caller in tree — and
-> `ConnectionTrait`'s six generic methods therefore carry it as a bound
-> alongside `ToStatement`. Since `SqlText` is implemented for every type
+> SQL at all, and `ConnectionTrait`'s six generic methods therefore carry it as
+> a bound alongside `ToStatement`. Two callers use it: `metric.fingerprint`, to
+> identify a query it is reporting on, and `conn.pool.conn-trait`, to key the
+> statement cache. Both read the same `None` the same way — a prepared
+> `Statement` is a statement whose text pgorm never saw, so there is nothing to
+> fingerprint and nothing to cache, and each passes it along untouched rather
+> than inventing a text. Since `SqlText` is implemented for every type
 > `ToStatement` admits, the added bound rejects no call site that compiled
 > without it.
 
-> [spec:pgorm:def:conn.pool.conn-trait+4]
+> [spec:pgorm:def:conn.pool.conn-trait+5]
 > `ConnectionTrait` is the uniform statement-execution surface over
 > connections and transactions. It defines seven async methods. Six are
 > generic over `T: ?Sized + ToStatement + SqlText + Send + Sync` — the second
@@ -131,6 +233,17 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > which takes the same `BorrowToSql` iterator as `execute_raw` and returns
 > the unbuffered row stream of `exec.stream`. Errors map to
 > `Error::Postgres`.
+>
+> All six resolve the statement through the connection's `StatementCache`
+> (`conn.pool.statement-cache`) before executing it, so a text executed twice on
+> one connection is parsed once. The seam is `conn.sql-text`: a statement that
+> answers `Some(sql)` is looked up, and prepared and inserted on a miss; a
+> statement that answers `None` — an already-prepared
+> `tokio_postgres::Statement`, which is what it is because it has already been
+> prepared — is passed through untouched. What the cache returns is bound to the
+> connection the call is running on, so nothing crosses connections that did not
+> already. A rejected cached plan is evicted and retried under
+> `conn.pool.statement-cache.invalidate`.
 >
 > The seventh, `batch_execute(sql: &str) -> ()`, is neither generic nor
 > parameterized: it sends `sql` through the simple-query protocol, so the
@@ -146,8 +259,10 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > must be built from trusted input.
 >
 > It is implemented for `DatabaseConnection`, `&DatabaseConnection`, and
-> `DatabaseTransaction`, each delegating directly to the underlying
-> `pgorm-pool` client or transaction — `batch_execute` through
+> `DatabaseTransaction`, each resolving through the cache its underlying
+> `pgorm-pool` client or transaction owns and then delegating to it — the three
+> share one cache per physical connection, since a transaction's is its
+> client's (`conn.tx`) — with `batch_execute` going through
 > `GenericClient::batch_execute` (`conn.pool.generic-client`), which is
 > otherwise unreachable from pgorm because the wrapper types' inner fields are
 > crate-private.

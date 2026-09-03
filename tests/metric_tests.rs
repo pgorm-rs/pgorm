@@ -245,6 +245,56 @@ pub async fn query_opt_reports_one_row_or_zero() -> Result<(), Error> {
     Ok(())
 }
 
+// [spec:pgorm:req:metric.layer.delegate+4/test]    a cache hit is still a reported call
+// [spec:pgorm:def:conn.pool.conn-trait+5/test]    the wrapper inherits the routing it delegates to
+#[pgorm_macros::test]
+pub async fn cached_statements_still_report_each_call() -> Result<(), Error> {
+    const SQL: &str = "SELECT id FROM widget WHERE id = 1";
+
+    let ctx = TestContext::new("metric_layer_cached_metriccache").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let conn = pool.get().await?;
+    conn.batch_execute("CREATE TABLE widget (id int primary key)")
+        .await?;
+    conn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+        .await?;
+
+    for _ in 0..3 {
+        assert_eq!(conn.query_all(SQL, &[]).await?.len(), 1);
+    }
+
+    assert_eq!(
+        metrics.count("query_success:query_all:Some(1)"),
+        3,
+        "every call reports, whether it parsed a statement or reused one: {:?}",
+        metrics.events()
+    );
+    assert!(
+        metrics
+            .queries()
+            .iter()
+            .filter(|query| query.operation == "query_all")
+            .all(|query| query.sql.as_deref() == Some(SQL)),
+        "the context still carries the caller's own text"
+    );
+
+    let prepared: i64 = conn
+        .query_one(
+            "SELECT count(*) FROM pg_prepared_statements WHERE statement = $1",
+            &[&SQL],
+        )
+        .await?
+        .get(0);
+    assert_eq!(prepared, 1, "three reported calls, one parse");
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
 // [spec:pgorm:req:metric.layer.delegate+4/test]    batch_execute reports a rowless success
 #[pgorm_macros::test]
 pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), Error> {
@@ -511,7 +561,7 @@ pub async fn wrappers_expose_inner_and_metrics() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.sql-text/test]    what each statement form answers
+// [spec:pgorm:def:conn.sql-text+1/test]    what each statement form answers
 #[pgorm_macros::test]
 pub async fn sql_text_answers_with_the_statement_text() {
     let owned = "SELECT id FROM widget WHERE id = $1".to_owned();

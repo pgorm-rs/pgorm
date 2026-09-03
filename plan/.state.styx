@@ -332,6 +332,7 @@ assertions (
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
+    {id infra.statement-cache, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:23:45.108082Z}
     {id infra.statement-verify, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:19:44.577055Z}
     {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
     {id infra.tx.batch, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:36:48.34752Z}

@@ -858,12 +858,20 @@ children (
                 id infra.statement-cache
                 title "Route ConnectionTrait through the statement cache: evict-once on 0A000, bounded keys"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-03T20:37:59.772606Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Implements [dec:pgorm:prepared-statement-reuse] (probe evidence on spike/prepared-api, prototype in its src/main.rs): the six extended-protocol ConnectionTrait methods resolve SqlText::sql_text() through the connection's existing StatementCache (prepare_cached); a passed tokio_postgres::Statement (sql_text() None) goes through untouched. Three concerns in one node: (1) routing — three impls in src/database/db_connection.rs; (2) invalidation — on SQLSTATE 0A000 (cached plan must not change result type, the one hazard reuse introduces; probed: search_path changes and table recreation are re-planned fine by PG) evict the key via StatementCaches::remove and re-prepare ONCE, second failure surfaces; (3) bound — capacity cap with eviction plus a ManagerConfig opt-out (key space is unbounded: 25 IN-list arities = 25 entries; Clean recycling deliberately keeps entries). Measured 2.30x on real ORM queries at 4ms RTT; misses linear in pool size not query count. Spec: bump conn.pool.statement-cache (its cache-is-opt-in paragraph becomes false) and conn.pool.conn-trait; new rules for invalidate + bound. Note eq-any's paved road exists partly for this: eq_any keeps one SQL text across list cardinalities."
+                    }
+
+                    {
+                        at 2026-09-03T21:23:45.108082Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

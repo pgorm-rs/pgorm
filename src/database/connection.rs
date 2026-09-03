@@ -9,20 +9,21 @@ use super::DatabaseTransaction;
 /// The SQL text behind a statement, where the statement still carries it.
 ///
 /// [`ToStatement`] is sealed by tokio-postgres and hides which of its two forms
-/// a caller passed, so a wrapper that wants to look at the SQL — to fingerprint
-/// it, to log it — has no way to ask. This trait is that question, answered by
+/// a caller passed, so code that wants to look at the SQL — to key a statement
+/// cache on it, to fingerprint it, to log it — has no way to ask. This trait is
+/// that question, answered by
 /// each of the three types `ToStatement` admits: a `str` or `String` is the SQL
 /// itself, while a prepared [`Statement`] holds only the server-side name it
 /// was assigned, its parameter types, and its result columns. The text is gone
 /// by then, so the answer is [`None`] rather than a reconstruction.
-// [spec:pgorm:def:conn.sql-text]
+// [spec:pgorm:def:conn.sql-text+1]
 pub trait SqlText {
     /// The statement's SQL text, or `None` when the statement no longer carries
     /// it.
     fn sql_text(&self) -> Option<&str>;
 }
 
-// [spec:pgorm:def:conn.sql-text]    the three shapes ToStatement admits
+// [spec:pgorm:def:conn.sql-text+1]    the three shapes ToStatement admits
 impl SqlText for str {
     fn sql_text(&self) -> Option<&str> {
         Some(self)
@@ -43,7 +44,15 @@ impl SqlText for Statement {
 
 /// The generic API for a database connection that can perform query or execute statements.
 /// It abstracts database connection and transaction
-// [spec:pgorm:def:conn.pool.conn-trait+4]
+///
+/// The six statement methods go through the extended protocol and resolve the
+/// statement through the connection's prepared-statement cache, so a SQL text
+/// executed twice on one connection is parsed once. An already-prepared
+/// [`Statement`] is passed through untouched. The seventh, [`batch_execute`],
+/// uses the simple-query protocol and prepares nothing.
+///
+/// [`batch_execute`]: ConnectionTrait::batch_execute
+// [spec:pgorm:def:conn.pool.conn-trait+5]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a SQL statement with its bound parameters, returning the number
