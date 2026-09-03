@@ -1,6 +1,6 @@
 [package]
 name = "pgorm-pool"
-version = "0.14.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]

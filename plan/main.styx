@@ -1287,6 +1287,22 @@ children (
                 id polish.version-unify
                 title "Every workspace crate is version 0.2.0"
                 kind @build
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T18:41:41.078448Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T18:42:04.066056Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

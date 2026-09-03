@@ -1,6 +1,6 @@
 [package]
 name = "pgorm-sql-macro"
-version = "0.1.0"
+version = "0.2.0"
 authors = []
 edition = "2024"
 description = "Compile-time PostgreSQL grammar validation for raw SQL string literals"

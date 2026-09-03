@@ -1,6 +1,6 @@
 [package]
 name = "pgorm-query"
-version = "0.32.0-rc.1"
+version = "0.2.0"
 authors = [
     "Chris Tsang <chris.2y3@outlook.com>",
     "Billy Chan <ccw.billy.123@gmail.com>",
@@ -25,8 +25,8 @@ path = "src/lib.rs"
 
 [dependencies]
 inherent = "1.0.14"
-pgorm-query-attr = { version = "0.1.1", path = "pgorm-query-attr", default-features = false, optional = true }
-pgorm-query-derive = { version = "0.4.0", path = "pgorm-query-derive", default-features = false, optional = true }
+pgorm-query-attr = { version = "0.2.0", path = "pgorm-query-attr", default-features = false, optional = true }
+pgorm-query-derive = { version = "0.2.0", path = "pgorm-query-derive", default-features = false, optional = true }
 serde_json = { version = "1.0.151", default-features = false, features = ["std"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 postgres-types = { version = "0.2.14", default-features = false }

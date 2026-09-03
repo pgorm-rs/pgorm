@@ -3,7 +3,7 @@ members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool"
 
 [package]
 name = "pgorm"
-version = "0.1.0"
+version = "0.2.0"
 authors = []
 edition = "2024"
 description = "An async ORM for PostgreSQL"
@@ -45,8 +45,8 @@ futures = { version = "0.3.34", default-features = false, features = ["std"] }
 log = { version = "0.4.34", default-features = false }
 rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-features = false, optional = true }
 pg_query = "6.2.0"
-pgorm-macros = { version = "~1.0.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
-pgorm-sql-macro = { version = "0.1.0", path = "pgorm-sql-macro", optional = true }
+pgorm-macros = { version = "0.2.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
+pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro", optional = true }
 pgorm-query.workspace = true
 strum = { version = "0.28", default-features = false }
 serde_json = { version = "1.0.151", default-features = false, optional = true }

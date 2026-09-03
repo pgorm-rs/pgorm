@@ -389,6 +389,7 @@ assertions (
     {id polish.drop-issues, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:05:00.588306Z}
     {id polish.drop-vendor-dirs, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:20:11.658061Z}
     {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
+    {id polish.version-unify, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:42:04.066056Z}
 )
 
 impl_evidence (

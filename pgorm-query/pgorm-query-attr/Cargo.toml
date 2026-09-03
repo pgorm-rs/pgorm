@@ -1,6 +1,6 @@
 [package]
 name = "pgorm-query-attr"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Pedro Henrique <hello@exst.fun>"]
 edition = "2024"
 description = "Proc macros for pgorm-query"
