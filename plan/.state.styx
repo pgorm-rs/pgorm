@@ -277,6 +277,7 @@ derived_priorities (
     {id orm.binding-types, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
     {id orm.try-insert-conflicted, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id orm.value-decode, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
+    {id polish.claude-md, priority 1, derived_at 2026-09-02T01:19:32.415791Z}
     {id polish.conn-acquire, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id polish.error-dead-code, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id polish.gates, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
@@ -334,6 +335,7 @@ assertions (
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
     {id infra.statement-cache, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:23:45.108082Z}
+    {id infra.statement-identity, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:04:27.327139Z}
     {id infra.statement-verify, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:19:44.577055Z}
     {id infra.tx-review, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:29:29.481195Z}
     {id infra.tx.batch, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:36:48.34752Z}
@@ -401,7 +403,7 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id infra.statement-identity, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:04:27.327139Z}
+    {id polish.bare-gates, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:43:45.696061Z}
 )
 
 impl_evidence (

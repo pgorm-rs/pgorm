@@ -24,10 +24,6 @@ commit {
     type-prefix "required"
 }
 
-adoption {
-    scope "maintenance"
-}
-
 quality {
     // scaffold templates are starting shapes for downstream
     // crates, not code any structural gate can judge

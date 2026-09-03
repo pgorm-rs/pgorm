@@ -1399,6 +1399,21 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.bare-gates
+                title "Delete the adoption-era grandfathering: quality baseline and adoption scope"
+                kind @chore
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T22:43:45.696061Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 
