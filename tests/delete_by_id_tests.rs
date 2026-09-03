@@ -5,7 +5,7 @@ pub use common::{TestContext, features::*, setup::*};
 use pgorm::{DatabaseConnection, IntoActiveModel, entity::prelude::*};
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("delete_by_id_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -20,7 +20,7 @@ async fn main() -> Result<(), DbErr> {
 
 // [spec:pgorm:sem:exec.crud.delete/test]    `DeleteMany::exec` reports rows
 // affected, and deleting zero rows is `Ok(0)` rather than an error
-pub async fn create_and_delete_applog(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_delete_applog(db: &DatabaseConnection) -> Result<(), Error> {
     let log1 = applog::Model {
         id: 1,
         action: "Testing".to_owned(),

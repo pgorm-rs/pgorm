@@ -2,7 +2,7 @@ use migration::Migrator;
 use pgorm_migration::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt::init();
 
     let url = std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");

@@ -1,6 +1,6 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityName, EntityTrait, IdenStatic,
-    IntoActiveModel, Iterable, PrimaryKeyTrait, QueryTrait, RuntimeErr,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IdenStatic,
+    IntoActiveModel, Iterable, PrimaryKeyTrait, QueryTrait, RuntimeError,
 };
 use core::marker::PhantomData;
 use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
@@ -60,7 +60,7 @@ impl InsertColumns {
 
 /// Names the columns each side of a mismatch sets and the other does not,
 /// dropping the side that has none.
-fn columns_mismatch_err(first_only: &[String], later_only: &[String]) -> DbErr {
+fn columns_mismatch_err(first_only: &[String], later_only: &[String]) -> Error {
     let sides = [
         (first_only, "set in the first model but not in a later one"),
         (later_only, "set in a later model but not in the first"),
@@ -70,7 +70,7 @@ fn columns_mismatch_err(first_only: &[String], later_only: &[String]) -> DbErr {
     .map(|(names, side)| format!("{} {side}", quoted_columns(names)))
     .collect::<Vec<_>>();
 
-    DbErr::Query(RuntimeErr::Internal(format!(
+    Error::Query(RuntimeError::Internal(format!(
         "models added to one insert do not share a column set: {}",
         sides.join("; ")
     )))
@@ -127,7 +127,7 @@ where
 
     /// Whether the statement carries no column at all: either no model was
     /// added, or every model added left every column `NotSet`.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.columns, InsertColumns::Empty { .. })
     }
@@ -137,10 +137,10 @@ where
     /// [`add`](Self::add) returns `Self` so that calls chain, so a model whose
     /// present columns disagree with the first model's is recorded rather than
     /// reported there. Every execution path asks here and fails with the
-    /// resulting [`DbErr::Query`] before sending any SQL; callers that want the
+    /// resulting [`Error::Query`] before sending any SQL; callers that want the
     /// error sooner can ask directly.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
-    pub fn ensure_uniform_columns(&self) -> Result<(), DbErr> {
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
+    pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
         match &self.columns {
             InsertColumns::Mismatch {
                 first_only,
@@ -222,7 +222,7 @@ where
     /// added contributes neither columns nor values; the disagreement is
     /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
     /// and by every execution path.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     // [spec:pgorm:sem:query.build.insert+1]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
@@ -373,7 +373,7 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
     pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -414,7 +414,7 @@ where
 ///
 /// All functions works the same as if it is `Insert<A>`. Please refer to the
 /// `Insert<A>` page for more information
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
 #[derive(Debug)]
 pub struct TryInsert<A>
 where
@@ -495,8 +495,8 @@ where
 
     /// The columns mismatch recorded while models were added, if any; see
     /// [`Insert::ensure_uniform_columns`].
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
-    pub fn ensure_uniform_columns(&self) -> Result<(), DbErr> {
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
+    pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
         self.insert_struct.ensure_uniform_columns()
     }
 }

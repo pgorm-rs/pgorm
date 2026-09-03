@@ -4,8 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    ActiveEnum, ActiveEnumValue, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait, DbErr,
-    EntityTrait, FromQueryResult, Iterable, NotSet, QueryFilter, QueryResult, QuerySelect,
+    ActiveEnum, ActiveEnumValue, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait,
+    EntityTrait, Error, FromQueryResult, Iterable, NotSet, QueryFilter, QueryResult, QuerySelect,
     QueryTrait, TryFromU64, Value, entity::prelude::*,
 };
 use pgorm_query::{ArrayType, Expr, Query, QueryBuilder, SimpleExpr, StringLen};
@@ -25,10 +25,10 @@ fn expr_sql(e: SimpleExpr) -> String {
 // entity.traits.active-enum
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.active-enum/test]    the `ActiveEnum` surface:
+// [spec:pgorm:def:entity.traits.active-enum+1/test]    the `ActiveEnum` surface:
 // `name()` as the database enum's identifier, `to_value` / `into_value` mapping
 // a variant to its backing value, `try_from_value` as the fallible reverse
-// (`DbErr` for an unknown value), `db_type()` as the column definition,
+// (`Error` for an unknown value), `db_type()` as the column definition,
 // `as_enum()` wrapping a value in a cast to the enum's type name, and `values()`
 // enumerating every variant in iterator order
 #[test]
@@ -54,7 +54,7 @@ fn active_enum_trait_surface() {
     assert_eq!(Color::Black.to_value(), 0);
     assert_eq!(Color::White.to_value(), 1);
 
-    // `try_from_value` is the reverse mapping; unknown values are a `DbErr`.
+    // `try_from_value` is the reverse mapping; unknown values are an `Error`.
     assert_eq!(
         Tea::try_from_value(&"EverydayTea".to_owned()).unwrap(),
         Tea::EverydayTea
@@ -67,8 +67,8 @@ fn active_enum_trait_surface() {
 
     let err = Tea::try_from_value(&"OolongTea".to_owned()).unwrap_err();
     assert!(
-        matches!(err, DbErr::Type(_)),
-        "unknown value must be a DbErr::Type, got {err:?}"
+        matches!(err, Error::Type(_)),
+        "unknown value must be an Error::Type, got {err:?}"
     );
     assert!(Color::try_from_value(&99).is_err());
 
@@ -122,9 +122,9 @@ fn active_enum_trait_surface() {
 
 fn assert_is_active_enum_value<T: ActiveEnumValue>() {}
 
-// [spec:pgorm:req:entity.traits.active-enum.limits+1/test]    `ActiveEnumValue` is
+// [spec:pgorm:req:entity.traits.active-enum.limits+2/test]    `ActiveEnumValue` is
 // implemented for exactly `String`, `i8`, `i16`, `i32`, `i64` and `u32`, and the
-// blanket `TryFromU64` impl for every `ActiveEnum` returns `DbErr::ConvertFromU64`
+// blanket `TryFromU64` impl for every `ActiveEnum` returns `Error::ConvertFromU64`
 // — which is why an active-enum primary key has to declare `auto_increment = false`
 #[test]
 fn active_enum_value_limits() {
@@ -139,7 +139,7 @@ fn active_enum_value_limits() {
     // Every `ActiveEnum` is `TryFromU64`, and every such conversion refuses.
     let err = <Tea as TryFromU64>::try_from_u64(1).unwrap_err();
     assert!(
-        matches!(err, DbErr::ConvertFromU64(_)),
+        matches!(err, Error::ConvertFromU64(_)),
         "expected ConvertFromU64, got {err:?}"
     );
     assert!(<Category as TryFromU64>::try_from_u64(0).is_err());
@@ -157,13 +157,13 @@ fn active_enum_value_limits() {
 struct U32VecProbe;
 
 impl FromQueryResult for U32VecProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         <u32 as ActiveEnumValue>::try_get_vec_by(res, "ids")?;
         Ok(Self)
     }
 }
 
-// [spec:pgorm:req:entity.traits.active-enum.limits+1/test]    reading an array of
+// [spec:pgorm:req:entity.traits.active-enum.limits+2/test]    reading an array of
 // enum values is a Postgres-only capability, and `u32` is not covered by
 // `postgres-array`, so `try_get_vec_by` errors rather than decoding
 #[pgorm_macros::test]
@@ -176,7 +176,7 @@ fn active_enum_u32_vec_read_errors() {
         .await
         .expect_err("a `u32` enum array cannot be decoded");
     assert!(
-        matches!(err, DbErr::Type(ref msg) if msg.contains("postgres-array")),
+        matches!(err, Error::Type(ref msg) if msg.contains("postgres-array")),
         "expected a postgres-array type error, got {err:?}"
     );
 
@@ -346,7 +346,7 @@ fn json_column_flattens_json_array_without_cast() {
 // real round trip: values written through the enum cast read back as the
 // original variants
 #[pgorm_macros::test]
-async fn enum_cast_round_trip() -> Result<(), DbErr> {
+async fn enum_cast_round_trip() -> Result<(), Error> {
     use pgorm::{ConnectionTrait, Schema};
 
     let ctx = TestContext::new("enum_cast_round_trip").await;

@@ -45,6 +45,6 @@ async fn caller_attributes_are_passed_through() {
 /// The return type is carried over too, so a fallible body still works.
 // [spec:pgorm:sem:macros.derive.test-attr+1/test]
 #[pgorm_macros::test]
-async fn the_return_type_is_preserved() -> Result<(), pgorm::DbErr> {
+async fn the_return_type_is_preserved() -> Result<(), pgorm::Error> {
     Ok(())
 }

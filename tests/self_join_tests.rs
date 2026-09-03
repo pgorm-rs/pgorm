@@ -7,7 +7,7 @@ use pgorm::{DatabaseConnection, IntoActiveModel, QueryOrder, entity::prelude::*,
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("self_join_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -20,7 +20,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let model = self_join::Model {
         uuid: Uuid::new_v4(),
         uuid_ref: None,

@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, DbErr, Delete, DeleteMany, DeleteOne,
+    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, Delete, DeleteMany, DeleteOne, Error,
     FromQueryResult, Insert, ModelTrait, NoColumns, PrimaryKeyToColumn, PrimaryKeyTrait,
     QueryFilter, Related, RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany,
     UpdateOne,
@@ -58,7 +58,7 @@ pub trait EntityName: IdenStatic + Default {
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
 // [spec:pgorm:def:entity.traits]
-// [spec:pgorm:req:entity.traits.crud+1]
+// [spec:pgorm:req:entity.traits.crud+2]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]
     type Model: ModelTrait<Entity = Self> + FromQueryResult;
@@ -110,10 +110,10 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
-    /// // `one` appends `LIMIT 1` and fails with `DbErr::RecordNotFound` when no
+    /// // `one` appends `LIMIT 1` and fails with `Error::RecordNotFound` when no
     /// // row matches; `one_opt` returns `None` in that case instead.
     /// let cake: cake::Model = cake::Entity::find().one(&db).await?;
     /// let maybe_cake: Option<cake::Model> = cake::Entity::find().one_opt(&db).await?;
@@ -144,7 +144,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let sponge_cake: cake::Model = cake::Entity::find_by_id(11).one(&db).await?;
@@ -177,7 +177,7 @@ pub trait EntityTrait: EntityName {
     /// # Panics
     ///
     /// Panics if arity of input values don't match arity of primary key
-    // [spec:pgorm:req:entity.traits.crud+1]
+    // [spec:pgorm:req:entity.traits.crud+2]
     fn find_by_id<T>(values: T) -> Select<Self>
     where
         T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
@@ -205,7 +205,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
@@ -248,7 +248,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
@@ -295,7 +295,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
-    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
     ///
     /// # Example
@@ -303,7 +303,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
@@ -313,7 +313,7 @@ pub trait EntityTrait: EntityName {
     /// };
     ///
     /// // `exec` returns the updated model through `RETURNING`, and fails with
-    /// // `DbErr::RecordNotFound` when the statement matches no row.
+    /// // `Error::RecordNotFound` when the statement matches no row.
     /// let updated: fruit::Model = fruit::Entity::update(orange)?
     ///     .filter(fruit::Column::Name.contains("orange"))
     ///     .exec(&db)
@@ -344,7 +344,7 @@ pub trait EntityTrait: EntityName {
     ///     .join(" ")
     /// );
     /// ```
-    fn update<A>(model: A) -> Result<UpdateOne<A>, DbErr>
+    fn update<A>(model: A) -> Result<UpdateOne<A>, Error>
     where
         A: ActiveModelTrait<Entity = Self>,
     {
@@ -361,7 +361,7 @@ pub trait EntityTrait: EntityName {
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// # use pgorm::pgorm_query::{Expr, Value};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let update_result = fruit::Entity::update_many()
@@ -396,7 +396,7 @@ pub trait EntityTrait: EntityName {
     ///
     /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
     ///
-    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
     ///
     /// # Example
@@ -404,7 +404,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
@@ -435,7 +435,7 @@ pub trait EntityTrait: EntityName {
     ///     r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#
     /// );
     /// ```
-    fn delete<A>(model: A) -> Result<DeleteOne<A>, DbErr>
+    fn delete<A>(model: A) -> Result<DeleteOne<A>, Error>
     where
         A: ActiveModelTrait<Entity = Self>,
     {
@@ -451,7 +451,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let delete_result = fruit::Entity::delete_many()
@@ -484,7 +484,7 @@ pub trait EntityTrait: EntityName {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let delete_result = fruit::Entity::delete_by_id(1).exec(&db).await?;

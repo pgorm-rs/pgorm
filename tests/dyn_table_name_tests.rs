@@ -11,7 +11,7 @@ use pgorm_query::{Expr, Query};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("dyn_table_name_tests").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -24,11 +24,11 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+3/test]    `UpdateMany::exec` returns
+// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateMany::exec` returns
 // `UpdateResult { rows_affected }`
 // [spec:pgorm:sem:exec.crud.delete/test]    `DeleteMany::exec` returns
 // `DeleteResult { rows_affected }`
-pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), Error> {
     use dyn_table_name_lazy_static::*;
 
     for i in 1..=2 {

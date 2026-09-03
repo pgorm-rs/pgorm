@@ -9,7 +9,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DbErr, PaginatorTrait, QuerySelect, RuntimeErr,
+    ActiveValue::Set, DatabaseConnection, Error, PaginatorTrait, QuerySelect, RuntimeError,
     SelectGetableTuple, SelectProjected, Selector, entity::prelude::*,
 };
 use pgorm_query::SelectStatement;
@@ -34,11 +34,11 @@ async fn main() {
     ctx.delete().await;
 }
 
-/// A `DbErr::Query` — rather than a `DbErr::Postgres` carrying `42601` — is the
+/// An `Error::Query` — rather than an `Error::Postgres` carrying `42601` — is the
 /// evidence the statement never left the process.
-fn assert_empty_select_list(err: DbErr) {
-    let DbErr::Query(RuntimeErr::Internal(message)) = &err else {
-        panic!("expected DbErr::Query(RuntimeErr::Internal(..)), got {err:?}");
+fn assert_empty_select_list(err: Error) {
+    let Error::Query(RuntimeError::Internal(message)) = &err else {
+        panic!("expected Error::Query(RuntimeError::Internal(..)), got {err:?}");
     };
     assert_eq!(
         message,
@@ -58,8 +58,8 @@ fn empty_projection() -> SelectProjected<Bakery> {
         .columns(std::iter::empty::<bakery::Column>())
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    every execution path over a
-// statement whose projection list is empty returns DbErr::Query before the
+// [spec:pgorm:sem:query.build.modifiers+3/test]    every execution path over a
+// statement whose projection list is empty returns Error::Query before the
 // statement is sent
 pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     assert_empty_select_list(
@@ -142,7 +142,7 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    a hand-rolled statement,
+// [spec:pgorm:sem:query.build.modifiers+3/test]    a hand-rolled statement,
 // which the typestate never sees, is refused by the same guard
 pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
     assert_empty_select_list(
@@ -153,7 +153,7 @@ pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    a statement whose projection
+// [spec:pgorm:sem:query.build.modifiers+3/test]    a statement whose projection
 // list is non-empty is untouched by the guard
 pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
     Bakery::insert(bakery::ActiveModel {

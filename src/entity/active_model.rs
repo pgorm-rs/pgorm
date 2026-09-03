@@ -68,7 +68,7 @@ impl<V: Into<Value>> From<V> for ActiveValue<V> {
 /// attach an `ON CONFLICT` clause with [`Insert::on_conflict`](crate::Insert::on_conflict).
 ///
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:req:entity.active-model+1]
+// [spec:pgorm:req:entity.active-model+2]
 // [spec:pgorm:req:entity.active-model.save+1]
 #[async_trait]
 pub trait ActiveModelTrait: Clone + Debug {
@@ -82,8 +82,8 @@ pub trait ActiveModelTrait: Clone + Debug {
     fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> ActiveValue<Value>;
 
     /// Set the Value into an ActiveModel, reporting a column this model does not
-    /// carry, or a value of the wrong type for it, as [`DbErr::Type`].
-    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), DbErr>;
+    /// carry, or a value of the wrong type for it, as [`Error::Type`].
+    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), Error>;
 
     /// Set the state of an [ActiveValue] to the not set state
     fn not_set(&mut self, c: <Self::Entity as EntityTrait>::Column);
@@ -158,7 +158,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
@@ -173,7 +173,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # }
     /// ```
     // [spec:pgorm:req:entity.active-model.persistence+1]
-    async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
+    async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         Self: ActiveModelBehavior + 'a,
@@ -196,7 +196,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
@@ -205,13 +205,13 @@ pub trait ActiveModelTrait: Clone + Debug {
     ///     ..Default::default()
     /// };
     ///
-    /// // Fails with `DbErr::RecordNotFound` when the primary key matches no row.
+    /// // Fails with `Error::RecordNotFound` when the primary key matches no row.
     /// let orange: fruit::Model = orange.update(&db).await?;
     /// # Ok(())
     /// # }
     /// ```
     // [spec:pgorm:req:entity.active-model.persistence+1]
-    async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
+    async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         Self: ActiveModelBehavior + 'a,
@@ -230,7 +230,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
@@ -244,7 +244,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # }
     /// ```
     // [spec:pgorm:req:entity.active-model.hooks]
-    async fn delete<'a, C>(self, db: &'a C) -> Result<DeleteResult, DbErr>
+    async fn delete<'a, C>(self, db: &'a C) -> Result<DeleteResult, Error>
     where
         Self: ActiveModelBehavior + 'a,
         C: ConnectionTrait,
@@ -259,9 +259,9 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// Set the corresponding attributes in the ActiveModel from a JSON value
     ///
     /// Note that this method will not alter the primary key values in ActiveModel.
-    // [spec:pgorm:req:entity.active-model.json+1]
+    // [spec:pgorm:req:entity.active-model.json+2]
     #[cfg(feature = "with-json")]
-    fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), DbErr>
+    fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), Error>
     where
         <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         for<'de> <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model:
@@ -290,9 +290,9 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Create ActiveModel from a JSON value
-    // [spec:pgorm:req:entity.active-model.json+1]
+    // [spec:pgorm:req:entity.active-model.json+2]
     #[cfg(feature = "with-json")]
-    fn from_json(json: serde_json::Value) -> Result<Self, DbErr>
+    fn from_json(json: serde_json::Value) -> Result<Self, Error>
     where
         <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
         for<'de> <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model:
@@ -369,7 +369,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
 
     /// Will be called before `ActiveModel::insert` (`insert: true`) and
     /// `ActiveModel::update` (`insert: false`)
-    async fn before_save<C>(self, db: &C, insert: bool) -> Result<Self, DbErr>
+    async fn before_save<C>(self, db: &C, insert: bool) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -382,7 +382,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
         model: <Self::Entity as EntityTrait>::Model,
         db: &C,
         insert: bool,
-    ) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
+    ) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         C: ConnectionTrait,
     {
@@ -390,7 +390,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
     }
 
     /// Will be called before `ActiveModel::delete`
-    async fn before_delete<C>(self, db: &C) -> Result<Self, DbErr>
+    async fn before_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -398,7 +398,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
     }
 
     /// Will be called after `ActiveModel::delete`
-    async fn after_delete<C>(self, db: &C) -> Result<Self, DbErr>
+    async fn after_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -717,7 +717,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::ActiveValue::{NotSet, Set, Unchanged};
-    use crate::{DbErr, entity::*, tests_cfg::*};
+    use crate::{Error, entity::*, tests_cfg::*};
     use pretty_assertions::assert_eq;
 
     #[cfg(feature = "with-json")]
@@ -860,7 +860,7 @@ mod tests {
                 cake_id: Set(None),
             }
             .try_into_model(),
-            Err(DbErr::AttrNotSet(String::from("name")))
+            Err(Error::AttrNotSet(String::from("name")))
         );
 
         assert_eq!(
@@ -870,7 +870,7 @@ mod tests {
                 cake_id: NotSet,
             }
             .try_into_model(),
-            Err(DbErr::AttrNotSet(String::from("cake_id")))
+            Err(Error::AttrNotSet(String::from("cake_id")))
         );
     }
 
@@ -964,7 +964,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "with-json")]
-    fn test_active_model_set_from_json_2() -> Result<(), DbErr> {
+    fn test_active_model_set_from_json_2() -> Result<(), Error> {
         let mut fruit: fruit::ActiveModel = Default::default();
 
         fruit.set_from_json(json!({

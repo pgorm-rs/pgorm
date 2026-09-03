@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 
 use pgorm::{
-    ColumnFromStrErr, ConnectionTrait, DbErr, LoaderTrait, RuntimeErr, entity::prelude::*,
+    ColumnFromStrError, ConnectionTrait, Error, LoaderTrait, RuntimeError, entity::prelude::*,
 };
 use pgorm_pool::{PoolError, Runtime};
 use pretty_assertions::assert_eq;
@@ -23,12 +23,12 @@ impl fmt::Display for Boom {
 
 impl StdError for Boom {}
 
-// [spec:pgorm:def:error.model+3/test]    the variants pgorm constructs itself, and how each renders
+// [spec:pgorm:def:error.model+4/test]    the variants pgorm constructs itself, and how each renders
 #[test]
-fn db_err_variants_render_expected_messages() {
-    let cases: Vec<(DbErr, &str)> = vec![
+fn error_variants_render_expected_messages() {
+    let cases: Vec<(Error, &str)> = vec![
         (
-            DbErr::TryIntoErr {
+            Error::Conversion {
                 from: "i64",
                 into: "u8",
                 source: Box::new(Boom("out of range")),
@@ -36,34 +36,34 @@ fn db_err_variants_render_expected_messages() {
             "Error converting `i64` into `u8`: out of range",
         ),
         (
-            DbErr::Query(RuntimeErr::Internal("bad filter".to_owned())),
+            Error::Query(RuntimeError::Internal("bad filter".to_owned())),
             "Query Error: bad filter",
         ),
         (
-            DbErr::ConvertFromU64("Uuid"),
+            Error::ConvertFromU64("Uuid"),
             "Type 'Uuid' cannot be converted from u64",
         ),
-        (DbErr::UnpackInsertId, "Failed to unpack last_insert_id"),
-        (DbErr::PrimaryKeyNotSet, "A primary key value is not set"),
+        (Error::UnpackInsertId, "Failed to unpack last_insert_id"),
+        (Error::PrimaryKeyNotSet, "A primary key value is not set"),
         (
-            DbErr::AttrNotSet("name".to_owned()),
+            Error::AttrNotSet("name".to_owned()),
             "Attribute name is NotSet",
         ),
         (
-            DbErr::Type("not a date".to_owned()),
+            Error::Type("not a date".to_owned()),
             "Type Error: not a date",
         ),
         (
-            DbErr::Json("not an object".to_owned()),
+            Error::Json("not an object".to_owned()),
             "Json Error: not an object",
         ),
         (
-            DbErr::RecordNotFound,
+            Error::RecordNotFound,
             "No records were returned for the given query",
         ),
-        (DbErr::RecordNotInserted, "None of the records are inserted"),
-        (DbErr::RecordNotUpdated, "None of the records are updated"),
-        (DbErr::Custom("boom".to_owned()), "Custom Error: boom"),
+        (Error::RecordNotInserted, "None of the records are inserted"),
+        (Error::RecordNotUpdated, "None of the records are updated"),
+        (Error::Custom("boom".to_owned()), "Custom Error: boom"),
     ];
 
     for (err, rendered) in cases {
@@ -71,18 +71,18 @@ fn db_err_variants_render_expected_messages() {
     }
 }
 
-// [spec:pgorm:def:error.model+3/test]    PartialEq/Eq compare rendered messages, not payloads
+// [spec:pgorm:def:error.model+4/test]    PartialEq/Eq compare rendered messages, not payloads
 #[test]
-fn db_err_eq_compares_rendered_messages() {
+fn error_eq_compares_rendered_messages() {
     fn assert_is_eq<T: Eq>() {}
-    assert_is_eq::<DbErr>();
+    assert_is_eq::<Error>();
 
-    let from_io = DbErr::TryIntoErr {
+    let from_io = Error::Conversion {
         from: "i64",
         into: "u8",
         source: Box::new(std::io::Error::other("out of range")),
     };
-    let from_boom = DbErr::TryIntoErr {
+    let from_boom = Error::Conversion {
         from: "i64",
         into: "u8",
         source: Box::new(Boom("out of range")),
@@ -92,20 +92,20 @@ fn db_err_eq_compares_rendered_messages() {
         "distinct payloads with identical rendered messages compare equal"
     );
 
-    assert_ne!(DbErr::Custom("a".to_owned()), DbErr::Custom("b".to_owned()));
-    assert_ne!(DbErr::RecordNotFound, DbErr::RecordNotInserted);
-    assert_eq!(DbErr::RecordNotFound, DbErr::RecordNotFound);
+    assert_ne!(Error::Custom("a".to_owned()), Error::Custom("b".to_owned()));
+    assert_ne!(Error::RecordNotFound, Error::RecordNotInserted);
+    assert_eq!(Error::RecordNotFound, Error::RecordNotFound);
 }
 
-// [spec:pgorm:def:error.model+3/test]    ColumnFromStrErr covers FromStr failures on entity columns
+// [spec:pgorm:def:error.model+4/test]    ColumnFromStrError covers FromStr failures on entity columns
 #[test]
-fn column_from_str_err_reports_bad_input() {
+fn column_from_str_error_reports_bad_input() {
     assert!(matches!(
         cake::Column::from_str("gluten_free"),
         Ok(cake::Column::GlutenFree)
     ));
 
-    let err: ColumnFromStrErr =
+    let err: ColumnFromStrError =
         cake::Column::from_str("not_a_column").expect_err("there is no such column");
     assert_eq!(err.0, "not_a_column");
     assert_eq!(
@@ -114,30 +114,49 @@ fn column_from_str_err_reports_bad_input() {
     );
 }
 
-// [spec:pgorm:def:error.model.runtime+2/test]    Internal is the only variant, and the payload of Query
+// [spec:pgorm:def:error.model+4/test]    Result defaults to Error but still takes a foreign one
 #[test]
-fn runtime_err_wraps_internal_message() {
-    let runtime = RuntimeErr::Internal("boom".to_owned());
+fn result_alias_defaults_to_error() {
+    fn defaulted() -> pgorm::Result<u8> {
+        Err(Error::RecordNotFound)
+    }
+
+    fn foreign() -> pgorm::Result<u8, Boom> {
+        Err(Boom("not ours"))
+    }
+
+    let widened: std::result::Result<u8, Error> = defaulted();
+    assert_eq!(
+        widened.expect_err("the alias resolves to Error"),
+        Error::RecordNotFound
+    );
+    assert_eq!(foreign().expect_err("the alias carries Boom").0, "not ours");
+}
+
+// [spec:pgorm:def:error.model.runtime+3/test]    Internal is the only variant, and the payload of Query
+#[test]
+fn runtime_error_wraps_internal_message() {
+    let runtime = RuntimeError::Internal("boom".to_owned());
     // Irrefutable: this only compiles while `Internal` is the sole variant.
-    let RuntimeErr::Internal(message) = &runtime;
+    let RuntimeError::Internal(message) = &runtime;
     assert_eq!(message, "boom");
     assert_eq!(runtime.to_string(), "boom");
 
-    let err = DbErr::Query(RuntimeErr::Internal("boom".to_owned()));
-    let DbErr::Query(inner) = &err else {
-        panic!("expected a RuntimeErr-carrying variant, got {err:?}");
+    let err = Error::Query(RuntimeError::Internal("boom".to_owned()));
+    let Error::Query(inner) = &err else {
+        panic!("expected a RuntimeError-carrying variant, got {err:?}");
     };
-    let RuntimeErr::Internal(message) = inner;
+    let RuntimeError::Internal(message) = inner;
     assert_eq!(message, "boom");
     assert!(
         StdError::source(&err).is_some(),
-        "the RuntimeErr is the error source: {err:?}"
+        "the RuntimeError is the error source: {err:?}"
     );
 }
 
-// [spec:pgorm:def:error.model.runtime+2/test]    a real internal failure arrives as Query(Internal(..))
+// [spec:pgorm:def:error.model.runtime+3/test]    a real internal failure arrives as Query(Internal(..))
 #[pgorm_macros::test]
-async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
+async fn query_err_surfaces_through_loader_misuse() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_runtime_errmodel").await;
     let db = ctx.db.get().await?;
 
@@ -148,8 +167,8 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
         .await
         .expect_err("cake has many lineitems");
 
-    let DbErr::Query(RuntimeErr::Internal(message)) = &err else {
-        panic!("expected DbErr::Query(RuntimeErr::Internal(..)), got {err:?}");
+    let Error::Query(RuntimeError::Internal(message)) = &err else {
+        panic!("expected Error::Query(RuntimeError::Internal(..)), got {err:?}");
     };
     assert_eq!(message, "Relation is HasMany instead of HasOne");
     assert_eq!(
@@ -163,9 +182,9 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+3/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
+// [spec:pgorm:def:error.model+4/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
 #[pgorm_macros::test]
-async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
+async fn error_postgres_carries_server_detail() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_postgres_errmodel").await;
     let db = ctx.db.get().await?;
 
@@ -174,8 +193,8 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
         .await
         .expect_err("there is no such table");
 
-    let DbErr::Postgres(driver) = &err else {
-        panic!("expected DbErr::Postgres, got {err:?}");
+    let Error::Postgres(driver) = &err else {
+        panic!("expected Error::Postgres, got {err:?}");
     };
     let detail = driver
         .as_db_error()
@@ -205,7 +224,7 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
             .map(|_| ())
             .expect_err("query_all fails the same way"),
     ] {
-        assert!(matches!(other, DbErr::Postgres(_)), "{other:?}");
+        assert!(matches!(other, Error::Postgres(_)), "{other:?}");
     }
 
     drop(db);
@@ -214,9 +233,9 @@ async fn db_err_postgres_carries_server_detail() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+3/test]    DatabasePool::get surfaces pool exhaustion as DbErr::Pool
+// [spec:pgorm:def:error.model+4/test]    DatabasePool::get surfaces pool exhaustion as Error::Pool
 #[pgorm_macros::test]
-async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
+async fn error_pool_from_acquisition_timeout() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_pool_errmodel").await;
     let base_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is set by TestContext");
 
@@ -234,7 +253,7 @@ async fn db_err_pool_from_acquisition_timeout() -> Result<(), DbErr> {
         .expect_err("the pool's only connection is checked out");
 
     assert!(
-        matches!(err, DbErr::Pool(PoolError::Timeout(_))),
+        matches!(err, Error::Pool(PoolError::Timeout(_))),
         "expected a wait timeout, got {err:?}"
     );
     assert!(err.to_string().starts_with("Pool Error:"), "{err}");

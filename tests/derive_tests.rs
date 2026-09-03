@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::TestContext;
-use pgorm::{DbErr, FromQueryResult, SelectModel, SelectorRaw, TryGetable};
+use pgorm::{Error, FromQueryResult, SelectModel, SelectorRaw, TryGetable};
 use pgorm_query::Values;
 
 #[derive(FromQueryResult)]
@@ -97,7 +97,7 @@ where
 // empty prefix
 // [spec:pgorm:sem:macros.derive.from-query-result/test]    field-named reads, generics, and `skip`
 #[pgorm_macros::test]
-async fn from_query_result_derive() -> Result<(), DbErr> {
+async fn from_query_result_derive() -> Result<(), Error> {
     let ctx = TestContext::new("derive_tests_from_query_result").await;
     let db = ctx.db.get().await?;
 

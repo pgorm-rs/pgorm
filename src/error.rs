@@ -1,10 +1,9 @@
-use thiserror::Error;
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+3]
-#[derive(Error, Debug)]
-pub enum DbErr {
+// [spec:pgorm:def:error.model+4]
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
     /// Postgres error
     #[error("Postgres Error: {0:?} {db:?}", db = .0.as_db_error())]
     Postgres(#[from] tokio_postgres::Error),
@@ -13,17 +12,17 @@ pub enum DbErr {
     Pool(#[from] pgorm_pool::PoolError),
     /// Runtime type conversion error
     #[error("Error converting `{from}` into `{into}`: {source}")]
-    TryIntoErr {
+    Conversion {
         /// From type
         from: &'static str,
         /// Into type
         into: &'static str,
-        /// TryError
+        /// The conversion failure being reported
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// An error occurred while performing a query
     #[error("Query Error: {0}")]
-    Query(#[source] RuntimeErr),
+    Query(#[source] RuntimeError),
     /// Type error: the specified type cannot be converted from u64. This is not a runtime error.
     #[error("Type '{0}' cannot be converted from u64")]
     ConvertFromU64(&'static str),
@@ -59,65 +58,82 @@ pub enum DbErr {
     Custom(String),
 }
 
+/// The result of a fallible pgorm operation, defaulting to [`Error`].
+///
+/// The default type parameter lets callers write `pgorm::Result<Model>` for
+/// the common case while still naming a foreign error type — as
+/// [`DatabaseConnection::transaction`](crate::DatabaseConnection::transaction)
+/// does — where the closure carries its own.
+///
+/// ```
+/// fn first_cake_id() -> pgorm::Result<i32> {
+///     Err(pgorm::Error::RecordNotFound)
+/// }
+///
+/// assert!(first_cake_id().is_err());
+/// ```
+// [spec:pgorm:def:error.model+4]    crate-root Result alias
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// Runtime error
-// [spec:pgorm:def:error.model.runtime+2]
-#[derive(Error, Debug)]
-pub enum RuntimeErr {
+// [spec:pgorm:def:error.model.runtime+3]
+#[derive(thiserror::Error, Debug)]
+pub enum RuntimeError {
     /// Error generated from within pgorm
     #[error("{0}")]
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+3]    Display-string equality
-impl PartialEq for DbErr {
+// [spec:pgorm:def:error.model+4]    Display-string equality
+impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
     }
 }
 
-impl Eq for DbErr {}
+impl Eq for Error {}
 
 /// Error during `impl FromStr for Entity::Column`
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error("Failed to match \"{0}\" as Column")]
-pub struct ColumnFromStrErr(pub String);
+pub struct ColumnFromStrError(pub String);
 
 #[allow(dead_code)]
-pub(crate) fn query_err<T>(s: T) -> DbErr
+pub(crate) fn query_err<T>(s: T) -> Error
 where
     T: ToString,
 {
-    DbErr::Query(RuntimeErr::Internal(s.to_string()))
+    Error::Query(RuntimeError::Internal(s.to_string()))
 }
 
 #[allow(dead_code)]
-pub(crate) fn type_err<T>(s: T) -> DbErr
+pub(crate) fn type_err<T>(s: T) -> Error
 where
     T: ToString,
 {
-    DbErr::Type(s.to_string())
+    Error::Type(s.to_string())
 }
 
 #[allow(dead_code)]
-pub(crate) fn json_err<T>(s: T) -> DbErr
+pub(crate) fn json_err<T>(s: T) -> Error
 where
     T: ToString,
 {
-    DbErr::Json(s.to_string())
+    Error::Json(s.to_string())
 }
 
 #[allow(dead_code)]
-pub(crate) fn primary_key_type_err(table: &str, err: pgorm_query::ValueTupleErr) -> DbErr {
-    DbErr::Type(format!(
+pub(crate) fn primary_key_type_err(table: &str, err: pgorm_query::ValueTupleError) -> Error {
+    Error::Type(format!(
         "primary key of `{table}` does not match its declared `ValueType`: {err}"
     ))
 }
 
 /// An error from unsuccessful SQL query
-// [spec:pgorm:sem:error.model.sql-class+2]
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+// [spec:pgorm:sem:error.model.sql-class+3]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum SqlErr {
+pub enum SqlError {
     /// Error for duplicate record in unique field or primary key field
     #[error("Unique Constraint Violated: {0}")]
     UniqueConstraintViolation(String),
@@ -128,29 +144,29 @@ pub enum SqlErr {
 
 /// An error after which re-running the whole transaction may succeed.
 ///
-/// Implemented for [`DbErr`]; implement it for a domain error type to use that
+/// Implemented for [`Error`]; implement it for a domain error type to use that
 /// type as the closure error of
 /// [`DatabaseConnection::transaction_with_retry`](crate::DatabaseConnection::transaction_with_retry).
-// [spec:pgorm:sem:conn.tx.retry]    retryability predicate
+// [spec:pgorm:sem:conn.tx.retry+1]    retryability predicate
 pub trait RetryableError {
     /// Whether the transaction that produced this error is worth retrying.
     fn is_retryable(&self) -> bool;
 }
 
-// [spec:pgorm:sem:conn.tx.retry]
-impl RetryableError for DbErr {
+// [spec:pgorm:sem:conn.tx.retry+1]
+impl RetryableError for Error {
     fn is_retryable(&self) -> bool {
-        DbErr::is_retryable(self)
+        Error::is_retryable(self)
     }
 }
 
-impl DbErr {
+impl Error {
     /// Whether this is a transaction-rollback error PostgreSQL expects the
     /// client to retry: SQLSTATE `40001` (`serialization_failure`) or `40P01`
     /// (`deadlock_detected`).
-    // [spec:pgorm:sem:conn.tx.retry]    SQLSTATE classification
+    // [spec:pgorm:sem:conn.tx.retry+1]    SQLSTATE classification
     pub fn is_retryable(&self) -> bool {
-        let DbErr::Postgres(error) = self else {
+        let Error::Postgres(error) = self else {
             return false;
         };
         let Some(db_error) = error.as_db_error() else {
@@ -160,20 +176,20 @@ impl DbErr {
         *code == SqlState::T_R_SERIALIZATION_FAILURE || *code == SqlState::T_R_DEADLOCK_DETECTED
     }
 
-    /// Classify a [`DbErr`] as a [`SqlErr`], returning `None` when the error is
+    /// Classify an [`Error`] as a [`SqlError`], returning `None` when the error is
     /// not a recognised constraint violation.
-    // [spec:pgorm:sem:error.model.sql-class+2]    classifier entry point
-    pub fn sql_err(&self) -> Option<SqlErr> {
+    // [spec:pgorm:sem:error.model.sql-class+3]    classifier entry point
+    pub fn sql_error(&self) -> Option<SqlError> {
         let db_error = match self {
-            DbErr::Postgres(e) => e.as_db_error()?,
+            Error::Postgres(e) => e.as_db_error()?,
             _ => return None,
         };
         let code = db_error.code();
         let message = db_error.message().to_owned();
         if *code == SqlState::UNIQUE_VIOLATION {
-            Some(SqlErr::UniqueConstraintViolation(message))
+            Some(SqlError::UniqueConstraintViolation(message))
         } else if *code == SqlState::FOREIGN_KEY_VIOLATION {
-            Some(SqlErr::ForeignKeyConstraintViolation(message))
+            Some(SqlError::ForeignKeyConstraintViolation(message))
         } else {
             None
         }

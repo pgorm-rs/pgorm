@@ -1,5 +1,5 @@
 use crate::{
-    ActiveEnum, ColumnTrait, ColumnType, DbErr, EntityTrait, Iterable, PrimaryKeyArity,
+    ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Error, Iterable, PrimaryKeyArity,
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
@@ -13,8 +13,8 @@ impl Schema {
     ///
     /// An `ActiveEnum` may be backed by a plain column type — a `String` column,
     /// say — rather than a database enum, in which case there is no type to
-    /// create and this returns [`DbErr::Type`].
-    pub fn create_enum_from_active_enum<A>(&self) -> Result<TypeCreateStatement, DbErr>
+    /// create and this returns [`Error::Type`].
+    pub fn create_enum_from_active_enum<A>(&self) -> Result<TypeCreateStatement, Error>
     where
         A: ActiveEnum,
     {
@@ -147,14 +147,14 @@ impl Schema {
     }
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+1]    from a single ActiveEnum
-pub(crate) fn create_enum_from_active_enum<A>() -> Result<TypeCreateStatement, DbErr>
+// [spec:pgorm:sem:schema.from-entity.enum+2]    from a single ActiveEnum
+pub(crate) fn create_enum_from_active_enum<A>() -> Result<TypeCreateStatement, Error>
 where
     A: ActiveEnum,
 {
     let col_def = A::db_type();
     create_enum_from_column_type(col_def.get_column_type()).ok_or_else(|| {
-        DbErr::Type(format!(
+        Error::Type(format!(
             "`{}` is not backed by a database enum, so there is no type to create",
             A::name().to_string()
         ))
@@ -173,7 +173,7 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<Type
     )
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+1]
+// [spec:pgorm:sem:schema.from-entity.enum+2]
 pub(crate) fn create_enum_from_entity<E>(_: E) -> Vec<TypeCreateStatement>
 where
     E: EntityTrait,

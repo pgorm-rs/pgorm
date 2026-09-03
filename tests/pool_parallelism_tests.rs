@@ -9,7 +9,7 @@ use pretty_assertions::assert_eq;
 
 const CONNECTIONS: usize = 4;
 
-async fn insert_bakery<C>(db: &C, name: &str, profit_margin: f64) -> Result<(), DbErr>
+async fn insert_bakery<C>(db: &C, name: &str, profit_margin: f64) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
@@ -24,7 +24,7 @@ where
     Ok(())
 }
 
-async fn count_bakeries<C>(db: &C, search_name: &str) -> Result<usize, DbErr>
+async fn count_bakeries<C>(db: &C, search_name: &str) -> Result<usize, Error>
 where
     C: ConnectionTrait,
 {
@@ -35,10 +35,10 @@ where
         .len())
 }
 
-// [spec:pgorm:sem:conn.pool.get/test]    N concurrent checkouts, status arithmetic, recovery on drop
+// [spec:pgorm:sem:conn.pool.get+1/test]    N concurrent checkouts, status arithmetic, recovery on drop
 // [spec:pgorm:req:conn.pool.no-conn-trait/test]    every statement runs on an explicitly acquired connection
 #[pgorm_macros::test]
-pub async fn pool_parallel_transactions_poolpar() -> Result<(), DbErr> {
+pub async fn pool_parallel_transactions_poolpar() -> Result<(), Error> {
     let ctx = TestContext::new("pool_parallel_transactions_poolpar").await;
     create_tables(&ctx.db).await?;
 
@@ -110,9 +110,9 @@ pub async fn pool_parallel_transactions_poolpar() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.pool.get/test]    pooled connections are distinct sessions, not a shared one
+// [spec:pgorm:sem:conn.pool.get+1/test]    pooled connections are distinct sessions, not a shared one
 #[pgorm_macros::test]
-pub async fn pool_checkouts_are_distinct_sessions_poolpar() -> Result<(), DbErr> {
+pub async fn pool_checkouts_are_distinct_sessions_poolpar() -> Result<(), Error> {
     let ctx = TestContext::new("pool_checkouts_are_distinct_sessions_poolpar").await;
     create_tables(&ctx.db).await?;
 

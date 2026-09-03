@@ -7,7 +7,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Pool construction and access
 
-> [spec:pgorm:req:conn.pool+1]
+> [spec:pgorm:req:conn.pool+2]
 > `connect(config: tokio_postgres::Config) -> DatabasePool` MUST construct a
 > deadpool-backed pool wrapping `pgorm_pool::Pool`: a `Manager` built from the
 > given config with `NoTls`, `RecyclingMethod::Fast`, and no tag, combined with
@@ -18,19 +18,19 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > `connect_with_builder(config, build)` MUST apply the caller's closure to the
 > `PoolBuilder` before building, allowing pool sizing and timeout customization,
-> and MUST return `Result<DatabasePool, DbErr>`. Because the closure is caller
+> and MUST return `Result<DatabasePool, Error>`. Because the closure is caller
 > input, a builder shaped into an unbuildable pool — deadpool rejects timeouts
-> configured without a runtime — MUST surface as `DbErr::Custom` carrying the
+> configured without a runtime — MUST surface as `Error::Custom` carrying the
 > builder's message, never as a panic.
 >
 > TLS connections are not supported through these entry points (`NoTls` is
 > hard-coded); a custom-TLS pool requires assembling a `pgorm_pool::Manager`
 > directly.
 
-> [spec:pgorm:sem:conn.pool.get]
+> [spec:pgorm:sem:conn.pool.get+1]
 > `DatabasePool::get()` asynchronously acquires a pooled connection and wraps
 > it as `DatabaseConnection`; acquisition failure surfaces as
-> `DbErr::Pool(pgorm_pool::PoolError)` via `From`. `DatabasePool::status()`
+> `Error::Pool(pgorm_pool::PoolError)` via `From`. `DatabasePool::status()`
 > returns the live `deadpool::Status` (size, available, waiting) and
 > `DatabasePool::tag()` returns the pool's tag as `Arc<String>`. An untagged
 > pool receives a generated default tag of the form `default-{n}` from a
@@ -44,15 +44,15 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > breaks transactional reasoning, so the pool-as-connection pattern inherited
 > from SeaORM was removed.
 
-> [spec:pgorm:sem:conn.pool.multi+1]
+> [spec:pgorm:sem:conn.pool.multi+2]
 > `connect_multi_with_builder(config, builders)` builds one pool per entry of a
 > `BTreeMap<String, builder-fn>`: each pool clones the shared
 > `tokio_postgres::Config`, is tagged with its map key, and uses
 > `RecyclingMethod::Fast`; the result is a
-> `Result<BTreeMap<Arc<String>, DatabasePool>, DbErr>` keyed by tag. Every
+> `Result<BTreeMap<Arc<String>, DatabasePool>, Error>` keyed by tag. Every
 > builder is caller input, so construction is fallible on the same terms as
 > `connect_with_builder` (`conn.pool`): the first entry whose builder cannot
-> produce a pool aborts the whole construction with `DbErr::Custom` and no map
+> produce a pool aborts the whole construction with `Error::Custom` and no map
 > is returned. `DatabaseMultiPool` wraps the same map shape and offers
 > `get(key) -> Option<DatabasePool>` (a cheap clone of the refcounted pool) and
 > `status()` returning per-tag `deadpool::Status`.
@@ -117,7 +117,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `ToStatement` admits, the added bound rejects no call site that compiled
 > without it.
 
-> [spec:pgorm:def:conn.pool.conn-trait+3]
+> [spec:pgorm:def:conn.pool.conn-trait+4]
 > `ConnectionTrait` is the uniform statement-execution surface over
 > connections and transactions. It defines seven async methods. Six are
 > generic over `T: ?Sized + ToStatement + SqlText + Send + Sync` — the second
@@ -130,7 +130,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `query_all -> Vec<Row>`, and `query_raw(stmt, params) -> RowStream`,
 > which takes the same `BorrowToSql` iterator as `execute_raw` and returns
 > the unbuffered row stream of `exec.stream`. Errors map to
-> `DbErr::Postgres`.
+> `Error::Postgres`.
 >
 > The seventh, `batch_execute(sql: &str) -> ()`, is neither generic nor
 > parameterized: it sends `sql` through the simple-query protocol, so the
@@ -226,11 +226,11 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > form on the trait would require the savepoint implementation to ignore or
 > reject its argument, so it is offered only where PostgreSQL honours it.
 
-> [spec:pgorm:sem:conn.tx.guard+1]
+> [spec:pgorm:sem:conn.tx.guard+2]
 > `DatabaseTransaction` wraps `Option<pgorm_pool::Transaction>` as a
 > commit-or-rollback guard. `commit(self)` and `rollback(self)` each consume
 > the handle, `take()` the inner transaction, and await `COMMIT` / `ROLLBACK`
-> respectively, mapping failure to `DbErr::Postgres`. Because both take the
+> respectively, mapping failure to `Error::Postgres`. Because both take the
 > `Option`, the `Drop` impl's
 > `tracing::warn!("Transaction dropped without committing!")` fires only on
 > the implicit path — neither `commit` nor `rollback` was called.
@@ -255,7 +255,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
-> [spec:pgorm:sem:conn.tx.closure]
+> [spec:pgorm:sem:conn.tx.closure+1]
 > `DatabaseConnection::transaction(f)` and `transaction_with(opts, f)` run a
 > closure inside a transaction, taking `F: AsyncFnOnce(&mut
 > DatabaseTransaction<'s>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
@@ -275,11 +275,11 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > transaction's own lifetime.
 >
 > Failures are wrapped in `TransactionError<E>`, whose two variants keep the two
-> kinds of failure apart: `Connection(DbErr)` for a failing `BEGIN` or `COMMIT`
+> kinds of failure apart: `Connection(Error)` for a failing `BEGIN` or `COMMIT`
 > — the transaction machinery — and `Transaction(E)` for the closure's own
 > error. It is `Debug` unconditionally, `Display` where `E: Display`, and
 > `std::error::Error` with a `source()` where `E: Error + 'static`. There is
-> deliberately no `From<DbErr> for TransactionError<E>`: with `E = DbErr`, the
+> deliberately no `From<Error> for TransactionError<E>`: with `E = Error`, the
 > common case, it would file every closure-side error under `Connection` and
 > erase the distinction the enum exists to draw.
 >
@@ -289,7 +289,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > failed rollback its consequence, so promoting the latter would replace the
 > answer to "why did this transaction fail?" with a symptom.
 
-> [spec:pgorm:sem:conn.tx.retry]
+> [spec:pgorm:sem:conn.tx.retry+1]
 > `DatabaseConnection::transaction_with_retry(opts, max_retries, f)` is
 > `transaction_with` plus replay: it retries the whole begin/run/commit cycle —
 > not the failing statement — while the failure is retryable, for at most `1 +
@@ -301,17 +301,17 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > Retryable means SQLSTATE `40001` (`serialization_failure`) or `40P01`
 > (`deadlock_detected`) — the transaction-rollback errors PostgreSQL raises
-> expecting the client to replay — as decided by `DbErr::is_retryable()`, which
-> is `false` for every non-`DbErr::Postgres` variant and for any `Postgres`
+> expecting the client to replay — as decided by `Error::is_retryable()`, which
+> is `false` for every non-`Error::Postgres` variant and for any `Postgres`
 > error carrying no `DbError`. Anything else returns immediately, on the first
 > attempt, with its variant intact.
 >
 > Both failure sites are classified, because a serialization failure can surface
 > either mid-transaction (a statement raises it, reaching the helper as the
-> closure's `E`) or at `COMMIT` (reaching it as a `DbErr`). Classifying the
+> closure's `E`) or at `COMMIT` (reaching it as an `Error`). Classifying the
 > closure's error requires seeing inside an otherwise opaque `E`, so
 > `transaction_with_retry` bounds `E: RetryableError` — a single-method trait
-> (`is_retryable(&self) -> bool`) implemented for `DbErr` and implementable for
+> (`is_retryable(&self) -> bool`) implemented for `Error` and implementable for
 > a domain error type. `transaction` and `transaction_with` carry no such bound.
 >
 > `F` is `AsyncFnMut` rather than `AsyncFnOnce` because it is called once per

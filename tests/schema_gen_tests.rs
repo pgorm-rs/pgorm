@@ -5,8 +5,8 @@ pub mod common;
 pub use common::{TestContext, setup::*};
 
 use pgorm::{
-    ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr, EntityName,
-    EntityTrait, Iterable, Schema, entity::prelude::*,
+    ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityName, EntityTrait,
+    Error, Iterable, Schema, entity::prelude::*,
 };
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, QueryBuilder, TableCreateStatement};
 use pretty_assertions::assert_eq;
@@ -436,7 +436,7 @@ fn create_index_from_entity_uses_table_ref() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+1/test]    one statement per enum column, variant order preserved, duplicates kept
+// [spec:pgorm:sem:schema.from-entity.enum+2/test]    one statement per enum column, variant order preserved, duplicates kept
 #[test]
 fn create_enum_from_entity_emits_per_column() {
     let schema = Schema::new();
@@ -458,7 +458,7 @@ fn create_enum_from_entity_emits_per_column() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+1/test]    the single-ActiveEnum form builds the same statement from A::db_type()
+// [spec:pgorm:sem:schema.from-entity.enum+2/test]    the single-ActiveEnum form builds the same statement from A::db_type()
 #[test]
 fn create_enum_from_active_enum_uses_db_type() {
     let schema = Schema::new();
@@ -476,7 +476,7 @@ fn create_enum_from_active_enum_uses_db_type() {
     ));
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+1/test]    errors when the resolved column type is not an enum
+// [spec:pgorm:sem:schema.from-entity.enum+2/test]    errors when the resolved column type is not an enum
 #[test]
 fn create_enum_from_active_enum_errs_non_enum() {
     assert!(!matches!(
@@ -487,16 +487,16 @@ fn create_enum_from_active_enum_errs_non_enum() {
         .create_enum_from_active_enum::<Size>()
         .expect_err("a String-backed ActiveEnum has no type to create");
     assert!(
-        matches!(err, DbErr::Type(ref msg) if msg.contains("not backed by a database enum")),
+        matches!(err, Error::Type(ref msg) if msg.contains("not backed by a database enum")),
         "expected a type error naming the enum, got {err:?}"
     );
 }
 
 // [spec:pgorm:sem:schema.from-entity+2/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
-// [spec:pgorm:sem:schema.from-entity.enum+1/test]    the projected type is a usable Postgres enum
+// [spec:pgorm:sem:schema.from-entity.enum+2/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
-async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
+async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
     let ctx = TestContext::new("schema_gen_executes_schemagen").await;
     let db = ctx.db.get().await?;
     let schema = Schema::new();
@@ -508,7 +508,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         .execute(&enums[1].to_string(), &[])
         .await
         .expect_err("the second statement re-creates the same type");
-    assert!(matches!(duplicate, DbErr::Postgres(_)));
+    assert!(matches!(duplicate, Error::Postgres(_)));
 
     for entity_stmt in [
         schema.create_table_from_entity(factory::Entity),
@@ -588,8 +588,8 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
     .await
     .expect_err("code is unique");
     assert!(matches!(
-        unique.sql_err(),
-        Some(pgorm::SqlErr::UniqueConstraintViolation(_))
+        unique.sql_error(),
+        Some(pgorm::SqlError::UniqueConstraintViolation(_))
     ));
 
     // The belongs-to foreign key is enforced.
@@ -605,8 +605,8 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
     .await
     .expect_err("factory_id has no matching factory");
     assert!(matches!(
-        fk.sql_err(),
-        Some(pgorm::SqlErr::ForeignKeyConstraintViolation(_))
+        fk.sql_error(),
+        Some(pgorm::SqlError::ForeignKeyConstraintViolation(_))
     ));
 
     // The composite primary key is enforced across both columns.
@@ -626,8 +626,8 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
         .await
         .expect_err("(widget_id, tag) is the primary key");
     assert!(matches!(
-        composite.sql_err(),
-        Some(pgorm::SqlErr::UniqueConstraintViolation(_))
+        composite.sql_error(),
+        Some(pgorm::SqlError::UniqueConstraintViolation(_))
     ));
 
     drop(db);
@@ -639,7 +639,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), DbErr> {
 // [spec:pgorm:sem:schema.from-entity+2/test]    the comment statements execute, and only they
 // attach anything: the text arrives in pg_description exactly as declared
 #[pgorm_macros::test]
-async fn entity_comments_land_in_pg_description() -> Result<(), DbErr> {
+async fn entity_comments_land_in_pg_description() -> Result<(), Error> {
     const TABLE_COMMENT: &str = "SELECT obj_description('quirk'::regclass, 'pg_class')";
     const COLUMN_COMMENT: &str = "SELECT col_description('quirk'::regclass, attnum) \
          FROM pg_attribute WHERE attrelid = 'quirk'::regclass AND attname = 'note'";

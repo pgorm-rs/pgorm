@@ -194,7 +194,7 @@ impl ActiveEnum {
         })
     }
 
-    // [spec:pgorm:sem:macros.derive.active-enum.expansion]
+    // [spec:pgorm:sem:macros.derive.active-enum.expansion+1]
     fn expand(&self) -> syn::Result<TokenStream> {
         let expanded_impl_active_enum = self.impl_active_enum();
 
@@ -353,10 +353,10 @@ impl ActiveEnum {
                     .to_owned()
                 }
 
-                fn try_from_value(v: &Self::Value) -> std::result::Result<Self, pgorm::DbErr> {
+                fn try_from_value(v: &Self::Value) -> std::result::Result<Self, pgorm::Error> {
                     match #val {
                         #( #variant_values => Ok(Self::#variant_idents), )*
-                        _ => Err(pgorm::DbErr::Type(format!(
+                        _ => Err(pgorm::Error::Type(format!(
                             "unexpected value for {} enum: {}",
                             stringify!(#ident),
                             v
@@ -383,15 +383,15 @@ impl ActiveEnum {
             impl pgorm::TryGetable for #ident {
                 fn try_get_by<I: pgorm::RowIndex + std::fmt::Display>(res: &pgorm::QueryResult, idx: I) -> std::result::Result<Self, pgorm::TryGetError> {
                     let value = <<Self as pgorm::ActiveEnum>::Value as pgorm::TryGetable>::try_get_by(res, idx)?;
-                    <Self as pgorm::ActiveEnum>::try_from_value(&value).map_err(pgorm::TryGetError::DbErr)
+                    <Self as pgorm::ActiveEnum>::try_from_value(&value).map_err(pgorm::TryGetError::Db)
                 }
             }
 
             #[automatically_derived]
             impl pgorm::pgorm_query::ValueType for #ident {
-                fn try_from(v: pgorm::pgorm_query::Value) -> std::result::Result<Self, pgorm::pgorm_query::ValueTypeErr> {
+                fn try_from(v: pgorm::pgorm_query::Value) -> std::result::Result<Self, pgorm::pgorm_query::ValueTypeError> {
                     let value = <<Self as pgorm::ActiveEnum>::Value as pgorm::pgorm_query::ValueType>::try_from(v)?;
-                    <Self as pgorm::ActiveEnum>::try_from_value(&value).map_err(|_| pgorm::pgorm_query::ValueTypeErr)
+                    <Self as pgorm::ActiveEnum>::try_from_value(&value).map_err(|_| pgorm::pgorm_query::ValueTypeError)
                 }
 
                 fn type_name() -> String {

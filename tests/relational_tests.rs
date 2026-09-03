@@ -4,7 +4,7 @@ pub mod common;
 
 pub use chrono::offset::Utc;
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{ActiveValue::Set, DbErr, DerivePartialModel, FromQueryResult, entity::*, query::*};
+use pgorm::{ActiveValue::Set, DerivePartialModel, Error, FromQueryResult, entity::*, query::*};
 use pgorm_query::{Expr, Func, SimpleExpr};
 use pretty_assertions::assert_eq;
 pub use rust_decimal::prelude::*;
@@ -474,10 +474,10 @@ pub async fn having() {
 // empty `Vec` for a left row with no right model
 // [spec:pgorm:req:entity.relation+1/test]    `Related::find_related` inner-joins
 // `to()` onto a fresh `Select<R>`, exercised against real rows
-// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::find_related` scopes
+// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::find_related` scopes
 // that select to a single model instance
 #[pgorm_macros::test]
-pub async fn related() -> Result<(), DbErr> {
+pub async fn related() -> Result<(), Error> {
     use pgorm::{SelectA, SelectB};
 
     let ctx = TestContext::new("test_related").await;
@@ -723,10 +723,10 @@ pub async fn related() -> Result<(), DbErr> {
 // [spec:pgorm:req:entity.relation.linked/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
-// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::find_linked` scopes
+// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::find_linked` scopes
 // a multi-hop join to one model instance
 #[pgorm_macros::test]
-pub async fn linked() -> Result<(), DbErr> {
+pub async fn linked() -> Result<(), Error> {
     use common::bakery_chain::Order;
     use pgorm::{SelectA, SelectB};
     use pgorm_query::{Alias, Expr};
@@ -1167,7 +1167,7 @@ mod composite_child {
 // (pair-arity) left primary key, in row order, with a childless parent still
 // producing an entry
 #[pgorm_macros::test]
-pub async fn consolidate_composite_key() -> Result<(), DbErr> {
+pub async fn consolidate_composite_key() -> Result<(), Error> {
     use pgorm::{QueryOrder, Schema};
 
     let ctx = TestContext::new("test_consolidate_composite_key").await;
@@ -1279,7 +1279,7 @@ pub async fn consolidate_composite_key() -> Result<(), DbErr> {
 // the join on every declared pair: against rows where each column alone is
 // ambiguous, the join still matches exactly one parent per child
 #[pgorm_macros::test]
-pub async fn composite_join_constrains_both_columns() -> Result<(), DbErr> {
+pub async fn composite_join_constrains_both_columns() -> Result<(), Error> {
     use pgorm::{QueryOrder, Schema};
     use pgorm_query::QueryBuilder;
 

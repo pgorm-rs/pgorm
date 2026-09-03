@@ -60,12 +60,12 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 
-    async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
         if self.price.as_ref() == &rust_dec(0) {
-            Err(DbErr::Custom(format!(
+            Err(Error::Custom(format!(
                 "[before_save] Invalid Price, insert: {insert}"
             )))
         } else {
@@ -73,12 +73,12 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 
-    async fn after_save<C>(model: Model, _db: &C, insert: bool) -> Result<Model, DbErr>
+    async fn after_save<C>(model: Model, _db: &C, insert: bool) -> Result<Model, Error>
     where
         C: ConnectionTrait,
     {
         if model.price < rust_dec(0) {
-            Err(DbErr::Custom(format!(
+            Err(Error::Custom(format!(
                 "[after_save] Invalid Price, insert: {insert}"
             )))
         } else {
@@ -86,12 +86,12 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 
-    async fn before_delete<C>(self, _db: &C) -> Result<Self, DbErr>
+    async fn before_delete<C>(self, _db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
         if self.name.as_ref().contains("(err_on_before_delete)") {
-            Err(DbErr::Custom(
+            Err(Error::Custom(
                 "[before_delete] Cannot be deleted".to_owned(),
             ))
         } else {
@@ -99,12 +99,12 @@ impl ActiveModelBehavior for ActiveModel {
         }
     }
 
-    async fn after_delete<C>(self, _db: &C) -> Result<Self, DbErr>
+    async fn after_delete<C>(self, _db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
         if self.name.as_ref().contains("(err_on_after_delete)") {
-            Err(DbErr::Custom("[after_delete] Cannot be deleted".to_owned()))
+            Err(Error::Custom("[after_delete] Cannot be deleted".to_owned()))
         } else {
             Ok(self)
         }

@@ -5,14 +5,14 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait,
-    ConnectionTrait, DbErr, EntityName, EntityTrait, FromQueryResult, IdenStatic, IntoActiveModel,
+    ConnectionTrait, EntityName, EntityTrait, Error, FromQueryResult, IdenStatic, IntoActiveModel,
     Iterable, Linked, ModelTrait, NotSet, PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn,
     PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult, QuerySelect, QueryTrait, Related,
     RelationDef, RelationTrait, Schema, Select, SelectColumns, TryIntoModel, Value,
     entity::prelude::*,
 };
 use pgorm_query::{
-    Alias, Expr, IntoIden, QueryBuilder, TableName, TryFromValueTuple, ValueTuple, ValueTupleErr,
+    Alias, Expr, IntoIden, QueryBuilder, TableName, TryFromValueTuple, ValueTuple, ValueTupleError,
     ValueTupleShape,
 };
 use pretty_assertions::assert_eq;
@@ -396,7 +396,7 @@ fn entity_name_defaults_and_table_ref() {
 // entity.traits.crud
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.traits.crud+1/test]    the static CRUD surface: `find`
+// [spec:pgorm:req:entity.traits.crud+2/test]    the static CRUD surface: `find`
 // returns a fresh `Select`, `find_by_id` adds one equality filter per key column
 // in primary-key iteration order, and `insert` / `insert_many` / `update` /
 // `update_many` / `delete` / `delete_many` / `delete_by_id` build their
@@ -522,7 +522,7 @@ fn entity_crud_surface() {
     );
 }
 
-// [spec:pgorm:req:entity.traits.crud+1/test]    `find_by_id` panics with
+// [spec:pgorm:req:entity.traits.crud+2/test]    `find_by_id` panics with
 // `primary key arity mismatch` when more values arrive than the key has columns
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -530,7 +530,7 @@ fn find_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::find_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+1/test]    ...and in the other direction too,
+// [spec:pgorm:req:entity.traits.crud+2/test]    ...and in the other direction too,
 // when the key has more columns than values were supplied
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -538,7 +538,7 @@ fn find_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::find_by_id(1);
 }
 
-// [spec:pgorm:req:entity.traits.crud+1/test]    `delete_by_id` carries the same
+// [spec:pgorm:req:entity.traits.crud+2/test]    `delete_by_id` carries the same
 // guard as `find_by_id`, in both directions
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -546,14 +546,14 @@ fn delete_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::delete_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+1/test]
+// [spec:pgorm:req:entity.traits.crud+2/test]
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
 fn delete_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::delete_by_id(1);
 }
 
-// [spec:pgorm:def:sql.value.tuple+1/test]    the conversion `exec_insert` and
+// [spec:pgorm:def:sql.value.tuple+2/test]    the conversion `exec_insert` and
 // `find_updated_model_by_id` run a cached primary-key tuple through errs on a
 // shape the entity's `ValueType` does not have, naming both shapes
 #[test]
@@ -563,40 +563,40 @@ fn primary_key_value_type_errs_on_arity() {
 
     assert_eq!(
         ItemKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), 2i32.into())),
-        Err(ValueTupleErr::Arity {
+        Err(ValueTupleError::Arity {
             expected: ValueTupleShape::One,
             actual: ValueTupleShape::Two,
         })
     );
     assert_eq!(
         PairKey::try_from_value_tuple(ValueTuple::One(1i32.into())),
-        Err(ValueTupleErr::Arity {
+        Err(ValueTupleError::Arity {
             expected: ValueTupleShape::Two,
             actual: ValueTupleShape::One,
         })
     );
     assert_eq!(
         PairKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), "b".into())),
-        Err(ValueTupleErr::Element {
+        Err(ValueTupleError::Element {
             position: 1,
             expected: "i32".to_owned(),
         })
     );
 }
 
-// [spec:pgorm:sem:exec.crud.insert+1/test]    reconstructing `last_insert_id`
-// from the cached tuple returns `DbErr::Type` naming the table and the
+// [spec:pgorm:sem:exec.crud.insert+2/test]    reconstructing `last_insert_id`
+// from the cached tuple returns `Error::Type` naming the table and the
 // mismatch when the entity's `ValueType` disagrees, rather than panicking
-// [spec:pgorm:sem:exec.crud.update+3/test]    the no-op re-fetch rebuilds the
+// [spec:pgorm:sem:exec.crud.update+4/test]    the no-op re-fetch rebuilds the
 // same typed key and fails the same way
 #[pgorm_macros::test]
-async fn mistyped_primary_key_errs_on_crud() -> Result<(), DbErr> {
+async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     let ctx = TestContext::new("mistyped_primary_key").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity);
     db.execute(&stmt.to_string(), &[]).await?;
 
-    let expected = DbErr::Type(
+    let expected = Error::Type(
         "primary key of `mistyped_key` does not match its declared `ValueType`: \
          value at position 0 is not a valid `String`"
             .to_owned(),
@@ -929,7 +929,7 @@ fn primary_key_trait_surface() {
 // entity.traits.model
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::get` reads a column
+// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::get` reads a column
 // as a `Value` and `set` writes one; `find_related` scopes a `Select` to this
 // instance; and `TryIntoModel` has a blanket identity impl for any model
 #[test]
@@ -992,11 +992,11 @@ fn model_trait_get_set_and_identity() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.model+1/test]    `ModelTrait::delete` converts the
+// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::delete` converts the
 // model through `IntoActiveModel` and delegates to `ActiveModelTrait::delete`,
 // so the behavior hooks run on the way through
 #[pgorm_macros::test]
-async fn model_trait_delete_runs_through_active_model() -> Result<(), DbErr> {
+async fn model_trait_delete_runs_through_active_model() -> Result<(), Error> {
     let ctx = TestContext::new("model_trait_delete").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(item::Entity);
@@ -1063,7 +1063,7 @@ struct PrefixProbe {
 }
 
 impl FromQueryResult for PrefixProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         Ok(Self {
             prefixed: ItemRow::from_query_result(res, "A_")?,
             unprefixed_is_err: ItemRow::from_query_result(res, "").is_err(),
@@ -1079,7 +1079,7 @@ impl FromQueryResult for PrefixProbe {
 // discards the error, `find_by_statement` runs raw SQL into typed rows, and
 // `PartialModelTrait::select_cols` narrows a select to the columns it needs
 #[pgorm_macros::test]
-async fn from_query_result_surface() -> Result<(), DbErr> {
+async fn from_query_result_surface() -> Result<(), Error> {
     let ctx = TestContext::new("from_query_result_surface").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(item::Entity);

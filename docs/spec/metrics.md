@@ -85,7 +85,7 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Delegation contract
 
-> [spec:pgorm:req:metric.layer.delegate+3]
+> [spec:pgorm:req:metric.layer.delegate+4]
 > Instrumented wrappers MUST delegate every operation to the wrapped type and
 > return its result unchanged — wrapping preserves `ConnectionTrait`
 > semantics, adding only timing and collector calls around each awaited
@@ -101,7 +101,7 @@ chooses to construct, so unused metrics cost nothing.
 > `query_all`, `None` for `query_raw` per `exec.stream.decode`, and `None`
 > for `batch_execute`, which yields no rows at all — and on
 > failure they report `record_query_error` with the same
-> context before propagating the `DbErr`. `InstrumentedPool::get`
+> context before propagating the `Error`. `InstrumentedPool::get`
 > times pool acquisition, reporting `record_connection_acquired` on success
 > (and returning an `InstrumentedConnection` sharing a clone of the
 > collector) or `record_connection_error` on failure.

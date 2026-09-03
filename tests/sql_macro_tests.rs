@@ -11,7 +11,7 @@ pub mod common;
 pub use common::TestContext;
 use futures::TryStreamExt;
 use pgorm::{
-    ConnectionTrait, DbErr, FromQueryResult, SelectModel, SelectorRaw, TransactionTrait, sql,
+    ConnectionTrait, Error, FromQueryResult, SelectModel, SelectorRaw, TransactionTrait, sql,
 };
 use pgorm_query::Values;
 use pretty_assertions::assert_eq;
@@ -32,7 +32,7 @@ const SCHEMA: &str = sql!(
 // [spec:pgorm:def:macros.sql+1/test]    the literal reaches the server unchanged
 // [spec:pgorm:sem:macros.sql.script/test]    a validated script through `batch_execute`
 #[pgorm_macros::test]
-async fn checked_literal_drives_selector_raw() -> Result<(), DbErr> {
+async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
     let ctx = TestContext::new("sql_macro_selector_raw").await;
     let db = ctx.db.get().await?;
 
@@ -58,7 +58,7 @@ async fn checked_literal_drives_selector_raw() -> Result<(), DbErr> {
 
 // [spec:pgorm:def:macros.sql+1/test]    the same literal bound as a prepared statement
 #[pgorm_macros::test]
-async fn checked_literal_drives_query_raw() -> Result<(), DbErr> {
+async fn checked_literal_drives_query_raw() -> Result<(), Error> {
     let ctx = TestContext::new("sql_macro_query_raw").await;
     let db = ctx.db.get().await?;
 
@@ -74,7 +74,7 @@ async fn checked_literal_drives_query_raw() -> Result<(), DbErr> {
             .await?,
     );
 
-    let row = stream.try_next().await?.ok_or(DbErr::RecordNotFound)?;
+    let row = stream.try_next().await?.ok_or(Error::RecordNotFound)?;
     assert_eq!(row.get::<_, i32>(0), 1);
     assert_eq!(row.get::<_, &str>(1), "Chocolate");
 
@@ -90,7 +90,7 @@ async fn checked_literal_drives_query_raw() -> Result<(), DbErr> {
 // [spec:pgorm:req:macros.sql.ceiling/test]    grammar, not schema: a statement the
 // macro accepts can still fail against a real catalog
 #[pgorm_macros::test]
-async fn checked_literal_can_still_fail_at_runtime() -> Result<(), DbErr> {
+async fn checked_literal_can_still_fail_at_runtime() -> Result<(), Error> {
     let ctx = TestContext::new("sql_macro_unknown_relation").await;
     let db = ctx.db.get().await?;
 

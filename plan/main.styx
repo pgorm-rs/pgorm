@@ -1654,12 +1654,20 @@ children (
                 id bug.error-idiom
                 title "The error type is Error, not DbErr: idiomatic naming across the error family"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-03T18:36:40.532368Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator: \"DbErr should just be Error\" — the Err-suffixed family predates the fork and reads as SeaORM, not Rust. DbErr -> Error (crate root export), RuntimeErr -> RuntimeError, ColumnFromStrErr -> ColumnFromStrError, SqlErr -> SqlError; pgorm-query's ValueTupleErr -> ValueTupleError. Variant TryIntoErr -> a non-redundant name (Error::TryIntoErr reads stuttery). Add the idiomatic pub type Result<T, E = Error> alias at the crate root. Renames are outright per delete-don't-deprecate: no aliases left behind. Macros generate paths naming the old types — sweep pgorm-macros' quote! bodies. Every spec rule body naming DbErr changes and therefore bumps + re-pins (error.model family normatively; count the prose mentions across docs/spec first)."
+                    }
+
+                    {
+                        at 2026-09-03T19:00:03.989671Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

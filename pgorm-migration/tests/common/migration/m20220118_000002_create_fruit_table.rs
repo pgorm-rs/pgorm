@@ -6,7 +6,7 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr> {
+    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
         let table = Table::create(Fruit::Table)
             .col(
                 ColumnDef::new(Fruit::Id)

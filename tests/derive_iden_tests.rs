@@ -63,7 +63,7 @@ impl Iden for EmptyIden {
 
 // [spec:pgorm:sem:macros.derive.iden+1/test]    unit structs, enums, `Table`, and the `iden` override
 #[test]
-fn main() -> Result<(), DbErr> {
+fn main() -> Result<(), Error> {
     assert_eq!(ClassName::Table.to_string(), "class_name");
     assert_eq!(ClassName::Id.to_string(), "id");
     assert_eq!(ClassName::Title.to_string(), "title");

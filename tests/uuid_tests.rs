@@ -7,7 +7,7 @@ use pgorm::{ActiveValue::Set, DatabaseConnection, entity::prelude::*, entity::*}
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("bakery_chain_schema_uuid_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -21,7 +21,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),
@@ -46,7 +46,7 @@ pub async fn insert_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let metadata = metadata::Model {
         uuid: Uuid::new_v4(),
         ty: "Type".to_owned(),
@@ -73,7 +73,7 @@ pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), D
     .exec(db)
     .await;
 
-    assert_eq!(update_res, Err(DbErr::RecordNotFound));
+    assert_eq!(update_res, Err(Error::RecordNotFound));
 
     Ok(())
 }

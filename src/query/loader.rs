@@ -1,5 +1,5 @@
 use crate::{
-    Condition, ConnectionTrait, DbErr, EntityName, EntityTrait, Identity, ModelTrait, QueryFilter,
+    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Identity, ModelTrait, QueryFilter,
     Related, RelationType, Select, error::*,
 };
 use async_trait::async_trait;
@@ -23,7 +23,7 @@ pub trait LoaderTrait {
     type Model: ModelTrait;
 
     /// Used to eager load has_one relations
-    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
+    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -32,7 +32,7 @@ pub trait LoaderTrait {
         <<Self as LoaderTrait>::Model as ModelTrait>::Entity: Related<R>;
 
     /// Used to eager load has_many relations
-    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
+    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -46,7 +46,7 @@ pub trait LoaderTrait {
         stmt: S,
         via: V,
         db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, DbErr>
+    ) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -82,7 +82,7 @@ where
 {
     type Model = M;
 
-    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
+    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -93,7 +93,7 @@ where
         self.as_slice().load_one(stmt, db).await
     }
 
-    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
+    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -109,7 +109,7 @@ where
         stmt: S,
         via: V,
         db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, DbErr>
+    ) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -131,8 +131,8 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.regroup+2]
-    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, DbErr>
+    // [spec:pgorm:sem:query.loader.regroup+3]
+    async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -159,7 +159,7 @@ where
         let keys: Vec<ValueTuple> = self
             .iter()
             .map(|model: &M| extract_key(&from_col, model))
-            .collect::<Result<_, DbErr>>()?;
+            .collect::<Result<_, Error>>()?;
 
         let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
@@ -179,8 +179,8 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.regroup+2]
-    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, DbErr>
+    // [spec:pgorm:sem:query.loader.regroup+3]
+    async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -208,7 +208,7 @@ where
         let keys: Vec<ValueTuple> = self
             .iter()
             .map(|model: &M| extract_key(&from_col, model))
-            .collect::<Result<_, DbErr>>()?;
+            .collect::<Result<_, Error>>()?;
 
         let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
@@ -247,7 +247,7 @@ where
         stmt: S,
         via: V,
         db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, DbErr>
+    ) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
@@ -286,7 +286,7 @@ where
             let pkeys: Vec<ValueTuple> = self
                 .iter()
                 .map(|model: &M| extract_key(&via_from_col, model))
-                .collect::<Result<_, DbErr>>()?;
+                .collect::<Result<_, Error>>()?;
 
             // Map of M::PK -> Vec<R::PK>
             let mut keymap: HashMap<ValueTuple, Vec<ValueTuple>> = Default::default();
@@ -350,13 +350,13 @@ fn identity_columns(identity: &Identity) -> String {
         .join(", ")
 }
 
-// [spec:pgorm:sem:query.loader.regroup+2]
+// [spec:pgorm:sem:query.loader.regroup+3]
 fn unmatched_key_err(
     key: &ValueTuple,
     input_keys: &[ValueTuple],
     from_col: &Identity,
     to_col: &Identity,
-) -> DbErr {
+) -> Error {
     let sample = match input_keys.first() {
         Some(sample) => format!("{sample:?}"),
         None => "none".to_owned(),
@@ -371,8 +371,8 @@ fn unmatched_key_err(
     ))
 }
 
-// [spec:pgorm:sem:query.loader.batching+2]
-fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, DbErr>
+// [spec:pgorm:sem:query.loader.batching+3]
+fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
 {
@@ -386,8 +386,8 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+2]
-fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, DbErr>
+// [spec:pgorm:sem:query.loader.batching+3]
+fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
 {
@@ -412,12 +412,12 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+2]
+// [spec:pgorm:sem:query.loader.batching+3]
 fn prepare_condition(
     table: &FromItem,
     col: &Identity,
     keys: &[ValueTuple],
-) -> Result<Condition, DbErr> {
+) -> Result<Condition, Error> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
     Ok(match col {
@@ -450,8 +450,8 @@ fn prepare_condition(
     })
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation+2]
-fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, DbErr> {
+// [spec:pgorm:req:query.loader.table-ref-limitation+3]
+fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
     match tbl.to_owned() {
         FromItem::Table(NamedTable {
             name: TableName::Table(tbl),

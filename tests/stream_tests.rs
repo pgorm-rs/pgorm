@@ -17,7 +17,7 @@ struct BakeryName {
 }
 
 #[pgorm_macros::test]
-async fn stream_tests() -> Result<(), DbErr> {
+async fn stream_tests() -> Result<(), Error> {
     let ctx = TestContext::new("stream_tests").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -34,7 +34,7 @@ async fn stream_tests() -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn seed(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn seed(db: &DatabaseConnection) -> Result<(), Error> {
     for (name, margin) in [
         ("SeaSide Bakery", 10.4),
         ("Top Bakery", 15.0),
@@ -53,8 +53,8 @@ async fn seed(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.stream.decode/test]    ordered multi-row stream matches `all`
-async fn stream_many(db: &DatabaseConnection) -> Result<(), DbErr> {
+// [spec:pgorm:sem:exec.stream.decode+1/test]    ordered multi-row stream matches `all`
+async fn stream_many(db: &DatabaseConnection) -> Result<(), Error> {
     let expected = Bakery::find()
         .order_by_asc(bakery::Column::Id)
         .all(db)
@@ -73,8 +73,8 @@ async fn stream_many(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.stream/test]    partial models decode from a stream
-async fn stream_partial(db: &DatabaseConnection) -> Result<(), DbErr> {
+// [spec:pgorm:def:exec.stream+1/test]    partial models decode from a stream
+async fn stream_partial(db: &DatabaseConnection) -> Result<(), Error> {
     let streamed: Vec<BakeryName> = Bakery::find()
         .order_by_asc(bakery::Column::Id)
         .stream_partial_model::<_, BakeryName>(db)
@@ -103,8 +103,8 @@ async fn stream_partial(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.stream.decode/test]    zero rows terminates immediately
-async fn stream_empty(db: &DatabaseConnection) -> Result<(), DbErr> {
+// [spec:pgorm:sem:exec.stream.decode+1/test]    zero rows terminates immediately
+async fn stream_empty(db: &DatabaseConnection) -> Result<(), Error> {
     let streamed: Vec<bakery::Model> = Bakery::find()
         .filter(bakery::Column::Name.eq("No Such Bakery"))
         .stream(db)
@@ -117,8 +117,8 @@ async fn stream_empty(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.stream/test]    streaming through a transaction
-async fn stream_in_transaction(db: &mut DatabaseConnection) -> Result<(), DbErr> {
+// [spec:pgorm:def:exec.stream+1/test]    streaming through a transaction
+async fn stream_in_transaction(db: &mut DatabaseConnection) -> Result<(), Error> {
     let txn = db.begin().await?;
 
     bakery::ActiveModel {

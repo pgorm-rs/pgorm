@@ -312,6 +312,7 @@ assertions (
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
+    {id bug.error-idiom, kind @complete, author "brendan@necessary.nu", at 2026-09-03T19:00:03.989671Z}
     {id bug.ident-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:00:40.269307Z}
     {id bug.insert-empty-model, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:55:49.663561Z}
     {id bug.oracle-findings, kind @complete, author "brendan@necessary.nu", at 2026-09-02T23:13:32.053159Z}

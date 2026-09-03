@@ -19,11 +19,11 @@ use pgorm::{
     entity::prelude::*,
     entity::*,
 };
-use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeErr};
+use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeError};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("value_type_tests").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_value(db: &DatabaseConnection) -> Result<(), Error> {
     let model = value_type_general::Model {
         id: 1,
         number: 48.into(),
@@ -55,7 +55,7 @@ pub async fn insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn postgres_insert_value(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn postgres_insert_value(db: &DatabaseConnection) -> Result<(), Error> {
     let model = value_type_pg::Model {
         id: 1,
         number: 48.into(),
@@ -108,5 +108,5 @@ pub fn conversion_test() {
     // test for error
     let try_from_string_vec = <StringVec as ValueType>::try_from(Value::Char(Some('a')))
         .expect_err("should not be ok to convert char to stringvec");
-    assert_eq!(try_from_string_vec.to_string(), ValueTypeErr.to_string());
+    assert_eq!(try_from_string_vec.to_string(), ValueTypeError.to_string());
 }

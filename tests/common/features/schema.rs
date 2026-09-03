@@ -6,7 +6,7 @@ use pgorm_query::{
     extension::Type,
 };
 
-pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
+pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
     let db = &db.get().await?;
 
     create_log_table(db).await?;
@@ -56,7 +56,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_log_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_log_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -93,7 +93,7 @@ where
     create_table(db, &stmt, Applog).await
 }
 
-pub async fn create_metadata_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_metadata_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -115,7 +115,7 @@ where
     create_table(db, &stmt, Metadata).await
 }
 
-pub async fn create_repository_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_repository_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -138,7 +138,7 @@ where
     create_table(db, &stmt, Repository).await
 }
 
-pub async fn create_self_join_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_self_join_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -164,7 +164,7 @@ where
     create_table(db, &stmt, SelfJoin).await
 }
 
-pub async fn create_byte_primary_key_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_byte_primary_key_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -183,7 +183,7 @@ where
     create_table_without_asserts(db, &stmt).await
 }
 
-pub async fn create_active_enum_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_active_enum_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -206,7 +206,7 @@ where
     create_table(db, &create_table_stmt, ActiveEnum).await
 }
 
-pub async fn create_active_enum_child_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_active_enum_child_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -242,7 +242,7 @@ where
     create_table(db, &create_table_stmt, ActiveEnumChild).await
 }
 
-pub async fn create_satellites_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_satellites_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -276,7 +276,7 @@ where
     create_table(db, &stmt, Satellite).await
 }
 
-pub async fn create_transaction_log_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_transaction_log_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -313,7 +313,7 @@ where
     create_table(db, &stmt, TransactionLog).await
 }
 
-pub async fn create_insert_default_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_insert_default_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -330,7 +330,7 @@ where
     create_table(db, &create_table_stmt, InsertDefault).await
 }
 
-pub async fn create_json_vec_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_json_vec_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -348,7 +348,7 @@ where
     create_table(db, &create_table_stmt, JsonVec).await
 }
 
-pub async fn create_json_struct_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_json_struct_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -372,7 +372,7 @@ where
     create_table(db, &stmt, JsonStruct).await
 }
 
-pub async fn create_json_string_vec_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_json_string_vec_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -390,7 +390,7 @@ where
     create_table(db, &create_table_stmt, JsonStringVec).await
 }
 
-pub async fn create_json_struct_vec_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_json_struct_vec_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -412,7 +412,7 @@ where
     create_table(db, &create_table_stmt, JsonStructVec).await
 }
 
-pub async fn create_collection_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_collection_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -481,7 +481,7 @@ where
     create_table(db, &stmt, Collection).await
 }
 
-pub async fn create_pi_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_pi_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -504,7 +504,7 @@ where
     create_table(db, &stmt, Pi).await
 }
 
-pub async fn create_event_trigger_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_event_trigger_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -526,7 +526,7 @@ where
     create_table(db, &stmt, EventTrigger).await
 }
 
-pub async fn create_uuid_fmt_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_uuid_fmt_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -560,7 +560,7 @@ where
     create_table(db, &stmt, UuidFmt).await
 }
 
-pub async fn create_edit_log_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_edit_log_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -579,7 +579,7 @@ where
     create_table(db, &stmt, EditLog).await
 }
 
-pub async fn create_teas_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_teas_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -597,7 +597,7 @@ where
     create_table(db, &create_table_stmt, Teas).await
 }
 
-pub async fn create_categories_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_categories_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -617,7 +617,7 @@ where
     create_table(db, &create_table_stmt, Categories).await
 }
 
-pub async fn create_binary_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_binary_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -641,7 +641,7 @@ where
     create_table(db, &create_table_stmt, Binary).await
 }
 
-pub async fn create_bits_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_bits_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -688,7 +688,7 @@ where
     create_table(db, &create_table_stmt, Bits).await
 }
 
-pub async fn create_dyn_table_name_lazy_static_table<C>(db: &C) -> Result<(), DbErr>
+pub async fn create_dyn_table_name_lazy_static_table<C>(db: &C) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
@@ -720,7 +720,7 @@ where
     Ok(())
 }
 
-pub async fn create_value_type_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_value_type_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -741,7 +741,7 @@ where
 
     create_table(db, &general_stmt, value_type::value_type_general::Entity).await
 }
-pub async fn create_value_type_postgres_table<C>(db: &C) -> Result<u64, DbErr>
+pub async fn create_value_type_postgres_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {

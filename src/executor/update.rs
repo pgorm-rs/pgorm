@@ -26,7 +26,7 @@ where
     A: ActiveModelTrait,
 {
     /// Execute an update operation on an ActiveModel
-    pub async fn exec<C>(self, db: &C) -> Result<<A::Entity as EntityTrait>::Model, DbErr>
+    pub async fn exec<C>(self, db: &C) -> Result<<A::Entity as EntityTrait>::Model, Error>
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -42,7 +42,7 @@ where
     E: EntityTrait,
 {
     /// Execute an update operation on multiple ActiveModels
-    pub async fn exec<C>(self, db: &'a C) -> Result<UpdateResult, DbErr>
+    pub async fn exec<C>(self, db: &'a C) -> Result<UpdateResult, Error>
     where
         C: ConnectionTrait,
     {
@@ -50,7 +50,7 @@ where
     }
 
     /// Execute an update operation and return the updated model (use `RETURNING` syntax if supported)
-    pub async fn exec_with_returning<C>(self, db: &'a C) -> Result<Vec<E::Model>, DbErr>
+    pub async fn exec_with_returning<C>(self, db: &'a C) -> Result<Vec<E::Model>, Error>
     where
         C: ConnectionTrait,
     {
@@ -60,7 +60,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+3]
+// [spec:pgorm:sem:exec.crud.update+4]
 impl Updater {
     /// Instantiate an update using an [UpdateStatement]
     pub fn new(query: UpdateStatement) -> Self {
@@ -77,7 +77,7 @@ impl Updater {
     }
 
     /// Execute an update operation
-    pub async fn exec<C>(self, db: &C) -> Result<UpdateResult, DbErr>
+    pub async fn exec<C>(self, db: &C) -> Result<UpdateResult, Error>
     where
         C: ConnectionTrait,
     {
@@ -93,7 +93,7 @@ impl Updater {
 
         let result = db.execute(&stmt, &values).await?;
         if self.check_record_exists && result == 0 {
-            return Err(DbErr::RecordNotUpdated);
+            return Err(Error::RecordNotUpdated);
         }
         Ok(UpdateResult {
             rows_affected: result,
@@ -104,7 +104,7 @@ impl Updater {
         mut self,
         model: A,
         db: &C,
-    ) -> Result<<A::Entity as EntityTrait>::Model, DbErr>
+    ) -> Result<<A::Entity as EntityTrait>::Model, Error>
     where
         A: ActiveModelTrait,
         C: ConnectionTrait,
@@ -130,7 +130,7 @@ impl Updater {
         Ok(found)
     }
 
-    async fn exec_update_with_returning<E, C>(mut self, db: &C) -> Result<Vec<E::Model>, DbErr>
+    async fn exec_update_with_returning<E, C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
     where
         E: EntityTrait,
         C: ConnectionTrait,
@@ -159,11 +159,11 @@ impl Updater {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+3]
+// [spec:pgorm:sem:exec.crud.update+4]
 async fn find_updated_model_by_id<A, C>(
     model: A,
     db: &C,
-) -> Result<<A::Entity as EntityTrait>::Model, DbErr>
+) -> Result<<A::Entity as EntityTrait>::Model, Error>
 where
     A: ActiveModelTrait,
     C: ConnectionTrait,
@@ -174,7 +174,7 @@ where
     let primary_key_value = match model.get_primary_key_value() {
         Some(val) => ValueType::<A>::try_from_value_tuple(val)
             .map_err(|err| primary_key_type_err(Entity::<A>::default().table_name(), err))?,
-        None => return Err(DbErr::PrimaryKeyNotSet),
+        None => return Err(Error::PrimaryKeyNotSet),
     };
     let found = Entity::<A>::find_by_id(primary_key_value).one(db).await?;
 

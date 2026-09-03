@@ -5,7 +5,7 @@ pub use connection::*;
 pub use db_connection::*;
 pub use tokio_postgres::{Config, IsolationLevel};
 
-use crate::error::DbErr;
+use crate::error::Error;
 use pgorm_pool::{BuildError, Manager, ManagerConfig, Pool, PoolBuilder, RecyclingMethod};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio_postgres::NoTls;
@@ -13,8 +13,8 @@ use tokio_postgres::NoTls;
 /// The builder rejected the pool it was asked to build. deadpool's only such
 /// failure is a timeout configured without a runtime, so the message is carried
 /// through verbatim.
-fn pool_build_err(err: BuildError) -> DbErr {
-    DbErr::Custom(format!("cannot build connection pool: {err}"))
+fn pool_build_err(err: BuildError) -> Error {
+    Error::Custom(format!("cannot build connection pool: {err}"))
 }
 
 /// Method to create a [DatabasePool] on a database
@@ -25,7 +25,7 @@ fn pool_build_err(err: BuildError) -> DbErr {
 /// `config` shapes the [`Manager`], not the pool, so nothing a caller supplies
 /// can reach that check: a panic here is a pgorm bug, not caller error. Use
 /// [`connect_with_builder`] for a fallible pool whose shape the caller chooses.
-// [spec:pgorm:req:conn.pool+1]
+// [spec:pgorm:req:conn.pool+2]
 pub fn connect(config: Config) -> DatabasePool {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
@@ -44,13 +44,13 @@ pub fn connect(config: Config) -> DatabasePool {
 ///
 /// # Errors
 ///
-/// Returns [`DbErr::Custom`] if the builder produced by `build` cannot build a
+/// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
 /// pool — deadpool rejects a pool configured with timeouts but no runtime.
-// [spec:pgorm:req:conn.pool+1]    builder customization
+// [spec:pgorm:req:conn.pool+2]    builder customization
 pub fn connect_with_builder(
     config: Config,
     build: impl Fn(PoolBuilder) -> PoolBuilder,
-) -> Result<DatabasePool, DbErr> {
+) -> Result<DatabasePool, Error> {
     let mgr_config = ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
         tag: None,
@@ -68,13 +68,13 @@ pub fn connect_with_builder(
 ///
 /// # Errors
 ///
-/// Returns [`DbErr::Custom`] for the first entry whose builder cannot produce a
+/// Returns [`Error::Custom`] for the first entry whose builder cannot produce a
 /// pool; no map is returned in that case.
-// [spec:pgorm:sem:conn.pool.multi+1]    per-tag pool construction
+// [spec:pgorm:sem:conn.pool.multi+2]    per-tag pool construction
 pub fn connect_multi_with_builder(
     config: Config,
     build: BTreeMap<String, Box<dyn Fn(PoolBuilder) -> PoolBuilder>>,
-) -> Result<BTreeMap<Arc<String>, DatabasePool>, DbErr> {
+) -> Result<BTreeMap<Arc<String>, DatabasePool>, Error> {
     build
         .into_iter()
         .map(|(key, build)| {

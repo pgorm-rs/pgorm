@@ -19,10 +19,10 @@ use pgorm::tests_cfg::{
     sea_orm_active_enums::Tea, vendor,
 };
 use pgorm::{
-    ActiveValue, ColumnTrait, Condition, DbErr, DebugQuery, Delete, DeleteMany, DeleteOne,
-    EntityTrait, IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select,
-    SelectColumns, SelectTwo, SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
+    ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
+    Error, IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectColumns, SelectTwo,
+    SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -359,7 +359,7 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+3/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions, and
 // `SelectColumns` re-exposes the first two
@@ -420,7 +420,7 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+3/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -432,7 +432,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+3/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -468,7 +468,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+3/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -513,7 +513,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+3/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {
@@ -970,7 +970,7 @@ fn insert_on_conflict_is_attached_verbatim() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    models sharing
+// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    models sharing
 // a presence bitmap merge into one multi-row VALUES list
 #[test]
 fn insert_many_shares_one_column_list() {
@@ -991,7 +991,7 @@ fn insert_many_shares_one_column_list() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    a model whose
+// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    a model whose
 // presence differs from the first one is recorded as a mismatch, naming the
 // column it does not share, and contributes nothing to the statement
 #[test]
@@ -1049,7 +1049,7 @@ fn all_not_set_model_renders_a_default_row() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    a first model
+// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    a first model
 // that sets nothing is a column set like any other: a later model that sets a
 // column mismatches it
 #[test]
@@ -1074,7 +1074,7 @@ fn insert_many_rejects_a_blank_first_model() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    `do_nothing` and
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    `do_nothing` and
 // `on_empty_do_nothing` convert to `TryInsert` without touching the statement,
 // while `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]
@@ -1118,7 +1118,7 @@ fn try_insert_conversions_and_conflict_clause() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+2/test]    `Update::one` filters on every
+// [spec:pgorm:sem:query.build.update+3/test]    `Update::one` filters on every
 // primary-key column and SETs only `Set`, non-key columns
 #[test]
 fn update_one_sets_changed_non_key_columns() {
@@ -1167,7 +1167,7 @@ fn update_one_sets_changed_non_key_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+2/test]    a `NotSet` primary key has no
+// [spec:pgorm:sem:query.build.update+3/test]    a `NotSet` primary key has no
 // filter to contribute, so `Update::one` refuses to build the statement
 #[test]
 fn update_one_errs_on_unset_primary_key() {
@@ -1176,7 +1176,7 @@ fn update_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("a NotSet primary key cannot narrow the update");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // A composite key rejects the model when any one of its columns is unset.
     let err = Update::one(cake_filling_price::ActiveModel {
@@ -1185,7 +1185,7 @@ fn update_one_errs_on_unset_primary_key() {
         price: ActiveValue::Set(rust_decimal::Decimal::ONE),
     })
     .expect_err("half a composite key is not a key");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // `EntityTrait::update` forwards the same error.
     let err = cake::Entity::update(cake::ActiveModel {
@@ -1193,10 +1193,10 @@ fn update_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("the entry point forwards the builder's error");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.update+2/test]    `Update::many` adds no implicit
+// [spec:pgorm:sem:query.build.update+3/test]    `Update::many` adds no implicit
 // filter; `set` writes `Set` columns including primary keys, `col_expr` writes
 // a raw expression, and `QueryFilter` supplies the WHERE clause
 #[test]
@@ -1234,7 +1234,7 @@ fn update_many_has_no_implicit_filter() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete+1/test]    `Delete::one` filters on the
+// [spec:pgorm:sem:query.build.delete+2/test]    `Delete::one` filters on the
 // primary key only — non-key attributes never reach the WHERE clause
 #[test]
 fn delete_one_filters_by_primary_key_only() {
@@ -1276,7 +1276,7 @@ fn delete_one_filters_by_primary_key_only() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete+1/test]    a `NotSet` primary key has no
+// [spec:pgorm:sem:query.build.delete+2/test]    a `NotSet` primary key has no
 // filter to contribute, so `Delete::one` refuses to build the statement
 #[test]
 fn delete_one_errs_on_unset_primary_key() {
@@ -1285,7 +1285,7 @@ fn delete_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("a NotSet primary key cannot narrow the delete");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // A composite key rejects the model when any one of its columns is unset.
     let err = Delete::one(cake_filling::ActiveModel {
@@ -1293,7 +1293,7 @@ fn delete_one_errs_on_unset_primary_key() {
         filling_id: ActiveValue::NotSet,
     })
     .expect_err("half a composite key is not a key");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // `EntityTrait::delete` forwards the same error.
     let err = cake::Entity::delete(cake::ActiveModel {
@@ -1301,10 +1301,10 @@ fn delete_one_errs_on_unset_primary_key() {
         name: ActiveValue::Set("Apple Pie".to_owned()),
     })
     .expect_err("the entry point forwards the builder's error");
-    assert_eq!(err, DbErr::PrimaryKeyNotSet);
+    assert_eq!(err, Error::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.delete+1/test]    `Delete::many` is bare; narrowing
+// [spec:pgorm:sem:query.build.delete+2/test]    `Delete::many` is bare; narrowing
 // it is the caller's job through `QueryFilter`
 #[test]
 fn delete_many_is_unconstrained_until_filtered() {

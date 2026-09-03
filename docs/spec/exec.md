@@ -9,7 +9,7 @@ These rules capture what the code does today, including known gaps.
 
 ## Decoding (`exec.decode`)
 
-> [spec:pgorm:def:exec.decode]
+> [spec:pgorm:def:exec.decode+1]
 > `QueryResult` is a `#[repr(transparent)]` wrapper around a single
 > `tokio_postgres::Row`. Values are extracted through the `TryGetable`
 > trait, which has three entry points: `try_get_by` (any
@@ -20,21 +20,21 @@ These rules capture what the code does today, including known gaps.
 >
 > `QueryResult` re-exposes these as `try_get_by`, `try_get`,
 > `try_get_by_index`, `try_get_many`, and `try_get_many_by_index`, each
-> converting the internal `TryGetError` into `DbErr`. `column_names`
+> converting the internal `TryGetError` into `Error`. `column_names`
 > returns the result set's column names in order.
 
-> [spec:pgorm:sem:exec.decode.null]
+> [spec:pgorm:sem:exec.decode.null+1]
 > Decoding delegates to `Row::try_get`. A resulting
 > `tokio_postgres::Error` is classified by `TryGetError::postgres`: when
 > the error's `source()` downcasts to `tokio_postgres::types::WasNull`
 > it becomes `TryGetError::Null(...)`; any other error (including one with
-> no source at all) becomes `TryGetError::DbErr(DbErr::Postgres(...))`.
+> no source at all) becomes `TryGetError::Db(Error::Postgres(...))`.
 >
 > The blanket `TryGetable for Option<T>` impl converts
 > `TryGetError::Null` into `Ok(None)` and propagates every other error,
 > so SQL `NULL` is only an error when decoding into a non-`Option` type.
-> `From<TryGetError> for DbErr` renders the null case as
-> `DbErr::Type("A null value was encountered while decoding {s}")`.
+> `From<TryGetError> for Error` renders the null case as
+> `Error::Type("A null value was encountered while decoding {s}")`.
 
 > [spec:pgorm:sem:exec.decode.null-context]
 > Null-decode errors do not carry structured column context. The payload
@@ -120,7 +120,7 @@ These rules capture what the code does today, including known gaps.
 > Surplus column names are ignored. The index-based path performs no such
 > check; it simply reads ordinals `0..N`.
 
-> [spec:pgorm:def:exec.decode.json]
+> [spec:pgorm:def:exec.decode.json+1]
 > Under `with-json`, `TryGetableFromJson` decodes any
 > `serde::Deserialize` type from a JSON/JSONB column via the
 > `tokio_postgres::types::Json<T>` wrapper. A blanket impl provides
@@ -131,17 +131,17 @@ These rules capture what the code does today, including known gaps.
 > provides `Vec<T>` decoding by reading the column as a
 > `serde_json::Value` and running `from_json_vec`, which deserializes
 > each element of a JSON array and fails with
-> `DbErr::Json("Value is not an Array")` for any non-array value.
+> `Error::Json("Value is not an Array")` for any non-array value.
 
-> [spec:pgorm:def:exec.decode.from-u64+1]
+> [spec:pgorm:def:exec.decode.from-u64+2]
 > `TryFromU64` converts a `u64` (e.g. a rows-affected-derived id) into a
 > primary-key value type. Numeric impls (`i8`, `i16`, `i32`, `i64`, `u8`,
 > `u16`, `u32`, `u64`) use checked `TryInto`, failing with
-> `DbErr::TryIntoErr` on overflow. `String` converts via `to_string`.
+> `Error::Conversion` on overflow. `String` converts via `to_string`.
 > Every other implementor — `bool`, `f32`, `f64`, `Vec<u8>`,
 > `serde_json::Value`, the chrono types, `Decimal`,
 > `uuid::Uuid`, and tuples of arity 2 through 12 — unconditionally
-> returns `DbErr::ConvertFromU64`.
+> returns `Error::ConvertFromU64`.
 
 ## CRUD execution (`exec.crud`)
 
@@ -162,12 +162,12 @@ These rules capture what the code does today, including known gaps.
 > with the Postgres `QueryBuilder`, then binds each `Value` through the
 > `ValueHolder` `ToSql` adapter (see `exec.cursor.binding`).
 
-> [spec:pgorm:sem:exec.crud.select]
+> [spec:pgorm:sem:exec.crud.select+1]
 > `Selector::one` and `one_opt` set `LIMIT 1` on the query, then execute
 > through the connection's `query_opt`. `SelectorRaw::one` and `one_opt`
 > execute the raw statement as-is (no limit is injected).
 >
-> `one` returns the decoded item and fails with `DbErr::RecordNotFound`
+> `one` returns the decoded item and fails with `Error::RecordNotFound`
 > when zero rows are returned; `one_opt` returns `Ok(None)` in that
 > case. This is a deliberate pgorm difference from SeaORM, where `one`
 > returns an `Option`. `all` executes via `query_all` and decodes every
@@ -186,30 +186,30 @@ These rules capture what the code does today, including known gaps.
 > pagination: `one()` was dropped, and `paginate`/`count` are absent
 > because a page boundary could split one parent's children.
 
-> [spec:pgorm:sem:exec.crud.insert+1]
+> [spec:pgorm:sem:exec.crud.insert+2]
 > `Insert::exec` appends a `RETURNING` clause of the entity's primary-key
 > columns and resolves `InsertResult::last_insert_id` (typed as the
 > entity's `PrimaryKey::ValueType`) in one of two modes. When the insert
 > captured a client-supplied primary-key `ValueTuple`, the statement runs
 > through `execute`; zero rows affected fails with
-> `DbErr::RecordNotInserted`, and `last_insert_id` is reconstructed from
+> `Error::RecordNotInserted`, and `last_insert_id` is reconstructed from
 > the cached tuple through `sql.value.tuple`. A tuple whose shape or
 > element types disagree with the entity's declared `ValueType` fails with
-> `DbErr::Type` naming the table and the mismatch, rather than panicking.
+> `Error::Type` naming the table and the mismatch, rather than panicking.
 > Otherwise the statement runs through `query_all` and
 > the **last** returned row's primary-key columns are read by name;
-> an empty result fails with `DbErr::RecordNotInserted`, and a decode
-> failure of the key columns fails with `DbErr::UnpackInsertId`.
+> an empty result fails with `Error::RecordNotInserted`, and a decode
+> failure of the key columns fails with `Error::UnpackInsertId`.
 
-> [spec:pgorm:sem:exec.crud.insert-returning]
+> [spec:pgorm:sem:exec.crud.insert-returning+1]
 > `Insert::exec_with_returning` appends a `RETURNING` clause of **all**
 > entity columns and decodes the inserted model through
 > `SelectorRaw::<SelectModel<Model>>::one_opt`; when no row comes back it
-> fails with `DbErr::RecordNotFound`. `Insert::exec_without_returning`
+> fails with `Error::RecordNotFound`. `Insert::exec_without_returning`
 > appends no `RETURNING` clause and returns the rows-affected count as
 > `u64`.
 
-> [spec:pgorm:sem:exec.crud.try-insert+1]
+> [spec:pgorm:sem:exec.crud.try-insert+2]
 > `TryInsert::exec`, `exec_without_returning`, and `exec_with_returning`
 > wrap the corresponding `Insert` executions in `TryInsertResult`. When
 > the underlying insert statement has no columns (e.g. `insert_many`
@@ -219,34 +219,34 @@ These rules capture what the code does today, including known gaps.
 > All three otherwise report an insert that the conflict clause skipped
 > as `TryInsertResult::Conflicted`, each reading the signal its own
 > execution yields for "no row was written". `exec` maps a
-> `DbErr::RecordNotInserted`, which `exec.crud.insert` raises only when
+> `Error::RecordNotInserted`, which `exec.crud.insert` raises only when
 > the primary-key `RETURNING` came back empty. `exec_without_returning`
 > maps a zero rows-affected count and `exec_with_returning` maps a
 > missing `RETURNING` row — both only when the statement carries an
 > `ON CONFLICT` clause, since neither signal can otherwise be attributed
 > to a conflict. Without such a clause those two keep the plain `Insert`
-> outcome, `TryInsertResult::Inserted(0)` and `DbErr::RecordNotFound`
+> outcome, `TryInsertResult::Inserted(0)` and `Error::RecordNotFound`
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update+3]
+> [spec:pgorm:sem:exec.crud.update+4]
 > `Updater::exec` short-circuits when the update statement carries no SET
 > values, returning a default `UpdateResult` (zero `rows_affected`)
 > without a database round-trip; otherwise it executes and returns
 > `UpdateResult { rows_affected }`. With `check_record_exists` enabled,
-> zero rows affected fails with `DbErr::RecordNotUpdated`.
+> zero rows affected fails with `Error::RecordNotUpdated`.
 >
 > `UpdateOne::exec` returns the updated model: it appends a `RETURNING`
 > clause of all entity columns and decodes through `SelectorRaw::one`, so
-> an update matching zero rows surfaces the `DbErr::RecordNotFound` of
+> an update matching zero rows surfaces the `Error::RecordNotFound` of
 > `exec.crud.select`. On the no-op path (nothing to set) it instead
 > re-fetches the current model by primary key. That re-fetch keeps a
-> `DbErr::PrimaryKeyNotSet` guard for an active model with no
+> `Error::PrimaryKeyNotSet` guard for an active model with no
 > primary-key value, but the guard is defensive only: `query.build.update`
 > rejects an unset primary key when the `UpdateOne` is built, so no caller
 > can reach `exec` with one. Rebuilding the typed key from that tuple goes
 > through `sql.value.tuple`, so a shape or element-type disagreement with
-> the entity's declared `ValueType` fails with `DbErr::Type` naming the
+> the entity's declared `ValueType` fails with `Error::Type` naming the
 > table and the mismatch, rather than panicking.
 > `UpdateMany::exec_with_returning` appends the
 > same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
@@ -266,7 +266,7 @@ These rules capture what the code does today, including known gaps.
 
 ## Streaming (`exec.stream`)
 
-> [spec:pgorm:def:exec.stream]
+> [spec:pgorm:def:exec.stream+1]
 > Row-level streaming is exposed through `ConnectionTrait::query_raw`, which
 > takes the same `BorrowToSql` `ExactSizeIterator` params as `execute_raw`
 > and returns a `tokio_postgres::RowStream`: rows are read from the
@@ -278,7 +278,7 @@ These rules capture what the code does today, including known gaps.
 > On top of it the executor exposes `stream` on `SelectorRaw`, `Selector`,
 > `Select`, and `SelectTwo`, plus `stream_partial_model` on `Select` and
 > `SelectTwo`, each returning
-> `PinBoxSendStream<'db, Result<Item, DbErr>>` — an alias for
+> `PinBoxSendStream<'db, Result<Item, Error>>` — an alias for
 > `Pin<Box<dyn Stream<Item = ..> + Send + 'db>>`. Unlike `PinBoxStream`
 > (used by `Paginator::into_stream`) it is `Send`, so a streamed select can
 > be consumed from a spawned task. `SelectTwoMany` deliberately has no
@@ -286,11 +286,11 @@ These rules capture what the code does today, including known gaps.
 > complete (see `exec.crud.consolidate`). Page-batched and keyset-windowed
 > consumption remain available through `exec.paginator` and `exec.cursor`.
 
-> [spec:pgorm:sem:exec.stream.decode]
+> [spec:pgorm:sem:exec.stream.decode+1]
 > `SelectorRaw::stream` binds `Values` through the `ValueHolder` `ToSql`
 > adapter exactly as `all` does, then maps the `RowStream` item-wise: each
 > `Ok(row)` is decoded by `S::from_raw_query_result`, and each transport
-> error becomes `DbErr::Postgres`. Decoding is lazy and per-item — no row is
+> error becomes `Error::Postgres`. Decoding is lazy and per-item — no row is
 > decoded until it is polled, and a decode failure is yielded as one `Err`
 > item rather than discarding the rest of the result set, which is the
 > deliberate difference from `all` (which aborts at the first bad row).
@@ -302,7 +302,7 @@ These rules capture what the code does today, including known gaps.
 > usable — but the query still runs to completion server-side. A stream MUST
 > NOT be polled after the connection or transaction it came from is dropped:
 > `RowStream` is `'static` and does not borrow the connection, so doing so
-> compiles, and the stream then yields `DbErr::Postgres` for a closed
+> compiles, and the stream then yields `Error::Postgres` for a closed
 > connection.
 >
 > The metric layer records `query_raw` at stream *creation*, timing only the

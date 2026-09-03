@@ -7,7 +7,7 @@ use pgorm::{ActiveValue::Set, DatabaseConnection, entity::prelude::*, entity::*}
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("pi_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -22,7 +22,7 @@ async fn main() -> Result<(), DbErr> {
 
 // The literals are the fixture: this exercises decimal round-tripping of pi.
 #[allow(clippy::approx_constant)]
-pub async fn create_and_update_pi(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_pi(db: &DatabaseConnection) -> Result<(), Error> {
     let pi = pi::Model {
         id: 1,
         decimal: rust_dec(3.1415926536),

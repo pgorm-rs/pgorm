@@ -48,7 +48,7 @@ LIMIT 10;
 use pgorm::connect;
 
 // `connect` returns the pool directly; pool construction failure panics
-// rather than surfacing as a `DbErr`.
+// rather than surfacing as an `Error`.
 let pool = connect(config);
 
 // Get pool status (deadpool::Status: max_size, size, available, waiting)
@@ -71,9 +71,9 @@ println!("Pool: {}", tag);
 #[async_trait]
 pub trait MetricsCollector: Clone + Send + Sync + 'static {
     async fn record_query_success(&self, query: QueryContext<'_>, duration: Duration, rows: Option<u64>);
-    async fn record_query_error(&self, query: QueryContext<'_>, duration: Duration, error: &DbErr);
+    async fn record_query_error(&self, query: QueryContext<'_>, duration: Duration, error: &Error);
     async fn record_connection_acquired(&self, duration: Duration);
-    async fn record_connection_error(&self, duration: Duration, error: &DbErr);
+    async fn record_connection_error(&self, duration: Duration, error: &Error);
     async fn record_transaction_begin(&self, duration: Duration);
     async fn record_transaction_commit(&self, duration: Duration);
     async fn record_transaction_rollback(&self, duration: Duration);
@@ -161,7 +161,7 @@ Because `get()` clones the collector for every connection, keep collectors cheap
 
 `query.sql()` is the statement itself in each of these — the `&str` or `&String` you passed, or the whole script in the case of `batch_execute`.
 
-On failure the same context goes to `record_query_error`, and the `DbErr` is propagated unchanged.
+On failure the same context goes to `record_query_error`, and the `Error` is propagated unchanged.
 
 ### Transactions
 
@@ -197,7 +197,7 @@ Implement the trait for your own type. All seven hooks are required, so a collec
 
 ```rust
 use async_trait::async_trait;
-use pgorm::DbErr;
+use pgorm::Error;
 use pgorm::metric::{InstrumentedPool, MetricsCollector, QueryContext};
 use prometheus::{Counter, Histogram};
 use std::time::Duration;
@@ -226,7 +226,7 @@ impl MetricsCollector for PrometheusMetrics {
         self.query_duration.observe(duration.as_secs_f64());
     }
 
-    async fn record_query_error(&self, _query: QueryContext<'_>, duration: Duration, _error: &DbErr) {
+    async fn record_query_error(&self, _query: QueryContext<'_>, duration: Duration, _error: &Error) {
         self.queries.inc();
         self.query_duration.observe(duration.as_secs_f64());
     }
@@ -235,7 +235,7 @@ impl MetricsCollector for PrometheusMetrics {
         self.connections.inc();
     }
 
-    async fn record_connection_error(&self, _duration: Duration, _error: &DbErr) {}
+    async fn record_connection_error(&self, _duration: Duration, _error: &Error) {}
     async fn record_transaction_begin(&self, _duration: Duration) {}
     async fn record_transaction_commit(&self, _duration: Duration) {}
     async fn record_transaction_rollback(&self, _duration: Duration) {}

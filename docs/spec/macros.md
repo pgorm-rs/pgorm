@@ -162,18 +162,18 @@ they describe what the macros generate and reject today, including known limitat
 
 ## Column, Model and ActiveModel derives
 
-> [spec:pgorm:sem:macros.derive.column]
+> [spec:pgorm:sem:macros.derive.column+1]
 > `DeriveColumn` (enums only; other inputs are a compile error) generates: an inherent
 > `default_as_str` returning the snake_case of the variant name or a
 > `#[pgorm(column_name = "...")]` override; a `FromStr` impl accepting either the
 > snake_case or the lowerCamelCase spelling of each variant and returning
-> `ColumnFromStrErr(input)` otherwise; an `Iden` impl writing `IdenStatic::as_str`; and
+> `ColumnFromStrError(input)` otherwise; an `Iden` impl writing `IdenStatic::as_str`; and
 > an `IdenStatic` impl whose `as_str` is `default_as_str`. `DeriveCustomColumn`
 > generates the same minus the `IdenStatic` impl, leaving `as_str` to the user (who may
 > delegate to `default_as_str`) — this is the escape hatch for non-snake-case column
 > names. Note that neither derive adds `EnumIter`; callers derive it alongside.
 
-> [spec:pgorm:sem:macros.derive.model+1]
+> [spec:pgorm:sem:macros.derive.model+2]
 > `DeriveModel` (named-field structs only; otherwise a compile error) generates two
 > impls. `FromQueryResult`: each field is read with
 > `row.try_get(pre, Column::<Variant>.as_str())`, where the variant name follows the
@@ -181,27 +181,27 @@ they describe what the macros generate and reject today, including known limitat
 > `[spec:pgorm:sem:macros.derive.entity-model.casing+1]`; `#[pgorm(ignore)]` fields are
 > filled with `Default::default()` instead. `ModelTrait`: `get` clones the field and
 > converts it `.into()` a `Value`; `set` converts through `ValueType::try_from` and
-> assigns, answering `DbErr::Type("value does not match the type of {Model} field
+> assigns, answering `Error::Type("value does not match the type of {Model} field
 > {field}")` when the value is of another type. Ignored fields have no match arm, so
 > `get` on them panics with "field does not exist on {Model}" and `set` returns that
-> same text as `DbErr::Type`. The
+> same text as `Error::Type`. The
 > target entity defaults to `Entity`, overridable via `#[pgorm(entity = Ident)]`.
 
-> [spec:pgorm:sem:macros.derive.active-model+1]
+> [spec:pgorm:sem:macros.derive.active-model+2]
 > `DeriveActiveModel` (named-field structs only) generates a
 > `pub struct ActiveModel` — name and entity are hard-coded as `ActiveModel`/`Entity` —
 > with one `pub field: ActiveValue<T>` per non-ignored field, plus: `Default`
 > delegating to `ActiveModelBehavior::new()`; `From<Model>` mapping every field through
 > `ActiveValue::unchanged`; an `IntoActiveModel` impl for `Model`; and
 > `ActiveModelTrait` with `take`/`get` (unmatched columns yield `not_set`),
-> `set` (`DbErr::Type("This ActiveModel does not have this field")` on an unmatched
-> column, and `DbErr::Type("value does not match the type of ActiveModel field
+> `set` (`Error::Type("This ActiveModel does not have this field")` on an unmatched
+> column, and `Error::Type("value does not match the type of ActiveModel field
 > {field}")` when the value is of another type),
 > `not_set` (silently ignores unmatched), `is_not_set` (panics on unmatched),
 > `default` (all fields `not_set`), and `reset`. It also generates
 > `TryFrom<ActiveModel> for Model` and `TryIntoModel`: each non-ignored field is
 > taken out of its `ActiveValue` directly — no round trip through `Value` — and one
-> left `NotSet` fails with `DbErr::AttrNotSet(field)`; ignored fields are rebuilt with
+> left `NotSet` fails with `Error::AttrNotSet(field)`; ignored fields are rebuilt with
 > `Default::default()`.
 >
 > `DeriveActiveModelBehavior` unconditionally emits
@@ -232,7 +232,7 @@ they describe what the macros generate and reject today, including known limitat
 > literals written with unary minus (other unary operators are rejected); a variant with
 > neither attribute nor usable discriminant is a compile error.
 
-> [spec:pgorm:sem:macros.derive.active-enum.expansion]
+> [spec:pgorm:sem:macros.derive.active-enum.expansion+1]
 > The expansion generates: a unit struct `{Enum}Enum` with an `Iden` impl writing the
 > `enum_name`; when any variant has a string value (explicit or via rename), an enum
 > `{Enum}Variant` deriving `EnumIter` with an `Iden` impl writing the raw string values
@@ -240,7 +240,7 @@ they describe what the macros generate and reject today, including known limitat
 > with `Value = rs_type`, `ValueVec = Vec<rs_type>`, `name()` returning the
 > `{Enum}Enum` iden, `to_value()` matching variants to their values, `try_from_value()`
 > matching back (comparing `v.as_ref()` for strings) and failing with
-> `DbErr::Type("unexpected value for {Enum} enum: ...")`, and `db_type()` building a
+> `Error::Type("unexpected value for {Enum} enum: ...")`, and `db_type()` building a
 > `ColumnDef` from the `db_type` tokens; plus `TryGetable`, `TryGetableArray`,
 > `Into<Value>`, `ValueType`, `Nullable`, and the `NotU8` marker impl.
 >
@@ -412,7 +412,7 @@ they describe what the macros generate and reject today, including known limitat
 > the wrong place for a C dependency the entity derives have no use for. The root crate
 > re-exports it as `pgorm::sql` behind the off-by-default `sql-macro` feature. That
 > feature no longer decides whether libpg_query is compiled — `pg_query` is a plain
-> dependency of `pgorm` itself, because `[spec:pgorm:sem:exec.paginator.raw+1]` parses
+> dependency of `pgorm` itself, because `[spec:pgorm:sem:exec.paginator.raw+2]` parses
 > raw statements at runtime — only whether the macro is in scope. Its call sites are the
 > escape hatches that take SQL as text — `SelectorRaw::from_statement`,
 > `ConnectionTrait::query_raw` / `execute_raw` / `batch_execute`, and migration bodies.

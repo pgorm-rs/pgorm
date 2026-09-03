@@ -7,7 +7,7 @@ use pgorm::{ActiveValue::Set, DatabaseConnection, IntoActiveModel, entity::prelu
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("features_parallel_tests").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -20,7 +20,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn crud_in_parallel(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn crud_in_parallel(db: &DatabaseConnection) -> Result<(), Error> {
     let metadata = [
         metadata::Model {
             uuid: Uuid::new_v4(),

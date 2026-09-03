@@ -14,14 +14,14 @@ pub async fn test_cake_error(db: &DatabaseConnection) {
 
     let cake = mud_cake.insert(db).await.expect("could not insert cake");
 
-    let error: DbErr = cake
+    let error: Error = cake
         .into_active_model()
         .insert(db)
         .await
         .expect_err("inserting should fail due to duplicate primary key");
 
     match &error {
-        DbErr::Postgres(e) => {
+        Error::Postgres(e) => {
             let db_error = e.as_db_error().expect("expected a database error");
             assert_eq!(db_error.code().code(), "23505");
         }

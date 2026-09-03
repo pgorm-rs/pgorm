@@ -54,7 +54,7 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - Failsafe behavior for empty `insert_many` operations
 
 ### Connections
-`pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning a `DbErr`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is a `DbErr`, not a panic. TLS is not supported through these entry points (`NoTls` is hard-coded).
+`pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning an `Error`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is an `Error`, not a panic. TLS is not supported through these entry points (`NoTls` is hard-coded).
 
 ### Testing Setup
 Tests use a common setup pattern in `tests/common/setup/mod.rs` that:

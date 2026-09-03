@@ -9,7 +9,7 @@ use pgorm::{ActiveValue::Set, DatabaseConnection, pgorm_query::OnConflict};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("upsert_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -22,9 +22,9 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+1/test]    `last_insert_id` read from the last
+// [spec:pgorm:sem:exec.crud.insert+2/test]    `last_insert_id` read from the last
 // RETURNING row of a batch, and RecordNotInserted when nothing is written
-pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     let on_conflict = OnConflict::column(Column::Id).do_nothing();
@@ -38,7 +38,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
     .exec(db)
     .await;
 
-    // [spec:pgorm:sem:exec.crud.insert+1] last_insert_id comes from the last
+    // [spec:pgorm:sem:exec.crud.insert+2] last_insert_id comes from the last
     // RETURNING row of the batch.
     assert_eq!(res?.last_insert_id, 3);
 
@@ -64,7 +64,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
     .exec(db)
     .await;
 
-    assert!(matches!(res, Err(DbErr::RecordNotInserted)));
+    assert!(matches!(res, Err(Error::RecordNotInserted)));
 
     let res = Entity::insert_many([
         ActiveModel { id: Set(1) },

@@ -31,7 +31,7 @@ where
 }
 
 /// The types of results for an INSERT operation
-// [spec:pgorm:sem:exec.crud.try-insert+1]
+// [spec:pgorm:sem:exec.crud.try-insert+2]
 #[derive(Debug)]
 pub enum TryInsertResult<T> {
     /// The INSERT statement did not have any value to insert
@@ -42,7 +42,7 @@ pub enum TryInsertResult<T> {
     Inserted(T),
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+1]
+// [spec:pgorm:sem:exec.crud.try-insert+2]
 impl<A> TryInsert<A>
 where
     A: ActiveModelTrait,
@@ -54,9 +54,9 @@ where
     }
 
     /// Execute an insert operation
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     #[allow(unused_mut)]
-    pub async fn exec<'a, C>(self, db: &'a C) -> Result<TryInsertResult<InsertResult<A>>, DbErr>
+    pub async fn exec<'a, C>(self, db: &'a C) -> Result<TryInsertResult<InsertResult<A>>, Error>
     where
         C: ConnectionTrait,
         A: 'a,
@@ -68,18 +68,18 @@ where
         let res = self.insert_struct.exec(db).await;
         match res {
             Ok(res) => Ok(TryInsertResult::Inserted(res)),
-            Err(DbErr::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
+            Err(Error::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
             Err(err) => Err(err),
         }
     }
 
     /// Execute an insert operation without returning (don't use `RETURNING` syntax)
     /// Number of rows affected is returned
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     pub async fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> Result<TryInsertResult<u64>, DbErr>
+    ) -> Result<TryInsertResult<u64>, Error>
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -94,17 +94,17 @@ where
         match res {
             Ok(0) if conflict_clause => Ok(TryInsertResult::Conflicted),
             Ok(res) => Ok(TryInsertResult::Inserted(res)),
-            Err(DbErr::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
+            Err(Error::RecordNotInserted) => Ok(TryInsertResult::Conflicted),
             Err(err) => Err(err),
         }
     }
 
     /// Execute an insert operation and return the inserted model (use `RETURNING` syntax if supported)
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     pub async fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> Result<TryInsertResult<<A::Entity as EntityTrait>::Model>, DbErr>
+    ) -> Result<TryInsertResult<<A::Entity as EntityTrait>::Model>, Error>
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -119,7 +119,7 @@ where
         match res {
             Ok(Some(res)) => Ok(TryInsertResult::Inserted(res)),
             Ok(None) if conflict_clause => Ok(TryInsertResult::Conflicted),
-            Ok(None) => Err(DbErr::RecordNotFound),
+            Ok(None) => Err(Error::RecordNotFound),
             Err(err) => Err(err),
         }
     }
@@ -130,10 +130,10 @@ where
     A: ActiveModelTrait,
 {
     /// Execute an insert operation
-    // [spec:pgorm:sem:exec.crud.insert+1]
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:sem:exec.crud.insert+2]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     #[allow(unused_mut)]
-    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
+    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, Error>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -154,11 +154,11 @@ where
 
     /// Execute an insert operation without returning (don't use `RETURNING` syntax)
     /// Number of rows affected is returned
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     pub fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<u64, DbErr>> + 'a
+    ) -> impl Future<Output = Result<u64, Error>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -171,11 +171,11 @@ where
     }
 
     /// Execute an insert operation and return the inserted model (use `RETURNING` syntax if supported)
-    // [spec:pgorm:req:query.build.insert.uniform-columns+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
     pub fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + 'a
+    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, Error>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -202,7 +202,7 @@ where
     }
 
     /// Execute an insert operation, returning the last inserted id
-    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, DbErr>> + 'a
+    pub fn exec<'a, C>(self, db: &'a C) -> impl Future<Output = Result<InsertResult<A>, Error>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -214,7 +214,7 @@ where
     pub fn exec_without_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<u64, DbErr>> + 'a
+    ) -> impl Future<Output = Result<u64, Error>> + 'a
     where
         C: ConnectionTrait,
         A: 'a,
@@ -226,7 +226,7 @@ where
     pub fn exec_with_returning<'a, C>(
         self,
         db: &'a C,
-    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, DbErr>> + 'a
+    ) -> impl Future<Output = Result<<A::Entity as EntityTrait>::Model, Error>> + 'a
     where
         <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -236,12 +236,12 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert+1]
+// [spec:pgorm:sem:exec.crud.insert+2]
 async fn exec_insert<A, C>(
     primary_key: Option<ValueTuple>,
     statement: InsertStatement,
     db: &C,
-) -> Result<InsertResult<A>, DbErr>
+) -> Result<InsertResult<A>, Error>
 where
     C: ConnectionTrait,
     A: ActiveModelTrait,
@@ -259,7 +259,7 @@ where
         Some(value_tuple) => {
             let res = db.execute(&stmt, &values).await?;
             if res == 0 {
-                return Err(DbErr::RecordNotInserted);
+                return Err(Error::RecordNotInserted);
             }
             TryFromValueTuple::try_from_value_tuple(value_tuple).map_err(|err| {
                 primary_key_type_err(<A::Entity as Default>::default().table_name(), err)
@@ -269,24 +269,24 @@ where
             let mut rows = db.query_all(&stmt, &values).await?;
             let row = match rows.pop() {
                 Some(row) => QueryResult { row },
-                None => return Err(DbErr::RecordNotInserted),
+                None => return Err(Error::RecordNotInserted),
             };
             let cols = PrimaryKey::<A>::iter()
                 .map(|col| col.to_string())
                 .collect::<Vec<_>>();
             row.try_get_many("", cols.as_ref())
-                .map_err(|_| DbErr::UnpackInsertId)?
+                .map_err(|_| Error::UnpackInsertId)?
         }
     };
 
     Ok(InsertResult { last_insert_id })
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning]
+// [spec:pgorm:sem:exec.crud.insert-returning+1]
 async fn exec_insert_without_returning<C>(
     insert_statement: InsertStatement,
     db: &C,
-) -> Result<u64, DbErr>
+) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -301,11 +301,11 @@ where
     Ok(exec_result)
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning]
+// [spec:pgorm:sem:exec.crud.insert-returning+1]
 async fn exec_insert_with_returning<A, C>(
     insert_statement: InsertStatement,
     db: &C,
-) -> Result<<A::Entity as EntityTrait>::Model, DbErr>
+) -> Result<<A::Entity as EntityTrait>::Model, Error>
 where
     <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
     C: ConnectionTrait,
@@ -313,7 +313,7 @@ where
 {
     exec_insert_with_returning_opt::<A, C>(insert_statement, db)
         .await?
-        .ok_or(DbErr::RecordNotFound)
+        .ok_or(Error::RecordNotFound)
 }
 
 /// A missing `RETURNING` row is reported as `None` rather than an error, so
@@ -322,7 +322,7 @@ where
 async fn exec_insert_with_returning_opt<A, C>(
     mut insert_statement: InsertStatement,
     db: &C,
-) -> Result<Option<<A::Entity as EntityTrait>::Model>, DbErr>
+) -> Result<Option<<A::Entity as EntityTrait>::Model>, Error>
 where
     <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
     C: ConnectionTrait,

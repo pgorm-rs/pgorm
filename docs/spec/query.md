@@ -58,7 +58,7 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias string.
 
-> [spec:pgorm:sem:query.build.modifiers+2]
+> [spec:pgorm:sem:query.build.modifiers+3]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` / `expr_as_` /
@@ -116,7 +116,7 @@ is what `EntityTrait::find()` produces.
 > straight to `Selector::with_columns` / `Selector::into_tuple` — so the
 > execution-boundary guard stays. Every ORM path that would send a SELECT
 > whose projection list is empty MUST return
-> `DbErr::Query(RuntimeErr::Internal("select list is empty; add at least one
+> `Error::Query(RuntimeError::Internal("select list is empty; add at least one
 > column or expression"))` before any statement reaches the server: the paths
 > are `Selector::one` / `one_opt` / `all` / `stream` (and everything routed
 > through them, including `Select::all`, `SelectTwo`/`SelectTwoMany`,
@@ -213,7 +213,7 @@ what makes it total over partially-set models.
 > `last_insert_id`); for auto-increment keys it is left `None`.
 > `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
 
-> [spec:pgorm:req:query.build.insert.uniform-columns+1]
+> [spec:pgorm:req:query.build.insert.uniform-columns+2]
 > All models added to a single `Insert` MUST have the same set of present
 > (`Set` or `Unchanged`) columns; rows with heterogeneous column sets are never
 > merged into a column union. The first model added records a per-column
@@ -229,13 +229,13 @@ what makes it total over partially-set models.
 > compared — so a mismatch never panics and never renders a ragged VALUES list.
 >
 > `Insert::ensure_uniform_columns`, mirrored on `TryInsert`, reports the
-> recorded state as `Err(DbErr::Query(RuntimeErr::Internal(..)))` whose message
+> recorded state as `Err(Error::Query(RuntimeError::Internal(..)))` whose message
 > names the offending columns on each side. Every execution path of both types
 > (`exec`, `exec_without_returning`, `exec_with_returning`) asks it first and
 > fails with that error before any SQL is sent, so a mismatched batch leaves
 > the database untouched.
 
-> [spec:pgorm:sem:query.build.insert.empty-failsafe+1]
+> [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
 > `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:
 > `Insert::do_nothing()` and its alias `on_empty_do_nothing()` convert without
 > altering the statement, while `Insert::on_conflict_do_nothing()` first
@@ -250,16 +250,16 @@ what makes it total over partially-set models.
 > `exec_with_returning`) read that one state, so an all-`NotSet` model reports
 > `TryInsertResult::Empty` on every path exactly as an empty batch does,
 > without sending any SQL and leaving the database untouched. A
-> `DbErr::RecordNotInserted` from the underlying insert is mapped to
+> `Error::RecordNotInserted` from the underlying insert is mapped to
 > `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.
 
-> [spec:pgorm:sem:query.build.update+2]
+> [spec:pgorm:sem:query.build.update+3]
 > `Update::one(model)` builds an `UpdateOne<A>` in two passes over the
-> ActiveModel and returns `Result<UpdateOne<A>, DbErr>`. Filters: every
+> ActiveModel and returns `Result<UpdateOne<A>, Error>`. Filters: every
 > primary-key column contributes a `WHERE pk = value` equality from a `Set`
 > or `Unchanged` value; a `NotSet` primary key aborts the build with
-> `Err(DbErr::PrimaryKeyNotSet)` rather than panicking, so an `UpdateOne`
+> `Err(Error::PrimaryKeyNotSet)` rather than panicking, so an `UpdateOne`
 > can never exist without a filter on every primary-key column. Values: only
 > `Set`, non-primary-key columns are written into the SET clause (through
 > `col.save_as`); `Unchanged` and `NotSet` columns are omitted, so only
@@ -271,12 +271,12 @@ what makes it total over partially-set models.
 > primary-key columns, and `col_expr(col, expr)` sets a raw expression. Both
 > forms implement `QueryFilter` for WHERE clauses.
 
-> [spec:pgorm:sem:query.build.delete+1]
+> [spec:pgorm:sem:query.build.delete+2]
 > `Delete::one(model)` converts through `IntoActiveModel`, targets the
-> entity's table and returns `Result<DeleteOne<A>, DbErr>`: every primary-key
+> entity's table and returns `Result<DeleteOne<A>, Error>`: every primary-key
 > column contributes a `WHERE pk = value` equality from a `Set` or
 > `Unchanged` value; a `NotSet` primary key aborts the build with
-> `Err(DbErr::PrimaryKeyNotSet)` rather than panicking, so a `DeleteOne` can
+> `Err(Error::PrimaryKeyNotSet)` rather than panicking, so a `DeleteOne` can
 > never exist without a filter on every primary-key column and this path
 > cannot render an unfiltered `DELETE`. Non-key attribute values do not
 > participate in the filter. `EntityTrait::delete` forwards both the success
@@ -314,21 +314,21 @@ what makes it total over partially-set models.
 > by `Debug` formatting). An empty input slice short-circuits to an empty
 > result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+2]
+> [spec:pgorm:sem:query.loader.batching+3]
 > Keys are collected in input order: for each input model, `extract_key`
 > builds a `ValueTuple` from the from side of the relation's `columns`,
 > projected as an `Identity` (unary,
 > binary, ternary or many), resolving each column name back to the entity's
 > `Column` enum via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
-> return `Err(DbErr::Query)` naming the unresolved column and the model's
+> return `Err(Error::Query)` naming the unresolved column and the model's
 > table rather than panicking, and the load aborts with that error. The
 > batch filter built by `prepare_condition` is a single IN predicate against
 > the to side of the relation's `columns` on `to_tbl`: a unary key becomes
 > `col IN (v1, v2, ...)` over the flattened values; composite keys become a
 > tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`;
 > `prepare_condition` is likewise fallible, propagating the qualification
-> error of [spec:pgorm:req:query.loader.table-ref-limitation].
+> error of [spec:pgorm:req:query.loader.table-ref-limitation+3].
 >
 > Keys are not deduplicated: duplicate key values across input models are
 > repeated verbatim in the IN list (the dedup is an acknowledged TODO in
@@ -336,7 +336,7 @@ what makes it total over partially-set models.
 > is AND-ed onto the caller-supplied `Select` via `QueryFilter::filter`, so
 > user filters and the key predicate compose.
 
-> [spec:pgorm:sem:query.loader.regroup+2]
+> [spec:pgorm:sem:query.loader.regroup+3]
 > Results are regrouped to input order by hashing on the to-side key extracted
 > from each returned row. `load_one` builds a `HashMap<ValueTuple, Model>`
 > — if several returned rows share a key, the last row wins — and yields, per
@@ -350,7 +350,7 @@ what makes it total over partially-set models.
 > A returned row whose key is absent from the seeded map means the relation's
 > two sides matched in SQL but not as Rust values — differing integer widths,
 > `char(n)` blank padding, a case-insensitive collation. `load_many` MUST
-> report that as `Err(DbErr::Query)` rather than panicking, and the message
+> report that as `Err(Error::Query)` rather than panicking, and the message
 > MUST carry the unmatched key and a sample input key in `Debug` form (so both
 > value types are named) together with both sides' column lists, making the
 > asymmetry diagnosable from the error alone.
@@ -368,10 +368,10 @@ what makes it total over partially-set models.
 > (e.g. filtered out by the caller's `Select`) are silently dropped, and
 > shared targets are cloned per referencing input.
 
-> [spec:pgorm:req:query.loader.table-ref-limitation+2]
+> [spec:pgorm:req:query.loader.table-ref-limitation+3]
 > Loader key predicates can only qualify columns for an unaliased
 > `FromItem::Table` relation target: `table_column` matches exactly that
-> shape, over either `TableName` form, and MUST return `Err(DbErr::Query)`
+> shape, over either `TableName` form, and MUST return `Err(Error::Query)`
 > for every other from item (an aliased table, a subquery, a values list or
 > a function call), naming the key column it could not qualify and the
 > offending from item. `prepare_condition` propagates that error, so the load

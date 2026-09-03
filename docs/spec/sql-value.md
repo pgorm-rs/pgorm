@@ -66,13 +66,13 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array+2]`).
+> `[spec:pgorm:def:sql.value.array+3]`).
 
-> [spec:pgorm:def:sql.value.value-type+2]
+> [spec:pgorm:def:sql.value.value-type+3]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
-> that maps into `Value`. `try_from(v: Value) -> Result<Self, ValueTypeErr>`
+> that maps into `Value`. `try_from(v: Value) -> Result<Self, ValueTypeError>`
 > succeeds only when `v` is the matching variant with a `Some` payload
-> (`ValueTypeErr` displays as "Value type mismatch") and is the trait's only
+> (`ValueTypeError` displays as "Value type mismatch") and is the trait's only
 > extraction entry point: there is no panicking `unwrap`/`expect` pair, on the
 > trait or as an inherent convenience on `Value`.
 > `type_name()` returns the Rust type name, `array_type()` the matching
@@ -92,7 +92,7 @@ including panic semantics and quirks inherited from sea-query.
 > `None` payload of the right variant round-trips to `Option::None` while a
 > wrong-variant value still errors.
 
-> [spec:pgorm:sem:sql.value.accessor-panics+1]
+> [spec:pgorm:sem:sql.value.accessor-panics+2]
 > The inherent accessors on `Value` MUST NOT panic. (The rule keeps the id it
 > was given when they did: every `as_ref_*` panicked with a message like
 > `not Value::Json` on a variant other than its own.)
@@ -108,7 +108,7 @@ including panic semantics and quirks inherited from sea-query.
 > predicate of the pair is the discriminator for a caller that needs the
 > distinction — `is_array` is true for an `Array` of any element tag — and
 > `ValueType::try_from` is the typed extraction that reports a mismatch as
-> `ValueTypeErr`.
+> `ValueTypeError`.
 >
 > `chrono_as_naive_utc_in_string` stringifies any non-NULL chrono variant, in
 > the UTC-naive form for the three zoned ones, and returns `None` for both a
@@ -119,7 +119,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Arrays
 
-> [spec:pgorm:def:sql.value.array+2]
+> [spec:pgorm:def:sql.value.array+3]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
 > chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
@@ -134,13 +134,13 @@ including panic semantics and quirks inherited from sea-query.
 > Vec<T>` produces `Array(tag, None)`. `ValueType for Vec<T>` requires the
 > stored tag to equal `T::array_type()` and then converts every element through
 > `T::try_from`, so a mismatched element inside the vector surfaces as
-> `ValueTypeErr` rather than panicking.
+> `ValueTypeError` rather than panicking.
 > `ValueType::column_type()` for `Vec<T>` is
 > `ColumnType::Array(Arc::new(T::column_type()))`.
 
 ## Value tuples
 
-> [spec:pgorm:def:sql.value.tuple+1]
+> [spec:pgorm:def:sql.value.tuple+2]
 > `ValueTuple` represents an ordered tuple of values for composite keys and
 > VALUES lists: `One(Value)`, `Two(Value, Value)`, `Three(Value, Value,
 > Value)` or `Many(Vec<Value>)`. `IntoValueTuple` is implemented for any
@@ -153,15 +153,15 @@ including panic semantics and quirks inherited from sea-query.
 > with length of N`.
 >
 > `TryFromValueTuple` inverts the mapping, is arity-strict, and is fallible:
-> it returns `Result<Self, ValueTupleErr>` and never panics. The scalar impl
+> it returns `Result<Self, ValueTupleError>` and never panics. The scalar impl
 > requires `One`, the pair impl `Two`, the triple impl `Three`, and the 4..=12
 > impls `Many` with exactly the expected length; anything else is
-> `ValueTupleErr::Arity { expected, actual }`, naming both shapes. Element
+> `ValueTupleError::Arity { expected, actual }`, naming both shapes. Element
 > extraction goes through `ValueType::try_from`, so a type mismatch at any
-> position is `ValueTupleErr::Element { position, expected }`, naming the
+> position is `ValueTupleError::Element { position, expected }`, naming the
 > zero-based position and the `ValueType::type_name` required there. The
 > conversion is short-circuiting: the leftmost failing position is the one
-> reported. `ValueTupleErr` implements `std::error::Error`; `Arity` displays
+> reported. `ValueTupleError` implements `std::error::Error`; `Arity` displays
 > as `expected {expected}, received {actual}` and `Element` as `value at
 > position {position} is not a valid {expected}`, the type name backquoted.
 >

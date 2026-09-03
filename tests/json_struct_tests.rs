@@ -11,7 +11,7 @@ use serde_json::json;
 // `From<T> for Value` serialises through serde_json, `ValueType` / `TryGetableFromJson` read it
 // back, and the `Option` column exercises the `Nullable` impl.
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("json_struct_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -25,9 +25,9 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.json/test]    a `TryGetableFromJson` type decoded
+// [spec:pgorm:def:exec.decode.json+1/test]    a `TryGetableFromJson` type decoded
 // through the blanket `TryGetable` impl, both bare and behind an `Option`
-pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), Error> {
     use json_struct::*;
 
     let model = Model {
@@ -67,7 +67,7 @@ pub async fn insert_json_struct_1(db: &DatabaseConnection) -> Result<(), DbErr> 
     Ok(())
 }
 
-pub async fn insert_json_struct_2(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_2(db: &DatabaseConnection) -> Result<(), Error> {
     use json_struct::*;
 
     let model = Model {

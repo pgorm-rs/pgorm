@@ -407,7 +407,7 @@ static DEFAULT_TAG_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[repr(transparent)]
 pub(crate) struct Tag(pub Arc<String>);
 
-// [spec:pgorm:sem:conn.pool.get]    generated default tag
+// [spec:pgorm:sem:conn.pool.get+1]    generated default tag
 impl Default for Tag {
     fn default() -> Self {
         Self(Arc::new(format!(

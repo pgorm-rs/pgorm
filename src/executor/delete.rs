@@ -23,7 +23,7 @@ where
     A: ActiveModelTrait,
 {
     /// Execute a DELETE operation on one ActiveModel
-    pub fn exec<C>(self, db: &'a C) -> impl Future<Output = Result<DeleteResult, DbErr>> + 'a
+    pub fn exec<C>(self, db: &'a C) -> impl Future<Output = Result<DeleteResult, Error>> + 'a
     where
         C: ConnectionTrait,
     {
@@ -37,7 +37,7 @@ where
     E: EntityTrait,
 {
     /// Execute a DELETE operation on many ActiveModels
-    pub fn exec<C>(self, db: &'a C) -> impl Future<Output = Result<DeleteResult, DbErr>> + 'a
+    pub fn exec<C>(self, db: &'a C) -> impl Future<Output = Result<DeleteResult, Error>> + 'a
     where
         C: ConnectionTrait,
     {
@@ -53,7 +53,7 @@ impl Deleter {
     }
 
     /// Execute a DELETE operation
-    pub fn exec<C>(self, db: &C) -> impl Future<Output = Result<DeleteResult, DbErr>> + '_
+    pub fn exec<C>(self, db: &C) -> impl Future<Output = Result<DeleteResult, Error>> + '_
     where
         C: ConnectionTrait,
     {
@@ -61,7 +61,7 @@ impl Deleter {
     }
 }
 
-async fn exec_delete_only<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, DbErr>
+async fn exec_delete_only<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, Error>
 where
     C: ConnectionTrait,
 {
@@ -69,7 +69,7 @@ where
 }
 
 // [spec:pgorm:sem:exec.crud.delete]
-async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, DbErr>
+async fn exec_delete<C>(query: DeleteStatement, db: &C) -> Result<DeleteResult, Error>
 where
     C: ConnectionTrait,
 {

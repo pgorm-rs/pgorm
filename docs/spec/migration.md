@@ -38,7 +38,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > `name()` and `status()`, where `MigrationStatus` is `Pending` or `Applied`
 > and `Display`s as those words.
 
-> [spec:pgorm:sem:migration.up]
+> [spec:pgorm:sem:migration.up+1]
 > `up(db, steps)` acquires one pooled connection, opens one transaction, and
 > runs the entire batch inside it before committing. Within that transaction it
 > installs the ledger, computes the pending set, and applies migrations in
@@ -63,7 +63,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 >
 > The reverse direction is also checked: if the ledger holds a version with no
 > corresponding entry in `migrations()`, `get_migration_with_status` fails with
-> `DbErr::Custom` naming each missing migration, so a deleted or renamed
+> `Error::Custom` naming each missing migration, so a deleted or renamed
 > migration file surfaces as an error rather than silently re-running.
 
 ## Forward-only by construction
@@ -83,7 +83,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > monotonic, auditable log. Callers needing a reversal write it as the next
 > migration.
 
-> [spec:pgorm:sem:migration.name+1]
+> [spec:pgorm:sem:migration.name+2]
 > A migration's identity — the value written to and matched against the
 > ledger's `version` column — is its **source filename** without extension, not
 > its type name. `DeriveMigrationName` implements `MigrationName::name` as
@@ -98,6 +98,6 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > The consequence is that renaming a migration file renames the migration:
 > the old name remains in the ledger with no matching entry in `migrations()`,
 > which `get_migration_with_status` reports as a missing-migration
-> `DbErr::Custom`, and the new name is treated as pending and re-applied.
+> `Error::Custom`, and the new name is treated as pending and re-applied.
 > Implementors may bypass the derive and write `MigrationName` by hand to pin a
 > name independently of the filename.

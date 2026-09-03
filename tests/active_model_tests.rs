@@ -4,8 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DbErr,
-    DeleteResult, EntityTrait, IntoActiveModel, IntoActiveValue, Iterable, NotSet, PrimaryKeyTrait,
+    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DeleteResult,
+    EntityTrait, Error, IntoActiveModel, IntoActiveValue, Iterable, NotSet, PrimaryKeyTrait,
     QueryTrait, Schema, Value, entity::prelude::*,
 };
 use pgorm_query::{QueryBuilder, ValueTuple};
@@ -122,7 +122,7 @@ mod pk4 {
 // ActiveModelTrait: per-column state access
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model+1/test]    the per-column state surface —
+// [spec:pgorm:req:entity.active-model+2/test]    the per-column state surface —
 // `default()` leaves every column `NotSet`, `set` stores a `Value` as `Set`,
 // `get` reads without consuming, `take` removes and leaves `NotSet` behind,
 // `not_set` clears, `is_not_set` reports, and `reset` / `reset_all` promote
@@ -213,7 +213,7 @@ fn active_model_column_state_access() {
     assert!(all.is_changed());
 }
 
-// [spec:pgorm:req:entity.active-model+1/test]    `get_primary_key_value` picks the
+// [spec:pgorm:req:entity.active-model+2/test]    `get_primary_key_value` picks the
 // `ValueTuple` arm from `PrimaryKeyArity::ARITY` — One / Two / Three / Many — and
 // returns `None` when any key component is `NotSet`
 #[test]
@@ -667,9 +667,9 @@ fn into_active_model_and_into_active_value() {
 // JSON
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model.json+1/test]    `from_json` normalises per
+// [spec:pgorm:req:entity.active-model.json+2/test]    `from_json` normalises per
 // column — keys present in the JSON object become `Set`, everything else `NotSet`
-// — and a deserialization failure surfaces as `DbErr`
+// — and a deserialization failure surfaces as `Error`
 #[test]
 fn active_model_from_json() {
     use serde_json::json;
@@ -705,15 +705,15 @@ fn active_model_from_json() {
         }
     );
 
-    // A missing required field is a deserialization error surfaced as DbErr.
+    // A missing required field is a deserialization error surfaced as Error.
     let err = row::ActiveModel::from_json(json!({ "id": 1 })).unwrap_err();
     assert!(
-        matches!(err, DbErr::Json(_)),
-        "expected DbErr::Json, got {err:?}"
+        matches!(err, Error::Json(_)),
+        "expected Error::Json, got {err:?}"
     );
 }
 
-// [spec:pgorm:req:entity.active-model.json+1/test]    `set_from_json` applies the
+// [spec:pgorm:req:entity.active-model.json+2/test]    `set_from_json` applies the
 // same normalisation in place but MUST NOT alter the primary key: the key states
 // are taken before the overwrite and restored after, so `Set` / `Unchanged`
 // payloads survive and `NotSet` stays `NotSet` whatever the JSON said
@@ -778,7 +778,7 @@ fn active_model_set_from_json_preserves_primary_key() {
 // Persistence (DB-backed)
 // ---------------------------------------------------------------------------
 
-async fn create_row_table<C>(db: &C) -> Result<(), DbErr>
+async fn create_row_table<C>(db: &C) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
@@ -792,7 +792,7 @@ where
 // round trip), `update` returns the freshly written `Model`, and `delete`
 // returns a `DeleteResult` keyed on the primary key
 #[pgorm_macros::test]
-async fn active_model_persistence() -> Result<(), DbErr> {
+async fn active_model_persistence() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_persistence").await;
     let db = ctx.db.get().await?;
     create_row_table(&db).await?;
@@ -861,7 +861,7 @@ async fn active_model_persistence() -> Result<(), DbErr> {
 // have had to tell apart
 // [spec:pgorm:req:entity.active-model.persistence+1/test]
 #[pgorm_macros::test]
-async fn update_accepts_set_or_unchanged_key() -> Result<(), DbErr> {
+async fn update_accepts_set_or_unchanged_key() -> Result<(), Error> {
     let ctx = TestContext::new("update_accepts_set_or_unchanged_key").await;
     let db = ctx.db.get().await?;
     create_row_table(&db).await?;
@@ -912,7 +912,7 @@ async fn update_accepts_set_or_unchanged_key() -> Result<(), DbErr> {
 // never reach, since the caller has to populate the key to name the row at all —
 // while `update` against a key that matches nothing still fails
 #[pgorm_macros::test]
-async fn manual_key_insert_and_update_are_explicit() -> Result<(), DbErr> {
+async fn manual_key_insert_and_update_are_explicit() -> Result<(), Error> {
     let ctx = TestContext::new("manual_key_insert_and_update").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(manual_key::Entity);
@@ -927,7 +927,7 @@ async fn manual_key_insert_and_update_are_explicit() -> Result<(), DbErr> {
     .await
     .unwrap_err();
     assert!(
-        matches!(err, DbErr::RecordNotFound),
+        matches!(err, Error::RecordNotFound),
         "expected RecordNotFound, got {err:?}"
     );
     assert_eq!(manual_key::Entity::find().all(&db).await?.len(), 0);
@@ -994,7 +994,7 @@ mod hooked {
 
     #[async_trait::async_trait]
     impl ActiveModelBehavior for ActiveModel {
-        async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
+        async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, Error>
         where
             C: ConnectionTrait,
         {
@@ -1006,7 +1006,7 @@ mod hooked {
             model: <Self::Entity as EntityTrait>::Model,
             _db: &C,
             insert: bool,
-        ) -> Result<<Self::Entity as EntityTrait>::Model, DbErr>
+        ) -> Result<<Self::Entity as EntityTrait>::Model, Error>
         where
             C: ConnectionTrait,
         {
@@ -1014,7 +1014,7 @@ mod hooked {
             Ok(model)
         }
 
-        async fn before_delete<C>(self, _db: &C) -> Result<Self, DbErr>
+        async fn before_delete<C>(self, _db: &C) -> Result<Self, Error>
         where
             C: ConnectionTrait,
         {
@@ -1022,7 +1022,7 @@ mod hooked {
             Ok(self)
         }
 
-        async fn after_delete<C>(self, _db: &C) -> Result<Self, DbErr>
+        async fn after_delete<C>(self, _db: &C) -> Result<Self, Error>
         where
             C: ConnectionTrait,
         {
@@ -1037,7 +1037,7 @@ mod hooked {
 // `update` runs the same pair with `insert: false`; `delete` calls
 // `before_delete` then `after_delete` on a clone of the pre-delete active model
 #[pgorm_macros::test]
-async fn active_model_hook_ordering() -> Result<(), DbErr> {
+async fn active_model_hook_ordering() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_hook_ordering").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(hooked::Entity);
@@ -1111,18 +1111,18 @@ mod hook_abort {
 
     #[async_trait::async_trait]
     impl ActiveModelBehavior for ActiveModel {
-        async fn before_save<C>(self, _db: &C, _insert: bool) -> Result<Self, DbErr>
+        async fn before_save<C>(self, _db: &C, _insert: bool) -> Result<Self, Error>
         where
             C: ConnectionTrait,
         {
-            Err(DbErr::Custom("before_save refused".to_owned()))
+            Err(Error::Custom("before_save refused".to_owned()))
         }
 
-        async fn before_delete<C>(self, _db: &C) -> Result<Self, DbErr>
+        async fn before_delete<C>(self, _db: &C) -> Result<Self, Error>
         where
             C: ConnectionTrait,
         {
-            Err(DbErr::Custom("before_delete refused".to_owned()))
+            Err(Error::Custom("before_delete refused".to_owned()))
         }
     }
 }
@@ -1131,7 +1131,7 @@ mod hook_abort {
 // the operation: nothing is written, nothing is removed. Also pins the
 // pass-through defaults and `new()` delegating to `ActiveModelTrait::default()`
 #[pgorm_macros::test]
-async fn active_model_hook_error_aborts() -> Result<(), DbErr> {
+async fn active_model_hook_error_aborts() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_hook_error_aborts").await;
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(hook_abort::Entity);

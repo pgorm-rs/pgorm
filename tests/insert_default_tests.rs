@@ -7,7 +7,7 @@ use pgorm::{DatabaseConnection, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("insert_default_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -23,7 +23,7 @@ async fn main() -> Result<(), DbErr> {
 // [spec:pgorm:sem:query.build.insert+1/test]    a batch of models that set no
 // column inserts one default row per model rather than collapsing into one
 #[pgorm_macros::test]
-async fn all_not_set_models_insert_one_row_each() -> Result<(), DbErr> {
+async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {
     use insert_default::*;
 
     let ctx = TestContext::new("insert_default_tests_blank_batch").await;
@@ -56,7 +56,7 @@ async fn all_not_set_models_insert_one_row_each() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     let active_model = ActiveModel {

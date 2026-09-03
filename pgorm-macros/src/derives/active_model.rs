@@ -8,7 +8,7 @@ use quote::{quote, quote_spanned};
 use syn::{Data, DataStruct, Expr, Field, Fields, LitStr, Type, punctuated::IntoIter};
 
 /// Method to derive an [ActiveModel](pgorm::ActiveModel)
-// [spec:pgorm:sem:macros.derive.active-model+1]
+// [spec:pgorm:sem:macros.derive.active-model+2]
 pub fn expand_derive_active_model(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     // including ignored fields
     let all_fields = match data {
@@ -130,16 +130,16 @@ fn derive_active_model(all_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
                 }
             }
 
-            fn set(&mut self, c: <Self::Entity as pgorm::EntityTrait>::Column, v: pgorm::Value) -> std::result::Result<(), pgorm::DbErr> {
+            fn set(&mut self, c: <Self::Entity as pgorm::EntityTrait>::Column, v: pgorm::Value) -> std::result::Result<(), pgorm::Error> {
                 match c {
                     #(<Self::Entity as pgorm::EntityTrait>::Column::#name => {
                         self.#field = pgorm::ActiveValue::set(
                             pgorm::pgorm_query::ValueType::try_from(v)
-                                .map_err(|_| pgorm::DbErr::Type(#mismatch_msg.to_owned()))?,
+                                .map_err(|_| pgorm::Error::Type(#mismatch_msg.to_owned()))?,
                         );
                         Ok(())
                     },)*
-                    _ => Err(pgorm::DbErr::Type("This ActiveModel does not have this field".to_owned())),
+                    _ => Err(pgorm::Error::Type("This ActiveModel does not have this field".to_owned())),
                 }
             }
 
@@ -197,7 +197,7 @@ fn derive_into_model(model_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
             } else {
                 quote! {
                     a.#field.take().ok_or_else(|| {
-                        pgorm::DbErr::AttrNotSet(stringify!(#field).to_owned())
+                        pgorm::Error::AttrNotSet(stringify!(#field).to_owned())
                     })?
                 }
             }
@@ -207,10 +207,10 @@ fn derive_into_model(model_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
     Ok(quote!(
         #[automatically_derived]
         impl std::convert::TryFrom<ActiveModel> for <Entity as pgorm::EntityTrait>::Model {
-            type Error = pgorm::DbErr;
-            fn try_from(mut a: ActiveModel) -> Result<Self, pgorm::DbErr> {
+            type Error = pgorm::Error;
+            fn try_from(mut a: ActiveModel) -> Result<Self, pgorm::Error> {
                 #(if matches!(a.#active_model_field, pgorm::ActiveValue::NotSet) {
-                    return Err(pgorm::DbErr::AttrNotSet(stringify!(#active_model_field).to_owned()));
+                    return Err(pgorm::Error::AttrNotSet(stringify!(#active_model_field).to_owned()));
                 })*
                 Ok(
                     Self {
@@ -222,7 +222,7 @@ fn derive_into_model(model_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
 
         #[automatically_derived]
         impl pgorm::TryIntoModel<<Entity as pgorm::EntityTrait>::Model> for ActiveModel {
-            fn try_into_model(self) -> Result<<Entity as pgorm::EntityTrait>::Model, pgorm::DbErr> {
+            fn try_into_model(self) -> Result<<Entity as pgorm::EntityTrait>::Model, pgorm::Error> {
                 self.try_into()
             }
         }

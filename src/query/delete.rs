@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, Iterable,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error, IntoActiveModel, Iterable,
     PrimaryKeyToColumn, QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
@@ -29,11 +29,11 @@ where
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:sem:query.build.delete+1]
+// [spec:pgorm:sem:query.build.delete+2]
 impl Delete {
     /// Delete one Model or ActiveModel
     ///
-    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`], since there would be nothing to
     /// narrow the statement to a single row.
     ///
@@ -69,7 +69,7 @@ impl Delete {
     /// ```
     ///
     /// ```
-    /// use pgorm::{entity::*, error::DbErr, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, error::Error, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
@@ -77,10 +77,10 @@ impl Delete {
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
     ///     .unwrap_err(),
-    ///     DbErr::PrimaryKeyNotSet,
+    ///     Error::PrimaryKeyNotSet,
     /// );
     /// ```
-    pub fn one<E, A, M>(model: M) -> Result<DeleteOne<A>, DbErr>
+    pub fn one<E, A, M>(model: M) -> Result<DeleteOne<A>, Error>
     where
         E: EntityTrait,
         A: ActiveModelTrait<Entity = E>,
@@ -121,19 +121,19 @@ impl Delete {
     }
 }
 
-// [spec:pgorm:sem:query.build.delete+1]
+// [spec:pgorm:sem:query.build.delete+2]
 impl<A> DeleteOne<A>
 where
     A: ActiveModelTrait,
 {
-    fn prepare_filters(mut self) -> Result<Self, DbErr> {
+    fn prepare_filters(mut self) -> Result<Self, Error> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
             match self.model.get(col) {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
-                ActiveValue::NotSet => return Err(DbErr::PrimaryKeyNotSet),
+                ActiveValue::NotSet => return Err(Error::PrimaryKeyNotSet),
             }
         }
         Ok(self)

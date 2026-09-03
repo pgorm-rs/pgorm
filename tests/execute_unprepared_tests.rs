@@ -13,7 +13,7 @@ const TWO_TABLES: &str = "CREATE TABLE batch_left (id int primary key);
      CREATE TABLE batch_right (id int primary key);";
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("execute_unprepared_tests").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -26,7 +26,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn execute_raw_statements(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn execute_raw_statements(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     db.execute_raw(
@@ -46,7 +46,7 @@ pub async fn execute_raw_statements(db: &DatabaseConnection) -> Result<(), DbErr
     Ok(())
 }
 
-async fn ids<C: ConnectionTrait>(db: &C, table: &str) -> Result<Vec<i32>, DbErr> {
+async fn ids<C: ConnectionTrait>(db: &C, table: &str) -> Result<Vec<i32>, Error> {
     let rows = db
         .query_all(&format!("SELECT id FROM {table} ORDER BY id"), &[])
         .await?;
@@ -54,9 +54,9 @@ async fn ids<C: ConnectionTrait>(db: &C, table: &str) -> Result<Vec<i32>, DbErr>
     Ok(rows.iter().map(|row| row.get(0)).collect())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+3/test]    multi-statement string on a pooled connection
+// [spec:pgorm:def:conn.pool.conn-trait+4/test]    multi-statement string on a pooled connection
 #[pgorm_macros::test]
-async fn batch_execute_on_connection() -> Result<(), DbErr> {
+async fn batch_execute_on_connection() -> Result<(), Error> {
     let ctx = TestContext::new("batch_execute_conn_txbatch").await;
     let db = ctx.db.get().await?;
 
@@ -76,9 +76,9 @@ async fn batch_execute_on_connection() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+3/test]    multi-statement string inside a transaction
+// [spec:pgorm:def:conn.pool.conn-trait+4/test]    multi-statement string inside a transaction
 #[pgorm_macros::test]
-async fn batch_execute_in_transaction() -> Result<(), DbErr> {
+async fn batch_execute_in_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("batch_execute_txn_txbatch").await;
     let mut db = ctx.db.get().await?;
 
@@ -102,9 +102,9 @@ async fn batch_execute_in_transaction() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+3/test]    the rejection batch_execute exists to lift
+// [spec:pgorm:def:conn.pool.conn-trait+4/test]    the rejection batch_execute exists to lift
 #[pgorm_macros::test]
-async fn multi_statement_string_needs_batch_execute() -> Result<(), DbErr> {
+async fn multi_statement_string_needs_batch_execute() -> Result<(), Error> {
     let ctx = TestContext::new("batch_execute_two_commands_txbatch").await;
     let db = ctx.db.get().await?;
 
@@ -114,8 +114,8 @@ async fn multi_statement_string_needs_batch_execute() -> Result<(), DbErr> {
         .expect_err("a prepared statement carries exactly one command");
 
     match &error {
-        DbErr::Postgres(e) => assert_eq!(e.code(), Some(&SqlState::SYNTAX_ERROR)),
-        other => panic!("expected DbErr::Postgres, got {other:?}"),
+        Error::Postgres(e) => assert_eq!(e.code(), Some(&SqlState::SYNTAX_ERROR)),
+        other => panic!("expected Error::Postgres, got {other:?}"),
     }
 
     db.batch_execute(TWO_TABLES).await?;
@@ -129,9 +129,9 @@ async fn multi_statement_string_needs_batch_execute() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+3/test]    one implicit transaction per string
+// [spec:pgorm:def:conn.pool.conn-trait+4/test]    one implicit transaction per string
 #[pgorm_macros::test]
-async fn batch_execute_unwinds_at_first_failure() -> Result<(), DbErr> {
+async fn batch_execute_unwinds_at_first_failure() -> Result<(), Error> {
     let ctx = TestContext::new("batch_execute_implicit_txn_txbatch").await;
     let db = ctx.db.get().await?;
 

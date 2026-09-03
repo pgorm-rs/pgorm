@@ -7,7 +7,7 @@ use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("uuid_fmt_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -20,7 +20,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_uuid_fmt(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_uuid_fmt(db: &DatabaseConnection) -> Result<(), Error> {
     let uuid = Uuid::new_v4();
 
     let uuid_fmt = uuid_fmt::Model {

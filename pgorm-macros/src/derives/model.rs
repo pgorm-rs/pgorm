@@ -123,7 +123,7 @@ impl DeriveModel {
         quote!(
             #[automatically_derived]
             impl pgorm::FromQueryResult for #ident {
-                fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::DbErr> {
+                fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::Error> {
                     Ok(Self {
                         #(#field_idents: #field_values),*
                     })
@@ -170,14 +170,14 @@ impl DeriveModel {
                     }
                 }
 
-                fn set(&mut self, c: <Self::Entity as pgorm::entity::EntityTrait>::Column, v: pgorm::Value) -> std::result::Result<(), pgorm::DbErr> {
+                fn set(&mut self, c: <Self::Entity as pgorm::entity::EntityTrait>::Column, v: pgorm::Value) -> std::result::Result<(), pgorm::Error> {
                     match c {
                         #(<Self::Entity as pgorm::entity::EntityTrait>::Column::#column_idents => {
                             self.#field_idents = pgorm::pgorm_query::ValueType::try_from(v)
-                                .map_err(|_| pgorm::DbErr::Type(#mismatch_msgs.to_owned()))?;
+                                .map_err(|_| pgorm::Error::Type(#mismatch_msgs.to_owned()))?;
                             Ok(())
                         },)*
-                        _ => Err(pgorm::DbErr::Type(#missing_field_msg.to_owned())),
+                        _ => Err(pgorm::Error::Type(#missing_field_msg.to_owned())),
                     }
                 }
             }
@@ -186,7 +186,7 @@ impl DeriveModel {
 }
 
 /// Method to derive an ActiveModel
-// [spec:pgorm:sem:macros.derive.model+1]
+// [spec:pgorm:sem:macros.derive.model+2]
 pub fn expand_derive_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
     match DeriveModel::new(input) {

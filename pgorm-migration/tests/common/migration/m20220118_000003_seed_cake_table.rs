@@ -7,7 +7,7 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), DbErr> {
+    async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
         cake::ActiveModel {
             name: Set("Cheesecake".to_owned()),
             ..Default::default()

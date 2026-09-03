@@ -4,13 +4,15 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pgorm_query::{Alias, Expr};
-use pgorm::{ActiveValue::Set, DatabaseConnection, DbErr, RuntimeErr, Schema, entity::*, query::*};
+use pgorm::{
+    ActiveValue::Set, DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*,
+};
 
 // [spec:pgorm:req:query.loader/test]    `load_one` over a `Vec<M>`, taking a
 // bare entity through `EntityOrSelect`, returning `Vec<Option<R::Model>>`
 // positionally aligned with the input, and rejecting a `HasMany` relation
 #[pgorm_macros::test]
-async fn loader_load_one() -> Result<(), DbErr> {
+async fn loader_load_one() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_load_one").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -41,7 +43,7 @@ async fn loader_load_one() -> Result<(), DbErr> {
 
     assert_eq!(
         bakers,
-        Err(DbErr::Query(RuntimeErr::Internal(
+        Err(Error::Query(RuntimeError::Internal(
             "Relation is HasMany instead of HasOne".to_string()
         )))
     );
@@ -55,11 +57,11 @@ async fn loader_load_one() -> Result<(), DbErr> {
 // [spec:pgorm:req:query.loader/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
-// [spec:pgorm:sem:query.loader.regroup+2/test]    a bucket per input key in
+// [spec:pgorm:sem:query.loader.regroup+3/test]    a bucket per input key in
 // result order, an empty `Vec` for an input nothing matched, and a clone of
 // the same model for two inputs sharing a key
 #[pgorm_macros::test]
-async fn loader_load_many() -> Result<(), DbErr> {
+async fn loader_load_many() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_load_many").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -133,7 +135,7 @@ async fn loader_load_many() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
-async fn loader_load_many_multi() -> Result<(), DbErr> {
+async fn loader_load_many_multi() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_load_many_multi").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -172,7 +174,7 @@ async fn loader_load_many_multi() -> Result<(), DbErr> {
 // referencing input, and a foreign key whose target row the caller's `Select`
 // filtered away is silently dropped from that input's list
 #[pgorm_macros::test]
-async fn loader_load_many_to_many() -> Result<(), DbErr> {
+async fn loader_load_many_to_many() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_load_many_to_many").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -244,7 +246,7 @@ async fn loader_load_many_to_many() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_bakery(db: &DatabaseConnection, name: &str) -> Result<bakery::Model, DbErr> {
+pub async fn insert_bakery(db: &DatabaseConnection, name: &str) -> Result<bakery::Model, Error> {
     bakery::ActiveModel {
         name: Set(name.to_owned()),
         profit_margin: Set(1.0),
@@ -258,7 +260,7 @@ pub async fn insert_baker(
     db: &DatabaseConnection,
     name: &str,
     bakery_id: i32,
-) -> Result<baker::Model, DbErr> {
+) -> Result<baker::Model, Error> {
     baker::ActiveModel {
         name: Set(name.to_owned()),
         contact_details: Set(serde_json::json!({})),
@@ -273,7 +275,7 @@ pub async fn insert_cake(
     db: &DatabaseConnection,
     name: &str,
     bakery_id: Option<i32>,
-) -> Result<cake::Model, DbErr> {
+) -> Result<cake::Model, Error> {
     cake::ActiveModel {
         name: Set(name.to_owned()),
         price: Set(rust_decimal::Decimal::ONE),
@@ -289,7 +291,7 @@ pub async fn insert_cake_baker(
     db: &DatabaseConnection,
     baker_id: i32,
     cake_id: i32,
-) -> Result<cakes_bakers::Model, DbErr> {
+) -> Result<cakes_bakers::Model, Error> {
     cakes_bakers::ActiveModel {
         cake_id: Set(cake_id),
         baker_id: Set(baker_id),
@@ -415,18 +417,18 @@ impl Related<cakes_bakers::Entity> for cakes_bakers::Entity {
     }
 }
 
-fn internal_err<T>(message: &str) -> Result<T, DbErr> {
-    Err(DbErr::Query(RuntimeErr::Internal(message.to_owned())))
+fn internal_err<T>(message: &str) -> Result<T, Error> {
+    Err(Error::Query(RuntimeError::Internal(message.to_owned())))
 }
 
-fn internal_message<T: std::fmt::Debug>(outcome: Result<T, DbErr>, context: &str) -> String {
+fn internal_message<T: std::fmt::Debug>(outcome: Result<T, Error>, context: &str) -> String {
     match outcome.expect_err(context) {
-        DbErr::Query(RuntimeErr::Internal(message)) => message,
+        Error::Query(RuntimeError::Internal(message)) => message,
         other => panic!("{context}, got: {other:?}"),
     }
 }
 
-async fn create_ledger_table<C>(db: &C) -> Result<u64, DbErr>
+async fn create_ledger_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -434,7 +436,7 @@ where
     create_table_without_asserts(db, &stmt).await
 }
 
-async fn create_padded_table<C>(db: &C) -> Result<u64, DbErr>
+async fn create_padded_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
@@ -446,7 +448,7 @@ async fn insert_ledger(
     db: &DatabaseConnection,
     owner_id: i32,
     label: &str,
-) -> Result<ledger::Model, DbErr> {
+) -> Result<ledger::Model, Error> {
     ledger::ActiveModel {
         owner_id: Set(owner_id),
         label: Set(label.to_owned()),
@@ -462,7 +464,7 @@ async fn insert_ledger(
 // target and a junction entity that is not the relation's own. The `&[M]` impl
 // the `Vec<M>` one delegates to is public API in its own right.
 #[pgorm_macros::test]
-async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
+async fn loader_rejects_wrong_relation_shapes() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_relation_shapes").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -507,7 +509,7 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
         .await
         .expect_err("a mismatched junction entity must be rejected");
     match wrong_via {
-        DbErr::Query(RuntimeErr::Internal(message)) => assert!(
+        Error::Query(RuntimeError::Internal(message)) => assert!(
             message.starts_with("The given via Entity is incorrect"),
             "{message}"
         ),
@@ -528,7 +530,7 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), DbErr> {
 // empty result without querying: every selector passed here would raise a
 // database error if it were ever sent
 #[pgorm_macros::test]
-async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
+async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_empty_input").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -567,7 +569,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+2/test]    keys are collected in input
+// [spec:pgorm:sem:query.loader.batching+3/test]    keys are collected in input
 // order and become a single IN predicate on the relation's to side: a
 // composite key renders as a tuple `IN` list through `in_tuples` (the unary
 // `col IN (..)` form is what every other loader test here exercises). The
@@ -575,10 +577,10 @@ async fn loader_empty_input_skips_the_query() -> Result<(), DbErr> {
 // with it. The rule's note that duplicate keys are repeated rather than
 // deduplicated concerns the emitted SQL text, which is not observable through
 // this API.
-// [spec:pgorm:sem:query.loader.regroup+2/test]    two inputs sharing a key each
+// [spec:pgorm:sem:query.loader.regroup+3/test]    two inputs sharing a key each
 // receive their own clone of that key's bucket
 #[pgorm_macros::test]
-async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
+async fn loader_batches_composite_keys_as_tuples() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_composite_keys").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -643,14 +645,14 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+2/test]    `load_one` indexes the returned
+// [spec:pgorm:sem:query.loader.regroup+3/test]    `load_one` indexes the returned
 // rows into a map keyed on the relation's to side in result order, so when a relation
 // declared `HasOne` matches several rows for one key the last row wins, an
 // unmatched input gets `None`, and inputs sharing a key each get a clone
-// [spec:pgorm:req:query.loader.table-ref-limitation+2/test]    the supported
+// [spec:pgorm:req:query.loader.table-ref-limitation+3/test]    the supported
 // `TableName::SchemaTable` target: its key column is qualified and the load runs
 #[pgorm_macros::test]
-async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
+async fn loader_load_one_keeps_the_last_row() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_last_row_wins").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -677,12 +679,12 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader.table-ref-limitation+2/test]    a relation whose
+// [spec:pgorm:req:query.loader.table-ref-limitation+3/test]    a relation whose
 // target resolves to any other from item — an aliased table here — cannot have
 // its key column qualified, so the load returns an `Err` naming the column and
 // the offending from item
 #[pgorm_macros::test]
-async fn loader_errors_on_aliased_from_item() -> Result<(), DbErr> {
+async fn loader_errors_on_aliased_from_item() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_table_ref_limit").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -715,11 +717,11 @@ async fn loader_errors_on_aliased_from_item() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+2/test]    a relation naming a column
+// [spec:pgorm:sem:query.loader.batching+3/test]    a relation naming a column
 // its source model does not have is reported as an `Err` naming that column and
 // the model's table, not a panic
 #[pgorm_macros::test]
-async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
+async fn loader_errors_on_unknown_relation_column() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_unknown_column").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
@@ -744,12 +746,12 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+2/test]    a returned row whose key is
+// [spec:pgorm:sem:query.loader.regroup+3/test]    a returned row whose key is
 // absent from the seeded map — here because `char(3)` pads it back out — is an
 // `Err` naming the unmatched key, a sample input key and both column lists,
 // rather than a panic
 #[pgorm_macros::test]
-async fn loader_errors_on_unmatched_returned_key() -> Result<(), DbErr> {
+async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_unmatched_key").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;

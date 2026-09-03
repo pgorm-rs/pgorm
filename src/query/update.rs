@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DbErr, EntityTrait, Iterable, PrimaryKeyToColumn,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error, Iterable, PrimaryKeyToColumn,
     QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
@@ -32,7 +32,7 @@ where
 impl Update {
     /// Update one ActiveModel
     ///
-    /// Fails with [`DbErr::PrimaryKeyNotSet`] when a primary-key column of
+    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
     /// `model` is [`ActiveValue::NotSet`], since there would be nothing to
     /// narrow the statement to a single row.
     ///
@@ -52,7 +52,7 @@ impl Update {
     /// ```
     ///
     /// ```
-    /// use pgorm::{entity::*, error::DbErr, query::*, tests_cfg::cake};
+    /// use pgorm::{entity::*, error::Error, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
@@ -60,10 +60,10 @@ impl Update {
     ///         name: ActiveValue::set("Apple Pie".to_owned()),
     ///     })
     ///     .unwrap_err(),
-    ///     DbErr::PrimaryKeyNotSet,
+    ///     Error::PrimaryKeyNotSet,
     /// );
     /// ```
-    pub fn one<E, A>(model: A) -> Result<UpdateOne<A>, DbErr>
+    pub fn one<E, A>(model: A) -> Result<UpdateOne<A>, Error>
     where
         E: EntityTrait,
         A: ActiveModelTrait<Entity = E>,
@@ -102,19 +102,19 @@ impl Update {
     }
 }
 
-// [spec:pgorm:sem:query.build.update+2]
+// [spec:pgorm:sem:query.build.update+3]
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
 {
-    fn prepare_filters(mut self) -> Result<Self, DbErr> {
+    fn prepare_filters(mut self) -> Result<Self, Error> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
             match self.model.get(col) {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
-                ActiveValue::NotSet => return Err(DbErr::PrimaryKeyNotSet),
+                ActiveValue::NotSet => return Err(Error::PrimaryKeyNotSet),
             }
         }
         Ok(self)
@@ -197,7 +197,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.update+2]
+// [spec:pgorm:sem:query.build.update+3]
 impl<E> UpdateMany<E>
 where
     E: EntityTrait,

@@ -13,7 +13,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("features_schema_string_primary_key_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -27,9 +27,9 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+1/test]    zero rows affected on the
+// [spec:pgorm:sem:exec.crud.insert+2/test]    zero rows affected on the
 // client-supplied-key path fails with RecordNotInserted
-pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
         id: "unique-id-001".to_owned(),
         owner: "GC".to_owned(),
@@ -58,7 +58,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
             .exec(db)
             .await;
 
-        assert_eq!(err.err(), Some(DbErr::RecordNotInserted));
+        assert_eq!(err.err(), Some(Error::RecordNotInserted));
     }
 
     result.delete(db).await?;
@@ -112,14 +112,14 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+1/test]    the client-supplied primary-key
+// [spec:pgorm:sem:exec.crud.insert+2/test]    the client-supplied primary-key
 // path: `last_insert_id` is reconstructed from the cached `ValueTuple`
 // [spec:pgorm:sem:query.build.insert+1/test]    the capture that makes that
 // possible: `Insert::add` records the model's primary-key value tuple when the
 // entity's key is not auto-increment
-// [spec:pgorm:sem:exec.crud.update+3/test]    `UpdateOne::exec` returns the model
+// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateOne::exec` returns the model
 // built from the full-column RETURNING, including a column set back to NULL
-pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
         id: "unique-id-002".to_owned(),
         owner: "GC".to_owned(),
@@ -148,9 +148,9 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         .exec(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+3] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+4] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
-    assert_eq!(update_res, Err(DbErr::RecordNotFound));
+    assert_eq!(update_res, Err(Error::RecordNotFound));
 
     let update_res = Repository::update(updated_active_model)?
         .filter(repository::Column::Id.eq("unique-id-002".to_owned()))

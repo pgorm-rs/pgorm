@@ -1,7 +1,7 @@
 use std::{future::Future, time::Duration};
 
 use pgorm::{
-    ColumnTrait, ColumnType, ConnectionTrait, DatabasePool, DbErr, EntityTrait, Iterable, Schema,
+    ColumnTrait, ColumnType, ConnectionTrait, DatabasePool, EntityTrait, Error, Iterable, Schema,
 };
 use pgorm_query::{
     QueryBuilder, SeaRc, TableCreateStatement,
@@ -63,8 +63,8 @@ fn fnv1a(bytes: &[u8]) -> u32 {
 /// `OBJECT_IN_USE`, which leaves the old database in place and so makes the
 /// following `CREATE` report `DUPLICATE_DATABASE`, and two sessions dropping
 /// one database leave the loser with `UNDEFINED_DATABASE`.
-fn is_contended(err: &DbErr) -> bool {
-    let DbErr::Postgres(err) = err else {
+fn is_contended(err: &Error) -> bool {
+    let Error::Postgres(err) = err else {
         return false;
     };
     matches!(
@@ -76,10 +76,10 @@ fn is_contended(err: &DbErr) -> bool {
 }
 
 /// Re-run `step` while it fails on a contended state, waiting longer each time.
-async fn retrying<F, Fut, T>(mut step: F) -> Result<T, DbErr>
+async fn retrying<F, Fut, T>(mut step: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, DbErr>>,
+    Fut: Future<Output = Result<T, Error>>,
 {
     let mut attempt = 1;
     loop {
@@ -93,7 +93,7 @@ where
     }
 }
 
-async fn drop_database(maintenance: &DatabasePool, db_name: &str) -> Result<u64, DbErr> {
+async fn drop_database(maintenance: &DatabasePool, db_name: &str) -> Result<u64, Error> {
     maintenance
         .get()
         .await?
@@ -111,7 +111,7 @@ async fn drop_database(maintenance: &DatabasePool, db_name: &str) -> Result<u64,
 /// reason the `CREATE` finds the name taken, so re-attempting the `CREATE`
 /// alone could never recover. Taking the maintenance connection afresh each
 /// time keeps one terminated backend from poisoning every attempt.
-async fn provision(maintenance: &DatabasePool, db_name: &str) -> Result<(), DbErr> {
+async fn provision(maintenance: &DatabasePool, db_name: &str) -> Result<(), Error> {
     drop_database(maintenance, db_name).await?;
     maintenance
         .get()
@@ -127,7 +127,7 @@ pub async fn setup(base_url: &str, db_name: &str) -> DatabasePool {
     retrying(|| provision(&maintenance, db_name))
         .await
         .map_err(|err| {
-            DbErr::Custom(format!(
+            Error::Custom(format!(
                 "test database {db_name:?} was not provisioned in {DDL_ATTEMPTS} attempts: {err}"
             ))
         })
@@ -155,7 +155,7 @@ pub async fn create_enum<C, E>(
     db: &C,
     creates: &[TypeCreateStatement],
     entity: E,
-) -> Result<(), DbErr>
+) -> Result<(), Error>
 where
     C: ConnectionTrait,
     E: EntityTrait,
@@ -199,7 +199,7 @@ pub async fn create_table<C, E>(
     db: &C,
     create: &TableCreateStatement,
     entity: E,
-) -> Result<u64, DbErr>
+) -> Result<u64, Error>
 where
     C: ConnectionTrait,
     E: EntityTrait,
@@ -216,7 +216,7 @@ where
 pub async fn create_table_without_asserts<C>(
     db: &C,
     create: &TableCreateStatement,
-) -> Result<u64, DbErr>
+) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {

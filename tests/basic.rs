@@ -15,7 +15,7 @@ pub use pgorm::{
 
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432 cargo test --test basic
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("basic_tests").await;
     let db = ctx.db.get().await?;
 
@@ -28,7 +28,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn setup_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn setup_schema(db: &DatabaseConnection) -> Result<(), Error> {
     use pgorm_query::{ColumnDef, Table};
 
     let stmt = Table::create(cake::Entity)
@@ -47,7 +47,7 @@ async fn setup_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn crud_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn crud_cake(db: &DatabaseConnection) -> Result<(), Error> {
     let apple = cake::ActiveModel {
         name: Set("Apple Pie".to_owned()),
         ..Default::default()

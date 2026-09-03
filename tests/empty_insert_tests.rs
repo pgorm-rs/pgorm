@@ -5,7 +5,7 @@ mod crud;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DatabasePool, EntityName, entity::*, error::DbErr,
+    ActiveValue::Set, DatabaseConnection, DatabasePool, EntityName, entity::*, error::Error,
     tests_cfg,
 };
 
@@ -25,9 +25,9 @@ async fn main() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+1/test]    `TryInsert::exec` reporting
+// [spec:pgorm:sem:exec.crud.try-insert+2/test]    `TryInsert::exec` reporting
 // Inserted, Conflicted and Empty
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    `on_empty_do_nothing`
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    `on_empty_do_nothing`
 // / `on_conflict_do_nothing` produce a `TryInsert` whose `exec` maps
 // RecordNotInserted to Conflicted and an empty batch to Empty
 pub async fn test(db: &DatabaseConnection) {
@@ -57,7 +57,7 @@ pub async fn test(db: &DatabaseConnection) {
 
     assert!(matches!(conflict_insert, Ok(TryInsertResult::Conflicted)));
 
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+1] An empty batch is a
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2] An empty batch is a
     // no-op that reports Empty before any SQL is issued.
     let empty_insert = Bakery::insert_many(std::iter::empty::<bakery::ActiveModel>())
         .on_empty_do_nothing()
@@ -79,7 +79,7 @@ pub async fn test(db: &DatabaseConnection) {
     assert_eq!(Bakery::find().all(db).await.unwrap().len(), 1);
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+1/test]    every execution
+// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    every execution
 // path of both insert types reports the recorded mismatch instead of sending
 // SQL, so the batch leaves the database untouched
 pub async fn columns_mismatch_is_refused(db: &DatabaseConnection) {

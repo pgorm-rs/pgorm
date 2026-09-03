@@ -51,21 +51,21 @@ where
     S: SelectorTrait + 'db,
 {
     /// The statement to page over, or the reason there is none to page over.
-    // [spec:pgorm:sem:exec.paginator.raw+1]
-    fn query(&self) -> Result<&SelectStatement, DbErr> {
+    // [spec:pgorm:sem:exec.paginator.raw+2]
+    fn query(&self) -> Result<&SelectStatement, Error> {
         let query = self
             .query
             .as_ref()
-            .map_err(|report| DbErr::Query(RuntimeErr::Internal(report.clone())))?;
+            .map_err(|report| Error::Query(RuntimeError::Internal(report.clone())))?;
         ensure_select_list(query)?;
         Ok(query)
     }
 
     /// Fetch a specific page; page index starts from zero
-    // [spec:pgorm:sem:exec.paginator.fetch+1]
-    pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, DbErr> {
+    // [spec:pgorm:sem:exec.paginator.fetch+2]
+    pub async fn fetch_page(&self, page: u64) -> Result<Vec<S::Item>, Error> {
         let offset = self.page_size.get().checked_mul(page).ok_or_else(|| {
-            DbErr::Query(RuntimeErr::Internal(format!(
+            Error::Query(RuntimeError::Internal(format!(
                 "page {page} at page size {} is past the largest representable offset",
                 self.page_size
             )))
@@ -88,14 +88,14 @@ where
     }
 
     /// Fetch the current page
-    // [spec:pgorm:sem:exec.paginator.fetch+1]
-    pub async fn fetch(&self) -> Result<Vec<S::Item>, DbErr> {
+    // [spec:pgorm:sem:exec.paginator.fetch+2]
+    pub async fn fetch(&self) -> Result<Vec<S::Item>, Error> {
         self.fetch_page(self.page).await
     }
 
     /// Get the total number of items
     // [spec:pgorm:sem:exec.paginator.count]
-    pub async fn num_items(&self) -> Result<u64, DbErr> {
+    pub async fn num_items(&self) -> Result<u64, Error> {
         let mut counted = self.query()?.clone();
         counted.reset_limit().reset_offset().clear_order_by();
         let stmt = SelectStatement::new()
@@ -118,14 +118,14 @@ where
     }
 
     /// Get the total number of pages
-    pub async fn num_pages(&self) -> Result<u64, DbErr> {
+    pub async fn num_pages(&self) -> Result<u64, Error> {
         let num_items = self.num_items().await?;
         let num_pages = self.compute_pages_number(num_items);
         Ok(num_pages)
     }
 
     /// Get the total number of items and pages
-    pub async fn num_items_and_pages(&self) -> Result<ItemsAndPagesNumber, DbErr> {
+    pub async fn num_items_and_pages(&self) -> Result<ItemsAndPagesNumber, Error> {
         let number_of_items = self.num_items().await?;
         let number_of_pages = self.compute_pages_number(number_of_items);
 
@@ -160,7 +160,7 @@ where
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
     /// # const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(50).unwrap();
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let mut cake_pages = cake::Entity::find()
@@ -174,7 +174,7 @@ where
     /// # }
     /// ```
     // [spec:pgorm:sem:exec.paginator.iterate]
-    pub async fn fetch_and_next(&mut self) -> Result<Option<Vec<S::Item>>, DbErr> {
+    pub async fn fetch_and_next(&mut self) -> Result<Option<Vec<S::Item>>, Error> {
         let vec = self.fetch().await?;
         self.next();
         let opt = if !vec.is_empty() { Some(vec) } else { None };
@@ -189,7 +189,7 @@ where
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, PaginatorTrait};
     /// #
     /// # const PAGE_SIZE: NonZeroU64 = NonZeroU64::new(50).unwrap();
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let mut cake_stream = cake::Entity::find()
@@ -204,7 +204,7 @@ where
     /// # }
     /// ```
     // [spec:pgorm:sem:exec.paginator.iterate]
-    pub fn into_stream(mut self) -> PinBoxStream<'db, Result<Vec<S::Item>, DbErr>> {
+    pub fn into_stream(mut self) -> PinBoxStream<'db, Result<Vec<S::Item>, Error>> {
         Box::pin(stream! {
             while let Some(vec) = self.fetch_and_next().await? {
                 yield Ok(vec);
@@ -246,11 +246,11 @@ where
     /// cake::Entity::find().paginate(db, PAGE_SIZE);
     /// # }
     /// ```
-    // [spec:pgorm:req:exec.paginator.page-size+1/test]
+    // [spec:pgorm:req:exec.paginator.page-size+2/test]
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector>;
 
     /// Perform a count on the paginated results
-    async fn count(self, db: &'db C) -> Result<u64, DbErr>
+    async fn count(self, db: &'db C) -> Result<u64, Error>
     where
         Self: Send + Sized,
     {
@@ -265,7 +265,7 @@ where
 {
     type Selector = S;
 
-    // [spec:pgorm:req:exec.paginator.page-size+1]
+    // [spec:pgorm:req:exec.paginator.page-size+2]
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
             query: Ok(self.query),
@@ -283,8 +283,8 @@ where
     S: SelectorTrait + Send + Sync + 'db,
 {
     type Selector = S;
-    // [spec:pgorm:req:exec.paginator.page-size+1]
-    // [spec:pgorm:sem:exec.paginator.raw+1]
+    // [spec:pgorm:req:exec.paginator.page-size+2]
+    // [spec:pgorm:sem:exec.paginator.raw+2]
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
             query: wrap_raw_select(&self.stmt, self.values.0),
@@ -302,7 +302,7 @@ const RAW_SUBQUERY_ALIAS: &str = "sub_statement";
 /// Wrap a caller's raw statement as `SELECT * FROM (<statement>) AS "sub_statement"`,
 /// the shape `LIMIT` and `OFFSET` append to whatever clauses the statement carries
 /// of its own, or report why it cannot be paged over at all.
-// [spec:pgorm:sem:exec.paginator.raw+1]
+// [spec:pgorm:sem:exec.paginator.raw+2]
 fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, String> {
     let select = single_select(stmt)?;
     let sql = format!(r#"* FROM ({select}) AS "{RAW_SUBQUERY_ALIAS}""#);
@@ -321,7 +321,7 @@ fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, St
 ///
 /// A `WITH ... SELECT` qualifies: PostgreSQL hangs the `WITH` clause off the
 /// `SelectStmt` itself rather than making it a statement of its own.
-// [spec:pgorm:sem:exec.paginator.raw+1]
+// [spec:pgorm:sem:exec.paginator.raw+2]
 fn single_select(stmt: &str) -> Result<&str, String> {
     let parsed = pg_query::parse(stmt).map_err(|error| {
         format!(

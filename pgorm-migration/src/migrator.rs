@@ -8,8 +8,8 @@ use tracing::info;
 use super::{MigrationTrait, seaql_migrations};
 use pgorm::pgorm_query::{ColumnDef, IntoIden, Order, Query, SelectStatement, Table};
 use pgorm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DbErr,
-    DynIden, EntityTrait, FromQueryResult, Iterable, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabasePool, DatabaseTransaction, DynIden,
+    EntityTrait, Error, FromQueryResult, Iterable, TransactionTrait,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -76,7 +76,7 @@ pub trait MigratorTrait: Send {
     /// Get list of applied migrations from database
     async fn get_migration_models(
         db: &(impl ConnectionTrait),
-    ) -> Result<Vec<seaql_migrations::Model>, DbErr> {
+    ) -> Result<Vec<seaql_migrations::Model>, Error> {
         Self::install(db).await?;
         let stmt = Query::select()
             .table_name(Self::migration_table_name())
@@ -90,10 +90,10 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of migrations with status
-    // [spec:pgorm:sem:migration.up]    pending set difference + missing-file detection
+    // [spec:pgorm:sem:migration.up+1]    pending set difference + missing-file detection
     async fn get_migration_with_status(
         db: &(impl ConnectionTrait),
-    ) -> Result<Vec<Migration>, DbErr> {
+    ) -> Result<Vec<Migration>, Error> {
         Self::install(db).await?;
         let mut migration_files = Self::get_migration_files();
         let migration_models = Self::get_migration_models(db).await?;
@@ -122,14 +122,14 @@ pub trait MigratorTrait: Send {
             }).collect();
 
         if !errors.is_empty() {
-            Err(DbErr::Custom(errors.join("\n")))
+            Err(Error::Custom(errors.join("\n")))
         } else {
             Ok(migration_files)
         }
     }
 
     /// Get list of pending migrations
-    async fn get_pending_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
+    async fn get_pending_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, Error> {
         Self::install(db).await?;
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -139,7 +139,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of applied migrations
-    async fn get_applied_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, DbErr> {
+    async fn get_applied_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, Error> {
         Self::install(db).await?;
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -150,7 +150,7 @@ pub trait MigratorTrait: Send {
 
     /// Create migration table `seaql_migrations` in the database
     // [spec:pgorm:def:migration.runner]    self-provisioning ledger under migration_table_name()
-    async fn install(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
+    async fn install(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         let stmt = Table::create(Self::migration_table_name())
             .if_not_exists()
             .col(
@@ -171,7 +171,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Check the status of all migrations
-    async fn status(db: &(impl ConnectionTrait)) -> Result<(), DbErr> {
+    async fn status(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         Self::install(db).await?;
 
         info!("Checking migration status");
@@ -184,8 +184,8 @@ pub trait MigratorTrait: Send {
     }
 
     /// Apply pending migrations
-    // [spec:pgorm:sem:migration.up]
-    async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), DbErr> {
+    // [spec:pgorm:sem:migration.up+1]
+    async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), Error> {
         tracing::debug!("Applying migrations");
         exec_with_connection::<'_, _>(db, move |manager| {
             tracing::debug!("Exec up");
@@ -195,12 +195,12 @@ pub trait MigratorTrait: Send {
     }
 }
 
-// [spec:pgorm:sem:migration.up]    one connection, one transaction for the whole batch
-async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), DbErr>
+// [spec:pgorm:sem:migration.up+1]    one connection, one transaction for the whole batch
+async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), Error>
 where
     F: for<'b> Fn(
         &'b DatabaseTransaction<'_>,
-    ) -> Pin<Box<dyn Future<Output = Result<(), DbErr>> + Send + 'b>>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'b>>,
 {
     let mut conn = db.get().await?;
     let transaction = conn.begin().await?;
@@ -208,8 +208,8 @@ where
     transaction.commit().await
 }
 
-// [spec:pgorm:sem:migration.up]    declaration-order application, step bound, ledger append
-async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), DbErr>
+// [spec:pgorm:sem:migration.up+1]    declaration-order application, step bound, ledger append
+async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), Error>
 where
     M: MigratorTrait + ?Sized,
 {
@@ -239,7 +239,7 @@ where
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|err| {
-                DbErr::Custom(format!("system clock is before the Unix epoch: {err}"))
+                Error::Custom(format!("system clock is before the Unix epoch: {err}"))
             })?;
         seaql_migrations::Entity::insert(seaql_migrations::ActiveModel {
             version: ActiveValue::Set(migration.name().to_owned()),

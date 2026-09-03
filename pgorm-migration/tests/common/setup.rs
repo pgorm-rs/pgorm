@@ -1,4 +1,4 @@
-use pgorm_migration::pgorm::{Config, ConnectionTrait, DatabasePool, DbErr, types::ToSql};
+use pgorm_migration::pgorm::{Config, ConnectionTrait, DatabasePool, Error, types::ToSql};
 
 const NO_PARAMS: [&(dyn ToSql + Sync); 0] = [];
 
@@ -55,7 +55,7 @@ impl TestContext {
     }
 }
 
-pub async fn has_table(db: &DatabasePool, name: &str) -> Result<bool, DbErr> {
+pub async fn has_table(db: &DatabasePool, name: &str) -> Result<bool, Error> {
     let conn = db.get().await?;
     let params: [&(dyn ToSql + Sync); 1] = [&name];
     let row = conn
@@ -64,7 +64,7 @@ pub async fn has_table(db: &DatabasePool, name: &str) -> Result<bool, DbErr> {
     Ok(row.get(0))
 }
 
-pub async fn has_index(db: &DatabasePool, table: &str, index: &str) -> Result<bool, DbErr> {
+pub async fn has_index(db: &DatabasePool, table: &str, index: &str) -> Result<bool, Error> {
     let conn = db.get().await?;
     let params: [&(dyn ToSql + Sync); 2] = [&table, &index];
     let row = conn
@@ -76,7 +76,7 @@ pub async fn has_index(db: &DatabasePool, table: &str, index: &str) -> Result<bo
     Ok(row.get(0))
 }
 
-pub async fn count_rows(db: &DatabasePool, table: &str) -> Result<i64, DbErr> {
+pub async fn count_rows(db: &DatabasePool, table: &str) -> Result<i64, Error> {
     let conn = db.get().await?;
     let row = conn
         .query_one(&format!("SELECT COUNT(*) FROM \"{table}\""), &[])

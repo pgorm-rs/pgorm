@@ -99,7 +99,7 @@ fn impl_value_type(
 
         #[automatically_derived]
         impl pgorm::pgorm_query::ValueType for #name {
-            fn try_from(v: pgorm::Value) -> std::result::Result<Self, pgorm::pgorm_query::ValueTypeErr> {
+            fn try_from(v: pgorm::Value) -> std::result::Result<Self, pgorm::pgorm_query::ValueTypeError> {
                 <#field_type as pgorm::pgorm_query::ValueType>::try_from(v).map(|v| #name(v))
             }
 

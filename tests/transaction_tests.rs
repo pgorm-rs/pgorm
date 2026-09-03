@@ -10,7 +10,7 @@ use pgorm::{
 use pretty_assertions::assert_eq;
 use tokio_postgres::error::SqlState;
 
-async fn insert_bakery<C>(db: &C, name: &str, profit_margin: f64) -> Result<(), DbErr>
+async fn insert_bakery<C>(db: &C, name: &str, profit_margin: f64) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
@@ -25,7 +25,7 @@ where
     Ok(())
 }
 
-async fn count_bakeries<C>(db: &C, search_name: &str) -> Result<usize, DbErr>
+async fn count_bakeries<C>(db: &C, search_name: &str) -> Result<usize, Error>
 where
     C: ConnectionTrait,
 {
@@ -36,7 +36,7 @@ where
         .len())
 }
 
-async fn show<C>(db: &C, setting: &str) -> Result<String, DbErr>
+async fn show<C>(db: &C, setting: &str) -> Result<String, Error>
 where
     C: ConnectionTrait,
 {
@@ -46,18 +46,18 @@ where
     Ok(row.get(0))
 }
 
-fn assert_read_only_violation(err: &DbErr) {
+fn assert_read_only_violation(err: &Error) {
     match err {
-        DbErr::Postgres(e) => assert_eq!(
+        Error::Postgres(e) => assert_eq!(
             e.as_db_error().map(|e| e.code()),
             Some(&SqlState::READ_ONLY_SQL_TRANSACTION),
         ),
-        other => panic!("expected DbErr::Postgres, got {other:?}"),
+        other => panic!("expected Error::Postgres, got {other:?}"),
     }
 }
 
 #[pgorm_macros::test]
-pub async fn transaction() -> Result<(), DbErr> {
+pub async fn transaction() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -80,7 +80,7 @@ pub async fn transaction() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
-pub async fn transaction_with_reference() -> Result<(), DbErr> {
+pub async fn transaction_with_reference() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_with_reference_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -106,7 +106,7 @@ async fn _transaction_with_reference(
     name1: &str,
     name2: &str,
     search_name: &str,
-) -> Result<(), DbErr> {
+) -> Result<(), Error> {
     insert_bakery(txn, name1, 10.4).await?;
     insert_bakery(txn, name2, 15.0).await?;
 
@@ -115,9 +115,9 @@ async fn _transaction_with_reference(
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1/test]    the implicit path: dropping an uncommitted handle rolls back, and the queued ROLLBACK lands ahead of the connection's next statement
+// [spec:pgorm:sem:conn.tx.guard+2/test]    the implicit path: dropping an uncommitted handle rolls back, and the queued ROLLBACK lands ahead of the connection's next statement
 #[pgorm_macros::test]
-pub async fn transaction_begin_out_of_scope() -> Result<(), DbErr> {
+pub async fn transaction_begin_out_of_scope() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_begin_out_of_scope_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -148,7 +148,7 @@ pub async fn transaction_begin_out_of_scope() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
-pub async fn transaction_begin_commit() -> Result<(), DbErr> {
+pub async fn transaction_begin_commit() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_begin_commit_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -180,7 +180,7 @@ pub async fn transaction_begin_commit() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
-pub async fn transaction_error_rollback() -> Result<(), DbErr> {
+pub async fn transaction_error_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_error_rollback_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -216,9 +216,9 @@ pub async fn transaction_error_rollback() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1/test]    the explicit path: rollback() consumes the handle and awaits the round trip
+// [spec:pgorm:sem:conn.tx.guard+2/test]    the explicit path: rollback() consumes the handle and awaits the round trip
 #[pgorm_macros::test]
-pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
+pub async fn transaction_explicit_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_explicit_rollback_txrollback").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -242,9 +242,9 @@ pub async fn transaction_explicit_rollback() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1/test]    the ROLLBACK queued by Drop still lands after the connection returns to the pool
+// [spec:pgorm:sem:conn.tx.guard+2/test]    the ROLLBACK queued by Drop still lands after the connection returns to the pool
 #[pgorm_macros::test]
-pub async fn transaction_drop_rollback_survives_handback() -> Result<(), DbErr> {
+pub async fn transaction_drop_rollback_survives_handback() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_drop_rollback_survives_handback").await;
     create_tables(&ctx.db).await?;
 
@@ -289,10 +289,10 @@ pub async fn transaction_drop_rollback_survives_handback() -> Result<(), DbErr> 
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1/test]    a failing COMMIT reaches the caller as DbErr::Postgres
+// [spec:pgorm:sem:conn.tx.guard+2/test]    a failing COMMIT reaches the caller as Error::Postgres
 #[pgorm_macros::test]
-pub async fn transaction_commit_failure_maps_dberr() -> Result<(), DbErr> {
-    let ctx = TestContext::new("transaction_commit_failure_maps_dberr").await;
+pub async fn transaction_commit_failure_maps_error() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_commit_failure_maps_error").await;
     let mut db = ctx.db.get().await?;
 
     // A deferred constraint is only checked at COMMIT, so the failure can reach
@@ -315,11 +315,11 @@ pub async fn transaction_commit_failure_maps_dberr() -> Result<(), DbErr> {
         .expect_err("the deferred unique constraint must fail the COMMIT");
 
     match &err {
-        DbErr::Postgres(e) => assert_eq!(
+        Error::Postgres(e) => assert_eq!(
             e.as_db_error().map(|e| e.code()),
             Some(&SqlState::UNIQUE_VIOLATION),
         ),
-        other => panic!("expected DbErr::Postgres, got {other:?}"),
+        other => panic!("expected Error::Postgres, got {other:?}"),
     }
 
     assert!(
@@ -337,7 +337,7 @@ pub async fn transaction_commit_failure_maps_dberr() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:conn.tx+2/test]    ReadOnly emits both clauses, and the server enforces the access mode
 #[pgorm_macros::test]
-pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
+pub async fn transaction_read_only_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_read_only_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -372,7 +372,7 @@ pub async fn transaction_read_only_txconfig() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:conn.tx+2/test]    ReadWrite carries the isolation level, and still commits
 #[pgorm_macros::test]
-pub async fn transaction_serializable_txconfig() -> Result<(), DbErr> {
+pub async fn transaction_serializable_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_serializable_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -402,7 +402,7 @@ pub async fn transaction_serializable_txconfig() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:conn.tx+2/test]    Default appends no clause, so the session default stands
 #[pgorm_macros::test]
-pub async fn transaction_default_inherits_session_txconfig() -> Result<(), DbErr> {
+pub async fn transaction_default_inherits_session_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_default_inherits_session_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -435,7 +435,7 @@ pub async fn transaction_default_inherits_session_txconfig() -> Result<(), DbErr
 
 // [spec:pgorm:req:conn.tx+2/test]    ReadWrite overrides a read-only session default
 #[pgorm_macros::test]
-pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), DbErr> {
+pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_read_write_overrides_default_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -465,7 +465,7 @@ pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), D
 }
 
 #[pgorm_macros::test]
-pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
+pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_with_active_model_behaviour_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -482,7 +482,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
             }
             .insert(&txn)
             .await,
-            Err(DbErr::Custom(
+            Err(Error::Custom(
                 "[before_save] Invalid Price, insert: true".to_owned()
             ))
         );
@@ -498,7 +498,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
             }
             .insert(&txn)
             .await,
-            Err(DbErr::Custom(
+            Err(Error::Custom(
                 "[after_save] Invalid Price, insert: true".to_owned()
             ))
         );
@@ -518,7 +518,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
 
         assert_eq!(
             readonly_cake_1.delete(&txn).await.err(),
-            Some(DbErr::Custom(
+            Some(Error::Custom(
                 "[before_delete] Cannot be deleted".to_owned()
             ))
         );
@@ -538,7 +538,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
 
         assert_eq!(
             readonly_cake_2.delete(&txn).await.err(),
-            Some(DbErr::Custom("[after_delete] Cannot be deleted".to_owned()))
+            Some(Error::Custom("[after_delete] Cannot be deleted".to_owned()))
         );
 
         assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
@@ -553,7 +553,7 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), DbErr> {
 }
 
 #[pgorm_macros::test]
-pub async fn transaction_nested() -> Result<(), DbErr> {
+pub async fn transaction_nested() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_nested_test").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -653,9 +653,9 @@ fn serializable() -> TransactionMode {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure/test]    Ok commits, and the value is returned
+// [spec:pgorm:sem:conn.tx.closure+1/test]    Ok commits, and the value is returned
 #[pgorm_macros::test]
-pub async fn transaction_closure_commit_txclosure() -> Result<(), DbErr> {
+pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_commit_txclosure").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -687,9 +687,9 @@ pub async fn transaction_closure_commit_txclosure() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure/test]    Err rolls back and is wrapped, not swallowed
+// [spec:pgorm:sem:conn.tx.closure+1/test]    Err rolls back and is wrapped, not swallowed
 #[pgorm_macros::test]
-pub async fn transaction_closure_error_txclosure() -> Result<(), DbErr> {
+pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_error_txclosure").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -701,13 +701,13 @@ pub async fn transaction_closure_error_txclosure() -> Result<(), DbErr> {
 
             assert_eq!(count_bakeries(&*txn, "Bakery").await?, 2);
 
-            Err::<(), DbErr>(DbErr::Custom("closure said no".to_owned()))
+            Err::<(), Error>(Error::Custom("closure said no".to_owned()))
         })
         .await
         .expect_err("closure transaction must not commit");
 
     match err {
-        TransactionError::Transaction(DbErr::Custom(message)) => {
+        TransactionError::Transaction(Error::Custom(message)) => {
             assert_eq!(message, "closure said no")
         }
         other => panic!("expected TransactionError::Transaction, got {other:?}"),
@@ -721,9 +721,9 @@ pub async fn transaction_closure_error_txclosure() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry/test]    SQLSTATE 40001 raised by a statement is retried
+// [spec:pgorm:sem:conn.tx.retry+1/test]    SQLSTATE 40001 raised by a statement is retried
 #[pgorm_macros::test]
-pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), DbErr> {
+pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_concurrent_update_txclosure").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -763,7 +763,7 @@ pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), DbErr
             )
             .await?;
 
-            Ok::<_, DbErr>(margin)
+            Ok::<_, Error>(margin)
         })
         .await
         .expect("the retried transaction must eventually commit");
@@ -780,9 +780,9 @@ pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), DbErr
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry/test]    write skew between two serializable transactions
+// [spec:pgorm:sem:conn.tx.retry+1/test]    write skew between two serializable transactions
 #[pgorm_macros::test]
-pub async fn transaction_retry_write_skew_txclosure() -> Result<(), DbErr> {
+pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_write_skew_txclosure").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -805,7 +805,7 @@ pub async fn transaction_retry_write_skew_txclosure() -> Result<(), DbErr> {
                 other_txn.commit().await?;
             }
 
-            Ok::<_, DbErr>(seen)
+            Ok::<_, Error>(seen)
         })
         .await
         .expect("the retried transaction must eventually commit");
@@ -820,9 +820,9 @@ pub async fn transaction_retry_write_skew_txclosure() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry/test]    a non-retryable error is returned on the first attempt
+// [spec:pgorm:sem:conn.tx.retry+1/test]    a non-retryable error is returned on the first attempt
 #[pgorm_macros::test]
-pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), DbErr> {
+pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_non_retryable_txclosure").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -833,14 +833,14 @@ pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), DbErr> {
         .transaction_with_retry(serializable(), 5, async |txn| {
             attempts += 1;
             insert_bakery(&*txn, "SeaSide Bakery", 10.4).await?;
-            Err::<(), DbErr>(DbErr::Custom("closure said no".to_owned()))
+            Err::<(), Error>(Error::Custom("closure said no".to_owned()))
         })
         .await
         .expect_err("a non-retryable error must not be retried");
 
     assert_eq!(attempts, 1);
     match err {
-        TransactionError::Transaction(DbErr::Custom(message)) => {
+        TransactionError::Transaction(Error::Custom(message)) => {
             assert_eq!(message, "closure said no")
         }
         other => panic!("expected TransactionError::Transaction, got {other:?}"),
@@ -856,7 +856,7 @@ pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:conn.tx+2/test]    a savepoint under a configured outer transaction
 #[pgorm_macros::test]
-pub async fn transaction_nested_under_config_txtests() -> Result<(), DbErr> {
+pub async fn transaction_nested_under_config_txtests() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_nested_under_config_txtests").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
@@ -899,7 +899,7 @@ pub async fn transaction_nested_under_config_txtests() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:conn.tx+2/test]    DeferrableSnapshot carries serializable + read only, the one combination DEFERRABLE needs
 #[pgorm_macros::test]
-pub async fn transaction_deferrable_txtests() -> Result<(), DbErr> {
+pub async fn transaction_deferrable_txtests() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_deferrable_txtests").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;

@@ -1,5 +1,5 @@
 pub use super::*;
-use pgorm::{DbErr, PaginatorTrait, query::*};
+use pgorm::{Error, PaginatorTrait, query::*};
 use uuid::Uuid;
 
 pub async fn test_update_cake(db: &DatabaseConnection) {
@@ -123,7 +123,7 @@ pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
 
     let customer_update_res = customer.update(db).await;
 
-    assert_eq!(customer_update_res, Err(DbErr::RecordNotFound));
+    assert_eq!(customer_update_res, Err(Error::RecordNotFound));
 
     assert_eq!(Customer::find().count(db).await.unwrap(), init_n_customers);
 

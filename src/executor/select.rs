@@ -17,7 +17,7 @@ use super::ValueHolder;
 ///
 /// Unlike [`PinBoxStream`](crate::PinBoxStream) this is `Send`, so it can be
 /// consumed from a spawned task.
-// [spec:pgorm:def:exec.stream]
+// [spec:pgorm:def:exec.stream+1]
 pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 'db>>;
 
 /// The guard every ORM path that sends a `SELECT` passes through: a statement
@@ -27,10 +27,10 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
-// [spec:pgorm:sem:query.build.modifiers+2]
-pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), DbErr> {
+// [spec:pgorm:sem:query.build.modifiers+3]
+pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
-        return Err(DbErr::Query(RuntimeErr::Internal(
+        return Err(Error::Query(RuntimeError::Internal(
             "select list is empty; add at least one column or expression".to_owned(),
         )));
     }
@@ -67,7 +67,7 @@ pub trait SelectorTrait {
     type Item: Sized;
 
     /// The method to perform a query on a Model
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr>;
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error>;
 }
 
 /// Get tuple from query result based on a list of column identifiers
@@ -116,7 +116,7 @@ where
 {
     type Item = T;
 
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr> {
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
         let cols: Vec<String> = C::iter().map(|col| col.to_string()).collect();
         T::try_get_many(&res, "", &cols).map_err(Into::into)
     }
@@ -128,7 +128,7 @@ where
 {
     type Item = T;
 
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr> {
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
         T::try_get_many_by_index(&res).map_err(Into::into)
     }
 }
@@ -139,7 +139,7 @@ where
 {
     type Item = M;
 
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr> {
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
         // tracing::debug!("Got raw query result: {:?}", res);
         M::from_query_result(&res, "")
     }
@@ -152,7 +152,7 @@ where
 {
     type Item = (M, Option<N>);
 
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, DbErr> {
+    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
         Ok((
             M::from_query_result(&res, SelectA.as_str())?,
             N::from_query_result_optional(&res, SelectB.as_str())?,
@@ -240,7 +240,7 @@ where
     /// #     name_upper: String,
     /// # }
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let cakes: Vec<PartialCake> = cake::Entity::find()
@@ -265,7 +265,7 @@ where
     /// # {
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, DeriveColumn, EnumIter};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
     ///     CakeName,
@@ -312,7 +312,7 @@ where
     /// # {
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, DeriveColumn, EnumIter};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
     /// enum QueryAs {
     ///     CakeName,
@@ -346,7 +346,7 @@ where
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let res: Vec<String> = cake::Entity::find()
@@ -390,7 +390,7 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one<C>(self, db: &C) -> Result<E::Model, DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<E::Model, Error>
     where
         C: ConnectionTrait,
     {
@@ -398,7 +398,7 @@ where
     }
 
     /// Get one Model from the SELECT query
-    pub async fn one_opt<C>(self, db: &C) -> Result<Option<E::Model>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<E::Model>, Error>
     where
         C: ConnectionTrait,
     {
@@ -406,7 +406,7 @@ where
     }
 
     /// Get all Models from the SELECT query
-    pub async fn all<C>(self, db: &C) -> Result<Vec<E::Model>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<E::Model>, Error>
     where
         C: ConnectionTrait,
     {
@@ -414,11 +414,11 @@ where
     }
 
     /// Stream the results of a SELECT operation on a Model
-    // [spec:pgorm:def:exec.stream]
+    // [spec:pgorm:def:exec.stream+1]
     pub async fn stream<'b, C>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<E::Model, DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<E::Model, Error>>, Error>
     where
         C: ConnectionTrait,
         E::Model: 'b,
@@ -427,11 +427,11 @@ where
     }
 
     /// Stream the result of the operation with PartialModel
-    // [spec:pgorm:def:exec.stream]
+    // [spec:pgorm:def:exec.stream+1]
     pub async fn stream_partial_model<'b, C, M>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<M, DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<M, Error>>, Error>
     where
         C: ConnectionTrait,
         M: PartialModelTrait + 'b,
@@ -440,7 +440,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2]
+// [spec:pgorm:sem:query.build.modifiers+3]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -452,7 +452,7 @@ where
     /// # {
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, FromQueryResult};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Debug, FromQueryResult)]
     /// struct NameOnly {
     ///     name: String,
@@ -512,7 +512,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2]
+// [spec:pgorm:sem:query.build.modifiers+3]
 impl<E, F> SelectTwoProjected<E, F>
 where
     E: EntityTrait,
@@ -575,7 +575,7 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one<C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), DbErr>
+    pub async fn one<C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), Error>
     where
         C: ConnectionTrait,
     {
@@ -583,7 +583,7 @@ where
     }
 
     /// Get one Model from the Select query
-    pub async fn one_opt<C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, Error>
     where
         C: ConnectionTrait,
     {
@@ -591,7 +591,7 @@ where
     }
 
     /// Get all Models from the Select query
-    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, Error>
     where
         C: ConnectionTrait,
     {
@@ -599,11 +599,11 @@ where
     }
 
     /// Stream the results of a Select operation on a Model
-    // [spec:pgorm:def:exec.stream]
+    // [spec:pgorm:def:exec.stream+1]
     pub async fn stream<'b, C>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<(E::Model, Option<F::Model>), DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<(E::Model, Option<F::Model>), Error>>, Error>
     where
         C: ConnectionTrait,
         E::Model: 'b,
@@ -613,11 +613,11 @@ where
     }
 
     /// Stream the result of the operation with PartialModel
-    // [spec:pgorm:def:exec.stream]
+    // [spec:pgorm:def:exec.stream+1]
     pub async fn stream_partial_model<'b, C, M, N>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<(M, Option<N>), DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<(M, Option<N>), Error>>, Error>
     where
         C: ConnectionTrait,
         M: PartialModelTrait + 'b,
@@ -653,7 +653,7 @@ where
     /// >
     /// > See <https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading> for details.
     // [spec:pgorm:sem:exec.crud.consolidate]
-    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, Error>
     where
         C: ConnectionTrait,
     {
@@ -702,7 +702,7 @@ where
         }
     }
 
-    fn into_selector_raw(self) -> Result<SelectorRaw<S>, DbErr> {
+    fn into_selector_raw(self) -> Result<SelectorRaw<S>, Error> {
         ensure_select_list(&self.query)?;
         let (stmt, values) = self.query.build();
 
@@ -714,8 +714,8 @@ where
     }
 
     /// Get an item from the Select query
-    // [spec:pgorm:sem:exec.crud.select]
-    pub async fn one<C>(mut self, db: &C) -> Result<S::Item, DbErr>
+    // [spec:pgorm:sem:exec.crud.select+1]
+    pub async fn one<C>(mut self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
     {
@@ -724,7 +724,7 @@ where
     }
 
     /// Get an item from the Select query
-    pub async fn one_opt<C>(mut self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one_opt<C>(mut self, db: &C) -> Result<Option<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
@@ -733,7 +733,7 @@ where
     }
 
     /// Get all items from the Select query
-    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
@@ -741,11 +741,11 @@ where
     }
 
     /// Stream the results of the Select operation
-    // [spec:pgorm:def:exec.stream]
+    // [spec:pgorm:def:exec.stream+1]
     pub async fn stream<'b, C>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<S::Item, DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<S::Item, Error>>, Error>
     where
         C: ConnectionTrait,
         S: 'b,
@@ -796,7 +796,7 @@ where
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, FromQueryResult};
     /// # use pgorm::pgorm_query::Values;
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {
     ///     name: String,
@@ -832,14 +832,14 @@ where
     /// Get an item from the Select query.
     ///
     /// The raw statement is executed exactly as written — no `LIMIT` is
-    /// injected. Zero rows fails with [`DbErr::RecordNotFound`]; use
+    /// injected. Zero rows fails with [`Error::RecordNotFound`]; use
     /// [`one_opt`](SelectorRaw::one_opt) for an `Option` instead.
     ///
     /// ```no_run
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// # use pgorm::pgorm_query::{Value, Values};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let cake: cake::Model = cake::Entity::find()
@@ -852,8 +852,8 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.select]
-    pub async fn one<C>(self, db: &C) -> Result<S::Item, DbErr>
+    // [spec:pgorm:sem:exec.crud.select+1]
+    pub async fn one<C>(self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
     {
@@ -867,7 +867,7 @@ where
         let row = db.query_opt(&self.stmt, &values).await?;
         match row {
             Some(row) => Ok(S::from_raw_query_result(QueryResult { row })?),
-            None => Err(DbErr::RecordNotFound),
+            None => Err(Error::RecordNotFound),
         }
     }
 
@@ -877,7 +877,7 @@ where
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// # use pgorm::pgorm_query::{Value, Values};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let cake: Option<cake::Model> = cake::Entity::find()
@@ -890,7 +890,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn one_opt<C>(self, db: &C) -> Result<Option<S::Item>, DbErr>
+    pub async fn one_opt<C>(self, db: &C) -> Result<Option<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
@@ -914,7 +914,7 @@ where
     /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
     /// # use pgorm::pgorm_query::Values;
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// let db = pool.get().await?;
     ///
     /// let cakes: Vec<cake::Model> = cake::Entity::find()
@@ -927,7 +927,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
@@ -951,11 +951,11 @@ where
 
     /// Stream the results of the Select operation, decoding each row as it
     /// arrives rather than buffering the whole result set
-    // [spec:pgorm:sem:exec.stream.decode]
+    // [spec:pgorm:sem:exec.stream.decode+1]
     pub async fn stream<'b, C>(
         self,
         db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<S::Item, DbErr>>, DbErr>
+    ) -> Result<PinBoxSendStream<'b, Result<S::Item, Error>>, Error>
     where
         C: ConnectionTrait,
         S: 'b,
@@ -971,7 +971,7 @@ where
             .await?;
         Ok(Box::pin(rows.map(|row| match row {
             Ok(row) => S::from_raw_query_result(QueryResult { row }),
-            Err(err) => Err(DbErr::Postgres(err)),
+            Err(err) => Err(Error::Postgres(err)),
         })))
     }
 }

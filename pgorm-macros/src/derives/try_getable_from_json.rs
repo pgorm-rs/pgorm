@@ -21,12 +21,12 @@ pub fn expand_derive_from_json_query_result(ident: Ident) -> syn::Result<TokenSt
 
         #[automatically_derived]
         impl pgorm::pgorm_query::ValueType for #ident {
-            fn try_from(v: pgorm::Value) -> Result<Self, pgorm::pgorm_query::ValueTypeErr> {
+            fn try_from(v: pgorm::Value) -> Result<Self, pgorm::pgorm_query::ValueTypeError> {
                 match v {
                     pgorm::Value::Json(Some(json)) => Ok(
-                        serde_json::from_value(*json).map_err(|_| pgorm::pgorm_query::ValueTypeErr)?,
+                        serde_json::from_value(*json).map_err(|_| pgorm::pgorm_query::ValueTypeError)?,
                     ),
-                    _ => Err(pgorm::pgorm_query::ValueTypeErr),
+                    _ => Err(pgorm::pgorm_query::ValueTypeError),
                 }
             }
 

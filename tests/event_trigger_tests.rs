@@ -19,7 +19,7 @@ use pgorm::{
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("event_trigger_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -32,7 +32,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_event_trigger(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_event_trigger(db: &DatabaseConnection) -> Result<(), Error> {
     let event_trigger = event_trigger::Model {
         id: 1,
         events: Events(

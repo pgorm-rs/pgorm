@@ -32,7 +32,7 @@ including the remaining gaps in parameter binding.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+1]
+> [spec:pgorm:sem:exec.cursor.keyset+2]
 > `after(values)` filters to rows strictly beyond the boundary in the
 > logical sort direction: column `>` value when ascending, `<` when
 > descending. `before(values)` is the mirror image (`<` ascending, `>`
@@ -52,7 +52,7 @@ including the remaining gaps in parameter binding.
 > runtime-built `Identity`, whose `ValueType` is `ValueTuple`: that `K`
 > admits any `IntoValueTuple`, keeping the arity check for execution.
 > A length that does not match the columns MUST then be reported when the
-> filters are composed, as `DbErr::Query(RuntimeErr::Internal)` reading
+> filters are composed, as `Error::Query(RuntimeError::Internal)` reading
 > "cursor boundary of arity {n} does not match {m} order column(s)". No
 > arity mismatch panics.
 >
@@ -202,22 +202,22 @@ including the remaining gaps in parameter binding.
 > `PinBoxStream` is the pinned boxed stream alias returned by
 > `into_stream`.
 
-> [spec:pgorm:req:exec.paginator.page-size+1]
+> [spec:pgorm:req:exec.paginator.page-size+2]
 > `page_size` is a `NonZeroU64` — in the `paginate` signature and in the
 > `Paginator` field it is stored in — so a zero page size is not a value
 > a caller can supply and not a state the paginator can hold. There is
-> no assertion to trip, no panic to catch and no `DbErr` to recover:
+> no assertion to trip, no panic to catch and no `Error` to recover:
 > zero is rejected by the compiler at the call site. The page-count
 > division of `[spec:pgorm:sem:exec.paginator.count]` is therefore total
 > by construction, and `PaginatorTrait::count` names its page size of
 > one as `NonZeroU64::MIN` rather than a literal the type would refuse.
 
-> [spec:pgorm:sem:exec.paginator.fetch+1]
+> [spec:pgorm:sem:exec.paginator.fetch+2]
 > `fetch_page(page)` executes a clone of the query with
 > `LIMIT page_size OFFSET page_size * page`; pages are zero-indexed and
 > the paginator's own cursor is not consulted or advanced. The offset is
 > computed with checked multiplication: a `page` whose offset would not
-> fit a `u64` is a `DbErr::Query`, not a debug-build panic and not a
+> fit a `u64` is an `Error::Query`, not a debug-build panic and not a
 > release-build wrap to a small offset that would silently serve the
 > wrong rows. Rows are decoded through the selector, aborting on the
 > first decode error. `fetch()` is `fetch_page(cur_page())`; `next()`
@@ -245,7 +245,7 @@ including the remaining gaps in parameter binding.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw+1]
+> [spec:pgorm:sem:exec.paginator.raw+2]
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` 6.2.0 the render oracle and `sql!` use
@@ -276,5 +276,5 @@ including the remaining gaps in parameter binding.
 > neither a panic nor mangled SQL sent to the server. `paginate` records
 > the reason, and every reader that can report it (`fetch_page`, and
 > `num_items` with the page counts derived from it) returns it as a
-> `DbErr::Query` naming what the statement actually parsed as, using
+> `Error::Query` naming what the statement actually parsed as, using
 > PostgreSQL's own node name for anything it has no SQL keyword for.

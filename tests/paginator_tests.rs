@@ -22,7 +22,7 @@ const BAKERIES: [(&str, f64); 7] = [
     ("Golf Bakery", 7.0),
 ];
 
-async fn seed(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn seed(db: &DatabaseConnection) -> Result<(), Error> {
     for (name, margin) in BAKERIES {
         bakery::ActiveModel {
             name: Set(name.to_owned()),
@@ -50,10 +50,10 @@ const RAW_ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDE
 
 // [spec:pgorm:def:exec.paginator+1/test]    paginate is reachable from every
 // selector shape, and `count` pages at `NonZeroU64::MIN`
-// [spec:pgorm:sem:exec.paginator.fetch+1/test]    zero-indexed pages, an
+// [spec:pgorm:sem:exec.paginator.fetch+2/test]    zero-indexed pages, an
 // independent page cursor, and `next` advancing without fetching
 #[pgorm_macros::test]
-async fn paginator_fetch_page() -> Result<(), DbErr> {
+async fn paginator_fetch_page() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_fetch_page").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -125,7 +125,7 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
         .fetch_page(2)
         .await;
     assert!(
-        matches!(&overflowing, Err(DbErr::Query(_))),
+        matches!(&overflowing, Err(Error::Query(_))),
         "unexpected result: {overflowing:?}"
     );
     assert!(
@@ -144,7 +144,7 @@ async fn paginator_fetch_page() -> Result<(), DbErr> {
 // [spec:pgorm:sem:exec.paginator.count/test]    counting strips limit, offset
 // and ORDER BY; page count is ceiling division and is never cached
 #[pgorm_macros::test]
-async fn paginator_count() -> Result<(), DbErr> {
+async fn paginator_count() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_count").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -217,7 +217,7 @@ async fn paginator_count() -> Result<(), DbErr> {
 // [spec:pgorm:sem:exec.paginator.iterate/test]    `fetch_and_next` terminates
 // only on an empty page, and `into_stream` wraps that same loop
 #[pgorm_macros::test]
-async fn paginator_iterate() -> Result<(), DbErr> {
+async fn paginator_iterate() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_iterate").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -268,10 +268,10 @@ async fn paginator_iterate() -> Result<(), DbErr> {
 
 // [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
-// [spec:pgorm:sem:exec.paginator.raw+1/test]    a parsed single `SELECT` is
+// [spec:pgorm:sem:exec.paginator.raw+2/test]    a parsed single `SELECT` is
 // wrapped whole as a subquery, so its own clauses survive paging
 #[pgorm_macros::test]
-async fn paginator_raw() -> Result<(), DbErr> {
+async fn paginator_raw() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_raw").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -347,10 +347,10 @@ async fn paginator_raw() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+1/test]    anything that is not one
-// row-returning `SELECT` is a `DbErr::Query` naming what it parsed as
+// [spec:pgorm:sem:exec.paginator.raw+2/test]    anything that is not one
+// row-returning `SELECT` is an `Error::Query` naming what it parsed as
 #[pgorm_macros::test]
-async fn paginator_raw_rejects_non_select() -> Result<(), DbErr> {
+async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_raw_rejects").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -385,7 +385,7 @@ async fn paginator_raw_rejects_non_select() -> Result<(), DbErr> {
         ] {
             let reported = reported.unwrap_or_else(|| panic!("{stmt:?} was not refused"));
             assert!(
-                matches!(reported, DbErr::Query(_)),
+                matches!(reported, Error::Query(_)),
                 "{stmt:?}: unexpected error: {reported:?}"
             );
             assert!(

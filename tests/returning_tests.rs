@@ -21,7 +21,7 @@ fn params(holders: &[ValueHolder]) -> Vec<&(dyn ToSql + Sync)> {
 // [spec:pgorm:def:exec.cursor.binding+2/test]    every built statement value is
 // wrapped in `ValueHolder` for binding — here `String`, `Double` and `Int`
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     use bakery::*;
 
     let ctx = TestContext::new("returning_tests").await;
@@ -68,7 +68,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+3/test]    `UpdateMany::exec_with_returning`
+// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateMany::exec_with_returning`
 // returns every updated model, and an empty `Vec` on the no-op path
 #[pgorm_macros::test]
 async fn update_many() {
@@ -175,7 +175,7 @@ async fn update_many() {
         drop(db);
         ctx.delete().await;
 
-        Result::<(), DbErr>::Ok(())
+        Result::<(), Error>::Ok(())
     };
 
     run().await.unwrap();
@@ -189,11 +189,11 @@ fn bakery_model(name: &str, margin: f64) -> bakery::ActiveModel {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning/test]    `exec_with_returning`
+// [spec:pgorm:sem:exec.crud.insert-returning+1/test]    `exec_with_returning`
 // decodes a full-column RETURNING (and fails with RecordNotFound when the
 // insert matched nothing); `exec_without_returning` reports rows affected
 #[pgorm_macros::test]
-async fn insert_returning_modes() -> Result<(), DbErr> {
+async fn insert_returning_modes() -> Result<(), Error> {
     use pgorm::PaginatorTrait;
     use pgorm_query::OnConflict;
 
@@ -242,7 +242,7 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
     .on_conflict(OnConflict::do_nothing())
     .exec_with_returning(&db)
     .await;
-    assert_eq!(conflicted, Err(DbErr::RecordNotFound));
+    assert_eq!(conflicted, Err(Error::RecordNotFound));
 
     // The same conflict is not an error for `exec_without_returning`: no row
     // was written, so the count is zero.
@@ -262,16 +262,16 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+1/test]    `TryInsertResult` across all
+// [spec:pgorm:sem:exec.crud.try-insert+2/test]    `TryInsertResult` across all
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from a skipped `ON CONFLICT` insert, and any other error
 // propagating
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+1/test]    the same three
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    the same three
 // entry points reading the one recorded empty state: an insert over an empty
 // iterator and an insert of an all-NotSet model both return Empty with the
 // database left untouched
 #[pgorm_macros::test]
-async fn try_insert_result_variants() -> Result<(), DbErr> {
+async fn try_insert_result_variants() -> Result<(), Error> {
     use pgorm::TryInsertResult;
     use pgorm_query::OnConflict;
 
@@ -394,7 +394,7 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
             .on_empty_do_nothing()
             .exec_with_returning(&db)
             .await,
-        Err(DbErr::Postgres(_))
+        Err(Error::Postgres(_))
     ));
 
     drop(db);
@@ -403,10 +403,10 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+3/test]    the no-op short-circuit of
+// [spec:pgorm:sem:exec.crud.update+4/test]    the no-op short-circuit of
 // `Updater::exec` and `UpdateOne::exec`, plus `check_record_exists`
 #[pgorm_macros::test]
-async fn update_noop_and_record_check() -> Result<(), DbErr> {
+async fn update_noop_and_record_check() -> Result<(), Error> {
     use pgorm::{ActiveValue::Unchanged, ColumnTrait, Updater};
 
     let ctx = TestContext::new("returning_tests_update_noop").await;
@@ -448,7 +448,7 @@ async fn update_noop_and_record_check() -> Result<(), DbErr> {
     );
     assert_eq!(
         Updater::new(update).check_record_exists().exec(&db).await,
-        Err(DbErr::RecordNotUpdated)
+        Err(Error::RecordNotUpdated)
     );
 
     // On `UpdateOne`'s no-op path nothing is written; the current model is

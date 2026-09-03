@@ -1,6 +1,6 @@
 use super::select::ensure_select_list;
 use crate::{
-    ConnectionTrait, DbErr, EntityTrait, FromQueryResult, Identity, IdentityOf, IntoBoundary,
+    ConnectionTrait, EntityTrait, Error, FromQueryResult, Identity, IdentityOf, IntoBoundary,
     IntoIdentity, PartialModelTrait, PrimaryKeyToColumn, QueryOrder, QuerySelect, Select,
     SelectModel, SelectProjected, SelectTwo, SelectTwoModel, SelectTwoProjected, SelectorTrait,
     error::query_err,
@@ -40,7 +40,7 @@ impl Window {
 /// It is not a [`SelectorTrait`], so [`Cursor::all`] does not exist until
 /// [`Cursor::into_model`] or [`Cursor::into_partial_model`] says what the rows
 /// are.
-// [spec:pgorm:sem:query.build.modifiers+2]
+// [spec:pgorm:sem:query.build.modifiers+3]
 #[derive(Clone, Copy, Debug)]
 pub struct SelectUndecoded;
 
@@ -60,7 +60,7 @@ pub struct Cursor<S, K = ValueTuple> {
     phantom: PhantomData<(S, K)>,
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+1]
+// [spec:pgorm:sem:exec.cursor.keyset+2]
 fn identity_arity(columns: &Identity) -> usize {
     match columns {
         Identity::Unary(..) => 1,
@@ -70,7 +70,7 @@ fn identity_arity(columns: &Identity) -> usize {
     }
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+1]
+// [spec:pgorm:sem:exec.cursor.keyset+2]
 fn value_tuple_arity(values: &ValueTuple) -> usize {
     match values {
         ValueTuple::One(..) => 1,
@@ -118,8 +118,8 @@ impl<S, K> Cursor<S, K> {
         self
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+1]
-    fn apply_filters(&mut self) -> Result<(), DbErr> {
+    // [spec:pgorm:sem:exec.cursor.keyset+2]
+    fn apply_filters(&mut self) -> Result<(), Error> {
         if let Some(values) = self.after.clone() {
             let condition = self.apply_filter(values, |c, v| {
                 let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
@@ -139,8 +139,8 @@ impl<S, K> Cursor<S, K> {
         Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+1]
-    fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, DbErr>
+    // [spec:pgorm:sem:exec.cursor.keyset+2]
+    fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, Error>
     where
         F: Fn(&DynIden, Value) -> SimpleExpr,
     {
@@ -365,7 +365,7 @@ where
 {
     /// Fetch the paginated result
     // [spec:pgorm:sem:exec.cursor.order]
-    pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, DbErr>
+    pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
@@ -463,7 +463,7 @@ where
     /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
     /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
     /// ```
-    // [spec:pgorm:sem:exec.cursor.keyset+1/test]
+    // [spec:pgorm:sem:exec.cursor.keyset+2/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoIdentity,
@@ -526,7 +526,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2]
+// [spec:pgorm:sem:query.build.modifiers+3]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -543,7 +543,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+2]
+// [spec:pgorm:sem:query.build.modifiers+3]
 impl<E, F> SelectTwoProjected<E, F>
 where
     E: EntityTrait,

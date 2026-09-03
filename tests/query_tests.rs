@@ -4,11 +4,11 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::entity::*;
-pub use pgorm::{ActiveValue::Set, ConnectionTrait, DbErr, QueryFilter, QueryOrder, QuerySelect};
+pub use pgorm::{ActiveValue::Set, ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect};
 
 // Run the test locally:
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_tests
-// [spec:pgorm:sem:exec.crud.select/test]    `one` fails with RecordNotFound on
+// [spec:pgorm:sem:exec.crud.select+1/test]    `one` fails with RecordNotFound on
 // zero rows where `one_opt` reports `None` — pgorm's deliberate difference
 #[pgorm_macros::test]
 pub async fn find_one_with_no_result() {
@@ -21,7 +21,7 @@ pub async fn find_one_with_no_result() {
 
     assert!(matches!(
         Bakery::find().one(&db).await,
-        Err(DbErr::RecordNotFound)
+        Err(Error::RecordNotFound)
     ));
 
     drop(db);
@@ -51,7 +51,7 @@ pub async fn find_one_with_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select/test]    the same split on a filtered select
+// [spec:pgorm:sem:exec.crud.select+1/test]    the same split on a filtered select
 #[pgorm_macros::test]
 pub async fn find_by_id_with_no_result() {
     let ctx = TestContext::new("find_by_id_with_no_result").await;
@@ -63,7 +63,7 @@ pub async fn find_by_id_with_no_result() {
 
     assert!(matches!(
         Bakery::find_by_id(999).one(&db).await,
-        Err(DbErr::RecordNotFound)
+        Err(Error::RecordNotFound)
     ));
 
     drop(db);
@@ -106,7 +106,7 @@ pub async fn find_all_with_no_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select/test]    `all` decodes every returned row
+// [spec:pgorm:sem:exec.crud.select+1/test]    `all` decodes every returned row
 #[pgorm_macros::test]
 pub async fn find_all_with_result() {
     let ctx = TestContext::new("find_all_with_result").await;
@@ -271,7 +271,7 @@ pub async fn char_literal_round_trips_through_server() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select/test]    `all` aborts on the first decode
+// [spec:pgorm:sem:exec.crud.select+1/test]    `all` aborts on the first decode
 // error instead of yielding a partial result set
 #[pgorm_macros::test]
 pub async fn select_only_exclude_option_fields() {
@@ -310,7 +310,7 @@ pub async fn select_only_exclude_option_fields() {
         .await
         .expect_err("an absent `notes` column must not decode as None");
 
-    assert!(matches!(err, DbErr::Postgres(_)), "unexpected error: {err}");
+    assert!(matches!(err, Error::Postgres(_)), "unexpected error: {err}");
 
     let customers = Customer::find()
         .select_only()
@@ -333,12 +333,12 @@ pub async fn select_only_exclude_option_fields() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select/test]    `SelectorRaw::one` / `one_opt`
+// [spec:pgorm:sem:exec.crud.select+1/test]    `SelectorRaw::one` / `one_opt`
 // execute the statement exactly as written, with no `LIMIT` injected
 // [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` and
 // `SelectorRaw::into_model` re-targeting the decoded type
 #[pgorm_macros::test]
-pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
+pub async fn raw_selector_one_semantics() -> Result<(), Error> {
     use pgorm::FromQueryResult;
     use pgorm_query::{Value, Values};
 
@@ -367,7 +367,7 @@ pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
     };
     assert!(matches!(
         missing().one(&db).await,
-        Err(DbErr::RecordNotFound)
+        Err(Error::RecordNotFound)
     ));
     assert_eq!(missing().one_opt(&db).await?, None);
 
@@ -378,7 +378,7 @@ pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
         .one(&db)
         .await;
     match unlimited {
-        Err(DbErr::Postgres(err)) => assert_eq!(
+        Err(Error::Postgres(err)) => assert_eq!(
             err.to_string(),
             "query returned an unexpected number of rows"
         ),
@@ -438,7 +438,7 @@ pub async fn raw_selector_one_semantics() -> Result<(), DbErr> {
 // LIMIT, run against a live server
 // [spec:pgorm:req:sql.render.window+3/test]
 #[pgorm_macros::test]
-pub async fn named_window_over_a_real_query() -> Result<(), DbErr> {
+pub async fn named_window_over_a_real_query() -> Result<(), Error> {
     use pgorm::pgorm_query::{Alias, Expr, Func, Order, Query, QueryBuilder, WindowStatement};
 
     let ctx = TestContext::new("named_window_over_a_real_query").await;

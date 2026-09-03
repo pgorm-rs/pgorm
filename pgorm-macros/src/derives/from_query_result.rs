@@ -65,7 +65,7 @@ pub fn expand_derive_from_query_result(
     Ok(quote!(
         #[automatically_derived]
         impl #impl_generics pgorm::FromQueryResult for #ident #ty_generics #where_clause {
-            fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::DbErr> {
+            fn from_query_result(row: &pgorm::QueryResult, pre: &str) -> std::result::Result<Self, pgorm::Error> {
                 Ok(Self {
                     #(#field)*
                 })

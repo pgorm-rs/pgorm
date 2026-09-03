@@ -13,7 +13,7 @@ use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.render.cast-param-type/test]
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = common::TestContext::new("bits_tests_bindtypes").await;
     create_tables(&ctx.db).await?;
 
@@ -26,7 +26,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), Error> {
     let bits = bits::Model {
         id: 1,
         bit0: 0,

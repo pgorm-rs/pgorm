@@ -13,7 +13,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("collection_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -32,7 +32,7 @@ async fn main() -> Result<(), DbErr> {
 // uuid format wrapper decoded element-wise from Postgres arrays
 // [spec:pgorm:def:exec.cursor.binding+2/test]    `Value::Array` binding by
 // recursively wrapping its elements, with a `None` array emitted as SQL NULL
-pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), Error> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
@@ -130,7 +130,7 @@ pub async fn insert_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn update_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn update_collection(db: &DatabaseConnection) -> Result<(), Error> {
     use collection::*;
 
     let uuid = Uuid::new_v4();
@@ -166,7 +166,7 @@ pub async fn update_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn select_collection(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn select_collection(db: &DatabaseConnection) -> Result<(), Error> {
     use collection::*;
 
     #[derive(DerivePartialModel, FromQueryResult, Debug, PartialEq)]

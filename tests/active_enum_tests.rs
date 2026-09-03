@@ -15,7 +15,7 @@ use pgorm::{
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("active_enum_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -32,7 +32,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
     use active_enum::*;
 
     let model = Model {
@@ -193,7 +193,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), Error> {
     use active_enum_child::*;
 
     active_enum::ActiveModel {
@@ -271,7 +271,7 @@ pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), DbE
     Ok(())
 }
 
-pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), Error> {
     use categories::*;
 
     let model = Model {
@@ -333,7 +333,7 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(
         active_enum::Model {
             id: 2,
@@ -459,7 +459,7 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), DbE
     Ok(())
 }
 
-pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(
         active_enum::Model {
             id: 2,

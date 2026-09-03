@@ -14,7 +14,7 @@ use pgorm::{
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("enum_primary_key_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -27,7 +27,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
     use teas::*;
 
     let model = Model {

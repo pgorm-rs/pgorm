@@ -1,8 +1,8 @@
 use crate::{SelectGetableValue, SelectorRaw, error::*};
-use std::error::Error;
+use std::error::Error as _;
 
 /// Defines the result of a query operation on a Model
-// [spec:pgorm:def:exec.decode]
+// [spec:pgorm:def:exec.decode+1]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct QueryResult {
@@ -10,7 +10,7 @@ pub struct QueryResult {
 }
 
 /// An interface to get a value from the query result
-// [spec:pgorm:def:exec.decode]
+// [spec:pgorm:def:exec.decode+1]
 pub trait TryGetable: Sized {
     /// Get a value from the query result with an RowIndex
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -37,31 +37,31 @@ pub trait TryGetable: Sized {
 /// An error from trying to get a row from a Model
 #[derive(Debug)]
 pub enum TryGetError {
-    /// A database error was encountered as defined in [crate::DbErr]
-    DbErr(DbErr),
+    /// A database error was encountered as defined in [crate::Error]
+    Db(Error),
     /// A null value was encountered
     Null(String),
 }
 
-// [spec:pgorm:sem:exec.decode.null]
+// [spec:pgorm:sem:exec.decode.null+1]
 impl TryGetError {
     fn postgres(value: tokio_postgres::Error) -> Self {
         let Some(source) = value.source() else {
-            return TryGetError::DbErr(DbErr::Postgres(value));
+            return TryGetError::Db(Error::Postgres(value));
         };
 
         if let Some(WasNull) = source.downcast_ref() {
             return TryGetError::Null(format!("{}", value));
         }
 
-        TryGetError::DbErr(DbErr::Postgres(value))
+        TryGetError::Db(Error::Postgres(value))
     }
 }
 
-impl From<TryGetError> for DbErr {
-    fn from(e: TryGetError) -> DbErr {
+impl From<TryGetError> for Error {
+    fn from(e: TryGetError) -> Error {
         match e {
-            TryGetError::DbErr(e) => e,
+            TryGetError::Db(e) => e,
             TryGetError::Null(s) => {
                 type_err(format!("A null value was encountered while decoding {s}"))
             }
@@ -69,9 +69,9 @@ impl From<TryGetError> for DbErr {
     }
 }
 
-impl From<DbErr> for TryGetError {
-    fn from(e: DbErr) -> TryGetError {
-        Self::DbErr(e)
+impl From<Error> for TryGetError {
+    fn from(e: Error) -> TryGetError {
+        Self::Db(e)
     }
 }
 
@@ -79,7 +79,7 @@ impl From<DbErr> for TryGetError {
 
 impl QueryResult {
     /// Get a value from the query result with an RowIndex
-    pub fn try_get_by<T, I>(&self, index: I) -> Result<T, DbErr>
+    pub fn try_get_by<T, I>(&self, index: I) -> Result<T, Error>
     where
         T: TryGetable,
         I: RowIndex + std::fmt::Display,
@@ -88,7 +88,7 @@ impl QueryResult {
     }
 
     /// Get a value from the query result with prefixed column name
-    pub fn try_get<T>(&self, pre: &str, col: &str) -> Result<T, DbErr>
+    pub fn try_get<T>(&self, pre: &str, col: &str) -> Result<T, Error>
     where
         T: TryGetable,
     {
@@ -96,7 +96,7 @@ impl QueryResult {
     }
 
     /// Get a value from the query result based on the order in the select expressions
-    pub fn try_get_by_index<T>(&self, idx: usize) -> Result<T, DbErr>
+    pub fn try_get_by_index<T>(&self, idx: usize) -> Result<T, Error>
     where
         T: TryGetable,
     {
@@ -104,7 +104,7 @@ impl QueryResult {
     }
 
     /// Get a tuple value from the query result with prefixed column name
-    pub fn try_get_many<T>(&self, pre: &str, cols: &[String]) -> Result<T, DbErr>
+    pub fn try_get_many<T>(&self, pre: &str, cols: &[String]) -> Result<T, Error>
     where
         T: TryGetableMany,
     {
@@ -112,7 +112,7 @@ impl QueryResult {
     }
 
     /// Get a tuple value from the query result based on the order in the select expressions
-    pub fn try_get_many_by_index<T>(&self) -> Result<T, DbErr>
+    pub fn try_get_many_by_index<T>(&self) -> Result<T, Error>
     where
         T: TryGetableMany,
     {
@@ -131,7 +131,7 @@ impl QueryResult {
 
 // TryGetable //
 
-// [spec:pgorm:sem:exec.decode.null]
+// [spec:pgorm:sem:exec.decode.null+1]
 impl<T: TryGetable> TryGetable for Option<T> {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
         res: &QueryResult,
@@ -275,7 +275,10 @@ struct InetSql(IpNetwork);
 
 // [spec:pgorm:def:exec.decode.types+1]
 impl<'a> FromSql<'a> for InetSql {
-    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         let inet = postgres_protocol::types::inet_from_sql(raw)?;
         Ok(Self(IpNetwork::new(inet.addr(), inet.netmask())?))
     }
@@ -292,7 +295,10 @@ struct MacAddrSql(MacAddress);
 
 // [spec:pgorm:def:exec.decode.types+1]
 impl<'a> FromSql<'a> for MacAddrSql {
-    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         let bytes = postgres_protocol::types::macaddr_from_sql(raw)?;
         Ok(Self(MacAddress::new(bytes)))
     }
@@ -477,7 +483,7 @@ pub trait TryGetableMany: Sized {
     /// # use pgorm::{error::*, query::*, DatabasePool, DeriveIden, EnumIter, TryGetableMany};
     /// # use pgorm::pgorm_query::Values;
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(EnumIter, DeriveIden)]
     /// enum ResultCol {
     ///     Name,
@@ -594,7 +600,7 @@ fn try_get_many_with_slice_len_of(len: usize, cols: &[String]) -> Result<(), Try
 /// A blanket impl is provided for `TryGetableFromJson`, while the impl for `ActiveEnum`
 /// is provided by the `DeriveActiveEnum` macro. So as an end user you won't normally
 /// touch this trait.
-// [spec:pgorm:def:exec.decode.json]
+// [spec:pgorm:def:exec.decode.json+1]
 pub trait TryGetableArray: Sized {
     /// Just a delegate
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -618,7 +624,7 @@ where
 // TryGetableFromJson //
 
 /// An interface to get a JSON from the query result
-// [spec:pgorm:def:exec.decode.json]
+// [spec:pgorm:def:exec.decode.json+1]
 #[cfg(feature = "with-json")]
 pub trait TryGetableFromJson: Sized
 where
@@ -644,7 +650,7 @@ where
                 }
                 Ok(res)
             }
-            _ => Err(TryGetError::DbErr(DbErr::Json(
+            _ => Err(TryGetError::Db(Error::Json(
                 "Value is not an Array".to_owned(),
             ))),
         }
@@ -679,17 +685,17 @@ where
 
 // TryFromU64 //
 /// Try to convert a type to a u64
-// [spec:pgorm:def:exec.decode.from-u64+1]
+// [spec:pgorm:def:exec.decode.from-u64+2]
 pub trait TryFromU64: Sized {
     /// The method to convert the type to a u64
-    fn try_from_u64(n: u64) -> Result<Self, DbErr>;
+    fn try_from_u64(n: u64) -> Result<Self, Error>;
 }
 
 macro_rules! try_from_u64_err {
     ( $type: ty ) => {
         impl TryFromU64 for $type {
-            fn try_from_u64(_: u64) -> Result<Self, DbErr> {
-                Err(DbErr::ConvertFromU64(stringify!($type)))
+            fn try_from_u64(_: u64) -> Result<Self, Error> {
+                Err(Error::ConvertFromU64(stringify!($type)))
             }
         }
     };
@@ -699,8 +705,8 @@ macro_rules! try_from_u64_err {
         where
             $( $gen_type: TryFromU64, )*
         {
-            fn try_from_u64(_: u64) -> Result<Self, DbErr> {
-                Err(DbErr::ConvertFromU64(stringify!($($gen_type,)*)))
+            fn try_from_u64(_: u64) -> Result<Self, Error> {
+                Err(Error::ConvertFromU64(stringify!($($gen_type,)*)))
             }
         }
     };
@@ -726,9 +732,9 @@ mod try_from_u64_err {
 macro_rules! try_from_u64_numeric {
     ( $type: ty ) => {
         impl TryFromU64 for $type {
-            fn try_from_u64(n: u64) -> Result<Self, DbErr> {
+            fn try_from_u64(n: u64) -> Result<Self, Error> {
                 use std::convert::TryInto;
-                n.try_into().map_err(|e| DbErr::TryIntoErr {
+                n.try_into().map_err(|e| Error::Conversion {
                     from: stringify!(u64),
                     into: stringify!($type),
                     source: Box::new(e),
@@ -750,7 +756,7 @@ try_from_u64_numeric!(u64);
 macro_rules! try_from_u64_string {
     ( $type: ty ) => {
         impl TryFromU64 for $type {
-            fn try_from_u64(n: u64) -> Result<Self, DbErr> {
+            fn try_from_u64(n: u64) -> Result<Self, Error> {
                 Ok(n.to_string())
             }
         }
@@ -797,19 +803,19 @@ mod tests {
 
     #[test]
     fn from_try_get_error() {
-        // TryGetError::DbErr
-        let try_get_error = TryGetError::DbErr(DbErr::Query(RuntimeErr::Internal(
+        // TryGetError::Db
+        let try_get_error = TryGetError::Db(Error::Query(RuntimeError::Internal(
             "expected error message".to_owned(),
         )));
         assert_eq!(
-            DbErr::from(try_get_error),
-            DbErr::Query(RuntimeErr::Internal("expected error message".to_owned()))
+            Error::from(try_get_error),
+            Error::Query(RuntimeError::Internal("expected error message".to_owned()))
         );
 
         // TryGetError::Null
         let try_get_error = TryGetError::Null("column".to_owned());
         let expected = "A null value was encountered while decoding column".to_owned();
-        assert_eq!(DbErr::from(try_get_error), DbErr::Type(expected));
+        assert_eq!(Error::from(try_get_error), Error::Type(expected));
     }
 
     // [spec:pgorm:def:exec.decode.types+1/test]

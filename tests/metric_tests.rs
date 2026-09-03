@@ -6,7 +6,7 @@ pub use common::{TestContext, setup::*};
 
 use async_trait::async_trait;
 use pgorm::{
-    ConnectionTrait, DbErr, SqlText,
+    ConnectionTrait, Error, SqlText,
     metric::{
         InstrumentedConnection, InstrumentedPool, InstrumentedTransaction, LoggingMetrics,
         MetricsCollector, NoOpMetrics, QueryContext,
@@ -102,7 +102,7 @@ impl MetricsCollector for RecordingMetrics {
         &self,
         query: QueryContext<'_>,
         _duration: Duration,
-        _error: &DbErr,
+        _error: &Error,
     ) {
         self.push(format!("query_error:{}", query.operation()));
         self.record(query);
@@ -112,7 +112,7 @@ impl MetricsCollector for RecordingMetrics {
         self.push("connection_acquired".to_owned());
     }
 
-    async fn record_connection_error(&self, _duration: Duration, _error: &DbErr) {
+    async fn record_connection_error(&self, _duration: Duration, _error: &Error) {
         self.push("connection_error".to_owned());
     }
 
@@ -131,7 +131,7 @@ impl MetricsCollector for RecordingMetrics {
 
 // [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + explicit rollback
 #[pgorm_macros::test]
-pub async fn instrumented_begin_and_rollback() -> Result<(), DbErr> {
+pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_rollback_metrictx").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -169,7 +169,7 @@ pub async fn instrumented_begin_and_rollback() -> Result<(), DbErr> {
 
 // [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + commit
 #[pgorm_macros::test]
-pub async fn instrumented_begin_and_commit() -> Result<(), DbErr> {
+pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_commit_metrictx").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -195,9 +195,9 @@ pub async fn instrumented_begin_and_commit() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:metric.layer.delegate+3/test]    query_opt's Some/None row counts
+// [spec:pgorm:req:metric.layer.delegate+4/test]    query_opt's Some/None row counts
 #[pgorm_macros::test]
-pub async fn query_opt_reports_one_row_or_zero() -> Result<(), DbErr> {
+pub async fn query_opt_reports_one_row_or_zero() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_query_opt_metricopt").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -245,9 +245,9 @@ pub async fn query_opt_reports_one_row_or_zero() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:metric.layer.delegate+3/test]    batch_execute reports a rowless success
+// [spec:pgorm:req:metric.layer.delegate+4/test]    batch_execute reports a rowless success
 #[pgorm_macros::test]
-pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
+pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_batch_execute_txbatch").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -278,7 +278,7 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
         .batch_execute("CREATE TABLE widget (id int primary key);")
         .await
         .expect_err("the table already exists");
-    assert!(matches!(error, DbErr::Postgres(_)));
+    assert!(matches!(error, Error::Postgres(_)));
     assert_eq!(metrics.count("query_error:batch_execute"), 1);
 
     drop(conn);
@@ -289,7 +289,7 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), DbErr> {
 
 // [spec:pgorm:sem:metric.layer.tx+2/test]    dropping an instrumented transaction records nothing
 #[pgorm_macros::test]
-pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), DbErr> {
+pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_drop_metrictx").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -352,7 +352,7 @@ where
 /// Drives all seven hooks of a collector, in declaration order.
 async fn drive_all_hooks<M: MetricsCollector>(metrics: &M) {
     let elapsed = Duration::from_millis(1);
-    let error = DbErr::Custom("boom".to_owned());
+    let error = Error::Custom("boom".to_owned());
     let query = QueryContext::new("execute", Some("SELECT 1"));
 
     metrics.record_query_success(query, elapsed, Some(3)).await;
@@ -447,7 +447,7 @@ pub async fn logging_metrics_emits_expected_levels() {
 
 // [spec:pgorm:def:metric.layer+1/test]    three wrappers, their inner()/metrics() accessors, and the pool's tag()/status()
 #[pgorm_macros::test]
-pub async fn wrappers_expose_inner_and_metrics() -> Result<(), DbErr> {
+pub async fn wrappers_expose_inner_and_metrics() -> Result<(), Error> {
     fn assert_collector_bounds<M: MetricsCollector>() {
         fn assert_bounds<T: Clone + Send + Sync + 'static>() {}
         assert_bounds::<M>();
@@ -530,7 +530,7 @@ pub async fn sql_text_answers_with_the_statement_text() {
 
 // [spec:pgorm:req:metric.fingerprint/test]    the hooks see the statement they report on
 #[pgorm_macros::test]
-pub async fn query_context_carries_statement_text() -> Result<(), DbErr> {
+pub async fn query_context_carries_statement_text() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_context_metricctx").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
@@ -544,7 +544,7 @@ pub async fn query_context_carries_statement_text() -> Result<(), DbErr> {
         .query_one("SELECT id FROM widget WHERE id = $1", &[&404i32])
         .await
         .expect_err("no row matches");
-    assert!(matches!(failed, DbErr::Postgres(_)));
+    assert!(matches!(failed, Error::Postgres(_)));
 
     let recorded: Vec<(String, Option<String>)> = metrics
         .queries()
@@ -684,7 +684,7 @@ pub async fn unparseable_sql_has_no_fingerprint() {
 // [spec:pgorm:req:metric.fingerprint/test]    fingerprints reach the collector through the wrappers
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
-pub async fn instrumented_wrapper_reports_fingerprints() -> Result<(), DbErr> {
+pub async fn instrumented_wrapper_reports_fingerprints() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_fingerprint_metricfp").await;
     let metrics = RecordingMetrics::default();
     let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());

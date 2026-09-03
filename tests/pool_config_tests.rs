@@ -21,7 +21,7 @@ fn maintenance_config() -> pgorm::Config {
     common::setup::config(&database_url(), "postgres")
 }
 
-async fn session_setting<C>(db: &C, name: &str) -> Result<String, DbErr>
+async fn session_setting<C>(db: &C, name: &str) -> Result<String, Error>
 where
     C: ConnectionTrait,
 {
@@ -31,9 +31,9 @@ where
         .get(0))
 }
 
-// [spec:pgorm:req:conn.pool+1/test]    connect() builds an untagged, default-sized, Fast-recycling pool
+// [spec:pgorm:req:conn.pool+2/test]    connect() builds an untagged, default-sized, Fast-recycling pool
 #[pgorm_macros::test]
-pub async fn connect_builds_default_fast_pool() -> Result<(), DbErr> {
+pub async fn connect_builds_default_fast_pool() -> Result<(), Error> {
     let pool = pgorm::connect(maintenance_config());
 
     let status = pool.status();
@@ -68,9 +68,9 @@ pub async fn connect_builds_default_fast_pool() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool+1/test]    connect_with_builder applies the closure before the pool is built
+// [spec:pgorm:req:conn.pool+2/test]    connect_with_builder applies the closure before the pool is built
 #[pgorm_macros::test]
-pub async fn connect_with_builder_applies_closure() -> Result<(), DbErr> {
+pub async fn connect_with_builder_applies_closure() -> Result<(), Error> {
     let pool = pgorm::connect_with_builder(maintenance_config(), |builder| builder.max_size(2))?;
 
     assert_eq!(pool.status().max_size, 2);
@@ -97,16 +97,16 @@ pub async fn connect_with_builder_applies_closure() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool+1/test]    a builder the caller cannot build yields DbErr, not a panic
+// [spec:pgorm:req:conn.pool+2/test]    a builder the caller cannot build yields Error, not a panic
 #[pgorm_macros::test]
-pub async fn connect_with_builder_errs_on_build_failure() -> Result<(), DbErr> {
+pub async fn connect_with_builder_errs_on_build_failure() -> Result<(), Error> {
     // deadpool refuses to build a pool with timeouts but no runtime.
     let err = pgorm::connect_with_builder(maintenance_config(), |builder| {
         builder.wait_timeout(Some(Duration::from_secs(1)))
     })
     .expect_err("a wait timeout without a runtime cannot build");
 
-    assert!(matches!(err, DbErr::Custom(_)), "{err:?}");
+    assert!(matches!(err, Error::Custom(_)), "{err:?}");
     assert!(
         err.to_string().contains("Timeouts require a runtime"),
         "the builder's own message is carried through, got {err}"
@@ -125,9 +125,9 @@ fn pool_for<'a>(
         .map(|(_, pool)| pool)
 }
 
-// [spec:pgorm:sem:conn.pool.multi+1/test]    one pool per builder entry, tagged and keyed by its map key
+// [spec:pgorm:sem:conn.pool.multi+2/test]    one pool per builder entry, tagged and keyed by its map key
 #[pgorm_macros::test]
-pub async fn connect_multi_builds_tagged_pools() -> Result<(), DbErr> {
+pub async fn connect_multi_builds_tagged_pools() -> Result<(), Error> {
     let mut builders: BTreeMap<String, Box<dyn Fn(PoolBuilder) -> PoolBuilder>> = BTreeMap::new();
     builders.insert("reader".to_owned(), Box::new(|builder| builder.max_size(2)));
     builders.insert("writer".to_owned(), Box::new(|builder| builder.max_size(3)));
@@ -183,9 +183,9 @@ pub async fn connect_multi_builds_tagged_pools() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.pool.multi+1/test]    one unbuildable entry fails the whole construction
+// [spec:pgorm:sem:conn.pool.multi+2/test]    one unbuildable entry fails the whole construction
 #[pgorm_macros::test]
-pub async fn connect_multi_errs_on_build_failure() -> Result<(), DbErr> {
+pub async fn connect_multi_errs_on_build_failure() -> Result<(), Error> {
     let mut builders: BTreeMap<String, Box<dyn Fn(PoolBuilder) -> PoolBuilder>> = BTreeMap::new();
     builders.insert("reader".to_owned(), Box::new(|builder| builder.max_size(2)));
     builders.insert(
@@ -196,7 +196,7 @@ pub async fn connect_multi_errs_on_build_failure() -> Result<(), DbErr> {
     let err = pgorm::connect_multi_with_builder(maintenance_config(), builders)
         .expect_err("one unbuildable entry sinks the whole map");
 
-    assert!(matches!(err, DbErr::Custom(_)), "{err:?}");
+    assert!(matches!(err, Error::Custom(_)), "{err:?}");
 
     Ok(())
 }

@@ -10,7 +10,7 @@ use pgorm::{
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn cursor_tests() -> Result<(), DbErr> {
+async fn cursor_tests() -> Result<(), Error> {
     let ctx = TestContext::new("cursor_tests").await;
     create_tables(&ctx.db).await?;
     bakery_chain_schema::create_tables(&ctx.db).await?;
@@ -27,7 +27,7 @@ async fn cursor_tests() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     for _ in 0..10 {
@@ -59,11 +59,11 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr>
 
 // [spec:pgorm:def:exec.cursor+2/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
-// [spec:pgorm:sem:exec.cursor.keyset+1/test]    `before` / `after` comparison
+// [spec:pgorm:sem:exec.cursor.keyset+2/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
 // [spec:pgorm:sem:exec.cursor.window+1/test]    `first` and `last` replacing
 // each other, and `last` reversing the fetched buffer back into logical order
-pub async fn cursor_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn cursor_pagination(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     // Before 5, i.e. id < 5
@@ -537,7 +537,7 @@ fn cakebaker(cake: char, baker: char) -> CakeBakerlite {
     }
 }
 
-pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     let mut bakeries: Vec<bakery::ActiveModel> = vec![];
     // bakeries named from 1 to 10
     for i in 1..=10 {
@@ -600,7 +600,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), DbErr> {
 // [spec:pgorm:sem:exec.cursor.order/test]    a joined cursor's automatic
 // secondary order on the other entity's primary key, giving the deterministic
 // tiebreak the row order below depends on
-pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Error> {
     use common::bakery_chain::*;
 
     assert_eq!(
@@ -955,7 +955,7 @@ mod net_cursor {
 // bound by hand through `postgres_protocol`, and the deliberately permissive
 // `accepts`
 #[pgorm_macros::test]
-async fn cursor_over_network_types() -> Result<(), DbErr> {
+async fn cursor_over_network_types() -> Result<(), Error> {
     use ipnetwork::IpNetwork;
     use mac_address::MacAddress;
     use net_cursor::{Column, Entity, Model};
@@ -1115,7 +1115,7 @@ const COMPOSITE_ROWS: [(i32, i32); 8] = [
     (3, 2),
 ];
 
-async fn seed_composite(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn seed_composite(db: &DatabaseConnection) -> Result<(), Error> {
     use cursor_composite::*;
 
     let schema = pgorm::Schema::new();
@@ -1143,10 +1143,10 @@ fn ids(rows: &[cursor_composite::Model]) -> Vec<i32> {
     rows.iter().map(|row| row.id).collect()
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+1/test]    the row-value emulation of a
+// [spec:pgorm:sem:exec.cursor.keyset+2/test]    the row-value emulation of a
 // composite boundary, in each arity, in both sort directions
 #[pgorm_macros::test]
-async fn cursor_composite_keyset() -> Result<(), DbErr> {
+async fn cursor_composite_keyset() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
 
     let ctx = TestContext::new("cursor_tests_composite_keyset").await;
@@ -1235,12 +1235,12 @@ async fn cursor_composite_keyset() -> Result<(), DbErr> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+1/test]    a boundary whose arity does not
-// match a runtime-built `Identity` is a `DbErr`, not a panic; the typed
+// [spec:pgorm:sem:exec.cursor.keyset+2/test]    a boundary whose arity does not
+// match a runtime-built `Identity` is an `Error`, not a panic; the typed
 // counterpart of the same mismatch does not compile at all, which the
 // `compile_fail` doctests on `Select::cursor_by` prove
 #[pgorm_macros::test]
-async fn cursor_dynamic_boundary_arity_error() -> Result<(), DbErr> {
+async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
     use pgorm::IntoIdentity;
 
@@ -1293,7 +1293,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), DbErr> {
 // ORDER BY, applies the order columns in declared order, then the unary
 // secondary entries, all in the single resolved direction
 #[pgorm_macros::test]
-async fn cursor_order_composition() -> Result<(), DbErr> {
+async fn cursor_order_composition() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
     use pgorm::{Identity, IntoIdentity, QueryOrder};
     use pgorm_query::{Alias, IntoIden};
@@ -1341,7 +1341,7 @@ async fn cursor_order_composition() -> Result<(), DbErr> {
     )]);
     assert!(matches!(
         bad_unary.first(8).all(&db).await,
-        Err(DbErr::Postgres(_))
+        Err(Error::Postgres(_))
     ));
 
     // ... whereas the same columns wrapped in a composite identity are dropped

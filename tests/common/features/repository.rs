@@ -17,7 +17,7 @@ pub enum Relation {}
 
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
-    async fn before_save<C>(self, db: &C, _: bool) -> Result<Self, DbErr>
+    async fn before_save<C>(self, db: &C, _: bool) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -26,7 +26,7 @@ impl ActiveModelBehavior for ActiveModel {
         Ok(self)
     }
 
-    async fn after_save<C>(model: Model, db: &C, _: bool) -> Result<Model, DbErr>
+    async fn after_save<C>(model: Model, db: &C, _: bool) -> Result<Model, Error>
     where
         C: ConnectionTrait,
     {
@@ -34,7 +34,7 @@ impl ActiveModelBehavior for ActiveModel {
         Ok(model)
     }
 
-    async fn before_delete<C>(self, db: &C) -> Result<Self, DbErr>
+    async fn before_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -43,7 +43,7 @@ impl ActiveModelBehavior for ActiveModel {
         Ok(self)
     }
 
-    async fn after_delete<C>(self, db: &C) -> Result<Self, DbErr>
+    async fn after_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
     {
@@ -53,7 +53,7 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-async fn insert_edit_log<T, M, C>(action: T, model: &M, db: &C) -> Result<(), DbErr>
+async fn insert_edit_log<T, M, C>(action: T, model: &M, db: &C) -> Result<(), Error>
 where
     T: Into<String>,
     M: Serialize,

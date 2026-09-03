@@ -205,7 +205,7 @@ pub(crate) const RUST_SPECIAL_KEYWORDS: [&str; 3] = ["crate", "Self", "self"];
 mod tests {
     use super::*;
 
-    // [spec:pgorm:sem:macros.derive.active-enum.expansion/test]
+    // [spec:pgorm:sem:macros.derive.active-enum.expansion+1/test]
     #[test]
     fn test_non_uax31_escape() {
         // Test empty string

@@ -9,11 +9,11 @@ use pgorm_migration::prelude::*;
 /// A fresh database has nothing applied; `up` installs the tracking table and
 /// runs every pending migration in order.
 // [spec:pgorm:def:migration.runner/test]
-// [spec:pgorm:sem:migration.up/test]
-// [spec:pgorm:sem:migration.name+1/test]    asserted names are file stems
+// [spec:pgorm:sem:migration.up+1/test]
+// [spec:pgorm:sem:migration.name+2/test]    asserted names are file stems
 // [spec:pgorm:def:macros.derive/test]    `DeriveMigrationName` names each migration after the file stem
 #[tokio::test]
-async fn fresh_install_applies_all_pending() -> Result<(), DbErr> {
+async fn fresh_install_applies_all_pending() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_fresh").await;
     let db = &ctx.db;
 
@@ -54,9 +54,9 @@ async fn fresh_install_applies_all_pending() -> Result<(), DbErr> {
 
 /// Re-running `up` on an already-migrated database is a no-op: no migration is
 /// re-applied and no extra ledger row is written.
-// [spec:pgorm:sem:migration.up/test]
+// [spec:pgorm:sem:migration.up+1/test]
 #[tokio::test]
-async fn repeated_up_is_idempotent() -> Result<(), DbErr> {
+async fn repeated_up_is_idempotent() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_idempotent").await;
     let db = &ctx.db;
 
@@ -81,9 +81,9 @@ async fn repeated_up_is_idempotent() -> Result<(), DbErr> {
 /// `steps` bounds how many pending migrations are applied, and `status` reports
 /// the split without altering it.
 // [spec:pgorm:def:migration.runner/test]
-// [spec:pgorm:sem:migration.up/test]
+// [spec:pgorm:sem:migration.up+1/test]
 #[tokio::test]
-async fn stepped_up_reports_status() -> Result<(), DbErr> {
+async fn stepped_up_reports_status() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_status").await;
     let db = &ctx.db;
 
@@ -118,7 +118,7 @@ async fn stepped_up_reports_status() -> Result<(), DbErr> {
 /// `migration_table_name` is honoured everywhere, including by `install`.
 // [spec:pgorm:def:migration.runner/test]
 #[tokio::test]
-async fn migration_table_name_is_overridable() -> Result<(), DbErr> {
+async fn migration_table_name_is_overridable() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_table_name").await;
     let db = &ctx.db;
 
@@ -135,17 +135,17 @@ async fn migration_table_name_is_overridable() -> Result<(), DbErr> {
 
 /// The whole `up` run shares one transaction, so a failing migration rolls back
 /// every migration in the run along with the ledger rows.
-// [spec:pgorm:sem:migration.up/test]
+// [spec:pgorm:sem:migration.up+1/test]
 // [spec:pgorm:req:migration.up-only/test]    no rollback path other than the transaction
 #[tokio::test]
-async fn failed_migration_rolls_back_the_run() -> Result<(), DbErr> {
+async fn failed_migration_rolls_back_the_run() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_abort").await;
     let db = &ctx.db;
 
     let err = common::migrator::abort::Migrator::up(db.clone(), None)
         .await
         .expect_err("the final migration must fail");
-    assert!(matches!(err, DbErr::Custom(ref msg) if msg == "Abort migration"));
+    assert!(matches!(err, Error::Custom(ref msg) if msg == "Abort migration"));
 
     assert!(!has_table(db, "cake").await?);
     assert!(!has_table(db, "fruit").await?);

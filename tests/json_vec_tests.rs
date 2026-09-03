@@ -7,7 +7,7 @@ use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("json_vec_tests").await;
     create_tables(&ctx.db).await?;
 
@@ -22,7 +22,7 @@ async fn main() -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_vec(db: &DatabaseConnection) -> Result<(), Error> {
     let json_vec = json_vec::Model {
         id: 1,
         str_vec: Some(json_vec::StringVec(vec![
@@ -46,7 +46,7 @@ pub async fn insert_json_vec(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-pub async fn insert_json_string_vec_derive(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_string_vec_derive(db: &DatabaseConnection) -> Result<(), Error> {
     let json_vec = json_vec_derive::json_string_vec::Model {
         id: 1,
         str_vec: Some(json_vec_derive::json_string_vec::StringVec(vec![
@@ -75,9 +75,9 @@ pub async fn insert_json_string_vec_derive(db: &DatabaseConnection) -> Result<()
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.json/test]    `Vec<T>` of a `TryGetableFromJson`
+// [spec:pgorm:def:exec.decode.json+1/test]    `Vec<T>` of a `TryGetableFromJson`
 // type decoded through `TryGetableArray` / `from_json_vec`
-pub async fn insert_json_struct_vec_derive(db: &DatabaseConnection) -> Result<(), DbErr> {
+pub async fn insert_json_struct_vec_derive(db: &DatabaseConnection) -> Result<(), Error> {
     let json_vec = json_vec_derive::json_struct_vec::Model {
         id: 2,
         struct_vec: vec![

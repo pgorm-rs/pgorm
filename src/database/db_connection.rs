@@ -17,7 +17,7 @@ pub struct DatabasePool(pub(crate) Pool);
 
 /// A set of [`DatabasePool`]s keyed by their tags, as built by
 /// [`connect_multi_with_builder`](crate::connect_multi_with_builder).
-// [spec:pgorm:sem:conn.pool.multi+1]    tag-keyed accessor surface
+// [spec:pgorm:sem:conn.pool.multi+2]    tag-keyed accessor surface
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct DatabaseMultiPool(pub(crate) BTreeMap<Arc<String>, DatabasePool>);
@@ -37,10 +37,10 @@ impl DatabaseMultiPool {
     }
 }
 
-// [spec:pgorm:sem:conn.pool.get]
+// [spec:pgorm:sem:conn.pool.get+1]
 impl DatabasePool {
     /// Take a connection from the pool, waiting for one to become available.
-    pub async fn get(&self) -> Result<DatabaseConnection, DbErr> {
+    pub async fn get(&self) -> Result<DatabaseConnection, Error> {
         let conn = Pool::get(&self.0).await?;
         Ok(DatabaseConnection(conn))
     }
@@ -100,7 +100,7 @@ impl DatabaseConnection {
     pub async fn begin_with(
         &mut self,
         mode: TransactionMode,
-    ) -> Result<DatabaseTransaction<'_>, DbErr> {
+    ) -> Result<DatabaseTransaction<'_>, Error> {
         let mut builder = self.0.build_transaction();
 
         match mode {
@@ -135,7 +135,7 @@ impl DatabaseConnection {
     /// returns. `Ok` is returned only once `COMMIT` succeeded; a failing
     /// `BEGIN` or `COMMIT` is [`TransactionError::Connection`] and the
     /// closure's own error is [`TransactionError::Transaction`].
-    // [spec:pgorm:sem:conn.tx.closure]    plain BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+1]    plain BEGIN
     pub async fn transaction<'s, T, E, F>(&'s mut self, f: F) -> Result<T, TransactionError<E>>
     where
         F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
@@ -149,7 +149,7 @@ impl DatabaseConnection {
 
     /// [`DatabaseConnection::transaction`] over a transaction configured by
     /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
-    // [spec:pgorm:sem:conn.tx.closure]    configured BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+1]    configured BEGIN
     pub async fn transaction_with<'s, T, E, F>(
         &'s mut self,
         mode: TransactionMode,
@@ -174,7 +174,7 @@ impl DatabaseConnection {
     /// replay it. `f` is [`AsyncFnMut`] because it is called once per attempt,
     /// and must therefore be replayable: every effect it has outside the
     /// transaction happens again on each attempt.
-    // [spec:pgorm:sem:conn.tx.retry]
+    // [spec:pgorm:sem:conn.tx.retry+1]
     pub async fn transaction_with_retry<T, E, F>(
         &mut self,
         mode: TransactionMode,
@@ -223,11 +223,11 @@ impl DatabaseConnection {
 }
 
 enum Retryable<E> {
-    Connection(DbErr),
+    Connection(Error),
     Transaction(E),
 }
 
-// [spec:pgorm:sem:conn.tx.closure]    commit on Ok, awaited rollback on Err
+// [spec:pgorm:sem:conn.tx.closure+1]    commit on Ok, awaited rollback on Err
 async fn drive<'s, T, E, F>(
     mut txn: DatabaseTransaction<'s>,
     f: F,
@@ -248,7 +248,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure]    a failed ROLLBACK does not displace the closure error
+// [spec:pgorm:sem:conn.tx.closure+1]    a failed ROLLBACK does not displace the closure error
 async fn rollback(txn: DatabaseTransaction<'_>) {
     if let Err(error) = txn.rollback().await {
         tracing::error!(
@@ -262,13 +262,13 @@ async fn rollback(txn: DatabaseTransaction<'_>) {
 ///
 /// The two variants keep the closure's own failure distinct from a failure of
 /// the transaction machinery itself, which is why there is deliberately no
-/// `From<DbErr>` impl: with `E = DbErr` it would silently file every
+/// `From<Error>` impl: with `E = Error` it would silently file every
 /// closure-side error under `Connection` and erase that distinction.
-// [spec:pgorm:sem:conn.tx.closure]    error wrapper
+// [spec:pgorm:sem:conn.tx.closure+1]    error wrapper
 #[derive(Debug)]
 pub enum TransactionError<E> {
     /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.
-    Connection(DbErr),
+    Connection(Error),
     /// The closure returned an error; the transaction was rolled back.
     Transaction(E),
 }
@@ -297,7 +297,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1]
+// [spec:pgorm:sem:conn.tx.guard+2]
 /// An open transaction, borrowing the [`DatabaseConnection`] or parent
 /// transaction it was opened on. Rolls back if dropped uncommitted.
 #[derive(Debug)]
@@ -318,9 +318,9 @@ impl<'a> DatabaseTransaction<'a> {
     }
 
     /// Commits the transaction, making every change made within it permanent.
-    pub async fn commit(mut self) -> Result<(), DbErr> {
+    pub async fn commit(mut self) -> Result<(), Error> {
         if let Some(tx) = self.0.take() {
-            tx.commit().await.map_err(DbErr::Postgres)
+            tx.commit().await.map_err(Error::Postgres)
         } else {
             unreachable!()
         }
@@ -332,18 +332,18 @@ impl<'a> DatabaseTransaction<'a> {
     /// `Drop` queues a `ROLLBACK` on the connection and returns immediately,
     /// discarding the server's response, so a failure is invisible and only a
     /// `tracing::warn!` marks that it happened. This method awaits the
-    /// `ROLLBACK` round trip and surfaces any failure as `DbErr::Postgres`, and
+    /// `ROLLBACK` round trip and surfaces any failure as `Error::Postgres`, and
     /// consumes the handle so no warning is emitted.
-    pub async fn rollback(mut self) -> Result<(), DbErr> {
+    pub async fn rollback(mut self) -> Result<(), Error> {
         if let Some(tx) = self.0.take() {
-            tx.rollback().await.map_err(DbErr::Postgres)
+            tx.rollback().await.map_err(Error::Postgres)
         } else {
             unreachable!()
         }
     }
 }
 
-// [spec:pgorm:sem:conn.tx.guard+1]    rollback-on-drop warning
+// [spec:pgorm:sem:conn.tx.guard+2]    rollback-on-drop warning
 impl Drop for DatabaseTransaction<'_> {
     fn drop(&mut self) {
         if self.0.is_some() {
@@ -355,7 +355,7 @@ impl Drop for DatabaseTransaction<'_> {
 #[async_trait::async_trait]
 impl ConnectionTrait for &DatabaseConnection {
     // #[instrument(level = "trace")]
-    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -363,7 +363,7 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 
     // #[instrument(level = "trace")]
-    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -377,7 +377,7 @@ impl ConnectionTrait for &DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<tokio_postgres::Row, DbErr>
+    ) -> Result<tokio_postgres::Row, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -388,7 +388,7 @@ impl ConnectionTrait for &DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    ) -> Result<Option<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -399,14 +399,14 @@ impl ConnectionTrait for &DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
         Ok(self.0.query(statement, params).await?)
     }
 
-    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -416,16 +416,16 @@ impl ConnectionTrait for &DatabaseConnection {
         Ok(self.0.query_raw(statement, params).await?)
     }
 
-    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+    async fn batch_execute(&self, sql: &str) -> Result<(), Error> {
         Ok(pgorm_pool::GenericClient::batch_execute(&self.0, sql).await?)
     }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+3]    delegating impls
+// [spec:pgorm:def:conn.pool.conn-trait+4]    delegating impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
-    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -433,7 +433,7 @@ impl ConnectionTrait for DatabaseConnection {
     }
 
     // #[instrument(level = "trace")]
-    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -447,7 +447,7 @@ impl ConnectionTrait for DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<tokio_postgres::Row, DbErr>
+    ) -> Result<tokio_postgres::Row, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -458,7 +458,7 @@ impl ConnectionTrait for DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    ) -> Result<Option<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -469,15 +469,15 @@ impl ConnectionTrait for DatabaseConnection {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
         Ok(self.0.query(statement, params).await?)
     }
 
-    // [spec:pgorm:def:exec.stream]    pooled-client row stream
-    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    // [spec:pgorm:def:exec.stream+1]    pooled-client row stream
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -487,7 +487,7 @@ impl ConnectionTrait for DatabaseConnection {
         Ok(self.0.query_raw(statement, params).await?)
     }
 
-    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+    async fn batch_execute(&self, sql: &str) -> Result<(), Error> {
         Ok(pgorm_pool::GenericClient::batch_execute(&self.0, sql).await?)
     }
 }
@@ -495,7 +495,7 @@ impl ConnectionTrait for DatabaseConnection {
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseTransaction<'_> {
     // #[instrument(level = "trace")]
-    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, DbErr>
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -503,7 +503,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     }
 
     // #[instrument(level = "trace")]
-    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, DbErr>
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -517,7 +517,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<tokio_postgres::Row, DbErr>
+    ) -> Result<tokio_postgres::Row, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -528,7 +528,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<tokio_postgres::Row>, DbErr>
+    ) -> Result<Option<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
@@ -539,15 +539,15 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<tokio_postgres::Row>, DbErr>
+    ) -> Result<Vec<tokio_postgres::Row>, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
     {
         Ok(self.tx().query(statement, params).await?)
     }
 
-    // [spec:pgorm:def:exec.stream]    in-transaction row stream
-    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, DbErr>
+    // [spec:pgorm:def:exec.stream+1]    in-transaction row stream
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + ToStatement + SqlText + Send + Sync,
         P: BorrowToSql,
@@ -557,13 +557,13 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         Ok(self.tx().query_raw(statement, params).await?)
     }
 
-    async fn batch_execute(&self, sql: &str) -> Result<(), DbErr> {
+    async fn batch_execute(&self, sql: &str) -> Result<(), Error> {
         Ok(pgorm_pool::GenericClient::batch_execute(self.tx(), sql).await?)
     }
 }
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseTransaction<'_> {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
+    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {
         Ok(DatabaseTransaction(Some(
             self.tx_mut().transaction().await?,
         )))
@@ -573,7 +573,7 @@ impl TransactionTrait for DatabaseTransaction<'_> {
 // [spec:pgorm:req:conn.tx+2]    BEGIN on the pooled client
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseConnection {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, DbErr> {
+    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {
         let tx = self.0.transaction().await?;
         Ok(DatabaseTransaction(Some(tx)))
     }

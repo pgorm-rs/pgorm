@@ -8,7 +8,7 @@
 //! ```no_run
 //! # use pgorm::{entity::*, error::*, query::*, tests_cfg::*, DatabasePool};
 //! #
-//! # async fn function(pool: &DatabasePool) -> Result<(), DbErr> {
+//! # async fn function(pool: &DatabasePool) -> Result<(), Error> {
 //! // one pooled connection per concurrent query
 //! let (cake_conn, fruit_conn) = futures::try_join!(pool.get(), pool.get())?;
 //!
@@ -26,7 +26,7 @@
 //! ```no_run
 //! # use pgorm_query::Query;
 //! # use pgorm::{entity::*, error::*, query::*, tests_cfg::*, DatabaseConnection};
-//! # async fn function(db: &DatabaseConnection) -> Result<(), DbErr> {
+//! # async fn function(db: &DatabaseConnection) -> Result<(), Error> {
 //! // build subquery with ease
 //! let cakes_with_filling: Vec<cake::Model> = cake::Entity::find()
 //!     .filter(

@@ -32,13 +32,13 @@ explicit limitations.
 > `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
 > through `table_ref`, so a `Some` schema name qualifies every statement.
 
-> [spec:pgorm:req:entity.traits.crud+1]
+> [spec:pgorm:req:entity.traits.crud+2]
 > `EntityTrait` provides the static CRUD surface (`src/entity/base_entity.rs`):
 > `find()` returns a fresh `Select<Self>`; `find_by_id(values)` builds on `find()` by
 > adding an equality filter per primary-key column, consuming the value tuple in
 > primary-key iteration order. `insert(model)` returns `Insert::one`,
 > `insert_many(models)` returns `Insert::many`, `update(model)` returns
-> `Result<UpdateOne<A>, DbErr>` and `delete(model)` `Result<DeleteOne<A>, DbErr>` —
+> `Result<UpdateOne<A>, Error>` and `delete(model)` `Result<DeleteOne<A>, Error>` —
 > both forward the builder guards of `query.build.update` / `query.build.delete`,
 > erring on an unset primary key. `update_many()` returns an `UpdateMany`,
 > `delete_many()` a `DeleteMany`, and `delete_by_id(values)` a `DeleteMany` filtered
@@ -97,12 +97,12 @@ explicit limitations.
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.
 
-> [spec:pgorm:def:entity.traits.model+1]
+> [spec:pgorm:def:entity.traits.model+2]
 > `ModelTrait: Clone + Send + Debug` (`src/entity/model.rs`) is the read-side row
 > representation. `get(column)` returns the column's `Value`;
-> `set(column, value) -> Result<(), DbErr>` writes it, reporting a column this
+> `set(column, value) -> Result<(), Error>` writes it, reporting a column this
 > model does not carry, or a value whose type does not match the field, as
-> `DbErr::Type`. `find_related(R)` returns a `Select<R>` scoped to this instance via
+> `Error::Type`. `find_related(R)` returns a `Select<R>` scoped to this instance via
 > `Related::find_related().belongs_to(self)`; `find_linked(L)` scopes a multi-hop
 > `Linked` join to this instance using the last hop's `r{n}` table alias.
 > `delete(self, db)` converts the model through `IntoActiveModel` and delegates to
@@ -122,36 +122,36 @@ explicit limitations.
 > `DerivePartialModel` is a compile error rather than a query with an empty
 > projection (`query.build.modifiers`).
 
-> [spec:pgorm:def:entity.traits.active-enum]
+> [spec:pgorm:def:entity.traits.active-enum+1]
 > `ActiveEnum: Sized + Iterable` (`src/entity/active_enum.rs`) maps a Rust enum onto a
 > database value. `Value` is the backing Rust type and must implement `ActiveEnumValue`
 > (`Into<Value> + ValueType + Nullable + TryGetable`). `name()` returns the database
 > enum's identifier as a `DynIden`; `to_value` / `into_value` convert a variant to its
 > database value; `try_from_value` performs the fallible reverse mapping, returning
-> `DbErr` for unknown values; `db_type()` returns the column definition used for the
+> `Error` for unknown values; `db_type()` returns the column definition used for the
 > enum column. `as_enum()` wraps a value expression in a cast to the enum's type name,
 > and `values()` enumerates every variant's database value in iterator order. The
 > `ValueVec` associated type has no purpose and is documented for removal.
 
-> [spec:pgorm:req:entity.traits.active-enum.limits+1]
+> [spec:pgorm:req:entity.traits.active-enum.limits+2]
 > `ActiveEnumValue` is implemented for `String`, `i8`, `i16`, `i32`, `i64` and `u32`
 > only (`src/entity/active_enum.rs`). `try_get_vec_by` — reading an array of enum
 > values, a Postgres-only capability — MUST NOT panic when it cannot decode: it
-> MUST return `TryGetError::DbErr(DbErr::Type(_))` for `u32` (not supported by
+> MUST return `TryGetError::Db(Error::Type(_))` for `u32` (not supported by
 > `postgres-array`), and likewise for the other types when the `postgres-array`
 > feature is disabled. The blanket `TryFromU64` impl for every `ActiveEnum` MUST
-> return `DbErr::ConvertFromU64`, so a primary key containing an active-enum field
+> return `Error::ConvertFromU64`, so a primary key containing an active-enum field
 > MUST declare `auto_increment = false` to be usable.
 
 ## Active model
 
-> [spec:pgorm:req:entity.active-model+1]
+> [spec:pgorm:req:entity.active-model+2]
 > `ActiveModelTrait: Clone + Debug` (`src/entity/active_model.rs`) is the write-side
 > row representation whose fields are `ActiveValue`s. Implementations MUST provide
 > per-column state access: `get` (immutable), `take` (removes and returns, leaving
-> `NotSet`), `set` (stores a `Value` as `Set`, returning `Result<(), DbErr>` so an
+> `NotSet`), `set` (stores a `Value` as `Set`, returning `Result<(), Error>` so an
 > unmatched column or a value of the wrong type for the field comes back as
-> `DbErr::Type` instead of unwinding), `not_set` (clears to `NotSet`),
+> `Error::Type` instead of unwinding), `not_set` (clears to `NotSet`),
 > `is_not_set`, `reset` (per-column `Unchanged` → `Set`), and `default()` (all columns
 > `NotSet`). `reset_all` applies `reset` to every column. `get_primary_key_value`
 > returns the key as a `ValueTuple` (`One`/`Two`/`Three`/`Many` chosen by
@@ -238,10 +238,10 @@ explicit limitations.
 > feature-gated `Json`/date-time/`Decimal`/`Uuid` types) MUST produce `Set`
 > (`src/entity/active_model.rs`).
 
-> [spec:pgorm:req:entity.active-model.json+1]
+> [spec:pgorm:req:entity.active-model.json+2]
 > Under the `with-json` feature, `ActiveModelTrait::from_json` builds an active model
 > by deserializing the JSON object into the entity's `Model` (errors surface as
-> `DbErr`), converting it with `IntoActiveModel`, then normalizing states per column:
+> `Error`), converting it with `IntoActiveModel`, then normalizing states per column:
 > attributes whose key exists in the JSON object become `Set`, and all others MUST be
 > `NotSet`. `set_from_json` applies the same conversion in place but MUST NOT alter
 > the primary-key values: key values are taken before the overwrite and put back
@@ -303,7 +303,7 @@ explicit limitations.
 > whose arity is only known at runtime. `IntoBoundary<K>` is the matching
 > relation on the value side, implemented exactly for the tuples whose length `K`
 > describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
-> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+1]`)
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+2]`)
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Identity` case is the only one left to check.
 

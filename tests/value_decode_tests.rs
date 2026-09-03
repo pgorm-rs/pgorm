@@ -66,7 +66,7 @@ fn models() -> Vec<net_decode::Model> {
 
 // [spec:pgorm:def:exec.decode.types+1/test]
 #[pgorm_macros::test]
-async fn main() -> Result<(), DbErr> {
+async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_valuedecode").await;
     let db = ctx.db.get().await?;
 
@@ -85,7 +85,7 @@ async fn main() -> Result<(), DbErr> {
 // [spec:pgorm:def:exec.decode.types+1/test]
 // [spec:pgorm:def:exec.cursor.binding+2/test]    `IpNetwork` and `MacAddress`
 // values, and a `None` payload emitted as SQL NULL, bound through `ValueHolder`
-async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Error> {
     for model in models() {
         let returned = model.clone().into_active_model().insert(db).await?;
         assert_eq!(returned, model);
@@ -106,7 +106,7 @@ async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), DbEr
 }
 
 // [spec:pgorm:def:exec.decode.types+1/test]
-async fn decode_inet_and_macaddr_as_tuple(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn decode_inet_and_macaddr_as_tuple(db: &DatabaseConnection) -> Result<(), Error> {
     let decoded: Vec<(IpNetwork, MacAddress, Option<IpNetwork>)> = net_decode::Entity::find()
         .select_only()
         .column(net_decode::Column::Ip)
@@ -147,7 +147,7 @@ struct EntryPoints {
 }
 
 impl FromQueryResult for EntryPoints {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         Ok(Self {
             by_name: res.try_get_by("num")?,
             by_row_ordinal: res.try_get_by(0_usize)?,
@@ -161,10 +161,10 @@ impl FromQueryResult for EntryPoints {
     }
 }
 
-// [spec:pgorm:def:exec.decode/test]    every `QueryResult` entry point, and the
+// [spec:pgorm:def:exec.decode+1/test]    every `QueryResult` entry point, and the
 // `{pre}{col}` concatenation `try_get` performs
 #[pgorm_macros::test]
-async fn decode_entry_points() -> Result<(), DbErr> {
+async fn decode_entry_points() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_entry_points").await;
     let db = ctx.db.get().await?;
 
@@ -209,13 +209,13 @@ struct NullProbe {
 }
 
 impl FromQueryResult for NullProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         let strict_null = res
             .try_get::<i32>("", "maybe")
             .expect_err("a NULL must not decode into a bare i32");
-        let strict_null_is_type_err = matches!(strict_null, DbErr::Type(_));
+        let strict_null_is_type_err = matches!(strict_null, Error::Type(_));
         let strict_null_message = match strict_null {
-            DbErr::Type(message) => message,
+            Error::Type(message) => message,
             other => format!("{other:?}"),
         };
 
@@ -225,23 +225,23 @@ impl FromQueryResult for NullProbe {
             strict_null_is_type_err,
             missing_is_postgres_err: matches!(
                 res.try_get::<i32>("", "nope"),
-                Err(DbErr::Postgres(_))
+                Err(Error::Postgres(_))
             ),
             optional_missing_is_err: res.try_get::<Option<i32>>("", "nope").is_err(),
             wrong_type_is_postgres_err: matches!(
                 res.try_get::<String>("", "num"),
-                Err(DbErr::Postgres(_))
+                Err(Error::Postgres(_))
             ),
         })
     }
 }
 
-// [spec:pgorm:sem:exec.decode.null/test]    `Option<T>` swallows only the null
+// [spec:pgorm:sem:exec.decode.null+1/test]    `Option<T>` swallows only the null
 // case; every other decode error propagates
 // [spec:pgorm:sem:exec.decode.null-context/test]    the null payload is the
 // driver's ordinal-based message, not the requested column name
 #[pgorm_macros::test]
-async fn decode_null_handling() -> Result<(), DbErr> {
+async fn decode_null_handling() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_null_handling").await;
     let db = ctx.db.get().await?;
 
@@ -253,7 +253,7 @@ async fn decode_null_handling() -> Result<(), DbErr> {
     assert_eq!(row.optional, None);
 
     // ... and is an error for a non-`Option` target, rendered by
-    // `From<TryGetError> for DbErr`.
+    // `From<TryGetError> for Error`.
     assert!(row.strict_null_is_type_err);
     assert!(
         row.strict_null_message.starts_with(
@@ -268,7 +268,7 @@ async fn decode_null_handling() -> Result<(), DbErr> {
     // the requested column name.
     assert!(!row.strict_null_message.contains("maybe"));
 
-    // An error with no `WasNull` source stays a `DbErr::Postgres`, and
+    // An error with no `WasNull` source stays an `Error::Postgres`, and
     // `Option<T>` propagates it rather than reporting `None`.
     assert!(row.missing_is_postgres_err);
     assert!(row.optional_missing_is_err);
@@ -287,7 +287,7 @@ struct OidProbe {
 }
 
 impl FromQueryResult for OidProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         Ok(Self {
             oid: res.try_get("", "an_oid")?,
             oids: res.try_get("", "some_oids")?,
@@ -299,7 +299,7 @@ impl FromQueryResult for OidProbe {
 // [spec:pgorm:sem:exec.decode.u32-oid/test]    `u32` and `Vec<u32>` read `OID`
 // columns, and reject `INT4`
 #[pgorm_macros::test]
-async fn decode_u32_is_oid() -> Result<(), DbErr> {
+async fn decode_u32_is_oid() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_u32_oid").await;
     let db = ctx.db.get().await?;
 
@@ -340,7 +340,7 @@ struct Arrays {
 // [spec:pgorm:def:exec.decode.array+1/test]    the array-decoding subset, and
 // `Vec<u8>` staying bytes rather than an array
 #[pgorm_macros::test]
-async fn decode_arrays() -> Result<(), DbErr> {
+async fn decode_arrays() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_arrays").await;
     let db = ctx.db.get().await?;
 
@@ -405,7 +405,7 @@ struct ManyProbe {
 }
 
 impl FromQueryResult for ManyProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         let num = || "num".to_owned();
         let word = || "word".to_owned();
         let ratio = || "ratio".to_owned();
@@ -413,9 +413,9 @@ impl FromQueryResult for ManyProbe {
         let too_few = res
             .try_get_many::<(i32, String)>("", &[num()])
             .expect_err("a short column slice must be rejected");
-        let too_few_names_is_type_err = matches!(too_few, DbErr::Type(_));
+        let too_few_names_is_type_err = matches!(too_few, Error::Type(_));
         let too_few_names_message = match too_few {
-            DbErr::Type(message) => message,
+            Error::Type(message) => message,
             other => format!("{other:?}"),
         };
 
@@ -438,7 +438,7 @@ struct WideProbe {
 }
 
 impl FromQueryResult for WideProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         Ok(Self {
             dozen: res.try_get_many_by_index()?,
         })
@@ -458,7 +458,7 @@ enum ResultCol {
 // [spec:pgorm:def:exec.crud/test]    `find_by_statement` builds a `SelectorRaw`
 // over `SelectGetableValue` through `with_columns`
 #[pgorm_macros::test]
-async fn decode_many() -> Result<(), DbErr> {
+async fn decode_many() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_many").await;
     let db = ctx.db.get().await?;
 
@@ -512,15 +512,15 @@ struct JsonProbe {
 }
 
 impl FromQueryResult for JsonProbe {
-    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, DbErr> {
+    fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         use json_vec_derive::json_struct_vec::JsonColumn;
 
         let non_array = res
             .try_get::<Vec<JsonColumn>>("", "object")
             .expect_err("a JSON object must not decode as a Vec");
-        let non_array_is_json_err = matches!(non_array, DbErr::Json(_));
+        let non_array_is_json_err = matches!(non_array, Error::Json(_));
         let non_array_message = match non_array {
-            DbErr::Json(message) => message,
+            Error::Json(message) => message,
             other => format!("{other:?}"),
         };
 
@@ -533,10 +533,10 @@ impl FromQueryResult for JsonProbe {
     }
 }
 
-// [spec:pgorm:def:exec.decode.json/test]    the `TryGetableFromJson` blanket
+// [spec:pgorm:def:exec.decode.json+1/test]    the `TryGetableFromJson` blanket
 // impl and the `TryGetableArray` `Vec<T>` path, including its non-array error
 #[pgorm_macros::test]
-async fn decode_json() -> Result<(), DbErr> {
+async fn decode_json() -> Result<(), Error> {
     use json_vec_derive::json_struct_vec::JsonColumn;
 
     let ctx = TestContext::new("value_decode_tests_json").await;

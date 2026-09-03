@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use entity::{Column, Entity};
 use pgorm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbErr, DerivePartialModel, EntityTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DerivePartialModel, EntityTrait, Error,
     FromQueryResult, ModelTrait, QueryOrder,
 };
 use pgorm_query::Expr;
@@ -91,7 +91,7 @@ struct IntScaledBakery {
 // [spec:pgorm:def:exec.crud/test]    `Select::into_partial_model` re-targets
 // the decoded type, and `one` / `all` run through the same selector
 #[pgorm_macros::test]
-async fn partial_model_select() -> Result<(), DbErr> {
+async fn partial_model_select() -> Result<(), Error> {
     let ctx = TestContext::new("partial_model_select").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
@@ -149,7 +149,7 @@ async fn partial_model_select() -> Result<(), DbErr> {
 
 // [spec:pgorm:req:exec.cursor.binding-coerce/test]
 #[pgorm_macros::test]
-async fn integer_operand_against_float_column() -> Result<(), DbErr> {
+async fn integer_operand_against_float_column() -> Result<(), Error> {
     let ctx = TestContext::new("partial_model_int_operand_bindtypes").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;

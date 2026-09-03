@@ -19,7 +19,7 @@ alternatives (
 )
 consequences {
     accepted (
-        "New and changed user-facing failure paths return DbErr (or another Result channel) rather than panicking, even where the surrounding inherited code still panics."
+        "New and changed user-facing failure paths return Error (or another Result channel) rather than panicking, even where the surrounding inherited code still panics."
         "Where an infallible rendering API (to_string/build) cannot carry an error, the guard lives at the nearest fallible boundary — typically the ORM execution layer."
     )
     deferred ("The inherited panic surface (value accessor panics, condition-mixing panic, insert arity panics, connect()'s panic on pool-build failure) predates this decision and is spec-documented; retrofitting it to Result is future work, node by node, each with a rule bump. The DDL builder panics, originally on this list, were closed by construction under unrep.ddl-empty-builders.")
@@ -32,9 +32,9 @@ codifies ([spec:pgorm:def:error.model])
 pgorm is a library: its callers own the process, and a caller's
 recoverable mistake — an unset primary key, an emptied select list, a
 misassembled statement — must come back to them as a value they can
-handle, not as an unwound stack. `DbErr` exists precisely to be that
+handle, not as an unwound stack. `Error` (née `DbErr`) exists precisely to be that
 channel, and every execution-adjacent path already returns
-`Result<_, DbErr>`.
+`Result<_, Error>`.
 
 Panics remain legitimate for exactly one thing: internal invariant
 violations, where continuing would be incoherent and the bug is

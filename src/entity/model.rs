@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, DbErr, DeleteResult, EntityTrait,
+    ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, DeleteResult, EntityTrait, Error,
     IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select, SelectModel, SelectorRaw,
 };
 use async_trait::async_trait;
@@ -8,7 +8,7 @@ use pgorm_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
-// [spec:pgorm:def:entity.traits.model+1]
+// [spec:pgorm:def:entity.traits.model+2]
 #[async_trait]
 pub trait ModelTrait: Clone + Send + Debug {
     #[allow(missing_docs)]
@@ -18,8 +18,8 @@ pub trait ModelTrait: Clone + Send + Debug {
     fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> Value;
 
     /// Set the [Value] of a column in an Entity, reporting a column this model
-    /// does not carry, or a value of the wrong type for it, as [`DbErr::Type`].
-    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), DbErr>;
+    /// does not carry, or a value of the wrong type for it, as [`Error::Type`].
+    fn set(&mut self, c: <Self::Entity as EntityTrait>::Column, v: Value) -> Result<(), Error>;
 
     /// Find related Models
     fn find_related<R>(&self, _: R) -> Select<R>
@@ -41,7 +41,7 @@ pub trait ModelTrait: Clone + Send + Debug {
     }
 
     /// Delete a model
-    async fn delete<'a, A, C>(self, db: &'a C) -> Result<DeleteResult, DbErr>
+    async fn delete<'a, A, C>(self, db: &'a C) -> Result<DeleteResult, Error>
     where
         Self: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -55,11 +55,11 @@ pub trait ModelTrait: Clone + Send + Debug {
 // [spec:pgorm:def:entity.traits.from-query-result+1]
 pub trait FromQueryResult: Sized {
     /// Instantiate a Model from a [QueryResult]
-    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, DbErr>;
+    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error>;
 
     /// Transform the error from instantiating a Model from a [QueryResult]
     /// and converting it to an [Option]
-    fn from_query_result_optional(res: &QueryResult, pre: &str) -> Result<Option<Self>, DbErr> {
+    fn from_query_result_optional(res: &QueryResult, pre: &str) -> Result<Option<Self>, Error> {
         Ok(Self::from_query_result(res, pre).ok())
     }
 
@@ -70,7 +70,7 @@ pub trait FromQueryResult: Sized {
     /// # {
     /// # use pgorm::{error::*, query::*, DatabasePool, FromQueryResult};
     /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), DbErr> {
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Debug, PartialEq, FromQueryResult)]
     /// struct SelectResult {
     ///     name: String,
@@ -103,14 +103,14 @@ where
     M: ModelTrait,
 {
     /// Method to call to perform the conversion
-    fn try_into_model(self) -> Result<M, DbErr>;
+    fn try_into_model(self) -> Result<M, Error>;
 }
 
 impl<M> TryIntoModel<M> for M
 where
     M: ModelTrait,
 {
-    fn try_into_model(self) -> Result<M, DbErr> {
+    fn try_into_model(self) -> Result<M, Error> {
         Ok(self)
     }
 }
