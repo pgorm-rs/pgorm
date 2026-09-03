@@ -56,7 +56,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+1] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+2] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -183,12 +183,17 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+1]
+    // [spec:pgorm:req:sql.render.select-order+2]
+    // [spec:pgorm:sem:query.build.with.attach]
     pub(crate) fn prepare_select_statement(
         &self,
         select: &SelectStatement,
         sql: &mut dyn SqlWriter,
     ) {
+        if let Some(with_clause) = &select.with {
+            self.prepare_with_clause(with_clause, sql);
+        }
+
         write!(sql, "SELECT ").unwrap();
 
         if let Some(distinct) = &select.distinct {
@@ -769,7 +774,7 @@ impl QueryBuilder {
         query.query.prepare_statement(sql);
     }
 
-    // [spec:pgorm:req:sql.render.cte+1]
+    // [spec:pgorm:req:sql.render.cte+2]
     pub(crate) fn prepare_with_clause(&self, with_clause: &AnyWithClause, sql: &mut dyn SqlWriter) {
         match with_clause {
             AnyWithClause::Plain(plain) => {

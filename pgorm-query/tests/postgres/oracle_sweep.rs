@@ -13,7 +13,7 @@ fn base() -> SelectStatement {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the select clause vocabulary
-// [spec:pgorm:req:sql.render.select-order+1/test]
+// [spec:pgorm:req:sql.render.select-order+2/test]
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([
@@ -248,7 +248,7 @@ fn sweep_union_and_locking_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    common table expressions
-// [spec:pgorm:req:sql.render.cte+1/test]
+// [spec:pgorm:req:sql.render.cte+2/test]
 #[test]
 fn sweep_cte_shapes() {
     let named = |name: &str| {

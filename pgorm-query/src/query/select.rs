@@ -1,6 +1,6 @@
 use crate::{
-    AnyWithClause, FunctionCall, QueryStatementBuilder, SubQueryStatement, WindowStatement,
-    WithQuery,
+    AnyWithClause, FunctionCall, QueryStatementBuilder, RecursiveWithClause, SubQueryStatement,
+    WindowStatement, WithClause,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -9,6 +9,9 @@ use crate::{
     value::*,
 };
 use inherent::inherent;
+
+#[path = "select_with.rs"]
+mod select_with;
 
 /// Select rows from an existing table
 ///
@@ -31,9 +34,11 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select+1]
+// [spec:pgorm:def:sql.ast.select+2]
+// [spec:pgorm:def:query.build.with]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
+    pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) distinct: Option<SelectDistinct>,
     pub(crate) selects: Vec<SelectExpr>,
     pub(crate) from: Vec<FromItem>,
@@ -84,7 +89,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select+1]
+// [spec:pgorm:def:sql.ast.select+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct LockClause {
     pub(crate) r#type: LockType,
@@ -110,6 +115,7 @@ impl SelectStatement {
     /// Take the ownership of data in the current [`SelectStatement`]
     pub fn take(&mut self) -> Self {
         Self {
+            with: self.with.take(),
             distinct: self.distinct.take(),
             selects: std::mem::take(&mut self.selects),
             from: std::mem::take(&mut self.from),
@@ -1836,62 +1842,6 @@ impl SelectStatement {
     ) -> &mut Self {
         self.unions.extend(unions);
         self
-    }
-
-    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
-    /// either a [`WithClause`](crate::WithClause) or a
-    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
-    ///
-    /// let base_query = SelectStatement::new()
-    ///                     .column(Alias::new("id"))
-    ///                     .expr(1i32)
-    ///                     .column(Alias::new("next"))
-    ///                     .column(Alias::new("value"))
-    ///                     .from(Alias::new("table"))
-    ///                     .to_owned();
-    ///
-    /// let cte_referencing = SelectStatement::new()
-    ///                             .column(Alias::new("id"))
-    ///                             .expr(Expr::col(Alias::new("depth")).add(1i32))
-    ///                             .column(Alias::new("next"))
-    ///                             .column(Alias::new("value"))
-    ///                             .from(Alias::new("table"))
-    ///                             .join(
-    ///                                 JoinType::InnerJoin,
-    ///                                 Alias::new("cte_traversal"),
-    ///                                 Expr::col((Alias::new("cte_traversal"), Alias::new("next"))).equals((Alias::new("table"), Alias::new("id")))
-    ///                             )
-    ///                             .to_owned();
-    ///
-    /// let common_table_expression = CommonTableExpression::new(
-    ///             Alias::new("cte_traversal"),
-    ///             base_query.clone().union(UnionType::All, cte_referencing).to_owned(),
-    ///         )
-    ///         .columns([Alias::new("id"), Alias::new("depth"), Alias::new("next"), Alias::new("value")])
-    ///         .to_owned();
-    ///
-    /// let select = SelectStatement::new()
-    ///         .column(ColumnRef::Asterisk)
-    ///         .from(Alias::new("cte_traversal"))
-    ///         .to_owned();
-    ///
-    /// let query = select.with(RecursiveWithClause::new(common_table_expression));
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) SELECT * FROM "cte_traversal""#
-    /// );
-    /// ```
-    pub fn with<C>(self, clause: C) -> WithQuery
-    where
-        C: Into<AnyWithClause>,
-    {
-        WithQuery::new(clause, self)
     }
 
     /// WINDOW

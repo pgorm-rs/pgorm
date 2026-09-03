@@ -8,7 +8,7 @@ pub use pgorm::{ActiveValue::Set, ConnectionTrait, Error, QueryFilter, QueryOrde
 
 // Run the test locally:
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_tests
-// [spec:pgorm:sem:exec.crud.select+1/test]    `one` fails with RecordNotFound on
+// [spec:pgorm:sem:exec.crud.select+2/test]    `one` fails with RecordNotFound on
 // zero rows where `one_opt` reports `None` — pgorm's deliberate difference
 #[pgorm_macros::test]
 pub async fn find_one_with_no_result() {
@@ -51,7 +51,7 @@ pub async fn find_one_with_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+1/test]    the same split on a filtered select
+// [spec:pgorm:sem:exec.crud.select+2/test]    the same split on a filtered select
 #[pgorm_macros::test]
 pub async fn find_by_id_with_no_result() {
     let ctx = TestContext::new("find_by_id_with_no_result").await;
@@ -106,7 +106,7 @@ pub async fn find_all_with_no_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+1/test]    `all` decodes every returned row
+// [spec:pgorm:sem:exec.crud.select+2/test]    `all` decodes every returned row
 #[pgorm_macros::test]
 pub async fn find_all_with_result() {
     let ctx = TestContext::new("find_all_with_result").await;
@@ -271,7 +271,7 @@ pub async fn char_literal_round_trips_through_server() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+1/test]    `all` aborts on the first decode
+// [spec:pgorm:sem:exec.crud.select+2/test]    `all` aborts on the first decode
 // error instead of yielding a partial result set
 #[pgorm_macros::test]
 pub async fn select_only_exclude_option_fields() {
@@ -333,7 +333,7 @@ pub async fn select_only_exclude_option_fields() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+1/test]    `SelectorRaw::one` / `one_opt`
+// [spec:pgorm:sem:exec.crud.select+2/test]    `SelectorRaw::one` / `one_opt`
 // execute the statement exactly as written, with no `LIMIT` injected
 // [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` and
 // `SelectorRaw::into_model` re-targeting the decoded type
@@ -434,7 +434,7 @@ pub async fn raw_selector_one_semantics() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:sql.render.select-order+1/test]    a named window combined with ORDER BY and
+// [spec:pgorm:req:sql.render.select-order+2/test]    a named window combined with ORDER BY and
 // LIMIT, run against a live server
 // [spec:pgorm:req:sql.render.window+3/test]
 #[pgorm_macros::test]

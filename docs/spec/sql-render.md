@@ -136,6 +136,35 @@ an ideal Postgres renderer would emit.
 > `CAST($1::text AS tea)` reaches an enum through Postgres' text I/O
 > conversion, exactly as the unpinned form did.
 
+> [spec:pgorm:sem:sql.render.placeholder-typing]
+> Every `SimpleExpr::Value` renders as a `$n` placeholder
+> (`sql.render.param-vs-inline`), and PostgreSQL types a placeholder from the
+> context it appears in. A placeholder in a position that supplies *no* context
+> resolves to `text`, and the value the driver then binds is neither the type the
+> server inferred nor convertible to it. The two positions that supply no context
+> are a bare projection — `SELECT $1`, whether standalone, in a LATERAL marker
+> subquery, or as the anchor arm of a recursive CTE, whose column types the whole
+> recursion is resolved from — and any operand whose siblings are themselves
+> untyped.
+>
+> The failures are the server's, at parse or bind time, not the renderer's: a
+> recursive CTE whose anchor projects a bare `$n` settles that column as `text`
+> and the recursive arm's `"col" + $n` fails `42883`
+> (`operator does not exist: text + …`), while a bare `SELECT $1` bound with an
+> integer fails `22021` (`invalid byte sequence for encoding "UTF8"`) because the
+> driver wrote `int4` bytes where the server asked for `text`.
+>
+> pgorm-query annotates a placeholder in exactly one place — the operand of a
+> cast, per `sql.render.cast-param-type` — and MUST NOT guess a type anywhere
+> else: the renderer has no catalog and no expression typing, so any other
+> annotation would be a guess that silently changes what the statement means.
+> Supplying the context is therefore the caller's obligation, and it has two
+> spellings: annotate the value with `Expr::val(v).cast_as("<type>")`, which
+> renders `CAST($n::<pin> AS <type>)` and gives the position a type; or, where the
+> value is a fixed literal rather than caller data, use `SimpleExpr::Constant`,
+> which is inlined and so is never a placeholder at all
+> (`join_lateral_on_true`'s `TRUE` is this case, per `query.build.lateral`).
+
 ## Identifiers and literals
 
 > [spec:pgorm:req:sql.render.ident-quoting]
@@ -285,8 +314,11 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+1]
-> `prepare_select_statement` MUST emit clauses in exactly this order:
+> [spec:pgorm:req:sql.render.select-order+2]
+> `prepare_select_statement` MUST emit clauses in exactly this order: the
+> statement's carried WITH clause when it has one (`query.build.with`), rendered
+> through the same `prepare_with_clause` a `WithQuery` uses and therefore already
+> ending in a separating space;
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
@@ -366,7 +398,7 @@ an ideal Postgres renderer would emit.
 
 ## CTEs
 
-> [spec:pgorm:req:sql.render.cte+1]
+> [spec:pgorm:req:sql.render.cte+2]
 > A `WithClause` renders `WITH ` followed by its comma-separated common table
 > expressions; a `RecursiveWithClause` renders `WITH RECURSIVE ` followed by the
 > single one it holds. Each CTE renders as: quoted table name; optional
@@ -378,9 +410,14 @@ an ideal Postgres renderer would emit.
 > ` SET "alias" `, and `CYCLE ` expr ` SET "col" USING "col" `. The renderer has
 > nothing to refuse — the empty clause and the multi-CTE recursive clause are
 > unrepresentable per `sql.ast.with` and `sql.ast.with.recursive` — so it
-> carries no assertion and MUST NOT panic on a caller-built clause. The attached
-> statement (`WithQuery`) may be any of SELECT/INSERT/UPDATE/DELETE/nested-WITH
-> via `SubQueryStatement`.
+> carries no assertion and MUST NOT panic on a caller-built clause.
+>
+> The same `prepare_with_clause` serves both ways a clause reaches the sink: as
+> the prefix a `SelectStatement` renders for its own carried clause
+> (`sql.render.select-order`), and as the prefix of a `WithQuery`, whose attached
+> statement is an INSERT, UPDATE or DELETE (`query.build.with.single`) reached
+> through `SubQueryStatement`. The two are the same bytes, so a CTE query reads
+> identically whichever route built it.
 
 ## INSERT / UPDATE / DELETE
 

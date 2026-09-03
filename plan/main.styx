@@ -2601,12 +2601,20 @@ children (
                 title "SelectStatement carries its WITH clause; every ORM decode path inherits CTEs"
                 kind @feat
                 deps (ergo.orm-bridge)
+                sealed true
                 log (
                     {
                         at 2026-09-03T20:38:08.113507Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Implements ergo.orm-bridge's verdict (probes on spike/orm-bridge, 8/8 green; full design in that node's decision log). Core: with: Option<AnyWithClause> field on SelectStatement in pgorm-query, rendered as an unconditional prefix in prepare_select_statement (live-PG-verified legal in every nesting position); WithQuery's consuming path and inertness end. ORM: QuerySelect default methods with_cte/with_recursive_cte/join_lateral/join_lateral_on_true/window/window_expr_as/union (LATERAL/WINDOW/UNION are in-place SelectStatement mutations — combinators only, no decode change). Entry points: Selector::from_select::<M>(SelectStatement) (gap G1) and SelectorRaw::into_tuple (gap G2 — the landing pad for ergo.pipeline-v1's SQL output). Watch: the untyped-$n recursive-anchor hazard (E42883/E22021 probed live; only cast_as annotates a placeholder) gets its own rule sql.render.placeholder-typing documenting the caller obligation. Eight proposed rules drafted in the orm-bridge agent report (query.build.with family, exec.crud.selector-entry); bumps query.build.modifiers and exec.crud.select. Estimate 1.5-2.5 days, no breaking signatures."
+                    }
+
+                    {
+                        at 2026-09-03T21:27:18.318285Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

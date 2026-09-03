@@ -329,6 +329,7 @@ assertions (
     {id ergo.jsonb-vocab, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:48:38.413406Z}
     {id ergo.orm-bridge, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:22.67587Z}
     {id ergo.pipeline-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:19.821969Z}
+    {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}

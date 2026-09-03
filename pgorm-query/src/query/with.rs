@@ -1,8 +1,29 @@
 use crate::{
-    ColumnRef, DynIden, FromItem, IntoIden, QueryStatementBuilder, SelectExpr, SelectStatement,
-    SimpleExpr, SqlWriter, SubQueryStatement, Values, {Alias, QueryBuilder},
+    ColumnRef, DeleteStatement, DynIden, FromItem, InsertStatement, IntoIden,
+    QueryStatementBuilder, SelectExpr, SelectStatement, SimpleExpr, SqlWriter, SubQueryStatement,
+    UpdateStatement, Values, {Alias, QueryBuilder},
 };
 use inherent::inherent;
+
+/// The statements a [`WithQuery`] may prefix.
+///
+/// [`SelectStatement`] is deliberately absent. A select carries its own WITH
+/// clause ([`SelectStatement::with`]), so wrapping one would give the same
+/// clause two places to live and let two of them render at once —
+/// `WITH a AS (…) WITH b AS (…) SELECT …`, which PostgreSQL does not parse.
+/// Excluding the select from this bound is what makes that state
+/// unconstructible rather than merely discouraged.
+// [spec:pgorm:req:query.build.with.single]
+pub trait WithBody: QueryStatementBuilder {}
+
+// [spec:pgorm:req:query.build.with.single]
+impl WithBody for InsertStatement {}
+
+// [spec:pgorm:req:query.build.with.single]
+impl WithBody for UpdateStatement {}
+
+// [spec:pgorm:req:query.build.with.single]
+impl WithBody for DeleteStatement {}
 
 /// A table definition inside a WITH clause ([WithClause] or [RecursiveWithClause]).
 ///
@@ -27,7 +48,7 @@ use inherent::inherent;
 ///
 /// It is your responsibility to ensure that the kind of WITH clause that you put together makes
 /// sense and valid for that database that you are using.
-// [spec:pgorm:def:sql.ast.with+1]
+// [spec:pgorm:def:sql.ast.with+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
     pub(crate) table_name: DynIden,
@@ -288,7 +309,7 @@ impl Cycle {
 ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "table") SELECT * FROM "cte""#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.with+1]
+// [spec:pgorm:def:sql.ast.with+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithClause {
     pub(crate) first: CommonTableExpression,
@@ -315,11 +336,12 @@ impl WithClause {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
 
-    /// You can turn this into a [WithQuery] using this function. The resulting WITH query will
-    /// execute the argument query with this WITH clause.
+    /// Prefix a data-modifying statement with this clause, yielding a
+    /// [WithQuery]. A SELECT instead carries the clause on itself — see
+    /// [`SelectStatement::with`] and [`WithBody`].
     pub fn query<T>(self, query: T) -> WithQuery
     where
-        T: QueryStatementBuilder,
+        T: WithBody,
     {
         WithQuery::new(self, query)
     }
@@ -429,11 +451,12 @@ impl RecursiveWithClause {
         self
     }
 
-    /// You can turn this into a [WithQuery] using this function. The resulting WITH query will
-    /// execute the argument query with this WITH clause.
+    /// Prefix a data-modifying statement with this clause, yielding a
+    /// [WithQuery]. A SELECT instead carries the clause on itself — see
+    /// [`SelectStatement::with`] and [`WithBody`].
     pub fn query<T>(self, query: T) -> WithQuery
     where
-        T: QueryStatementBuilder,
+        T: WithBody,
     {
         WithQuery::new(self, query)
     }
@@ -441,7 +464,7 @@ impl RecursiveWithClause {
 
 /// Either form of WITH clause. This is what the statement builders' `with` methods accept and what
 /// a [WithQuery] carries.
-// [spec:pgorm:def:sql.ast.with+1]
+// [spec:pgorm:def:sql.ast.with+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyWithClause {
     /// A non-recursive clause of one or more common table expressions.
@@ -462,7 +485,7 @@ impl From<RecursiveWithClause> for AnyWithClause {
     }
 }
 
-/// A WITH query. A simple SQL query that has a WITH clause ([WithClause] or
+/// A data-modifying statement prefixed by a WITH clause ([WithClause] or
 /// [RecursiveWithClause]).
 ///
 /// These named queries can act as a "query local table" that are materialized during execution and
@@ -470,8 +493,25 @@ impl From<RecursiveWithClause> for AnyWithClause {
 ///
 /// Both the clause and the query it prefixes are given to [WithQuery::new], so a [WithQuery] is
 /// always complete. It is usually built through [WithClause::query],
-/// [RecursiveWithClause::query], or the `with` method on a select/insert/update/delete statement.
-// [spec:pgorm:def:sql.ast.with+1]
+/// [RecursiveWithClause::query], or the `with` method on an insert/update/delete statement.
+///
+/// A SELECT never becomes a [WithQuery]: it carries its clause itself, which is
+/// what keeps it a live [SelectStatement] afterwards. Handing one to this
+/// constructor does not compile ([`WithBody`]):
+///
+/// ```compile_fail
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let cte = CommonTableExpression::new(
+///     Alias::new("cte"),
+///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
+/// );
+/// let select = Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned();
+///
+/// WithQuery::new(WithClause::new(cte), select);
+/// ```
+// [spec:pgorm:def:sql.ast.with+2]
+// [spec:pgorm:req:query.build.with.single]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithQuery {
     pub(crate) with_clause: AnyWithClause,
@@ -479,11 +519,12 @@ pub struct WithQuery {
 }
 
 impl WithQuery {
-    /// Constructs a [WithQuery] from a with clause of either form and the query it prefixes.
+    /// Constructs a [WithQuery] from a with clause of either form and the
+    /// data-modifying statement it prefixes.
     pub fn new<C, T>(with_clause: C, query: T) -> Self
     where
         C: Into<AnyWithClause>,
-        T: QueryStatementBuilder,
+        T: WithBody,
     {
         Self {
             with_clause: with_clause.into(),

@@ -26,10 +26,9 @@ fn the_single_backend_renders_every_statement_kind() {
         .from_table(Glyph::Table)
         .and_where(Expr::col(Glyph::Id).eq(1))
         .to_owned();
-    let with = select().with(WithClause::new(CommonTableExpression::new(
-        Alias::new("cte"),
-        select(),
-    )));
+    let cte = || CommonTableExpression::new(Alias::new("cte"), select());
+    let with = select().with(WithClause::new(cte()));
+    let with_query = WithClause::new(cte()).query(delete.clone());
 
     assert_eq!(
         select().to_string(),
@@ -46,6 +45,14 @@ fn the_single_backend_renders_every_statement_kind() {
         [
             r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = 1)"#,
             r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        with_query.to_string(),
+        [
+            r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = 1)"#,
+            r#"DELETE FROM "glyph" WHERE "id" = 1"#,
         ]
         .join(" ")
     );
@@ -80,6 +87,14 @@ fn the_single_backend_renders_every_statement_kind() {
         [
             r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = $1)"#,
             r#"SELECT "id" FROM "glyph" WHERE "aspect" = $2"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        collect(&with_query),
+        [
+            r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = $1)"#,
+            r#"DELETE FROM "glyph" WHERE "id" = $2"#,
         ]
         .join(" ")
     );

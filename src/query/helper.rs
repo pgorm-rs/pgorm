@@ -1,10 +1,11 @@
 use crate::{
     ColumnPairs, ColumnTrait, EntityTrait, IntoIdentity, IntoSimpleExpr, Iterable, ModelTrait,
-    PrimaryKeyToColumn, RelationDef,
+    PrimaryKeyToColumn, QueryTrait, RelationDef,
 };
 use pgorm_query::{
-    Alias, ConditionType, Expr, FromItem, Iden, IntoCondition, IntoIden, LockBehavior, LockType,
-    NullOrdering, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
+    Alias, ConditionType, Expr, FromItem, FunctionCall, Iden, IntoCondition, IntoIden,
+    LockBehavior, LockType, NullOrdering, RecursiveWithClause, SeaRc, SelectExpr, SelectStatement,
+    SimpleExpr, UnionType, WindowStatement, WithClause,
 };
 pub use pgorm_query::{
     Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
@@ -16,7 +17,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -582,11 +583,146 @@ pub trait QuerySelect: Sized {
             .expr_as(Expr::col((tbl, col)), alias.into_identity());
         self.into_projected()
     }
+
+    /// Prefix the query with a non-recursive `WITH` clause.
+    ///
+    /// The clause is carried on the statement, not wrapped around it, so this
+    /// returns `Self`: filters, ordering, joins, the typed terminals, the
+    /// paginator and the cursor all keep working afterwards. The last call
+    /// wins.
+    ///
+    /// ```
+    /// use pgorm::pgorm_query::{Alias, CommonTableExpression, Query, WithClause};
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// let cheap = CommonTableExpression::new(
+    ///     Alias::new("cheap"),
+    ///     Query::select().column(cake::Column::Id).from(cake::Entity).to_owned(),
+    /// );
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .with_cte(WithClause::new(cheap))
+    ///         .filter(cake::Column::Id.gt(1))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     concat!(
+    ///         r#"WITH "cheap" AS (SELECT "id" FROM "cake") "#,
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" > 1"#,
+    ///     )
+    /// );
+    /// ```
+    // [spec:pgorm:def:query.build.with]
+    // [spec:pgorm:sem:query.build.with.attach]
+    fn with_cte(mut self, clause: WithClause) -> Self {
+        QuerySelect::query(&mut self).with_cte(clause);
+        self
+    }
+
+    /// Prefix the query with a `WITH RECURSIVE` clause.
+    ///
+    /// See [`with_cte`](QuerySelect::with_cte); the two share one slot, so the
+    /// last of either call wins.
+    ///
+    /// A recursive CTE takes its column types from the anchor arm, where an
+    /// unannotated `$n` placeholder resolves to `text`. Annotate any literal in
+    /// that arm with [`cast_as`](pgorm_query::Expr::cast_as) — see
+    /// `[spec:pgorm:sem:sql.render.placeholder-typing]`.
+    // [spec:pgorm:def:query.build.with]
+    // [spec:pgorm:sem:query.build.with.attach]
+    // [spec:pgorm:sem:sql.render.placeholder-typing]
+    fn with_recursive_cte(mut self, clause: RecursiveWithClause) -> Self {
+        QuerySelect::query(&mut self).with_recursive_cte(clause);
+        self
+    }
+
+    /// `JOIN LATERAL (<sub>) AS <alias> ON <on>`.
+    ///
+    /// A lateral join mutates the select statement in place, so the builder's
+    /// type — and with it the decode target — is unchanged.
+    // [spec:pgorm:sem:query.build.lateral]
+    fn join_lateral<T, C>(mut self, join: JoinType, sub: SelectStatement, alias: T, on: C) -> Self
+    where
+        T: IntoIden,
+        C: IntoCondition,
+    {
+        QuerySelect::query(&mut self).join_lateral(join, sub, alias, on);
+        self
+    }
+
+    /// `JOIN LATERAL (<sub>) AS <alias> ON TRUE` — the top-N-per-group shape,
+    /// where the correlation lives in the subquery's own `WHERE` and the join
+    /// itself has nothing left to constrain.
+    // [spec:pgorm:sem:query.build.lateral]
+    fn join_lateral_on_true<T>(self, join: JoinType, sub: SelectStatement, alias: T) -> Self
+    where
+        T: IntoIden,
+    {
+        self.join_lateral(join, sub, alias, SimpleExpr::Constant(true.into()))
+    }
+
+    /// Declare a named window the projection can refer to with `OVER "name"`.
+    // [spec:pgorm:sem:query.build.window]
+    fn window<A>(mut self, name: A, window: WindowStatement) -> Self
+    where
+        A: IntoIden,
+    {
+        QuerySelect::query(&mut self).window(name, window);
+        self
+    }
+
+    /// Project a windowed aggregate: `<func>() OVER <window> AS <alias>`.
+    ///
+    /// The window is referenced by the name given to
+    /// [`window`](QuerySelect::window). Being a projection, this steps the
+    /// builder to [`Projected`](QuerySelect::Projected) exactly as
+    /// [`column`](QuerySelect::column) and [`expr_as`](QuerySelect::expr_as) do.
+    // [spec:pgorm:sem:query.build.window]
+    fn window_expr_as<W, A>(mut self, func: FunctionCall, window: W, alias: A) -> Self::Projected
+    where
+        W: IntoIden,
+        A: IntoIden,
+    {
+        QuerySelect::query(&mut self).expr_window_name_as(func, window, alias);
+        self.into_projected()
+    }
+
+    /// Append a `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` arm.
+    ///
+    /// Both arms are the same builder type, so both project the same columns in
+    /// the same order and the combined result still decodes as whatever the
+    /// first arm decoded as — which is also the arm PostgreSQL takes the result
+    /// column names from.
+    ///
+    /// ```
+    /// use pgorm::pgorm_query::UnionType;
+    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    ///
+    /// let cheap = cake::Entity::find().filter(cake::Column::Id.lt(3));
+    /// let dear = cake::Entity::find().filter(cake::Column::Id.gt(9));
+    ///
+    /// assert_eq!(
+    ///     cheap.union(UnionType::All, dear).as_query().to_string(),
+    ///     concat!(
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" < 3 "#,
+    ///         r#"UNION ALL (SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" > 9)"#,
+    ///     )
+    /// );
+    /// ```
+    // [spec:pgorm:sem:query.build.union]
+    fn union(mut self, union_type: UnionType, other: Self) -> Self
+    where
+        Self: QueryTrait<QueryStatement = SelectStatement>,
+    {
+        let other = other.into_query();
+        QuerySelect::query(&mut self).union(union_type, other);
+        self
+    }
 }
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;

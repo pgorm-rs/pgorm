@@ -27,7 +27,7 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(
@@ -440,7 +440,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -512,7 +512,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 impl<E, F> SelectTwoProjected<E, F>
 where
     E: EntityTrait,
@@ -702,6 +702,50 @@ where
         }
     }
 
+    /// Decode a caller-built [`SelectStatement`]'s rows into a
+    /// [`FromQueryResult`] type.
+    ///
+    /// The statement need not have an entity behind it — a CTE used as the
+    /// driving table is the motivating case — and it stays a statement, so
+    /// [`one`](Selector::one) still injects its `LIMIT 1` and the
+    /// empty-projection guard still runs before anything reaches the server.
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "macros")]
+    /// # {
+    /// # use pgorm::{DatabasePool, Error, FromQueryResult, SelectModel, Selector, tests_cfg::cake};
+    /// # use pgorm::pgorm_query::{Alias, Expr, Query};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
+    /// #[derive(Debug, FromQueryResult)]
+    /// struct NameOnly {
+    ///     name: String,
+    /// }
+    ///
+    /// let statement = Query::select()
+    ///     .expr_as(Expr::col(cake::Column::Name), Alias::new("name"))
+    ///     .from(cake::Entity)
+    ///     .to_owned();
+    ///
+    /// let db = pool.get().await?;
+    /// let names: Vec<NameOnly> = Selector::<SelectModel<NameOnly>>::from_select::<NameOnly>(statement)
+    ///     .all(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    // [spec:pgorm:sem:exec.crud.selector-entry]
+    pub fn from_select<M>(query: SelectStatement) -> Selector<SelectModel<M>>
+    where
+        M: FromQueryResult,
+    {
+        Selector {
+            query,
+            selector: SelectModel { model: PhantomData },
+        }
+    }
+
     fn into_selector_raw(self) -> Result<SelectorRaw<S>, Error> {
         ensure_select_list(&self.query)?;
         let (stmt, values) = self.query.build();
@@ -714,7 +758,7 @@ where
     }
 
     /// Get an item from the Select query
-    // [spec:pgorm:sem:exec.crud.select+1]
+    // [spec:pgorm:sem:exec.crud.select+2]
     pub async fn one<C>(mut self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
@@ -768,6 +812,41 @@ where
             stmt,
             values,
             selector: SelectModel { model: PhantomData },
+        }
+    }
+
+    /// Decode a raw statement's rows into a tuple by column index.
+    ///
+    /// The ordinal counterpart of [`with_columns`](SelectorRaw::with_columns),
+    /// which needs an `Iden` enum to name the columns — an enum a caller who
+    /// already holds the SQL text usually does not have.
+    ///
+    /// ```no_run
+    /// # use pgorm::{DatabasePool, Error, SelectGetableTuple, SelectorRaw};
+    /// # use pgorm::pgorm_query::Values;
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
+    /// let db = pool.get().await?;
+    ///
+    /// let rows: Vec<(i32, String)> =
+    ///     SelectorRaw::<SelectGetableTuple<(i32, String)>>::into_tuple::<(i32, String)>(
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#.to_owned(),
+    ///         Values(vec![]),
+    ///     )
+    ///     .all(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    // [spec:pgorm:sem:exec.crud.selector-entry]
+    pub fn into_tuple<T>(stmt: String, values: Values) -> SelectorRaw<SelectGetableTuple<T>>
+    where
+        T: TryGetableMany,
+    {
+        SelectorRaw {
+            stmt,
+            values,
+            selector: SelectGetableTuple { model: PhantomData },
         }
     }
 
@@ -852,7 +931,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.select+1]
+    // [spec:pgorm:sem:exec.crud.select+2]
     pub async fn one<C>(self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,

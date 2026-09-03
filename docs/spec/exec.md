@@ -255,16 +255,41 @@ These rules capture what the code does today, including known gaps.
 > `SelectGetableValue<T, C>` (tuple by named columns from the `C` enum),
 > and `SelectGetableTuple<T>` (tuple by ordinal).
 >
-> Conversions: `Select::into_model`, `into_partial_model`, `into_values`,
-> `into_tuple`, `from_raw_sql`; `SelectorRaw::from_statement`,
-> `with_columns`, `into_model`. Executing a `Selector` first builds SQL
+> Conversions from a builder: `Select::into_model`, `into_partial_model`,
+> `into_values`, `into_tuple`, `from_raw_sql`; the constructors that take a
+> statement or a string directly are enumerated by
+> `exec.crud.selector-entry`. Executing a `Selector` first builds SQL
 > with the Postgres `QueryBuilder`, then binds each `Value` through the
 > `ValueHolder` `ToSql` adapter (see `exec.cursor.binding`).
 
-> [spec:pgorm:sem:exec.crud.select+1]
+> [spec:pgorm:sem:exec.crud.selector-entry]
+> A caller who has built a `SelectStatement` outside the entity builders —
+> a CTE used as the driving table has no entity behind it at all — MUST
+> still be able to name a decode target without collapsing the statement to
+> a string. `Selector` therefore has one constructor per decode shape:
+> `from_select::<M>(SelectStatement)` for a `FromQueryResult` type,
+> `into_tuple::<T>(SelectStatement)` for an ordinal tuple, and
+> `with_columns::<T, C>(SelectStatement)` for a tuple named by an `Iden`
+> enum. `SelectorRaw` mirrors the last two over `(String, Values)`:
+> `from_statement::<M>`, `into_tuple::<T>` and `with_columns::<T, C>`.
+>
+> The `Selector` constructors yield an ordinary `Selector`, so what they
+> build is not a lesser statement: `one` still injects `LIMIT 1`
+> (`exec.crud.select`), the empty-projection guard still runs before
+> anything reaches the server (`query.build.modifiers`), and `all`, `stream`
+> and the paginator are the same code as for an entity query. The
+> `SelectorRaw` constructors carry the raw statement's semantics unchanged —
+> no injected limit, and no projection guard, since a caller-supplied string
+> has no projection list to inspect.
+
+> [spec:pgorm:sem:exec.crud.select+2]
 > `Selector::one` and `one_opt` set `LIMIT 1` on the query, then execute
-> through the connection's `query_opt`. `SelectorRaw::one` and `one_opt`
-> execute the raw statement as-is (no limit is injected).
+> through the connection's `query_opt`. The limit is set on the statement
+> the selector holds, which for a CTE query is the carrying select and never
+> a CTE body (`query.build.with.attach`). `SelectorRaw::one` and `one_opt`
+> execute the raw statement as-is (no limit is injected), so a raw statement
+> that returns more than one row is a `query_opt` protocol error rather than
+> a first row.
 >
 > `one` returns the decoded item and fails with `Error::RecordNotFound`
 > when zero rows are returned; `one_opt` returns `Ok(None)` in that

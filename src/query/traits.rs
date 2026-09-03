@@ -77,7 +77,7 @@ pub trait QueryTrait {
 }
 
 /// Select specific column for partial model queries
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 pub trait SelectColumns {
     /// The state this builder moves to once a column has been selected.
     ///

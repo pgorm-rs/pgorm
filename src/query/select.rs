@@ -44,7 +44,7 @@ where
 /// `SELECT` with no projection has no rows to decode. Adding any column or
 /// expression moves to [`SelectProjected<E>`], where the terminal operations
 /// live.
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 #[derive(Clone, Debug)]
 pub struct SelectCustom<E>
 where
@@ -64,7 +64,7 @@ where
 /// [`into_values`](SelectProjected::into_values). The two-model combinators
 /// are absent for the same reason — their `A_`/`B_` aliasing scheme assumes
 /// `E`'s own select list.
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 #[derive(Clone, Debug)]
 pub struct SelectProjected<E>
 where
@@ -77,7 +77,7 @@ where
 /// A [`SelectTwo<E, F>`] whose projection list has been cleared by
 /// [`SelectTwo::select_only`]: the two-model counterpart of
 /// [`SelectCustom<E>`].
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 #[derive(Clone, Debug)]
 pub struct SelectTwoCustom<E, F>
 where
@@ -90,7 +90,7 @@ where
 
 /// A two-model select carrying a caller-authored projection: the two-model
 /// counterpart of [`SelectProjected<E>`].
-// [spec:pgorm:sem:query.build.modifiers+3]
+// [spec:pgorm:sem:query.build.modifiers+4]
 #[derive(Clone, Debug)]
 pub struct SelectTwoProjected<E, F>
 where
@@ -325,7 +325,7 @@ where
     ///     .column(cake::Column::Name)
     ///     .find_also_related(fruit::Entity);
     /// ```
-    // [spec:pgorm:sem:query.build.modifiers+3]
+    // [spec:pgorm:sem:query.build.modifiers+4]
     pub fn select_only(mut self) -> SelectCustom<E> {
         self.query.clear_selects();
         SelectCustom {
@@ -341,7 +341,7 @@ where
 {
     /// Discard the projection built so far and start over from
     /// [`SelectCustom<E>`].
-    // [spec:pgorm:sem:query.build.modifiers+3]
+    // [spec:pgorm:sem:query.build.modifiers+4]
     pub fn select_only(mut self) -> SelectCustom<E> {
         self.query.clear_selects();
         SelectCustom {
@@ -358,7 +358,7 @@ where
 {
     /// Clear the selection list, moving to the projection-less
     /// [`SelectTwoCustom<E, F>`] state.
-    // [spec:pgorm:sem:query.build.modifiers+3]
+    // [spec:pgorm:sem:query.build.modifiers+4]
     pub fn select_only(mut self) -> SelectTwoCustom<E, F> {
         self.query.clear_selects();
         SelectTwoCustom {
@@ -375,7 +375,7 @@ where
 {
     /// Discard the projection built so far and start over from
     /// [`SelectTwoCustom<E, F>`].
-    // [spec:pgorm:sem:query.build.modifiers+3]
+    // [spec:pgorm:sem:query.build.modifiers+4]
     pub fn select_only(mut self) -> SelectTwoCustom<E, F> {
         self.query.clear_selects();
         SelectTwoCustom {

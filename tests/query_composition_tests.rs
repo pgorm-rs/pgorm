@@ -1,0 +1,522 @@
+#![allow(unused_imports, dead_code)]
+
+//! CTE, LATERAL, WINDOW and UNION composition against a live server.
+//!
+//! Each of these claims that a statement shaped by one of the composition
+//! clauses still decodes through the ORM's own terminals — `one` with its
+//! injected `LIMIT 1`, `all`, `stream`, the tuple decode. A renderer cannot
+//! prove that; only rows coming back can.
+//!
+//! Run the test locally:
+//! DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_composition_tests
+
+pub mod common;
+
+use futures::StreamExt;
+
+use common::bakery_chain::{Bakery, Cake, bakery, cake, create_tables};
+pub use common::{TestContext, setup::*};
+use pgorm::pgorm_query::{
+    Alias, CommonTableExpression, Condition, Func, Order, OrderedStatement, Query,
+    RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
+};
+use pgorm::{
+    ActiveValue::Set, ConnectionTrait, Error, FromQueryResult, JoinType, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, SelectGetableTuple, SelectModel, Selector, SelectorRaw,
+    entity::prelude::*,
+};
+use pretty_assertions::assert_eq;
+
+async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
+    let alpha = bakery::ActiveModel {
+        name: Set("Alpha".to_owned()),
+        profit_margin: Set(10.0),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    let beta = bakery::ActiveModel {
+        name: Set("Beta".to_owned()),
+        profit_margin: Set(20.0),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+
+    let prices = [
+        (alpha.id, "Alpha Bun", 5),
+        (alpha.id, "Alpha Tart", 15),
+        (alpha.id, "Alpha Torte", 25),
+        (beta.id, "Beta Bun", 8),
+        (beta.id, "Beta Slice", 18),
+        (beta.id, "Beta Gateau", 35),
+    ];
+    for (bakery_id, name, price) in prices {
+        cake::ActiveModel {
+            name: Set(name.to_owned()),
+            price: Set(rust_dec(price)),
+            gluten_free: Set(false),
+            serial: Set(Uuid::new_v4()),
+            bakery_id: Set(Some(bakery_id)),
+            ..Default::default()
+        }
+        .insert(db)
+        .await?;
+    }
+
+    Ok((alpha.id, beta.id))
+}
+
+/// `WITH RECURSIVE bracket (lo) AS (anchor UNION ALL step)`, counting the cakes
+/// that fall in each ten-unit price band.
+///
+/// The anchor's literal carries an explicit cast: a bare `$n` there would settle
+/// the CTE's column type as `text` and the step arm's `lo + 10` would have no
+/// operator to resolve.
+fn price_brackets() -> RecursiveWithClause {
+    let bracket = Alias::new("bracket");
+    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+
+    let mut anchor = Query::select()
+        .expr_as(
+            Expr::val(0i32).cast_as(Alias::new("integer")),
+            Alias::new("lo"),
+        )
+        .to_owned();
+
+    let step = Query::select()
+        .expr_as(lo().add(10i32), Alias::new("lo"))
+        .from(bracket.clone())
+        .and_where(lo().lt(30i32))
+        .to_owned();
+
+    RecursiveWithClause::new(
+        CommonTableExpression::new(bracket, anchor.union(UnionType::All, step).to_owned())
+            .columns([Alias::new("lo")])
+            .to_owned(),
+    )
+}
+
+/// The band-count query whose driving table is the CTE, so no entity is behind
+/// it and `Selector::from_select` is the only typed way in.
+fn bracket_counts() -> SelectStatement {
+    let bracket = Alias::new("bracket");
+    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+
+    Query::select()
+        .expr_as(lo(), Alias::new("lo"))
+        .expr_as(
+            Expr::col((cake::Entity, cake::Column::Id)).count(),
+            Alias::new("cakes"),
+        )
+        .from(bracket)
+        .join(
+            JoinType::LeftJoin,
+            cake::Entity,
+            Condition::all()
+                .add(Expr::col((cake::Entity, cake::Column::Price)).gte(lo()))
+                .add(Expr::col((cake::Entity, cake::Column::Price)).lt(lo().add(10i32))),
+        )
+        .add_group_by([lo().into()])
+        .to_owned()
+}
+
+#[derive(Debug, PartialEq, Eq, FromQueryResult)]
+struct PriceBracket {
+    lo: i32,
+    cakes: i64,
+}
+
+// [spec:pgorm:def:query.build.with/test]    a recursive CTE drives the query and the rows land in a
+// `FromQueryResult` struct through every terminal the ORM owns
+// [spec:pgorm:sem:query.build.with.attach/test]
+// [spec:pgorm:sem:exec.crud.selector-entry/test]
+// [spec:pgorm:sem:sql.render.placeholder-typing/test]    the anchor's cast is what makes the
+// recursion typecheck at all
+#[pgorm_macros::test]
+pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
+    let ctx = TestContext::new("recursive_cte_decodes_all_one_and_stream").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let ascending = || {
+        bracket_counts()
+            .order_by((Alias::new("bracket"), Alias::new("lo")), Order::Asc)
+            .to_owned()
+            .with(price_brackets())
+    };
+
+    let all = Selector::<SelectModel<PriceBracket>>::from_select::<PriceBracket>(ascending())
+        .all(&db)
+        .await?;
+    assert_eq!(
+        all,
+        [
+            PriceBracket { lo: 0, cakes: 2 },
+            PriceBracket { lo: 10, cakes: 2 },
+            PriceBracket { lo: 20, cakes: 1 },
+            PriceBracket { lo: 30, cakes: 1 },
+        ],
+        "four bands, each counting the cakes priced into it"
+    );
+
+    // `one` pushes its LIMIT onto the carrying select, not into the CTE, so a
+    // multi-row query yields its first row instead of a protocol error.
+    let fullest = Selector::<SelectModel<PriceBracket>>::from_select::<PriceBracket>(
+        bracket_counts()
+            .order_by_expr(
+                Expr::col((cake::Entity, cake::Column::Id)).count(),
+                Order::Desc,
+            )
+            .order_by((Alias::new("bracket"), Alias::new("lo")), Order::Asc)
+            .to_owned()
+            .with(price_brackets()),
+    )
+    .one(&db)
+    .await?;
+    assert_eq!(fullest, PriceBracket { lo: 0, cakes: 2 });
+
+    let mut stream =
+        Selector::<SelectModel<PriceBracket>>::from_select::<PriceBracket>(ascending())
+            .stream(&db)
+            .await?;
+    let mut streamed = Vec::new();
+    while let Some(row) = stream.next().await {
+        streamed.push(row?);
+    }
+    assert_eq!(streamed, all, "the stream decodes what `all` collected");
+    drop(stream);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:sql.render.placeholder-typing/test]    the caller obligation has teeth: an
+// unannotated anchor placeholder resolves to `text` and the server refuses the recursion
+#[pgorm_macros::test]
+pub async fn recursive_cte_anchor_needs_a_cast() -> Result<(), Error> {
+    let ctx = TestContext::new("recursive_cte_anchor_needs_a_cast").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let bracket = Alias::new("bracket");
+    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+
+    let mut anchor = Query::select()
+        .expr_as(Expr::val(0i32), Alias::new("lo"))
+        .to_owned();
+    let step = Query::select()
+        .expr_as(lo().add(10i32), Alias::new("lo"))
+        .from(bracket.clone())
+        .and_where(lo().lt(30i32))
+        .to_owned();
+
+    let uncast = Query::select()
+        .expr_as(lo(), Alias::new("lo"))
+        .from(bracket.clone())
+        .to_owned()
+        .with(RecursiveWithClause::new(
+            CommonTableExpression::new(bracket, anchor.union(UnionType::All, step).to_owned())
+                .columns([Alias::new("lo")])
+                .to_owned(),
+        ));
+
+    let refused = Selector::<SelectGetableTuple<(i32,)>>::into_tuple::<(i32,)>(uncast)
+        .all(&db)
+        .await
+        .expect_err("an untyped anchor placeholder cannot carry an integer band");
+    let message = refused.to_string();
+    assert!(
+        message.contains("operator does not exist: text +"),
+        "the untyped anchor settles the CTE column as text: {message}"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.build.with.attach/test]    a CTE joined into an entity's own query leaves
+// the builder a `Select<E>`, so filters, ordering and the `E::Model` terminals all still apply
+// [spec:pgorm:sem:query.build.lateral/test]
+#[pgorm_macros::test]
+pub async fn cte_joins_into_entity_find() -> Result<(), Error> {
+    let ctx = TestContext::new("cte_joins_into_entity_find").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    let (_alpha, beta) = seed(&db).await?;
+
+    let best = Alias::new("best");
+    let cte = CommonTableExpression::new(
+        best.clone(),
+        Query::select()
+            .column(cake::Column::BakeryId)
+            .expr_as(
+                Expr::col((cake::Entity, cake::Column::Price)).max(),
+                Alias::new("top"),
+            )
+            .from(cake::Entity)
+            .group_by_col(cake::Column::BakeryId)
+            .to_owned(),
+    )
+    .columns([Alias::new("bakery_id"), Alias::new("top")])
+    .to_owned();
+
+    // A bare projected `$n` is untyped for the same reason a recursive anchor's
+    // is, so the marker column is a constant rather than a bound value.
+    let dearest = Query::select()
+        .expr(SimpleExpr::Constant(1i32.into()))
+        .from(best.clone())
+        .and_where(
+            Expr::col((best.clone(), Alias::new("bakery_id")))
+                .equals((bakery::Entity, bakery::Column::Id)),
+        )
+        .and_where(Expr::col((best.clone(), Alias::new("top"))).gt(rust_dec(30)))
+        .to_owned();
+
+    let bakeries = Bakery::find()
+        .with_cte(WithClause::new(cte))
+        .join_lateral_on_true(JoinType::InnerJoin, dearest, Alias::new("m"))
+        .filter(bakery::Column::Name.like("B%"))
+        .order_by_asc(bakery::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        bakeries.iter().map(|b| b.id).collect::<Vec<_>>(),
+        [beta],
+        "only the bakery whose dearest cake clears 30 survives both the CTE and the filter"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// `bakery CROSS JOIN LATERAL (SELECT … FROM cake WHERE cake.bakery_id =
+/// bakery.id ORDER BY price DESC LIMIT 2) top ON TRUE`.
+fn top_two_per_bakery() -> SelectStatement {
+    let top = Alias::new("top");
+    let per_bakery = Query::select()
+        .column(cake::Column::Name)
+        .from(cake::Entity)
+        .and_where(
+            Expr::col((cake::Entity, cake::Column::BakeryId))
+                .equals((bakery::Entity, bakery::Column::Id)),
+        )
+        .order_by(cake::Column::Price, Order::Desc)
+        .limit(2)
+        .to_owned();
+
+    Bakery::find()
+        .select_only()
+        .column_as(bakery::Column::Name, "bakery")
+        .expr_as(Expr::col((top.clone(), cake::Column::Name)), "cake")
+        .join_lateral_on_true(JoinType::InnerJoin, per_bakery, top.clone())
+        .order_by_asc(bakery::Column::Id)
+        .order_by(
+            SimpleExpr::from(Expr::col((top, cake::Column::Name))),
+            Order::Asc,
+        )
+        .into_query()
+}
+
+#[derive(Debug, PartialEq, Eq, FromQueryResult)]
+struct TopCake {
+    bakery: String,
+    cake: String,
+}
+
+// [spec:pgorm:sem:query.build.lateral/test]    a LATERAL top-N-per-group is an in-place mutation of
+// the statement, so a named decode target still works
+#[pgorm_macros::test]
+pub async fn lateral_top_n_decodes_into_struct() -> Result<(), Error> {
+    let ctx = TestContext::new("lateral_top_n_decodes_into_struct").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let rows = Selector::<SelectModel<TopCake>>::from_select::<TopCake>(top_two_per_bakery())
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        rows,
+        [
+            TopCake {
+                bakery: "Alpha".to_owned(),
+                cake: "Alpha Tart".to_owned()
+            },
+            TopCake {
+                bakery: "Alpha".to_owned(),
+                cake: "Alpha Torte".to_owned()
+            },
+            TopCake {
+                bakery: "Beta".to_owned(),
+                cake: "Beta Gateau".to_owned()
+            },
+            TopCake {
+                bakery: "Beta".to_owned(),
+                cake: "Beta Slice".to_owned()
+            },
+        ],
+        "the two dearest cakes of each bakery"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.crud.selector-entry/test]    the very same statement decodes ordinally
+// through `Selector::into_tuple`, and its raw counterpart through `SelectorRaw::into_tuple`
+#[pgorm_macros::test]
+pub async fn lateral_top_n_decodes_into_tuple() -> Result<(), Error> {
+    let ctx = TestContext::new("lateral_top_n_decodes_into_tuple").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let tuples: Vec<(String, String)> =
+        Selector::<SelectGetableTuple<(String, String)>>::into_tuple::<(String, String)>(
+            top_two_per_bakery(),
+        )
+        .all(&db)
+        .await?;
+    assert_eq!(tuples.len(), 4);
+    assert_eq!(
+        tuples[0],
+        ("Alpha".to_owned(), "Alpha Tart".to_owned()),
+        "column order, not column name, is what an ordinal decode reads"
+    );
+
+    let (sql, values) = top_two_per_bakery().build();
+    let raw: Vec<(String, String)> =
+        SelectorRaw::<SelectGetableTuple<(String, String)>>::into_tuple::<(String, String)>(
+            sql, values,
+        )
+        .all(&db)
+        .await?;
+    assert_eq!(raw, tuples, "the raw entry point decodes the same rows");
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq, FromQueryResult)]
+struct RankedCake {
+    bakery_id: i32,
+    name: String,
+    rank: i64,
+}
+
+// [spec:pgorm:sem:query.build.window/test]    a named window declaration and the projection that
+// refers to it, both reachable as ORM combinators
+#[pgorm_macros::test]
+pub async fn window_clause_ranks_rows_per_bakery() -> Result<(), Error> {
+    let ctx = TestContext::new("window_clause_ranks_rows_per_bakery").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let ranked = Cake::find()
+        .select_only()
+        .column(cake::Column::BakeryId)
+        .column(cake::Column::Name)
+        .window_expr_as(
+            Func::cust(Alias::new("row_number")),
+            Alias::new("w"),
+            Alias::new("rank"),
+        )
+        .window(
+            Alias::new("w"),
+            WindowStatement::partition_by(cake::Column::BakeryId)
+                .order_by(cake::Column::Price, Order::Desc)
+                .to_owned(),
+        )
+        .order_by_asc(cake::Column::BakeryId)
+        .order_by_desc(cake::Column::Price)
+        .into_model::<RankedCake>()
+        .all(&db)
+        .await?;
+
+    assert_eq!(ranked.len(), 6);
+    assert_eq!(
+        ranked.iter().map(|c| c.rank).collect::<Vec<_>>(),
+        [1, 2, 3, 1, 2, 3],
+        "the rank restarts with each partition"
+    );
+    assert_eq!(ranked[0].name, "Alpha Torte");
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.build.union/test]    both arms are the same builder type, so the combined
+// result still decodes as `E::Model`
+#[pgorm_macros::test]
+pub async fn union_and_intersect_of_typed_selects() -> Result<(), Error> {
+    let ctx = TestContext::new("union_and_intersect_of_typed_selects").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let cheap = Cake::find().filter(cake::Column::Price.lt(rust_dec(10)));
+    let dear = Cake::find().filter(cake::Column::Price.gt(rust_dec(30)));
+    let extremes = cheap.union(UnionType::All, dear).all(&db).await?;
+    assert_eq!(
+        sorted_names(&extremes),
+        ["Alpha Bun", "Beta Bun", "Beta Gateau"],
+        "UNION ALL keeps every row of both arms"
+    );
+
+    let over_ten = Cake::find().filter(cake::Column::Price.gt(rust_dec(10)));
+    let under_thirty = Cake::find().filter(cake::Column::Price.lt(rust_dec(30)));
+    let middle = over_ten
+        .union(UnionType::Intersect, under_thirty)
+        .all(&db)
+        .await?;
+    assert_eq!(
+        sorted_names(&middle),
+        ["Alpha Tart", "Alpha Torte", "Beta Slice"],
+        "INTERSECT rides the same combinator"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+fn sorted_names(cakes: &[cake::Model]) -> Vec<String> {
+    let mut names: Vec<String> = cakes.iter().map(|c| c.name.clone()).collect();
+    names.sort();
+    names
+}
+
+// [spec:pgorm:sem:exec.crud.selector-entry/test]    the new constructor is a `Selector`, so it
+// inherits the empty-projection guard rather than sending `SELECT  FROM …`
+// [spec:pgorm:sem:query.build.modifiers+4/test]
+#[pgorm_macros::test]
+pub async fn from_select_guards_an_empty_projection() -> Result<(), Error> {
+    let ctx = TestContext::new("from_select_guards_an_empty_projection").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let empty = Query::select().from(cake::Entity).to_owned();
+    let refused = Selector::<SelectModel<cake::Model>>::from_select::<cake::Model>(empty)
+        .all(&db)
+        .await
+        .expect_err("a statement with no projection never reaches the server");
+    assert_eq!(
+        refused.to_string(),
+        "Query Error: select list is empty; add at least one column or expression"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}

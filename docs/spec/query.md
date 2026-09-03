@@ -58,7 +58,7 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias string.
 
-> [spec:pgorm:sem:query.build.modifiers+3]
+> [spec:pgorm:sem:query.build.modifiers+4]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` / `expr_as_` /
@@ -68,7 +68,13 @@ is what `EntityTrait::find()` produces.
 > removes it. `group_by` adds a GROUP BY expression, `having` accumulates
 > AND-ed HAVING conditions, `distinct` / `distinct_on` add DISTINCT /
 > DISTINCT ON, and `lock`, `lock_shared`, `lock_exclusive` and
-> `lock_with_behavior` add row-locking clauses. `SelectColumns` (in
+> `lock_with_behavior` add row-locking clauses. The composition clauses join
+> them on the same terms — `with_cte` / `with_recursive_cte`
+> (`query.build.with`), `join_lateral` / `join_lateral_on_true`
+> (`query.build.lateral`), `window` and `window_expr_as`
+> (`query.build.window`), and `union` (`query.build.union`) — each a default
+> method mutating the statement and returning `Self`, except the projecting
+> `window_expr_as`, which returns `Projected`. `SelectColumns` (in
 > `traits.rs`) re-exposes `column`/`column_as` as
 > `select_column`/`select_column_as` for partial-model queries.
 >
@@ -113,7 +119,8 @@ is what `EntityTrait::find()` produces.
 > where the mistake is caught. The typestate keeps the ORM's own builders out
 > of the empty-projection state, but two seams remain — an empty
 > `columns([])` / `exprs([])` iterator, and a `SelectStatement` handed
-> straight to `Selector::with_columns` / `Selector::into_tuple` — so the
+> straight to `Selector::with_columns` / `Selector::into_tuple` /
+> `Selector::from_select` (`exec.crud.selector-entry`) — so the
 > execution-boundary guard stays. Every ORM path that would send a SELECT
 > whose projection list is empty MUST return
 > `Error::Query(RuntimeError::Internal("select list is empty; add at least one
@@ -190,6 +197,105 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > columns are selected from the last alias as `B_<column>`. Unlike
 > `find_with_related`, `find_with_linked` does not append the primary-key
 > ORDER BY (it constructs the selector with `new_without_prepare`).
+
+The composition clauses — WITH, LATERAL, WINDOW and the set operators — are all
+in-place mutations of the same `SelectStatement`, so none of them changes what a
+builder is or what its rows decode into.
+
+> [spec:pgorm:def:query.build.with]
+> A WITH clause attaches to a SELECT by being *carried on it*:
+> `SelectStatement` holds `with: Option<Box<AnyWithClause>>` and the statement
+> renders its own prefix (`sql.render.select-order`). It MUST NOT be modelled as
+> a wrapper around the select, because a wrapper erases the statement — the
+> ORM's whole spine is a `SelectStatement`, and a value that has stopped being
+> one can no longer take a filter, an ordering, a `LIMIT`, a projection or any
+> typed terminal.
+>
+> Three setters write that one slot. `SelectStatement::with(clause)` takes
+> `self` and returns `Self`, accepting either clause form through
+> `Into<AnyWithClause>`; `with_cte(WithClause)` and
+> `with_recursive_cte(RecursiveWithClause)` are the `&mut self` builder-style
+> pair, named apart so the call site says which form it is building. All three
+> overwrite: the last call wins and a select carries at most one clause
+> (`query.build.with.single`).
+>
+> `QuerySelect` re-exposes the pair as owned-`self` default methods
+> `with_cte` / `with_recursive_cte` returning `Self`, so every ORM builder over a
+> `SelectStatement` — `Select<E>`, the projected and two-model states, `Cursor` —
+> gains CTE support without a new type and without a new decode path. `Selector`,
+> `SelectorRaw`, `Paginator` and `Cursor` inherit it unchanged, because the
+> clause is already inside the statement they were always given.
+
+> [spec:pgorm:sem:query.build.with.attach]
+> The carried clause renders as a prefix of the statement at whatever level the
+> statement occupies, so a select carrying one nests exactly like any other: as a
+> FROM subquery, a union arm, a CTE body and a LATERAL body, all of which
+> PostgreSQL parses. Nothing else about the statement changes — the builder keeps
+> its type, the projection keeps its shape, and `filter`, `order_by`, `limit`,
+> `join`, `join_lateral` and the projection combinators all still apply after the
+> clause is attached.
+>
+> Because the clause rides *inside* the statement rather than around it, the
+> execution terminals keep their semantics: `Selector::one` sets `LIMIT 1` on the
+> carrying select and not on any CTE body (`exec.crud.select`), the
+> empty-projection guard still inspects the carrying select's projection
+> (`query.build.modifiers`), and `stream`, the paginator and the cursor work on a
+> CTE query with no code of their own.
+>
+> A recursive CTE takes its column types from the anchor arm, where an
+> unannotated placeholder resolves to `text`; annotating it is the caller's
+> obligation under `sql.render.placeholder-typing`.
+
+> [spec:pgorm:req:query.build.with.single]
+> A WITH clause MUST have exactly one place to live on a SELECT. A carried clause
+> and a clause wrapped around the same select would both render, producing
+> `WITH … WITH … SELECT …`, which PostgreSQL does not parse — so the wrapping
+> form is removed from the type system rather than guarded at runtime
+> (`[dec:pgorm:invalid-states-unrepresentable]`).
+>
+> `WithQuery` therefore prefixes data-modifying statements only: its bound is the
+> `WithBody` trait, implemented for `InsertStatement`, `UpdateStatement` and
+> `DeleteStatement` and NOT for `SelectStatement` (nor for `WithQuery` itself,
+> which would stack two prefixes on one statement). `WithQuery::new`,
+> `WithClause::query` and `RecursiveWithClause::query` all take `T: WithBody`, so
+> handing any of them a select is a compile error and the double-WITH render is
+> unconstructible. `SelectStatement::with` accordingly returns `Self` rather than
+> a `WithQuery`; the DML statements' `with` methods still return one, since they
+> carry no clause of their own.
+
+> [spec:pgorm:sem:query.build.lateral]
+> `QuerySelect::join_lateral(join_type, sub, alias, on)` is the ORM name for
+> `SelectStatement::join_lateral`: it appends the join in place and returns
+> `Self`, so the builder's type — and the decode target with it — is unchanged.
+> `join_lateral_on_true(join_type, sub, alias)` is the top-N-per-group spelling,
+> where the correlation lives in the subquery's own WHERE and the join has
+> nothing left to constrain; its ON condition is the inlined constant `TRUE`
+> (`SimpleExpr::Constant`), never a bound parameter, because a bare `$n` in that
+> position has no type to resolve from (`sql.render.placeholder-typing`).
+
+> [spec:pgorm:sem:query.build.window]
+> `QuerySelect::window(name, spec)` declares a named window in place and returns
+> `Self`. `window_expr_as(func, window, alias)` projects
+> `<func>(…) OVER <window> AS <alias>` and, being a projection, returns
+> `QuerySelect::Projected` — it steps the `select_only` typestate forward exactly
+> as `column` and `expr_as` do (`query.build.modifiers`). The window declaration
+> is rendered at its own query level, ahead of the set operations and the
+> ORDER BY/LIMIT tail (`sql.render.select-order`).
+
+> [spec:pgorm:sem:query.build.union]
+> `QuerySelect::union(union_type, other)` appends a set-operation arm, where
+> `other` is of the *same builder type* as the receiver. That is the whole of the
+> static guarantee available at this layer and it is exactly the right one: both
+> arms are the same type, therefore the same projection in the same order,
+> therefore the same row shape — and the combined result still decodes as
+> whatever the first arm decoded as, which is also the arm PostgreSQL takes the
+> result column names from.
+>
+> The method carries `where Self: QueryTrait<QueryStatement = SelectStatement>`
+> so it can take the other arm's statement by value; a builder that is not one
+> simply does not have it. `UnionType::All` / `Distinct` / `Intersect` / `Except`
+> select the operator (`sql.ast.select.union`), and the arms accumulate rather
+> than merge.
 
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.

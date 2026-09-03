@@ -52,8 +52,11 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+1]
-> `SelectStatement` is the SELECT AST node. It accumulates: an optional
+> [spec:pgorm:def:sql.ast.select+2]
+> `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
+> WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
+> pays one pointer — `query.build.with` records why the clause lives on the
+> statement rather than in a wrapper), an optional
 > `SelectDistinct` (`All`, `Distinct`, `DistinctOn(Vec<ColumnRef>)` — the
 > MySQL-era `DistinctRow`, which no builder set and no renderer spelled, is
 > gone and MUST NOT return),
@@ -473,7 +476,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## WITH clauses and CTEs
 
-> [spec:pgorm:def:sql.ast.with+1]
+> [spec:pgorm:def:sql.ast.with+2]
 > `CommonTableExpression` defines one named query in a WITH clause and MUST be
 > complete the moment it exists: `CommonTableExpression::new(table_name, query)`
 > takes both mandatory parts, the query being any `QueryStatementBuilder` stored
@@ -499,6 +502,12 @@ today, including panicking edges and deliberate failsafes.
 > `stmt.with(clause)` on select/insert/update/delete accept. `WithQuery::new`
 > takes the clause and the statement it prefixes together, so a `WithQuery` is
 > likewise never half-built.
+>
+> A `WithQuery` prefixes a *data-modifying* statement only: the statement bound
+> is the `WithBody` trait, which `SelectStatement` deliberately does not
+> implement because a select carries its clause itself. That split, and the
+> invalid state it makes unconstructible, are specified by
+> `query.build.with.single`.
 
 > [spec:pgorm:req:sql.ast.with.recursive+1]
 > The recursive WITH form MUST be a distinct type, `RecursiveWithClause`, whose

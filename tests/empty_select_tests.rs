@@ -58,7 +58,7 @@ fn empty_projection() -> SelectProjected<Bakery> {
         .columns(std::iter::empty::<bakery::Column>())
 }
 
-// [spec:pgorm:sem:query.build.modifiers+3/test]    every execution path over a
+// [spec:pgorm:sem:query.build.modifiers+4/test]    every execution path over a
 // statement whose projection list is empty returns Error::Query before the
 // statement is sent
 pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
@@ -142,7 +142,7 @@ pub async fn empty_select_list_is_refused(db: &DatabaseConnection) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+3/test]    a hand-rolled statement,
+// [spec:pgorm:sem:query.build.modifiers+4/test]    a hand-rolled statement,
 // which the typestate never sees, is refused by the same guard
 pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
     assert_empty_select_list(
@@ -153,7 +153,7 @@ pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+3/test]    a statement whose projection
+// [spec:pgorm:sem:query.build.modifiers+4/test]    a statement whose projection
 // list is non-empty is untouched by the guard
 pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
     Bakery::insert(bakery::ActiveModel {
