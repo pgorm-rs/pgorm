@@ -1148,88 +1148,69 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Write ON CONFLICT expression
-    // [spec:pgorm:req:sql.render.on-conflict]
+    // [spec:pgorm:req:sql.render.on-conflict+1]
     fn prepare_on_conflict(&self, on_conflict: &Option<OnConflict>, sql: &mut dyn SqlWriter) {
-        if let Some(on_conflict) = on_conflict {
-            self.prepare_on_conflict_keywords(sql);
-            self.prepare_on_conflict_target(&on_conflict.targets, sql);
-            self.prepare_on_conflict_condition(&on_conflict.target_where, sql);
-            self.prepare_on_conflict_action(&on_conflict.action, sql);
-            self.prepare_on_conflict_condition(&on_conflict.action_where, sql);
+        let Some(on_conflict) = on_conflict else {
+            return;
+        };
+        self.prepare_on_conflict_keywords(sql);
+        match on_conflict {
+            OnConflict::AnyDoNothing => write!(sql, " DO NOTHING").unwrap(),
+            OnConflict::Targeted { target, action } => {
+                self.prepare_on_conflict_target(target, sql);
+                self.prepare_on_conflict_action(action, sql);
+            }
         }
     }
 
     #[doc(hidden)]
     /// Write ON CONFLICT target
-    fn prepare_on_conflict_target(
-        &self,
-        on_conflict_targets: &[OnConflictTarget],
-        sql: &mut dyn SqlWriter,
-    ) {
-        if on_conflict_targets.is_empty() {
-            return;
-        }
-
-        write!(sql, "(").unwrap();
-        on_conflict_targets.iter().fold(true, |first, target| {
+    fn prepare_on_conflict_target(&self, target: &ConflictTarget, sql: &mut dyn SqlWriter) {
+        write!(sql, " (").unwrap();
+        target.elements().fold(true, |first, element| {
             if !first {
                 write!(sql, ", ").unwrap()
             }
-            match target {
-                OnConflictTarget::ConflictColumn(col) => {
+            match element {
+                ConflictElement::Column(col) => {
                     col.prepare(sql.as_writer(), self.quote());
                 }
-
-                OnConflictTarget::ConflictExpr(expr) => {
+                ConflictElement::Expr(expr) => {
                     self.prepare_simple_expr(expr, sql);
                 }
             }
             false
         });
         write!(sql, ")").unwrap();
+        self.prepare_on_conflict_condition(&target.filter, sql);
     }
 
     #[doc(hidden)]
     /// Write ON CONFLICT action
-    fn prepare_on_conflict_action(
-        &self,
-        on_conflict_action: &Option<OnConflictAction>,
-        sql: &mut dyn SqlWriter,
-    ) {
-        self.prepare_on_conflict_action_common(on_conflict_action, sql);
-    }
-
-    fn prepare_on_conflict_action_common(
-        &self,
-        on_conflict_action: &Option<OnConflictAction>,
-        sql: &mut dyn SqlWriter,
-    ) {
-        if let Some(action) = on_conflict_action {
-            match action {
-                OnConflictAction::DoNothing(_) => {
-                    write!(sql, " DO NOTHING").unwrap();
-                }
-                OnConflictAction::Update(update_strats) => {
-                    self.prepare_on_conflict_do_update_keywords(sql);
-                    update_strats.iter().fold(true, |first, update_strat| {
-                        if !first {
-                            write!(sql, ", ").unwrap()
+    fn prepare_on_conflict_action(&self, action: &ConflictAction, sql: &mut dyn SqlWriter) {
+        match action {
+            ConflictAction::DoNothing => write!(sql, " DO NOTHING").unwrap(),
+            ConflictAction::Update { sets, filter } => {
+                self.prepare_on_conflict_do_update_keywords(sql);
+                sets.iter().fold(true, |first, assignment| {
+                    if !first {
+                        write!(sql, ", ").unwrap()
+                    }
+                    match assignment {
+                        ConflictAssignment::Column(col) => {
+                            col.prepare(sql.as_writer(), self.quote());
+                            write!(sql, " = ").unwrap();
+                            self.prepare_on_conflict_excluded_table(col, sql);
                         }
-                        match update_strat {
-                            OnConflictUpdate::Column(col) => {
-                                col.prepare(sql.as_writer(), self.quote());
-                                write!(sql, " = ").unwrap();
-                                self.prepare_on_conflict_excluded_table(col, sql);
-                            }
-                            OnConflictUpdate::Expr(col, expr) => {
-                                col.prepare(sql.as_writer(), self.quote());
-                                write!(sql, " = ").unwrap();
-                                self.prepare_simple_expr(expr, sql);
-                            }
+                        ConflictAssignment::Expr(col, expr) => {
+                            col.prepare(sql.as_writer(), self.quote());
+                            write!(sql, " = ").unwrap();
+                            self.prepare_simple_expr(expr, sql);
                         }
-                        false
-                    });
-                }
+                    }
+                    false
+                });
+                self.prepare_on_conflict_condition(filter, sql);
             }
         }
     }
@@ -1237,7 +1218,7 @@ impl QueryBuilder {
     #[doc(hidden)]
     /// Write ON CONFLICT keywords
     fn prepare_on_conflict_keywords(&self, sql: &mut dyn SqlWriter) {
-        write!(sql, " ON CONFLICT ").unwrap();
+        write!(sql, " ON CONFLICT").unwrap();
     }
 
     #[doc(hidden)]
@@ -1262,12 +1243,11 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Write ON CONFLICT conditions
-    fn prepare_on_conflict_condition(
-        &self,
-        on_conflict_condition: &ConditionHolder,
-        sql: &mut dyn SqlWriter,
-    ) {
-        self.prepare_condition(on_conflict_condition, "WHERE", sql)
+    fn prepare_on_conflict_condition(&self, filter: &Option<Condition>, sql: &mut dyn SqlWriter) {
+        if let Some(condition) = filter {
+            write!(sql, " WHERE ").unwrap();
+            self.prepare_condition_where(condition, sql);
+        }
     }
 
     #[doc(hidden)]

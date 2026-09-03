@@ -1,77 +1,241 @@
-use crate::{ConditionHolder, DynIden, IntoCondition, IntoIden, SimpleExpr};
+use crate::{Condition, ConditionHolder, DynIden, IntoCondition, IntoIden, SimpleExpr};
 
-// [spec:pgorm:req:sql.ast.on-conflict]
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct OnConflict {
-    pub(crate) targets: Vec<OnConflictTarget>,
-    pub(crate) target_where: ConditionHolder,
-    pub(crate) action: Option<OnConflictAction>,
-    pub(crate) action_where: ConditionHolder,
+/// A complete `ON CONFLICT` clause.
+///
+/// PostgreSQL admits an arbiter-less clause only for `DO NOTHING`, so these two
+/// variants are the two shapes it accepts: a bare `DO NOTHING`, or a conflict
+/// target paired with the action taken on it. There is no clause without an
+/// action to build, and no `DO UPDATE` without the target PostgreSQL demands
+/// for one.
+///
+/// A clause is built by naming its target first, then its action:
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let query = Query::insert()
+///     .into_table(Glyph::Table)
+///     .columns([Glyph::Aspect])
+///     .values_panic(["abcd".into()])
+///     .on_conflict(OnConflict::column(Glyph::Id).do_nothing())
+///     .to_owned();
+///
+/// assert_eq!(
+///     query.to_string(QueryBuilder),
+///     r#"INSERT INTO "glyph" ("aspect") VALUES ('abcd') ON CONFLICT ("id") DO NOTHING"#
+/// );
+/// ```
+///
+/// A target under construction is not a clause, so a conflict target with no
+/// action does not typecheck:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Query::insert()
+///     .into_table(Glyph::Table)
+///     .columns([Glyph::Aspect])
+///     .values_panic(["abcd".into()])
+///     .on_conflict(OnConflict::column(Glyph::Id));
+/// ```
+///
+/// `DO NOTHING` takes no `WHERE` — PostgreSQL accepts one only on `DO UPDATE` —
+/// so a finished clause has nothing to attach a filter to:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::column(Glyph::Id)
+///     .do_nothing()
+///     .and_where(Expr::col(Glyph::Aspect).gt(0));
+/// ```
+///
+/// and the arbiter-less form reaches no action at all, so it cannot become the
+/// targetless `DO UPDATE` PostgreSQL rejects:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::do_nothing().update_column(Glyph::Aspect);
+/// ```
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+// The arbiter-less form genuinely carries nothing, so the size gap is the
+// shape of the clause rather than a payload to box away.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum OnConflict {
+    /// `ON CONFLICT DO NOTHING`: no inference specification, so a conflict on
+    /// any constraint is swallowed.
+    AnyDoNothing,
+    /// `ON CONFLICT (..) DO ..`: a conflict target and the action taken on it.
+    Targeted {
+        /// Which conflicts this clause answers for.
+        target: ConflictTarget,
+        /// What is done about them.
+        action: ConflictAction,
+    },
 }
 
-/// Represents ON CONFLICT (upsert) targets
+/// One entry of a conflict target.
+// [spec:pgorm:req:sql.ast.on-conflict+1]
 #[derive(Debug, Clone, PartialEq)]
-pub enum OnConflictTarget {
-    /// A column
-    ConflictColumn(DynIden),
-    /// An expression `(LOWER(column), ...)`
-    ConflictExpr(SimpleExpr),
-}
-
-/// Represents ON CONFLICT (upsert) actions
-// [spec:pgorm:req:sql.ast.on-conflict]
-#[derive(Debug, Clone, PartialEq)]
-pub enum OnConflictAction {
-    /// Do nothing
-    DoNothing(Vec<DynIden>),
-    /// Update column value of existing row
-    Update(Vec<OnConflictUpdate>),
-}
-
-/// Represents strategies to update column in ON CONFLICT (upsert) actions
-#[derive(Debug, Clone, PartialEq)]
-pub enum OnConflictUpdate {
-    /// Update column value of existing row with inserting value
+pub enum ConflictElement {
+    /// A column, as in `ON CONFLICT ("id")`.
     Column(DynIden),
-    /// Update column value of existing row with expression
+    /// An expression, as in `ON CONFLICT (LOWER("name"))`.
+    Expr(SimpleExpr),
+}
+
+/// The conflict target of an `ON CONFLICT` clause: the index inference
+/// specification a conflict is matched against, and the optional partial-index
+/// predicate narrowing it.
+///
+/// Non-empty by construction — [`OnConflict::column`] and [`OnConflict::expr`]
+/// take the first entry and every extension adds one — so `ON CONFLICT ()`,
+/// which the PostgreSQL grammar rejects, has no value to build. The predicate
+/// lives here rather than beside the action because `ON CONFLICT WHERE ..` with
+/// no target is rejected too.
+///
+/// There is no constructor taking a list, because a list can be empty:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::columns([Glyph::Id, Glyph::Aspect]);
+/// ```
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConflictTarget {
+    pub(crate) first: ConflictElement,
+    pub(crate) rest: Vec<ConflictElement>,
+    pub(crate) filter: Option<Condition>,
+}
+
+/// One assignment of a `DO UPDATE SET`.
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConflictAssignment {
+    /// Take the column's value from the row that failed to insert:
+    /// `"col" = "excluded"."col"`.
+    Column(DynIden),
+    /// Assign an expression: `"col" = <expr>`.
     Expr(DynIden, SimpleExpr),
 }
 
+/// The assignments of a `DO UPDATE SET`, non-empty by construction: the
+/// transition into an update takes the first, so the dangling
+/// `DO UPDATE SET ` with nothing after it has no value to build.
+///
+/// The plural forms extend an update in progress and so cannot begin one, which
+/// is what keeps an empty list from becoming an empty `SET`:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::column(Glyph::Id).update_columns::<Glyph, _>([]);
+/// ```
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConflictAssignments {
+    pub(crate) first: ConflictAssignment,
+    pub(crate) rest: Vec<ConflictAssignment>,
+}
+
+/// What an `ON CONFLICT` clause does about a conflict it matched.
+///
+/// Only `Update` carries a filter, because PostgreSQL accepts `WHERE` only
+/// after `DO UPDATE SET ..`.
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConflictAction {
+    /// `DO NOTHING`.
+    DoNothing,
+    /// `DO UPDATE SET ..`.
+    Update {
+        /// The assignments, of which there is at least one.
+        sets: ConflictAssignments,
+        /// Restricts which conflicting rows are updated.
+        filter: Option<Condition>,
+    },
+}
+
+/// A `DO UPDATE SET` under construction, holding the target it answers for.
+///
+/// [`InsertStatement::on_conflict`](crate::InsertStatement::on_conflict) takes
+/// anything that converts into an [`OnConflict`], so a chain ending here is
+/// passed as it stands.
+// [spec:pgorm:req:sql.ast.on-conflict+1]
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConflictUpdate {
+    target: ConflictTarget,
+    sets: ConflictAssignments,
+    filter: Option<Condition>,
+}
+
+/// Folds `addition` into `filter` through the same merge a `WHERE` clause uses.
+fn merge(filter: Option<Condition>, addition: Condition) -> Option<Condition> {
+    let mut holder = ConditionHolder { contents: filter };
+    holder.add_condition(addition);
+    holder.contents
+}
+
 impl OnConflict {
-    /// Create a ON CONFLICT expression without target column,
-    /// a special method designed for MySQL
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Set ON CONFLICT target column
-    pub fn column<C>(column: C) -> Self
-    where
-        C: IntoIden,
-    {
-        Self::columns([column])
-    }
-
-    /// Set ON CONFLICT target columns
-    pub fn columns<I, C>(columns: I) -> Self
-    where
-        C: IntoIden,
-        I: IntoIterator<Item = C>,
-    {
-        Self {
-            targets: columns
-                .into_iter()
-                .map(|c| OnConflictTarget::ConflictColumn(c.into_iden()))
-                .collect(),
-            target_where: ConditionHolder::new(),
-            action: None,
-            action_where: ConditionHolder::new(),
-        }
-    }
-
-    /// Set ON CONFLICT target expression
+    /// `ON CONFLICT DO NOTHING`, with no inference specification: a conflict on
+    /// any constraint is swallowed.
     ///
-    /// # Examples
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table)
+    ///     .columns([Glyph::Aspect])
+    ///     .values_panic(["abcd".into()])
+    ///     .on_conflict(OnConflict::do_nothing())
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(QueryBuilder),
+    ///     r#"INSERT INTO "glyph" ("aspect") VALUES ('abcd') ON CONFLICT DO NOTHING"#
+    /// );
+    /// ```
+    pub fn do_nothing() -> Self {
+        Self::AnyDoNothing
+    }
+
+    /// Begin a conflict target at `column`.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table)
+    ///     .columns([Glyph::Aspect, Glyph::Image])
+    ///     .values_panic([2.into(), 3.into()])
+    ///     .on_conflict(
+    ///         OnConflict::column(Glyph::Id)
+    ///             .and_column(Glyph::Aspect)
+    ///             .update_column(Glyph::Image),
+    ///     )
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(QueryBuilder),
+    ///     [
+    ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
+    ///         r#"ON CONFLICT ("id", "aspect") DO UPDATE SET "image" = "excluded"."image""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    pub fn column<C>(column: C) -> ConflictTarget
+    where
+        C: IntoIden,
+    {
+        ConflictTarget::new(ConflictElement::Column(column.into_iden()))
+    }
+
+    /// Begin a conflict target at `expr`, for a conflict arbitrated by an
+    /// expression index.
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -81,11 +245,9 @@ impl OnConflict {
     ///     .columns([Glyph::Aspect, Glyph::Image])
     ///     .values_panic(["abcd".into(), 3.1415.into()])
     ///     .on_conflict(
-    ///         OnConflict::new()
-    ///             .expr(Expr::col(Glyph::Id))
+    ///         OnConflict::expr(Expr::col(Glyph::Id))
     ///             .update_column(Glyph::Aspect)
-    ///             .value(Glyph::Image, Expr::val(1).add(2))
-    ///             .to_owned(),
+    ///             .value(Glyph::Image, Expr::val(1).add(2)),
     ///     )
     ///     .to_owned();
     ///
@@ -99,66 +261,82 @@ impl OnConflict {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn expr<T>(&mut self, expr: T) -> &mut Self
+    pub fn expr<T>(expr: T) -> ConflictTarget
     where
         T: Into<SimpleExpr>,
     {
-        Self::exprs(self, [expr])
+        ConflictTarget::new(ConflictElement::Expr(expr.into()))
+    }
+}
+
+impl ConflictTarget {
+    fn new(first: ConflictElement) -> Self {
+        Self {
+            first,
+            rest: Vec::new(),
+            filter: None,
+        }
     }
 
-    /// Set multiple target expressions for ON CONFLICT. See [`OnConflict::expr`]
-    pub fn exprs<I, T>(&mut self, exprs: I) -> &mut Self
+    /// Add a further column to the target.
+    #[must_use]
+    pub fn and_column<C>(mut self, column: C) -> Self
     where
-        T: Into<SimpleExpr>,
-        I: IntoIterator<Item = T>,
+        C: IntoIden,
     {
-        self.targets.append(
-            &mut exprs
+        self.rest.push(ConflictElement::Column(column.into_iden()));
+        self
+    }
+
+    /// Add further columns to the target. An empty iterator adds none, which
+    /// leaves the target as it was rather than emptying it.
+    #[must_use]
+    pub fn and_columns<C, I>(mut self, columns: I) -> Self
+    where
+        C: IntoIden,
+        I: IntoIterator<Item = C>,
+    {
+        self.rest.extend(
+            columns
                 .into_iter()
-                .map(|e: T| OnConflictTarget::ConflictExpr(e.into()))
-                .collect(),
+                .map(|c| ConflictElement::Column(c.into_iden())),
         );
         self
     }
 
-    /// Set ON CONFLICT do nothing.
-    ///
-    /// Please use [`Self::do_nothing_on()`] and provide primary keys if you are using MySQL.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::insert()
-    ///     .into_table(Glyph::Table)
-    ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic(["abcd".into(), 3.1415.into()])
-    ///     .on_conflict(
-    ///         OnConflict::columns([Glyph::Id, Glyph::Aspect])
-    ///             .do_nothing()
-    ///             .to_owned(),
-    ///     )
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     [
-    ///         r#"INSERT INTO "glyph" ("aspect", "image")"#,
-    ///         r#"VALUES ('abcd', 3.1415)"#,
-    ///         r#"ON CONFLICT ("id", "aspect") DO NOTHING"#,
-    ///     ]
-    ///     .join(" ")
-    /// );
-    /// ```
-    pub fn do_nothing(&mut self) -> &mut Self {
-        self.action = Some(OnConflictAction::DoNothing(vec![]));
+    /// Add a further expression to the target.
+    #[must_use]
+    pub fn and_expr<T>(mut self, expr: T) -> Self
+    where
+        T: Into<SimpleExpr>,
+    {
+        self.rest.push(ConflictElement::Expr(expr.into()));
         self
     }
 
-    /// Set ON CONFLICT do nothing, but with MySQL specific polyfill.
-    ///
-    /// # Examples
+    /// Add further expressions to the target.
+    #[must_use]
+    pub fn and_exprs<T, I>(mut self, exprs: I) -> Self
+    where
+        T: Into<SimpleExpr>,
+        I: IntoIterator<Item = T>,
+    {
+        self.rest
+            .extend(exprs.into_iter().map(|e| ConflictElement::Expr(e.into())));
+        self
+    }
+
+    /// The target's entries, in the order they were added.
+    pub fn elements(&self) -> impl Iterator<Item = &ConflictElement> {
+        std::iter::once(&self.first).chain(self.rest.iter())
+    }
+
+    /// The partial-index predicate narrowing the arbiter, if one was given.
+    pub fn filter(&self) -> Option<&Condition> {
+        self.filter.as_ref()
+    }
+
+    /// Narrow the arbiter to a partial index's predicate.
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -166,38 +344,110 @@ impl OnConflict {
     /// let query = Query::insert()
     ///     .into_table(Glyph::Table)
     ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic(["abcd".into(), 3.1415.into()])
+    ///     .values_panic([2.into(), 3.into()])
     ///     .on_conflict(
-    ///         OnConflict::columns([Glyph::Id, Glyph::Aspect])
-    ///             .do_nothing_on([Glyph::Id])
-    ///             .to_owned(),
+    ///         OnConflict::column(Glyph::Id)
+    ///             .and_where(Expr::col((Glyph::Table, Glyph::Aspect)).is_null())
+    ///             .value(Glyph::Image, Expr::val(1).add(2)),
     ///     )
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
     ///     [
-    ///         r#"INSERT INTO "glyph" ("aspect", "image")"#,
-    ///         r#"VALUES ('abcd', 3.1415)"#,
-    ///         r#"ON CONFLICT ("id", "aspect") DO NOTHING"#,
+    ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
+    ///         r#"ON CONFLICT ("id") WHERE "glyph"."aspect" IS NULL"#,
+    ///         r#"DO UPDATE SET "image" = 1 + 2"#,
     ///     ]
     ///     .join(" ")
     /// );
     /// ```
-    pub fn do_nothing_on<C, I>(&mut self, pk_cols: I) -> &mut Self
+    #[must_use]
+    pub fn and_where(self, other: SimpleExpr) -> Self {
+        self.cond_where(other)
+    }
+
+    /// Narrow the arbiter when there is a predicate to narrow it by.
+    #[must_use]
+    pub fn and_where_option(self, other: Option<SimpleExpr>) -> Self {
+        match other {
+            Some(other) => self.cond_where(other),
+            None => self,
+        }
+    }
+
+    /// Narrow the arbiter by a condition.
+    #[must_use]
+    pub fn cond_where<C>(mut self, condition: C) -> Self
+    where
+        C: IntoCondition,
+    {
+        self.filter = merge(self.filter, condition.into_condition());
+        self
+    }
+
+    /// Take no action on a conflict this target matches.
+    pub fn do_nothing(self) -> OnConflict {
+        OnConflict::Targeted {
+            target: self,
+            action: ConflictAction::DoNothing,
+        }
+    }
+
+    /// Begin a `DO UPDATE SET` whose first assignment takes the column's value
+    /// from the row that failed to insert.
+    pub fn update_column<C>(self, column: C) -> ConflictUpdate
     where
         C: IntoIden,
-        I: IntoIterator<Item = C>,
     {
-        self.action = Some(OnConflictAction::DoNothing(
-            pk_cols.into_iter().map(IntoIden::into_iden).collect(),
-        ));
+        ConflictUpdate::new(self, ConflictAssignment::Column(column.into_iden()))
+    }
+
+    /// Begin a `DO UPDATE SET` whose first assignment sets `col` to `value`.
+    pub fn value<C, T>(self, col: C, value: T) -> ConflictUpdate
+    where
+        C: IntoIden,
+        T: Into<SimpleExpr>,
+    {
+        ConflictUpdate::new(
+            self,
+            ConflictAssignment::Expr(col.into_iden(), value.into()),
+        )
+    }
+}
+
+impl ConflictAssignments {
+    /// The assignments, in the order they were added.
+    pub fn iter(&self) -> impl Iterator<Item = &ConflictAssignment> {
+        std::iter::once(&self.first).chain(self.rest.iter())
+    }
+}
+
+impl ConflictUpdate {
+    fn new(target: ConflictTarget, first: ConflictAssignment) -> Self {
+        Self {
+            target,
+            sets: ConflictAssignments {
+                first,
+                rest: Vec::new(),
+            },
+            filter: None,
+        }
+    }
+
+    /// Also take this column's value from the row that failed to insert.
+    #[must_use]
+    pub fn update_column<C>(mut self, column: C) -> Self
+    where
+        C: IntoIden,
+    {
+        self.sets
+            .rest
+            .push(ConflictAssignment::Column(column.into_iden()));
         self
     }
 
-    /// Set ON CONFLICT update column
-    ///
-    /// # Examples
+    /// Also take these columns' values from the row that failed to insert.
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -205,131 +455,41 @@ impl OnConflict {
     /// let query = Query::insert()
     ///     .into_table(Glyph::Table)
     ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic([
-    ///         "abcd".into(),
-    ///         3.1415.into(),
-    ///     ])
+    ///     .values_panic([2.into(), 3.into()])
     ///     .on_conflict(
-    ///         OnConflict::columns([Glyph::Id, Glyph::Aspect])
+    ///         OnConflict::column(Glyph::Id)
     ///             .update_column(Glyph::Aspect)
-    ///             .value(Glyph::Image, Expr::val(1).add(2))
-    ///             .to_owned()
+    ///             .update_columns([Glyph::Image]),
     ///     )
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
     ///     [
-    ///         r#"INSERT INTO "glyph" ("aspect", "image")"#,
-    ///         r#"VALUES ('abcd', 3.1415)"#,
-    ///         r#"ON CONFLICT ("id", "aspect") DO UPDATE SET "aspect" = "excluded"."aspect", "image" = 1 + 2"#,
+    ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
+    ///         r#"ON CONFLICT ("id") DO UPDATE SET"#,
+    ///         r#""aspect" = "excluded"."aspect", "image" = "excluded"."image""#,
     ///     ]
     ///     .join(" ")
     /// );
     /// ```
-    pub fn update_column<C>(&mut self, column: C) -> &mut Self
-    where
-        C: IntoIden,
-    {
-        self.update_columns([column])
-    }
-
-    /// Set ON CONFLICT update columns
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::insert()
-    ///     .into_table(Glyph::Table)
-    ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic([
-    ///         2.into(),
-    ///         3.into(),
-    ///     ])
-    ///     .on_conflict(
-    ///         OnConflict::column(Glyph::Id)
-    ///             .update_columns([Glyph::Aspect, Glyph::Image])
-    ///             .to_owned(),
-    ///     )
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3) ON CONFLICT ("id") DO UPDATE SET "aspect" = "excluded"."aspect", "image" = "excluded"."image""#
-    /// );
-    /// ```
-    pub fn update_columns<C, I>(&mut self, columns: I) -> &mut Self
+    #[must_use]
+    pub fn update_columns<C, I>(mut self, columns: I) -> Self
     where
         C: IntoIden,
         I: IntoIterator<Item = C>,
     {
-        let mut update_strats: Vec<OnConflictUpdate> = columns
-            .into_iter()
-            .map(|x| OnConflictUpdate::Column(IntoIden::into_iden(x)))
-            .collect();
-
-        match &mut self.action {
-            Some(OnConflictAction::Update(v)) => {
-                v.append(&mut update_strats);
-            }
-            Some(OnConflictAction::DoNothing(_)) | None => {
-                self.action = Some(OnConflictAction::Update(update_strats));
-            }
-        };
+        self.sets.rest.extend(
+            columns
+                .into_iter()
+                .map(|c| ConflictAssignment::Column(c.into_iden())),
+        );
         self
     }
 
-    /// Set ON CONFLICT update exprs
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::insert()
-    ///     .into_table(Glyph::Table)
-    ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic([
-    ///         2.into(),
-    ///         3.into(),
-    ///     ])
-    ///     .on_conflict(
-    ///         OnConflict::column(Glyph::Id)
-    ///             .value(Glyph::Image, Expr::val(1).add(2))
-    ///             .to_owned()
-    ///     )
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3) ON CONFLICT ("id") DO UPDATE SET "image" = 1 + 2"#
-    /// );
-    /// ```
-    pub fn values<C, I>(&mut self, values: I) -> &mut Self
-    where
-        C: IntoIden,
-        I: IntoIterator<Item = (C, SimpleExpr)>,
-    {
-        let mut update_exprs: Vec<OnConflictUpdate> = values
-            .into_iter()
-            .map(|(c, e)| OnConflictUpdate::Expr(c.into_iden(), e))
-            .collect();
-
-        match &mut self.action {
-            Some(OnConflictAction::Update(v)) => {
-                v.append(&mut update_exprs);
-            }
-            Some(OnConflictAction::DoNothing(_)) | None => {
-                self.action = Some(OnConflictAction::Update(update_exprs));
-            }
-        };
-        self
-    }
-
-    /// Set ON CONFLICT update value
-    pub fn value<C, T>(&mut self, col: C, value: T) -> &mut Self
+    /// Also set `col` to `value`.
+    #[must_use]
+    pub fn value<C, T>(self, col: C, value: T) -> Self
     where
         C: IntoIden,
         T: Into<SimpleExpr>,
@@ -337,9 +497,22 @@ impl OnConflict {
         self.values([(col, value.into())])
     }
 
-    /// Set target WHERE
-    ///
-    /// # Examples
+    /// Also apply these `(column, expression)` assignments.
+    #[must_use]
+    pub fn values<C, I>(mut self, values: I) -> Self
+    where
+        C: IntoIden,
+        I: IntoIterator<Item = (C, SimpleExpr)>,
+    {
+        self.sets.rest.extend(
+            values
+                .into_iter()
+                .map(|(c, e)| ConflictAssignment::Expr(c.into_iden(), e)),
+        );
+        self
+    }
+
+    /// Restrict which conflicting rows the update reaches.
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -347,89 +520,57 @@ impl OnConflict {
     /// let query = Query::insert()
     ///     .into_table(Glyph::Table)
     ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic([
-    ///         2.into(),
-    ///         3.into(),
-    ///     ])
+    ///     .values_panic([2.into(), 3.into()])
     ///     .on_conflict(
     ///         OnConflict::column(Glyph::Id)
     ///             .value(Glyph::Image, Expr::val(1).add(2))
-    ///             .target_and_where(Expr::col((Glyph::Table, Glyph::Aspect)).is_null())
-    ///             .to_owned()
+    ///             .and_where(Expr::col((Glyph::Table, Glyph::Aspect)).is_null()),
     ///     )
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(QueryBuilder),
-    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3) ON CONFLICT ("id") WHERE "glyph"."aspect" IS NULL DO UPDATE SET "image" = 1 + 2"#
+    ///     [
+    ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
+    ///         r#"ON CONFLICT ("id") DO UPDATE SET "image" = 1 + 2"#,
+    ///         r#"WHERE "glyph"."aspect" IS NULL"#,
+    ///     ]
+    ///     .join(" ")
     /// );
     /// ```
-    pub fn target_and_where(&mut self, other: SimpleExpr) -> &mut Self {
-        self.target_cond_where(other)
+    #[must_use]
+    pub fn and_where(self, other: SimpleExpr) -> Self {
+        self.cond_where(other)
     }
 
-    /// Set target WHERE
-    pub fn target_and_where_option(&mut self, other: Option<SimpleExpr>) -> &mut Self {
-        if let Some(other) = other {
-            self.target_cond_where(other);
+    /// Restrict the update when there is a predicate to restrict it by.
+    #[must_use]
+    pub fn and_where_option(self, other: Option<SimpleExpr>) -> Self {
+        match other {
+            Some(other) => self.cond_where(other),
+            None => self,
         }
-        self
     }
 
-    /// Set target WHERE
-    pub fn target_cond_where<C>(&mut self, condition: C) -> &mut Self
+    /// Restrict the update by a condition.
+    #[must_use]
+    pub fn cond_where<C>(mut self, condition: C) -> Self
     where
         C: IntoCondition,
     {
-        self.target_where.add_condition(condition.into_condition());
+        self.filter = merge(self.filter, condition.into_condition());
         self
     }
+}
 
-    /// Set action WHERE
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::insert()
-    ///     .into_table(Glyph::Table)
-    ///     .columns([Glyph::Aspect, Glyph::Image])
-    ///     .values_panic([
-    ///         2.into(),
-    ///         3.into(),
-    ///     ])
-    ///     .on_conflict(
-    ///         OnConflict::column(Glyph::Id)
-    ///             .value(Glyph::Image, Expr::val(1).add(2))
-    ///             .action_and_where(Expr::col((Glyph::Table, Glyph::Aspect)).is_null())
-    ///             .to_owned()
-    ///     )
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(QueryBuilder),
-    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3) ON CONFLICT ("id") DO UPDATE SET "image" = 1 + 2 WHERE "glyph"."aspect" IS NULL"#
-    /// );
-    /// ```
-    pub fn action_and_where(&mut self, other: SimpleExpr) -> &mut Self {
-        self.action_cond_where(other)
-    }
-
-    /// Set action WHERE
-    pub fn action_and_where_option(&mut self, other: Option<SimpleExpr>) -> &mut Self {
-        if let Some(other) = other {
-            self.action_cond_where(other);
+impl From<ConflictUpdate> for OnConflict {
+    fn from(update: ConflictUpdate) -> Self {
+        Self::Targeted {
+            target: update.target,
+            action: ConflictAction::Update {
+                sets: update.sets,
+                filter: update.filter,
+            },
         }
-        self
-    }
-
-    /// Set action WHERE
-    pub fn action_cond_where<C>(&mut self, condition: C) -> &mut Self
-    where
-        C: IntoCondition,
-    {
-        self.action_where.add_condition(condition.into_condition());
-        self
     }
 }

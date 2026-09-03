@@ -1913,6 +1913,13 @@ children (
                         kind @note
                         text "Audit: OnConflict has three independent fields (targets/action/action_where, on_conflict.rs:5-10). action:None renders bare \"ON CONFLICT \"; Update(vec![]) renders dangling \"DO UPDATE SET \"; do_nothing().action_and_where(p) renders DO NOTHING WHERE which PG only permits on DO UPDATE; OnConflict::new() is documented in-tree as designed for MySQL. Redesign: mandatory target + closed enum ConflictAction { DoNothing, Update { sets: non-empty, filter: Option<Condition> } } — all four invalid shapes unconstructible. Coordinates with the landed get_on_conflict accessor (try-insert fix). Bumps sql.ast.on-conflict, sql.render.on-conflict. M, breaking."
                     }
+
+                    {
+                        at 2026-09-03T12:30:54.760131Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

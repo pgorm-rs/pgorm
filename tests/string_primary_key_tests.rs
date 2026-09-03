@@ -54,7 +54,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
         use pgorm::pgorm_query::OnConflict;
 
         let err = Repository::insert(repository)
-            .on_conflict(OnConflict::new().do_nothing().to_owned())
+            .on_conflict(OnConflict::do_nothing())
             .exec(db)
             .await;
 

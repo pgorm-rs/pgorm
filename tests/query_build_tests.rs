@@ -972,11 +972,7 @@ fn insert_add_omits_not_set_columns() {
 fn insert_on_conflict_is_attached_verbatim() {
     assert_eq!(
         cake::Entity::insert(apple())
-            .on_conflict(
-                OnConflict::column(cake::Column::Name)
-                    .update_column(cake::Column::Name)
-                    .to_owned()
-            )
+            .on_conflict(OnConflict::column(cake::Column::Name).update_column(cake::Column::Name))
             .as_query()
             .to_string(QueryBuilder),
         [

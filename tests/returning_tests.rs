@@ -239,7 +239,7 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
         name: Set("Duplicate Bakery".to_owned()),
         profit_margin: Set(0.5),
     })
-    .on_conflict(OnConflict::new().do_nothing().to_owned())
+    .on_conflict(OnConflict::do_nothing())
     .exec_with_returning(&db)
     .await;
     assert_eq!(conflicted, Err(DbErr::RecordNotFound));
@@ -251,7 +251,7 @@ async fn insert_returning_modes() -> Result<(), DbErr> {
         name: Set("Duplicate Bakery".to_owned()),
         profit_margin: Set(0.5),
     })
-    .on_conflict(OnConflict::new().do_nothing().to_owned())
+    .on_conflict(OnConflict::do_nothing())
     .exec_without_returning(&db)
     .await?;
     assert_eq!(skipped, 0);
@@ -356,7 +356,7 @@ async fn try_insert_result_variants() -> Result<(), DbErr> {
         name: Set("Duplicate Bakery".to_owned()),
         profit_margin: Set(0.5),
     };
-    let on_conflict = || OnConflict::new().do_nothing().to_owned();
+    let on_conflict = OnConflict::do_nothing;
 
     // An `ON CONFLICT DO NOTHING` clause that skips the row reads as Conflicted
     // on every entry point: `exec` from RecordNotInserted,

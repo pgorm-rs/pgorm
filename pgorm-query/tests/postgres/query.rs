@@ -1285,10 +1285,10 @@ fn insert_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict/test]
+// [spec:pgorm:req:sql.ast.on-conflict+1/test]
 #[test]
 #[allow(clippy::approx_constant)]
-// [spec:pgorm:req:sql.render.on-conflict/test]
+// [spec:pgorm:req:sql.render.on-conflict+1/test]
 fn insert_on_conflict_1() {
     assert_eq!(
         Query::insert()
@@ -1298,11 +1298,7 @@ fn insert_on_conflict_1() {
                 "04108048005887010020060000204E0180400400".into(),
                 3.1415.into(),
             ])
-            .on_conflict(
-                OnConflict::column(Glyph::Id)
-                    .update_column(Glyph::Aspect)
-                    .to_owned()
-            )
+            .on_conflict(OnConflict::column(Glyph::Id).update_column(Glyph::Aspect))
             .to_string(QueryBuilder),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
@@ -1325,9 +1321,10 @@ fn insert_on_conflict_2() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
-                    .update_columns([Glyph::Aspect, Glyph::Image])
-                    .to_owned()
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
+                    .update_column(Glyph::Aspect)
+                    .update_columns([Glyph::Image])
             )
             .to_string(QueryBuilder),
         [
@@ -1351,12 +1348,13 @@ fn insert_on_conflict_3() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
-                    .values([
-                        (Glyph::Aspect, "04108048005887010020060000204E0180400400".into()),
-                        (Glyph::Image, 3.1415.into()),
-                    ])
-                    .to_owned()
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
+                    .value(
+                        Glyph::Aspect,
+                        Expr::val("04108048005887010020060000204E0180400400")
+                    )
+                    .values([(Glyph::Image, 3.1415.into())])
             )
             .to_string(QueryBuilder),
         [
@@ -1380,9 +1378,9 @@ fn insert_on_conflict_4() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
                     .value(Glyph::Image, Expr::val(1).add(2))
-                    .to_owned()
             )
             .to_string(QueryBuilder),
         [
@@ -1406,10 +1404,13 @@ fn insert_on_conflict_5() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
-                    .value(Glyph::Aspect, Expr::val("04108048005887010020060000204E0180400400"))
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
+                    .value(
+                        Glyph::Aspect,
+                        Expr::val("04108048005887010020060000204E0180400400")
+                    )
                     .update_column(Glyph::Image)
-                    .to_owned()
             )
             .to_string(QueryBuilder),
         [
@@ -1433,10 +1434,10 @@ fn insert_on_conflict_6() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
                     .update_column(Glyph::Aspect)
                     .value(Glyph::Image, Expr::val(1).add(2))
-                    .to_owned()
             )
             .to_string(QueryBuilder),
         [
@@ -1459,12 +1460,7 @@ fn insert_on_conflict_7() {
                 "04108048005887010020060000204E0180400400".into(),
                 3.1415.into(),
             ])
-            .on_conflict(
-                OnConflict::new()
-                    .expr(Expr::col(Glyph::Id))
-                    .update_column(Glyph::Aspect)
-                    .to_owned()
-            )
+            .on_conflict(OnConflict::expr(Expr::col(Glyph::Id)).update_column(Glyph::Aspect))
             .to_string(QueryBuilder),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
@@ -1487,10 +1483,9 @@ fn insert_on_conflict_8() {
                 3.1415.into(),
             ])
             .on_conflict(
-                OnConflict::new()
-                    .exprs([Expr::col(Glyph::Id), Expr::col(Glyph::Aspect)])
+                OnConflict::expr(Expr::col(Glyph::Id))
+                    .and_exprs([Expr::col(Glyph::Aspect)])
                     .update_column(Glyph::Aspect)
-                    .to_owned()
             )
             .to_string(QueryBuilder),
         [
@@ -1515,9 +1510,8 @@ fn insert_on_conflict_9() {
             ])
             .on_conflict(
                 OnConflict::column(Glyph::Id)
-                    .expr(Func::lower(Expr::col(Glyph::Tokens)))
+                    .and_expr(Func::lower(Expr::col(Glyph::Tokens)))
                     .update_column(Glyph::Aspect)
-                    .to_owned()
             )
             .to_string(QueryBuilder),
         [
@@ -1529,7 +1523,7 @@ fn insert_on_conflict_9() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict/test]
+// [spec:pgorm:req:sql.ast.on-conflict+1/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_on_conflict_do_nothing() {
@@ -1539,9 +1533,9 @@ fn insert_on_conflict_do_nothing() {
             .columns([Glyph::Aspect, Glyph::Image])
             .values_panic(["abcd".into(), 3.1415.into()])
             .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
+                OnConflict::column(Glyph::Id)
+                    .and_column(Glyph::Aspect)
                     .do_nothing()
-                    .to_owned(),
             )
             .to_string(QueryBuilder),
         [
@@ -1553,24 +1547,47 @@ fn insert_on_conflict_do_nothing() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.on-conflict+1/test]
+// [spec:pgorm:req:sql.render.on-conflict+1/test]
 #[test]
 #[allow(clippy::approx_constant)]
-fn insert_on_conflict_do_nothing_on() {
+fn insert_on_conflict_bare_do_nothing() {
     assert_eq!(
         Query::insert()
             .into_table(Glyph::Table)
             .columns([Glyph::Aspect, Glyph::Image])
             .values_panic(["abcd".into(), 3.1415.into()])
-            .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
-                    .do_nothing_on([Glyph::Id])
-                    .to_owned(),
-            )
+            .on_conflict(OnConflict::do_nothing())
             .to_string(QueryBuilder),
         [
             r#"INSERT INTO "glyph" ("aspect", "image")"#,
             r#"VALUES ('abcd', 3.1415)"#,
-            r#"ON CONFLICT ("id", "aspect") DO NOTHING"#,
+            r#"ON CONFLICT DO NOTHING"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.on-conflict+1/test]
+// [spec:pgorm:req:sql.render.on-conflict+1/test]
+#[test]
+fn insert_on_conflict_both_filters() {
+    assert_eq!(
+        Query::insert()
+            .into_table(Glyph::Table)
+            .columns([Glyph::Aspect])
+            .values_panic([1.into()])
+            .on_conflict(
+                OnConflict::column(Glyph::Id)
+                    .and_where(Expr::col(Glyph::Aspect).is_null())
+                    .update_column(Glyph::Aspect)
+                    .and_where(Expr::col(Glyph::Image).gt(0))
+            )
+            .to_string(QueryBuilder),
+        [
+            r#"INSERT INTO "glyph" ("aspect") VALUES (1)"#,
+            r#"ON CONFLICT ("id") WHERE "aspect" IS NULL"#,
+            r#"DO UPDATE SET "aspect" = "excluded"."aspect" WHERE "image" > 0"#,
         ]
         .join(" ")
     );

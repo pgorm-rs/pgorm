@@ -270,15 +270,17 @@ impl InsertStatement {
         self
     }
 
-    /// ON CONFLICT expression
+    /// ON CONFLICT expression.
     ///
-    /// # Examples
-    ///
-    /// - [`OnConflict::update_columns`]: Update column value of existing row with inserting value
-    /// - [`OnConflict::value`]: Update a column of the existing row with a value
-    /// - [`OnConflict::values`]: Update columns of the existing row with values
-    pub fn on_conflict(&mut self, on_conflict: OnConflict) -> &mut Self {
-        self.on_conflict = Some(on_conflict);
+    /// Takes a finished [`OnConflict`], or a
+    /// [`ConflictUpdate`](crate::ConflictUpdate) that converts into one, so a
+    /// builder chain is passed as it stands. See [`OnConflict`] for the shapes
+    /// available.
+    pub fn on_conflict<T>(&mut self, on_conflict: T) -> &mut Self
+    where
+        T: Into<OnConflict>,
+    {
+        self.on_conflict = Some(on_conflict.into());
         self
     }
 

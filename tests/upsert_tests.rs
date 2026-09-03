@@ -27,9 +27,7 @@ async fn main() -> Result<(), DbErr> {
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), DbErr> {
     use insert_default::*;
 
-    let on_conflict = OnConflict::column(Column::Id)
-        .do_nothing_on([Column::Id])
-        .to_owned();
+    let on_conflict = OnConflict::column(Column::Id).do_nothing();
 
     let res = Entity::insert_many([
         ActiveModel { id: Set(1) },

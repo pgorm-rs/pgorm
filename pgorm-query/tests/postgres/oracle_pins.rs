@@ -75,13 +75,17 @@ fn create_table_renders_no_trailing_options() {
     assert_parses(&sql);
 }
 
-// Fixed by plan node `unrep.on-conflict`: targets, action and action-filter are
-// three independent fields, so a target without an action, an empty update set,
-// and a filter on DO NOTHING are all constructible.
+// Fixed by plan node `unrep.on-conflict`, at the type level per
+// [dec:pgorm:invalid-states-unrepresentable]: a clause is a target paired with
+// an action or a bare `DO NOTHING`, the update assignments are non-empty by
+// construction, and only the update carries a filter. The three renders this
+// pin held — a target with no action, an empty `DO UPDATE SET`, and a filter on
+// `DO NOTHING` — no longer typecheck; the `compile_fail` doctests on
+// `OnConflict` prove it. What remains is the shapes the grammar does accept.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.on-conflict/test]
+// [spec:pgorm:req:sql.render.on-conflict+1/test]
 #[test]
-fn oracle_pins_on_conflict_shapes() {
+fn on_conflict_renders_only_valid_shapes() {
     let insert = |conflict: OnConflict| {
         Query::insert()
             .into_table(Glyph::Table)
@@ -91,25 +95,24 @@ fn oracle_pins_on_conflict_shapes() {
             .to_string(QueryBuilder)
     };
 
-    let no_action = insert(OnConflict::column(Glyph::Id).to_owned());
-    let empty_set = insert(
+    let bare = insert(OnConflict::do_nothing());
+    let targeted = insert(OnConflict::column(Glyph::Id).do_nothing());
+    let updated = insert(
         OnConflict::column(Glyph::Id)
-            .update_columns::<Glyph, _>([])
-            .to_owned(),
-    );
-    let filtered_nothing = insert(
-        OnConflict::column(Glyph::Id)
-            .do_nothing()
-            .action_and_where(Expr::col(Glyph::Aspect).gt(0))
-            .to_owned(),
+            .and_where(Expr::col(Glyph::Aspect).is_null())
+            .update_column(Glyph::Aspect)
+            .and_where(Expr::col(Glyph::Image).gt(0))
+            .into(),
     );
 
-    assert!(no_action.ends_with(r#"ON CONFLICT ("id")"#));
-    assert!(empty_set.ends_with("DO UPDATE SET "));
-    assert!(filtered_nothing.contains(r#"DO NOTHING WHERE "aspect" > 0"#));
-    assert_rejected(&no_action);
-    assert_rejected(&empty_set);
-    assert!(assert_rejected(&filtered_nothing).contains("WHERE"));
+    assert!(bare.ends_with("ON CONFLICT DO NOTHING"));
+    assert!(targeted.ends_with(r#"ON CONFLICT ("id") DO NOTHING"#));
+    assert!(updated.ends_with(
+        r#"ON CONFLICT ("id") WHERE "aspect" IS NULL DO UPDATE SET "aspect" = "excluded"."aspect" WHERE "image" > 0"#
+    ));
+    assert_parses(&bare);
+    assert_parses(&targeted);
+    assert_parses(&updated);
 }
 
 // No plan node yet. `sql.render.update-delete` pins the behaviour: ORDER BY and
@@ -327,11 +330,14 @@ fn escape_renders_only_inside_like() {
 
 // The oracle's ceiling, recorded rather than pinned: this render is grammatical,
 // so no parser can catch it. An empty select list is valid PostgreSQL and is
-// closed as an ORM-layer error by `sql.empty-select-list`. The other two members
-// of this family are closed by the type system instead: `money(12, 2)` — which
+// closed as an ORM-layer error by `sql.empty-select-list`. The other members of
+// this family are closed by the type system instead: `money(12, 2)` — which
 // only a resolved type modifier rejects — is gone with `ColumnType::Money`'s
-// precision argument, and a cross-database reference is gone with the
-// database-qualified `TableName` form.
+// precision argument, a cross-database reference is gone with the
+// database-qualified `TableName` form, and `ON CONFLICT DO UPDATE` with no
+// inference specification — which parse analysis rejects with "requires
+// inference specification or constraint name" — is gone with `OnConflict`'s
+// targeted variant.
 // [spec:pgorm:req:sql.render.oracle/test]
 #[test]
 fn oracle_records_parse_valid_defects() {
@@ -339,6 +345,9 @@ fn oracle_records_parse_valid_defects() {
 
     assert_eq!(empty_select_list, r#"SELECT  FROM "glyph""#);
     assert_parses(&empty_select_list);
+    assert_parses(
+        r#"INSERT INTO "glyph" ("aspect") VALUES (1) ON CONFLICT DO UPDATE SET "aspect" = 1"#,
+    );
 }
 
 // Fixed by plan node `unrep.ddl-empty-builders`, at the type level per

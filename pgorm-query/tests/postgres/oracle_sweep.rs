@@ -323,7 +323,7 @@ fn sweep_window_function_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert/test]
-// [spec:pgorm:req:sql.render.on-conflict/test]
+// [spec:pgorm:req:sql.render.on-conflict+1/test]
 // [spec:pgorm:req:sql.render.returning/test]
 #[test]
 fn sweep_insert_shapes() {
@@ -354,30 +354,29 @@ fn sweep_insert_shapes() {
             .returning(Query::returning().exprs([Expr::col(Glyph::Id).add(1)]))
             .to_string(QueryBuilder),
         insert()
-            .on_conflict(OnConflict::column(Glyph::Id).do_nothing().to_owned())
+            .on_conflict(OnConflict::do_nothing())
             .to_string(QueryBuilder),
         insert()
-            .on_conflict(
-                OnConflict::columns([Glyph::Id, Glyph::Aspect])
-                    .update_columns([Glyph::Image])
-                    .to_owned(),
-            )
+            .on_conflict(OnConflict::column(Glyph::Id).do_nothing())
             .to_string(QueryBuilder),
         insert()
             .on_conflict(
                 OnConflict::column(Glyph::Id)
-                    .value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1))
-                    .to_owned(),
+                    .and_column(Glyph::Aspect)
+                    .update_column(Glyph::Image),
             )
             .to_string(QueryBuilder),
         insert()
             .on_conflict(
-                OnConflict::new()
-                    .expr(Func::lower(Expr::col(Glyph::Tokens)))
-                    .target_and_where(Expr::col(Glyph::Aspect).gt(0))
-                    .update_columns([Glyph::Image])
-                    .action_and_where(Expr::col(Glyph::Id).gt(0))
-                    .to_owned(),
+                OnConflict::column(Glyph::Id).value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1)),
+            )
+            .to_string(QueryBuilder),
+        insert()
+            .on_conflict(
+                OnConflict::expr(Func::lower(Expr::col(Glyph::Tokens)))
+                    .and_where(Expr::col(Glyph::Aspect).gt(0))
+                    .update_column(Glyph::Image)
+                    .and_where(Expr::col(Glyph::Id).gt(0)),
             )
             .to_string(QueryBuilder),
     ]);
@@ -702,11 +701,7 @@ fn sweep_placeholder_builds() {
         .into_table(Glyph::Table)
         .columns([Glyph::Aspect, Glyph::Image])
         .values_panic([1.into(), "a".into()])
-        .on_conflict(
-            OnConflict::column(Glyph::Id)
-                .update_columns([Glyph::Image])
-                .to_owned(),
-        )
+        .on_conflict(OnConflict::column(Glyph::Id).update_column(Glyph::Image))
         .returning(Query::returning().all())
         .build(QueryBuilder);
     let (update, _) = Query::update()

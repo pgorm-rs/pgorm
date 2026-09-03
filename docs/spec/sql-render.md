@@ -377,15 +377,25 @@ an ideal Postgres renderer would emit.
 > CONFLICT (`sql.render.on-conflict`) and RETURNING (`sql.render.returning`)
 > follow.
 
-> [spec:pgorm:req:sql.render.on-conflict]
-> When present, the conflict clause MUST render ` ON CONFLICT ` followed by:
-> the optional parenthesized target list — each target either a quoted
-> conflict column or a conflict expression; the optional target ` WHERE `
-> condition; the action — ` DO NOTHING`, or ` DO UPDATE SET ` with
-> comma-separated assignments where `OnConflictUpdate::Column` renders
-> `"col" = "excluded"."col"` (the `excluded` pseudo-table is double-quoted)
-> and `OnConflictUpdate::Expr` renders `"col" = expr`; and the optional action
-> ` WHERE ` condition.
+> [spec:pgorm:req:sql.render.on-conflict+1]
+> When present, the conflict clause MUST render ` ON CONFLICT`, then its shape.
+> `OnConflict::AnyDoNothing` MUST render ` DO NOTHING` and nothing else.
+> `OnConflict::Targeted` MUST render ` (` the comma-separated target elements
+> `)` — each a quoted conflict column or a rendered conflict expression —
+> then, if the target carries one, ` WHERE ` and its condition; then the
+> action. `ConflictAction::DoNothing` renders ` DO NOTHING`;
+> `ConflictAction::Update` renders ` DO UPDATE SET ` with comma-separated
+> assignments, where `ConflictAssignment::Column` renders
+> `"col" = "excluded"."col"` (the `excluded` pseudo-table is double-quoted) and
+> `ConflictAssignment::Expr` renders `"col" = expr`, followed by ` WHERE ` and
+> its condition when the update carries a filter.
+>
+> Because the target list is non-empty and the assignment list is non-empty by
+> construction, the renderer has no empty case to guard: every clause it can be
+> handed is one the PostgreSQL grammar accepts. The one shape the grammar
+> accepts but parse analysis does not — `ON CONFLICT DO UPDATE` with no
+> inference specification — is unrepresentable per `sql.ast.on-conflict`, which
+> is the only guard available since `sql.render.oracle` cannot see it.
 
 > [spec:pgorm:req:sql.render.returning]
 > A returning clause on INSERT, UPDATE, or DELETE MUST render as the final

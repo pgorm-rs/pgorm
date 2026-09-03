@@ -295,24 +295,35 @@ today, including panicking edges and deliberate failsafes.
 
 ## ON CONFLICT
 
-> [spec:pgorm:req:sql.ast.on-conflict]
-> `OnConflict` (attached with `InsertStatement::on_conflict`) MUST hold: target
-> specifications — `OnConflictTarget::ConflictColumn` entries via
-> `OnConflict::column`/`columns` or `ConflictExpr` entries via `expr`/`exprs`
-> (expressions append to any existing targets); an optional target WHERE
-> (`target_and_where`, `target_and_where_option`, `target_cond_where`) rendered
-> between the target list and the action; an action; and an optional action
-> WHERE (`action_and_where`, `action_and_where_option`, `action_cond_where`)
-> rendered after `DO UPDATE SET ...`.
+> [spec:pgorm:req:sql.ast.on-conflict+1]
+> `OnConflict` (attached with `InsertStatement::on_conflict`, which accepts
+> anything converting into one) MUST be one of exactly two shapes:
+> `AnyDoNothing`, carrying nothing, for the arbiter-less clause PostgreSQL
+> admits only for `DO NOTHING`; or `Targeted`, pairing a `ConflictTarget` with
+> a `ConflictAction`. There is no third shape, so a clause without an action
+> and a `DO UPDATE` without the inference specification PostgreSQL demands are
+> both unrepresentable per [dec:pgorm:invalid-states-unrepresentable].
 >
-> The action is either `DoNothing` — set by `do_nothing()` or
-> `do_nothing_on(pk_cols)`, both rendering `DO NOTHING` on PostgreSQL (the
-> column list is a polyfill inherited from upstream and is not rendered) — or
-> `Update`, a list of `OnConflictUpdate` entries. `update_column`/`update_columns`
-> MUST add `Column` entries (rendering `"col" = "excluded"."col"`), and
-> `value`/`values` MUST add `Expr` entries (rendering `"col" = <expr>`).
-> Update entries MUST append to an existing `Update` action and MUST replace a
-> previously set `DoNothing` action.
+> `ConflictTarget` MUST hold at least one `ConflictElement` — `Column` or
+> `Expr` — plus an optional filter standing for a partial index's predicate.
+> `OnConflict::column`/`expr` take the first element and `and_column`,
+> `and_columns`, `and_expr`, `and_exprs` add further ones, so the empty target
+> list the PostgreSQL grammar rejects has no value to build; the filter lives
+> on the target because `ON CONFLICT WHERE ..` with no target is rejected too.
+> `and_where`, `and_where_option` and `cond_where` MUST fold into that filter
+> through the same merge `sql.ast.condition.holder` specifies.
+>
+> `ConflictAction` MUST be either `DoNothing`, carrying nothing, or `Update`
+> holding a non-empty `ConflictAssignments` and its own optional filter — the
+> only filter in the clause, because PostgreSQL accepts `WHERE` after
+> `DO UPDATE SET ..` and nowhere else. `ConflictTarget::do_nothing` yields the
+> first; `update_column` and `value` take the first assignment and yield a
+> `ConflictUpdate`, whose `update_column`/`update_columns` add `Column`
+> assignments (rendering `"col" = "excluded"."col"`), whose `value`/`values`
+> add `Expr` assignments (rendering `"col" = <expr>`), and whose
+> `and_where`/`and_where_option`/`cond_where` fold into the update's filter.
+> A `ConflictUpdate` converts into an `OnConflict`, which is how a builder
+> chain reaches the statement.
 
 ## RETURNING
 

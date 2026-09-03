@@ -300,11 +300,7 @@ where
     /// };
     /// assert_eq!(
     ///     cake::Entity::insert(orange)
-    ///         .on_conflict(
-    ///             OnConflict::column(cake::Column::Name)
-    ///                 .do_nothing()
-    ///                 .to_owned()
-    ///         )
+    ///         .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
     ///         .as_query()
     ///         .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
@@ -322,16 +318,17 @@ where
     /// assert_eq!(
     ///     cake::Entity::insert(orange)
     ///         .on_conflict(
-    ///             OnConflict::column(cake::Column::Name)
-    ///                 .update_column(cake::Column::Name)
-    ///                 .to_owned()
+    ///             OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
     ///         )
     ///         .as_query()
     ///         .to_string(QueryBuilder),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO UPDATE SET "name" = "excluded"."name""#,
     /// );
     /// ```
-    pub fn on_conflict(mut self, on_conflict: OnConflict) -> Self {
+    pub fn on_conflict<T>(mut self, on_conflict: T) -> Self
+    where
+        T: Into<OnConflict>,
+    {
         self.query.on_conflict(on_conflict);
         self
     }
@@ -355,6 +352,11 @@ where
 
     /// Set ON CONFLICT on the primary key columns to do nothing.
     ///
+    /// An entity with no primary key column gets the arbiter-less
+    /// `ON CONFLICT DO NOTHING`, which answers for every constraint — the
+    /// widest reading of "the primary key conflicted" when there is no primary
+    /// key to name.
+    ///
     /// ```
     /// use pgorm::{entity::*, query::*, pgorm_query::{OnConflict, QueryBuilder}, tests_cfg::cake};
     ///
@@ -376,12 +378,14 @@ where
     where
         A: ActiveModelTrait,
     {
-        let primary_keys = <A::Entity as EntityTrait>::PrimaryKey::iter();
-        self.query.on_conflict(
-            OnConflict::columns(primary_keys.clone())
-                .do_nothing_on(primary_keys)
-                .to_owned(),
-        );
+        let mut primary_keys = <A::Entity as EntityTrait>::PrimaryKey::iter();
+        let on_conflict = match primary_keys.next() {
+            Some(first) => OnConflict::column(first)
+                .and_columns(primary_keys)
+                .do_nothing(),
+            None => OnConflict::do_nothing(),
+        };
+        self.query.on_conflict(on_conflict);
 
         TryInsert::from_insert(self)
     }
@@ -474,7 +478,10 @@ where
         self
     }
 
-    pub fn on_conflict(mut self, on_conflict: OnConflict) -> Self {
+    pub fn on_conflict<T>(mut self, on_conflict: T) -> Self
+    where
+        T: Into<OnConflict>,
+    {
         self.insert_struct.query.on_conflict(on_conflict);
         self
     }
@@ -609,11 +616,7 @@ mod tests {
 
         assert_eq!(
             cake::Entity::insert(orange)
-                .on_conflict(
-                    OnConflict::column(cake::Column::Name)
-                        .do_nothing()
-                        .to_owned()
-                )
+                .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
                 .as_query()
                 .to_string(QueryBuilder),
             r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("name") DO NOTHING"#,
@@ -630,9 +633,7 @@ mod tests {
         assert_eq!(
             cake::Entity::insert(orange)
                 .on_conflict(
-                    OnConflict::column(cake::Column::Name)
-                        .update_column(cake::Column::Name)
-                        .to_owned()
+                    OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
                 )
                 .as_query()
                 .to_string(QueryBuilder),
