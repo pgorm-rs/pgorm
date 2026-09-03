@@ -2463,17 +2463,48 @@ children (
             {
                 id ergo.orm-bridge
                 title "Design: the typed bridge from CTE/LATERAL/window/union statements into ORM decode"
+                sealed true
+                log (
+                    {
+                        at 2026-09-03T20:17:03.719503Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Probe verdict: the problem is not one problem. LATERAL, WINDOW, and UNION/INTERSECT/EXCEPT mutate SelectStatement in place — typed decode never breaks, they are reachable today via QuerySelect::query(), and need only named ORM combinators. Only WITH is a real gap: SelectStatement::with() consumes into WithQuery, which is inert (pub(crate) fields, no Selector entry, no LIMIT/filter ever again). Design: carry with: Option<AnyWithClause> ON SelectStatement in pgorm-query, rendered as an unconditional prefix (live-PG-verified legal in every nesting position); Selector/SelectorRaw/Paginator/Cursor then inherit CTE support with zero changes; ORM grows QuerySelect default methods (with_cte, with_recursive_cte, join_lateral, window, union). Also close G1/G2: Selector::from_select::<M>(SelectStatement) and SelectorRaw::into_tuple (G2 is the prerequisite ergo.pipeline-api's SQL output lands on). Rejected with probe evidence: widening Selector to impl QueryStatementBuilder (admits write statements into SELECT decode; loses one()'s limit-1 — proven live, SelectorRaw::one() is a RowCount protocol error); TypedStatement<M>(Box<dyn ...>) (renderable but never nestable — into_sub_query_statement cannot move through the object). Found hazard for its own rule: recursive CTE anchor-arm types resolve untyped $n to text (live failures E42883/E22021); only cast_as annotates the placeholder. Eight rules drafted in the agent report. Effort 1.5-2.5 days, no breaking signatures. Probes 8/8 green; spike code archived on the node's branch, not merged."
+                    }
+
+                    {
+                        at 2026-09-03T20:17:22.67587Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {
                 id ergo.pipeline-api
                 title "Design + spike: a PRQL-shaped pipeline Select API backed by prqlc's relational IR"
+                sealed true
                 log (
                     {
                         at 2026-09-03T19:07:08.485824Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator direction (2026-09-03): not a prql! string macro — a Rust \"Select API shape\" mirroring PRQL's pipeline semantics, backed by prqlc, because relation->relation transforms make composition sound by construction (any fn(Pipeline) -> Pipeline is a reusable scope; prqlc's lowering places clauses and nests subqueries/CTEs automatically — filter-after-aggregate becomes HAVING, filter-after-window wraps, stages become CTEs). Architecture: construct prqlc's PL/RQ IR directly from entity metadata (no PRQL text round-trip), emit via its Postgres backend, hold output to the libpg_query oracle in tests. Three probes gate the design, in order: (1) parameter binding — can RQ carry opaque $N placeholder expressions so Values stay out of the SQL text; if not cleanly, the fallback of reimplementing PRQL's lowering over pgorm-query is the expensive path and probably kills it; (2) IR stability — PL/RQ are unstable API, so pin prqlc and own an adapter layer; (3) output-shape typing — v1 terminates via the existing name-matched into_model/into_tuple decode (upgrade path is ergo.orm-bridge; full type-level row tracking is out of scope). Deliverable: a spike answering the three probes plus a design verdict; build only after the verdict. Subsumes the earlier prql!-macro idea (a text macro can fall out as a byproduct if wanted)."
+                    }
+
+                    {
+                        at 2026-09-03T20:17:13.607287Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Spike verdict: BUILD. Architecture: typed pipeline -> prqlc PL AST -> pl_to_rq -> rq_to_sql(Dialect::Postgres), adapter module owning every prqlc import (~20 pinned pr:: items). PL not RQ (RQ means redoing resolver column lineage); not PRQL text; pgorm-query fallback unneeded. Probe evidence: ExprKind::Param survives to $N everywhere incl. HAVING and aggregate args, no renumbering; LIMIT cannot be parameterized (typed API takes i64 by value). Direct PL construction byte-identical to text-compiled SQL; columns table-qualified by construction from Iden metadata; PRQL stdlib-name collisions are a closed set -> typed error. Live-PG end-to-end with bound params: HAVING placement and filter-after-window CTE nesting verified structurally via pg_query and by decoded rows. Pin prqlc exact, default-features off; whole feature off-by-default (sql-macro pattern). v1 ~1 week; early open question: schema-qualified tables. Spike code archived on the node's branch (fdc19dc0), not merged — spikes stay out of main's tree per operator directive."
+                    }
+
+                    {
+                        at 2026-09-03T20:17:19.821969Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
