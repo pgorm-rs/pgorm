@@ -1221,12 +1221,20 @@ children (
                 id polish.deps-latest
                 title "Refresh every workspace dependency to its latest release"
                 kind @build
+                sealed true
                 log (
                     {
                         at 2026-09-03T16:33:05.51096Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-03T17:00:56.136197Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
