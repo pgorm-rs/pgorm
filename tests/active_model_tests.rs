@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{DeleteResult, Error, Schema, entity::prelude::*};
+use pgorm::{Error, Schema, entity::prelude::*};
 use pgorm_query::{QueryBuilder, ValueTuple};
 use pretty_assertions::assert_eq;
 
@@ -323,7 +323,7 @@ fn active_value_three_state_machine() {
 
     // Only `Set` columns are written. `note` is NotSet, so it is absent entirely.
     assert_eq!(
-        row::Entity::insert(row::ActiveModel {
+        Insert::one(row::ActiveModel {
             id: NotSet,
             name: set("Apple"),
             note: NotSet,
@@ -336,7 +336,7 @@ fn active_value_three_state_machine() {
     // On UPDATE, an `Unchanged` primary key drives the WHERE clause without
     // appearing in SET, and `Unchanged` non-key columns are not written either.
     assert_eq!(
-        row::Entity::update(row::ActiveModel {
+        Update::one(row::ActiveModel {
             id: ActiveValue::Unchanged(1),
             name: set("Apple"),
             note: ActiveValue::Unchanged(Some("old".to_owned())),
@@ -818,10 +818,10 @@ where
     Ok(())
 }
 
-// [spec:pgorm:req:entity.active-model.persistence+1/test]    `insert` comes back
+// [spec:pgorm:req:entity.active-model.persistence+2/test]    `insert` comes back
 // with the database-generated key populated (the single `INSERT ... RETURNING`
 // round trip), `update` returns the freshly written `Model`, and `delete`
-// returns a `DeleteResult` keyed on the primary key
+// returns the rows-affected count, keyed on the primary key
 #[pgorm_macros::test]
 async fn active_model_persistence() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_persistence").await;
@@ -872,9 +872,9 @@ async fn active_model_persistence() -> Result<(), Error> {
         updated
     );
 
-    // `delete` returns a DeleteResult and removes exactly the keyed row.
-    let res: DeleteResult = updated.clone().into_active_model().delete(&db).await?;
-    assert_eq!(res.rows_affected, 1);
+    // `delete` reports the rows removed and removes exactly the keyed row.
+    let res: u64 = updated.clone().into_active_model().delete(&db).await?;
+    assert_eq!(res, 1);
     assert_eq!(
         row::Entity::find_by_id(inserted.id).one_opt(&db).await?,
         None
@@ -890,7 +890,7 @@ async fn active_model_persistence() -> Result<(), Error> {
 // caller's choice, not a reading of the model: `update` accepts a primary key in
 // either the `Set` or the `Unchanged` state, the two states an inference would
 // have had to tell apart
-// [spec:pgorm:req:entity.active-model.persistence+1/test]
+// [spec:pgorm:req:entity.active-model.persistence+2/test]
 #[pgorm_macros::test]
 async fn update_accepts_set_or_unchanged_key() -> Result<(), Error> {
     let ctx = TestContext::new("update_accepts_set_or_unchanged_key").await;
@@ -1111,7 +1111,7 @@ async fn active_model_hook_ordering() -> Result<(), Error> {
     }
     .delete(&db)
     .await?;
-    assert_eq!(res.rows_affected, 1);
+    assert_eq!(res, 1);
     assert_eq!(
         hook_log(),
         [
@@ -1180,7 +1180,7 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
     assert_eq!(hook_abort::Entity::find().all(&db).await?.len(), 0);
 
     // Seed a row through the statement API, which does not run hooks.
-    hook_abort::Entity::insert(hook_abort::ActiveModel {
+    Insert::one(hook_abort::ActiveModel {
         id: NotSet,
         name: set("Apple"),
     })

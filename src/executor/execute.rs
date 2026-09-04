@@ -1,5 +1,5 @@
 /// Defines the result of executing an operation
-// [spec:pgorm:def:exec.crud.exec-result]
+// [spec:pgorm:def:exec.crud.exec-result+1]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct ExecResult {

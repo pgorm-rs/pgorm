@@ -16,9 +16,9 @@ pub use updates::*;
 
 pub use super::common::bakery_chain::*;
 pub use crate::common::setup::rust_dec;
-use pgorm::{DatabaseConnection, entity::*, set};
+use pgorm::{DatabaseConnection, Insert, entity::*, set};
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    a server-generated key is read from
+// [spec:pgorm:sem:exec.crud.insert+3/test]    a server-generated key is read from
 // the RETURNING row by name
 pub async fn test_create_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
@@ -26,12 +26,12 @@ pub async fn test_create_bakery(db: &DatabaseConnection) {
         profit_margin: set(10.4),
         ..Default::default()
     };
-    let res = Bakery::insert(seaside_bakery)
-        .exec(db)
+    let res = Insert::one(seaside_bakery)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert bakery");
 
-    let bakery: Option<bakery::Model> = Bakery::find_by_id(res.last_insert_id)
+    let bakery: Option<bakery::Model> = Bakery::find_by_id(res)
         .one_opt(db)
         .await
         .expect("could not find bakery");
@@ -48,12 +48,12 @@ pub async fn test_create_customer(db: &DatabaseConnection) {
         notes: "Loves cheese cake".into(),
         ..Default::default()
     };
-    let res = Customer::insert(customer_kate)
-        .exec(db)
+    let res = Insert::one(customer_kate)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert customer");
 
-    let customer: Option<customer::Model> = Customer::find_by_id(res.last_insert_id)
+    let customer: Option<customer::Model> = Customer::find_by_id(res)
         .one_opt(db)
         .await
         .expect("could not find customer");

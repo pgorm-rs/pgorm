@@ -5,7 +5,7 @@ mod crud;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::{
-    DatabaseConnection, DatabasePool, EntityName, entity::*, error::Error, set, tests_cfg,
+    DatabaseConnection, DatabasePool, EntityName, Insert, entity::*, error::Error, set, tests_cfg,
 };
 
 pub use crud::*;
@@ -24,9 +24,9 @@ async fn main() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+2/test]    `TryInsert::exec` reporting
+// [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsert::exec` reporting
 // Inserted, Conflicted and Empty
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    `on_empty_do_nothing`
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    `on_empty_do_nothing`
 // / `on_conflict_do_nothing` produce a `TryInsert` whose `exec` maps
 // RecordNotInserted to Conflicted and an empty batch to Empty
 pub async fn test(db: &DatabaseConnection) {
@@ -36,7 +36,7 @@ pub async fn test(db: &DatabaseConnection) {
         ..Default::default()
     };
 
-    let res = Bakery::insert(seaside_bakery)
+    let res = Insert::one(seaside_bakery)
         .on_empty_do_nothing()
         .exec(db)
         .await;
@@ -49,16 +49,16 @@ pub async fn test(db: &DatabaseConnection) {
         id: set(1),
     };
 
-    let conflict_insert = Bakery::insert_many([double_seaside_bakery])
+    let conflict_insert = Insert::many([double_seaside_bakery])
         .on_conflict_do_nothing()
         .exec(db)
         .await;
 
     assert!(matches!(conflict_insert, Ok(TryInsertResult::Conflicted)));
 
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2] An empty batch is a
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3] An empty batch is a
     // no-op that reports Empty before any SQL is issued.
-    let empty_insert = Bakery::insert_many(std::iter::empty::<bakery::ActiveModel>())
+    let empty_insert = Insert::many(std::iter::empty::<bakery::ActiveModel>())
         .on_empty_do_nothing()
         .exec(db)
         .await;
@@ -67,7 +67,7 @@ pub async fn test(db: &DatabaseConnection) {
 
     // A model with every column NotSet records no column either, so it reaches
     // the same empty state and leaves the database untouched.
-    let blank_insert = Bakery::insert(bakery::ActiveModel {
+    let blank_insert = Insert::one(bakery::ActiveModel {
         ..Default::default()
     })
     .on_empty_do_nothing()
@@ -78,12 +78,12 @@ pub async fn test(db: &DatabaseConnection) {
     assert_eq!(Bakery::find().all(db).await.unwrap().len(), 1);
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    every execution
+// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    every execution
 // path of both insert types reports the recorded mismatch instead of sending
 // SQL, so the batch leaves the database untouched
 pub async fn columns_mismatch_is_refused(db: &DatabaseConnection) {
     let mismatched = || {
-        Bakery::insert_many([
+        Insert::many([
             bakery::ActiveModel {
                 name: set("Hillside Bakery"),
                 profit_margin: set(1.0),
@@ -100,18 +100,18 @@ pub async fn columns_mismatch_is_refused(db: &DatabaseConnection) {
                     `id` is set in a later model but not in the first";
 
     let refused = [
+        mismatched().exec_returning_pk(db).await.err(),
         mismatched().exec(db).await.err(),
-        mismatched().exec_without_returning(db).await.err(),
-        mismatched().exec_with_returning(db).await.err(),
-        mismatched().do_nothing().exec(db).await.err(),
+        mismatched().exec_returning_model(db).await.err(),
         mismatched()
-            .do_nothing()
-            .exec_without_returning(db)
+            .on_empty_do_nothing()
+            .exec_returning_pk(db)
             .await
             .err(),
+        mismatched().on_empty_do_nothing().exec(db).await.err(),
         mismatched()
-            .do_nothing()
-            .exec_with_returning(db)
+            .on_empty_do_nothing()
+            .exec_returning_model(db)
             .await
             .err(),
     ];

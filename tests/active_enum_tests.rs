@@ -186,7 +186,7 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
 
     let res = model.delete(db).await?;
 
-    assert_eq!(res.rows_affected, 1);
+    assert_eq!(res, 1);
     assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())
@@ -326,7 +326,7 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), Error
 
     let res = model.delete(db).await?;
 
-    assert_eq!(res.rows_affected, 1);
+    assert_eq!(res, 1);
     assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())

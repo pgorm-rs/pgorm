@@ -57,20 +57,20 @@ pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), E
         time: Some(Time::from_hms_opt(11, 32, 55).unwrap()),
     };
 
-    let res = Metadata::insert(metadata.clone().into_active_model())
-        .exec(db)
+    let res = Insert::one(metadata.clone().into_active_model())
+        .exec_returning_pk(db)
         .await?;
 
     assert_eq!(Metadata::find().one_opt(db).await?, Some(metadata.clone()));
 
-    assert_eq!(res.last_insert_id, metadata.uuid);
+    assert_eq!(res, metadata.uuid);
 
-    let update_res = Metadata::update(metadata::ActiveModel {
+    let update_res = Update::one(metadata::ActiveModel {
         value: set("0.22"),
         ..metadata.clone().into_active_model()
     })?
     .filter(metadata::Column::Uuid.eq(Uuid::default()))
-    .exec(db)
+    .exec_returning_model(db)
     .await;
 
     assert_eq!(update_res, Err(Error::RecordNotFound));

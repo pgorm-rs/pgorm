@@ -289,7 +289,7 @@ known limitations.
 
 ## Projection and value derives
 
-> [spec:pgorm:sem:macros.derive.partial-model+1]
+> [spec:pgorm:sem:macros.derive.partial-model+2]
 > `DerivePartialModel` accepts only non-generic named-field structs (generics and other
 > shapes are compile errors). The container attribute `entity = "Type"` names the source
 > entity; it is required unless every field carries `from_expr`, and its absence
@@ -297,8 +297,8 @@ known limitations.
 > no attribute selects `Column::{UpperCamelCase(field)}`; `from_col = "name"` selects
 > `Column::{UpperCamelCase(name)}` aliased to the field name; `from_expr = "expr"`
 > selects the parsed expression aliased to the field name. The expansion implements
-> `PartialModelTrait::select_cols` by chaining `SelectColumns::select_column` /
-> `select_column_as` calls; the chain's type is `S::Projected`, so a struct with no
+> `PartialModelTrait::select_cols` by chaining `QuerySelect::column` /
+> `column_as` calls; the chain's type is `S::Projected`, so a struct with no
 > fields — whose chain is empty and whose body is therefore the unprojected `S` — does
 > not compile. Limitation: although supplying both `from_col` and
 > `from_expr` is a documented compile error, the parser overwrites both trackers on

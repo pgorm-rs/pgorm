@@ -2832,12 +2832,20 @@ children (
                 id ergo.fluent-deletions
                 title "Dead and duplicate surface dies: exec disambiguation, twin methods, zero-use layers, namespace collapse"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-04T15:24:43.408146Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From the fluent-audit (operator: all of it, delete-don't-deprecate). (1) do_nothing and on_empty_do_nothing are byte-identical pure conversions to TryInsert (insert.rs:338-352, second documented as an alias) — keep ONE, named for what it does (audit suggested into_try_insert; judgment), delete the other, churn the 30 uses. (2) Zero-use layers die outright: Inserter, Deleter (0 uses each; Updater has 5 — migrate them onto the surviving surface then delete), expr_as_ (\"here for legacy reasons\", 0 uses), select_column/select_column_as (duplicate column/column_as, 2 uses). (3) exec disambiguation: .exec() currently returns InsertResult or TryInsertResult<InsertResult> or Model (UpdateOne) or UpdateResult (UpdateMany) depending on distant calls — same word, incompatible shapes; design the rename so the shape is in the name (judgment on the vocabulary; breaking renames accepted). (4) Namespace collapse: EntityTrait::{insert, insert_many, update, update_many, delete, delete_many} are one-line forwards to Insert::one/Insert::many/... — delete the forwards per the save() precedent (active_model.rs:64-68 documents the reasoning); 92+ call sites churn to the canonical spellings. Every touched rule (exec.crud.insert/try-insert/update/delete, entity.traits.crud, query.build.insert...) bumps with exact-id re-pins; the deleted surfaces' spec claims are rewritten to specify the absence where they were load-bearing."
+                    }
+
+                    {
+                        at 2026-09-04T16:27:17.172923Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

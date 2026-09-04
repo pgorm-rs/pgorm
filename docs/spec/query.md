@@ -58,10 +58,10 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias string.
 
-> [spec:pgorm:sem:query.build.modifiers+4]
+> [spec:pgorm:sem:query.build.modifiers+5]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
-> default list); `columns` iterates it; `column_as` / `expr_as` / `expr_as_` /
+> default list); `columns` iterates it; `column_as` / `expr_as` /
 > `tbl_col_as` append an expression with an explicit alias; `expr` / `exprs`
 > append raw select expressions. `offset` and `limit` take
 > `Into<Option<u64>>`: `Some(n)` sets the clause (last call wins), `None`
@@ -74,9 +74,17 @@ is what `EntityTrait::find()` produces.
 > (`query.build.lateral`), `window` and `window_expr_as`
 > (`query.build.window`), and `union` (`query.build.union`) — each a default
 > method mutating the statement and returning `Self`, except the projecting
-> `window_expr_as`, which returns `Projected`. `SelectColumns` (in
-> `traits.rs`) re-exposes `column`/`column_as` as
-> `select_column`/`select_column_as` for partial-model queries.
+> `window_expr_as`, which returns `Projected`.
+>
+> There MUST be one name per projection operation. `expr_as_` (a trailing-
+> underscore duplicate of `expr_as`, kept "for legacy reasons" and called by
+> nothing) is deleted, and so is the `SelectColumns` trait, which re-exposed
+> `column`/`column_as` as `select_column`/`select_column_as` through a blanket
+> impl over `QuerySelect` with an identical `Projected` fixpoint. It added a
+> second vocabulary and no capability; `PartialModelTrait::select_cols` is
+> generic over `QuerySelect` directly, and the typestate proof that a
+> field-less `DerivePartialModel` cannot compile is unchanged because the
+> fixpoint bound it relies on is `QuerySelect`'s own.
 >
 > Clearing the select list is a typestate transition, not an in-place
 > mutation, and `select_only` is therefore NOT a `QuerySelect` method.
@@ -92,9 +100,8 @@ is what `EntityTrait::find()` produces.
 > `SelectTwo<E, F>`, `SelectTwoMany<E, F>`, `Cursor<S, K>`,
 > `SelectProjected<E>` and `SelectTwoProjected<E, F>` project onto
 > themselves; `SelectCustom<E>` projects onto `SelectProjected<E>` and
-> `SelectTwoCustom<E, F>` onto `SelectTwoProjected<E, F>`. `SelectColumns`
-> mirrors the associated type through its blanket impl over `QuerySelect`,
-> which is what lets `PartialModelTrait::select_cols<S>` return
+> `SelectTwoCustom<E, F>` onto `SelectTwoProjected<E, F>`. This associated
+> type is what lets `PartialModelTrait::select_cols<S: QuerySelect>` return
 > `S::Projected` (`entity.traits.from-query-result`).
 >
 > The two `Custom` states have no execution path at all: no `all` / `one` /
@@ -300,7 +307,7 @@ builder is or what its rows decode into.
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.
 
-> [spec:pgorm:sem:query.build.insert+1]
+> [spec:pgorm:sem:query.build.insert+2]
 > `Insert::<A>::new` targets `A::Entity`'s table and applies
 > `or_default_values()`, so a builder to which no model was ever added still
 > renders a valid default-values INSERT rather than invalid SQL. `Insert::one`
@@ -315,11 +322,11 @@ what makes it total over partially-set models.
 > it raises the statement's default-values row count, so `n` such models
 > render `VALUES (DEFAULT)` repeated `n` times, one row of database defaults
 > each. When the entity's primary key is not auto-increment, the model's
-> primary-key value tuple is captured on the builder (used later to report
-> `last_insert_id`); for auto-increment keys it is left `None`.
+> primary-key value tuple is captured on the builder (used later by
+> `exec_returning_pk`); for auto-increment keys it is left `None`.
 > `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
 
-> [spec:pgorm:req:query.build.insert.uniform-columns+2]
+> [spec:pgorm:req:query.build.insert.uniform-columns+3]
 > All models added to a single `Insert` MUST have the same set of present
 > (`Set` or `Unchanged`) columns; rows with heterogeneous column sets are never
 > merged into a column union. The first model added records a per-column
@@ -337,23 +344,30 @@ what makes it total over partially-set models.
 > `Insert::ensure_uniform_columns`, mirrored on `TryInsert`, reports the
 > recorded state as `Err(Error::Query(RuntimeError::Internal(..)))` whose message
 > names the offending columns on each side. Every execution path of both types
-> (`exec`, `exec_without_returning`, `exec_with_returning`) asks it first and
+> (`exec`, `exec_returning_pk`, `exec_returning_model`) asks it first and
 > fails with that error before any SQL is sent, so a mismatched batch leaves
 > the database untouched.
 
-> [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
+> [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
 > `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:
-> `Insert::do_nothing()` and its alias `on_empty_do_nothing()` convert without
+> `Insert::on_empty_do_nothing()` converts without
 > altering the statement, while `Insert::on_conflict_do_nothing()` first
 > attaches `ON CONFLICT (<primary key columns>) DO NOTHING` and then converts.
+>
+> There MUST be exactly one conversion method. `do_nothing()` was a
+> byte-identical twin of `on_empty_do_nothing()` and is deleted: the surviving
+> name says *when* it does nothing, and dropping the shorter one removes a
+> genuine collision, since `OnConflict::do_nothing()` appears in the same
+> chains and means the opposite — a statement that runs and lets the server
+> skip the row, rather than a statement never sent.
 >
 > Emptiness is a state the builder records, not a predicate re-derived at each
 > execution. An `Insert` holds either the per-column presence bitmap of the
 > first model added — which always marks at least one column present — or the
-> empty state, reached both by adding no model at all (`insert_many` over an
+> empty state, reached both by adding no model at all (`Insert::many` over an
 > empty iterator) and by adding only models that leave every column `NotSet`.
-> All three `TryInsert` execution paths (`exec`, `exec_without_returning`,
-> `exec_with_returning`) read that one state, so an all-`NotSet` model reports
+> All three `TryInsert` execution paths (`exec`, `exec_returning_pk`,
+> `exec_returning_model`) read that one state, so an all-`NotSet` model reports
 > `TryInsertResult::Empty` on every path exactly as an empty batch does,
 > without sending any SQL and leaving the database untouched. A
 > `Error::RecordNotInserted` from the underlying insert is mapped to

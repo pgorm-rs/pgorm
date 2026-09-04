@@ -33,7 +33,7 @@ pub async fn test_multiple_operations() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    a composite primary key comes back
+// [spec:pgorm:sem:exec.crud.insert+3/test]    a composite primary key comes back
 // as the entity's `PrimaryKey::ValueType` tuple
 async fn seed_data(db: &DatabaseConnection) {
     let bakery = bakery::ActiveModel {
@@ -74,22 +74,22 @@ async fn seed_data(db: &DatabaseConnection) {
         ..Default::default()
     };
 
-    let cake_insert_res = Cake::insert(mud_cake)
-        .exec(db)
+    let cake_insert_res = Insert::one(mud_cake)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert cake");
 
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: set(cake_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res),
         baker_id: set(baker_1.id),
     };
 
-    let cake_baker_res = CakesBakers::insert(cake_baker.clone())
-        .exec(db)
+    let cake_baker_res = Insert::one(cake_baker.clone())
+        .exec_returning_pk(db)
         .await
         .expect("could not insert cake_baker");
     assert_eq!(
-        cake_baker_res.last_insert_id,
+        cake_baker_res,
         (cake_baker.cake_id.unwrap(), cake_baker.baker_id.unwrap())
     );
 
@@ -114,7 +114,7 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert order");
 
     let _lineitem = lineitem::ActiveModel {
-        cake_id: set(cake_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res),
         price: set(rust_dec(10.00)),
         quantity: set(12),
         order_id: set(kate_order_1.id),
@@ -125,7 +125,7 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert order");
 
     let _lineitem2 = lineitem::ActiveModel {
-        cake_id: set(cake_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res),
         price: set(rust_dec(50.00)),
         quantity: set(2),
         order_id: set(kate_order_1.id),
@@ -200,29 +200,26 @@ async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cak
         ..Default::default()
     };
 
-    let cake_insert_res = Cake::insert(new_cake)
-        .exec(db)
+    let cake_insert_res = Insert::one(new_cake)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert cake");
 
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: set(cake_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res),
         baker_id: set(baker.id),
     };
 
-    let cake_baker_res = CakesBakers::insert(cake_baker.clone())
-        .exec(db)
+    let cake_baker_res = Insert::one(cake_baker.clone())
+        .exec_returning_pk(db)
         .await
         .expect("could not insert cake_baker");
     assert_eq!(
-        cake_baker_res.last_insert_id,
+        cake_baker_res,
         (cake_baker.cake_id.unwrap(), cake_baker.baker_id.unwrap())
     );
 
-    Cake::find_by_id(cake_insert_res.last_insert_id)
-        .one_opt(db)
-        .await
-        .unwrap()
+    Cake::find_by_id(cake_insert_res).one_opt(db).await.unwrap()
 }
 
 async fn create_order(db: &DatabaseConnection, cake: cake::Model) {

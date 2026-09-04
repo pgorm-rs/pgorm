@@ -20,7 +20,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.insert+1/test]    a batch of models that set no
+// [spec:pgorm:sem:query.build.insert+2/test]    a batch of models that set no
 // column inserts one default row per model rather than collapsing into one
 #[pgorm_macros::test]
 async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {
@@ -30,7 +30,7 @@ async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
 
-    let affected = Entity::insert_many([
+    let affected = Insert::many([
         ActiveModel {
             ..Default::default()
         },
@@ -41,7 +41,7 @@ async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {
             ..Default::default()
         },
     ])
-    .exec_without_returning(&db)
+    .exec(&db)
     .await?;
 
     assert_eq!(affected, 3);

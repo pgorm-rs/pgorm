@@ -22,8 +22,8 @@ use pgorm::tests_cfg::{
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
     Error, IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectColumns, SelectTwo,
-    SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
+    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectTwo, SelectTwoMany,
+    TryInsert, Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -75,7 +75,7 @@ fn every_builder_wraps_one_statement() {
     );
     let _: InsertStatement = insert.into_query();
 
-    let try_insert: TryInsert<cake::ActiveModel> = Insert::one(apple()).do_nothing();
+    let try_insert: TryInsert<cake::ActiveModel> = Insert::one(apple()).on_empty_do_nothing();
     let _: InsertStatement = try_insert.into_query();
 
     let update_one: UpdateOne<cake::ActiveModel> =
@@ -450,10 +450,9 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+4/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+5/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
-// `tbl_col_as`, `expr` and `exprs` append explicit expressions, and
-// `SelectColumns` re-exposes the first two
+// `tbl_col_as`, `expr` and `exprs` append explicit expressions
 #[test]
 fn select_list_modifiers_rewrite_the_list() {
     assert_eq!(
@@ -498,20 +497,9 @@ fn select_list_modifiers_rewrite_the_list() {
         ]
         .join(" ")
     );
-
-    // `SelectColumns` is the same pair of methods under partial-model names.
-    assert_eq!(
-        cake::Entity::find()
-            .select_only()
-            .select_column(cake::Column::Name)
-            .select_column_as(cake::Column::Id, "cake_id")
-            .as_query()
-            .to_string(),
-        r#"SELECT "cake"."name", "cake"."id" AS "cake_id" FROM "cake""#
-    );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+4/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+5/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -523,7 +511,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+4/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+5/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -559,7 +547,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+4/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+5/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -604,7 +592,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+4/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+5/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {
@@ -965,7 +953,7 @@ fn combine_leaves_bare_expression_unprefixed() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+1/test]    `Insert::new` renders a valid
+// [spec:pgorm:sem:query.build.insert+2/test]    `Insert::new` renders a valid
 // DEFAULT VALUES statement before any model is added, and `one`/`many` /
 // `add`/`add_many` take anything `IntoActiveModel`
 #[test]
@@ -974,7 +962,7 @@ fn insert_new_is_a_default_values_statement() {
     // than the `DEFAULT VALUES` spelling; PostgreSQL defaults the columns that
     // the list does not reach, so the statement is still valid.
     assert_eq!(
-        cake::Entity::insert_many(std::iter::empty::<cake::ActiveModel>())
+        Insert::many(std::iter::empty::<cake::ActiveModel>())
             .as_query()
             .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT)"#
@@ -1007,7 +995,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+1/test]    `add` writes `Set` and
+// [spec:pgorm:sem:query.build.insert+2/test]    `add` writes `Set` and
 // `Unchanged` columns through `col.save_as` and omits `NotSet` ones entirely
 #[test]
 fn insert_add_omits_not_set_columns() {
@@ -1044,12 +1032,12 @@ fn insert_add_omits_not_set_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+1/test]    `on_conflict` attaches the given
+// [spec:pgorm:sem:query.build.insert+2/test]    `on_conflict` attaches the given
 // pgorm-query clause verbatim
 #[test]
 fn insert_on_conflict_is_attached_verbatim() {
     assert_eq!(
-        cake::Entity::insert(apple())
+        Insert::one(apple())
             .on_conflict(OnConflict::column(cake::Column::Name).update_column(cake::Column::Name))
             .as_query()
             .to_string(),
@@ -1061,7 +1049,7 @@ fn insert_on_conflict_is_attached_verbatim() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    models sharing
+// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    models sharing
 // a presence bitmap merge into one multi-row VALUES list
 #[test]
 fn insert_many_shares_one_column_list() {
@@ -1082,7 +1070,7 @@ fn insert_many_shares_one_column_list() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    a model whose
+// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    a model whose
 // presence differs from the first one is recorded as a mismatch, naming the
 // column it does not share, and contributes nothing to the statement
 #[test]
@@ -1115,7 +1103,7 @@ fn insert_many_rejects_mismatched_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+1/test]    a model with nothing set
+// [spec:pgorm:sem:query.build.insert+2/test]    a model with nothing set
 // contributes a default-values row rather than an arity-zero column and value
 // list, and one such row per model
 #[test]
@@ -1140,7 +1128,7 @@ fn all_not_set_model_renders_a_default_row() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+2/test]    a first model
+// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    a first model
 // that sets nothing is a column set like any other: a later model that sets a
 // column mismatches it
 #[test]
@@ -1165,17 +1153,13 @@ fn insert_many_rejects_a_blank_first_model() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    `do_nothing` and
-// `on_empty_do_nothing` convert to `TryInsert` without touching the statement,
-// while `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    `on_empty_do_nothing`
+// converts to `TryInsert` without touching the statement, while
+// `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]
 fn try_insert_conversions_and_conflict_clause() {
     let plain = Insert::one(apple()).as_query().to_string();
 
-    assert_eq!(
-        Insert::one(apple()).do_nothing().as_query().to_string(),
-        plain
-    );
     assert_eq!(
         Insert::one(apple())
             .on_empty_do_nothing()
@@ -1279,7 +1263,7 @@ fn update_one_errs_on_unset_primary_key() {
     assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // `EntityTrait::update` forwards the same error.
-    let err = cake::Entity::update(cake::ActiveModel {
+    let err = Update::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
         name: set("Apple Pie"),
     })
@@ -1387,7 +1371,7 @@ fn delete_one_errs_on_unset_primary_key() {
     assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // `EntityTrait::delete` forwards the same error.
-    let err = cake::Entity::delete(cake::ActiveModel {
+    let err = Delete::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
         name: set("Apple Pie"),
     })
@@ -1419,7 +1403,7 @@ fn delete_many_is_unconstrained_until_filtered() {
 // raw SQL comes from `QueryTrait::build` instead
 #[test]
 fn debug_query_is_a_vestigial_holder() {
-    let query = cake::Entity::insert(apple());
+    let query = Insert::one(apple());
     let debug = DebugQuery {
         query: &query,
         value: 1_u8,

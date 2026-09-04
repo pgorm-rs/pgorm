@@ -544,7 +544,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
             ..Default::default()
         });
     }
-    let _ = Bakery::insert_many(bakeries).exec(db).await?;
+    let _ = Insert::many(bakeries).exec(db).await?;
 
     let mut bakers: Vec<baker::ActiveModel> = vec![];
     let mut cakes: Vec<cake::ActiveModel> = vec![];
@@ -585,9 +585,9 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
         ]
         .as_mut(),
     );
-    Baker::insert_many(bakers).exec(db).await?;
-    Cake::insert_many(cakes).exec(db).await?;
-    CakesBakers::insert_many(cakes_bakers).exec(db).await?;
+    Insert::many(bakers).exec(db).await?;
+    Insert::many(cakes).exec(db).await?;
+    Insert::many(cakes_bakers).exec(db).await?;
 
     Ok(())
 }

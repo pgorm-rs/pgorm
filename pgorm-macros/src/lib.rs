@@ -796,7 +796,7 @@ pub fn derive_from_json_query_result(input: TokenStream) -> TokenStream {
 /// ```
 ///
 /// A partial model with no fields selects nothing, so it cannot return the
-/// `SelectColumns::Projected` state `select_cols` promises. The empty
+/// `QuerySelect::Projected` state `select_cols` promises. The empty
 /// projection is a compile error rather than a query that renders
 /// `SELECT  FROM "tbl"`.
 ///

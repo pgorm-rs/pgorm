@@ -19,6 +19,4 @@ pub use traits::*;
 pub use update::*;
 pub use util::*;
 
-pub use crate::{
-    ConnectionTrait, CursorTrait, InsertResult, TransactionTrait, UpdateResult, Value,
-};
+pub use crate::{ConnectionTrait, CursorTrait, TransactionTrait, Value};

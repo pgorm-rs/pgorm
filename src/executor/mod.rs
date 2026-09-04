@@ -11,11 +11,9 @@ mod verify;
 
 pub use cursor::*;
 pub use decode::*;
-pub use delete::*;
 pub use execute::*;
 pub use insert::*;
 pub use paginator::*;
 pub use query::*;
 pub use select::*;
-pub use update::*;
 pub use verify::*;

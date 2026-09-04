@@ -1,8 +1,7 @@
 use crate::{
-    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, Delete, DeleteMany, DeleteOne, Error,
-    FromQueryResult, Insert, ModelTrait, NoColumns, PrimaryKeyToColumn, PrimaryKeyTrait,
-    QueryFilter, Related, RelationBuilder, RelationTrait, RelationType, Select, Update, UpdateMany,
-    UpdateOne,
+    ActiveModelBehavior, ColumnTrait, Delete, DeleteMany, FromQueryResult, ModelTrait, NoColumns,
+    PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
+    RelationType, Select,
 };
 use pgorm_query::{Alias, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
 use std::fmt::Debug;
@@ -58,7 +57,7 @@ pub trait EntityName: IdenStatic + Default {
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
 // [spec:pgorm:def:entity.traits]
-// [spec:pgorm:req:entity.traits.crud+2]
+// [spec:pgorm:req:entity.traits.crud+3]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]
     type Model: ModelTrait<Entity = Self> + FromQueryResult;
@@ -177,7 +176,7 @@ pub trait EntityTrait: EntityName {
     /// # Panics
     ///
     /// Panics if arity of input values don't match arity of primary key
-    // [spec:pgorm:req:entity.traits.crud+2]
+    // [spec:pgorm:req:entity.traits.crud+3]
     fn find_by_id<T>(values: T) -> Select<Self>
     where
         T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
@@ -196,285 +195,6 @@ pub trait EntityTrait: EntityName {
             panic!("primary key arity mismatch");
         }
         select
-    }
-
-    /// Insert an model into database
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let apple = cake::ActiveModel {
-    ///     name: set("Apple Pie"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // `exec` appends `RETURNING` for the primary key and resolves it into
-    /// // `InsertResult::last_insert_id`.
-    /// let insert_result = cake::Entity::insert(apple).exec(&db).await?;
-    /// let id: i32 = insert_result.last_insert_id;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
-    ///
-    /// let apple = cake::ActiveModel {
-    ///     name: set("Apple Pie"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     cake::Entity::insert(apple).build().0,
-    ///     r#"INSERT INTO "cake" ("name") VALUES ($1)"#
-    /// );
-    /// ```
-    fn insert<A>(model: A) -> Insert<A>
-    where
-        A: ActiveModelTrait<Entity = Self>,
-    {
-        Insert::one(model)
-    }
-
-    /// Insert many models into database
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let apple = cake::ActiveModel {
-    ///     name: set("Apple Pie"),
-    ///     ..Default::default()
-    /// };
-    /// let orange = cake::ActiveModel {
-    ///     name: set("Orange Scone"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // `last_insert_id` is taken from the last returned row.
-    /// let insert_result = cake::Entity::insert_many([apple, orange]).exec(&db).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
-    ///
-    /// let apple = cake::ActiveModel {
-    ///     name: set("Apple Pie"),
-    ///     ..Default::default()
-    /// };
-    /// let orange = cake::ActiveModel {
-    ///     name: set("Orange Scone"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     cake::Entity::insert_many([apple, orange]).build().0,
-    ///     r#"INSERT INTO "cake" ("name") VALUES ($1), ($2)"#
-    /// );
-    /// ```
-    fn insert_many<A, I>(models: I) -> Insert<A>
-    where
-        A: ActiveModelTrait<Entity = Self>,
-        I: IntoIterator<Item = A>,
-    {
-        Insert::many(models)
-    }
-
-    /// Update an model in database
-    ///
-    /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
-    ///
-    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
-    /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let orange = fruit::ActiveModel {
-    ///     id: set(1),
-    ///     name: set("Orange"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // `exec` returns the updated model through `RETURNING`, and fails with
-    /// // `Error::RecordNotFound` when the statement matches no row.
-    /// let updated: fruit::Model = fruit::Entity::update(orange)?
-    ///     .filter(fruit::Column::Name.contains("orange"))
-    ///     .exec(&db)
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
-    ///
-    /// let orange = fruit::ActiveModel {
-    ///     id: set(1),
-    ///     name: set("Orange"),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     fruit::Entity::update(orange)
-    ///         .expect("the primary key is set")
-    ///         .filter(fruit::Column::Name.contains("orange"))
-    ///         .build()
-    ///         .0,
-    ///     [
-    ///         r#"UPDATE "fruit" SET "name" = $1"#,
-    ///         r#"WHERE "fruit"."id" = $2 AND "fruit"."name" LIKE $3"#,
-    ///     ]
-    ///     .join(" ")
-    /// );
-    /// ```
-    fn update<A>(model: A) -> Result<UpdateOne<A>, Error>
-    where
-        A: ActiveModelTrait<Entity = Self>,
-    {
-        Update::one(model)
-    }
-
-    /// Update many models in database
-    ///
-    /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
-    /// # use pgorm::pgorm_query::{Expr, Value};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let update_result = fruit::Entity::update_many()
-    ///     .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
-    ///     .filter(fruit::Column::Name.contains("Apple"))
-    ///     .exec(&db)
-    ///     .await?;
-    ///
-    /// let affected: u64 = update_result.rows_affected;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::pgorm_query::{Expr, Value};
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
-    ///
-    /// assert_eq!(
-    ///     fruit::Entity::update_many()
-    ///         .col_expr(fruit::Column::CakeId, Expr::value(Value::Int(None)))
-    ///         .filter(fruit::Column::Name.contains("Apple"))
-    ///         .build()
-    ///         .0,
-    ///     r#"UPDATE "fruit" SET "cake_id" = $1 WHERE "fruit"."name" LIKE $2"#
-    /// );
-    /// ```
-    fn update_many() -> UpdateMany<Self> {
-        Update::many(Self::default())
-    }
-
-    /// Delete an model from database
-    ///
-    /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
-    ///
-    /// Fails with [`Error::PrimaryKeyNotSet`] when a primary-key column of
-    /// `model` is [`ActiveValue::NotSet`](crate::ActiveValue::NotSet).
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let orange = fruit::ActiveModel {
-    ///     id: set(3),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // Deleting zero rows is `Ok` with `rows_affected: 0`, never an error.
-    /// let delete_result = fruit::Entity::delete(orange)?.exec(&db).await?;
-    /// let affected: u64 = delete_result.rows_affected;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
-    ///
-    /// let orange = fruit::ActiveModel {
-    ///     id: set(3),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// assert_eq!(
-    ///     fruit::Entity::delete(orange)
-    ///         .expect("the primary key is set")
-    ///         .build()
-    ///         .0,
-    ///     r#"DELETE FROM "fruit" WHERE "fruit"."id" = $1"#
-    /// );
-    /// ```
-    fn delete<A>(model: A) -> Result<DeleteOne<A>, Error>
-    where
-        A: ActiveModelTrait<Entity = Self>,
-    {
-        Delete::one(model)
-    }
-
-    /// Delete many models from database
-    ///
-    /// - To apply where conditions / filters, see [`QueryFilter`](crate::query::QueryFilter)
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::fruit, DatabasePool};
-    /// #
-    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// let db = pool.get().await?;
-    ///
-    /// let delete_result = fruit::Entity::delete_many()
-    ///     .filter(fruit::Column::Name.contains("Apple"))
-    ///     .exec(&db)
-    ///     .await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
-    ///
-    /// assert_eq!(
-    ///     fruit::Entity::delete_many()
-    ///         .filter(fruit::Column::Name.contains("Apple"))
-    ///         .build()
-    ///         .0,
-    ///     r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE $1"#
-    /// );
-    /// ```
-    fn delete_many() -> DeleteMany<Self> {
-        Delete::many(Self::default())
     }
 
     /// Delete a model based on primary key
@@ -521,7 +241,7 @@ pub trait EntityTrait: EntityName {
     where
         T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
     {
-        let mut delete = Self::delete_many();
+        let mut delete = Delete::many(Self::default());
         let mut keys = Self::PrimaryKey::iter();
         for v in values.into().into_value_tuple() {
             if let Some(key) = keys.next() {

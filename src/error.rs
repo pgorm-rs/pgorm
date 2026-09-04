@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+5]
+// [spec:pgorm:def:error.model+6]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -26,8 +26,8 @@ pub enum Error {
     /// Type error: the specified type cannot be converted from u64. This is not a runtime error.
     #[error("Type '{0}' cannot be converted from u64")]
     ConvertFromU64(&'static str),
-    /// After an insert statement it was impossible to retrieve the last_insert_id
-    #[error("Failed to unpack last_insert_id")]
+    /// The inserted row's primary key could not be decoded from `RETURNING`
+    #[error("Failed to unpack the inserted primary key")]
     UnpackInsertId,
     /// A primary-key column of the model is `NotSet`, so there is nothing to
     /// narrow the statement to a single row
@@ -49,10 +49,6 @@ pub enum Error {
     /// that probably means all of them conflict with existing records in the table
     #[error("None of the records are inserted")]
     RecordNotInserted,
-    /// None of the records are updated, that means a WHERE condition has no matches.
-    /// May be the table is empty or the record does not exist
-    #[error("None of the records are updated")]
-    RecordNotUpdated,
     /// A decode target does not match the statement it would decode
     #[error("Verification Error: {0}")]
     Verify(#[from] VerifyError),
@@ -122,7 +118,7 @@ pub enum VerifyError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+5]    crate-root Result alias
+// [spec:pgorm:def:error.model+6]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -134,7 +130,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+5]    Display-string equality
+// [spec:pgorm:def:error.model+6]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

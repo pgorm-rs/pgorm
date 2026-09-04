@@ -9,8 +9,8 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
         profit_margin: set(10.4),
         ..Default::default()
     };
-    let bakery_insert_res = Bakery::insert(seaside_bakery)
-        .exec(db)
+    let bakery_insert_res = Insert::one(seaside_bakery)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert bakery");
 
@@ -19,16 +19,16 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
         price: set(rust_dec(10.25)),
         gluten_free: set(false),
         serial: set(Uuid::new_v4()),
-        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
+        bakery_id: set(Some(bakery_insert_res)),
         ..Default::default()
     };
 
-    let cake_insert_res = Cake::insert(mud_cake)
-        .exec(db)
+    let cake_insert_res = Insert::one(mud_cake)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert cake");
 
-    let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res.last_insert_id)
+    let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res)
         .one_opt(db)
         .await
         .expect("could not find cake");
@@ -47,7 +47,7 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
 
     let _cake_update_res: cake::Model = cake_am.update(db).await.expect("could not update cake");
 
-    let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res.last_insert_id)
+    let cake: Option<cake::Model> = Cake::find_by_id(cake_insert_res)
         .one_opt(db)
         .await
         .expect("could not find cake");
@@ -63,12 +63,12 @@ pub async fn test_update_bakery(db: &DatabaseConnection) {
         profit_margin: set(10.4),
         ..Default::default()
     };
-    let bakery_insert_res = Bakery::insert(seaside_bakery)
-        .exec(db)
+    let bakery_insert_res = Insert::one(seaside_bakery)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert bakery");
 
-    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
+    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res)
         .one_opt(db)
         .await
         .expect("could not find bakery");
@@ -85,7 +85,7 @@ pub async fn test_update_bakery(db: &DatabaseConnection) {
     let _bakery_update_res: bakery::Model =
         bakery_am.update(db).await.expect("could not update bakery");
 
-    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
+    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res)
         .one_opt(db)
         .await
         .expect("could not find bakery");

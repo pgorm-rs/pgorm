@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    zero rows affected on the
+// [spec:pgorm:sem:exec.crud.insert+3/test]    zero rows affected on the
 // client-supplied-key path fails with RecordNotInserted
 pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
@@ -48,12 +48,21 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     {
         use pgorm::pgorm_query::OnConflict;
 
-        let err = Repository::insert(repository)
+        let err = Insert::one(repository.clone())
             .on_conflict(OnConflict::do_nothing())
-            .exec(db)
+            .exec_returning_pk(db)
             .await;
 
         assert_eq!(err.err(), Some(Error::RecordNotInserted));
+
+        // [spec:pgorm:req:exec.crud.exec-vocabulary/test]    `exec` asks for no
+        // key, so a skipped row is a count of zero rather than an error: the
+        // terminal's name is the whole difference.
+        let skipped = Insert::one(repository)
+            .on_conflict(OnConflict::do_nothing())
+            .exec(db)
+            .await?;
+        assert_eq!(skipped, 0);
     }
 
     result.delete(db).await?;
@@ -107,12 +116,13 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    the client-supplied primary-key
-// path: `last_insert_id` is reconstructed from the cached `ValueTuple`
-// [spec:pgorm:sem:query.build.insert+1/test]    the capture that makes that
+// [spec:pgorm:sem:exec.crud.insert+3/test]    the client-supplied primary-key
+// path: the key is reconstructed from the cached `ValueTuple`
+// [spec:pgorm:sem:query.build.insert+2/test]    the capture that makes that
 // possible: `Insert::add` records the model's primary-key value tuple when the
 // entity's key is not auto-increment
-// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateOne::exec` returns the model
+// [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateOne::exec_returning_model`
+// returns the model
 // built from the full-column RETURNING, including a column set back to NULL
 pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
@@ -122,8 +132,8 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         description: None,
     };
 
-    let res = Repository::insert(repository.clone().into_active_model())
-        .exec(db)
+    let res = Insert::one(repository.clone().into_active_model())
+        .exec_returning_pk(db)
         .await?;
 
     assert_eq!(
@@ -131,25 +141,25 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         Some(repository.clone())
     );
 
-    assert_eq!(res.last_insert_id, repository.id);
+    assert_eq!(res, repository.id);
 
     let updated_active_model = repository::ActiveModel {
         description: "description...".into(),
         ..repository.clone().into_active_model()
     };
 
-    let update_res = Repository::update(updated_active_model.clone())?
+    let update_res = Update::one(updated_active_model.clone())?
         .filter(repository::Column::Id.eq("not-exists-id".to_owned()))
-        .exec(db)
+        .exec_returning_model(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+4] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+5] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(Error::RecordNotFound));
 
-    let update_res = Repository::update(updated_active_model)?
+    let update_res = Update::one(updated_active_model)?
         .filter(repository::Column::Id.eq("unique-id-002".to_owned()))
-        .exec(db)
+        .exec_returning_model(db)
         .await?;
 
     assert_eq!(
@@ -167,9 +177,9 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         ..repository.clone().into_active_model()
     };
 
-    let update_res = Repository::update(updated_active_model.clone())?
+    let update_res = Update::one(updated_active_model.clone())?
         .filter(repository::Column::Id.eq("unique-id-002".to_owned()))
-        .exec(db)
+        .exec_returning_model(db)
         .await?;
 
     assert_eq!(

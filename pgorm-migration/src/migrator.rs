@@ -8,8 +8,8 @@ use tracing::info;
 use super::{MigrationTrait, seaql_migrations};
 use pgorm::pgorm_query::{ColumnDef, IntoIden, Order, Query, SelectStatement, Table};
 use pgorm::{
-    ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, DynIden, EntityTrait,
-    Error, FromQueryResult, Iterable, TransactionTrait, set,
+    ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, DynIden, Error,
+    FromQueryResult, Insert, Iterable, TransactionTrait, set,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -241,7 +241,7 @@ where
             .map_err(|err| {
                 Error::Custom(format!("system clock is before the Unix epoch: {err}"))
             })?;
-        seaql_migrations::Entity::insert(seaql_migrations::ActiveModel {
+        Insert::one(seaql_migrations::ActiveModel {
             version: set(migration.name()),
             applied_at: set(now.as_secs() as i64),
         })

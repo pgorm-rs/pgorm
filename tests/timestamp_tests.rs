@@ -28,11 +28,11 @@ pub async fn create_applog(db: &DatabaseConnection) -> Result<(), Error> {
         created_at: "2021-09-17T17:50:20+08:00".parse().unwrap(),
     };
 
-    let res = Applog::insert(log.clone().into_active_model())
-        .exec(db)
+    let res = Insert::one(log.clone().into_active_model())
+        .exec_returning_pk(db)
         .await?;
 
-    assert_eq!(log.id, res.last_insert_id);
+    assert_eq!(log.id, res);
 
     let found = Applog::find().one(db).await?;
     assert_eq!(found, log);
@@ -49,11 +49,11 @@ pub async fn create_satellites_log(db: &DatabaseConnection) -> Result<(), Error>
         deployment_date: "2022-01-07T12:11:23Z".parse().unwrap(),
     };
 
-    let res = Satellite::insert(archive.clone().into_active_model())
-        .exec(db)
+    let res = Insert::one(archive.clone().into_active_model())
+        .exec_returning_pk(db)
         .await?;
 
-    assert_eq!(archive.id, res.last_insert_id);
+    assert_eq!(archive.id, res);
 
     let found = Satellite::find().one(db).await?;
     assert_eq!(found, archive);

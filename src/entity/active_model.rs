@@ -1,6 +1,6 @@
 use crate::{
-    ConnectionTrait, DeleteResult, EntityTrait, Iterable, PrimaryKeyArity, PrimaryKeyToColumn,
-    PrimaryKeyTrait, Value, error::*,
+    ConnectionTrait, Delete, EntityTrait, Insert, Iterable, PrimaryKeyArity, PrimaryKeyToColumn,
+    PrimaryKeyTrait, Update, Value, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{Nullable, ValueTuple};
@@ -231,7 +231,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:entity.active-model.persistence+1]
+    // [spec:pgorm:req:entity.active-model.persistence+2]
     async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -241,9 +241,7 @@ pub trait ActiveModelTrait: Clone + Debug {
         // tracing::debug!("Insert ActiveModel: {:?}", self);
         let am = ActiveModelBehavior::before_save(self, db, true).await?;
         // tracing::debug!("before save");
-        let model = <Self::Entity as EntityTrait>::insert(am)
-            .exec_with_returning(db)
-            .await?;
+        let model = Insert::one(am).exec_returning_model(db).await?;
         // tracing::debug!("before save");
         Self::after_save(model, db, true).await
     }
@@ -269,7 +267,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:entity.active-model.persistence+1]
+    // [spec:pgorm:req:entity.active-model.persistence+2]
     async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -278,7 +276,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     {
         let am = ActiveModelBehavior::before_save(self, db, false).await?;
         let model: <Self::Entity as EntityTrait>::Model =
-            Self::Entity::update(am)?.exec(db).await?;
+            Update::one(am)?.exec_returning_model(db).await?;
         Self::after_save(model, db, false).await
     }
 
@@ -297,20 +295,19 @@ pub trait ActiveModelTrait: Clone + Debug {
     ///     ..Default::default()
     /// };
     ///
-    /// let delete_result = orange.delete(&db).await?;
-    /// let affected: u64 = delete_result.rows_affected;
+    /// let rows_affected: u64 = orange.delete(&db).await?;
     /// # Ok(())
     /// # }
     /// ```
     // [spec:pgorm:req:entity.active-model.hooks]
-    async fn delete<'a, C>(self, db: &'a C) -> Result<DeleteResult, Error>
+    async fn delete<'a, C>(self, db: &'a C) -> Result<u64, Error>
     where
         Self: ActiveModelBehavior + 'a,
         C: ConnectionTrait,
     {
         let am = ActiveModelBehavior::before_delete(self, db).await?;
         let am_clone = am.clone();
-        let delete_res = Self::Entity::delete(am)?.exec(db).await?;
+        let delete_res = Delete::one(am)?.exec(db).await?;
         ActiveModelBehavior::after_delete(am_clone, db).await?;
         Ok(delete_res)
     }

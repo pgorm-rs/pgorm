@@ -146,21 +146,21 @@ impl DerivePartialModel {
         let select_col_code_gen = fields.iter().map(|col_as| match col_as {
             ColumnAs::Col { entity, col: ident } => {
                 let col_value = quote!( <#entity as pgorm::EntityTrait>::Column:: #ident);
-                quote!(let #select_ident =  pgorm::SelectColumns::select_column(#select_ident, #col_value);)
+                quote!(let #select_ident =  pgorm::QuerySelect::column(#select_ident, #col_value);)
             },
             ColumnAs::ColAlias { entity, col, field } => {
                 let col_value = quote!( <#entity as pgorm::EntityTrait>::Column:: #col);
-                quote!(let #select_ident =  pgorm::SelectColumns::select_column_as(#select_ident, #col_value, #field);)
+                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #col_value, #field);)
             },
             ColumnAs::Expr { expr, field_name } => {
-                quote!(let #select_ident =  pgorm::SelectColumns::select_column_as(#select_ident, #expr, #field_name);)
+                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #expr, #field_name);)
             },
         });
 
         quote! {
             #[automatically_derived]
             impl pgorm::PartialModelTrait for #ident{
-                fn select_cols<S: pgorm::SelectColumns>(#select_ident: S) -> S::Projected {
+                fn select_cols<S: pgorm::QuerySelect>(#select_ident: S) -> S::Projected {
                     #(#select_col_code_gen)*
                     #select_ident
                 }
@@ -169,7 +169,7 @@ impl DerivePartialModel {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.partial-model+1]
+// [spec:pgorm:sem:macros.derive.partial-model+2]
 pub fn expand_derive_partial_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 
@@ -245,7 +245,7 @@ struct PartialModel{
     expr_field : i32
 }
 "#;
-    // [spec:pgorm:sem:macros.derive.partial-model+1/test]
+    // [spec:pgorm:sem:macros.derive.partial-model+2/test]
     #[test]
     fn test_load_macro_input() -> StdResult<()> {
         let input = parse_str::<DeriveInput>(CODE_SNIPPET)?;

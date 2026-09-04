@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
     Error, PartialModelTrait, PrimaryKeyTrait, QueryResult, Related, RelationDef, RelationTrait,
-    Schema, Select, SelectColumns, Value, entity::prelude::*,
+    Schema, Select, Value, entity::prelude::*,
 };
 use pgorm_query::{
     Alias, Expr, IntoIden, QueryBuilder, TableName, TryFromValueTuple, ValueTuple, ValueTupleError,
@@ -358,7 +358,7 @@ fn entity_name_defaults_and_table_ref() {
         r#"SELECT "item"."id", "item"."name" FROM "warehouse"."item""#
     );
     assert_eq!(
-        scoped_item::Entity::insert(scoped_item::ActiveModel {
+        Insert::one(scoped_item::ActiveModel {
             id: NotSet,
             name: set("x"),
         })
@@ -367,7 +367,7 @@ fn entity_name_defaults_and_table_ref() {
         r#"INSERT INTO "warehouse"."item" ("name") VALUES ($1)"#
     );
     assert_eq!(
-        scoped_item::Entity::update(scoped_item::ActiveModel {
+        Update::one(scoped_item::ActiveModel {
             id: ActiveValue::Unchanged(1),
             name: set("x"),
         })
@@ -392,7 +392,7 @@ fn entity_name_defaults_and_table_ref() {
 // entity.traits.crud
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.traits.crud+2/test]    the static CRUD surface: `find`
+// [spec:pgorm:req:entity.traits.crud+3/test]    the static CRUD surface: `find`
 // returns a fresh `Select`, `find_by_id` adds one equality filter per key column
 // in primary-key iteration order, and `insert` / `insert_many` / `update` /
 // `update_many` / `delete` / `delete_many` / `delete_by_id` build their
@@ -433,7 +433,7 @@ fn entity_crud_surface() {
 
     // `insert` is `Insert::one`.
     assert_eq!(
-        item::Entity::insert(item::ActiveModel {
+        Insert::one(item::ActiveModel {
             id: NotSet,
             name: set("Apple"),
             note: NotSet,
@@ -445,7 +445,7 @@ fn entity_crud_surface() {
 
     // `insert_many` is `Insert::many`.
     assert_eq!(
-        item::Entity::insert_many([
+        Insert::many([
             item::ActiveModel {
                 id: NotSet,
                 name: set("Apple"),
@@ -464,7 +464,7 @@ fn entity_crud_surface() {
 
     // `update` is an `UpdateOne` keyed on the primary key.
     assert_eq!(
-        item::Entity::update(item::ActiveModel {
+        Update::one(item::ActiveModel {
             id: ActiveValue::Unchanged(1),
             name: set("Apple"),
             note: NotSet,
@@ -477,7 +477,7 @@ fn entity_crud_surface() {
 
     // `update_many` is an `UpdateMany`: no key filter, only what you add.
     assert_eq!(
-        item::Entity::update_many()
+        Update::many(item::Entity)
             .col_expr(item::Column::Name, Expr::value("Apple"))
             .filter(item::Column::Note.is_null())
             .build()
@@ -487,7 +487,7 @@ fn entity_crud_surface() {
 
     // `delete` is a `DeleteOne` keyed on the primary key.
     assert_eq!(
-        item::Entity::delete(item::ActiveModel {
+        Delete::one(item::ActiveModel {
             id: set(3),
             name: NotSet,
             note: NotSet,
@@ -500,7 +500,7 @@ fn entity_crud_surface() {
 
     // `delete_many` is unfiltered until you filter it.
     assert_eq!(
-        item::Entity::delete_many()
+        Delete::many(item::Entity)
             .filter(item::Column::Name.contains("Apple"))
             .build()
             .0,
@@ -518,7 +518,7 @@ fn entity_crud_surface() {
     );
 }
 
-// [spec:pgorm:req:entity.traits.crud+2/test]    `find_by_id` panics with
+// [spec:pgorm:req:entity.traits.crud+3/test]    `find_by_id` panics with
 // `primary key arity mismatch` when more values arrive than the key has columns
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -526,7 +526,7 @@ fn find_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::find_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+2/test]    ...and in the other direction too,
+// [spec:pgorm:req:entity.traits.crud+3/test]    ...and in the other direction too,
 // when the key has more columns than values were supplied
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -534,7 +534,7 @@ fn find_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::find_by_id(1);
 }
 
-// [spec:pgorm:req:entity.traits.crud+2/test]    `delete_by_id` carries the same
+// [spec:pgorm:req:entity.traits.crud+3/test]    `delete_by_id` carries the same
 // guard as `find_by_id`, in both directions
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -542,7 +542,7 @@ fn delete_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::delete_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+2/test]
+// [spec:pgorm:req:entity.traits.crud+3/test]
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
 fn delete_by_id_panics_when_key_outnumbers_values() {
@@ -580,11 +580,15 @@ fn primary_key_value_type_errs_on_arity() {
     );
 }
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    reconstructing `last_insert_id`
+// [spec:pgorm:sem:exec.crud.insert+3/test]    reconstructing the primary key
 // from the cached tuple returns `Error::Type` naming the table and the
-// mismatch when the entity's `ValueType` disagrees, rather than panicking
-// [spec:pgorm:sem:exec.crud.update+4/test]    the no-op re-fetch rebuilds the
+// mismatch when the entity's `ValueType` disagrees, rather than panicking.
+// Only `exec_returning_pk` decodes the key, so only it can raise this; plain
+// `exec` asks for no key and reports the row it wrote.
+// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op re-fetch rebuilds the
 // same typed key and fails the same way
+// [spec:pgorm:req:exec.crud.exec-vocabulary/test]    the two insert terminals
+// differ exactly as their names say: a count needs no key and cannot fail on one
 #[pgorm_macros::test]
 async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     let ctx = TestContext::new("mistyped_primary_key").await;
@@ -598,15 +602,24 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
             .to_owned(),
     );
 
-    let inserted = mistyped_key::Entity::insert(mistyped_key::ActiveModel { id: set(1) })
-        .exec(&db)
+    let inserted = Insert::one(mistyped_key::ActiveModel { id: set(1) })
+        .exec_returning_pk(&db)
         .await;
     assert_eq!(inserted.unwrap_err(), expected);
 
-    let updated = mistyped_key::Entity::update(mistyped_key::ActiveModel {
+    // `exec` decodes no key, so the mistyped `ValueType` is never consulted and
+    // the insert simply reports the row it wrote.
+    let counted = Insert::one(mistyped_key::ActiveModel {
+        id: ActiveValue::Set(2),
+    })
+    .exec(&db)
+    .await?;
+    assert_eq!(counted, 1);
+
+    let updated = Update::one(mistyped_key::ActiveModel {
         id: ActiveValue::Unchanged(1),
     })?
-    .exec(&db)
+    .exec_returning_model(&db)
     .await;
     assert_eq!(updated.unwrap_err(), expected);
 
@@ -1097,12 +1110,12 @@ async fn model_trait_delete_runs_through_active_model() -> Result<(), Error> {
 
     // Deleting straight off the Model removes exactly that row.
     let res = apple.clone().delete(&db).await?;
-    assert_eq!(res.rows_affected, 1);
+    assert_eq!(res, 1);
     assert_eq!(item::Entity::find().all(&db).await?, [pear]);
 
     // A model whose key no longer matches anything deletes nothing, without error.
     let res = apple.delete(&db).await?;
-    assert_eq!(res.rows_affected, 0);
+    assert_eq!(res, 0);
 
     drop(db);
     ctx.delete().await;
@@ -1151,7 +1164,7 @@ impl FromQueryResult for PrefixProbe {
     }
 }
 
-// [spec:pgorm:def:entity.traits.from-query-result+2/test]    `from_query_result`
+// [spec:pgorm:def:entity.traits.from-query-result+3/test]    `from_query_result`
 // instantiates a type from a row under a column-name prefix,
 // `from_query_result_optional` turns any decode error into `Ok(None)` and
 // discards the error, `find_by_statement` runs raw SQL into typed rows, and
@@ -1163,7 +1176,7 @@ async fn from_query_result_surface() -> Result<(), Error> {
     let stmt = Schema::new().create_table_from_entity(item::Entity);
     db.execute(&stmt.to_string(), &[]).await?;
 
-    item::Entity::insert_many([
+    Insert::many([
         item::ActiveModel {
             id: NotSet,
             name: set("Apple"),

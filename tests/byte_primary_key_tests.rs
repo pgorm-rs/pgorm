@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.crud/test]    `into_values` decoding through
 // `SelectGetableValue` and `into_tuple` through `SelectGetableTuple`
-// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateOne::exec` returns the
+// [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateOne::exec` returns the
 // updated model, and surfaces RecordNotFound when the filter matches nothing
 pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), Error> {
     use common::features::byte_primary_key::*;
@@ -32,31 +32,31 @@ pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), Error> {
         value: "First Row".to_owned(),
     };
 
-    let res = Entity::insert(model.clone().into_active_model())
-        .exec(db)
+    let res = Insert::one(model.clone().into_active_model())
+        .exec_returning_pk(db)
         .await?;
 
     assert_eq!(Entity::find().one_opt(db).await?, Some(model.clone()));
 
-    assert_eq!(res.last_insert_id, model.id);
+    assert_eq!(res, model.id);
 
     let updated_active_model = ActiveModel {
         value: set("First Row (Updated)"),
         ..model.clone().into_active_model()
     };
 
-    let update_res = Entity::update(updated_active_model.clone())?
+    let update_res = Update::one(updated_active_model.clone())?
         .filter(Column::Id.eq(vec![1_u8, 2_u8, 4_u8])) // annotate it as Vec<u8> explicitly
-        .exec(db)
+        .exec_returning_model(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+4] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+5] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(Error::RecordNotFound));
 
-    let update_res = Entity::update(updated_active_model)?
+    let update_res = Update::one(updated_active_model)?
         .filter(Column::Id.eq(vec![1_u8, 2_u8, 3_u8])) // annotate it as Vec<u8> explicitly
-        .exec(db)
+        .exec_returning_model(db)
         .await?;
 
     assert_eq!(

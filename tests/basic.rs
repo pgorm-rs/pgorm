@@ -86,7 +86,7 @@ async fn crud_cake(db: &DatabaseConnection) -> Result<(), Error> {
 
     let apple: cake::Model = apple.unwrap();
     let result = apple.delete(db).await?;
-    assert_eq!(result.rows_affected, 1);
+    assert_eq!(result, 1);
 
     let apple = cake::Entity::find_by_id(1).one_opt(db).await?;
     assert_eq!(None, apple);

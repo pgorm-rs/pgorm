@@ -17,7 +17,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+4]
+// [spec:pgorm:sem:query.build.modifiers+5]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -530,34 +530,6 @@ pub trait QuerySelect: Sized {
         self.into_projected()
     }
 
-    /// Same as `expr_as`. Here for legacy reasons.
-    ///
-    /// Select column.
-    ///
-    /// ```
-    /// use pgorm::pgorm_query::{Alias, Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
-    ///
-    /// assert_eq!(
-    ///     cake::Entity::find()
-    ///         .expr_as(
-    ///             Func::upper(Expr::col((cake::Entity, cake::Column::Name))),
-    ///             "name_upper"
-    ///         )
-    ///         .as_query()
-    ///         .to_string(),
-    ///     r#"SELECT "cake"."id", "cake"."name", UPPER("cake"."name") AS "name_upper" FROM "cake""#
-    /// );
-    /// ```
-    fn expr_as_<T, A>(mut self, expr: T, alias: A) -> Self::Projected
-    where
-        T: Into<SimpleExpr>,
-        A: IntoIdentity,
-    {
-        self.query().expr_as(expr, alias.into_identity());
-        self.into_projected()
-    }
-
     /// Shorthand of `expr_as(Expr::col((T, C)), A)`.
     ///
     /// ```
@@ -722,7 +694,7 @@ pub trait QuerySelect: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+4]
+// [spec:pgorm:sem:query.build.modifiers+5]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;

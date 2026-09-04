@@ -22,7 +22,7 @@ pub use crate::{
     IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait, PaginatorTrait,
     PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult,
     QuerySelect, QueryTrait, Related, RelationDef, RelationTrait, Select, TransactionTrait,
-    TryIntoModel, Update, Value,
+    TryInsert, TryIntoModel, Update, Value,
     error::*,
     pgorm_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     set,

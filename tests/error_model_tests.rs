@@ -21,7 +21,7 @@ impl fmt::Display for Boom {
 
 impl StdError for Boom {}
 
-// [spec:pgorm:def:error.model+5/test]    the variants pgorm constructs itself, and how each renders
+// [spec:pgorm:def:error.model+6/test]    the variants pgorm constructs itself, and how each renders
 #[test]
 fn error_variants_render_expected_messages() {
     let cases: Vec<(Error, &str)> = vec![
@@ -41,7 +41,10 @@ fn error_variants_render_expected_messages() {
             Error::ConvertFromU64("Uuid"),
             "Type 'Uuid' cannot be converted from u64",
         ),
-        (Error::UnpackInsertId, "Failed to unpack last_insert_id"),
+        (
+            Error::UnpackInsertId,
+            "Failed to unpack the inserted primary key",
+        ),
         (Error::PrimaryKeyNotSet, "A primary key value is not set"),
         (
             Error::AttrNotSet("name".to_owned()),
@@ -60,7 +63,6 @@ fn error_variants_render_expected_messages() {
             "No records were returned for the given query",
         ),
         (Error::RecordNotInserted, "None of the records are inserted"),
-        (Error::RecordNotUpdated, "None of the records are updated"),
         (Error::Custom("boom".to_owned()), "Custom Error: boom"),
     ];
 
@@ -69,7 +71,7 @@ fn error_variants_render_expected_messages() {
     }
 }
 
-// [spec:pgorm:def:error.model+5/test]    PartialEq/Eq compare rendered messages, not payloads
+// [spec:pgorm:def:error.model+6/test]    PartialEq/Eq compare rendered messages, not payloads
 #[test]
 fn error_eq_compares_rendered_messages() {
     fn assert_is_eq<T: Eq>() {}
@@ -95,7 +97,7 @@ fn error_eq_compares_rendered_messages() {
     assert_eq!(Error::RecordNotFound, Error::RecordNotFound);
 }
 
-// [spec:pgorm:def:error.model+5/test]    ColumnFromStrError covers FromStr failures on entity columns
+// [spec:pgorm:def:error.model+6/test]    ColumnFromStrError covers FromStr failures on entity columns
 #[test]
 fn column_from_str_error_reports_bad_input() {
     assert!(matches!(
@@ -112,7 +114,7 @@ fn column_from_str_error_reports_bad_input() {
     );
 }
 
-// [spec:pgorm:def:error.model+5/test]    Result defaults to Error but still takes a foreign one
+// [spec:pgorm:def:error.model+6/test]    Result defaults to Error but still takes a foreign one
 #[test]
 fn result_alias_defaults_to_error() {
     fn defaulted() -> pgorm::Result<u8> {
@@ -180,7 +182,7 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+5/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
+// [spec:pgorm:def:error.model+6/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
 #[pgorm_macros::test]
 async fn error_postgres_carries_server_detail() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_postgres_errmodel").await;
@@ -231,7 +233,7 @@ async fn error_postgres_carries_server_detail() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+5/test]    DatabasePool::get surfaces pool exhaustion as Error::Pool
+// [spec:pgorm:def:error.model+6/test]    DatabasePool::get surfaces pool exhaustion as Error::Pool
 #[pgorm_macros::test]
 async fn error_pool_from_acquisition_timeout() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_pool_errmodel").await;

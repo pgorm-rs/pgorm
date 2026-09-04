@@ -53,7 +53,7 @@ macro_rules! debug_query_build {
 /// ```
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
-/// let c = cake::Entity::insert(cake::ActiveModel {
+/// let c = Insert::one(cake::ActiveModel {
 ///     id: set(1),
 ///     name: set("Apple Pie"),
 /// });
@@ -91,7 +91,7 @@ macro_rules! debug_query_stmt {
 /// ```
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
-/// let c = cake::Entity::insert(cake::ActiveModel {
+/// let c = Insert::one(cake::ActiveModel {
 ///     id: set(1),
 ///     name: set("Apple Pie"),
 /// });

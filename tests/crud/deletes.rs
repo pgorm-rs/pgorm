@@ -10,8 +10,8 @@ pub async fn test_delete_cake(db: &DatabaseConnection) {
         profit_margin: set(10.4),
         ..Default::default()
     };
-    let bakery_insert_res = Bakery::insert(seaside_bakery)
-        .exec(db)
+    let bakery_insert_res = Insert::one(seaside_bakery)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert bakery");
 
@@ -20,7 +20,7 @@ pub async fn test_delete_cake(db: &DatabaseConnection) {
         price: set(rust_dec(10.25)),
         gluten_free: set(false),
         serial: set(Uuid::new_v4()),
-        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
+        bakery_id: set(Some(bakery_insert_res)),
         ..Default::default()
     };
 

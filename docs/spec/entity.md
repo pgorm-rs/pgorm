@@ -32,17 +32,24 @@ explicit limitations.
 > `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
 > through `table_ref`, so a `Some` schema name qualifies every statement.
 
-> [spec:pgorm:req:entity.traits.crud+2]
-> `EntityTrait` provides the static CRUD surface (`src/entity/base_entity.rs`):
+> [spec:pgorm:req:entity.traits.crud+3]
+> `EntityTrait` provides the static *read* surface (`src/entity/base_entity.rs`):
 > `find()` returns a fresh `Select<Self>`; `find_by_id(values)` builds on `find()` by
 > adding an equality filter per primary-key column, consuming the value tuple in
-> primary-key iteration order. `insert(model)` returns `Insert::one`,
-> `insert_many(models)` returns `Insert::many`, `update(model)` returns
-> `Result<UpdateOne<A>, Error>` and `delete(model)` `Result<DeleteOne<A>, Error>` —
-> both forward the builder guards of `query.build.update` / `query.build.delete`,
-> erring on an unset primary key. `update_many()` returns an `UpdateMany`,
-> `delete_many()` a `DeleteMany`, and `delete_by_id(values)` a `DeleteMany` filtered
-> per primary-key column like `find_by_id`.
+> primary-key iteration order. `delete_by_id(values)` returns a `DeleteMany`
+> filtered per primary-key column like `find_by_id`; it stays because the
+> per-column filter loop is real work, not a forward.
+>
+> `EntityTrait` MUST NOT carry `insert`, `insert_many`, `update`, `update_many`,
+> `delete`, or `delete_many`. Each was a one-line forward to a builder
+> constructor — `Insert::one`, `Insert::many`, `Update::one`, `Update::many`,
+> `Delete::one`, `Delete::many` — and a second spelling of a constructor is a
+> second thing to learn, a second place for docs to drift, and a second name
+> in every reader's search. This follows the precedent of
+> `entity.active-model.save`: where two spellings mean one thing, the surface
+> keeps the one that says what it does. `Insert`, `TryInsert`, `Update`, and
+> `Delete` are exported from `entity::prelude` so the surviving spelling is
+> reachable wherever the deleted one was.
 >
 > `find_by_id` and `delete_by_id` MUST panic with `primary key arity mismatch` when the
 > number of supplied values differs from the primary key's arity, in either direction.
@@ -136,7 +143,7 @@ explicit limitations.
 > `ActiveModelTrait::delete`, so behavior hooks run. `TryIntoModel<M>` is the fallible
 > reverse conversion with a blanket identity impl for any model.
 
-> [spec:pgorm:def:entity.traits.from-query-result+2]
+> [spec:pgorm:def:entity.traits.from-query-result+3]
 > `FromQueryResult` (`src/entity/model.rs`) instantiates a type from a `QueryResult`
 > row given a column-name prefix: `from_query_result(res, pre)`.
 > `from_query_result_optional` converts any decode error into `Ok(None)` — the error
@@ -146,7 +153,7 @@ explicit limitations.
 > be checked against the type before a row exists; it defaults to `None`, the answer of
 > an implementation that does not report them (`exec.verify`).
 > `PartialModelTrait: FromQueryResult` (`src/entity/partial_model.rs`) adds
-> `select_cols<S: SelectColumns>(S) -> S::Projected`, letting a partial model declare
+> `select_cols<S: QuerySelect>(S) -> S::Projected`, letting a partial model declare
 > exactly the columns it needs on a select. The return type is the *projected* state,
 > not `S`, so an implementation that selects no column cannot typecheck: a field-less
 > `DerivePartialModel` is a compile error rather than a query with an empty
@@ -244,13 +251,14 @@ explicit limitations.
 > root and is the spelling documentation uses
 > (`[spec:pgorm:def:entity.active-model.active-value+1]`).
 
-> [spec:pgorm:req:entity.active-model.persistence+1]
-> `ActiveModelTrait::insert` MUST execute via `Insert::exec_with_returning`, so on
+> [spec:pgorm:req:entity.active-model.persistence+2]
+> `ActiveModelTrait::insert` MUST execute via `Insert::exec_returning_model`, so on
 > PostgreSQL the insert and the returned `Model` are a single `INSERT ... RETURNING`
-> round trip. `ActiveModelTrait::update` executes `Entity::update(am).exec(db)`
+> round trip. `ActiveModelTrait::update` executes
+> `Update::one(am).exec_returning_model(db)`
 > (an `UPDATE ... RETURNING` statement keyed on the primary key) and likewise returns
 > the fresh `Model`. `ActiveModelTrait::delete` deletes by the model's primary key and
-> returns the `DeleteResult`. All three are async and generic over any
+> returns the rows-affected count as `u64`. All three are async and generic over any
 > `ConnectionTrait` (`src/entity/active_model.rs`). `insert` and `update` are the
 > trait's only write entry points, and which of them runs is the caller's stated
 > choice rather than a property of the model

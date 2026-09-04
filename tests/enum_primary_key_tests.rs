@@ -70,7 +70,7 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
 
     // UNIQUE constraint failed
     assert!(
-        Entity::insert(ActiveModel {
+        Insert::one(ActiveModel {
             id: set(Tea::EverydayTea),
             category: set(Some(Category::Big)),
             color: set(Some(Color::Black)),
@@ -127,7 +127,7 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
 
     let res = model.delete(db).await?;
 
-    assert_eq!(res.rows_affected, 1);
+    assert_eq!(res, 1);
     assert_eq!(Entity::find().one_opt(db).await?, None);
 
     Ok(())

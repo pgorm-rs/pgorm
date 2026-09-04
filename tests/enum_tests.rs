@@ -306,7 +306,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
 
     // An INSERT written through the entity carries the same casts.
     assert_eq!(
-        casts::Entity::insert(casts::ActiveModel {
+        Insert::one(casts::ActiveModel {
             id: NotSet,
             tea: set(Tea::BreakfastTea),
             teas: set(vec![Tea::EverydayTea]),

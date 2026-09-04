@@ -2,119 +2,36 @@ use crate::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityName, EntityTrait, IntoActiveModel,
     Iterable, PrimaryKeyTrait, SelectModel, SelectorRaw, UpdateMany, UpdateOne, error::*,
 };
-use pgorm_query::{Query, TryFromValueTuple, UpdateStatement};
+use pgorm_query::{Query, TryFromValueTuple};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
-
-/// Defines an update operation
-#[derive(Clone, Debug)]
-pub struct Updater {
-    query: UpdateStatement,
-    check_record_exists: bool,
-}
-
-/// The result of an update operation on an ActiveModel
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct UpdateResult {
-    /// The rows affected by the update operation
-    pub rows_affected: u64,
-}
 
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
 {
-    /// Execute an update operation on an ActiveModel
-    pub async fn exec<C>(self, db: &C) -> Result<<A::Entity as EntityTrait>::Model, Error>
-    where
-        <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
-        C: ConnectionTrait,
-    {
-        Updater::new(self.query)
-            .exec_update_and_return_updated(self.model, db)
-            .await
-    }
-}
-
-impl<'a, E> UpdateMany<E>
-where
-    E: EntityTrait,
-{
-    /// Execute an update operation on multiple ActiveModels
-    pub async fn exec<C>(self, db: &'a C) -> Result<UpdateResult, Error>
-    where
-        C: ConnectionTrait,
-    {
-        Updater::new(self.query).exec(db).await
-    }
-
-    /// Execute an update operation and return the updated model (use `RETURNING` syntax if supported)
-    pub async fn exec_with_returning<C>(self, db: &'a C) -> Result<Vec<E::Model>, Error>
-    where
-        C: ConnectionTrait,
-    {
-        Updater::new(self.query)
-            .exec_update_with_returning::<E, _>(db)
-            .await
-    }
-}
-
-// [spec:pgorm:sem:exec.crud.update+4]
-impl Updater {
-    /// Instantiate an update using an [UpdateStatement]
-    pub fn new(query: UpdateStatement) -> Self {
-        Self {
-            query,
-            check_record_exists: false,
-        }
-    }
-
-    /// Check if a record exists on the ActiveModel to perform the update operation on
-    pub fn check_record_exists(mut self) -> Self {
-        self.check_record_exists = true;
-        self
-    }
-
-    /// Execute an update operation
-    pub async fn exec<C>(self, db: &C) -> Result<UpdateResult, Error>
-    where
-        C: ConnectionTrait,
-    {
-        if self.is_noop() {
-            return Ok(UpdateResult::default());
-        }
-        let (stmt, values) = self.query.build();
-        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
-        let values = values
-            .iter()
-            .map(|x| x as _)
-            .collect::<Vec<&(dyn ToSql + Sync)>>();
-
-        let result = db.execute(&stmt, &values).await?;
-        if self.check_record_exists && result == 0 {
-            return Err(Error::RecordNotUpdated);
-        }
-        Ok(UpdateResult {
-            rows_affected: result,
-        })
-    }
-
-    async fn exec_update_and_return_updated<A, C>(
+    /// Execute the update and return the updated row as a model.
+    ///
+    /// `UpdateOne` has no bare `exec`: updating a single model by primary key
+    /// always reads the row back. Use [`Update::many`](crate::Update::many)
+    /// filtered to the key when a rows-affected count is all that is wanted.
+    // [spec:pgorm:sem:exec.crud.update+5]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    pub async fn exec_returning_model<C>(
         mut self,
-        model: A,
         db: &C,
     ) -> Result<<A::Entity as EntityTrait>::Model, Error>
     where
-        A: ActiveModelTrait,
+        <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
         C: ConnectionTrait,
     {
         type Entity<A> = <A as ActiveModelTrait>::Entity;
         type Model<A> = <Entity<A> as EntityTrait>::Model;
         type Column<A> = <Entity<A> as EntityTrait>::Column;
 
-        if self.is_noop() {
-            return find_updated_model_by_id(model, db).await;
+        if self.query.get_values().is_empty() {
+            return find_updated_model_by_id(self.model, db).await;
         }
 
         let returning = Query::returning()
@@ -129,13 +46,43 @@ impl Updater {
 
         Ok(found)
     }
+}
 
-    async fn exec_update_with_returning<E, C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
+impl<E> UpdateMany<E>
+where
+    E: EntityTrait,
+{
+    /// Execute the update and report how many rows it changed.
+    ///
+    /// No `RETURNING` clause is emitted. See [`Self::exec_returning_models`] for
+    /// the updated rows.
+    // [spec:pgorm:sem:exec.crud.update+5]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
-        E: EntityTrait,
         C: ConnectionTrait,
     {
-        if self.is_noop() {
+        if self.query.get_values().is_empty() {
+            return Ok(0);
+        }
+        let (stmt, values) = self.query.build();
+        let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
+        let values = values
+            .iter()
+            .map(|x| x as _)
+            .collect::<Vec<&(dyn ToSql + Sync)>>();
+
+        db.execute(&stmt, &values).await
+    }
+
+    /// Execute the update and return every updated row as a model.
+    // [spec:pgorm:sem:exec.crud.update+5]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    pub async fn exec_returning_models<C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
+    where
+        C: ConnectionTrait,
+    {
+        if self.query.get_values().is_empty() {
             return Ok(vec![]);
         }
 
@@ -153,13 +100,9 @@ impl Updater {
 
         Ok(models)
     }
-
-    fn is_noop(&self) -> bool {
-        self.query.get_values().is_empty()
-    }
 }
 
-// [spec:pgorm:sem:exec.crud.update+4]
+// [spec:pgorm:sem:exec.crud.update+5]
 async fn find_updated_model_by_id<A, C>(
     model: A,
     db: &C,

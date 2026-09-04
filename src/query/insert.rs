@@ -108,7 +108,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.insert+1]
+// [spec:pgorm:sem:query.build.insert+2]
 impl<A> Insert<A>
 where
     A: ActiveModelTrait,
@@ -127,7 +127,7 @@ where
 
     /// Whether the statement carries no column at all: either no model was
     /// added, or every model added left every column `NotSet`.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.columns, InsertColumns::Empty { .. })
     }
@@ -139,7 +139,7 @@ where
     /// reported there. Every execution path asks here and fails with the
     /// resulting [`Error::Query`] before sending any SQL; callers that want the
     /// error sooner can ask directly.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
         match &self.columns {
             InsertColumns::Mismatch {
@@ -222,8 +222,8 @@ where
     /// added contributes neither columns nor values; the disagreement is
     /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
     /// and by every execution path.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
-    // [spec:pgorm:sem:query.build.insert+1]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
+    // [spec:pgorm:sem:query.build.insert+2]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
     where
@@ -299,7 +299,7 @@ where
     ///     name: set("Orange"),
     /// };
     /// assert_eq!(
-    ///     cake::Entity::insert(orange)
+    ///     Insert::one(orange)
     ///         .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
     ///         .as_query()
     ///         .to_string(),
@@ -316,7 +316,7 @@ where
     ///     name: set("Orange"),
     /// };
     /// assert_eq!(
-    ///     cake::Entity::insert(orange)
+    ///     Insert::one(orange)
     ///         .on_conflict(
     ///             OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
     ///         )
@@ -333,16 +333,14 @@ where
         self
     }
 
-    /// Allow insert statement return safely if inserting nothing.
-    /// The database will not be affected.
-    pub fn do_nothing(self) -> TryInsert<A>
-    where
-        A: ActiveModelTrait,
-    {
-        TryInsert::from_insert(self)
-    }
-
-    /// alias to do_nothing
+    /// Make an empty insert a no-op instead of an error.
+    ///
+    /// Converts to [`TryInsert`] without touching the statement, so an insert
+    /// with nothing to write reports `TryInsertResult::Empty` rather than
+    /// sending SQL. Distinct from
+    /// [`OnConflict::do_nothing`](pgorm_query::OnConflict::do_nothing), which
+    /// attaches an `ON CONFLICT` clause to a statement that does run.
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
     pub fn on_empty_do_nothing(self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -366,14 +364,14 @@ where
     /// };
     ///
     /// assert_eq!(
-    ///     cake::Entity::insert(orange)
+    ///     Insert::one(orange)
     ///         .on_conflict_do_nothing()
     ///         .as_query()
     ///         .to_string(),
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
     pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -414,7 +412,7 @@ where
 ///
 /// All functions works the same as if it is `Insert<A>`. Please refer to the
 /// `Insert<A>` page for more information
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+2]
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
 #[derive(Debug)]
 pub struct TryInsert<A>
 where
@@ -495,7 +493,7 @@ where
 
     /// The columns mismatch recorded while models were added, if any; see
     /// [`Insert::ensure_uniform_columns`].
-    // [spec:pgorm:req:query.build.insert.uniform-columns+2]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
         self.insert_struct.ensure_uniform_columns()
     }
@@ -524,7 +522,7 @@ mod tests {
     use pgorm_query::OnConflict;
 
     use crate::tests_cfg::cake::{self};
-    use crate::{ActiveValue, EntityTrait, Insert, IntoActiveModel, QueryTrait, set};
+    use crate::{ActiveValue, Insert, IntoActiveModel, QueryTrait, set};
 
     #[test]
     fn insert_1() {
@@ -615,7 +613,7 @@ mod tests {
         };
 
         assert_eq!(
-            cake::Entity::insert(orange)
+            Insert::one(orange)
                 .on_conflict(OnConflict::column(cake::Column::Name).do_nothing())
                 .as_query()
                 .to_string(),
@@ -631,7 +629,7 @@ mod tests {
         };
 
         assert_eq!(
-            cake::Entity::insert(orange)
+            Insert::one(orange)
                 .on_conflict(
                     OnConflict::column(cake::Column::Name).update_column(cake::Column::Name)
                 )
@@ -669,7 +667,7 @@ mod tests {
         };
 
         assert_eq!(
-            post::Entity::insert(model.into_active_model())
+            Insert::one(model.into_active_model())
                 .as_query()
                 .to_string(),
             r#"INSERT INTO "posts" ("id", "title", "text") VALUES (CAST(1 AS TEXT), 'News wrap up 2022', 'brbrbrrrbrbrbrr...')"#,
@@ -717,7 +715,7 @@ mod tests {
         };
 
         assert_eq!(
-            post::Entity::insert(model.into_active_model())
+            Insert::one(model.into_active_model())
                 .as_query()
                 .to_string(),
             [

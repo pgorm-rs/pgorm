@@ -4,7 +4,7 @@ The executor layer (`src/executor/`) turns built statements into database
 round-trips and decodes `tokio_postgres` rows back into Rust values. It is
 split into a decoding surface (`QueryResult` and the `TryGetable` family,
 `src/executor/query.rs`) and a CRUD execution surface (`Selector`,
-`Inserter`, `Updater`, `Deleter`, `src/executor/{select,insert,update,delete,execute}.rs`).
+`src/executor/{select,insert,update,delete,execute}.rs`).
 These rules capture what the code does today, including known gaps.
 
 ## Decoding (`exec.decode`)
@@ -323,13 +323,51 @@ These rules capture what the code does today, including known gaps.
 > pagination: `one()` was dropped, and `paginate`/`count` are absent
 > because a page boundary could split one parent's children.
 
-> [spec:pgorm:sem:exec.crud.insert+2]
-> `Insert::exec` appends a `RETURNING` clause of the entity's primary-key
-> columns and resolves `InsertResult::last_insert_id` (typed as the
+> [spec:pgorm:req:exec.crud.exec-vocabulary]
+> A CRUD terminal's name MUST determine the shape of what it returns, so
+> that a reader of the call site needs no knowledge of which constructor
+> produced the builder. Exactly three terminal names exist, and each MUST
+> mean the same thing on every builder that offers it:
+>
+> - `exec` MUST emit no `RETURNING` clause and MUST return the rows-affected
+>   count as a bare `u64`.
+> - `exec_returning_pk` MUST return the inserted row's primary key, typed as
+>   the entity's `PrimaryKey::ValueType`.
+> - `exec_returning_model` MUST return exactly one `Model`;
+>   `exec_returning_models` MUST return `Vec<Model>`.
+>
+> The mapping is therefore total:
+>
+> | Builder | `exec` | `exec_returning_pk` | model-returning |
+> | --- | --- | --- | --- |
+> | `Insert<A>` | `u64` | `PrimaryKey::ValueType` | `exec_returning_model` → `Model` |
+> | `TryInsert<A>` | `TryInsertResult<u64>` | `TryInsertResult<ValueType>` | `exec_returning_model` → `TryInsertResult<Model>` |
+> | `UpdateOne<A>` | *absent* | *absent* | `exec_returning_model` → `Model` |
+> | `UpdateMany<E>` | `u64` | *absent* | `exec_returning_models` → `Vec<Model>` |
+> | `DeleteOne<A>` | `u64` | *absent* | *absent* |
+> | `DeleteMany<E>` | `u64` | *absent* | *absent* |
+>
+> `TryInsert`'s wrapper is the receiver type's contract, not a per-method
+> variation: every `TryInsert` terminal MUST wrap the corresponding `Insert`
+> terminal's shape in `TryInsertResult`.
+>
+> `UpdateOne` MUST NOT offer a bare `exec`. Updating one model by primary key
+> always reads the row back, so there is no count-shaped answer to give; a
+> caller wanting a count uses `Update::many` filtered to the key. The
+> absence is the point: no `exec` on `UpdateOne` can be misread as a count.
+>
+> The retired spellings MUST NOT exist. `exec_without_returning` is `exec`;
+> `exec_with_returning` is `exec_returning_model` (or `exec_returning_models`
+> on `UpdateMany`); the old `Insert::exec`, which returned a primary key
+> under a name that promised nothing, is `exec_returning_pk`.
+
+> [spec:pgorm:sem:exec.crud.insert+3]
+> `Insert::exec_returning_pk` appends a `RETURNING` clause of the entity's
+> primary-key columns and resolves the key (typed as the
 > entity's `PrimaryKey::ValueType`) in one of two modes. When the insert
 > captured a client-supplied primary-key `ValueTuple`, the statement runs
 > through `execute`; zero rows affected fails with
-> `Error::RecordNotInserted`, and `last_insert_id` is reconstructed from
+> `Error::RecordNotInserted`, and the key is reconstructed from
 > the cached tuple through `sql.value.tuple`. A tuple whose shape or
 > element types disagree with the entity's declared `ValueType` fails with
 > `Error::Type` naming the table and the mismatch, rather than panicking.
@@ -337,28 +375,34 @@ These rules capture what the code does today, including known gaps.
 > the **last** returned row's primary-key columns are read by name;
 > an empty result fails with `Error::RecordNotInserted`, and a decode
 > failure of the key columns fails with `Error::UnpackInsertId`.
+>
+> The key is returned bare. There is no `InsertResult` wrapper and no
+> `last_insert_id` field: a one-field struct whose field repeated the
+> method's promise carried no information the name does not, and
+> "last insert id" named a MySQL affordance rather than the `RETURNING`ed
+> primary key this actually is.
 
-> [spec:pgorm:sem:exec.crud.insert-returning+1]
-> `Insert::exec_with_returning` appends a `RETURNING` clause of **all**
+> [spec:pgorm:sem:exec.crud.insert-returning+2]
+> `Insert::exec_returning_model` appends a `RETURNING` clause of **all**
 > entity columns and decodes the inserted model through
 > `SelectorRaw::<SelectModel<Model>>::one_opt`; when no row comes back it
-> fails with `Error::RecordNotFound`. `Insert::exec_without_returning`
+> fails with `Error::RecordNotFound`. `Insert::exec`
 > appends no `RETURNING` clause and returns the rows-affected count as
 > `u64`.
 
-> [spec:pgorm:sem:exec.crud.try-insert+2]
-> `TryInsert::exec`, `exec_without_returning`, and `exec_with_returning`
+> [spec:pgorm:sem:exec.crud.try-insert+3]
+> `TryInsert::exec`, `exec_returning_pk`, and `exec_returning_model`
 > wrap the corresponding `Insert` executions in `TryInsertResult`. When
-> the underlying insert statement has no columns (e.g. `insert_many`
-> with an empty iterator), they return `TryInsertResult::Empty` without
+> the underlying insert statement has no columns (e.g. `Insert::many`
+> over an empty iterator), they return `TryInsertResult::Empty` without
 > touching the database — the failsafe for empty batch inserts.
 >
 > All three otherwise report an insert that the conflict clause skipped
 > as `TryInsertResult::Conflicted`, each reading the signal its own
-> execution yields for "no row was written". `exec` maps a
+> execution yields for "no row was written". `exec_returning_pk` maps a
 > `Error::RecordNotInserted`, which `exec.crud.insert` raises only when
-> the primary-key `RETURNING` came back empty. `exec_without_returning`
-> maps a zero rows-affected count and `exec_with_returning` maps a
+> the primary-key `RETURNING` came back empty. `exec`
+> maps a zero rows-affected count and `exec_returning_model` maps a
 > missing `RETURNING` row — both only when the statement carries an
 > `ON CONFLICT` clause, since neither signal can otherwise be attributed
 > to a conflict. Without such a clause those two keep the plain `Insert`
@@ -366,39 +410,49 @@ These rules capture what the code does today, including known gaps.
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update+4]
-> `Updater::exec` short-circuits when the update statement carries no SET
-> values, returning a default `UpdateResult` (zero `rows_affected`)
-> without a database round-trip; otherwise it executes and returns
-> `UpdateResult { rows_affected }`. With `check_record_exists` enabled,
-> zero rows affected fails with `Error::RecordNotUpdated`.
+> [spec:pgorm:sem:exec.crud.update+5]
+> `UpdateMany::exec` short-circuits when the update statement carries no SET
+> values, returning `0` without a database round-trip; otherwise it
+> executes and returns the rows-affected count as `u64`.
 >
-> `UpdateOne::exec` returns the updated model: it appends a `RETURNING`
-> clause of all entity columns and decodes through `SelectorRaw::one`, so
-> an update matching zero rows surfaces the `Error::RecordNotFound` of
-> `exec.crud.select`. On the no-op path (nothing to set) it instead
-> re-fetches the current model by primary key. That re-fetch keeps a
-> `Error::PrimaryKeyNotSet` guard for an active model with no
-> primary-key value, but the guard is defensive only: `query.build.update`
+> An update whose `WHERE` matches nothing is `Ok(0)`, never an error. There
+> is no `Updater` and no `check_record_exists`: the count is the whole
+> answer and the caller decides what zero means. `Error::RecordNotUpdated`
+> is deleted with them — it had no other producer, and an error variant no
+> code path can raise is a promise the error model cannot keep.
+>
+> `UpdateOne::exec_returning_model` returns the updated model: it appends a
+> `RETURNING` clause of all entity columns and decodes through
+> `SelectorRaw::one`, so an update matching zero rows surfaces the
+> `Error::RecordNotFound` of `exec.crud.select`. On the no-op path (nothing
+> to set) it instead re-fetches the current model by primary key. That
+> re-fetch keeps a `Error::PrimaryKeyNotSet` guard for an active model with
+> no primary-key value, but the guard is defensive only: `query.build.update`
 > rejects an unset primary key when the `UpdateOne` is built, so no caller
-> can reach `exec` with one. Rebuilding the typed key from that tuple goes
-> through `sql.value.tuple`, so a shape or element-type disagreement with
-> the entity's declared `ValueType` fails with `Error::Type` naming the
+> can reach the terminal with one. Rebuilding the typed key from that tuple
+> goes through `sql.value.tuple`, so a shape or element-type disagreement
+> with the entity's declared `ValueType` fails with `Error::Type` naming the
 > table and the mismatch, rather than panicking.
-> `UpdateMany::exec_with_returning` appends the
+> `UpdateMany::exec_returning_models` appends the
 > same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
 > no-op path returns an empty `Vec`.
 
-> [spec:pgorm:sem:exec.crud.delete]
-> `DeleteOne::exec`, `DeleteMany::exec`, and `Deleter::exec` all build
+> [spec:pgorm:sem:exec.crud.delete+1]
+> `DeleteOne::exec` and `DeleteMany::exec` both build
 > the `DeleteStatement`, bind values through `ValueHolder`, execute, and
-> return `DeleteResult { rows_affected }`. There is no existence check:
-> deleting zero rows is `Ok` with `rows_affected: 0`, never an error.
+> return the rows-affected count as `u64`. There is no existence check:
+> deleting zero rows is `Ok(0)`, never an error.
+>
+> There is no `Deleter` and no `DeleteResult`. The intermediate builder had
+> no caller and no capability the two entry points lack, and the result
+> struct was a one-field wrapper over the count that `exec` now returns
+> directly — the same `u64` every other `exec` yields, per
+> `exec.crud.exec-vocabulary`.
 
-> [spec:pgorm:def:exec.crud.exec-result]
+> [spec:pgorm:def:exec.crud.exec-result+1]
 > `ExecResult` is a `#[repr(transparent)]` wrapper over a `u64`
 > rows-affected count (`ExecResultHolder`), exposed via
-> `rows_affected()`. It carries no `last_insert_id`; insert ids are
+> `rows_affected()`. It carries no primary key; inserted keys are
 > obtained through `RETURNING` per `exec.crud.insert`.
 
 ## Streaming (`exec.stream`)

@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{ValueHolder, entity::prelude::*, types::ToSql};
+use pgorm::{TryInsertResult, ValueHolder, entity::prelude::*, types::ToSql};
 pub use pgorm_query::{Expr, Query, QueryBuilder, Values};
 use serde_json::json;
 
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+4/test]    `UpdateMany::exec_with_returning`
+// [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateMany::exec_returning_models`
 // returns every updated model, and an empty `Vec` on the no-op path
 #[pgorm_macros::test]
 async fn update_many() {
@@ -77,7 +77,7 @@ async fn update_many() {
         create_tables(&ctx.db).await?;
         let db = ctx.db.get().await?;
 
-        Entity::insert(
+        Insert::one(
             Model {
                 id: 1,
                 action: "before_save".into(),
@@ -88,7 +88,7 @@ async fn update_many() {
         .exec(&db)
         .await?;
 
-        Entity::insert(
+        Insert::one(
             Model {
                 id: 2,
                 action: "before_save".into(),
@@ -99,7 +99,7 @@ async fn update_many() {
         .exec(&db)
         .await?;
 
-        Entity::insert(
+        Insert::one(
             Model {
                 id: 3,
                 action: "before_save".into(),
@@ -133,13 +133,13 @@ async fn update_many() {
 
         // Update many with returning
         assert_eq!(
-            Entity::update_many()
+            Update::many(Entity)
                 .col_expr(
                     Column::Values,
                     Expr::value(json!({ "remarks": "save log" }))
                 )
                 .filter(Column::Action.eq("before_save"))
-                .exec_with_returning(&db)
+                .exec_returning_models(&db)
                 .await?,
             [
                 Model {
@@ -162,9 +162,9 @@ async fn update_many() {
 
         // No-op
         assert_eq!(
-            Entity::update_many()
+            Update::many(Entity)
                 .filter(Column::Action.eq("before_save"))
-                .exec_with_returning(&db)
+                .exec_returning_models(&db)
                 .await?,
             []
         );
@@ -186,9 +186,9 @@ fn bakery_model(name: &str, margin: f64) -> bakery::ActiveModel {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning+1/test]    `exec_with_returning`
+// [spec:pgorm:sem:exec.crud.insert-returning+2/test]    `exec_returning_model`
 // decodes a full-column RETURNING (and fails with RecordNotFound when the
-// insert matched nothing); `exec_without_returning` reports rows affected
+// insert matched nothing); `exec` reports rows affected
 #[pgorm_macros::test]
 async fn insert_returning_modes() -> Result<(), Error> {
     use pgorm_query::OnConflict;
@@ -199,8 +199,8 @@ async fn insert_returning_modes() -> Result<(), Error> {
 
     // Every entity column is returned, so the server-assigned primary key is
     // part of the decoded model.
-    let inserted = Bakery::insert(bakery_model("SeaSide Bakery", 10.4))
-        .exec_with_returning(&db)
+    let inserted = Insert::one(bakery_model("SeaSide Bakery", 10.4))
+        .exec_returning_model(&db)
         .await?;
     assert_eq!(
         inserted,
@@ -211,44 +211,44 @@ async fn insert_returning_modes() -> Result<(), Error> {
         }
     );
 
-    // `exec_without_returning` yields only the rows-affected count.
-    let affected = Bakery::insert_many([
+    // `exec` yields only the rows-affected count.
+    let affected = Insert::many([
         bakery_model("Top Bakery", 15.0),
         bakery_model("Third Bakery", 20.5),
         bakery_model("Fourth Bakery", 5.25),
     ])
-    .exec_without_returning(&db)
+    .exec(&db)
     .await?;
     assert_eq!(affected, 3);
     assert_eq!(Bakery::find().count(&db).await?, 4);
     assert_eq!(
-        Bakery::insert(bakery_model("Fifth Bakery", 1.0))
-            .exec_without_returning(&db)
+        Insert::one(bakery_model("Fifth Bakery", 1.0))
+            .exec(&db)
             .await?,
         1
     );
 
     // Nothing to decode: a conflicting insert returns no row, and
     // `SelectorRaw::one_opt` reporting `None` becomes RecordNotFound.
-    let conflicted = Bakery::insert(bakery::ActiveModel {
+    let conflicted = Insert::one(bakery::ActiveModel {
         id: set(inserted.id),
         name: set("Duplicate Bakery"),
         profit_margin: set(0.5),
     })
     .on_conflict(OnConflict::do_nothing())
-    .exec_with_returning(&db)
+    .exec_returning_model(&db)
     .await;
     assert_eq!(conflicted, Err(Error::RecordNotFound));
 
-    // The same conflict is not an error for `exec_without_returning`: no row
+    // The same conflict is not an error for `exec`: no row
     // was written, so the count is zero.
-    let skipped = Bakery::insert(bakery::ActiveModel {
+    let skipped = Insert::one(bakery::ActiveModel {
         id: set(inserted.id),
         name: set("Duplicate Bakery"),
         profit_margin: set(0.5),
     })
     .on_conflict(OnConflict::do_nothing())
-    .exec_without_returning(&db)
+    .exec(&db)
     .await?;
     assert_eq!(skipped, 0);
 
@@ -258,11 +258,11 @@ async fn insert_returning_modes() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+2/test]    `TryInsertResult` across all
+// [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsertResult` across all
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from a skipped `ON CONFLICT` insert, and any other error
 // propagating
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+2/test]    the same three
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    the same three
 // entry points reading the one recorded empty state: an insert over an empty
 // iterator and an insert of an all-NotSet model both return Empty with the
 // database left untouched
@@ -280,23 +280,23 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     // A column-less insert statement short-circuits to Empty on each entry
     // point, without issuing SQL.
     assert!(matches!(
-        Bakery::insert_many(empty())
+        Insert::many(empty())
             .on_empty_do_nothing()
             .exec(&db)
             .await?,
         TryInsertResult::Empty
     ));
     assert!(matches!(
-        Bakery::insert_many(empty())
+        Insert::many(empty())
             .on_empty_do_nothing()
-            .exec_without_returning(&db)
+            .exec(&db)
             .await?,
         TryInsertResult::Empty
     ));
     assert!(matches!(
-        Bakery::insert_many(empty())
+        Insert::many(empty())
             .on_empty_do_nothing()
-            .exec_with_returning(&db)
+            .exec_returning_model(&db)
             .await?,
         TryInsertResult::Empty
     ));
@@ -309,41 +309,35 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     };
 
     assert!(matches!(
-        Bakery::insert(blank())
-            .on_empty_do_nothing()
-            .exec(&db)
-            .await?,
+        Insert::one(blank()).on_empty_do_nothing().exec(&db).await?,
         TryInsertResult::Empty
     ));
     assert!(matches!(
-        Bakery::insert(blank())
-            .on_empty_do_nothing()
-            .exec_without_returning(&db)
-            .await?,
+        Insert::one(blank()).on_empty_do_nothing().exec(&db).await?,
         TryInsertResult::Empty
     ));
     assert!(matches!(
-        Bakery::insert(blank())
+        Insert::one(blank())
             .on_empty_do_nothing()
-            .exec_with_returning(&db)
+            .exec_returning_model(&db)
             .await?,
         TryInsertResult::Empty
     ));
     assert_eq!(Bakery::find().all(&db).await?, []);
 
     // Success wraps the inner result.
-    let inserted = Bakery::insert(bakery_model("SeaSide Bakery", 10.4))
+    let inserted = Insert::one(bakery_model("SeaSide Bakery", 10.4))
         .on_empty_do_nothing()
-        .exec_with_returning(&db)
+        .exec_returning_model(&db)
         .await?;
     match inserted {
         TryInsertResult::Inserted(model) => assert_eq!(model.name, "SeaSide Bakery"),
         other => panic!("unexpected result: {other:?}"),
     }
 
-    let counted = Bakery::insert(bakery_model("Top Bakery", 15.0))
+    let counted = Insert::one(bakery_model("Top Bakery", 15.0))
         .on_empty_do_nothing()
-        .exec_without_returning(&db)
+        .exec(&db)
         .await?;
     assert!(matches!(counted, TryInsertResult::Inserted(1)));
 
@@ -355,30 +349,30 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     let on_conflict = OnConflict::do_nothing;
 
     // An `ON CONFLICT DO NOTHING` clause that skips the row reads as Conflicted
-    // on every entry point: `exec` from RecordNotInserted,
-    // `exec_without_returning` from a zero rows-affected count, and
-    // `exec_with_returning` from the absent RETURNING row.
+    // on every entry point: `exec_returning_pk` from RecordNotInserted, `exec`
+    // from a zero rows-affected count, and `exec_returning_model` from the
+    // absent RETURNING row.
     assert!(matches!(
-        Bakery::insert(duplicate())
+        Insert::one(duplicate())
             .on_conflict(on_conflict())
-            .do_nothing()
+            .on_empty_do_nothing()
+            .exec_returning_pk(&db)
+            .await?,
+        TryInsertResult::Conflicted
+    ));
+    assert!(matches!(
+        Insert::one(duplicate())
+            .on_conflict(on_conflict())
+            .on_empty_do_nothing()
             .exec(&db)
             .await?,
         TryInsertResult::Conflicted
     ));
     assert!(matches!(
-        Bakery::insert(duplicate())
+        Insert::one(duplicate())
             .on_conflict(on_conflict())
-            .do_nothing()
-            .exec_without_returning(&db)
-            .await?,
-        TryInsertResult::Conflicted
-    ));
-    assert!(matches!(
-        Bakery::insert(duplicate())
-            .on_conflict(on_conflict())
-            .do_nothing()
-            .exec_with_returning(&db)
+            .on_empty_do_nothing()
+            .exec_returning_model(&db)
             .await?,
         TryInsertResult::Conflicted
     ));
@@ -386,9 +380,9 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     // With no conflict clause to attribute it to, a failing insert propagates
     // its error rather than being folded into a variant.
     assert!(matches!(
-        Bakery::insert(duplicate())
+        Insert::one(duplicate())
             .on_empty_do_nothing()
-            .exec_with_returning(&db)
+            .exec_returning_model(&db)
             .await,
         Err(Error::Postgres(_))
     ));
@@ -399,62 +393,55 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+4/test]    the no-op short-circuit of
-// `Updater::exec` and `UpdateOne::exec`, plus `check_record_exists`
+// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op short-circuit of
+// `UpdateMany::exec` and `UpdateOne::exec_returning_model`
 #[pgorm_macros::test]
 async fn update_noop_and_record_check() -> Result<(), Error> {
-    use pgorm::{ActiveValue::Unchanged, Updater};
+    use pgorm::ActiveValue::Unchanged;
 
     let ctx = TestContext::new("returning_tests_update_noop").await;
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
 
-    let seaside = Bakery::insert(bakery_model("SeaSide Bakery", 10.4))
-        .exec_with_returning(&db)
+    let seaside = Insert::one(bakery_model("SeaSide Bakery", 10.4))
+        .exec_returning_model(&db)
         .await?;
 
-    // `Updater::exec` short-circuits when there is nothing to SET: the filter
+    // `UpdateMany::exec` short-circuits when there is nothing to SET: the filter
     // matches an existing row, yet no rows are reported affected and the row
     // is untouched.
-    let noop = Bakery::update_many()
+    let noop = Update::many(Bakery)
         .filter(bakery::Column::Id.eq(seaside.id))
         .exec(&db)
         .await?;
-    assert_eq!(noop, pgorm::UpdateResult { rows_affected: 0 });
+    assert_eq!(noop, 0);
     assert_eq!(Bakery::find_by_id(seaside.id).one(&db).await?, seaside);
 
     // With something to SET the same call reports the rows it changed.
-    let applied = Bakery::update_many()
+    let applied = Update::many(Bakery)
         .col_expr(bakery::Column::ProfitMargin, Expr::value(12.5_f64))
         .filter(bakery::Column::Id.eq(seaside.id))
         .exec(&db)
         .await?;
-    assert_eq!(applied, pgorm::UpdateResult { rows_affected: 1 });
+    assert_eq!(applied, 1);
 
-    // `check_record_exists` turns "zero rows affected" into RecordNotUpdated.
-    let mut update = Query::update();
-    update
-        .table(bakery::Entity)
-        .values([(bakery::Column::Name, "Nowhere Bakery".into())])
-        .and_where(bakery::Column::Id.eq(9999));
-
-    assert_eq!(
-        Updater::new(update.clone()).exec(&db).await?,
-        pgorm::UpdateResult { rows_affected: 0 }
-    );
-    assert_eq!(
-        Updater::new(update).check_record_exists().exec(&db).await,
-        Err(Error::RecordNotUpdated)
-    );
+    // An update whose WHERE matches nothing is `Ok(0)`, not an error: the count
+    // is the whole answer, and the caller decides what zero means.
+    let missed = Update::many(Bakery)
+        .col_expr(bakery::Column::Name, Expr::value("Nowhere Bakery"))
+        .filter(bakery::Column::Id.eq(9999))
+        .exec(&db)
+        .await?;
+    assert_eq!(missed, 0);
 
     // On `UpdateOne`'s no-op path nothing is written; the current model is
     // re-fetched by primary key instead.
-    let refetched = Bakery::update(bakery::ActiveModel {
+    let refetched = Update::one(bakery::ActiveModel {
         id: Unchanged(seaside.id),
         name: Unchanged(seaside.name.clone()),
         profit_margin: Unchanged(seaside.profit_margin),
     })?
-    .exec(&db)
+    .exec_returning_model(&db)
     .await?;
     assert_eq!(
         refetched,
@@ -471,7 +458,7 @@ async fn update_noop_and_record_check() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.crud.exec-result/test]    `ExecResult` is a transparent
+// [spec:pgorm:def:exec.crud.exec-result+1/test]    `ExecResult` is a transparent
 // wrapper over the rows-affected `u64` and exposes nothing else
 #[pgorm_macros::test]
 async fn exec_result_is_a_transparent_row_count() {
@@ -486,7 +473,47 @@ async fn exec_result_is_a_transparent_row_count() {
         std::mem::align_of::<u64>()
     );
 
-    // The only accessor is `rows_affected`; there is no `last_insert_id`.
+    // The only accessor is `rows_affected`; it carries no primary key.
     let accessor: fn(&ExecResult) -> u64 = ExecResult::rows_affected;
     let _ = accessor;
+}
+
+/// Every CRUD terminal's return shape, pinned by explicit annotation.
+///
+/// Compiled but never run: the assertions are the type annotations, so a
+/// terminal that is renamed, dropped, or changes shape fails the build. A live
+/// round trip would prove less — these are claims about the surface, not about
+/// the database.
+// [spec:pgorm:req:exec.crud.exec-vocabulary/test]    `exec` is a count on every
+// builder that has one; each returning form names what it yields
+#[allow(dead_code)]
+async fn exec_terminals_name_their_shape<C: ConnectionTrait>(db: &C) -> Result<(), Error> {
+    let insert = || Insert::<bakery::ActiveModel>::one(bakery_model("Shape", 1.0));
+
+    let _rows: u64 = insert().exec(db).await?;
+    let _pk: i32 = insert().exec_returning_pk(db).await?;
+    let _model: bakery::Model = insert().exec_returning_model(db).await?;
+
+    let try_insert = || insert().on_empty_do_nothing();
+
+    let _t_rows: TryInsertResult<u64> = try_insert().exec(db).await?;
+    let _t_pk: TryInsertResult<i32> = try_insert().exec_returning_pk(db).await?;
+    let _t_model: TryInsertResult<bakery::Model> = try_insert().exec_returning_model(db).await?;
+
+    // `UpdateOne` offers only the model form: there is no count-shaped answer
+    // to updating one keyed row, so there is no `exec` to misread as one.
+    let _updated: bakery::Model = Update::one(bakery_model("Shape", 2.0))?
+        .exec_returning_model(db)
+        .await?;
+
+    let _update_rows: u64 = Update::many(bakery::Entity).exec(db).await?;
+    let _updated_many: Vec<bakery::Model> = Update::many(bakery::Entity)
+        .exec_returning_models(db)
+        .await?;
+
+    // Deletes have no returning form at all: the count is the whole answer.
+    let _delete_one_rows: u64 = Delete::one(bakery_model("Shape", 3.0))?.exec(db).await?;
+    let _delete_many_rows: u64 = Delete::many(bakery::Entity).exec(db).await?;
+
+    Ok(())
 }

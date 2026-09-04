@@ -8,8 +8,8 @@ pub async fn test_create_baker(db: &DatabaseConnection) {
         profit_margin: set(10.4),
         ..Default::default()
     };
-    let bakery_insert_res = Bakery::insert(seaside_bakery)
-        .exec(db)
+    let bakery_insert_res = Insert::one(seaside_bakery)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert bakery");
 
@@ -28,15 +28,15 @@ pub async fn test_create_baker(db: &DatabaseConnection) {
     let baker_bob = baker::ActiveModel {
         name: set("Baker Bob"),
         contact_details: set(serde_json::json!(baker_bob_contact)),
-        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
+        bakery_id: set(Some(bakery_insert_res)),
         ..Default::default()
     };
-    let res = Baker::insert(baker_bob)
-        .exec(db)
+    let res = Insert::one(baker_bob)
+        .exec_returning_pk(db)
         .await
         .expect("could not insert baker");
 
-    let baker: Option<baker::Model> = Baker::find_by_id(res.last_insert_id)
+    let baker: Option<baker::Model> = Baker::find_by_id(res)
         .one_opt(db)
         .await
         .expect("could not find baker");
@@ -63,7 +63,7 @@ pub async fn test_create_baker(db: &DatabaseConnection) {
         "SeaSide Bakery"
     );
 
-    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res.last_insert_id)
+    let bakery: Option<bakery::Model> = Bakery::find_by_id(bakery_insert_res)
         .one_opt(db)
         .await
         .unwrap();

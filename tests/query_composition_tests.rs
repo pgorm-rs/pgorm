@@ -495,7 +495,7 @@ fn sorted_names(cakes: &[cake::Model]) -> Vec<String> {
 
 // [spec:pgorm:sem:exec.crud.selector-entry/test]    the new constructor is a `Selector`, so it
 // inherits the empty-projection guard rather than sending `SELECT  FROM …`
-// [spec:pgorm:sem:query.build.modifiers+4/test]
+// [spec:pgorm:sem:query.build.modifiers+5/test]
 #[pgorm_macros::test]
 pub async fn from_select_guards_an_empty_projection() -> Result<(), Error> {
     let ctx = TestContext::new("from_select_guards_an_empty_projection").await;

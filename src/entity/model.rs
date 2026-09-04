@@ -1,7 +1,6 @@
 use crate::{
-    ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, DeleteResult, EntityTrait, Error,
-    ExpectedColumn, IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select,
-    SelectModel, SelectorRaw,
+    ActiveModelBehavior, ActiveModelTrait, ConnectionTrait, EntityTrait, Error, ExpectedColumn,
+    IntoActiveModel, Linked, QueryFilter, QueryResult, Related, Select, SelectModel, SelectorRaw,
 };
 use async_trait::async_trait;
 pub use pgorm_query::Value;
@@ -69,7 +68,7 @@ pub trait ModelTrait: Clone + Send + Debug {
     }
 
     /// Delete a model
-    async fn delete<'a, A, C>(self, db: &'a C) -> Result<DeleteResult, Error>
+    async fn delete<'a, A, C>(self, db: &'a C) -> Result<u64, Error>
     where
         Self: IntoActiveModel<A>,
         C: ConnectionTrait,
@@ -80,7 +79,7 @@ pub trait ModelTrait: Clone + Send + Debug {
 }
 
 /// A Trait for implementing a [QueryResult]
-// [spec:pgorm:def:entity.traits.from-query-result+2]
+// [spec:pgorm:def:entity.traits.from-query-result+3]
 pub trait FromQueryResult: Sized {
     /// Instantiate a Model from a [QueryResult]
     fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error>;

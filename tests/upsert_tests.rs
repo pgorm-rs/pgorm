@@ -22,58 +22,58 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+2/test]    `last_insert_id` read from the last
+// [spec:pgorm:sem:exec.crud.insert+3/test]    the primary key read from the last
 // RETURNING row of a batch, and RecordNotInserted when nothing is written
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
     let on_conflict = OnConflict::column(Column::Id).do_nothing();
 
-    let res = Entity::insert_many([
+    let res = Insert::many([
         ActiveModel { id: set(1) },
         ActiveModel { id: set(2) },
         ActiveModel { id: set(3) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec(db)
+    .exec_returning_pk(db)
     .await;
 
-    // [spec:pgorm:sem:exec.crud.insert+2] last_insert_id comes from the last
+    // [spec:pgorm:sem:exec.crud.insert+3] the key comes from the last
     // RETURNING row of the batch.
-    assert_eq!(res?.last_insert_id, 3);
+    assert_eq!(res?, 3);
 
-    let res = Entity::insert_many([
+    let res = Insert::many([
         ActiveModel { id: set(1) },
         ActiveModel { id: set(2) },
         ActiveModel { id: set(3) },
         ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec(db)
+    .exec_returning_pk(db)
     .await;
 
-    assert_eq!(res?.last_insert_id, 4);
+    assert_eq!(res?, 4);
 
-    let res = Entity::insert_many([
+    let res = Insert::many([
         ActiveModel { id: set(1) },
         ActiveModel { id: set(2) },
         ActiveModel { id: set(3) },
         ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec(db)
+    .exec_returning_pk(db)
     .await;
 
     assert!(matches!(res, Err(Error::RecordNotInserted)));
 
-    let res = Entity::insert_many([
+    let res = Insert::many([
         ActiveModel { id: set(1) },
         ActiveModel { id: set(2) },
         ActiveModel { id: set(3) },
         ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict)
-    .do_nothing()
+    .on_empty_do_nothing()
     .exec(db)
     .await;
 
