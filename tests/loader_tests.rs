@@ -4,9 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pgorm_query::{Alias, Expr};
-use pgorm::{
-    ActiveValue::Set, DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*,
-};
+use pgorm::{DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*, set};
 
 // [spec:pgorm:req:query.loader/test]    `load_one` over a `Vec<M>`, taking a
 // bare entity through `EntityOrSelect`, returning `Vec<Option<R::Model>>`
@@ -23,9 +21,9 @@ async fn loader_load_one() -> Result<(), Error> {
     let baker_1 = insert_baker(db, "Baker 1", bakery_0.id).await?;
     let baker_2 = insert_baker(db, "Baker 2", bakery_0.id).await?;
     let baker_3 = baker::ActiveModel {
-        name: Set("Baker 3".to_owned()),
-        contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(None),
+        name: set("Baker 3"),
+        contact_details: set(serde_json::json!({})),
+        bakery_id: set(None),
         ..Default::default()
     }
     .insert(db)
@@ -248,8 +246,8 @@ async fn loader_load_many_to_many() -> Result<(), Error> {
 
 pub async fn insert_bakery(db: &DatabaseConnection, name: &str) -> Result<bakery::Model, Error> {
     bakery::ActiveModel {
-        name: Set(name.to_owned()),
-        profit_margin: Set(1.0),
+        name: set(name),
+        profit_margin: set(1.0),
         ..Default::default()
     }
     .insert(db)
@@ -262,9 +260,9 @@ pub async fn insert_baker(
     bakery_id: i32,
 ) -> Result<baker::Model, Error> {
     baker::ActiveModel {
-        name: Set(name.to_owned()),
-        contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(Some(bakery_id)),
+        name: set(name),
+        contact_details: set(serde_json::json!({})),
+        bakery_id: set(Some(bakery_id)),
         ..Default::default()
     }
     .insert(db)
@@ -277,10 +275,10 @@ pub async fn insert_cake(
     bakery_id: Option<i32>,
 ) -> Result<cake::Model, Error> {
     cake::ActiveModel {
-        name: Set(name.to_owned()),
-        price: Set(rust_decimal::Decimal::ONE),
-        gluten_free: Set(false),
-        bakery_id: Set(bakery_id),
+        name: set(name),
+        price: set(rust_decimal::Decimal::ONE),
+        gluten_free: set(false),
+        bakery_id: set(bakery_id),
         ..Default::default()
     }
     .insert(db)
@@ -293,8 +291,8 @@ pub async fn insert_cake_baker(
     cake_id: i32,
 ) -> Result<cakes_bakers::Model, Error> {
     cakes_bakers::ActiveModel {
-        cake_id: Set(cake_id),
-        baker_id: Set(baker_id),
+        cake_id: set(cake_id),
+        baker_id: set(baker_id),
     }
     .insert(db)
     .await
@@ -450,8 +448,8 @@ async fn insert_ledger(
     label: &str,
 ) -> Result<ledger::Model, Error> {
     ledger::ActiveModel {
-        owner_id: Set(owner_id),
-        label: Set(label.to_owned()),
+        owner_id: set(owner_id),
+        label: set(label),
         ..Default::default()
     }
     .insert(db)
@@ -693,7 +691,7 @@ async fn loader_errors_on_aliased_from_item() -> Result<(), Error> {
 
     let customers = vec![
         customer::ActiveModel {
-            name: Set("Alice".to_owned()),
+            name: set("Alice"),
             ..Default::default()
         }
         .insert(db)
@@ -760,7 +758,7 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
 
     let bakery_1 = insert_bakery(db, "ab").await?;
     padded::ActiveModel {
-        code: Set("ab".to_owned()),
+        code: set("ab"),
         ..Default::default()
     }
     .insert(db)

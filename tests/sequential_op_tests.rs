@@ -4,7 +4,7 @@ pub mod common;
 
 use chrono::offset::Utc;
 use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{ActiveValue::Set, DatabaseConnection, FromQueryResult, entity::*, query::*};
+use pgorm::{DatabaseConnection, FromQueryResult, entity::*, query::*, set};
 use rust_decimal::prelude::*;
 use uuid::Uuid;
 
@@ -37,8 +37,8 @@ pub async fn test_multiple_operations() {
 // as the entity's `PrimaryKey::ValueType` tuple
 async fn seed_data(db: &DatabaseConnection) {
     let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(db)
@@ -46,9 +46,9 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert bakery");
 
     let baker_1 = baker::ActiveModel {
-        name: Set("Baker 1".to_owned()),
-        contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(Some(bakery.id)),
+        name: set("Baker 1"),
+        contact_details: set(serde_json::json!({})),
+        bakery_id: set(Some(bakery.id)),
         ..Default::default()
     }
     .insert(db)
@@ -56,9 +56,9 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert baker");
 
     let _baker_2 = baker::ActiveModel {
-        name: Set("Baker 2".to_owned()),
-        contact_details: Set(serde_json::json!({})),
-        bakery_id: Set(Some(bakery.id)),
+        name: set("Baker 2"),
+        contact_details: set(serde_json::json!({})),
+        bakery_id: set(Some(bakery.id)),
         ..Default::default()
     }
     .insert(db)
@@ -66,11 +66,11 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert baker");
 
     let mud_cake = cake::ActiveModel {
-        name: Set("Mud Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(bakery.id)),
+        name: set("Mud Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(bakery.id)),
         ..Default::default()
     };
 
@@ -80,8 +80,8 @@ async fn seed_data(db: &DatabaseConnection) {
         .expect("could not insert cake");
 
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        baker_id: Set(baker_1.id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        baker_id: set(baker_1.id),
     };
 
     let cake_baker_res = CakesBakers::insert(cake_baker.clone())
@@ -94,7 +94,7 @@ async fn seed_data(db: &DatabaseConnection) {
     );
 
     let customer_kate = customer::ActiveModel {
-        name: Set("Kate".to_owned()),
+        name: set("Kate"),
         ..Default::default()
     }
     .insert(db)
@@ -102,10 +102,10 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert customer");
 
     let kate_order_1 = order::ActiveModel {
-        bakery_id: Set(bakery.id),
-        customer_id: Set(customer_kate.id),
-        total: Set(rust_dec(99.95)),
-        placed_at: Set(Utc::now().naive_utc()),
+        bakery_id: set(bakery.id),
+        customer_id: set(customer_kate.id),
+        total: set(rust_dec(99.95)),
+        placed_at: set(Utc::now().naive_utc()),
 
         ..Default::default()
     }
@@ -114,10 +114,10 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert order");
 
     let _lineitem = lineitem::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        price: Set(rust_dec(10.00)),
-        quantity: Set(12),
-        order_id: Set(kate_order_1.id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        price: set(rust_dec(10.00)),
+        quantity: set(12),
+        order_id: set(kate_order_1.id),
         ..Default::default()
     }
     .insert(db)
@@ -125,10 +125,10 @@ async fn seed_data(db: &DatabaseConnection) {
     .expect("could not insert order");
 
     let _lineitem2 = lineitem::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        price: Set(rust_dec(50.00)),
-        quantity: Set(2),
-        order_id: Set(kate_order_1.id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        price: set(rust_dec(50.00)),
+        quantity: set(2),
+        order_id: set(kate_order_1.id),
         ..Default::default()
     }
     .insert(db)
@@ -192,11 +192,11 @@ async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model>
 
 async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cake::Model> {
     let new_cake = cake::ActiveModel {
-        name: Set("New Cake".to_owned()),
-        price: Set(rust_dec(8.00)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(baker.bakery_id.unwrap())),
+        name: set("New Cake"),
+        price: set(rust_dec(8.00)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(baker.bakery_id.unwrap())),
         ..Default::default()
     };
 
@@ -206,8 +206,8 @@ async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cak
         .expect("could not insert cake");
 
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        baker_id: Set(baker.id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        baker_id: set(baker.id),
     };
 
     let cake_baker_res = CakesBakers::insert(cake_baker.clone())
@@ -227,7 +227,7 @@ async fn create_cake(db: &DatabaseConnection, baker: baker::Model) -> Option<cak
 
 async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
     let another_customer = customer::ActiveModel {
-        name: Set("John".to_owned()),
+        name: set("John"),
         ..Default::default()
     }
     .insert(db)
@@ -235,10 +235,10 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
     .expect("could not insert customer");
 
     let order = order::ActiveModel {
-        bakery_id: Set(cake.bakery_id.unwrap()),
-        customer_id: Set(another_customer.id),
-        total: Set(rust_dec(200.00)),
-        placed_at: Set(Utc::now().naive_utc()),
+        bakery_id: set(cake.bakery_id.unwrap()),
+        customer_id: set(another_customer.id),
+        total: set(rust_dec(200.00)),
+        placed_at: set(Utc::now().naive_utc()),
 
         ..Default::default()
     }
@@ -247,10 +247,10 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
     .expect("could not insert order");
 
     let _lineitem = lineitem::ActiveModel {
-        cake_id: Set(cake.id),
-        price: Set(rust_dec(10.00)),
-        quantity: Set(300),
-        order_id: Set(order.id),
+        cake_id: set(cake.id),
+        price: set(rust_dec(10.00)),
+        quantity: set(300),
+        order_id: set(order.id),
         ..Default::default()
     }
     .insert(db)

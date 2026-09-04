@@ -1,5 +1,6 @@
 use super::pgorm_active_enums::*;
 use pgorm::entity::prelude::*;
+use pgorm::set;
 use pgorm::{ActiveValue, IntoActiveValue};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -28,12 +29,12 @@ pub struct CustomActiveModel {
 
 impl IntoActiveValue<Category> for Category {
     fn into_active_value(self) -> ActiveValue<Category> {
-        ActiveValue::set(self)
+        set(self)
     }
 }
 
 impl IntoActiveValue<Color> for Color {
     fn into_active_value(self) -> ActiveValue<Color> {
-        ActiveValue::set(self)
+        set(self)
     }
 }

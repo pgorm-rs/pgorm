@@ -2783,6 +2783,85 @@ children (
                     }
                 )
             }
+
+            {
+                id ergo.fluent-sugar
+                title "Entity-layer sugar: set(), From<&str> for ActiveValue, into_active(), eq_col siblings"
+                kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-09-04T15:24:38.351006Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From the fluent-audit (operator: all findings, one wave; probes on spike/fluent-audit — read via git show spike/fluent-audit:spikes/fluent-audit/src/probe_c_active_value_from.rs, probe_d, probe_i). (1) The .to_owned() tax, 177 sites: ActiveValue's blanket From pins V exactly, so &str has no route into ActiveValue<String> and the advertised From sugar saves nothing (corpus-proven: zero real .into() uses). Add From<&str> for ActiveValue<String> and ActiveValue<Option<String>>, From<&[u8]> for ActiveValue<Vec<u8>>, and pub fn set<V: Into<Value>, T: Into<V>>(v: T) -> ActiveValue<V>; coherence probed (targets differ from the blanket's). Convert the test corpus to set(...) — the churn is the proof the sugar covers real usage. Unify DOC spelling: Set / ActiveValue::Set / ActiveValue::set appear 567/154/65; pick set() for docs, mention Set for pattern-matching. (2) into_active: single-field updates need a type annotation only because IntoActiveModel is generic over destination while EntityTrait::ActiveModel already knows it — add non-generic ModelTrait::into_active() (probe_i: no annotation needed). (3) eq_col/ne_col/gt_col/lt_col/gte_col/lte_col + eq_expr on ColumnTrait so column-to-column predicates stop requiring the Expr::col escape hatch — DO NOT widen eq's Into<Value> bound (it routes through save_as, which casts enum operands; widening drops that silently, per the audit). Bumps: entity.active-model.active-value/from-sugar, entity.traits.column, entity.traits.model as touched."
+                    }
+
+                    {
+                        at 2026-09-04T15:52:59.018339Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-prelude
+                title "The prelude carries what files actually import; statements decode left-to-right; &mut txn is a connection"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-04T15:24:40.869382Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From the fluent-audit (probes on spike/fluent-audit: probe_f_prelude, probe_a_selector_entry, probe_e_txn_conn_impl). (1) Prelude gap, 58 files re-import ~10 names: add QuerySelect, QueryOrder, QueryTrait, PaginatorTrait, ActiveValue + Set/Unchanged/NotSet, IntoActiveModel, IntoActiveValue, FromQueryResult, TryIntoModel, Iterable, Condition, JoinType, Order, Insert, Update, Delete to entity::prelude (collision-probed clean); then strip the now-redundant imports across the test corpus — the deletion is the payoff. (2) Selector double-spelling, 14 sites: Selector::<SelectModel<M>>::from_select::<M>(stmt) names the row type twice because S is unconstrained — add extension traits per probe_a: stmt.into_model::<M>() / stmt.into_tuple() on SelectStatement and on (String, Values); keep existing constructors (additive); TIME-SENSITIVE for pipeline terminals which land on exactly (String, Values). Bump exec.crud.selector-entry. (3) Transaction friction: no impl ConnectionTrait for &mut DatabaseTransaction<'_> forces &*txn at 10 sites — add the forwarding impl ((**self)), disjointness probed; also consider the fixed-error transaction variant killing the 4 Ok::<_, Error> annotations (judgment on name). Bump conn.tx.closure / conn.pool.conn-trait as touched."
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-deletions
+                title "Dead and duplicate surface dies: exec disambiguation, twin methods, zero-use layers, namespace collapse"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-04T15:24:43.408146Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From the fluent-audit (operator: all of it, delete-don't-deprecate). (1) do_nothing and on_empty_do_nothing are byte-identical pure conversions to TryInsert (insert.rs:338-352, second documented as an alias) — keep ONE, named for what it does (audit suggested into_try_insert; judgment), delete the other, churn the 30 uses. (2) Zero-use layers die outright: Inserter, Deleter (0 uses each; Updater has 5 — migrate them onto the surviving surface then delete), expr_as_ (\"here for legacy reasons\", 0 uses), select_column/select_column_as (duplicate column/column_as, 2 uses). (3) exec disambiguation: .exec() currently returns InsertResult or TryInsertResult<InsertResult> or Model (UpdateOne) or UpdateResult (UpdateMany) depending on distant calls — same word, incompatible shapes; design the rename so the shape is in the name (judgment on the vocabulary; breaking renames accepted). (4) Namespace collapse: EntityTrait::{insert, insert_many, update, update_many, delete, delete_many} are one-line forwards to Insert::one/Insert::many/... — delete the forwards per the save() precedent (active_model.rs:64-68 documents the reasoning); 92+ call sites churn to the canonical spellings. Every touched rule (exec.crud.insert/try-insert/update/delete, entity.traits.crud, query.build.insert...) bumps with exact-id re-pins; the deleted surfaces' spec claims are rewritten to specify the absence where they were load-bearing."
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-joins
+                title "Join sugar, loader via-dropping, Linked boilerplate, and the IdenStatic name collision"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-04T15:24:45.780682Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "From the fluent-audit (probes: probe_h_joins, probe_g_alias_token surfaced the defect). (1) Join sugar, 88+17 sites: join(JoinType::LeftJoin, baker::Relation::Bakery.def()) -> left_join_rel(baker::Relation::Bakery) (+ inner/right variants; .rev() direction covered — probe_h shows identical SQL). Additive; keep join(). (2) load_many_to_many(stmt, via, db) makes the caller name the junction entity Related::via() already knows, and the body only compares-and-errors (loader.rs:270-275) — add load_many_via without the via param, then delete the old shape (11 sites). (3) Linked boilerplate: three of five hand-written Linked impls in tests are 11-line single-hop wrappers duplicating the Related impl directly above — either a DeriveLinked in pgorm-macros or find_also_linked/find_with_linked accepting a Related witness (judgment; M effort, cut if it balloons — report). (4) DEFECT: pgorm defines its own IdenStatic (base_entity.rs:13, as_str -> &str) colliding by name with pgorm_query::IdenStatic (-> &'static str), both reachable through preludes, and only pgorm's feeds IntoIdentity — implementing the wrong one is a confusing E0277. Resolve the collision: rename pgorm's (or unify if signatures allow — judgment, breaking accepted); bump entity.traits/entity rules touched."
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-alias
+                title "The shared alias token reaches the ORM: 125 stringly sites and the leaked r{N} internal"
+                kind @refactor
+                deps (ergo.fluent-pipeline)
+                log (
+                    {
+                        at 2026-09-04T15:24:48.228271Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Blocked on ergo.fluent-pipeline, which ships the shared Copy alias token (directive: one vocabulary, token implements Iden + IdenStatic so IntoIden/IntoColumnRef/IntoIdentity come free — probe_g on spike/fluent-audit proves every position accepts it with no new conversion trait). Scope when unblocked: convert the 125 non-pipeline stringly sites (column_as/having/order_by/group_by/window/lateral aliases) to the token; kill the leaked r{N} internal — find_also_linked's target alias (join.rs:100) becomes derivable (linked_target_alias(&link) or equivalent, probe_h has the shape) so callers stop hardcoding \"r4\" strings that silently rebind when a link gains a hop; the honest ceiling (unattached token compiles, server catches it) goes in the rule, no brand machinery. Alias::new stays for dynamic runtime names; the token is the static paved road."
+                    }
+                )
+            }
         )
     }
 )

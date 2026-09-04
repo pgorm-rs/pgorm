@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::entity::*;
-pub use pgorm::{ActiveValue::Set, ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect};
+pub use pgorm::{ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect, set};
 
 // Run the test locally:
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_tests
@@ -35,8 +35,8 @@ pub async fn find_one_with_result() {
     let db = ctx.db.get().await.unwrap();
 
     let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(&db)
@@ -77,8 +77,8 @@ pub async fn find_by_id_with_result() {
     let db = ctx.db.get().await.unwrap();
 
     let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(&db)
@@ -114,8 +114,8 @@ pub async fn find_all_with_result() {
     let db = ctx.db.get().await.unwrap();
 
     let _ = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(&db)
@@ -123,8 +123,8 @@ pub async fn find_all_with_result() {
     .expect("could not insert bakery");
 
     let _ = bakery::ActiveModel {
-        name: Set("Top Bakery".to_owned()),
-        profit_margin: Set(15.0),
+        name: set("Top Bakery"),
+        profit_margin: set(15.0),
         ..Default::default()
     }
     .insert(&db)
@@ -146,8 +146,8 @@ pub async fn find_all_filter_no_result() {
     let db = ctx.db.get().await.unwrap();
 
     let _ = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(&db)
@@ -155,8 +155,8 @@ pub async fn find_all_filter_no_result() {
     .expect("could not insert bakery");
 
     let _ = bakery::ActiveModel {
-        name: Set("Top Bakery".to_owned()),
-        profit_margin: Set(15.0),
+        name: set("Top Bakery"),
+        profit_margin: set(15.0),
         ..Default::default()
     }
     .insert(&db)
@@ -182,8 +182,8 @@ pub async fn find_all_filter_with_results() {
     let db = ctx.db.get().await.unwrap();
 
     let _ = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(&db)
@@ -191,8 +191,8 @@ pub async fn find_all_filter_with_results() {
     .expect("could not insert bakery");
 
     let _ = bakery::ActiveModel {
-        name: Set("Top Bakery".to_owned()),
-        profit_margin: Set(15.0),
+        name: set("Top Bakery"),
+        profit_margin: set(15.0),
         ..Default::default()
     }
     .insert(&db)
@@ -222,8 +222,8 @@ pub async fn empty_in_and_not_in_filter_asymmetry() {
 
     for name in ["SeaSide Bakery", "Top Bakery"] {
         bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(10.4),
+            name: set(name),
+            profit_margin: set(10.4),
             ..Default::default()
         }
         .insert(&db)
@@ -280,8 +280,8 @@ pub async fn select_only_exclude_option_fields() {
     let db = ctx.db.get().await.unwrap();
 
     let _ = customer::ActiveModel {
-        name: Set("Alice".to_owned()),
-        notes: Set(Some("Want to communicate with Bob".to_owned())),
+        name: set("Alice"),
+        notes: "Want to communicate with Bob".into(),
         ..Default::default()
     }
     .insert(&db)
@@ -289,8 +289,8 @@ pub async fn select_only_exclude_option_fields() {
     .expect("could not insert customer");
 
     let _ = customer::ActiveModel {
-        name: Set("Bob".to_owned()),
-        notes: Set(Some("Just listening".to_owned())),
+        name: set("Bob"),
+        notes: "Just listening".into(),
         ..Default::default()
     }
     .insert(&db)
@@ -348,8 +348,8 @@ pub async fn raw_selector_one_semantics() -> Result<(), Error> {
 
     for (name, margin) in [("SeaSide Bakery", 10.4), ("Top Bakery", 15.0)] {
         bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(margin),
+            name: set(name),
+            profit_margin: set(margin),
             ..Default::default()
         }
         .insert(&db)
@@ -447,8 +447,8 @@ pub async fn named_window_over_a_real_query() -> Result<(), Error> {
 
     for (name, profit_margin) in [("A", 1.0), ("B", 1.0), ("C", 2.0), ("D", 2.0), ("E", 2.0)] {
         bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(profit_margin),
+            name: set(name),
+            profit_margin: set(profit_margin),
             ..Default::default()
         }
         .insert(&db)

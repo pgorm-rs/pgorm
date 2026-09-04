@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::future::join_all;
-use pgorm::{ActiveValue::Set, DatabaseConnection, TransactionTrait, entity::prelude::*};
+use pgorm::{DatabaseConnection, TransactionTrait, entity::prelude::*, set};
 use pretty_assertions::assert_eq;
 
 const CONNECTIONS: usize = 4;
@@ -14,8 +14,8 @@ where
     C: ConnectionTrait,
 {
     bakery::ActiveModel {
-        name: Set(name.to_owned()),
-        profit_margin: Set(profit_margin),
+        name: set(name),
+        profit_margin: set(profit_margin),
         ..Default::default()
     }
     .insert(db)

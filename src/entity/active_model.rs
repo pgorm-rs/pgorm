@@ -15,6 +15,11 @@ pub use ActiveValue::NotSet;
 /// - [ActiveValue::Unchanged]: A defined [Value] remain unchanged
 /// - [ActiveValue::NotSet]: An undefined [Value]
 ///
+/// Write [`set(value)`][set] to construct the `Set` state: it converts into the
+/// field's type, so a `&str` literal reaches an `ActiveValue<String>` without a
+/// `.to_owned()`. The [`Set`][ActiveValue::Set] variant is spelled out when
+/// matching on the state, where a function call cannot appear.
+///
 /// The stateful value is useful when constructing UPDATE SQL statement,
 /// see an example below.
 ///
@@ -27,9 +32,9 @@ pub use ActiveValue::NotSet;
 /// // The code snipped below does an UPDATE operation on a `ActiveValue`
 /// assert_eq!(
 ///     Update::one(fruit::ActiveModel {
-///         id: ActiveValue::set(1),
-///         name: ActiveValue::set("Orange".to_owned()),
-///         cake_id: ActiveValue::not_set(),
+///         id: set(1),
+///         name: set("Orange"),
+///         cake_id: NotSet,
 ///     })
 ///     .expect("the primary key is set")
 ///     .as_query()
@@ -37,7 +42,7 @@ pub use ActiveValue::NotSet;
 ///     r#"UPDATE "fruit" SET "name" = 'Orange' WHERE "fruit"."id" = 1"#
 /// );
 /// ```
-// [spec:pgorm:def:entity.active-model.active-value]
+// [spec:pgorm:def:entity.active-model.active-value+1]
 #[derive(Clone, Debug)]
 pub enum ActiveValue<V>
 where
@@ -51,10 +56,64 @@ where
     NotSet,
 }
 
-// [spec:pgorm:req:entity.active-model.from-sugar]
+/// Construct an [`ActiveValue::Set`] from anything that converts into the
+/// column's type.
+///
+/// The [`Set`][ActiveValue::Set] variant and
+/// [`ActiveValue::set`][ActiveValue::set] both pin their argument to the field
+/// type exactly; this free function does not, so the ordinary conversions apply
+/// at the call site:
+///
+/// ```
+/// use pgorm::tests_cfg::fruit;
+/// use pgorm::entity::*;
+///
+/// let am = fruit::ActiveModel {
+///     id: set(1),
+///     // `&str`, not `String` — no `.to_owned()`
+///     name: set("Orange"),
+///     cake_id: NotSet,
+/// };
+/// assert_eq!(am.name, ActiveValue::Set("Orange".to_owned()));
+/// ```
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
+pub fn set<V, T>(value: T) -> ActiveValue<V>
+where
+    V: Into<Value>,
+    T: Into<V>,
+{
+    ActiveValue::Set(value.into())
+}
+
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
 impl<V: Into<Value>> From<V> for ActiveValue<V> {
     fn from(value: V) -> Self {
         ActiveValue::Set(value)
+    }
+}
+
+/// Targeted borrowed-to-owned conversions the blanket `From<V>` above cannot
+/// express: it pins the source type to the field type exactly, so `&str` only
+/// ever reaches an `ActiveValue<&str>`. Each target below differs from the one
+/// the blanket produces for the same source, so they cohere with it.
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
+impl From<&str> for ActiveValue<String> {
+    fn from(value: &str) -> Self {
+        ActiveValue::Set(value.to_owned())
+    }
+}
+
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
+impl From<&str> for ActiveValue<Option<String>> {
+    fn from(value: &str) -> Self {
+        ActiveValue::Set(Some(value.to_owned()))
+    }
+}
+
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
+impl From<&[u8]> for ActiveValue<Vec<u8>> {
+    fn from(value: &[u8]) -> Self {
+        ActiveValue::Set(value.to_vec())
     }
 }
 
@@ -162,7 +221,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///     name: set("Apple Pie"),
     ///     ..Default::default()
     /// };
     ///
@@ -200,8 +259,8 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(1),
-    ///     name: ActiveValue::Set("Orange".to_owned()),
+    ///     id: set(1),
+    ///     name: set("Orange"),
     ///     ..Default::default()
     /// };
     ///
@@ -234,7 +293,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(3),
+    ///     id: set(3),
     ///     ..Default::default()
     /// };
     ///
@@ -700,7 +759,7 @@ where
     }
 }
 
-// [spec:pgorm:req:entity.active-model.from-sugar]
+// [spec:pgorm:req:entity.active-model.from-sugar+1]
 impl<V> From<ActiveValue<V>> for ActiveValue<Option<V>>
 where
     V: Into<Value> + Nullable,
@@ -716,7 +775,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ActiveValue::{NotSet, Set, Unchanged};
+    use crate::ActiveValue::{NotSet, Unchanged};
     use crate::{Error, entity::*, tests_cfg::*};
     use pretty_assertions::assert_eq;
 
@@ -748,8 +807,8 @@ mod tests {
             .into_active_model(),
             fruit::ActiveModel {
                 id: NotSet,
-                name: Set("Apple".to_owned()),
-                cake_id: Set(Some(1)),
+                name: set("Apple"),
+                cake_id: set(Some(1)),
             }
         );
     }
@@ -776,7 +835,7 @@ mod tests {
             fruit::ActiveModel {
                 id: NotSet,
                 name: NotSet,
-                cake_id: Set(Some(1)),
+                cake_id: set(Some(1)),
             }
         );
 
@@ -788,7 +847,7 @@ mod tests {
             fruit::ActiveModel {
                 id: NotSet,
                 name: NotSet,
-                cake_id: Set(None),
+                cake_id: set(None),
             }
         );
 
@@ -825,9 +884,9 @@ mod tests {
         }
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(1),
-                name: Set("Pineapple".to_owned()),
-                cake_id: Set(None),
+                id: set(1),
+                name: set("Pineapple"),
+                cake_id: set(None),
             }
             .try_into_model()
             .unwrap(),
@@ -840,9 +899,9 @@ mod tests {
 
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(2),
-                name: Set("Apple".to_owned()),
-                cake_id: Set(Some(1)),
+                id: set(2),
+                name: set("Apple"),
+                cake_id: set(Some(1)),
             }
             .try_into_model()
             .unwrap(),
@@ -855,9 +914,9 @@ mod tests {
 
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(1),
+                id: set(1),
                 name: NotSet,
-                cake_id: Set(None),
+                cake_id: set(None),
             }
             .try_into_model(),
             Err(Error::AttrNotSet(String::from("name")))
@@ -865,8 +924,8 @@ mod tests {
 
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(1),
-                name: Set("Pineapple".to_owned()),
+                id: set(1),
+                name: set("Pineapple"),
                 cake_id: NotSet,
             }
             .try_into_model(),
@@ -898,8 +957,8 @@ mod tests {
         }
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(1),
-                name: Set("Pineapple".to_owned()),
+                id: set(1),
+                name: set("Pineapple"),
             }
             .try_into_model()
             .unwrap(),
@@ -935,8 +994,8 @@ mod tests {
         }
         assert_eq!(
             my_fruit::ActiveModel {
-                id: Set(1),
-                cake_id: Set(Some(1)),
+                id: set(1),
+                cake_id: set(Some(1)),
             }
             .try_into_model()
             .unwrap(),
@@ -974,7 +1033,7 @@ mod tests {
             fruit,
             fruit::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
+                name: set("Apple"),
                 cake_id: ActiveValue::NotSet,
             }
         );
@@ -985,7 +1044,7 @@ mod tests {
             }))?,
             fruit::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
+                name: set("Apple"),
                 cake_id: ActiveValue::NotSet,
             }
         );
@@ -998,8 +1057,8 @@ mod tests {
             fruit,
             fruit::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
-                cake_id: ActiveValue::Set(None),
+                name: set("Apple"),
+                cake_id: set(None),
             }
         );
 
@@ -1012,8 +1071,8 @@ mod tests {
             fruit,
             fruit::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
-                cake_id: ActiveValue::Set(Some(1)),
+                name: set("Apple"),
+                cake_id: set(Some(1)),
             }
         );
 
@@ -1026,13 +1085,13 @@ mod tests {
             fruit,
             fruit::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
-                cake_id: ActiveValue::Set(Some(1)),
+                name: set("Apple"),
+                cake_id: set(Some(1)),
             }
         );
 
         let mut fruit = fruit::ActiveModel {
-            id: ActiveValue::Set(1),
+            id: set(1),
             name: ActiveValue::NotSet,
             cake_id: ActiveValue::NotSet,
         };
@@ -1044,9 +1103,9 @@ mod tests {
         assert_eq!(
             fruit,
             fruit::ActiveModel {
-                id: ActiveValue::Set(1),
-                name: ActiveValue::Set("Apple".to_owned()),
-                cake_id: ActiveValue::Set(Some(1)),
+                id: set(1),
+                name: set("Apple"),
+                cake_id: set(Some(1)),
             }
         );
 
@@ -1089,9 +1148,9 @@ mod tests {
             .into_active_model()
             .reset_all(),
             fruit::ActiveModel {
-                id: Set(1),
-                name: Set("Apple".into()),
-                cake_id: Set(None)
+                id: set(1),
+                name: set("Apple"),
+                cake_id: set(None)
             },
         );
 
@@ -1118,9 +1177,9 @@ mod tests {
             .into_active_model()
             .reset_all(),
             fruit::ActiveModel {
-                id: Set(1),
-                name: Set("Apple".into()),
-                cake_id: Set(Some(2)),
+                id: set(1),
+                name: set("Apple"),
+                cake_id: set(Some(2)),
             },
         );
     }

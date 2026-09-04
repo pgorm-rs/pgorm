@@ -146,12 +146,12 @@ fn active_model_column_state_access() {
     assert!(!am.is_not_set(row::Column::Name));
     assert_eq!(
         am.get(row::Column::Name),
-        ActiveValue::Set(Value::String(Some(Box::new("Apple".to_owned()))))
+        set(Value::String(Some(Box::new("Apple".to_owned()))))
     );
     // Reading twice yields the same thing: `get` did not consume.
     assert_eq!(
         am.get(row::Column::Name),
-        ActiveValue::Set(Value::String(Some(Box::new("Apple".to_owned()))))
+        set(Value::String(Some(Box::new("Apple".to_owned()))))
     );
     assert!(am.is_changed());
 
@@ -159,7 +159,7 @@ fn active_model_column_state_access() {
     let taken = am.take(row::Column::Name);
     assert_eq!(
         taken,
-        ActiveValue::Set(Value::String(Some(Box::new("Apple".to_owned()))))
+        set(Value::String(Some(Box::new("Apple".to_owned()))))
     );
     assert!(am.is_not_set(row::Column::Name));
 
@@ -187,7 +187,7 @@ fn active_model_column_state_access() {
         am,
         row::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: ActiveValue::NotSet,
         }
     );
@@ -205,9 +205,9 @@ fn active_model_column_state_access() {
     assert_eq!(
         all,
         row::ActiveModel {
-            id: ActiveValue::Set(1),
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(Some("crisp".to_owned())),
+            id: set(1),
+            name: set("Apple"),
+            note: "crisp".into(),
         }
     );
     assert!(all.is_changed());
@@ -221,7 +221,7 @@ fn active_model_get_primary_key_value() {
     // Arity 1 -> ValueTuple::One. `Unchanged` counts as holding a value.
     let am = row::ActiveModel {
         id: ActiveValue::Unchanged(7),
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
         note: ActiveValue::NotSet,
     };
     assert_eq!(
@@ -231,8 +231,8 @@ fn active_model_get_primary_key_value() {
 
     // Arity 2 -> ValueTuple::Two, in primary-key iteration order.
     let am = pk2::ActiveModel {
-        id_1: ActiveValue::Set(1),
-        id_2: ActiveValue::Set("two".to_owned()),
+        id_1: set(1),
+        id_2: set("two"),
         name: ActiveValue::NotSet,
     };
     assert_eq!(
@@ -245,9 +245,9 @@ fn active_model_get_primary_key_value() {
 
     // Arity 3 -> ValueTuple::Three.
     let am = pk3::ActiveModel {
-        id_1: ActiveValue::Set(1),
-        id_2: ActiveValue::Set(2),
-        id_3: ActiveValue::Set(3),
+        id_1: set(1),
+        id_2: set(2),
+        id_3: set(3),
         name: ActiveValue::NotSet,
     };
     assert_eq!(
@@ -261,10 +261,10 @@ fn active_model_get_primary_key_value() {
 
     // Arity 4 falls into the `Many` arm.
     let am = pk4::ActiveModel {
-        id_1: ActiveValue::Set(1),
-        id_2: ActiveValue::Set(2),
-        id_3: ActiveValue::Set(3),
-        id_4: ActiveValue::Set(4),
+        id_1: set(1),
+        id_2: set(2),
+        id_3: set(3),
+        id_4: set(4),
         name: ActiveValue::NotSet,
     };
     assert_eq!(
@@ -280,13 +280,13 @@ fn active_model_get_primary_key_value() {
     // Any `NotSet` key component collapses the whole thing to `None`.
     let am = row::ActiveModel {
         id: ActiveValue::NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
         note: ActiveValue::NotSet,
     };
     assert_eq!(am.get_primary_key_value(), None);
 
     let am = pk2::ActiveModel {
-        id_1: ActiveValue::Set(1),
+        id_1: set(1),
         id_2: ActiveValue::NotSet,
         name: ActiveValue::NotSet,
     };
@@ -297,7 +297,7 @@ fn active_model_get_primary_key_value() {
 // ActiveValue: the three-state machine
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.active-model.active-value/test]    the three variants,
+// [spec:pgorm:def:entity.active-model.active-value+1/test]    the three variants,
 // `Default::default()` == `NotSet`, the crate-root `NotSet` re-export, the
 // variant-sensitive `PartialEq`, and the statement-level consequence: only `Set`
 // reaches the INSERT/UPDATE column list while an `Unchanged` primary key still
@@ -310,26 +310,26 @@ fn active_value_three_state_machine() {
     // `NotSet` is re-exported at the crate root, so struct literals read naturally.
     let am = row::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
         note: NotSet,
     };
     assert!(am.id.is_not_set());
     assert!(am.note.is_not_set());
 
     // PartialEq is equal only for identical variants carrying equal payloads.
-    assert_eq!(ActiveValue::Set(1), ActiveValue::Set(1));
+    assert_eq!(ActiveValue::set(1), ActiveValue::set(1));
     assert_eq!(ActiveValue::Unchanged(1), ActiveValue::Unchanged(1));
     assert_eq!(ActiveValue::<i32>::NotSet, ActiveValue::<i32>::NotSet);
-    assert_ne!(ActiveValue::Set(1), ActiveValue::Set(2));
-    assert_ne!(ActiveValue::Set(1), ActiveValue::Unchanged(1));
-    assert_ne!(ActiveValue::Set(1), ActiveValue::<i32>::NotSet);
+    assert_ne!(ActiveValue::set(1), ActiveValue::set(2));
+    assert_ne!(ActiveValue::set(1), ActiveValue::Unchanged(1));
+    assert_ne!(ActiveValue::set(1), ActiveValue::<i32>::NotSet);
     assert_ne!(ActiveValue::Unchanged(1), ActiveValue::<i32>::NotSet);
 
     // Only `Set` columns are written. `note` is NotSet, so it is absent entirely.
     assert_eq!(
         row::Entity::insert(row::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: NotSet,
         })
         .build()
@@ -342,7 +342,7 @@ fn active_value_three_state_machine() {
     assert_eq!(
         row::Entity::update(row::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: ActiveValue::Unchanged(Some("old".to_owned())),
         })
         .expect("the primary key is unchanged, not unset")
@@ -359,7 +359,7 @@ fn active_value_three_state_machine() {
 #[test]
 fn active_value_accessors() {
     // Constructors line up with the variants.
-    assert_eq!(ActiveValue::set(1), ActiveValue::Set(1));
+    assert_eq!(ActiveValue::set(1), ActiveValue::set(1));
     assert_eq!(ActiveValue::unchanged(1), ActiveValue::Unchanged(1));
     assert_eq!(ActiveValue::<i32>::not_set(), ActiveValue::NotSet);
 
@@ -373,7 +373,7 @@ fn active_value_accessors() {
 
     // `take` yields Some for Set and Unchanged, None for NotSet, and always
     // leaves NotSet behind.
-    let mut v = ActiveValue::Set(1);
+    let mut v = ActiveValue::set(1);
     assert_eq!(v.take(), Some(1));
     assert_eq!(v, ActiveValue::NotSet);
 
@@ -386,18 +386,18 @@ fn active_value_accessors() {
     assert_eq!(v, ActiveValue::NotSet);
 
     // `unwrap` returns the inner value for both populated variants.
-    assert_eq!(ActiveValue::Set(1).unwrap(), 1);
+    assert_eq!(ActiveValue::set(1).unwrap(), 1);
     assert_eq!(ActiveValue::Unchanged(2).unwrap(), 2);
 
     // `try_as_ref` is the non-panicking borrow; `as_ref` is the panicking one.
-    assert_eq!(ActiveValue::Set(1).try_as_ref(), Some(&1));
+    assert_eq!(ActiveValue::set(1).try_as_ref(), Some(&1));
     assert_eq!(ActiveValue::Unchanged(1).try_as_ref(), Some(&1));
     assert_eq!(ActiveValue::<i32>::NotSet.try_as_ref(), None);
-    assert_eq!(std::convert::AsRef::as_ref(&ActiveValue::Set(1)), &1);
+    assert_eq!(std::convert::AsRef::as_ref(&ActiveValue::set(1)), &1);
     assert_eq!(std::convert::AsRef::as_ref(&ActiveValue::Unchanged(1)), &1);
 
     // `into_value` erases the variant, keeping only presence.
-    assert_eq!(ActiveValue::Set(1).into_value(), Some(Value::Int(Some(1))));
+    assert_eq!(ActiveValue::set(1).into_value(), Some(Value::Int(Some(1))));
     assert_eq!(
         ActiveValue::Unchanged(1).into_value(),
         Some(Value::Int(Some(1)))
@@ -406,8 +406,8 @@ fn active_value_accessors() {
 
     // `into_wrapped_value` keeps the variant while widening to ActiveValue<Value>.
     assert_eq!(
-        ActiveValue::Set(1).into_wrapped_value(),
-        ActiveValue::Set(Value::Int(Some(1)))
+        ActiveValue::set(1).into_wrapped_value(),
+        ActiveValue::set(Value::Int(Some(1)))
     );
     assert_eq!(
         ActiveValue::Unchanged(1).into_wrapped_value(),
@@ -421,10 +421,10 @@ fn active_value_accessors() {
     // `reset` promotes Unchanged -> Set, is a no-op on Set, leaves NotSet alone.
     let mut v = ActiveValue::Unchanged(1);
     v.reset();
-    assert_eq!(v, ActiveValue::Set(1));
-    let mut v = ActiveValue::Set(1);
+    assert_eq!(v, ActiveValue::set(1));
+    let mut v = ActiveValue::set(1);
     v.reset();
-    assert_eq!(v, ActiveValue::Set(1));
+    assert_eq!(v, ActiveValue::set(1));
     let mut v = ActiveValue::<i32>::NotSet;
     v.reset();
     assert_eq!(v, ActiveValue::NotSet);
@@ -443,17 +443,17 @@ fn active_value_set_if_not_equals() {
 
     // Unchanged + different payload: becomes Set.
     v.set_if_not_equals("new");
-    assert_eq!(v, ActiveValue::Set("new"));
+    assert_eq!(v, set("new"));
 
     // `Set` with an equal payload is still re-Set — only `Unchanged` is special.
-    let mut v = ActiveValue::Set("same");
+    let mut v = set("same");
     v.set_if_not_equals("same");
-    assert_eq!(v, ActiveValue::Set("same"));
+    assert_eq!(v, set("same"));
 
     // NotSet always becomes Set.
     let mut v = ActiveValue::<&str>::NotSet;
     v.set_if_not_equals("x");
-    assert_eq!(v, ActiveValue::Set("x"));
+    assert_eq!(v, set("x"));
 
     // The whole-ActiveModel consequence: writing back an identical value leaves
     // `is_changed` false, writing a genuinely new one flips it.
@@ -489,7 +489,7 @@ fn active_value_as_ref_panics_on_not_set() {
 // From-sugar
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model.from-sugar/test]    the blanket
+// [spec:pgorm:req:entity.active-model.from-sugar+1/test]    the blanket
 // `From<V> for ActiveValue<V>` produces `Set` (pgorm's divergence from upstream
 // SeaORM), and `From<ActiveValue<V>> for ActiveValue<Option<V>>` lifts into a
 // nullable column position preserving the variant
@@ -497,13 +497,13 @@ fn active_value_as_ref_panics_on_not_set() {
 fn active_value_from_sugar() {
     // A plain value converts straight into the `Set` state.
     let v: ActiveValue<i32> = 1.into();
-    assert_eq!(v, ActiveValue::Set(1));
+    assert_eq!(v, set(1));
     let v: ActiveValue<String> = "Apple".to_owned().into();
-    assert_eq!(v, ActiveValue::Set("Apple".to_owned()));
+    assert_eq!(v, set("Apple"));
     let v: ActiveValue<bool> = true.into();
-    assert_eq!(v, ActiveValue::Set(true));
+    assert_eq!(v, set(true));
 
-    // Which is what makes this ActiveModel literal legal without `Set(...)`.
+    // Which is what makes this ActiveModel literal legal without `set(...)`.
     let am = row::ActiveModel {
         id: NotSet,
         name: "Apple".to_owned().into(),
@@ -513,18 +513,62 @@ fn active_value_from_sugar() {
         am,
         row::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(Some("crisp".to_owned())),
+            name: set("Apple"),
+            note: "crisp".into(),
         }
     );
 
     // Lifting into a nullable position preserves the variant in all three cases.
-    let lifted: ActiveValue<Option<i32>> = ActiveValue::Set(1).into();
-    assert_eq!(lifted, ActiveValue::Set(Some(1)));
+    let lifted: ActiveValue<Option<i32>> = ActiveValue::set(1).into();
+    assert_eq!(lifted, ActiveValue::set(Some(1)));
     let lifted: ActiveValue<Option<i32>> = ActiveValue::Unchanged(1).into();
     assert_eq!(lifted, ActiveValue::Unchanged(Some(1)));
     let lifted: ActiveValue<Option<i32>> = ActiveValue::<i32>::NotSet.into();
     assert_eq!(lifted, ActiveValue::NotSet);
+}
+
+// [spec:pgorm:req:entity.active-model.from-sugar+1/test]    the three targeted
+// borrowed-to-owned conversions the blanket cannot express, and that they cohere
+// with it: `&str` still reaches `ActiveValue<&str>` when that is what is asked for
+#[test]
+fn active_value_borrowed_from_impls() {
+    let owned: ActiveValue<String> = "Apple".into();
+    assert_eq!(owned, ActiveValue::Set("Apple".to_owned()));
+
+    let nullable: ActiveValue<Option<String>> = "Apple".into();
+    assert_eq!(nullable, ActiveValue::Set(Some("Apple".to_owned())));
+
+    let bytes: ActiveValue<Vec<u8>> = (&b"hi"[..]).into();
+    assert_eq!(bytes, ActiveValue::Set(b"hi".to_vec()));
+
+    // The blanket did not lose its `&str` case to the new impls: each of them
+    // names a target the blanket does not produce for the same source.
+    let borrowed: ActiveValue<&str> = "Apple".into();
+    assert_eq!(borrowed, ActiveValue::Set("Apple"));
+}
+
+// [spec:pgorm:req:entity.active-model.from-sugar+1/test]    the free `set(..)`
+// applies `Into<V>` at the call site, so a literal reaches an owning column with
+// no `.to_owned()`, while `ActiveValue::set` and the `Set` variant pin `V` exactly
+// [spec:pgorm:def:entity.active-model.active-value+1/test]    which is why `set` is
+// the documented construction spelling and `Set` the pattern-matching one
+#[test]
+fn active_value_set_free_function() {
+    // The conversion happens at the call site: `&str` into a `String` column.
+    let am = row::ActiveModel {
+        id: set(1),
+        name: set("Apple"),
+        note: NotSet,
+    };
+    assert_eq!(am.name, ActiveValue::Set("Apple".to_owned()));
+
+    // Reflexively, it is the plain constructor: an argument already of the field
+    // type goes through `Into`'s identity impl.
+    assert_eq!(set::<String, _>("Apple".to_owned()), am.name);
+    assert_eq!(set::<i32, _>(1), am.id);
+
+    // And the state it produces is `Set`, matchable as the variant.
+    assert!(matches!(am.id, ActiveValue::Set(1)));
 }
 
 // ---------------------------------------------------------------------------
@@ -548,6 +592,7 @@ mod row_dto {
         pub note: Option<Option<String>>,
     }
 }
+use pgorm::set;
 use row_dto::{NewRow, UpdateRow};
 
 // [spec:pgorm:req:entity.active-model.into+1/test]    the blanket identity
@@ -558,8 +603,8 @@ use row_dto::{NewRow, UpdateRow};
 fn into_active_model_and_into_active_value() {
     // Blanket identity impl for anything that is already an ActiveModel.
     let am = row::ActiveModel {
-        id: ActiveValue::Set(1),
-        name: ActiveValue::Set("Apple".to_owned()),
+        id: set(1),
+        name: set("Apple"),
         note: NotSet,
     };
     assert_eq!(am.clone().into_active_model(), am);
@@ -581,40 +626,31 @@ fn into_active_model_and_into_active_value() {
     );
 
     // `IntoActiveValue` for plain scalars always yields `Set`.
-    assert_eq!(true.into_active_value(), ActiveValue::Set(true));
-    assert_eq!(1i8.into_active_value(), ActiveValue::Set(1i8));
-    assert_eq!(1i16.into_active_value(), ActiveValue::Set(1i16));
-    assert_eq!(1i32.into_active_value(), ActiveValue::Set(1i32));
-    assert_eq!(1i64.into_active_value(), ActiveValue::Set(1i64));
-    assert_eq!(1u32.into_active_value(), ActiveValue::Set(1u32));
-    assert_eq!(1u64.into_active_value(), ActiveValue::Set(1u64));
-    assert_eq!(1.5f32.into_active_value(), ActiveValue::Set(1.5f32));
-    assert_eq!(1.5f64.into_active_value(), ActiveValue::Set(1.5f64));
-    assert_eq!("s".into_active_value(), ActiveValue::Set("s"));
-    assert_eq!(
-        "s".to_owned().into_active_value(),
-        ActiveValue::Set("s".to_owned())
-    );
-    assert_eq!(vec![1u8].into_active_value(), ActiveValue::Set(vec![1u8]));
+    assert_eq!(true.into_active_value(), set(true));
+    assert_eq!(1i8.into_active_value(), set(1i8));
+    assert_eq!(1i16.into_active_value(), set(1i16));
+    assert_eq!(1i32.into_active_value(), set(1i32));
+    assert_eq!(1i64.into_active_value(), set(1i64));
+    assert_eq!(1u32.into_active_value(), set(1u32));
+    assert_eq!(1u64.into_active_value(), set(1u64));
+    assert_eq!(1.5f32.into_active_value(), set(1.5f32));
+    assert_eq!(1.5f64.into_active_value(), set(1.5f64));
+    assert_eq!("s".into_active_value(), set("s"));
+    assert_eq!("s".to_owned().into_active_value(), set("s"));
+    assert_eq!(vec![1u8].into_active_value(), set(vec![1u8]));
 
-    // `Option<V>`: Some -> Set(Some(v)), None -> NotSet. There is deliberately
+    // `Option<V>`: Some -> set(Some(v)), None -> NotSet. There is deliberately
     // no way to spell "write NULL" through this impl.
-    assert_eq!(Some(1i32).into_active_value(), ActiveValue::Set(Some(1i32)));
+    assert_eq!(Some(1i32).into_active_value(), set(Some(1i32)));
     assert_eq!(
         None::<i32>.into_active_value(),
         ActiveValue::<Option<i32>>::NotSet
     );
 
-    // `Option<Option<V>>` adds the missing rung: Some(None) -> Set(None) nulls
+    // `Option<Option<V>>` adds the missing rung: Some(None) -> set(None) nulls
     // the column, None -> NotSet leaves it alone.
-    assert_eq!(
-        Some(Some(1i32)).into_active_value(),
-        ActiveValue::Set(Some(1i32))
-    );
-    assert_eq!(
-        Some(None::<i32>).into_active_value(),
-        ActiveValue::Set(None::<i32>)
-    );
+    assert_eq!(Some(Some(1i32)).into_active_value(), set(Some(1i32)));
+    assert_eq!(Some(None::<i32>).into_active_value(), set(None::<i32>));
     assert_eq!(
         None::<Option<i32>>.into_active_value(),
         ActiveValue::<Option<i32>>::NotSet
@@ -629,8 +665,8 @@ fn into_active_model_and_into_active_value() {
         .into_active_model(),
         row::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(Some("crisp".to_owned())),
+            name: set("Apple"),
+            note: "crisp".into(),
         }
     );
     assert_eq!(
@@ -641,7 +677,7 @@ fn into_active_model_and_into_active_value() {
         .into_active_model(),
         row::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: NotSet,
         }
     );
@@ -650,7 +686,7 @@ fn into_active_model_and_into_active_value() {
         row::ActiveModel {
             id: NotSet,
             name: NotSet,
-            note: ActiveValue::Set(None),
+            note: set(None),
         }
     );
     assert_eq!(
@@ -683,14 +719,14 @@ fn active_model_from_json() {
         }))
         .unwrap(),
         row::ActiveModel {
-            id: ActiveValue::Set(1),
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(Some("crisp".to_owned())),
+            id: set(1),
+            name: set("Apple"),
+            note: "crisp".into(),
         }
     );
 
     // An absent key is NotSet, even though the Model itself had to be built with
-    // some value for it. An explicit JSON null is present, so it is Set(None).
+    // some value for it. An explicit JSON null is present, so it is set(None).
     assert_eq!(
         row::ActiveModel::from_json(json!({
             "id": 1,
@@ -699,9 +735,9 @@ fn active_model_from_json() {
         }))
         .unwrap(),
         row::ActiveModel {
-            id: ActiveValue::Set(1),
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(None),
+            id: set(1),
+            name: set("Apple"),
+            note: set(None),
         }
     );
 
@@ -733,14 +769,14 @@ fn active_model_set_from_json_preserves_primary_key() {
         am,
         row::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
-            note: ActiveValue::Set(Some("crisp".to_owned())),
+            name: set("Apple"),
+            note: "crisp".into(),
         }
     );
 
-    // Starting from Set(1): the original key value survives the overwrite.
+    // Starting from set(1): the original key value survives the overwrite.
     let mut am = row::ActiveModel {
-        id: ActiveValue::Set(1),
+        id: set(1),
         name: NotSet,
         note: NotSet,
     };
@@ -752,8 +788,8 @@ fn active_model_set_from_json_preserves_primary_key() {
     assert_eq!(
         am,
         row::ActiveModel {
-            id: ActiveValue::Set(1),
-            name: ActiveValue::Set("Apple".to_owned()),
+            id: set(1),
+            name: set("Apple"),
             note: NotSet,
         }
     );
@@ -771,7 +807,7 @@ fn active_model_set_from_json_preserves_primary_key() {
     }))
     .unwrap();
     assert_eq!(am.id.into_value(), Some(Value::Int(Some(1))));
-    assert_eq!(am.name, ActiveValue::Set("Apple".to_owned()));
+    assert_eq!(am.name, set("Apple"));
 }
 
 // ---------------------------------------------------------------------------
@@ -801,8 +837,8 @@ async fn active_model_persistence() -> Result<(), Error> {
     // the very same statement, fully populated alongside every other column.
     let inserted = row::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
-        note: ActiveValue::Set(Some("crisp".to_owned())),
+        name: set("Apple"),
+        note: "crisp".into(),
     }
     .insert(&db)
     .await?;
@@ -814,7 +850,7 @@ async fn active_model_persistence() -> Result<(), Error> {
     // back what the database generated rather than echoing the input.
     let second = row::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Pear".to_owned()),
+        name: set("Pear"),
         note: NotSet,
     }
     .insert(&db)
@@ -825,7 +861,7 @@ async fn active_model_persistence() -> Result<(), Error> {
 
     // `update` is keyed on the primary key and returns the fresh Model.
     let mut am = inserted.clone().into_active_model();
-    am.name = ActiveValue::Set("Apple Pie".to_owned());
+    am.name = set("Apple Pie");
     let updated = am.update(&db).await?;
     assert_eq!(
         updated,
@@ -868,7 +904,7 @@ async fn update_accepts_set_or_unchanged_key() -> Result<(), Error> {
 
     let inserted = row::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
         note: NotSet,
     }
     .insert(&db)
@@ -878,14 +914,14 @@ async fn update_accepts_set_or_unchanged_key() -> Result<(), Error> {
     // An `Unchanged` key, as it comes back from `IntoActiveModel`.
     let mut am = inserted.into_active_model();
     assert_eq!(am.id, ActiveValue::Unchanged(id));
-    am.name = ActiveValue::Set("Apple Pie".to_owned());
+    am.name = set("Apple Pie");
     let updated = am.update(&db).await?;
     assert_eq!(updated.name, "Apple Pie");
 
     // A `Set` key, as a caller writes it by hand. Same statement, same row.
     let updated = row::ActiveModel {
-        id: ActiveValue::Set(id),
-        name: ActiveValue::Set("Apple Tart".to_owned()),
+        id: set(id),
+        name: set("Apple Tart"),
         note: NotSet,
     }
     .update(&db)
@@ -920,8 +956,8 @@ async fn manual_key_insert_and_update_are_explicit() -> Result<(), Error> {
 
     // `update` on a key that matches no row reports it rather than creating one.
     let err = manual_key::ActiveModel {
-        id: ActiveValue::Set(1),
-        name: ActiveValue::Set("Apple".to_owned()),
+        id: set(1),
+        name: set("Apple"),
     }
     .update(&db)
     .await
@@ -934,8 +970,8 @@ async fn manual_key_insert_and_update_are_explicit() -> Result<(), Error> {
 
     // The caller states the intent, so a populated manual key inserts.
     let inserted = manual_key::ActiveModel {
-        id: ActiveValue::Set(1),
-        name: ActiveValue::Set("Apple".to_owned()),
+        id: set(1),
+        name: set("Apple"),
     }
     .insert(&db)
     .await?;
@@ -949,8 +985,8 @@ async fn manual_key_insert_and_update_are_explicit() -> Result<(), Error> {
 
     // And the same key now updates the row it names.
     let updated = manual_key::ActiveModel {
-        id: ActiveValue::Set(1),
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        id: set(1),
+        name: set("Apple Pie"),
     }
     .update(&db)
     .await?;
@@ -1047,7 +1083,7 @@ async fn active_model_hook_ordering() -> Result<(), Error> {
 
     let model = hooked::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
     }
     .insert(&db)
     .await?;
@@ -1061,7 +1097,7 @@ async fn active_model_hook_ordering() -> Result<(), Error> {
 
     HOOK_LOG.lock().unwrap().clear();
     let mut am = model.clone().into_active_model();
-    am.name = ActiveValue::Set("Apple Pie".to_owned());
+    am.name = set("Apple Pie");
     am.update(&db).await?;
     assert_eq!(
         hook_log(),
@@ -1075,8 +1111,8 @@ async fn active_model_hook_ordering() -> Result<(), Error> {
     // before the delete, so its attributes are still populated.
     HOOK_LOG.lock().unwrap().clear();
     let res = hooked::ActiveModel {
-        id: ActiveValue::Set(model.id),
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        id: set(model.id),
+        name: set("Apple Pie"),
     }
     .delete(&db)
     .await?;
@@ -1140,7 +1176,7 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
     // `insert` aborts before executing.
     let err = hook_abort::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
     }
     .insert(&db)
     .await
@@ -1151,7 +1187,7 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
     // Seed a row through the statement API, which does not run hooks.
     hook_abort::Entity::insert(hook_abort::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
     })
     .exec(&db)
     .await?;
@@ -1160,7 +1196,7 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
     // `update` aborts too — `before_save` is shared by both paths.
     let err = hook_abort::ActiveModel {
         id: ActiveValue::Unchanged(seeded.id),
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
     }
     .update(&db)
     .await
@@ -1170,7 +1206,7 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
 
     // `delete` aborts before executing, so the row survives.
     let err = hook_abort::ActiveModel {
-        id: ActiveValue::Set(seeded.id),
+        id: set(seeded.id),
         name: NotSet,
     }
     .delete(&db)

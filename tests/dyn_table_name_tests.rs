@@ -4,8 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, Delete, IntoActiveModel, Iterable, QueryTrait, Update,
-    entity::prelude::*,
+    DatabaseConnection, Delete, IntoActiveModel, Iterable, QueryTrait, Update, entity::prelude::*,
+    set,
 };
 use pgorm_query::{Expr, Query};
 use pretty_assertions::assert_eq;
@@ -59,7 +59,7 @@ pub async fn dyn_table_name_lazy_static(db: &DatabaseConnection) -> Result<(), E
 
         // Prepare update statement
         let update = Update::many(entity).set(ActiveModel {
-            name: Set("1st Row (edited)".into()),
+            name: set("1st Row (edited)"),
             ..model.clone().into_active_model()
         });
         // Execute the update statement

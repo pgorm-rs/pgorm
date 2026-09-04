@@ -3,12 +3,7 @@
 pub mod common;
 
 use common::features::*;
-use pgorm::{
-    ActiveValue::{Set, Unchanged},
-    DatabaseConnection,
-    entity::prelude::*,
-    entity::*,
-};
+use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
 use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.render.cast-param-type/test]
@@ -44,8 +39,8 @@ pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(model, Some(bits.clone()));
 
     let res = bits::ActiveModel {
-        bit32: Set(320),
-        bit64: Set(640),
+        bit32: set(320),
+        bit64: set(640),
         ..bits.clone().into_active_model()
     }
     .update(db)

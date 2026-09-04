@@ -41,8 +41,8 @@ impl Update {
     ///
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
-    ///         id: ActiveValue::set(1),
-    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///         id: set(1),
+    ///         name: set("Apple Pie"),
     ///     })
     ///     .expect("the primary key is set")
     ///     .as_query()
@@ -57,7 +57,7 @@ impl Update {
     /// assert_eq!(
     ///     Update::one(cake::ActiveModel {
     ///         id: ActiveValue::not_set(),
-    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///         name: set("Apple Pie"),
     ///     })
     ///     .unwrap_err(),
     ///     Error::PrimaryKeyNotSet,
@@ -231,7 +231,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ActiveValue::{Set, Unchanged};
+    use crate::ActiveValue::Unchanged;
     use crate::tests_cfg::{cake, fruit, lunch_set, sea_orm_active_enums::Tea};
     use crate::{entity::*, query::*};
     use pgorm_query::{Expr, Value};
@@ -240,8 +240,8 @@ mod tests {
     fn update_1() {
         assert_eq!(
             Update::one(cake::ActiveModel {
-                id: ActiveValue::set(1),
-                name: ActiveValue::set("Apple Pie".to_owned()),
+                id: set(1),
+                name: set("Apple Pie"),
             })
             .expect("the primary key is set")
             .as_query()
@@ -254,8 +254,8 @@ mod tests {
     fn update_2() {
         assert_eq!(
             Update::one(fruit::ActiveModel {
-                id: ActiveValue::set(1),
-                name: ActiveValue::set("Orange".to_owned()),
+                id: set(1),
+                name: set("Orange"),
                 cake_id: ActiveValue::not_set(),
             })
             .expect("the primary key is set")
@@ -269,9 +269,9 @@ mod tests {
     fn update_3() {
         assert_eq!(
             Update::one(fruit::ActiveModel {
-                id: ActiveValue::set(2),
+                id: set(2),
                 name: ActiveValue::unchanged("Apple".to_owned()),
-                cake_id: ActiveValue::set(Some(3)),
+                cake_id: set(Some(3)),
             })
             .expect("the primary key is set")
             .as_query()
@@ -297,8 +297,8 @@ mod tests {
         assert_eq!(
             Update::many(fruit::Entity)
                 .set(fruit::ActiveModel {
-                    name: ActiveValue::set("Apple".to_owned()),
-                    cake_id: ActiveValue::set(Some(3)),
+                    name: set("Apple"),
+                    cake_id: set(Some(3)),
                     ..Default::default()
                 })
                 .filter(fruit::Column::Id.eq(2))
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(
             Update::many(fruit::Entity)
                 .set(fruit::ActiveModel {
-                    id: ActiveValue::set(3),
+                    id: set(3),
                     ..Default::default()
                 })
                 .filter(fruit::Column::Id.eq(2))
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(
             Update::many(lunch_set::Entity)
                 .set(lunch_set::ActiveModel {
-                    tea: Set(Tea::EverydayTea),
+                    tea: set(Tea::EverydayTea),
                     ..Default::default()
                 })
                 .filter(lunch_set::Column::Tea.eq(Tea::BreakfastTea))
@@ -343,7 +343,7 @@ mod tests {
         assert_eq!(
             Update::one(lunch_set::ActiveModel {
                 id: Unchanged(1),
-                tea: Set(Tea::EverydayTea),
+                tea: set(Tea::EverydayTea),
                 ..Default::default()
             })
             .expect("the primary key is set")

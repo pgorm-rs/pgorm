@@ -6,11 +6,12 @@ use active_enum::Entity as ActiveEnumEntity;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
     ActiveEnum as ActiveEnumTrait,
-    ActiveValue::{Set, Unchanged},
+    ActiveValue::Unchanged,
     DatabaseConnection, QueryTrait,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
+    set,
 };
 use pretty_assertions::assert_eq;
 
@@ -45,9 +46,9 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(
         model,
         ActiveModel {
-            category: Set(None),
-            color: Set(None),
-            tea: Set(None),
+            category: set(None),
+            color: set(None),
+            tea: set(None),
             ..Default::default()
         }
         .insert(db)
@@ -66,9 +67,9 @@ pub async fn insert_active_enum(db: &DatabaseConnection) -> Result<(), Error> {
     );
 
     let _ = ActiveModel {
-        category: Set(Some(Category::Big)),
-        color: Set(Some(Color::Black)),
-        tea: Set(Some(Tea::EverydayTea)),
+        category: set(Some(Category::Big)),
+        color: set(Some(Color::Black)),
+        tea: set(Some(Tea::EverydayTea)),
         ..model.into_active_model()
     }
     .update(db)
@@ -197,19 +198,19 @@ pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), Err
     use active_enum_child::*;
 
     active_enum::ActiveModel {
-        category: Set(Some(Category::Small)),
-        color: Set(Some(Color::White)),
-        tea: Set(Some(Tea::BreakfastTea)),
+        category: set(Some(Category::Small)),
+        color: set(Some(Color::White)),
+        tea: set(Some(Tea::BreakfastTea)),
         ..Default::default()
     }
     .insert(db)
     .await?;
 
     let am = ActiveModel {
-        parent_id: Set(2),
-        category: Set(None),
-        color: Set(None),
-        tea: Set(None),
+        parent_id: set(2),
+        category: set(None),
+        color: set(None),
+        tea: set(None),
         ..Default::default()
     }
     .insert(db)
@@ -238,9 +239,9 @@ pub async fn insert_active_enum_child(db: &DatabaseConnection) -> Result<(), Err
     );
 
     ActiveModel {
-        category: Set(Some(Category::Big)),
-        color: Set(Some(Color::Black)),
-        tea: Set(Some(Tea::EverydayTea)),
+        category: set(Some(Category::Big)),
+        color: set(Some(Color::Black)),
+        tea: set(Some(Tea::EverydayTea)),
         ..am.into_active_model()
     }
     .update(db)
@@ -282,8 +283,8 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), Error
     assert_eq!(
         model,
         ActiveModel {
-            id: Set(1),
-            categories: Set(None),
+            id: set(1),
+            categories: set(None),
         }
         .insert(db)
         .await?
@@ -299,8 +300,8 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), Error
     );
 
     let _ = ActiveModel {
-        id: Set(1),
-        categories: Set(Some(vec![Category::Big, Category::Small])),
+        id: set(1),
+        categories: set(Some(vec![Category::Big, Category::Small])),
     }
     .update(db)
     .await?;

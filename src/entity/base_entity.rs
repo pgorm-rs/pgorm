@@ -209,7 +209,7 @@ pub trait EntityTrait: EntityName {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///     name: set("Apple Pie"),
     ///     ..Default::default()
     /// };
     ///
@@ -225,7 +225,7 @@ pub trait EntityTrait: EntityName {
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///     name: set("Apple Pie"),
     ///     ..Default::default()
     /// };
     ///
@@ -252,11 +252,11 @@ pub trait EntityTrait: EntityName {
     /// let db = pool.get().await?;
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///     name: set("Apple Pie"),
     ///     ..Default::default()
     /// };
     /// let orange = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Orange Scone".to_owned()),
+    ///     name: set("Orange Scone"),
     ///     ..Default::default()
     /// };
     ///
@@ -270,11 +270,11 @@ pub trait EntityTrait: EntityName {
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
     /// let apple = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///     name: set("Apple Pie"),
     ///     ..Default::default()
     /// };
     /// let orange = cake::ActiveModel {
-    ///     name: ActiveValue::Set("Orange Scone".to_owned()),
+    ///     name: set("Orange Scone"),
     ///     ..Default::default()
     /// };
     ///
@@ -307,8 +307,8 @@ pub trait EntityTrait: EntityName {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(1),
-    ///     name: ActiveValue::Set("Orange".to_owned()),
+    ///     id: set(1),
+    ///     name: set("Orange"),
     ///     ..Default::default()
     /// };
     ///
@@ -326,8 +326,8 @@ pub trait EntityTrait: EntityName {
     /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(1),
-    ///     name: ActiveValue::Set("Orange".to_owned()),
+    ///     id: set(1),
+    ///     name: set("Orange"),
     ///     ..Default::default()
     /// };
     ///
@@ -408,7 +408,7 @@ pub trait EntityTrait: EntityName {
     /// let db = pool.get().await?;
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(3),
+    ///     id: set(3),
     ///     ..Default::default()
     /// };
     ///
@@ -423,7 +423,7 @@ pub trait EntityTrait: EntityName {
     /// use pgorm::{entity::*, query::*, tests_cfg::fruit};
     ///
     /// let orange = fruit::ActiveModel {
-    ///     id: ActiveValue::Set(3),
+    ///     id: set(3),
     ///     ..Default::default()
     /// };
     ///

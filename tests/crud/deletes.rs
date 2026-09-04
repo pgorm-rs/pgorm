@@ -1,12 +1,13 @@
 pub use super::*;
+use pgorm::set;
 use uuid::Uuid;
 
 pub async fn test_delete_cake(db: &DatabaseConnection) {
     let initial_cakes = Cake::find().all(db).await.unwrap().len();
 
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -15,11 +16,11 @@ pub async fn test_delete_cake(db: &DatabaseConnection) {
         .expect("could not insert bakery");
 
     let mud_cake = cake::ActiveModel {
-        name: Set("Mud Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        name: set("Mud Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
 
@@ -38,8 +39,8 @@ pub async fn test_delete_bakery(db: &DatabaseConnection) {
     let initial_bakeries = Bakery::find().all(db).await.unwrap().len();
 
     let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(db)

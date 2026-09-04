@@ -9,7 +9,7 @@ use pgorm_query::Values;
 use std::fmt::Debug;
 
 /// A Trait for a Model
-// [spec:pgorm:def:entity.traits.model+2]
+// [spec:pgorm:def:entity.traits.model+3]
 #[async_trait]
 pub trait ModelTrait: Clone + Send + Debug {
     #[allow(missing_docs)]
@@ -39,6 +39,33 @@ pub trait ModelTrait: Clone + Send + Debug {
     {
         let tbl_alias = &format!("r{}", l.link().len() - 1);
         l.find_linked().belongs_to_tbl_alias(self, tbl_alias)
+    }
+
+    /// Convert this model into its entity's `ActiveModel`.
+    ///
+    /// [`IntoActiveModel`] is generic over the destination, so it needs the
+    /// caller to name the target type. The entity already knows which
+    /// `ActiveModel` belongs to it, so this conversion does not:
+    ///
+    /// ```
+    /// use pgorm::entity::*;
+    /// use pgorm::tests_cfg::fruit;
+    ///
+    /// let model = fruit::Model {
+    ///     id: 1,
+    ///     name: "Orange".to_owned(),
+    ///     cake_id: None,
+    /// };
+    ///
+    /// let mut am = model.into_active();
+    /// am.name = set("Apple");
+    /// assert!(am.is_changed());
+    /// ```
+    fn into_active(self) -> <Self::Entity as EntityTrait>::ActiveModel
+    where
+        Self: IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel>,
+    {
+        self.into_active_model()
     }
 
     /// Delete a model

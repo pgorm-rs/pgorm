@@ -53,9 +53,9 @@ impl Related<super::lineitem::Entity> for Entity {
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
-        use pgorm::ActiveValue::Set;
+        use pgorm::set;
         Self {
-            serial: Set(Uuid::new_v4()),
+            serial: set(Uuid::new_v4()),
             ..ActiveModelTrait::default()
         }
     }

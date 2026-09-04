@@ -3,6 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
+use pgorm::set;
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait,
     ConnectionTrait, EntityName, EntityTrait, Error, FromQueryResult, IdenStatic, IntoActiveModel,
@@ -364,7 +365,7 @@ fn entity_name_defaults_and_table_ref() {
     assert_eq!(
         scoped_item::Entity::insert(scoped_item::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("x".to_owned()),
+            name: set("x"),
         })
         .build()
         .0,
@@ -373,7 +374,7 @@ fn entity_name_defaults_and_table_ref() {
     assert_eq!(
         scoped_item::Entity::update(scoped_item::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("x".to_owned()),
+            name: set("x"),
         })
         .expect("the primary key is unchanged, not unset")
         .build()
@@ -439,7 +440,7 @@ fn entity_crud_surface() {
     assert_eq!(
         item::Entity::insert(item::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: NotSet,
         })
         .build()
@@ -452,12 +453,12 @@ fn entity_crud_surface() {
         item::Entity::insert_many([
             item::ActiveModel {
                 id: NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
+                name: set("Apple"),
                 note: NotSet,
             },
             item::ActiveModel {
                 id: NotSet,
-                name: ActiveValue::Set("Pear".to_owned()),
+                name: set("Pear"),
                 note: NotSet,
             },
         ])
@@ -470,7 +471,7 @@ fn entity_crud_surface() {
     assert_eq!(
         item::Entity::update(item::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: NotSet,
         })
         .expect("the primary key is unchanged, not unset")
@@ -492,7 +493,7 @@ fn entity_crud_surface() {
     // `delete` is a `DeleteOne` keyed on the primary key.
     assert_eq!(
         item::Entity::delete(item::ActiveModel {
-            id: ActiveValue::Set(3),
+            id: set(3),
             name: NotSet,
             note: NotSet,
         })
@@ -602,11 +603,9 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
             .to_owned(),
     );
 
-    let inserted = mistyped_key::Entity::insert(mistyped_key::ActiveModel {
-        id: ActiveValue::Set(1),
-    })
-    .exec(&db)
-    .await;
+    let inserted = mistyped_key::Entity::insert(mistyped_key::ActiveModel { id: set(1) })
+        .exec(&db)
+        .await;
     assert_eq!(inserted.unwrap_err(), expected);
 
     let updated = mistyped_key::Entity::update(mistyped_key::ActiveModel {
@@ -631,7 +630,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column+1/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+2/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`
@@ -786,6 +785,68 @@ fn column_trait_expression_surface() {
     let _: ColumnType = pgorm_query::ColumnType::Integer;
 }
 
+// [spec:pgorm:def:entity.traits.column+2/test]    the column-to-column family
+// `eq_col` / `ne_col` / `gt_col` / `gte_col` / `lt_col` / `lte_col` and the
+// expression form `eq_expr` — each side qualified by its own entity, same SQL as
+// the `Expr::col` escape they replace, and the value-taking `eq` left alone
+#[test]
+fn column_trait_column_to_column_surface() {
+    // Two columns of the same table.
+    assert_eq!(
+        sql(pair::Column::LeftId.eq_col(pair::Column::RightId)),
+        format!(r#"{SELECT_ITEM}"pair"."left_id" = "pair"."right_id""#)
+    );
+
+    // Two columns of different tables: neither table is respelled at the call
+    // site, each operand carries its own.
+    assert_eq!(
+        sql(item::Column::Id.eq_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" = "pair"."left_id""#)
+    );
+    assert_eq!(
+        sql(item::Column::Id.ne_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" <> "pair"."left_id""#)
+    );
+    assert_eq!(
+        sql(item::Column::Id.gt_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" > "pair"."left_id""#)
+    );
+    assert_eq!(
+        sql(item::Column::Id.gte_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" >= "pair"."left_id""#)
+    );
+    assert_eq!(
+        sql(item::Column::Id.lt_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" < "pair"."left_id""#)
+    );
+    assert_eq!(
+        sql(item::Column::Id.lte_col(pair::Column::LeftId)),
+        format!(r#"{SELECT_ITEM}"item"."id" <= "pair"."left_id""#)
+    );
+
+    // The same predicate written through the `Expr::col` escape the sugar
+    // replaces: identical SQL, so nothing is lost by taking the short road.
+    assert_eq!(
+        sql(item::Column::Id.eq_col(pair::Column::LeftId)),
+        sql(Expr::col((item::Entity, item::Column::Id))
+            .equals((pair::Entity, pair::Column::LeftId)))
+    );
+
+    // `eq_expr` takes anything computed — the case with no spelling at all in
+    // the column vocabulary.
+    assert_eq!(
+        sql(item::Column::Id.eq_expr(Expr::col((item::Entity, item::Column::Id)).add(1))),
+        format!(r#"{SELECT_ITEM}"item"."id" = "item"."id" + 1"#)
+    );
+
+    // The value-taking `eq` is untouched: it still takes `Into<Value>`, and a
+    // bare column value still renders as a literal rather than a column ref.
+    assert_eq!(
+        sql(item::Column::Id.eq(1)),
+        format!(r#"{SELECT_ITEM}"item"."id" = 1"#)
+    );
+}
+
 // ---------------------------------------------------------------------------
 // entity.traits.column-def
 // ---------------------------------------------------------------------------
@@ -929,7 +990,7 @@ fn primary_key_trait_surface() {
 // entity.traits.model
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::get` reads a column
+// [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::get` reads a column
 // as a `Value` and `set` writes one; `find_related` scopes a `Select` to this
 // instance; and `TryIntoModel` has a blanket identity impl for any model
 #[test]
@@ -992,7 +1053,29 @@ fn model_trait_get_set_and_identity() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.model+2/test]    `ModelTrait::delete` converts the
+// [spec:pgorm:def:entity.traits.model+3/test]    `into_active` converts a model
+// into its own entity's ActiveModel with the destination fixed by the entity, so
+// unlike `into_active_model` the call site carries no type annotation
+#[test]
+fn model_trait_into_active_needs_no_annotation() {
+    let model = item::Model {
+        id: 1,
+        name: "Apple".to_owned(),
+        note: None,
+    };
+
+    // No `let am: item::ActiveModel = ...` — the entity names the destination.
+    let mut am = model.clone().into_active();
+    am.name = set("Pear");
+    assert!(am.is_changed());
+
+    // Same conversion as the annotated `into_active_model`, before the edit.
+    let annotated: item::ActiveModel = model.into_active_model();
+    assert_eq!(annotated.id, am.id);
+    assert_eq!(annotated.name, ActiveValue::Unchanged("Apple".to_owned()));
+}
+
+// [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::delete` converts the
 // model through `IntoActiveModel` and delegates to `ActiveModelTrait::delete`,
 // so the behavior hooks run on the way through
 #[pgorm_macros::test]
@@ -1004,14 +1087,14 @@ async fn model_trait_delete_runs_through_active_model() -> Result<(), Error> {
 
     let apple = item::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Apple".to_owned()),
+        name: set("Apple"),
         note: NotSet,
     }
     .insert(&db)
     .await?;
     let pear = item::ActiveModel {
         id: NotSet,
-        name: ActiveValue::Set("Pear".to_owned()),
+        name: set("Pear"),
         note: NotSet,
     }
     .insert(&db)
@@ -1088,12 +1171,12 @@ async fn from_query_result_surface() -> Result<(), Error> {
     item::Entity::insert_many([
         item::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             note: NotSet,
         },
         item::ActiveModel {
             id: NotSet,
-            name: ActiveValue::Set("Pear".to_owned()),
+            name: set("Pear"),
             note: NotSet,
         },
     ])

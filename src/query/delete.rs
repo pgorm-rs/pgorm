@@ -58,8 +58,8 @@ impl Delete {
     ///
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
-    ///         id: ActiveValue::set(1),
-    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///         id: set(1),
+    ///         name: set("Apple Pie"),
     ///     })
     ///     .expect("the primary key is set")
     ///     .as_query()
@@ -74,7 +74,7 @@ impl Delete {
     /// assert_eq!(
     ///     Delete::one(cake::ActiveModel {
     ///         id: ActiveValue::not_set(),
-    ///         name: ActiveValue::set("Apple Pie".to_owned()),
+    ///         name: set("Apple Pie"),
     ///     })
     ///     .unwrap_err(),
     ///     Error::PrimaryKeyNotSet,
@@ -219,8 +219,8 @@ mod tests {
         );
         assert_eq!(
             Delete::one(cake::ActiveModel {
-                id: ActiveValue::set(1),
-                name: ActiveValue::set("Apple Pie".to_owned()),
+                id: set(1),
+                name: set("Apple Pie"),
             })
             .expect("the primary key is set")
             .as_query()

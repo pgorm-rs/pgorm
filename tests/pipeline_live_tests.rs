@@ -19,7 +19,7 @@ pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pipeline::{
     Frame, JoinSide, Pipeline, WindowDef, col, count_rows, out, row_number, sum,
 };
-use pgorm::{ActiveValue::Set, ConnectionTrait, entity::*};
+use pgorm::{ConnectionTrait, entity::*, set};
 use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
 
@@ -32,8 +32,8 @@ struct Seeded {
 /// Three customers with 3, 2 and 1 orders: Alice spends 60, Bob 50, Cleo 5.
 async fn seed(db: &impl ConnectionTrait) -> Seeded {
     let bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     }
     .insert(db)
@@ -47,7 +47,7 @@ async fn seed(db: &impl ConnectionTrait) -> Seeded {
         ("Cleo", vec![5.00]),
     ] {
         let customer = customer::ActiveModel {
-            name: Set(name.to_owned()),
+            name: set(name),
             ..Default::default()
         }
         .insert(db)
@@ -55,10 +55,10 @@ async fn seed(db: &impl ConnectionTrait) -> Seeded {
         .expect("could not insert customer");
         for total in totals {
             order::ActiveModel {
-                bakery_id: Set(bakery.id),
-                customer_id: Set(customer.id),
-                total: Set(rust_dec(total)),
-                placed_at: Set(Utc::now().naive_utc()),
+                bakery_id: set(bakery.id),
+                customer_id: set(customer.id),
+                total: set(rust_dec(total)),
+                placed_at: set(Utc::now().naive_utc()),
                 ..Default::default()
             }
             .insert(db)

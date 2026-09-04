@@ -49,7 +49,7 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column+1]
+> [spec:pgorm:def:entity.traits.column+2]
 > `ColumnTrait: IdenStatic + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
@@ -65,6 +65,17 @@ explicit limitations.
 > enum-typed columns compare against properly cast values; `eq_any` / `ne_all` pass
 > their single array value through `save_array_as` instead, the whole array being one
 > operand.
+>
+> The comparison operators above take a *value*, bound by `Into<Value>`. Comparing
+> against another column, or against a computed expression, is a separate named
+> family: `eq_col`, `ne_col`, `gt_col`, `gte_col`, `lt_col` and `lte_col` take any
+> `ColumnTrait` and render `"a"."x" <op> "b"."y"`, each side qualified by its own
+> entity; `eq_expr` takes any `Into<SimpleExpr>` for the computed case. `eq` and its
+> siblings MUST NOT be widened to admit an expression operand: their operand goes
+> through `save_as`, which is what casts an enum value, and a widened bound would drop
+> that cast silently. The `_col` and `_expr` forms deliberately do not apply `save_as` —
+> a column or an expression is already typed on the server side, and an enum column
+> compared against another column of the same enum type needs no cast.
 >
 > `ColumnType` is a re-export of `pgorm_query::ColumnType`; the crate's own `ColumnType`
 > enum was dropped and `ColumnTypeTrait` (`def()`, `get_enum_name()`) bridges a
@@ -109,7 +120,7 @@ explicit limitations.
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.
 
-> [spec:pgorm:def:entity.traits.model+2]
+> [spec:pgorm:def:entity.traits.model+3]
 > `ModelTrait: Clone + Send + Debug` (`src/entity/model.rs`) is the read-side row
 > representation. `get(column)` returns the column's `Value`;
 > `set(column, value) -> Result<(), Error>` writes it, reporting a column this
@@ -117,6 +128,10 @@ explicit limitations.
 > `Error::Type`. `find_related(R)` returns a `Select<R>` scoped to this instance via
 > `Related::find_related().belongs_to(self)`; `find_linked(L)` scopes a multi-hop
 > `Linked` join to this instance using the last hop's `r{n}` table alias.
+> `into_active(self)` converts the model into
+> `<Self::Entity as EntityTrait>::ActiveModel` by delegating to `IntoActiveModel`;
+> because the destination is fixed by the entity rather than by a type parameter, the
+> call needs no annotation where `into_active_model()` does.
 > `delete(self, db)` converts the model through `IntoActiveModel` and delegates to
 > `ActiveModelTrait::delete`, so behavior hooks run. `TryIntoModel<M>` is the fallible
 > reverse conversion with a blanket identity impl for any model.
@@ -173,7 +188,7 @@ explicit limitations.
 > `PrimaryKeyArity::ARITY`) and MUST return `None` if any key component is `NotSet`.
 > `is_changed` returns `true` when any attribute is in the `Set` state.
 
-> [spec:pgorm:def:entity.active-model.active-value]
+> [spec:pgorm:def:entity.active-model.active-value+1]
 > `ActiveValue<V: Into<Value>>` (`src/entity/active_model.rs`) is a three-state
 > machine over a column value: `Set(V)` (a value actively being written),
 > `Unchanged(V)` (a value loaded from the database and not modified), and `NotSet`
@@ -182,6 +197,14 @@ explicit limitations.
 > values participate in generated `INSERT`/`UPDATE` column lists; `Unchanged` primary
 > keys still drive `WHERE` clauses. `PartialEq` compares equal only for identical
 > variants with equal payloads.
+>
+> The `Set` state has three spellings, and documentation and examples MUST use the
+> free `set(value)` function (`[spec:pgorm:req:entity.active-model.from-sugar+1]`) for
+> construction: it is the only one that converts into the column type. The `Set(v)`
+> variant and the `ActiveValue::set(v)` associated constructor both pin `v` to `V`
+> exactly, and remain the spelling where the variant itself is the subject — pattern
+> matching, where no function call can appear, and the cases where `V` is not
+> inferable from context.
 
 > [spec:pgorm:sem:entity.active-model.active-value.ops]
 > `ActiveValue` accessors (`src/entity/active_model.rs`): the constructors `set`,
@@ -195,7 +218,7 @@ explicit limitations.
 > assigns `Set(value)` unless the current state is `Unchanged` with an equal payload,
 > in which case it does nothing — making `is_changed` reflect actual differences.
 
-> [spec:pgorm:req:entity.active-model.from-sugar]
+> [spec:pgorm:req:entity.active-model.from-sugar+1]
 > pgorm provides a blanket `impl<V: Into<Value>> From<V> for ActiveValue<V>`
 > (`src/entity/active_model.rs`) so any column value converts into `ActiveValue` with
 > plain `.into()`, without writing `ActiveValue::Set(...)` — an ergonomic divergence
@@ -203,6 +226,23 @@ explicit limitations.
 > `From<ActiveValue<V>> for ActiveValue<Option<V>>` MUST lift a value into a nullable
 > column position while preserving the variant (`Set(v)` → `Set(Some(v))`,
 > `Unchanged(v)` → `Unchanged(Some(v))`, `NotSet` → `NotSet`).
+>
+> The blanket pins the source type to the field type exactly, so a borrowed value has
+> no route into an owning column: `&str` reaches only `ActiveValue<&str>`, never
+> `ActiveValue<String>`. Three targeted conversions close that gap —
+> `From<&str> for ActiveValue<String>`, `From<&str> for ActiveValue<Option<String>>`,
+> and `From<&[u8]> for ActiveValue<Vec<u8>>`. Each names a target the blanket does not
+> produce for the same source, so they cohere with it, and each MUST produce the `Set`
+> state.
+>
+> The free function `pub fn set<V: Into<Value>, T: Into<V>>(value: T) -> ActiveValue<V>`
+> is the `Set`-shaped counterpart of those conversions: it applies `Into<V>` at the
+> call site, so `set("Apple")` reaches an `ActiveValue<String>` and no ActiveModel
+> field needs a `.to_owned()`. Neither the `Set` variant nor the `ActiveValue::set`
+> associated constructor can offer this — a variant admits no conversion, and the
+> associated form is bound by the `V` of the impl block. `set` is exported at the crate
+> root and is the spelling documentation uses
+> (`[spec:pgorm:def:entity.active-model.active-value+1]`).
 
 > [spec:pgorm:req:entity.active-model.persistence+1]
 > `ActiveModelTrait::insert` MUST execute via `Insert::exec_with_returning`, so on

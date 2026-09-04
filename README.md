@@ -20,7 +20,8 @@ A fork of [SeaORM](https://github.com/SeaQL/sea-orm) focused entirely on Postgre
 - Pared-back migrations: `pgorm-migration` is a minimal up-only runner with no down migrations or rollback
 - Scoped transactions
 - Opt-in metrics layer in `pgorm::metric` — wrap a pool to instrument it, pay nothing if you don't (see [METRICS.md](METRICS.md))
-- From<...> implementation for ActiveValue fields (less `ActiveValue::Set(...)`, more `.into()`)
+- `set(...)` and `From<...>` for ActiveValue fields: `name: set("Apple")` and `name: "Apple".into()`
+  both reach an `ActiveValue<String>`, so a column value needs no `.to_owned()`
 - `pgorm-query` (fork of `sea-query`) is in-tree and all non-Postgres functionality is removed
 - Failsafe behaviour for `insert_many` on an empty iterator
 

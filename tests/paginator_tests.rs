@@ -5,8 +5,8 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::TryStreamExt;
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, ItemsAndPagesNumber, PaginatorTrait, QueryOrder,
-    QuerySelect, entity::prelude::*,
+    DatabaseConnection, ItemsAndPagesNumber, PaginatorTrait, QueryOrder, QuerySelect,
+    entity::prelude::*, set,
 };
 use pgorm_query::{Value, Values};
 use pretty_assertions::assert_eq;
@@ -25,8 +25,8 @@ const BAKERIES: [(&str, f64); 7] = [
 async fn seed(db: &DatabaseConnection) -> Result<(), Error> {
     for (name, margin) in BAKERIES {
         bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(margin),
+            name: set(name),
+            profit_margin: set(margin),
             ..Default::default()
         }
         .insert(db)
@@ -199,8 +199,8 @@ async fn paginator_count() -> Result<(), Error> {
     // Counts are re-run, not cached: a row inserted after the first count is
     // visible to the second.
     bakery::ActiveModel {
-        name: Set("Hotel Bakery".to_owned()),
-        profit_margin: Set(8.0),
+        name: set("Hotel Bakery"),
+        profit_margin: set(8.0),
         ..Default::default()
     }
     .insert(&db)

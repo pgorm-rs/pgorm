@@ -1,14 +1,15 @@
 pub use super::*;
 use pgorm::error::*;
+use pgorm::set;
 use uuid::Uuid;
 
 pub async fn test_cake_error(db: &DatabaseConnection) {
     let mud_cake = cake::ActiveModel {
-        name: Set("Moldy Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(None),
+        name: set("Moldy Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(None),
         ..Default::default()
     };
 

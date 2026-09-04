@@ -14,6 +14,7 @@ use pgorm::pgorm_query::{
     IntoIden, LockBehavior, LockType, NullOrdering, OnConflict, QueryBuilder, SelectStatement,
     SimpleExpr, UpdateStatement, Value, Values,
 };
+use pgorm::set;
 use pgorm::tests_cfg::{
     cake, cake_filling, cake_filling_price, entity_linked, filling, fruit, lunch_set,
     sea_orm_active_enums::Tea, vendor,
@@ -28,8 +29,8 @@ use pretty_assertions::assert_eq;
 
 fn apple() -> cake::ActiveModel {
     cake::ActiveModel {
-        id: ActiveValue::Set(1),
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        id: set(1),
+        name: set("Apple Pie"),
     }
 }
 
@@ -307,7 +308,7 @@ fn filter_accumulates_and_accepts_trees() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.column+1/test]    `eq_any` / `ne_all` spend one
+// [spec:pgorm:def:entity.traits.column+2/test]    `eq_any` / `ne_all` spend one
 // parameter on the whole list, so the statement text is the same at every
 // cardinality, where `is_in` / `is_not_in` spend one per element
 #[test]
@@ -1013,7 +1014,7 @@ fn insert_add_omits_not_set_columns() {
     assert_eq!(
         Insert::one(cake::ActiveModel {
             id: ActiveValue::NotSet,
-            name: ActiveValue::Set("Apple Pie".to_owned()),
+            name: set("Apple Pie"),
         })
         .as_query()
         .to_string(),
@@ -1023,7 +1024,7 @@ fn insert_add_omits_not_set_columns() {
     assert_eq!(
         Insert::one(cake::ActiveModel {
             id: ActiveValue::Unchanged(7),
-            name: ActiveValue::Set("Apple Pie".to_owned()),
+            name: set("Apple Pie"),
         })
         .as_query()
         .to_string(),
@@ -1034,8 +1035,8 @@ fn insert_add_omits_not_set_columns() {
     assert_eq!(
         Insert::one(lunch_set::ActiveModel {
             id: ActiveValue::NotSet,
-            name: ActiveValue::Set("Set A".to_owned()),
-            tea: ActiveValue::Set(Tea::EverydayTea),
+            name: set("Set A"),
+            tea: set(Tea::EverydayTea),
         })
         .as_query()
         .to_string(),
@@ -1068,11 +1069,11 @@ fn insert_many_shares_one_column_list() {
         Insert::<cake::ActiveModel>::many([
             cake::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
+                name: set("Apple"),
             },
             cake::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Orange".to_owned()),
+                name: set("Orange"),
             },
         ])
         .as_query()
@@ -1090,11 +1091,11 @@ fn insert_many_rejects_mismatched_columns() {
         Insert::<cake::ActiveModel>::many([
             cake::ActiveModel {
                 id: ActiveValue::NotSet,
-                name: ActiveValue::Set("Apple".to_owned()),
+                name: set("Apple"),
             },
             cake::ActiveModel {
-                id: ActiveValue::Set(2),
-                name: ActiveValue::Set("Orange".to_owned()),
+                id: set(2),
+                name: set("Orange"),
             },
         ])
     };
@@ -1151,7 +1152,7 @@ fn insert_many_rejects_a_blank_first_model() {
         },
         cake::ActiveModel {
             id: ActiveValue::NotSet,
-            name: ActiveValue::Set("Orange".to_owned()),
+            name: set("Orange"),
         },
     ])
     .ensure_uniform_columns()
@@ -1194,8 +1195,8 @@ fn try_insert_conversions_and_conflict_clause() {
     // Every primary-key column takes part in the conflict target.
     assert_eq!(
         Insert::one(cake_filling::ActiveModel {
-            cake_id: ActiveValue::Set(1),
-            filling_id: ActiveValue::Set(2),
+            cake_id: set(1),
+            filling_id: set(2),
         })
         .on_conflict_do_nothing()
         .as_query()
@@ -1214,8 +1215,8 @@ fn try_insert_conversions_and_conflict_clause() {
 fn update_one_sets_changed_non_key_columns() {
     assert_eq!(
         Update::one(cake::ActiveModel {
-            id: ActiveValue::Set(1),
-            name: ActiveValue::Set("Apple Pie".to_owned()),
+            id: set(1),
+            name: set("Apple Pie"),
         })
         .expect("the primary key is set")
         .as_query()
@@ -1228,7 +1229,7 @@ fn update_one_sets_changed_non_key_columns() {
     assert_eq!(
         Update::one(fruit::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("Apple".to_owned()),
+            name: set("Apple"),
             cake_id: ActiveValue::Unchanged(Some(2)),
         })
         .expect("the primary key is unchanged, not unset")
@@ -1241,9 +1242,9 @@ fn update_one_sets_changed_non_key_columns() {
     // still never written into the SET clause.
     assert_eq!(
         Update::one(cake_filling_price::ActiveModel {
-            cake_id: ActiveValue::Set(1),
-            filling_id: ActiveValue::Set(2),
-            price: ActiveValue::Set(rust_decimal::Decimal::ONE),
+            cake_id: set(1),
+            filling_id: set(2),
+            price: set(rust_decimal::Decimal::ONE),
         })
         .expect("both primary-key columns are set")
         .as_query()
@@ -1263,16 +1264,16 @@ fn update_one_sets_changed_non_key_columns() {
 fn update_one_errs_on_unset_primary_key() {
     let err = Update::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
     })
     .expect_err("a NotSet primary key cannot narrow the update");
     assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // A composite key rejects the model when any one of its columns is unset.
     let err = Update::one(cake_filling_price::ActiveModel {
-        cake_id: ActiveValue::Set(1),
+        cake_id: set(1),
         filling_id: ActiveValue::NotSet,
-        price: ActiveValue::Set(rust_decimal::Decimal::ONE),
+        price: set(rust_decimal::Decimal::ONE),
     })
     .expect_err("half a composite key is not a key");
     assert_eq!(err, Error::PrimaryKeyNotSet);
@@ -1280,7 +1281,7 @@ fn update_one_errs_on_unset_primary_key() {
     // `EntityTrait::update` forwards the same error.
     let err = cake::Entity::update(cake::ActiveModel {
         id: ActiveValue::NotSet,
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
     })
     .expect_err("the entry point forwards the builder's error");
     assert_eq!(err, Error::PrimaryKeyNotSet);
@@ -1294,8 +1295,8 @@ fn update_many_has_no_implicit_filter() {
     assert_eq!(
         Update::many(cake::Entity)
             .set(cake::ActiveModel {
-                id: ActiveValue::Set(9),
-                name: ActiveValue::Set("Pie".to_owned()),
+                id: set(9),
+                name: set("Pie"),
             })
             .as_query()
             .to_string(),
@@ -1306,7 +1307,7 @@ fn update_many_has_no_implicit_filter() {
         Update::many(cake::Entity)
             .set(cake::ActiveModel {
                 id: ActiveValue::Unchanged(9),
-                name: ActiveValue::Set("Pie".to_owned()),
+                name: set("Pie"),
             })
             .filter(cake::Column::Name.contains("Apple"))
             .as_query()
@@ -1342,7 +1343,7 @@ fn delete_one_filters_by_primary_key_only() {
     assert_eq!(
         Delete::one(cake::ActiveModel {
             id: ActiveValue::Unchanged(1),
-            name: ActiveValue::Set("Apple Pie".to_owned()),
+            name: set("Apple Pie"),
         })
         .expect("the primary key is unchanged, not unset")
         .as_query()
@@ -1372,14 +1373,14 @@ fn delete_one_filters_by_primary_key_only() {
 fn delete_one_errs_on_unset_primary_key() {
     let err = Delete::one(cake::ActiveModel {
         id: ActiveValue::NotSet,
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
     })
     .expect_err("a NotSet primary key cannot narrow the delete");
     assert_eq!(err, Error::PrimaryKeyNotSet);
 
     // A composite key rejects the model when any one of its columns is unset.
     let err = Delete::one(cake_filling::ActiveModel {
-        cake_id: ActiveValue::Set(1),
+        cake_id: set(1),
         filling_id: ActiveValue::NotSet,
     })
     .expect_err("half a composite key is not a key");
@@ -1388,7 +1389,7 @@ fn delete_one_errs_on_unset_primary_key() {
     // `EntityTrait::delete` forwards the same error.
     let err = cake::Entity::delete(cake::ActiveModel {
         id: ActiveValue::NotSet,
-        name: ActiveValue::Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
     })
     .expect_err("the entry point forwards the builder's error");
     assert_eq!(err, Error::PrimaryKeyNotSet);

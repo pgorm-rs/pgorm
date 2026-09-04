@@ -1,12 +1,13 @@
 pub use super::*;
 use chrono::offset::Utc;
+use pgorm::set;
 use uuid::Uuid;
 
 pub async fn test_create_lineitem(db: &DatabaseConnection) {
     // Bakery
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -16,13 +17,13 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Baker
     let baker_bob = baker::ActiveModel {
-        name: Set("Baker Bob".to_owned()),
-        contact_details: Set(serde_json::json!({
+        name: set("Baker Bob"),
+        contact_details: set(serde_json::json!({
             "mobile": "+61424000000",
             "home": "0395555555",
             "address": "12 Test St, Testville, Vic, Australia"
         })),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
     let baker_insert_res = Baker::insert(baker_bob)
@@ -32,11 +33,11 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Cake
     let mud_cake = cake::ActiveModel {
-        name: Set("Mud Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        name: set("Mud Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
 
@@ -47,8 +48,8 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Cake_Baker
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        baker_id: Set(baker_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        baker_id: set(baker_insert_res.last_insert_id),
     };
     let cake_baker_res = CakesBakers::insert(cake_baker.clone())
         .exec(db)
@@ -61,8 +62,8 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Customer
     let customer_kate = customer::ActiveModel {
-        name: Set("Kate".to_owned()),
-        notes: Set(Some("Loves cheese cake".to_owned())),
+        name: set("Kate"),
+        notes: "Loves cheese cake".into(),
         ..Default::default()
     };
     let customer_insert_res = Customer::insert(customer_kate)
@@ -72,10 +73,10 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Order
     let order_1 = order::ActiveModel {
-        bakery_id: Set(bakery_insert_res.last_insert_id),
-        customer_id: Set(customer_insert_res.last_insert_id),
-        total: Set(rust_dec(7.55)),
-        placed_at: Set(Utc::now().naive_utc()),
+        bakery_id: set(bakery_insert_res.last_insert_id),
+        customer_id: set(customer_insert_res.last_insert_id),
+        total: set(rust_dec(7.55)),
+        placed_at: set(Utc::now().naive_utc()),
         ..Default::default()
     };
     let order_insert_res = Order::insert(order_1)
@@ -85,10 +86,10 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
 
     // Lineitem
     let lineitem_1 = lineitem::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        order_id: Set(order_insert_res.last_insert_id),
-        price: Set(rust_dec(7.55)),
-        quantity: Set(1),
+        cake_id: set(cake_insert_res.last_insert_id),
+        order_id: set(order_insert_res.last_insert_id),
+        price: set(rust_dec(7.55)),
+        quantity: set(1),
         ..Default::default()
     };
     let lineitem_insert_res = Lineitem::insert(lineitem_1)

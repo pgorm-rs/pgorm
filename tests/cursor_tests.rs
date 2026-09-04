@@ -4,8 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DerivePartialModel, FromQueryResult, QuerySelect,
-    entity::prelude::*,
+    DatabaseConnection, DerivePartialModel, FromQueryResult, QuerySelect, entity::prelude::*, set,
 };
 use pretty_assertions::assert_eq;
 
@@ -542,8 +541,8 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     // bakeries named from 1 to 10
     for i in 1..=10 {
         bakeries.push(bakery::ActiveModel {
-            name: Set(i.to_string()),
-            profit_margin: Set(10.4),
+            name: set(i.to_string()),
+            profit_margin: set(10.4),
             ..Default::default()
         });
     }
@@ -555,35 +554,35 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     // baker and cakes named from "A" to "Z" and from "a" to "z"
     for c in 'A'..='Z' {
         bakers.push(baker::ActiveModel {
-            name: Set(c.clone().to_string()),
-            contact_details: Set(serde_json::json!({
+            name: set(c.clone().to_string()),
+            contact_details: set(serde_json::json!({
                 "mobile": "+61424000000",
             })),
-            bakery_id: Set(Some((c as i32 - 65) % 10 + 1)),
+            bakery_id: set(Some((c as i32 - 65) % 10 + 1)),
             ..Default::default()
         });
         cakes.push(cake::ActiveModel {
-            name: Set(c.to_ascii_lowercase().to_string()),
-            price: Set(rust_dec(10.25)),
-            gluten_free: Set(false),
-            serial: Set(Uuid::new_v4()),
-            bakery_id: Set(Some((c as i32 - 65) % 10 + 1)),
+            name: set(c.to_ascii_lowercase().to_string()),
+            price: set(rust_dec(10.25)),
+            gluten_free: set(false),
+            serial: set(Uuid::new_v4()),
+            bakery_id: set(Some((c as i32 - 65) % 10 + 1)),
             ..Default::default()
         });
         cakes_bakers.push(cakes_bakers::ActiveModel {
-            cake_id: Set(c as i32 - 64),
-            baker_id: Set(c as i32 - 64),
+            cake_id: set(c as i32 - 64),
+            baker_id: set(c as i32 - 64),
         })
     }
     cakes_bakers.append(
         vec![
             cakes_bakers::ActiveModel {
-                cake_id: Set(2),
-                baker_id: Set(1),
+                cake_id: set(2),
+                baker_id: set(1),
             },
             cakes_bakers::ActiveModel {
-                cake_id: Set(1),
-                baker_id: Set(2),
+                cake_id: set(1),
+                baker_id: set(2),
             },
         ]
         .as_mut(),
@@ -1124,13 +1123,13 @@ async fn seed_composite(db: &DatabaseConnection) -> Result<(), Error> {
     for (index, (a, b)) in COMPOSITE_ROWS.into_iter().enumerate() {
         let id = index as i32 + 1;
         ActiveModel {
-            id: Set(id),
-            a: Set(a),
-            b: Set(b),
+            id: set(id),
+            a: set(a),
+            b: set(b),
             // `c` and `d` are unique, so a ternary or n-ary order key sorts
             // exactly as `(a, b)` does.
-            c: Set(id),
-            d: Set(id),
+            c: set(id),
+            d: set(id),
         }
         .insert(db)
         .await?;

@@ -4,8 +4,8 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::error::RuntimeError;
 pub use pgorm::{
-    ActiveValue::Set, ConnectionTrait, DatabaseConnection, EntityName, entity::*, error::Error,
-    error::SqlError, tests_cfg,
+    ConnectionTrait, DatabaseConnection, EntityName, entity::*, error::Error, error::SqlError, set,
+    tests_cfg,
 };
 use tokio_postgres::error::SqlState;
 use uuid::Uuid;
@@ -34,11 +34,11 @@ async fn main() {
 
 pub async fn test_error(db: &DatabaseConnection) {
     let mud_cake = cake::ActiveModel {
-        name: Set("Moldy Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(None),
+        name: set("Moldy Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(None),
         ..Default::default()
     };
 
@@ -53,11 +53,11 @@ pub async fn test_error(db: &DatabaseConnection) {
     assert_eq!(sql_state(&error), SqlState::UNIQUE_VIOLATION);
 
     let fk_cake = cake::ActiveModel {
-        name: Set("fk error Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(1000)),
+        name: set("fk error Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(1000)),
         ..Default::default()
     };
 
@@ -82,11 +82,11 @@ async fn sql_error_classification() {
     let db = ctx.db.get().await.unwrap();
 
     let mud_cake = cake::ActiveModel {
-        name: Set("Moldy Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(None),
+        name: set("Moldy Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(None),
         ..Default::default()
     };
 
@@ -104,11 +104,11 @@ async fn sql_error_classification() {
     ));
 
     let fk_cake = cake::ActiveModel {
-        name: Set("fk error Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(1000)),
+        name: set("fk error Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(1000)),
         ..Default::default()
     };
 
@@ -135,11 +135,11 @@ async fn sql_error_payload_carries_server_message() {
     let db = ctx.db.get().await.unwrap();
 
     let cake = cake::ActiveModel {
-        name: Set("Moldy Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(None),
+        name: set("Moldy Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(None),
         ..Default::default()
     }
     .insert(&db)

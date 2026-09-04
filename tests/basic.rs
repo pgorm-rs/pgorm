@@ -4,13 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, setup::create_table_without_asserts};
 pub use pgorm::{
-    ActiveValue::{Set, Unchanged},
-    DatabaseConnection, PaginatorTrait,
-    entity::*,
-    error::*,
-    pgorm_query,
-    query::*,
-    tests_cfg::*,
+    ActiveValue::Unchanged, DatabaseConnection, PaginatorTrait, entity::*, error::*, pgorm_query,
+    query::*, set, tests_cfg::*,
 };
 
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432 cargo test --test basic
@@ -49,7 +44,7 @@ async fn setup_schema(db: &DatabaseConnection) -> Result<(), Error> {
 
 async fn crud_cake(db: &DatabaseConnection) -> Result<(), Error> {
     let apple = cake::ActiveModel {
-        name: Set("Apple Pie".to_owned()),
+        name: set("Apple Pie"),
         ..Default::default()
     };
 
@@ -63,8 +58,8 @@ async fn crud_cake(db: &DatabaseConnection) -> Result<(), Error> {
         }
     );
 
-    let mut apple: cake::ActiveModel = apple.into_active_model();
-    apple.name = Set("Lemon Tart".to_owned());
+    let mut apple = apple.into_active();
+    apple.name = set("Lemon Tart");
 
     let apple = apple.update(db).await?;
 

@@ -1,11 +1,12 @@
 pub use super::*;
+use pgorm::set;
 use pgorm::{Error, PaginatorTrait, query::*};
 use uuid::Uuid;
 
 pub async fn test_update_cake(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -14,11 +15,11 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
         .expect("could not insert bakery");
 
     let mud_cake = cake::ActiveModel {
-        name: Set("Mud Cake".to_owned()),
-        price: Set(rust_dec(10.25)),
-        gluten_free: Set(false),
-        serial: Set(Uuid::new_v4()),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        name: set("Mud Cake"),
+        price: set(rust_dec(10.25)),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
 
@@ -41,8 +42,8 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
     let large_number = "1234_5678_9012.3456".parse().unwrap();
 
     let mut cake_am: cake::ActiveModel = cake_model.into();
-    cake_am.name = Set("Extra chocolate mud cake".to_owned());
-    cake_am.price = Set(large_number);
+    cake_am.name = set("Extra chocolate mud cake");
+    cake_am.price = set(large_number);
 
     let _cake_update_res: cake::Model = cake_am.update(db).await.expect("could not update cake");
 
@@ -58,8 +59,8 @@ pub async fn test_update_cake(db: &DatabaseConnection) {
 
 pub async fn test_update_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -78,8 +79,8 @@ pub async fn test_update_bakery(db: &DatabaseConnection) {
     assert!((bakery_model.profit_margin - 10.40).abs() < f64::EPSILON);
 
     let mut bakery_am: bakery::ActiveModel = bakery_model.into();
-    bakery_am.name = Set("SeaBreeze Bakery".to_owned());
-    bakery_am.profit_margin = Set(12.00);
+    bakery_am.name = set("SeaBreeze Bakery");
+    bakery_am.profit_margin = set(12.00);
 
     let _bakery_update_res: bakery::Model =
         bakery_am.update(db).await.expect("could not update bakery");
@@ -97,8 +98,8 @@ pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
     let init_n_customers = Customer::find().count(db).await.unwrap();
 
     let customer = customer::ActiveModel {
-        name: Set("John".to_owned()),
-        notes: Set(None),
+        name: set("John"),
+        notes: set(None),
         ..Default::default()
     }
     .insert(db)
@@ -116,8 +117,8 @@ pub async fn test_update_deleted_customer(db: &DatabaseConnection) {
     assert_eq!(Customer::find().count(db).await.unwrap(), init_n_customers);
 
     let customer = customer::ActiveModel {
-        id: Set(customer_id),
-        name: Set("John 2".to_owned()),
+        id: set(customer_id),
+        name: set("John 2"),
         ..Default::default()
     };
 

@@ -5,8 +5,8 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::TryStreamExt;
 use pgorm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, DerivePartialModel, FromQueryResult,
-    QueryFilter, QueryOrder, TransactionTrait, entity::prelude::*,
+    ColumnTrait, DatabaseConnection, DerivePartialModel, FromQueryResult, QueryFilter, QueryOrder,
+    TransactionTrait, entity::prelude::*, set,
 };
 use pretty_assertions::assert_eq;
 
@@ -42,8 +42,8 @@ async fn seed(db: &DatabaseConnection) -> Result<(), Error> {
         ("Fourth Bakery", 5.25),
     ] {
         bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(margin),
+            name: set(name),
+            profit_margin: set(margin),
             ..Default::default()
         }
         .insert(db)
@@ -122,8 +122,8 @@ async fn stream_in_transaction(db: &mut DatabaseConnection) -> Result<(), Error>
     let txn = db.begin().await?;
 
     bakery::ActiveModel {
-        name: Set("Transient Bakery".to_owned()),
-        profit_margin: Set(1.5),
+        name: set("Transient Bakery"),
+        profit_margin: set(1.5),
         ..Default::default()
     }
     .insert(&txn)

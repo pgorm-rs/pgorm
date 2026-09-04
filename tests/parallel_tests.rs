@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{ActiveValue::Set, DatabaseConnection, IntoActiveModel, entity::prelude::*};
+use pgorm::{DatabaseConnection, IntoActiveModel, entity::prelude::*, set};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -78,9 +78,9 @@ pub async fn crud_in_parallel(db: &DatabaseConnection) -> Result<(), Error> {
         find_res.2.unwrap().into_active_model(),
     );
 
-    active_models.0.bytes = Set(vec![0]);
-    active_models.1.bytes = Set(vec![1]);
-    active_models.2.bytes = Set(vec![2]);
+    active_models.0.bytes = set(vec![0]);
+    active_models.1.bytes = set(vec![1]);
+    active_models.2.bytes = set(vec![2]);
 
     let _update_res = futures::try_join!(
         active_models.0.clone().update(db),

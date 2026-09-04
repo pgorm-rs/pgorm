@@ -5,8 +5,7 @@ mod crud;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DatabasePool, EntityName, entity::*, error::Error,
-    tests_cfg,
+    DatabaseConnection, DatabasePool, EntityName, entity::*, error::Error, set, tests_cfg,
 };
 
 pub use crud::*;
@@ -32,8 +31,8 @@ async fn main() {
 // RecordNotInserted to Conflicted and an empty batch to Empty
 pub async fn test(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
 
@@ -45,9 +44,9 @@ pub async fn test(db: &DatabaseConnection) {
     assert!(matches!(res, Ok(TryInsertResult::Inserted(_))));
 
     let double_seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
-        id: Set(1),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
+        id: set(1),
     };
 
     let conflict_insert = Bakery::insert_many([double_seaside_bakery])
@@ -86,14 +85,14 @@ pub async fn columns_mismatch_is_refused(db: &DatabaseConnection) {
     let mismatched = || {
         Bakery::insert_many([
             bakery::ActiveModel {
-                name: Set("Hillside Bakery".to_owned()),
-                profit_margin: Set(1.0),
+                name: set("Hillside Bakery"),
+                profit_margin: set(1.0),
                 ..Default::default()
             },
             bakery::ActiveModel {
-                id: Set(9),
-                name: Set("Riverside Bakery".to_owned()),
-                profit_margin: Set(2.0),
+                id: set(9),
+                name: set("Riverside Bakery"),
+                profit_margin: set(2.0),
             },
         ])
     };

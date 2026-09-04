@@ -3,7 +3,7 @@
 pub mod common;
 
 use common::{TestContext, features::*, setup::*};
-use pgorm::{ActiveValue::Set, DatabaseConnection, entity::prelude::*, entity::*};
+use pgorm::{DatabaseConnection, entity::prelude::*, entity::*, set};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -36,7 +36,7 @@ pub async fn create_and_update_pi(db: &DatabaseConnection) -> Result<(), Error> 
     assert_eq!(model, Some(pi.clone()));
 
     let res = pi::ActiveModel {
-        decimal_opt: Set(Some(rust_dec(3.1415926536))),
+        decimal_opt: set(Some(rust_dec(3.1415926536))),
         ..pi.clone().into_active_model()
     }
     .update(db)

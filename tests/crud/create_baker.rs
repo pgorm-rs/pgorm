@@ -1,10 +1,11 @@
 pub use super::*;
+use pgorm::set;
 use serde::{Deserialize, Serialize};
 
 pub async fn test_create_baker(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -25,9 +26,9 @@ pub async fn test_create_baker(db: &DatabaseConnection) {
         address: "12 Test St, Testville, Vic, Australia".to_owned(),
     };
     let baker_bob = baker::ActiveModel {
-        name: Set("Baker Bob".to_owned()),
-        contact_details: Set(serde_json::json!(baker_bob_contact)),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        name: set("Baker Bob"),
+        contact_details: set(serde_json::json!(baker_bob_contact)),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
     let res = Baker::insert(baker_bob)

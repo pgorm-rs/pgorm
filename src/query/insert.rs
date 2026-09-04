@@ -173,7 +173,7 @@ where
     /// assert_eq!(
     ///     Insert::one(cake::ActiveModel {
     ///         id: ActiveValue::NotSet,
-    ///         name: ActiveValue::Set("Apple Pie".to_owned()),
+    ///         name: set("Apple Pie"),
     ///     })
     ///     .as_query()
     ///     .to_string(),
@@ -295,8 +295,8 @@ where
     /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
-    ///     id: ActiveValue::set(2),
-    ///     name: ActiveValue::set("Orange".to_owned()),
+    ///     id: set(2),
+    ///     name: set("Orange"),
     /// };
     /// assert_eq!(
     ///     cake::Entity::insert(orange)
@@ -312,8 +312,8 @@ where
     /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
-    ///     id: ActiveValue::set(2),
-    ///     name: ActiveValue::set("Orange".to_owned()),
+    ///     id: set(2),
+    ///     name: set("Orange"),
     /// };
     /// assert_eq!(
     ///     cake::Entity::insert(orange)
@@ -361,8 +361,8 @@ where
     /// use pgorm::{entity::*, query::*, pgorm_query::OnConflict, tests_cfg::cake};
     ///
     /// let orange = cake::ActiveModel {
-    ///     id: ActiveValue::set(2),
-    ///     name: ActiveValue::set("Orange".to_owned()),
+    ///     id: set(2),
+    ///     name: set("Orange"),
     /// };
     ///
     /// assert_eq!(
@@ -524,7 +524,7 @@ mod tests {
     use pgorm_query::OnConflict;
 
     use crate::tests_cfg::cake::{self};
-    use crate::{ActiveValue, EntityTrait, Insert, IntoActiveModel, QueryTrait};
+    use crate::{ActiveValue, EntityTrait, Insert, IntoActiveModel, QueryTrait, set};
 
     #[test]
     fn insert_1() {
@@ -532,7 +532,7 @@ mod tests {
             Insert::<cake::ActiveModel>::new()
                 .add(cake::ActiveModel {
                     id: ActiveValue::not_set(),
-                    name: ActiveValue::set("Apple Pie".to_owned()),
+                    name: set("Apple Pie"),
                 })
                 .as_query()
                 .to_string(),
@@ -545,8 +545,8 @@ mod tests {
         assert_eq!(
             Insert::<cake::ActiveModel>::new()
                 .add(cake::ActiveModel {
-                    id: ActiveValue::set(1),
-                    name: ActiveValue::set("Apple Pie".to_owned()),
+                    id: set(1),
+                    name: set("Apple Pie"),
                 })
                 .as_query()
                 .to_string(),
@@ -591,12 +591,12 @@ mod tests {
     #[test]
     fn insert_5() {
         let apple = cake::ActiveModel {
-            name: ActiveValue::set("Apple".to_owned()),
+            name: set("Apple"),
             ..Default::default()
         };
         let orange = cake::ActiveModel {
-            id: ActiveValue::set(2),
-            name: ActiveValue::set("Orange".to_owned()),
+            id: set(2),
+            name: set("Orange"),
         };
         let insert = Insert::<cake::ActiveModel>::new().add_many([apple, orange]);
 
@@ -610,8 +610,8 @@ mod tests {
     #[test]
     fn insert_6() {
         let orange = cake::ActiveModel {
-            id: ActiveValue::set(2),
-            name: ActiveValue::set("Orange".to_owned()),
+            id: set(2),
+            name: set("Orange"),
         };
 
         assert_eq!(
@@ -626,8 +626,8 @@ mod tests {
     #[test]
     fn insert_7() {
         let orange = cake::ActiveModel {
-            id: ActiveValue::set(2),
-            name: ActiveValue::set("Orange".to_owned()),
+            id: set(2),
+            name: set("Orange"),
         };
 
         assert_eq!(

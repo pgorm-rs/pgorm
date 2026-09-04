@@ -4,10 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
-    ActiveValue::{Set, Unchanged},
-    DatabaseConnection, DerivePartialModel, FromQueryResult,
-    entity::prelude::*,
-    entity::*,
+    ActiveValue::Unchanged, DatabaseConnection, DerivePartialModel, FromQueryResult,
+    entity::prelude::*, entity::*, set,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -137,12 +135,12 @@ pub async fn update_collection(db: &DatabaseConnection) -> Result<(), Error> {
     let model = Entity::find_by_id(1).one(db).await?;
 
     ActiveModel {
-        integers: Set(vec![4, 5, 6]),
-        integers_opt: Set(Some(vec![4, 5, 6])),
-        teas: Set(vec![Tea::EverydayTea]),
-        teas_opt: Set(Some(vec![Tea::EverydayTea])),
-        colors: Set(vec![Color::White]),
-        colors_opt: Set(Some(vec![Color::White])),
+        integers: set(vec![4, 5, 6]),
+        integers_opt: set(Some(vec![4, 5, 6])),
+        teas: set(vec![Tea::EverydayTea]),
+        teas_opt: set(Some(vec![Tea::EverydayTea])),
+        colors: set(vec![Color::White]),
+        colors_opt: set(Some(vec![Color::White])),
         ..model.into_active_model()
     }
     .update(db)
@@ -150,15 +148,15 @@ pub async fn update_collection(db: &DatabaseConnection) -> Result<(), Error> {
 
     ActiveModel {
         id: Unchanged(3),
-        name: Set("Collection 3".into()),
-        integers: Set(vec![3, 1, 4]),
-        integers_opt: Set(None),
-        teas: Set(vec![Tea::EverydayTea]),
-        teas_opt: Set(None),
-        colors: Set(vec![Color::White]),
-        colors_opt: Set(None),
-        uuid: Set(vec![uuid]),
-        uuid_hyphenated: Set(vec![uuid.hyphenated()]),
+        name: set("Collection 3"),
+        integers: set(vec![3, 1, 4]),
+        integers_opt: set(None),
+        teas: set(vec![Tea::EverydayTea]),
+        teas_opt: set(None),
+        colors: set(vec![Color::White]),
+        colors_opt: set(None),
+        uuid: set(vec![uuid]),
+        uuid_hyphenated: set(vec![uuid.hyphenated()]),
     }
     .update(db)
     .await?;

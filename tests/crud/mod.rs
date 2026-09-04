@@ -16,14 +16,14 @@ pub use updates::*;
 
 pub use super::common::bakery_chain::*;
 pub use crate::common::setup::rust_dec;
-use pgorm::{ActiveValue::Set, DatabaseConnection, entity::*};
+use pgorm::{DatabaseConnection, entity::*, set};
 
 // [spec:pgorm:sem:exec.crud.insert+2/test]    a server-generated key is read from
 // the RETURNING row by name
 pub async fn test_create_bakery(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let res = Bakery::insert(seaside_bakery)
@@ -44,8 +44,8 @@ pub async fn test_create_bakery(db: &DatabaseConnection) {
 
 pub async fn test_create_customer(db: &DatabaseConnection) {
     let customer_kate = customer::ActiveModel {
-        name: Set("Kate".to_owned()),
-        notes: Set(Some("Loves cheese cake".to_owned())),
+        name: set("Kate"),
+        notes: "Loves cheese cake".into(),
         ..Default::default()
     };
     let res = Customer::insert(customer_kate)

@@ -14,15 +14,15 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use pgorm::entity::*;
-pub use pgorm::{ActiveValue::Set, ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect};
+pub use pgorm::{ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect, set};
 use pgorm::{QueryTrait, pgorm_query::Query};
 
 async fn seed(db: &impl ConnectionTrait) -> Vec<i32> {
     let mut ids = Vec::new();
     for name in ["SeaSide Bakery", "Top Bakery", "Corner Bakery"] {
         let bakery = bakery::ActiveModel {
-            name: Set(name.to_owned()),
-            profit_margin: Set(10.4),
+            name: set(name),
+            profit_margin: set(10.4),
             ..Default::default()
         }
         .insert(db)
@@ -36,7 +36,7 @@ async fn seed(db: &impl ConnectionTrait) -> Vec<i32> {
 // [spec:pgorm:req:sql.ast.expr.eq-any/test]    against a live server:
 // a three-element list and an empty one are the same statement with different
 // parameter payloads, and both select what the predicate says they should
-// [spec:pgorm:def:entity.traits.column+1/test]
+// [spec:pgorm:def:entity.traits.column+2/test]
 #[pgorm_macros::test]
 pub async fn eq_any_round_trips_one_array_parameter() {
     let ctx = TestContext::new("eq_any_round_trips_one_array_parameter").await;

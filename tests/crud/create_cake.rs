@@ -1,10 +1,11 @@
 pub use super::*;
+use pgorm::set;
 use uuid::Uuid;
 
 pub async fn test_create_cake(db: &DatabaseConnection) {
     let seaside_bakery = bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     };
     let bakery_insert_res = Bakery::insert(seaside_bakery)
@@ -13,13 +14,13 @@ pub async fn test_create_cake(db: &DatabaseConnection) {
         .expect("could not insert bakery");
 
     let baker_bob = baker::ActiveModel {
-        name: Set("Baker Bob".to_owned()),
-        contact_details: Set(serde_json::json!({
+        name: set("Baker Bob"),
+        contact_details: set(serde_json::json!({
             "mobile": "+61424000000",
             "home": "0395555555",
             "address": "12 Test St, Testville, Vic, Australia"
         })),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
     let baker_insert_res = Baker::insert(baker_bob)
@@ -29,11 +30,11 @@ pub async fn test_create_cake(db: &DatabaseConnection) {
     let uuid = Uuid::new_v4();
 
     let mud_cake = cake::ActiveModel {
-        name: Set("Mud Cake".to_owned()),
-        price: Set(rust_dec(-10.25)),
-        gluten_free: Set(false),
-        serial: Set(uuid),
-        bakery_id: Set(Some(bakery_insert_res.last_insert_id)),
+        name: set("Mud Cake"),
+        price: set(rust_dec(-10.25)),
+        gluten_free: set(false),
+        serial: set(uuid),
+        bakery_id: set(Some(bakery_insert_res.last_insert_id)),
         ..Default::default()
     };
 
@@ -48,8 +49,8 @@ pub async fn test_create_cake(db: &DatabaseConnection) {
         .expect("could not find cake");
 
     let cake_baker = cakes_bakers::ActiveModel {
-        cake_id: Set(cake_insert_res.last_insert_id),
-        baker_id: Set(baker_insert_res.last_insert_id),
+        cake_id: set(cake_insert_res.last_insert_id),
+        baker_id: set(baker_insert_res.last_insert_id),
     };
     let cake_baker_res = CakesBakers::insert(cake_baker.clone())
         .exec(db)

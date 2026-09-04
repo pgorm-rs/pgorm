@@ -4,8 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, DatabaseTransaction, IsolationLevel, TransactionError,
-    TransactionMode, TransactionTrait, entity::prelude::*,
+    DatabaseConnection, DatabaseTransaction, IsolationLevel, TransactionError, TransactionMode,
+    TransactionTrait, entity::prelude::*, set,
 };
 use pretty_assertions::assert_eq;
 use tokio_postgres::error::SqlState;
@@ -15,8 +15,8 @@ where
     C: ConnectionTrait,
 {
     bakery::ActiveModel {
-        name: Set(name.to_owned()),
-        profit_margin: Set(profit_margin),
+        name: set(name),
+        profit_margin: set(profit_margin),
         ..Default::default()
     }
     .insert(db)
@@ -196,9 +196,9 @@ pub async fn transaction_error_rollback() -> Result<(), Error> {
         assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 2);
 
         let res = bakery::ActiveModel {
-            id: Set(1),
-            name: Set("Duplicated primary key".to_owned()),
-            profit_margin: Set(20.0),
+            id: set(1),
+            name: set("Duplicated primary key"),
+            profit_margin: set(20.0),
         }
         .insert(&txn)
         .await;
@@ -475,9 +475,9 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
 
         assert_eq!(
             cake::ActiveModel {
-                name: Set("Cake with invalid price".to_owned()),
-                price: Set(rust_dec(0)),
-                gluten_free: Set(false),
+                name: set("Cake with invalid price"),
+                price: set(rust_dec(0)),
+                gluten_free: set(false),
                 ..Default::default()
             }
             .insert(&txn)
@@ -491,9 +491,9 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
 
         assert_eq!(
             cake::ActiveModel {
-                name: Set("Cake with invalid price".to_owned()),
-                price: Set(rust_dec(-10)),
-                gluten_free: Set(false),
+                name: set("Cake with invalid price"),
+                price: set(rust_dec(-10)),
+                gluten_free: set(false),
                 ..Default::default()
             }
             .insert(&txn)
@@ -506,9 +506,9 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
         assert_eq!(cake::Entity::find().all(&txn).await?.len(), 1);
 
         let readonly_cake_1 = cake::ActiveModel {
-            name: Set("Readonly cake (err_on_before_delete)".to_owned()),
-            price: Set(rust_dec(10)),
-            gluten_free: Set(true),
+            name: set("Readonly cake (err_on_before_delete)"),
+            price: set(rust_dec(10)),
+            gluten_free: set(true),
             ..Default::default()
         }
         .insert(&txn)
@@ -526,9 +526,9 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
         assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
 
         let readonly_cake_2 = cake::ActiveModel {
-            name: Set("Readonly cake (err_on_after_delete)".to_owned()),
-            price: Set(rust_dec(10)),
-            gluten_free: Set(true),
+            name: set("Readonly cake (err_on_after_delete)"),
+            price: set(rust_dec(10)),
+            gluten_free: set(true),
             ..Default::default()
         }
         .insert(&txn)

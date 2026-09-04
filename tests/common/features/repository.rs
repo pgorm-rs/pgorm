@@ -1,5 +1,5 @@
 use super::edit_log;
-use pgorm::{ActiveValue::Set, ConnectionTrait, TryIntoModel, entity::prelude::*};
+use pgorm::{ConnectionTrait, TryIntoModel, entity::prelude::*, set};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize)]
@@ -60,8 +60,8 @@ where
     C: ConnectionTrait,
 {
     edit_log::ActiveModel {
-        action: Set(action.into()),
-        values: Set(serde_json::json!(model)),
+        action: set(action.into()),
+        values: set(serde_json::json!(model)),
         ..Default::default()
     }
     .insert(db)

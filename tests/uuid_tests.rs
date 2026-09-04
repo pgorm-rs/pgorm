@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{ActiveValue::Set, DatabaseConnection, entity::prelude::*, entity::*};
+use pgorm::{DatabaseConnection, entity::prelude::*, entity::*, set};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -66,7 +66,7 @@ pub async fn create_and_update_metadata(db: &DatabaseConnection) -> Result<(), E
     assert_eq!(res.last_insert_id, metadata.uuid);
 
     let update_res = Metadata::update(metadata::ActiveModel {
-        value: Set("0.22".to_owned()),
+        value: set("0.22"),
         ..metadata.clone().into_active_model()
     })?
     .filter(metadata::Column::Uuid.eq(Uuid::default()))

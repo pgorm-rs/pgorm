@@ -4,8 +4,8 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, IntoActiveModel, ValueHolder,
-    entity::prelude::*, types::ToSql,
+    ColumnTrait, DatabaseConnection, IntoActiveModel, ValueHolder, entity::prelude::*, set,
+    types::ToSql,
 };
 pub use pgorm_query::{Expr, Query, QueryBuilder, Values};
 use serde_json::json;
@@ -183,8 +183,8 @@ async fn update_many() {
 
 fn bakery_model(name: &str, margin: f64) -> bakery::ActiveModel {
     bakery::ActiveModel {
-        name: Set(name.to_owned()),
-        profit_margin: Set(margin),
+        name: set(name),
+        profit_margin: set(margin),
         ..Default::default()
     }
 }
@@ -235,9 +235,9 @@ async fn insert_returning_modes() -> Result<(), Error> {
     // Nothing to decode: a conflicting insert returns no row, and
     // `SelectorRaw::one_opt` reporting `None` becomes RecordNotFound.
     let conflicted = Bakery::insert(bakery::ActiveModel {
-        id: Set(inserted.id),
-        name: Set("Duplicate Bakery".to_owned()),
-        profit_margin: Set(0.5),
+        id: set(inserted.id),
+        name: set("Duplicate Bakery"),
+        profit_margin: set(0.5),
     })
     .on_conflict(OnConflict::do_nothing())
     .exec_with_returning(&db)
@@ -247,9 +247,9 @@ async fn insert_returning_modes() -> Result<(), Error> {
     // The same conflict is not an error for `exec_without_returning`: no row
     // was written, so the count is zero.
     let skipped = Bakery::insert(bakery::ActiveModel {
-        id: Set(inserted.id),
-        name: Set("Duplicate Bakery".to_owned()),
-        profit_margin: Set(0.5),
+        id: set(inserted.id),
+        name: set("Duplicate Bakery"),
+        profit_margin: set(0.5),
     })
     .on_conflict(OnConflict::do_nothing())
     .exec_without_returning(&db)
@@ -352,9 +352,9 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     assert!(matches!(counted, TryInsertResult::Inserted(1)));
 
     let duplicate = || bakery::ActiveModel {
-        id: Set(1),
-        name: Set("Duplicate Bakery".to_owned()),
-        profit_margin: Set(0.5),
+        id: set(1),
+        name: set("Duplicate Bakery"),
+        profit_margin: set(0.5),
     };
     let on_conflict = OnConflict::do_nothing;
 

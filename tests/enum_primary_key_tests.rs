@@ -5,11 +5,12 @@ pub mod common;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
     ActiveEnum as ActiveEnumTrait,
-    ActiveValue::{Set, Unchanged},
+    ActiveValue::Unchanged,
     DatabaseConnection,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
+    set,
 };
 use pretty_assertions::assert_eq;
 
@@ -39,9 +40,9 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(
         model,
         ActiveModel {
-            id: Set(Tea::EverydayTea),
-            category: Set(None),
-            color: Set(None),
+            id: set(Tea::EverydayTea),
+            category: set(None),
+            color: set(None),
         }
         .insert(db)
         .await?
@@ -60,9 +61,9 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
     // UNIQUE constraint failed
     assert!(
         ActiveModel {
-            id: Set(Tea::EverydayTea),
-            category: Set(Some(Category::Big)),
-            color: Set(Some(Color::Black)),
+            id: set(Tea::EverydayTea),
+            category: set(Some(Category::Big)),
+            color: set(Some(Color::Black)),
         }
         .insert(db)
         .await
@@ -72,9 +73,9 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
     // UNIQUE constraint failed
     assert!(
         Entity::insert(ActiveModel {
-            id: Set(Tea::EverydayTea),
-            category: Set(Some(Category::Big)),
-            color: Set(Some(Color::Black)),
+            id: set(Tea::EverydayTea),
+            category: set(Some(Category::Big)),
+            color: set(Some(Color::Black)),
         })
         .exec(db)
         .await
@@ -82,8 +83,8 @@ pub async fn insert_teas(db: &DatabaseConnection) -> Result<(), Error> {
     );
 
     let _ = ActiveModel {
-        category: Set(Some(Category::Big)),
-        color: Set(Some(Color::Black)),
+        category: set(Some(Category::Big)),
+        color: set(Some(Color::Black)),
         ..model.into_active_model()
     }
     .update(db)

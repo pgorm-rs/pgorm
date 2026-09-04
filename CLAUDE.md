@@ -52,7 +52,9 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - Parameters are passed alongside the statement so it is prepared properly (no string interpolation)
 - Scoped transactions: `TransactionTrait::begin(&mut self)` returns a `DatabaseTransaction<'_>` that borrows the parent exclusively
 - `DatabasePool` deliberately does **not** implement `ConnectionTrait` — you must `pool.get()` a connection first
-- `From<T>` implementations for ActiveValue fields (less verbose than `ActiveValue::Set()`)
+- ActiveValue fields are written with the free `set(..)` (`name: set("Apple")`) or `.into()`; both convert into the column type, so no `.to_owned()`. `ActiveValue::Set` is the pattern-matching spelling
+- `ColumnTrait` carries `eq_col`/`ne_col`/`gt_col`/`gte_col`/`lt_col`/`lte_col`/`eq_expr` for column-to-column and column-to-expression predicates; `eq` and friends stay value-only so their `save_as` enum cast is never dropped
+- `ModelTrait::into_active()` converts a model to its entity's ActiveModel with no destination annotation
 - Failsafe behavior for empty `insert_many` operations
 
 ### Connections

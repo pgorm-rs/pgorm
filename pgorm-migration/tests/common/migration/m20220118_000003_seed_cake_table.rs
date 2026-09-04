@@ -1,5 +1,5 @@
-use pgorm_migration::pgorm::ActiveValue::Set;
 use pgorm_migration::pgorm::entity::*;
+use pgorm_migration::pgorm::set;
 use pgorm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -9,7 +9,7 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
         cake::ActiveModel {
-            name: Set("Cheesecake".to_owned()),
+            name: set("Cheesecake"),
             ..Default::default()
         }
         .insert(tx)

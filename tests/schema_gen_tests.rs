@@ -5,8 +5,8 @@ pub mod common;
 pub use common::{TestContext, setup::*};
 
 use pgorm::{
-    ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityName, EntityTrait,
-    Error, Iterable, Schema, entity::prelude::*,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityName, EntityTrait, Error, Iterable,
+    Schema, entity::prelude::*, set,
 };
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, QueryBuilder, TableCreateStatement};
 use pretty_assertions::assert_eq;
@@ -554,7 +554,7 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
     );
 
     let factory = factory::ActiveModel {
-        name: Set("Acme".to_owned()),
+        name: set("Acme"),
         ..Default::default()
     }
     .insert(&db)
@@ -562,11 +562,11 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
 
     // `origin` is omitted, so the DDL default has to supply it; `note` is nullable.
     let widget = widget::ActiveModel {
-        code: Set("W-1".to_owned()),
-        batch: Set(7),
-        grade: Set(widget::Grade::Gold),
-        spare_grade: Set(widget::Grade::Bronze),
-        factory_id: Set(factory.id),
+        code: set("W-1"),
+        batch: set(7),
+        grade: set(widget::Grade::Gold),
+        spare_grade: set(widget::Grade::Bronze),
+        factory_id: set(factory.id),
         ..Default::default()
     }
     .insert(&db)
@@ -577,11 +577,11 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
 
     // The unique key on `code` is enforced.
     let unique = widget::ActiveModel {
-        code: Set("W-1".to_owned()),
-        batch: Set(8),
-        grade: Set(widget::Grade::Silver),
-        spare_grade: Set(widget::Grade::Silver),
-        factory_id: Set(factory.id),
+        code: set("W-1"),
+        batch: set(8),
+        grade: set(widget::Grade::Silver),
+        spare_grade: set(widget::Grade::Silver),
+        factory_id: set(factory.id),
         ..Default::default()
     }
     .insert(&db)
@@ -594,11 +594,11 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
 
     // The belongs-to foreign key is enforced.
     let fk = widget::ActiveModel {
-        code: Set("W-2".to_owned()),
-        batch: Set(9),
-        grade: Set(widget::Grade::Silver),
-        spare_grade: Set(widget::Grade::Silver),
-        factory_id: Set(factory.id + 1_000),
+        code: set("W-2"),
+        batch: set(9),
+        grade: set(widget::Grade::Silver),
+        spare_grade: set(widget::Grade::Silver),
+        factory_id: set(factory.id + 1_000),
         ..Default::default()
     }
     .insert(&db)
@@ -611,13 +611,13 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
 
     // The composite primary key is enforced across both columns.
     let tag = widget_tag::ActiveModel {
-        widget_id: Set(widget.id),
-        tag: Set("shiny".to_owned()),
+        widget_id: set(widget.id),
+        tag: set("shiny"),
     };
     tag.clone().insert(&db).await?;
     widget_tag::ActiveModel {
-        widget_id: Set(widget.id),
-        tag: Set("matte".to_owned()),
+        widget_id: set(widget.id),
+        tag: set("matte"),
     }
     .insert(&db)
     .await?;

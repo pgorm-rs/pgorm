@@ -3,6 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
+use pgorm::set;
 use pgorm::{
     ActiveEnum, ActiveEnumValue, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait,
     EntityTrait, Error, FromQueryResult, Iterable, NotSet, QueryFilter, QueryResult, QuerySelect,
@@ -295,14 +296,25 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
         r#""casts"."tea" IN (CAST('EverydayTea' AS tea), CAST('BreakfastTea' AS tea))"#
     );
 
+    // The column-to-column siblings take the other road: the operand is already
+    // an enum column on the server, so no cast is applied to either side. This
+    // is why `eq` was not widened to admit a column — a widened bound would have
+    // dropped the cast above without saying so.
+    // [spec:pgorm:def:entity.traits.column+2/test]    the `_col` family does not
+    // route its operand through `save_as`
+    assert_eq!(
+        filter_sql(casts::Column::Tea.eq_col(casts::Column::Tea)),
+        r#""casts"."tea" = "casts"."tea""#
+    );
+
     // An INSERT written through the entity carries the same casts.
     assert_eq!(
         casts::Entity::insert(casts::ActiveModel {
             id: NotSet,
-            tea: ActiveValue::Set(Tea::BreakfastTea),
-            teas: ActiveValue::Set(vec![Tea::EverydayTea]),
-            name: ActiveValue::Set("plain".to_owned()),
-            payload: ActiveValue::Set(serde_json::json!({"k": "v"})),
+            tea: set(Tea::BreakfastTea),
+            teas: set(vec![Tea::EverydayTea]),
+            name: set("plain"),
+            payload: set(serde_json::json!({"k": "v"})),
         })
         .as_query()
         .to_string(),
@@ -364,10 +376,10 @@ async fn enum_cast_round_trip() -> Result<(), Error> {
 
     let inserted = casts::ActiveModel {
         id: NotSet,
-        tea: ActiveValue::Set(Tea::BreakfastTea),
-        teas: ActiveValue::Set(vec![Tea::EverydayTea, Tea::BreakfastTea]),
-        name: ActiveValue::Set("plain".to_owned()),
-        payload: ActiveValue::Set(serde_json::json!({"k": "v"})),
+        tea: set(Tea::BreakfastTea),
+        teas: set(vec![Tea::EverydayTea, Tea::BreakfastTea]),
+        name: set("plain"),
+        payload: set(serde_json::json!({"k": "v"})),
     }
     .insert(&db)
     .await?;

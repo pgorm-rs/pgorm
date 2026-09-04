@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::TryInsertResult;
 use pgorm::entity::prelude::*;
-use pgorm::{ActiveValue::Set, DatabaseConnection, pgorm_query::OnConflict};
+use pgorm::{DatabaseConnection, pgorm_query::OnConflict, set};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -30,9 +30,9 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     let on_conflict = OnConflict::column(Column::Id).do_nothing();
 
     let res = Entity::insert_many([
-        ActiveModel { id: Set(1) },
-        ActiveModel { id: Set(2) },
-        ActiveModel { id: Set(3) },
+        ActiveModel { id: set(1) },
+        ActiveModel { id: set(2) },
+        ActiveModel { id: set(3) },
     ])
     .on_conflict(on_conflict.clone())
     .exec(db)
@@ -43,10 +43,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     assert_eq!(res?.last_insert_id, 3);
 
     let res = Entity::insert_many([
-        ActiveModel { id: Set(1) },
-        ActiveModel { id: Set(2) },
-        ActiveModel { id: Set(3) },
-        ActiveModel { id: Set(4) },
+        ActiveModel { id: set(1) },
+        ActiveModel { id: set(2) },
+        ActiveModel { id: set(3) },
+        ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
     .exec(db)
@@ -55,10 +55,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     assert_eq!(res?.last_insert_id, 4);
 
     let res = Entity::insert_many([
-        ActiveModel { id: Set(1) },
-        ActiveModel { id: Set(2) },
-        ActiveModel { id: Set(3) },
-        ActiveModel { id: Set(4) },
+        ActiveModel { id: set(1) },
+        ActiveModel { id: set(2) },
+        ActiveModel { id: set(3) },
+        ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
     .exec(db)
@@ -67,10 +67,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     assert!(matches!(res, Err(Error::RecordNotInserted)));
 
     let res = Entity::insert_many([
-        ActiveModel { id: Set(1) },
-        ActiveModel { id: Set(2) },
-        ActiveModel { id: Set(3) },
-        ActiveModel { id: Set(4) },
+        ActiveModel { id: set(1) },
+        ActiveModel { id: set(2) },
+        ActiveModel { id: set(3) },
+        ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict)
     .do_nothing()

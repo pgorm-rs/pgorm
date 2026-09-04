@@ -16,8 +16,8 @@ pub mod common;
 
 pub use common::{TestContext, setup::*};
 use pgorm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, Error,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Schema, pgorm_query::Expr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Error, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Schema, pgorm_query::Expr, set,
 };
 use serde_json::json;
 
@@ -54,8 +54,8 @@ async fn seed(db: &impl ConnectionTrait) -> Result<(), Error> {
         (3, json!({ "other": 1 })),
     ] {
         doc::ActiveModel {
-            id: Set(id),
-            body: Set(body),
+            id: set(id),
+            body: set(body),
         }
         .insert(db)
         .await?;

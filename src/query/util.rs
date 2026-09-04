@@ -54,8 +54,8 @@ macro_rules! debug_query_build {
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
-///     id: ActiveValue::set(1),
-///     name: ActiveValue::set("Apple Pie".to_owned()),
+///     id: set(1),
+///     name: set("Apple Pie"),
 /// });
 ///
 /// assert_eq!(
@@ -92,8 +92,8 @@ macro_rules! debug_query_stmt {
 /// use pgorm::{entity::*, query::*, tests_cfg::cake};
 ///
 /// let c = cake::Entity::insert(cake::ActiveModel {
-///     id: ActiveValue::set(1),
-///     name: ActiveValue::set("Apple Pie".to_owned()),
+///     id: set(1),
+///     name: set("Apple Pie"),
 /// });
 ///
 /// assert_eq!(

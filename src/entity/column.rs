@@ -1,13 +1,16 @@
 use crate::{EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
 use pgorm_query::{
-    Alias, BinOper, DynIden, Expr, Func, IntoIden, SeaRc, SelectStatement, SimpleExpr, Value,
-    ValueType,
+    Alias, BinOper, DynIden, Expr, Func, IntoColumnRef, IntoIden, SeaRc, SelectStatement,
+    SimpleExpr, Value, ValueType,
 };
 use std::str::FromStr;
 
 // The original `pgorm::ColumnType` enum was dropped since 0.11.0
 // It was replaced by `pgorm_query::ColumnType`, we reexport it here to keep the `ColumnType` symbol
 pub use pgorm_query::ColumnType;
+#[path = "column_def.rs"]
+mod column_def;
+pub use column_def::*;
 
 /// Defines a Column for an Entity
 // [spec:pgorm:req:entity.traits.column-def]
@@ -30,6 +33,25 @@ macro_rules! bind_oper {
         {
             let expr = self.save_as(Expr::val(v));
             Expr::col((self.entity_name(), *self)).binary(BinOper::$bin_op, expr)
+        }
+    };
+}
+
+macro_rules! bind_oper_col {
+    ( $op: ident, $bin_op: ident, $doc: expr ) => {
+        #[doc = $doc]
+        ///
+        /// Both operands name their own entity, so the comparison needs neither
+        /// the `Expr::col` escape nor a respelling of either table. The operand
+        /// is a column rather than a value, so it does not pass through
+        /// `save_as`: an enum column compared against another column of the same
+        /// enum type needs no cast. See [`ColumnTrait::eq_col`] for an example.
+        fn $op<C>(&self, other: C) -> SimpleExpr
+        where
+            C: ColumnTrait,
+        {
+            Expr::col((self.entity_name(), *self))
+                .binary(BinOper::$bin_op, other.as_column_ref().into_column_ref())
         }
     };
 }
@@ -70,7 +92,7 @@ macro_rules! bind_subquery_func {
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column+1]
+// [spec:pgorm:def:entity.traits.column+2]
 pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -94,6 +116,91 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
     bind_oper!(gte, GreaterThanOrEqual);
     bind_oper!(lt, SmallerThan);
     bind_oper!(lte, SmallerThanOrEqual);
+
+    /// Express an equality between this column and another column.
+    ///
+    /// The value-taking [`eq`][ColumnTrait::eq] cannot express this: its operand
+    /// is bound by `Into<Value>` and is run through
+    /// [`save_as`][ColumnTrait::save_as], which is what casts an enum operand.
+    /// The column-taking siblings are separate methods rather than a widening of
+    /// `eq` so that cast is never silently dropped.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::{cake, fruit}};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .filter(cake::Column::Id.eq_col(fruit::Column::CakeId))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = "fruit"."cake_id""#
+    /// );
+    /// ```
+    ///
+    /// Both operands name their own entity, so the comparison needs neither the
+    /// `Expr::col` escape nor a respelling of either table. The operand is a
+    /// column rather than a value, so it does not pass through `save_as`: an
+    /// enum column compared against another column of the same enum type needs
+    /// no cast.
+    fn eq_col<C>(&self, other: C) -> SimpleExpr
+    where
+        C: ColumnTrait,
+    {
+        Expr::col((self.entity_name(), *self))
+            .binary(BinOper::Equal, other.as_column_ref().into_column_ref())
+    }
+
+    bind_oper_col!(
+        ne_col,
+        NotEqual,
+        "Express an inequality between this column and another column."
+    );
+    bind_oper_col!(
+        gt_col,
+        GreaterThan,
+        "Express a greater-than between this column and another column."
+    );
+    bind_oper_col!(
+        gte_col,
+        GreaterThanOrEqual,
+        "Express a greater-than-or-equal between this column and another column."
+    );
+    bind_oper_col!(
+        lt_col,
+        SmallerThan,
+        "Express a less-than between this column and another column."
+    );
+    bind_oper_col!(
+        lte_col,
+        SmallerThanOrEqual,
+        "Express a less-than-or-equal between this column and another column."
+    );
+
+    /// Express an equality between this column and an arbitrary expression.
+    ///
+    /// The general form of [`eq_col`][ColumnTrait::eq_col], for comparing
+    /// against something computed rather than against a plain column. Like
+    /// `eq_col`, the operand does not pass through
+    /// [`save_as`][ColumnTrait::save_as] — an expression carries whatever cast
+    /// it was built with.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, pgorm_query::Expr, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .filter(cake::Column::Id.eq_expr(Expr::col((cake::Entity, cake::Column::Id)).add(1)))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" = "cake"."id" + 1"#
+    /// );
+    /// ```
+    fn eq_expr<T>(&self, other: T) -> SimpleExpr
+    where
+        T: Into<SimpleExpr>,
+    {
+        Expr::col((self.entity_name(), *self)).binary(BinOper::Equal, other.into())
+    }
 
     /// ```
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
@@ -362,109 +469,6 @@ pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
             };
             col.as_enum(type_name)
         })
-    }
-}
-
-/// pgorm's utility methods that act on [ColumnType]
-pub trait ColumnTypeTrait {
-    /// Instantiate a new [ColumnDef]
-    fn def(self) -> ColumnDef;
-
-    /// Get the name of the enum if this is a enum column
-    fn get_enum_name(&self) -> Option<&DynIden>;
-}
-
-// [spec:pgorm:req:entity.traits.column-def]
-impl ColumnTypeTrait for ColumnType {
-    fn def(self) -> ColumnDef {
-        ColumnDef {
-            col_type: self,
-            null: false,
-            unique: false,
-            indexed: false,
-            default: None,
-            comment: None,
-        }
-    }
-
-    fn get_enum_name(&self) -> Option<&DynIden> {
-        enum_name(self)
-    }
-}
-
-impl ColumnTypeTrait for ColumnDef {
-    fn def(self) -> ColumnDef {
-        self
-    }
-
-    fn get_enum_name(&self) -> Option<&DynIden> {
-        enum_name(&self.col_type)
-    }
-}
-
-fn enum_name(col_type: &ColumnType) -> Option<&DynIden> {
-    match col_type {
-        ColumnType::Enum { name, .. } => Some(name),
-        ColumnType::Array(col_type) => enum_name(col_type),
-        _ => None,
-    }
-}
-
-impl ColumnDef {
-    /// Marks the column as `UNIQUE`
-    pub fn unique(mut self) -> Self {
-        self.unique = true;
-        self
-    }
-    /// Set column comment
-    pub fn comment(mut self, v: &str) -> Self {
-        self.comment = Some(v.into());
-        self
-    }
-
-    /// Mark the column as nullable
-    pub fn null(self) -> Self {
-        self.nullable()
-    }
-
-    /// Mark the column as nullable
-    pub fn nullable(mut self) -> Self {
-        self.null = true;
-        self
-    }
-
-    /// Set the `indexed` field  to `true`
-    pub fn indexed(mut self) -> Self {
-        self.indexed = true;
-        self
-    }
-
-    /// Set the default value
-    pub fn default_value<T>(mut self, value: T) -> Self
-    where
-        T: Into<Value>,
-    {
-        self.default = Some(value.into().into());
-        self
-    }
-
-    /// Set the default value or expression of a column
-    pub fn default<T>(mut self, default: T) -> Self
-    where
-        T: Into<SimpleExpr>,
-    {
-        self.default = Some(default.into());
-        self
-    }
-
-    /// Get [ColumnType] as reference
-    pub fn get_column_type(&self) -> &ColumnType {
-        &self.col_type
-    }
-
-    /// Returns true if the column is nullable
-    pub fn is_null(&self) -> bool {
-        self.null
     }
 }
 

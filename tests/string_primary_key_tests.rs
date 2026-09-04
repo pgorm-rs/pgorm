@@ -3,12 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{
-    ActiveValue::{Set, Unchanged},
-    DatabaseConnection,
-    entity::prelude::*,
-    entity::*,
-};
+use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -139,7 +134,7 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
     assert_eq!(res.last_insert_id, repository.id);
 
     let updated_active_model = repository::ActiveModel {
-        description: Set(Some("description...".to_owned())),
+        description: "description...".into(),
         ..repository.clone().into_active_model()
     };
 
@@ -168,7 +163,7 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
     );
 
     let updated_active_model = repository::ActiveModel {
-        description: Set(None),
+        description: set(None),
         ..repository.clone().into_active_model()
     };
 

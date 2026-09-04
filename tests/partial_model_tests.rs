@@ -5,8 +5,8 @@ pub mod common;
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use entity::{Column, Entity};
 use pgorm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DerivePartialModel, EntityTrait, Error,
-    FromQueryResult, ModelTrait, QueryOrder,
+    ActiveModelTrait, ColumnTrait, DerivePartialModel, EntityTrait, Error, FromQueryResult,
+    ModelTrait, QueryOrder, set,
 };
 use pgorm_query::Expr;
 
@@ -97,16 +97,16 @@ async fn partial_model_select() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.5),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.5),
         ..Default::default()
     }
     .insert(&db)
     .await?;
 
     bakery::ActiveModel {
-        name: Set("Top Bakery".to_owned()),
-        profit_margin: Set(4.5),
+        name: set("Top Bakery"),
+        profit_margin: set(4.5),
         ..Default::default()
     }
     .insert(&db)
@@ -155,8 +155,8 @@ async fn integer_operand_against_float_column() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.5),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.5),
         ..Default::default()
     }
     .insert(&db)

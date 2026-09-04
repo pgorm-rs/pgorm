@@ -9,8 +9,8 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    ActiveValue::Set, DatabaseConnection, Error, PaginatorTrait, QuerySelect, RuntimeError,
-    SelectGetableTuple, SelectProjected, Selector, entity::prelude::*,
+    DatabaseConnection, Error, PaginatorTrait, QuerySelect, RuntimeError, SelectGetableTuple,
+    SelectProjected, Selector, entity::prelude::*, set,
 };
 use pgorm_query::SelectStatement;
 use pretty_assertions::assert_eq;
@@ -157,8 +157,8 @@ pub async fn raw_builder_select_list_is_refused(db: &DatabaseConnection) {
 // list is non-empty is untouched by the guard
 pub async fn populated_select_list_still_runs(db: &DatabaseConnection) {
     Bakery::insert(bakery::ActiveModel {
-        name: Set("SeaSide Bakery".to_owned()),
-        profit_margin: Set(10.4),
+        name: set("SeaSide Bakery"),
+        profit_margin: set(10.4),
         ..Default::default()
     })
     .exec(db)

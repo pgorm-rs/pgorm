@@ -3,12 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{
-    ActiveValue::{Set, Unchanged},
-    DatabaseConnection,
-    entity::prelude::*,
-    entity::*,
-};
+use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -46,7 +41,7 @@ pub async fn create_and_update(db: &DatabaseConnection) -> Result<(), Error> {
     assert_eq!(res.last_insert_id, model.id);
 
     let updated_active_model = ActiveModel {
-        value: Set("First Row (Updated)".to_owned()),
+        value: set("First Row (Updated)"),
         ..model.clone().into_active_model()
     };
 

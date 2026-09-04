@@ -21,23 +21,22 @@ use pgorm::pgorm_query::{
     RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
 };
 use pgorm::{
-    ActiveValue::Set, ConnectionTrait, Error, FromQueryResult, JoinType, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, SelectGetableTuple, SelectModel, Selector, SelectorRaw,
-    entity::prelude::*,
+    ConnectionTrait, Error, FromQueryResult, JoinType, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait, SelectGetableTuple, SelectModel, Selector, SelectorRaw, entity::prelude::*, set,
 };
 use pretty_assertions::assert_eq;
 
 async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
     let alpha = bakery::ActiveModel {
-        name: Set("Alpha".to_owned()),
-        profit_margin: Set(10.0),
+        name: set("Alpha"),
+        profit_margin: set(10.0),
         ..Default::default()
     }
     .insert(db)
     .await?;
     let beta = bakery::ActiveModel {
-        name: Set("Beta".to_owned()),
-        profit_margin: Set(20.0),
+        name: set("Beta"),
+        profit_margin: set(20.0),
         ..Default::default()
     }
     .insert(db)
@@ -53,11 +52,11 @@ async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
     ];
     for (bakery_id, name, price) in prices {
         cake::ActiveModel {
-            name: Set(name.to_owned()),
-            price: Set(rust_dec(price)),
-            gluten_free: Set(false),
-            serial: Set(Uuid::new_v4()),
-            bakery_id: Set(Some(bakery_id)),
+            name: set(name),
+            price: set(rust_dec(price)),
+            gluten_free: set(false),
+            serial: set(Uuid::new_v4()),
+            bakery_id: set(Some(bakery_id)),
             ..Default::default()
         }
         .insert(db)
