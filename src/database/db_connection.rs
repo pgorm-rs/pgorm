@@ -211,7 +211,7 @@ impl DatabaseConnection {
     /// returns. `Ok` is returned only once `COMMIT` succeeded; a failing
     /// `BEGIN` or `COMMIT` is [`TransactionError::Connection`] and the
     /// closure's own error is [`TransactionError::Transaction`].
-    // [spec:pgorm:sem:conn.tx.closure+1]    plain BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+2]    plain BEGIN
     pub async fn transaction<'s, T, E, F>(&'s mut self, f: F) -> Result<T, TransactionError<E>>
     where
         F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
@@ -225,7 +225,7 @@ impl DatabaseConnection {
 
     /// [`DatabaseConnection::transaction`] over a transaction configured by
     /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
-    // [spec:pgorm:sem:conn.tx.closure+1]    configured BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+2]    configured BEGIN
     pub async fn transaction_with<'s, T, E, F>(
         &'s mut self,
         mode: TransactionMode,
@@ -303,7 +303,7 @@ enum Retryable<E> {
     Transaction(E),
 }
 
-// [spec:pgorm:sem:conn.tx.closure+1]    commit on Ok, awaited rollback on Err
+// [spec:pgorm:sem:conn.tx.closure+2]    commit on Ok, awaited rollback on Err
 async fn drive<'s, T, E, F>(
     mut txn: DatabaseTransaction<'s>,
     f: F,
@@ -324,7 +324,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+1]    a failed ROLLBACK does not displace the closure error
+// [spec:pgorm:sem:conn.tx.closure+2]    a failed ROLLBACK does not displace the closure error
 async fn rollback(txn: DatabaseTransaction<'_>) {
     if let Err(error) = txn.rollback().await {
         tracing::error!(
@@ -340,7 +340,7 @@ async fn rollback(txn: DatabaseTransaction<'_>) {
 /// the transaction machinery itself, which is why there is deliberately no
 /// `From<Error>` impl: with `E = Error` it would silently file every
 /// closure-side error under `Connection` and erase that distinction.
-// [spec:pgorm:sem:conn.tx.closure+1]    error wrapper
+// [spec:pgorm:sem:conn.tx.closure+2]    error wrapper
 #[derive(Debug)]
 pub enum TransactionError<E> {
     /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.
@@ -515,7 +515,7 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+6]    cache-routing impls
+// [spec:pgorm:def:conn.pool.conn-trait+7]    cache-routing impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
@@ -691,6 +691,80 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         Ok(pgorm_pool::GenericClient::batch_execute(self.tx(), sql).await?)
     }
 }
+/// The handle a transaction closure is given is `&mut DatabaseTransaction`, and
+/// a helper that takes `&C` would otherwise have to be passed a reborrowed
+/// `&*txn`: `&mut T` is its own type, and the coercion to `&T` does not fire
+/// into the inference variable `C`. Forwarding through the exclusive borrow
+/// makes the closure's handle spell a connection the same way the transaction
+/// itself does.
+// [spec:pgorm:def:conn.pool.conn-trait+7]    the closure's handle is itself a connection
+#[async_trait::async_trait]
+impl ConnectionTrait for &mut DatabaseTransaction<'_> {
+    async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+    {
+        (**self).execute(statement, params).await
+    }
+
+    async fn execute_raw<T, P, I>(&self, statement: &T, params: I) -> Result<u64, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        (**self).execute_raw(statement, params).await
+    }
+
+    async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<tokio_postgres::Row, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+    {
+        (**self).query_one(statement, params).await
+    }
+
+    async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<tokio_postgres::Row>, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+    {
+        (**self).query_opt(statement, params).await
+    }
+
+    async fn query_all<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<tokio_postgres::Row>, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+    {
+        (**self).query_all(statement, params).await
+    }
+
+    async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
+    where
+        T: ?Sized + SqlText + Sync,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P> + Send,
+        I::IntoIter: ExactSizeIterator,
+    {
+        (**self).query_raw(statement, params).await
+    }
+
+    async fn batch_execute(&self, sql: &str) -> Result<(), Error> {
+        (**self).batch_execute(sql).await
+    }
+}
+
 #[async_trait::async_trait]
 impl TransactionTrait for DatabaseTransaction<'_> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {

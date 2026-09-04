@@ -4,10 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::TryStreamExt;
-use pgorm::{
-    ColumnTrait, DatabaseConnection, DerivePartialModel, FromQueryResult, QueryFilter, QueryOrder,
-    TransactionTrait, entity::prelude::*, set,
-};
+use pgorm::{DerivePartialModel, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 #[derive(Debug, PartialEq, FromQueryResult, DerivePartialModel)]

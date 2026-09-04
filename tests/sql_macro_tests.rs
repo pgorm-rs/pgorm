@@ -10,7 +10,8 @@ pub mod common;
 pub use common::TestContext;
 use futures::TryStreamExt;
 use pgorm::{
-    ConnectionTrait, Error, FromQueryResult, SelectModel, SelectorRaw, TransactionTrait, sql,
+    ConnectionTrait, DecodeRaw, Error, FromQueryResult, SelectModel, SelectorRaw, TransactionTrait,
+    sql,
 };
 use pgorm_query::Values;
 use pretty_assertions::assert_eq;
@@ -37,12 +38,13 @@ async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
 
     db.batch_execute(SCHEMA).await?;
 
-    let rows = SelectorRaw::<SelectModel<Cake>>::from_statement::<Cake>(
-        sql!(r#"SELECT "id", "name" FROM "cake" ORDER BY "id""#).to_owned(),
+    let rows = (
+        sql!(r#"SELECT "id", "name" FROM "cake" ORDER BY "id""#),
         Values(Vec::new()),
     )
-    .all(&db)
-    .await?;
+        .into_model::<Cake>()
+        .all(&db)
+        .await?;
 
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].id, 1);

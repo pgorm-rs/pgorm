@@ -3,11 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DeleteResult,
-    EntityTrait, Error, IntoActiveModel, IntoActiveValue, Iterable, NotSet, PrimaryKeyTrait,
-    QueryTrait, Schema, Value, entity::prelude::*,
-};
+use pgorm::{DeleteResult, Error, Schema, entity::prelude::*};
 use pgorm_query::{QueryBuilder, ValueTuple};
 use pretty_assertions::assert_eq;
 
@@ -592,7 +588,6 @@ mod row_dto {
         pub note: Option<Option<String>>,
     }
 }
-use pgorm::set;
 use row_dto::{NewRow, UpdateRow};
 
 // [spec:pgorm:req:entity.active-model.into+1/test]    the blanket identity

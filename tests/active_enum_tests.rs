@@ -7,11 +7,9 @@ pub use common::{TestContext, features::*, setup::*};
 use pgorm::{
     ActiveEnum as ActiveEnumTrait,
     ActiveValue::Unchanged,
-    DatabaseConnection, QueryTrait,
     entity::prelude::*,
     entity::*,
     pgorm_query::{BinOper, Expr},
-    set,
 };
 use pretty_assertions::assert_eq;
 

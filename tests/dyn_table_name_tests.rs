@@ -3,10 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{
-    DatabaseConnection, Delete, IntoActiveModel, Iterable, QueryTrait, Update, entity::prelude::*,
-    set,
-};
+use pgorm::entity::prelude::*;
 use pgorm_query::{Expr, Query};
 use pretty_assertions::assert_eq;
 

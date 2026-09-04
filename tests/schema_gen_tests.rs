@@ -4,10 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, setup::*};
 
-use pgorm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityName, EntityTrait, Error, Iterable,
-    Schema, entity::prelude::*, set,
-};
+use pgorm::{Error, Schema, entity::prelude::*};
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, QueryBuilder, TableCreateStatement};
 use pretty_assertions::assert_eq;
 

@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::future::join_all;
-use pgorm::{DatabaseConnection, TransactionTrait, entity::prelude::*, set};
+use pgorm::entity::prelude::*;
 use pretty_assertions::assert_eq;
 
 const CONNECTIONS: usize = 4;

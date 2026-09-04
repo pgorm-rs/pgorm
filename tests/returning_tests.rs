@@ -3,10 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{
-    ColumnTrait, DatabaseConnection, IntoActiveModel, ValueHolder, entity::prelude::*, set,
-    types::ToSql,
-};
+use pgorm::{ValueHolder, entity::prelude::*, types::ToSql};
 pub use pgorm_query::{Expr, Query, QueryBuilder, Values};
 use serde_json::json;
 
@@ -194,7 +191,6 @@ fn bakery_model(name: &str, margin: f64) -> bakery::ActiveModel {
 // insert matched nothing); `exec_without_returning` reports rows affected
 #[pgorm_macros::test]
 async fn insert_returning_modes() -> Result<(), Error> {
-    use pgorm::PaginatorTrait;
     use pgorm_query::OnConflict;
 
     let ctx = TestContext::new("returning_tests_insert_modes").await;
@@ -407,7 +403,7 @@ async fn try_insert_result_variants() -> Result<(), Error> {
 // `Updater::exec` and `UpdateOne::exec`, plus `check_record_exists`
 #[pgorm_macros::test]
 async fn update_noop_and_record_check() -> Result<(), Error> {
-    use pgorm::{ActiveValue::Unchanged, ColumnTrait, Updater};
+    use pgorm::{ActiveValue::Unchanged, Updater};
 
     let ctx = TestContext::new("returning_tests_update_noop").await;
     create_tables(&ctx.db).await?;

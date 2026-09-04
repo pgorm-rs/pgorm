@@ -5,7 +5,7 @@ pub mod common;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::TryInsertResult;
 use pgorm::entity::prelude::*;
-use pgorm::{DatabaseConnection, pgorm_query::OnConflict, set};
+use pgorm::pgorm_query::OnConflict;
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]

@@ -3,11 +3,8 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::set;
 use pgorm::{
-    ActiveEnum, ActiveEnumValue, ActiveValue, ColumnTrait, ColumnType, ColumnTypeTrait,
-    EntityTrait, Error, FromQueryResult, Iterable, NotSet, QueryFilter, QueryResult, QuerySelect,
-    QueryTrait, TryFromU64, Value, entity::prelude::*,
+    ActiveEnum, ActiveEnumValue, Error, QueryResult, TryFromU64, Value, entity::prelude::*,
 };
 use pgorm_query::{ArrayType, Expr, Query, QueryBuilder, SimpleExpr, StringLen};
 use pretty_assertions::assert_eq;
@@ -359,7 +356,7 @@ fn json_column_flattens_json_array_without_cast() {
 // original variants
 #[pgorm_macros::test]
 async fn enum_cast_round_trip() -> Result<(), Error> {
-    use pgorm::{ConnectionTrait, Schema};
+    use pgorm::Schema;
 
     let ctx = TestContext::new("enum_cast_round_trip").await;
     let db = ctx.db.get().await?;

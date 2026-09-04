@@ -4,10 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use futures::TryStreamExt;
-use pgorm::{
-    DatabaseConnection, ItemsAndPagesNumber, PaginatorTrait, QueryOrder, QuerySelect,
-    entity::prelude::*, set,
-};
+use pgorm::{ItemsAndPagesNumber, entity::prelude::*};
 use pgorm_query::{Value, Values};
 use pretty_assertions::assert_eq;
 use std::num::NonZeroU64;

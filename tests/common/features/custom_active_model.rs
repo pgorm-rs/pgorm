@@ -1,7 +1,5 @@
 use super::pgorm_active_enums::*;
 use pgorm::entity::prelude::*;
-use pgorm::set;
-use pgorm::{ActiveValue, IntoActiveValue};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[pgorm(table_name = "custom_active_model")]

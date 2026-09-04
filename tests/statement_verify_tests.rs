@@ -4,8 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, setup::*};
 use pgorm::{
-    DatabaseConnection, DerivePartialModel, Error, ExpectedColumn, FromQueryResult, QueryResult,
-    RowIndex, TransactionTrait, TryGetable, VerifyError, VerifyStatement, entity::prelude::*,
+    Error, ExpectedColumn, RowIndex, TryGetable, VerifyError, VerifyStatement, entity::prelude::*,
 };
 use pretty_assertions::assert_eq;
 

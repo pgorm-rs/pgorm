@@ -233,7 +233,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > particular connection already in hand, and there a prepared `Statement` is
 > the point rather than the hazard.
 
-> [spec:pgorm:def:conn.pool.conn-trait+6]
+> [spec:pgorm:def:conn.pool.conn-trait+7]
 > `ConnectionTrait` is the uniform statement-execution surface over
 > connections and transactions. It defines seven async methods. Six are
 > generic over `T: ?Sized + SqlText + Sync` — the statement is SQL text and
@@ -279,6 +279,16 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `GenericClient::batch_execute` (`conn.pool.generic-client`), which is
 > otherwise unreachable from pgorm because the wrapper types' inner fields are
 > crate-private.
+>
+> A fourth implementor carries no execution of its own: `&mut
+> DatabaseTransaction<'_>` forwards every method through the exclusive borrow.
+> It exists because that is the handle a transaction closure is given
+> (`conn.tx.closure`), and a helper generic over `C: ConnectionTrait` taking
+> `&C` cannot be passed one without it — `&mut T` is its own type, distinct
+> from `T`, and the coercion to `&T` does not fire into an inference variable,
+> so the call site would otherwise have to reborrow as `&*txn`. Being a
+> distinct type is also why the impl cannot overlap the one for
+> `DatabaseTransaction`.
 
 > [spec:pgorm:def:conn.pool.generic-client]
 > `pgorm_pool::GenericClient` is the sealed trait (`Sync` + a private
@@ -383,7 +393,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
-> [spec:pgorm:sem:conn.tx.closure+1]
+> [spec:pgorm:sem:conn.tx.closure+2]
 > `DatabaseConnection::transaction(f)` and `transaction_with(opts, f)` run a
 > closure inside a transaction, taking `F: AsyncFnOnce(&mut
 > DatabaseTransaction<'s>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
@@ -401,6 +411,20 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > opts)`) rather than reborrowed, so the closure is handed the concrete
 > `DatabaseTransaction<'s>` and `F` needs no higher-ranked bound over the
 > transaction's own lifetime.
+>
+> The handle the closure receives is a `ConnectionTrait` implementor in its own
+> right (`conn.pool.conn-trait`), so `&txn` is what a helper generic over `&C`
+> is passed, inside a closure exactly as outside one; no `&*txn` reborrow is
+> required at the call site.
+>
+> `E` stays the caller's. Where a closure body's tail is a bare `Ok(value)` and
+> every fallible call reaches `?`, nothing pins `E` and the caller annotates —
+> `Ok::<_, Error>(value)`. There is deliberately no fixed-`Error` sibling of
+> these methods to spare that annotation: it would be a second name per entry
+> point differing only in a type parameter, and it would have to either return
+> the same `TransactionError<Error>` — an inference alias, nothing more — or
+> flatten to `Error` and erase the distinction `TransactionError` exists to
+> draw.
 >
 > Failures are wrapped in `TransactionError<E>`, whose two variants keep the two
 > kinds of failure apart: `Connection(Error)` for a failing `BEGIN` or `COMMIT`

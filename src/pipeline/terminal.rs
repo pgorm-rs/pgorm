@@ -3,8 +3,8 @@
 use pgorm_query::Values;
 
 use crate::{
-    ConnectionTrait, Error, FromQueryResult, SelectGetableTuple, SelectModel, SelectorRaw,
-    TryGetableMany,
+    ConnectionTrait, DecodeRaw, Error, FromQueryResult, SelectGetableTuple, SelectModel,
+    SelectorRaw, TryGetableMany,
 };
 
 use super::adapter;
@@ -41,10 +41,7 @@ impl Pipeline {
     where
         M: FromQueryResult,
     {
-        let (sql, values) = self.into_sql()?;
-        Ok(SelectorRaw::<SelectModel<M>>::from_statement::<M>(
-            sql, values,
-        ))
+        Ok(self.into_sql()?.into_model::<M>())
     }
 
     /// Compile and stage the pipeline for decoding into a tuple by column
@@ -54,10 +51,7 @@ impl Pipeline {
     where
         T: TryGetableMany,
     {
-        let (sql, values) = self.into_sql()?;
-        Ok(SelectorRaw::<SelectGetableTuple<T>>::into_tuple::<T>(
-            sql, values,
-        ))
+        Ok(self.into_sql()?.into_tuple::<T>())
     }
 
     /// Compile, execute and decode every row into `M`.

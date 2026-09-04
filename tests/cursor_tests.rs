@@ -3,9 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{
-    DatabaseConnection, DerivePartialModel, FromQueryResult, QuerySelect, entity::prelude::*, set,
-};
+use pgorm::{DerivePartialModel, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]
@@ -1294,7 +1292,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
 #[pgorm_macros::test]
 async fn cursor_order_composition() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
-    use pgorm::{Identity, IntoIdentity, QueryOrder};
+    use pgorm::{Identity, IntoIdentity};
     use pgorm_query::{Alias, IntoIden};
 
     let ctx = TestContext::new("cursor_tests_order_composition").await;

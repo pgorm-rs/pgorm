@@ -5,7 +5,7 @@ pub mod common;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{ConnectionTrait, DatabasePool, entity::prelude::*};
+use pgorm::entity::prelude::*;
 use pgorm_pool::{PoolBuilder, PoolConfig};
 use pretty_assertions::assert_eq;
 

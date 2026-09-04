@@ -2810,12 +2810,20 @@ children (
                 id ergo.fluent-prelude
                 title "The prelude carries what files actually import; statements decode left-to-right; &mut txn is a connection"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-04T15:24:40.869382Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From the fluent-audit (probes on spike/fluent-audit: probe_f_prelude, probe_a_selector_entry, probe_e_txn_conn_impl). (1) Prelude gap, 58 files re-import ~10 names: add QuerySelect, QueryOrder, QueryTrait, PaginatorTrait, ActiveValue + Set/Unchanged/NotSet, IntoActiveModel, IntoActiveValue, FromQueryResult, TryIntoModel, Iterable, Condition, JoinType, Order, Insert, Update, Delete to entity::prelude (collision-probed clean); then strip the now-redundant imports across the test corpus — the deletion is the payoff. (2) Selector double-spelling, 14 sites: Selector::<SelectModel<M>>::from_select::<M>(stmt) names the row type twice because S is unconstrained — add extension traits per probe_a: stmt.into_model::<M>() / stmt.into_tuple() on SelectStatement and on (String, Values); keep existing constructors (additive); TIME-SENSITIVE for pipeline terminals which land on exactly (String, Values). Bump exec.crud.selector-entry. (3) Transaction friction: no impl ConnectionTrait for &mut DatabaseTransaction<'_> forces &*txn at 10 sites — add the forwarding impl ((**self)), disjointness probed; also consider the fixed-error transaction variant killing the 4 Ok::<_, Error> annotations (judgment on name). Bump conn.tx.closure / conn.pool.conn-trait as touched."
+                    }
+
+                    {
+                        at 2026-09-04T16:01:11.030623Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

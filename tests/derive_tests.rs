@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::TestContext;
-use pgorm::{Error, FromQueryResult, SelectModel, SelectorRaw, TryGetable};
+use pgorm::{DecodeRaw, Error, FromQueryResult, SelectModel, SelectorRaw, TryGetable};
 use pgorm_query::Values;
 
 #[derive(FromQueryResult)]
@@ -89,7 +89,7 @@ fn raw<M>(sql: &str) -> SelectorRaw<SelectModel<M>>
 where
     M: FromQueryResult,
 {
-    SelectorRaw::<SelectModel<M>>::from_statement::<M>(sql.to_owned(), Values(Vec::new()))
+    (sql, Values(Vec::new())).into_model::<M>()
 }
 
 // [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding

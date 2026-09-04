@@ -95,17 +95,12 @@ pub use pgorm_sql_macro::sql;
 /// The result lands on the same escape hatches as [`sql!`](crate::sql):
 ///
 /// ```no_run
-/// # use pgorm::{prql, FromQueryResult, SelectModel, SelectorRaw};
+/// # use pgorm::{prql, DecodeRaw, FromQueryResult};
 /// # #[derive(FromQueryResult)]
 /// # struct Invoice { total: i64 }
 /// # async fn demo(db: pgorm::DatabaseConnection) -> Result<(), pgorm::Error> {
 /// let (sql, values) = prql!("from invoice | filter total > $1 | take 5", 100_i64);
-/// let rows: Vec<Invoice> = SelectorRaw::<SelectModel<Invoice>>::from_statement::<Invoice>(
-///     sql.to_owned(),
-///     values,
-/// )
-/// .all(&db)
-/// .await?;
+/// let rows: Vec<Invoice> = (sql, values).into_model::<Invoice>().all(&db).await?;
 /// # Ok(())
 /// # }
 /// ```

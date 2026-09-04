@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabaseConnection, entity::prelude::*, entity::*, set};
+use pgorm::{entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]

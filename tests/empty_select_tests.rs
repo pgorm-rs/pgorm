@@ -9,8 +9,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{
-    DatabaseConnection, Error, PaginatorTrait, QuerySelect, RuntimeError, SelectGetableTuple,
-    SelectProjected, Selector, entity::prelude::*, set,
+    Error, RuntimeError, SelectGetableTuple, SelectProjected, Selector, entity::prelude::*,
 };
 use pgorm_query::SelectStatement;
 use pretty_assertions::assert_eq;

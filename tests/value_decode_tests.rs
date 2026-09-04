@@ -3,10 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{
-    DatabaseConnection, FromQueryResult, QueryOrder, QuerySelect, Schema, SelectModel, SelectorRaw,
-    TryGetableMany, entity::prelude::*, entity::*,
-};
+use pgorm::{Schema, SelectModel, SelectorRaw, TryGetableMany, entity::prelude::*};
 use pgorm_query::Values;
 use pretty_assertions::assert_eq;
 
@@ -132,7 +129,7 @@ fn raw<M>(sql: &str) -> SelectorRaw<SelectModel<M>>
 where
     M: FromQueryResult,
 {
-    SelectorRaw::<SelectModel<M>>::from_statement::<M>(sql.to_owned(), Values(Vec::new()))
+    (sql, Values(Vec::new())).into_model::<M>()
 }
 
 struct EntryPoints {

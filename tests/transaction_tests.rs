@@ -3,10 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{
-    DatabaseConnection, DatabaseTransaction, IsolationLevel, TransactionError, TransactionMode,
-    TransactionTrait, entity::prelude::*, set,
-};
+use pgorm::{IsolationLevel, TransactionError, TransactionMode, entity::prelude::*};
 use pretty_assertions::assert_eq;
 use tokio_postgres::error::SqlState;
 

@@ -4,9 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 
-use pgorm::{
-    ColumnFromStrError, ConnectionTrait, Error, LoaderTrait, RuntimeError, entity::prelude::*,
-};
+use pgorm::{ColumnFromStrError, Error, RuntimeError, entity::prelude::*};
 use pgorm_pool::{PoolError, Runtime};
 use pretty_assertions::assert_eq;
 use std::{error::Error as StdError, fmt, str::FromStr, time::Duration};

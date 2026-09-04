@@ -13,7 +13,9 @@
 pub mod common;
 
 pub use common::TestContext;
-use pgorm::{ConnectionTrait, Error, FromQueryResult, SelectModel, SelectorRaw, Values, prql, sql};
+use pgorm::{
+    ConnectionTrait, DecodeRaw, Error, FromQueryResult, SelectModel, SelectorRaw, Values, prql, sql,
+};
 use pretty_assertions::assert_eq;
 
 #[derive(FromQueryResult, Debug, PartialEq)]
@@ -30,7 +32,7 @@ const SCHEMA: &str = sql!(
 );
 
 fn selector(sql: &str, values: Values) -> SelectorRaw<SelectModel<Invoice>> {
-    SelectorRaw::<SelectModel<Invoice>>::from_statement::<Invoice>(sql.to_owned(), values)
+    (sql, values).into_model::<Invoice>()
 }
 
 // [spec:pgorm:def:macros.prql/test]    the expansion binds its argument end to end
@@ -127,9 +129,7 @@ async fn sstring_survives_to_execution() -> Result<(), Error> {
         r#"from invoice | filter total > $1 | derive lowered = s"lower(billing_city)" | select {lowered}"#,
         150_i64,
     );
-    let rows = SelectorRaw::<SelectModel<City>>::from_statement::<City>(query.to_owned(), values)
-        .all(&db)
-        .await?;
+    let rows = (query, values).into_model::<City>().all(&db).await?;
 
     assert_eq!(
         rows.iter()

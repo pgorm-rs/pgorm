@@ -406,3 +406,41 @@ explicit limitations.
 > first pair goes to the constructor and the rest are appended
 > (`[spec:pgorm:req:sql.ddl.foreign-key+3]`). There is no unpaired or empty
 > column set on either side of the conversion for it to fail on.
+
+## Prelude
+
+> [spec:pgorm:def:entity.prelude]
+> `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
+> talks to the database imports instead of naming what it needs one item at a
+> time. Membership is chosen from what code actually writes, and is public API:
+> removing a name from it breaks callers that never mentioned it.
+>
+> It carries the entity trait family and the derives that produce it
+> (`entity.traits`); the query-builder traits whose methods are otherwise
+> unreachable — `QueryFilter`, `QuerySelect`, `QueryOrder`, `QueryTrait`,
+> `PaginatorTrait`, `CursorTrait`, `LoaderTrait`; the active-model vocabulary
+> `ActiveValue` with its `Set` / `Unchanged` / `NotSet` variants,
+> `IntoActiveModel`, `IntoActiveValue`, `TryIntoModel`, and the free `set`
+> constructor (`entity.active-model.from-sugar`); the CRUD entry points
+> `Select`, `Insert`, `Update`, `Delete`; the decode surface `FromQueryResult`,
+> `QueryResult`, `DecodeSelect`, `DecodeRaw` (`exec.crud.selector-entry`); the
+> connection types `DatabasePool`, `DatabaseConnection`, `DatabaseTransaction`,
+> `ConnectionTrait`, `TransactionTrait`; `Iterable`, `Condition`, `JoinType`,
+> `Value`, the `error` module's contents, and the handful of `pgorm_query`
+> names an entity definition needs (`Expr`, `DynIden`, `SeaRc`, `StringLen`,
+> `ForeignKeyAction`, `RcOrArc`).
+>
+> `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.
+> `order` is an ordinary table name, so an entity aliased `Order` is ordinary
+> too, and a module globbing both it and this prelude makes every mention of
+> `Order` an E0659 ambiguity; `order_by_asc` / `order_by_desc` cover the common
+> case and the enum is one import away. The same hazard is live for members
+> that stay — `ActiveEnum` collides with an entity of that name — so a file
+> hitting it disambiguates with an explicit import, which is why the hazard is
+> stated here rather than resolved by shrinking the prelude to names no schema
+> could reuse.
+>
+> `IdenStatic` is a member, and pgorm's `IdenStatic` is NOT
+> `pgorm_query::IdenStatic`: the two traits share a name and differ in
+> signature, so glob-importing both modules is an ambiguity waiting for its
+> first use.

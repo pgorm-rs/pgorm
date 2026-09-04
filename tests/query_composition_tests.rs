@@ -20,10 +20,7 @@ use pgorm::pgorm_query::{
     Alias, CommonTableExpression, Condition, Func, Order, OrderedStatement, Query,
     RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
 };
-use pgorm::{
-    ConnectionTrait, Error, FromQueryResult, JoinType, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait, SelectGetableTuple, SelectModel, Selector, SelectorRaw, entity::prelude::*, set,
-};
+use pgorm::{Error, SelectGetableTuple, SelectModel, Selector, SelectorRaw, entity::prelude::*};
 use pretty_assertions::assert_eq;
 
 async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {

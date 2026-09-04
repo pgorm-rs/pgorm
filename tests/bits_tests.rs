@@ -3,7 +3,7 @@
 pub mod common;
 
 use common::features::*;
-use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
+use pgorm::{ActiveValue::Unchanged, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 // [spec:pgorm:req:sql.render.cast-param-type/test]

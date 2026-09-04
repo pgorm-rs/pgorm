@@ -2,7 +2,7 @@
 
 pub mod common;
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabaseConnection, IntoActiveModel, entity::prelude::*};
+use pgorm::entity::prelude::*;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {

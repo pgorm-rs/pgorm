@@ -13,7 +13,7 @@ pub use common::{
     },
     setup::*,
 };
-use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
+use pgorm::{ActiveValue::Unchanged, entity::prelude::*, entity::*};
 use pgorm_query::{ArrayType, ColumnType, Value, ValueType, ValueTypeError};
 use pretty_assertions::assert_eq;
 

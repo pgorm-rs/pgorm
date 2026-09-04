@@ -10,7 +10,7 @@ pub use common::{
     },
     setup::*,
 };
-use pgorm::{ActiveValue::Unchanged, DatabaseConnection, entity::prelude::*, entity::*, set};
+use pgorm::{ActiveValue::Unchanged, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
 #[pgorm_macros::test]

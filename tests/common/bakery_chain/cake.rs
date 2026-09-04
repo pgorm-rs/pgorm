@@ -1,5 +1,5 @@
 use crate::common::setup::rust_dec;
-use pgorm::{ConnectionTrait, entity::prelude::*};
+use pgorm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[pgorm(table_name = "cake")]
@@ -53,7 +53,6 @@ impl Related<super::lineitem::Entity> for Entity {
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
-        use pgorm::set;
         Self {
             serial: set(Uuid::new_v4()),
             ..ActiveModelTrait::default()

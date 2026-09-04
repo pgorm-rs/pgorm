@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, features::*, setup::*};
-use pgorm::{DatabaseConnection, entity::prelude::*, entity::*};
+use pgorm::entity::prelude::*;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
