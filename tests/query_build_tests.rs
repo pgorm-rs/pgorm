@@ -21,7 +21,7 @@ use pgorm::tests_cfg::{
 };
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
-    Error, IdenStatic, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
+    Error, IdenStr, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
     QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectTwo, SelectTwoMany,
     TryInsert, Update, UpdateMany, UpdateOne,
 };
@@ -308,7 +308,7 @@ fn filter_accumulates_and_accepts_trees() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.column+2/test]    `eq_any` / `ne_all` spend one
+// [spec:pgorm:def:entity.traits.column+3/test]    `eq_any` / `ne_all` spend one
 // parameter on the whole list, so the statement text is the same at every
 // cardinality, where `is_in` / `is_not_in` spend one per element
 #[test]
@@ -612,7 +612,7 @@ fn order_by_appends_and_never_dedups() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+2/test]    `join` targets `to_tbl`, `join_rev`
+// [spec:pgorm:sem:query.build.join+3/test]    `join` targets `to_tbl`, `join_rev`
 // targets `from_tbl`, and `join_as`/`join_as_rev` re-alias the joined table
 // first; the ON condition is one equality per declared column pair
 #[test]
@@ -693,7 +693,7 @@ fn join_direction_and_alias_choice() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+2/test]    `condition_type` picks `all` or
+// [spec:pgorm:sem:query.build.join+3/test]    `condition_type` picks `all` or
 // `any` for the ON condition, and the `on_condition` closure is added to it
 #[test]
 fn join_condition_type_and_custom_predicate() {
@@ -722,7 +722,7 @@ fn join_condition_type_and_custom_predicate() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+2/test]    the `Related` helpers join the
+// [spec:pgorm:sem:query.build.join+3/test]    the `Related` helpers join the
 // junction relation first when a `via` exists, and `reverse_join` walks the
 // relation backwards
 #[test]
@@ -773,6 +773,68 @@ fn related_helpers_join_via_then_target() {
         [
             r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
             r#"INNER JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:sem:query.build.join.rel/test]    each `*_join_rel` method is its
+// `join(JoinType::X, rel.def())` spelling and each `*_join_rel_rev` its
+// `join_rev` one, for a relation carrying whatever `on_condition` it likes
+#[test]
+fn relation_named_joins_match_the_long_spelling() {
+    for (sugar, spelled) in [
+        (
+            cake::Entity::find().left_join_rel(cake::Relation::Fruit),
+            cake::Entity::find().join(JoinType::LeftJoin, cake::Relation::Fruit.def()),
+        ),
+        (
+            cake::Entity::find().inner_join_rel(cake::Relation::Fruit),
+            cake::Entity::find().join(JoinType::InnerJoin, cake::Relation::Fruit.def()),
+        ),
+        (
+            cake::Entity::find().right_join_rel(cake::Relation::Fruit),
+            cake::Entity::find().join(JoinType::RightJoin, cake::Relation::Fruit.def()),
+        ),
+        // The relation's own `on_condition` rides along, since the def is the
+        // same def.
+        (
+            cake::Entity::find().left_join_rel(cake::Relation::TropicalFruit),
+            cake::Entity::find().join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def()),
+        ),
+    ] {
+        assert_eq!(sugar.as_query().to_string(), spelled.as_query().to_string());
+    }
+
+    for (sugar, spelled) in [
+        (
+            fruit::Entity::find().left_join_rel_rev(cake::Relation::Fruit),
+            fruit::Entity::find().join_rev(JoinType::LeftJoin, cake::Relation::Fruit.def()),
+        ),
+        (
+            fruit::Entity::find().inner_join_rel_rev(cake::Relation::Fruit),
+            fruit::Entity::find().join_rev(JoinType::InnerJoin, cake::Relation::Fruit.def()),
+        ),
+        (
+            fruit::Entity::find().right_join_rel_rev(cake::Relation::Fruit),
+            fruit::Entity::find().join_rev(JoinType::RightJoin, cake::Relation::Fruit.def()),
+        ),
+    ] {
+        assert_eq!(sugar.as_query().to_string(), spelled.as_query().to_string());
+    }
+
+    // The sugar is on `QuerySelect`, so it reaches every builder `join` does,
+    // and composes with the rest of the surface.
+    assert_eq!(
+        cake::Entity::find()
+            .left_join_rel(cake::Relation::Fruit)
+            .filter(fruit::Column::Name.contains("cherry"))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+            r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+            r#"WHERE "fruit"."name" LIKE '%cherry%'"#,
         ]
         .join(" ")
     );

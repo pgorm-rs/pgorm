@@ -6,7 +6,7 @@ pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pgorm_query::{Alias, Expr};
 use pgorm::{DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*, set};
 
-// [spec:pgorm:req:query.loader/test]    `load_one` over a `Vec<M>`, taking a
+// [spec:pgorm:req:query.loader+1/test]    `load_one` over a `Vec<M>`, taking a
 // bare entity through `EntityOrSelect`, returning `Vec<Option<R::Model>>`
 // positionally aligned with the input, and rejecting a `HasMany` relation
 #[pgorm_macros::test]
@@ -52,7 +52,7 @@ async fn loader_load_one() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader/test]    `load_many` returning `Vec<Vec<..>>`
+// [spec:pgorm:req:query.loader+1/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
 // [spec:pgorm:sem:query.loader.regroup+3/test]    a bucket per input key in
@@ -165,15 +165,16 @@ async fn loader_load_many_multi() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader/test]    `load_many_to_many` across a junction,
-// from a bare entity and from a pre-filtered `Select<R>`
-// [spec:pgorm:sem:query.loader.many-to-many+1/test]    the junction is resolved
-// first and the targets second: a shared target is cloned into every
-// referencing input, and a foreign key whose target row the caller's `Select`
-// filtered away is silently dropped from that input's list
+// [spec:pgorm:req:query.loader+1/test]    `load_many_via` across a junction,
+// from a bare entity and from a pre-filtered `Select<R>` — the junction entity
+// is never named by the caller
+// [spec:pgorm:sem:query.loader.many-to-many+2/test]    one join carries the
+// input key back with each target row: a shared target is cloned into every
+// referencing input, a target the caller's `Select` filtered away is dropped
+// from that input's list, and the caller's `order_by` orders every bucket
 #[pgorm_macros::test]
-async fn loader_load_many_to_many() -> Result<(), Error> {
-    let ctx = TestContext::new("loader_test_load_many_to_many").await;
+async fn loader_load_many_via() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_load_many_via").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
     let db = &conn;
@@ -195,9 +196,13 @@ async fn loader_load_many_to_many() -> Result<(), Error> {
     insert_cake_baker(db, baker_2.id, cake_3.id).await?;
 
     let bakers = baker::Entity::find().all(db).await?;
-    let cakes = bakers
-        .load_many_to_many(cake::Entity, cakes_bakers::Entity, db)
-        .await?;
+
+    // A bare entity: the rows arrive in whatever order the join produces, so
+    // the assertion sorts each bucket rather than pretending otherwise.
+    let mut cakes = bakers.load_many_via(cake::Entity, db).await?;
+    for bucket in &mut cakes {
+        bucket.sort_by_key(|cake| cake.id);
+    }
 
     assert_eq!(bakers, [baker_1.clone(), baker_2.clone(), baker_3.clone()]);
     assert_eq!(
@@ -212,19 +217,19 @@ async fn loader_load_many_to_many() -> Result<(), Error> {
     // same, but apply restrictions on cakes
 
     let cakes = bakers
-        .load_many_to_many(
+        .load_many_via(
             cake::Entity::find().filter(cake::Column::Name.like("Ch%")),
-            cakes_bakers::Entity,
             db,
         )
         .await?;
     assert_eq!(cakes, [vec![cake_1.clone()], vec![cake_3.clone()], vec![]]);
 
-    // now, start again from cakes
+    // now, start again from cakes — and order the target selector, which
+    // orders every bucket.
 
     let cakes = cake::Entity::find().all(db).await?;
     let bakers = cakes
-        .load_many_to_many(baker::Entity, cakes_bakers::Entity, db)
+        .load_many_via(baker::Entity::find().order_by_desc(baker::Column::Id), db)
         .await?;
 
     assert_eq!(cakes, [cake_1, cake_2, cake_3, cake_4]);
@@ -232,7 +237,7 @@ async fn loader_load_many_to_many() -> Result<(), Error> {
         bakers,
         [
             vec![baker_1.clone()],
-            vec![baker_1.clone(), baker_2.clone()],
+            vec![baker_2.clone(), baker_1.clone()],
             vec![baker_2.clone()],
             vec![]
         ]
@@ -456,11 +461,12 @@ async fn insert_ledger(
     .await
 }
 
-// [spec:pgorm:req:query.loader/test]    relation shape is validated up front:
+// [spec:pgorm:req:query.loader+1/test]    relation shape is validated up front:
 // `load_one` rejects a junction, `load_many` rejects a junction and a HasOne
-// target, and `load_many_to_many` rejects a missing junction, a non-HasOne
-// target and a junction entity that is not the relation's own. The `&[M]` impl
-// the `Vec<M>` one delegates to is public API in its own right.
+// target, and `load_many_via` rejects a missing junction and a non-HasOne
+// target. There is no longer a mismatched-junction case to reject: the
+// junction is the relation's own and the caller cannot name a different one.
+// The `&[M]` impl the `Vec<M>` one delegates to is public API in its own right.
 #[pgorm_macros::test]
 async fn loader_rejects_wrong_relation_shapes() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_relation_shapes").await;
@@ -489,30 +495,13 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), Error> {
         internal_err("Relation is HasOne instead of HasMany")
     );
     assert_eq!(
-        bakers
-            .load_many_to_many(bakery::Entity, cakes_bakers::Entity, db)
-            .await,
+        bakers.load_many_via(bakery::Entity, db).await,
         internal_err("Relation is not ManyToMany")
     );
     assert_eq!(
-        cakes
-            .load_many_to_many(ledger::Entity, cakes_bakers::Entity, db)
-            .await,
+        cakes.load_many_via(ledger::Entity, db).await,
         internal_err("Relation to is not HasOne")
     );
-
-    // The junction entity is compared against the relation's own junction.
-    let wrong_via = bakers
-        .load_many_to_many(cake::Entity, bakery::Entity, db)
-        .await
-        .expect_err("a mismatched junction entity must be rejected");
-    match wrong_via {
-        Error::Query(RuntimeError::Internal(message)) => assert!(
-            message.starts_with("The given via Entity is incorrect"),
-            "{message}"
-        ),
-        other => panic!("unexpected error: {other:?}"),
-    }
 
     // The slice impl carries the actual implementation.
     let slice: &[baker::Model] = bakers.as_slice();
@@ -524,7 +513,7 @@ async fn loader_rejects_wrong_relation_shapes() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:query.loader/test]    an empty input short-circuits to an
+// [spec:pgorm:req:query.loader+1/test]    an empty input short-circuits to an
 // empty result without querying: every selector passed here would raise a
 // database error if it were ever sent
 #[pgorm_macros::test]
@@ -555,9 +544,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
 
     let no_bakers_slice: &[baker::Model] = &[];
     assert_eq!(
-        no_bakers_slice
-            .load_many_to_many(poisoned_cake(), cakes_bakers::Entity, db)
-            .await?,
+        no_bakers_slice.load_many_via(poisoned_cake(), db).await?,
         Vec::<Vec<cake::Model>>::new()
     );
 

@@ -1,11 +1,11 @@
 use crate::{
-    ColumnTrait, EntityTrait, IdenStatic, Iterable, Linked, QuerySelect, Related, Select, SelectA,
+    ColumnTrait, EntityTrait, IdenStr, Iterable, Linked, QuerySelect, Related, Select, SelectA,
     SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
 };
 pub use pgorm_query::JoinType;
 use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
 
-// [spec:pgorm:sem:query.build.join+2]
+// [spec:pgorm:sem:query.build.join+3]
 // [spec:pgorm:sem:query.build.combine+1]
 impl<E> Select<E>
 where

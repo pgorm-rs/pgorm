@@ -7,16 +7,27 @@ use pgorm_query::{Alias, Iden, IntoIden, IntoTableName, IntoValueTuple, TableNam
 use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
-/// Ensure the identifier for an Entity can be converted to a static str
-// [spec:pgorm:def:entity.traits]
-pub trait IdenStatic: Iden + Copy + Debug + 'static {
-    /// Method to call to get the static string identity
+/// An [`Iden`] that also hands out its name as a `&str`.
+///
+/// This is the base identifier contract of the entity layer: entities,
+/// columns and primary keys all implement it, and it is what
+/// [`IntoIdentity`](crate::IntoIdentity) keys on, so implementing it is what
+/// lets a type stand in a column position.
+///
+/// It is deliberately *not* [`pgorm_query::IdenStatic`], whose `as_str`
+/// returns `&'static str`: the name an entity hands out is borrowed from
+/// `self` (`EntityName::table_name`), so the two cannot be one trait. They
+/// once shared the name `IdenStatic`, which put two incompatible traits with
+/// the same name and the same method into scope together.
+// [spec:pgorm:def:entity.traits+1]
+pub trait IdenStr: Iden + Copy + Debug + 'static {
+    /// The identifier as an unquoted string.
     fn as_str(&self) -> &str;
 }
 
 /// A Trait for mapping an Entity to a database table
 // [spec:pgorm:req:entity.traits.entity-name+1]
-pub trait EntityName: IdenStatic + Default {
+pub trait EntityName: IdenStr + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {
         None
@@ -56,7 +67,7 @@ pub trait EntityName: IdenStatic + Default {
 /// - Insert: `insert`, `insert_*`
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
-// [spec:pgorm:def:entity.traits]
+// [spec:pgorm:def:entity.traits+1]
 // [spec:pgorm:req:entity.traits.crud+3]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]

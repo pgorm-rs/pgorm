@@ -1,5 +1,5 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IdenStatic,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IdenStr,
     IntoActiveModel, Iterable, PrimaryKeyTrait, QueryTrait, RuntimeError,
 };
 use core::marker::PhantomData;

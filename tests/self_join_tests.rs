@@ -51,7 +51,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
 
     assert_eq!(
         model
-            .find_linked(self_join::SelfReferencingLink)
+            .find_linked(RelatedLink::to(self_join::Entity))
             .all(db)
             .await?,
         []
@@ -59,7 +59,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
 
     assert_eq!(
         linked_model
-            .find_linked(self_join::SelfReferencingLink)
+            .find_linked(RelatedLink::to(self_join::Entity))
             .all(db)
             .await?,
         std::slice::from_ref(&model)
@@ -67,7 +67,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
 
     assert_eq!(
         not_linked_model
-            .find_linked(self_join::SelfReferencingLink)
+            .find_linked(RelatedLink::to(self_join::Entity))
             .all(db)
             .await?,
         []
@@ -75,7 +75,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
 
     assert_eq!(
         self_join::Entity::find()
-            .find_also_linked(self_join::SelfReferencingLink)
+            .find_also_linked(RelatedLink::to(self_join::Entity))
             .order_by_asc(self_join::Column::Time)
             .all(db)
             .await?,
@@ -87,4 +87,27 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     );
 
     Ok(())
+}
+
+// [spec:pgorm:req:entity.relation.linked+1/test]    a self-relation is the case
+// `RelatedLink` exists for: the link form aliases the joined table, so the
+// entity's own table can be joined a second time without being named twice
+#[test]
+fn self_related_link_aliases_the_second_copy() {
+    use pgorm::QueryTrait;
+
+    assert_eq!(
+        self_join::Entity::find()
+            .find_also_linked(RelatedLink::to(self_join::Entity))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "self_join"."uuid" AS "A_uuid", "self_join"."uuid_ref" AS "A_uuid_ref","#,
+            r#""self_join"."time" AS "A_time", "r0"."uuid" AS "B_uuid","#,
+            r#""r0"."uuid_ref" AS "B_uuid_ref", "r0"."time" AS "B_time""#,
+            r#"FROM "self_join""#,
+            r#"LEFT JOIN "self_join" AS "r0" ON "self_join"."uuid_ref" = "r0"."uuid""#,
+        ]
+        .join(" ")
+    );
 }

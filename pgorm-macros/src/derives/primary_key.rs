@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned};
 use syn::{Data, DataEnum, Expr, Fields, LitStr, Variant};
 
 /// Method to derive a Primary Key for a Model using the [PrimaryKeyTrait](pgorm::PrimaryKeyTrait)
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 pub fn expand_derive_primary_key(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     let variants = match data {
@@ -61,12 +61,12 @@ pub fn expand_derive_primary_key(ident: Ident, data: Data) -> syn::Result<TokenS
         #[automatically_derived]
         impl pgorm::Iden for #ident {
             fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                write!(s, "{}", pgorm::IdenStatic::as_str(self)).unwrap();
+                write!(s, "{}", pgorm::IdenStr::as_str(self)).unwrap();
             }
         }
 
         #[automatically_derived]
-        impl pgorm::IdenStatic for #ident {
+        impl pgorm::IdenStr for #ident {
             fn as_str(&self) -> &str {
                 match self {
                     #(Self::#variant => #name),*

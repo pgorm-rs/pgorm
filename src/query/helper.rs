@@ -1,6 +1,6 @@
 use crate::{
     ColumnPairs, ColumnTrait, EntityTrait, IntoIdentity, IntoSimpleExpr, Iterable, ModelTrait,
-    PrimaryKeyToColumn, QueryTrait, RelationDef,
+    PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
 };
 use pgorm_query::{
     Alias, ConditionType, Expr, FromItem, FunctionCall, Iden, IntoCondition, IntoIden,
@@ -427,6 +427,110 @@ pub trait QuerySelect: Sized {
         self.query()
             .join(join, rel.from_tbl.clone(), join_condition(rel));
         self
+    }
+
+    /// `LEFT JOIN` the entity a relation points at.
+    ///
+    /// The relation names itself; the join type is in the method name and the
+    /// [`RelationDef`] is taken from the relation, so neither has to be
+    /// spelled at the call site.
+    ///
+    /// ```
+    /// use pgorm::{EntityTrait, QuerySelect, QueryTrait, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .left_join_rel(cake::Relation::Fruit)
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+    ///         r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:sem:query.build.join.rel]
+    fn left_join_rel<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join(JoinType::LeftJoin, rel.def())
+    }
+
+    /// `INNER JOIN` the entity a relation points at.
+    ///
+    /// ```
+    /// use pgorm::{EntityTrait, QuerySelect, QueryTrait, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .inner_join_rel(cake::Relation::Fruit)
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+    ///         r#"INNER JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    fn inner_join_rel<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join(JoinType::InnerJoin, rel.def())
+    }
+
+    /// `RIGHT JOIN` the entity a relation points at.
+    fn right_join_rel<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join(JoinType::RightJoin, rel.def())
+    }
+
+    /// `LEFT JOIN` the entity a relation points *from*.
+    ///
+    /// The `_rev` methods are [`join_rev`](QuerySelect::join_rev)'s direction:
+    /// given a relation A to B, they join A while selecting from B.
+    ///
+    /// ```
+    /// use pgorm::{EntityTrait, QuerySelect, QueryTrait, tests_cfg::{cake, fruit}};
+    ///
+    /// assert_eq!(
+    ///     fruit::Entity::find()
+    ///         .left_join_rel_rev(cake::Relation::Fruit)
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id" FROM "fruit""#,
+    ///         r#"LEFT JOIN "cake" ON "cake"."id" = "fruit"."cake_id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    fn left_join_rel_rev<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join_rev(JoinType::LeftJoin, rel.def())
+    }
+
+    /// `INNER JOIN` the entity a relation points *from*.
+    fn inner_join_rel_rev<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join_rev(JoinType::InnerJoin, rel.def())
+    }
+
+    /// `RIGHT JOIN` the entity a relation points *from*.
+    fn right_join_rel_rev<R>(self, rel: R) -> Self
+    where
+        R: RelationTrait,
+    {
+        self.join_rev(JoinType::RightJoin, rel.def())
     }
 
     /// Select lock
@@ -975,7 +1079,7 @@ pub trait QueryFilter: Sized {
     }
 }
 
-// [spec:pgorm:sem:query.build.join+2]
+// [spec:pgorm:sem:query.build.join+3]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
     let from_tbl = SeaRc::clone(rel.from_tbl.qualifier());
@@ -997,7 +1101,7 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     condition
 }
 
-// [spec:pgorm:sem:query.build.join+2]
+// [spec:pgorm:sem:query.build.join+3]
 pub(crate) fn join_tbl_on_condition(
     from_tbl: SeaRc<dyn Iden>,
     to_tbl: SeaRc<dyn Iden>,

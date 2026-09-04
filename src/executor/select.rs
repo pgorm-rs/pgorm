@@ -1,5 +1,5 @@
 use crate::{
-    ConnectionTrait, EntityTrait, FromQueryResult, IdenStatic, Iterable, ModelTrait,
+    ConnectionTrait, EntityTrait, FromQueryResult, IdenStr, Iterable, ModelTrait,
     PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, Select,
     SelectA, SelectB, SelectProjected, SelectTwo, SelectTwoMany, SelectTwoProjected,
     TryGetableMany, error::*,

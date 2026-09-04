@@ -23,7 +23,7 @@ pub enum Column {
 }
 
 // Then, customize each column names here.
-impl IdenStatic for Column {
+impl IdenStr for Column {
     fn as_str(&self) -> &str {
         match self {
             // Override column names

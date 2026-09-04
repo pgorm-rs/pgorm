@@ -2854,12 +2854,20 @@ children (
                 id ergo.fluent-joins
                 title "Join sugar, loader via-dropping, Linked boilerplate, and the IdenStatic name collision"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-04T15:24:45.780682Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "From the fluent-audit (probes: probe_h_joins, probe_g_alias_token surfaced the defect). (1) Join sugar, 88+17 sites: join(JoinType::LeftJoin, baker::Relation::Bakery.def()) -> left_join_rel(baker::Relation::Bakery) (+ inner/right variants; .rev() direction covered — probe_h shows identical SQL). Additive; keep join(). (2) load_many_to_many(stmt, via, db) makes the caller name the junction entity Related::via() already knows, and the body only compares-and-errors (loader.rs:270-275) — add load_many_via without the via param, then delete the old shape (11 sites). (3) Linked boilerplate: three of five hand-written Linked impls in tests are 11-line single-hop wrappers duplicating the Related impl directly above — either a DeriveLinked in pgorm-macros or find_also_linked/find_with_linked accepting a Related witness (judgment; M effort, cut if it balloons — report). (4) DEFECT: pgorm defines its own IdenStatic (base_entity.rs:13, as_str -> &str) colliding by name with pgorm_query::IdenStatic (-> &'static str), both reachable through preludes, and only pgorm's feeds IntoIdentity — implementing the wrong one is a confusing E0277. Resolve the collision: rename pgorm's (or unify if signatures allow — judgment, breaking accepted); bump entity.traits/entity rules touched."
+                    }
+
+                    {
+                        at 2026-09-04T16:44:09.940572Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

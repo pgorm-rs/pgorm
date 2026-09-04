@@ -1,4 +1,4 @@
-use crate::{EntityName, Iden, IdenStatic, IntoSimpleExpr, Iterable};
+use crate::{EntityName, Iden, IdenStr, IntoSimpleExpr, Iterable};
 use pgorm_query::{
     Alias, BinOper, DynIden, Expr, Func, IntoColumnRef, IntoIden, SeaRc, SelectStatement,
     SimpleExpr, Value, ValueType,
@@ -92,8 +92,8 @@ macro_rules! bind_subquery_func {
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column+2]
-pub trait ColumnTrait: IdenStatic + Iterable + FromStr {
+// [spec:pgorm:def:entity.traits.column+3]
+pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
 

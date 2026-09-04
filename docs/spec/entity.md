@@ -7,11 +7,17 @@ explicit limitations.
 
 ## Entity traits
 
-> [spec:pgorm:def:entity.traits]
+> [spec:pgorm:def:entity.traits+1]
 > The entity trait family is defined in `src/entity/` and re-exported from
-> `pgorm::entity` (`src/entity/mod.rs`). `IdenStatic` (`base_entity.rs`) is the base
+> `pgorm::entity` (`src/entity/mod.rs`). `IdenStr` (`base_entity.rs`) is the base
 > identifier contract: `Iden + Copy + Debug + 'static` plus `as_str(&self) -> &str`.
-> `EntityName: IdenStatic + Default` maps an entity to a table. `EntityTrait: EntityName`
+> It MUST NOT be named `IdenStatic`: `pgorm_query::IdenStatic` is a different
+> trait with the same method name and an incompatible signature
+> (`-> &'static str`, `[spec:pgorm:def:sql.types+2]`), and the two are reachable
+> together, so sharing the name made implementing the wrong one an unreadable
+> unsatisfied-bound error. They cannot be one trait: an entity's name is
+> borrowed from `self` through `EntityName::table_name`, not `'static`.
+> `EntityName: IdenStr + Default` maps an entity to a table. `EntityTrait: EntityName`
 > is the abstract entity, carrying five associated types: `Model`
 > (`ModelTrait<Entity = Self> + FromQueryResult`), `ActiveModel`
 > (`ActiveModelBehavior<Entity = Self>`), `Column` (`ColumnTrait`), `Relation`
@@ -56,8 +62,8 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column+2]
-> `ColumnTrait: IdenStatic + Iterable + FromStr` (`src/entity/column.rs`) describes one
+> [spec:pgorm:def:entity.traits.column+3]
+> `ColumnTrait: IdenStr + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
 > expression-building surface wrapping `pgorm_query::Expr`: comparison operators `eq`,
@@ -116,8 +122,8 @@ explicit limitations.
 > its own, as `#[pgorm(save_as = "…")]` generates, MUST override this too if its array
 > comparisons are to carry the matching cast; the default knows only the enum case.
 
-> [spec:pgorm:def:entity.traits.primary-key+1]
-> `PrimaryKeyTrait: IdenStatic + Iterable` (`src/entity/primary_key.rs`) defines an
+> [spec:pgorm:def:entity.traits.primary-key+2]
+> `PrimaryKeyTrait: IdenStr + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
 > `Sized + Send + Debug + PartialEq + IntoValueTuple + TryFromValueTuple
@@ -331,7 +337,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+3]
+> [spec:pgorm:def:entity.relation.def+4]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
@@ -357,7 +363,7 @@ explicit limitations.
 >
 > `Identity` (`src/entity/identity.rs`) encodes column-set arity as
 > `Unary` / `Binary` / `Ternary` / `Many(Vec<DynIden>)`. `IntoIdentity` converts
-> `&str` and `String` (via `Alias`), any `IdenStatic`, and tuples of up to 12
+> `&str` and `String` (via `Alias`), any `IdenStr`, and tuples of up to 12
 > identifiers; `IdentityOf<E>`, a subtrait of `IntoIdentity`, restricts
 > conversions to columns of entity `E`.
 >
@@ -388,7 +394,7 @@ explicit limitations.
 > conversion from `NoColumns`, so a relation missing its columns is a compile
 > error rather than a panic.
 
-> [spec:pgorm:req:entity.relation.linked]
+> [spec:pgorm:req:entity.relation.linked+1]
 > `Linked` (`src/entity/link.rs`) expresses a multi-hop join: `link()` returns the
 > ordered `Vec<RelationDef>` chain from `FromEntity` to `ToEntity`. `find_linked()`
 > MUST build the join by iterating the chain in reverse, aliasing each hop's source
@@ -397,6 +403,20 @@ explicit limitations.
 > augmented by that relation's `on_condition` closure when present.
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
+>
+> A chain a `Related` implementation already describes MUST NOT have to be
+> restated as a hand-written `Linked`: `RelatedLink<E, R>` is that chain, its
+> `link()` returning `[E::to()]` for a direct relation and `[via, E::to()]` for
+> a junction-mediated one — the order `Linked` expects. It is a zero-sized
+> `Copy` witness carrying no data, written `RelatedLink::to(target_entity)`,
+> which names only the target: the source entity is inferred from the position
+> the witness is used in. Hand-written `Linked` impls remain the way to express
+> what a `Related` impl does not — chains of more than one relation, and hops
+> carrying a bespoke `on_condition`.
+>
+> The linked form differs from the `Related` one (`find_also_related`) in
+> aliasing the joined table, so `RelatedLink::to(Entity)` on an entity related
+> to itself is well-formed where the related form would name one table twice.
 
 > [spec:pgorm:req:entity.relation.fk+3]
 > A `RelationDef` converts into DDL foreign-key forms via
@@ -417,7 +437,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude]
+> [spec:pgorm:def:entity.prelude+1]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -448,7 +468,15 @@ explicit limitations.
 > stated here rather than resolved by shrinking the prelude to names no schema
 > could reuse.
 >
-> `IdenStatic` is a member, and pgorm's `IdenStatic` is NOT
-> `pgorm_query::IdenStatic`: the two traits share a name and differ in
-> signature, so glob-importing both modules is an ambiguity waiting for its
-> first use.
+> It also carries the relation vocabulary an entity definition and its call
+> sites write: `Related`, `Linked`, `RelationDef`, `RelationTrait`, and the
+> `RelatedLink` witness that spares a `Related` chain from being restated as a
+> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+1]`).
+>
+> `IdenStr` is a member, and it is the reason the base identifier contract is
+> NOT named `IdenStatic` (`[spec:pgorm:def:entity.traits+1]`):
+> `pgorm_query::IdenStatic` is a different trait with the same method and an
+> incompatible signature, and a prelude that globbed one of them into every
+> file made the collision reachable from anywhere. Under the distinct name the
+> two coexist, and the hazard is one the rename retires rather than one a
+> reader has to remember.

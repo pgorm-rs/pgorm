@@ -1,5 +1,5 @@
 use crate::{
-    ColumnTrait, EntityTrait, IdenStatic, Iterable, QueryTrait, Select, SelectTwo, SelectTwoMany,
+    ColumnTrait, EntityTrait, IdenStr, Iterable, QueryTrait, Select, SelectTwo, SelectTwoMany,
 };
 use core::marker::PhantomData;
 use pgorm_query::{
@@ -8,7 +8,7 @@ use pgorm_query::{
 
 macro_rules! select_def {
     ( $ident: ident, $str: expr ) => {
-        /// Implements the traits [Iden] and [IdenStatic] for a type
+        /// Implements the traits [Iden] and [IdenStr] for a type
         #[derive(Debug, Clone, Copy)]
         pub struct $ident;
 
@@ -18,7 +18,7 @@ macro_rules! select_def {
             }
         }
 
-        impl IdenStatic for $ident {
+        impl IdenStr for $ident {
             fn as_str(&self) -> &str {
                 $str
             }

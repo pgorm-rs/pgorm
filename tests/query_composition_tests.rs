@@ -126,7 +126,7 @@ struct PriceBracket {
 // [spec:pgorm:def:query.build.with/test]    a recursive CTE drives the query and the rows land in a
 // `FromQueryResult` struct through every terminal the ORM owns
 // [spec:pgorm:sem:query.build.with.attach/test]
-// [spec:pgorm:sem:exec.crud.selector-entry/test]
+// [spec:pgorm:sem:exec.crud.selector-entry+1/test]
 // [spec:pgorm:sem:sql.render.placeholder-typing/test]    the anchor's cast is what makes the
 // recursion typecheck at all
 #[pgorm_macros::test]
@@ -366,7 +366,7 @@ pub async fn lateral_top_n_decodes_into_struct() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.selector-entry/test]    the very same statement decodes ordinally
+// [spec:pgorm:sem:exec.crud.selector-entry+1/test]    the very same statement decodes ordinally
 // through `Selector::into_tuple`, and its raw counterpart through `SelectorRaw::into_tuple`
 #[pgorm_macros::test]
 pub async fn lateral_top_n_decodes_into_tuple() -> Result<(), Error> {
@@ -493,7 +493,7 @@ fn sorted_names(cakes: &[cake::Model]) -> Vec<String> {
     names
 }
 
-// [spec:pgorm:sem:exec.crud.selector-entry/test]    the new constructor is a `Selector`, so it
+// [spec:pgorm:sem:exec.crud.selector-entry+1/test]    the new constructor is a `Selector`, so it
 // inherits the empty-projection guard rather than sending `SELECT  FROM …`
 // [spec:pgorm:sem:query.build.modifiers+5/test]
 #[pgorm_macros::test]

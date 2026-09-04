@@ -650,7 +650,7 @@ fn serializable() -> TransactionMode {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+1/test]    Ok commits, and the value is returned
+// [spec:pgorm:sem:conn.tx.closure+2/test]    Ok commits, and the value is returned
 #[pgorm_macros::test]
 pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_commit_txclosure").await;
@@ -684,7 +684,7 @@ pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+1/test]    Err rolls back and is wrapped, not swallowed
+// [spec:pgorm:sem:conn.tx.closure+2/test]    Err rolls back and is wrapped, not swallowed
 #[pgorm_macros::test]
 pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_error_txclosure").await;

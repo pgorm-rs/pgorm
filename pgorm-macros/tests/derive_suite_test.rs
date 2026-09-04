@@ -100,7 +100,7 @@ pub enum CustomCol {
     Id,
 }
 
-impl pgorm::IdenStatic for CustomCol {
+impl pgorm::IdenStr for CustomCol {
     fn as_str(&self) -> &str {
         self.default_as_str()
     }

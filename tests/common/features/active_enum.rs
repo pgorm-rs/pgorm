@@ -23,16 +23,4 @@ impl Related<super::active_enum_child::Entity> for Entity {
     }
 }
 
-pub struct ActiveEnumChildLink;
-
-impl Linked for ActiveEnumChildLink {
-    type FromEntity = Entity;
-
-    type ToEntity = super::active_enum_child::Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![Relation::ActiveEnumChild.def()]
-    }
-}
-
 impl ActiveModelBehavior for ActiveModel {}

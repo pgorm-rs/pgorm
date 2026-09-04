@@ -118,7 +118,7 @@ impl DeriveModel {
                     }
                 } else {
                     quote! {
-                        row.try_get(pre, pgorm::IdenStatic::as_str(&<<Self as pgorm::ModelTrait>::Entity as pgorm::entity::EntityTrait>::Column::#column_ident).into())?
+                        row.try_get(pre, pgorm::IdenStr::as_str(&<<Self as pgorm::ModelTrait>::Entity as pgorm::entity::EntityTrait>::Column::#column_ident).into())?
                     }
                 }
             })
@@ -134,7 +134,7 @@ impl DeriveModel {
                 let rust_type = spell_type(field_type);
                 quote! {
                     pgorm::ExpectedColumn::new(
-                        pgorm::IdenStatic::as_str(&<<Self as pgorm::ModelTrait>::Entity as pgorm::entity::EntityTrait>::Column::#column_ident),
+                        pgorm::IdenStr::as_str(&<<Self as pgorm::ModelTrait>::Entity as pgorm::entity::EntityTrait>::Column::#column_ident),
                         #rust_type,
                         <#field_type as pgorm::TryGetable>::accepts,
                     )

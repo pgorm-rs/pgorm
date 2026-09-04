@@ -1,4 +1,4 @@
-use super::{ColumnTrait, IdenStatic, Iterable};
+use super::{ColumnTrait, IdenStr, Iterable};
 use crate::{TryFromU64, TryGetableMany};
 use pgorm_query::{IntoValueTuple, TryFromValueTuple};
 use std::fmt::Debug;
@@ -37,8 +37,8 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key+1]
-pub trait PrimaryKeyTrait: IdenStatic + Iterable {
+// [spec:pgorm:def:entity.traits.primary-key+2]
+pub trait PrimaryKeyTrait: IdenStr + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
         + Send
@@ -69,7 +69,7 @@ pub trait PrimaryKeyToColumn {
 }
 
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key+1]
+// [spec:pgorm:def:entity.traits.primary-key+2]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

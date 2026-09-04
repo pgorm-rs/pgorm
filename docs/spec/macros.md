@@ -47,7 +47,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+1]`).
 
 > [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier
@@ -138,7 +138,7 @@ known limitations.
 > same rows mapped to their `ArrayType` counterparts, except `Vec<u8>`, which it does not
 > carry at all.
 
-> [spec:pgorm:sem:macros.derive.entity-model.primary-key]
+> [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
 > its type to `PrimaryKeyTrait::ValueType` — a bare type for a single key, a tuple for
 > composite keys. `auto_increment()` returns true only when there is exactly one primary
@@ -146,31 +146,31 @@ known limitations.
 > shared: a `false` on any field flips it globally).
 >
 > `DerivePrimaryKey` itself (enums only; other inputs are a compile error) generates
-> `Iden` delegating to `IdenStatic::as_str`, an `IdenStatic` impl mapping each variant
+> `Iden` delegating to `IdenStr::as_str`, an `IdenStr` impl mapping each variant
 > to its snake_case name (or a `column_name` attribute override), and a
 > `PrimaryKeyToColumn` impl whose `into_column`/`from_column` map variants to the
 > same-named variants of a sibling type hard-coded as `Column`.
 
-> [spec:pgorm:sem:macros.derive.entity]
+> [spec:pgorm:sem:macros.derive.entity+1]
 > `DeriveEntity` wires up the entity unit struct. It always generates
 > `impl EntityTrait` with associated types `Model`, `ActiveModel`, `Column`,
 > `PrimaryKey`, `Relation` — each identifier defaulting to those names but overridable
 > via struct-level `#[pgorm(model = Ident, active_model = Ident, column = Ident,
-> primary_key = Ident, relation = Ident)]` — plus `Iden` and `IdenStatic` impls that
+> primary_key = Ident, relation = Ident)]` — plus `Iden` and `IdenStr` impls that
 > render `EntityName::table_name`. An `EntityName` impl (with optional `schema_name`)
 > is generated only when a `table_name` attribute is present; the `DeriveEntityModel`
 > path omits it because the composite writes its own `EntityName` impl.
 
 ## Column, Model and ActiveModel derives
 
-> [spec:pgorm:sem:macros.derive.column+1]
+> [spec:pgorm:sem:macros.derive.column+2]
 > `DeriveColumn` (enums only; other inputs are a compile error) generates: an inherent
 > `default_as_str` returning the snake_case of the variant name or a
 > `#[pgorm(column_name = "...")]` override; a `FromStr` impl accepting either the
 > snake_case or the lowerCamelCase spelling of each variant and returning
-> `ColumnFromStrError(input)` otherwise; an `Iden` impl writing `IdenStatic::as_str`; and
-> an `IdenStatic` impl whose `as_str` is `default_as_str`. `DeriveCustomColumn`
-> generates the same minus the `IdenStatic` impl, leaving `as_str` to the user (who may
+> `ColumnFromStrError(input)` otherwise; an `Iden` impl writing `IdenStr::as_str`; and
+> an `IdenStr` impl whose `as_str` is `default_as_str`. `DeriveCustomColumn`
+> generates the same minus the `IdenStr` impl, leaving `as_str` to the user (who may
 > delegate to `default_as_str`) — this is the escape hatch for non-snake-case column
 > names. Note that neither derive adds `EnumIter`; callers derive it alongside.
 

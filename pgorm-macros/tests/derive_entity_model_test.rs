@@ -457,7 +457,7 @@ fn sql_column_names_are_pinned_only_when_needed() {
     assert_eq!(renamed::Column::SecondName.to_string(), "explicit");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key/test]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1/test]
 #[test]
 fn primary_key_value_type_and_auto_increment() {
     // A single key contributes a bare type...
@@ -477,15 +477,15 @@ fn primary_key_value_type_and_auto_increment() {
     assert!(!shared_auto_increment::PrimaryKey::auto_increment());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key/test]    what DerivePrimaryKey itself emits
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
-    // `IdenStatic` maps the variant to its snake_case name, or a `column_name`
+    // `IdenStr` maps the variant to its snake_case name, or a `column_name`
     // override; `Iden` delegates to it.
-    assert_eq!(pgorm::IdenStatic::as_str(&single_pk::PrimaryKey::Id), "ID");
+    assert_eq!(pgorm::IdenStr::as_str(&single_pk::PrimaryKey::Id), "ID");
     assert_eq!(single_pk::PrimaryKey::Id.to_string(), "ID");
     assert_eq!(
-        pgorm::IdenStatic::as_str(&composite_pk::PrimaryKey::CakeId),
+        pgorm::IdenStr::as_str(&composite_pk::PrimaryKey::CakeId),
         "cake_id"
     );
 
@@ -504,7 +504,7 @@ fn derive_primary_key_emits_iden_and_mapping() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity/test]    EntityTrait associated types and the Iden pair
+// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityTrait associated types and the Iden pair
 #[test]
 fn derive_entity_wires_up_the_entity_trait() {
     // The five associated types default to the conventional names.
@@ -527,12 +527,12 @@ fn derive_entity_wires_up_the_entity_trait() {
     fn assert_relation<E: EntityTrait<Relation = filling::Relation>>() {}
     assert_relation::<filling::Entity>();
 
-    // `Iden` and `IdenStatic` both render `EntityName::table_name`.
-    assert_eq!(pgorm::IdenStatic::as_str(&filling::Entity), "filling");
+    // `Iden` and `IdenStr` both render `EntityName::table_name`.
+    assert_eq!(pgorm::IdenStr::as_str(&filling::Entity), "filling");
     assert_eq!(filling::Entity.to_string(), "filling");
 }
 
-// [spec:pgorm:sem:macros.derive.entity/test]    EntityName only when table_name is present
+// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityName only when table_name is present
 #[test]
 fn derive_entity_omits_entity_name_without_table_name() {
     // `no_table_name::Entity` carries `DeriveEntity` with no `table_name`, and a

@@ -4,7 +4,7 @@ This chapter covers `src/query/`: the fluent builders that turn entities and
 ActiveModels into PostgreSQL statements (`select.rs`, `insert.rs`, `update.rs`,
 `delete.rs`, `join.rs`, `combine.rs`, `helper.rs`, `traits.rs`, `util.rs`) and
 the data-loader API (`loader.rs`). Rules are grouped under
-`[spec:pgorm:req:query.build]` and `[spec:pgorm:req:query.loader]`.
+`[spec:pgorm:req:query.build]` and `[spec:pgorm:req:query.loader+1]`.
 
 ## Query building
 
@@ -151,7 +151,7 @@ is what `EntityTrait::find()` produces.
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
-> [spec:pgorm:sem:query.build.join+2]
+> [spec:pgorm:sem:query.build.join+3]
 > `QuerySelect::join(join_type, rel)` joins `rel.to_tbl`;
 > `join_rev` joins `rel.from_tbl`; `join_as` / `join_as_rev` first re-alias
 > the joined table with a caller-supplied identifier. The ON condition is
@@ -162,7 +162,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+3]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+4]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -170,7 +170,21 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `inner_join` — call `join_join(type, E::to(), E::via())`: when a junction
 > relation `via` exists it is joined first, then the target relation.
 > `reverse_join(R)` performs an INNER JOIN using `R::to()` in the reverse
-> direction.
+> direction. The relation-named forms of `join` / `join_rev` are
+> `[spec:pgorm:sem:query.build.join.rel]`.
+
+> [spec:pgorm:sem:query.build.join.rel]
+> `QuerySelect` MUST also carry the join type in the method name and take the
+> relation rather than its `RelationDef`: `left_join_rel`, `inner_join_rel` and
+> `right_join_rel` are `join(JoinType::{Left,Inner,Right}Join, rel.def())`, and
+> `left_join_rel_rev`, `inner_join_rel_rev`, `right_join_rel_rev` the same over
+> `join_rev`. They are provided methods over any `R: RelationTrait`, so they
+> reach every builder `join` does and emit the identical SQL — including
+> whatever `on_condition` and `condition_type` the relation's own def carries.
+>
+> This is sugar, not a replacement: `join` / `join_rev` remain, and are still
+> the way to join a `RelationDef` that was modified in flight (`.rev()`,
+> `.on_condition(..)`) rather than taken whole from a relation.
 
 > [spec:pgorm:sem:query.build.combine+1]
 > `SelectTwo`/`SelectTwoMany` use a fixed column-aliasing scheme
@@ -415,24 +429,26 @@ what makes it total over partially-set models.
 
 ## Batched loading
 
-> [spec:pgorm:req:query.loader]
+> [spec:pgorm:req:query.loader+1]
 > The loader layer MUST provide `LoaderTrait`, implemented for `Vec<M>` and
 > `&[M]` (the `Vec` impl delegating to the slice impl), with three batched
 > eager-loading operations: `load_one` for has-one relations
 > (`Vec<Option<R::Model>>`), `load_many` for has-many relations
-> (`Vec<Vec<R::Model>>`) and `load_many_to_many` for junction-mediated
+> (`Vec<Vec<R::Model>>`) and `load_many_via` for junction-mediated
 > relations (`Vec<Vec<R::Model>>`). Each accepts either a bare entity or a
 > pre-filtered `Select<R>` through `EntityOrSelect` (a bare entity becomes
 > `E::find()`), and each returns results positionally aligned with the input
 > slice.
 >
+> No loader operation takes the junction entity: it is the one
+> `Related::via()` already names, so `load_many_via` MUST NOT ask the caller
+> for it and there is no mismatched-junction error to raise.
+>
 > Relation shape is validated before querying: `load_one` errors if the
 > relation has a `via` junction or is `HasMany`; `load_many` errors if it has
-> a `via` junction or is `HasOne`; `load_many_to_many` errors if there is no
-> `via` junction, if the target relation is not `HasOne`, or if the passed
-> junction entity's table ref differs from the relation's junction (compared
-> by `Debug` formatting). An empty input slice short-circuits to an empty
-> result without querying.
+> a `via` junction or is `HasOne`; `load_many_via` errors if there is no
+> `via` junction or if the target relation is not `HasOne`. An empty input
+> slice short-circuits to an empty result without querying.
 
 > [spec:pgorm:sem:query.loader.batching+3]
 > Keys are collected in input order: for each input model, `extract_key`
@@ -475,18 +491,34 @@ what makes it total over partially-set models.
 > value types are named) together with both sides' column lists, making the
 > asymmetry diagnosable from the error alone.
 
-> [spec:pgorm:sem:query.loader.many-to-many+1]
-> `load_many_to_many` issues two queries. First the junction entity is loaded
-> with `V::find()` filtered on the via-relation's to side against the input
-> primary keys, building a key map from each input key to the list of target
-> foreign keys in junction-row order. Second, the target selector is filtered
-> on the target relation's to side against all collected foreign keys (their
-> order is the flattening of a `HashMap`'s values, hence unspecified) and the
-> returned models are indexed by key, last row winning on duplicates. The
-> result maps each input key to its foreign-key list resolved against that
-> index via `filter_map`, so foreign keys whose target row was not returned
-> (e.g. filtered out by the caller's `Select`) are silently dropped, and
-> shared targets are cloned per referencing input.
+> [spec:pgorm:sem:query.loader.many-to-many+2]
+> `load_many_via` issues one query. The caller's target selector is inner
+> joined backwards through the target relation to the junction and through the
+> via relation to the input entity's own table, which is joined under an
+> internal alias so that a self-referencing many-to-many does not name one
+> table twice and so that the key predicate — the via relation's from side
+> against the input keys — qualifies against that alias. The input entity's
+> columns are appended to the projection as the `B_` side
+> (`[spec:pgorm:sem:query.build.combine+1]`), so each returned row carries its
+> target model and the input model it belongs to.
+>
+> The junction's own columns are never decoded: reading a junction row would
+> mean decoding a column whose Rust type the loader cannot name, whereas both
+> entities' models decode through the path every other read takes. The price
+> is that the input entity's row is transmitted once per matching target row.
+>
+> Rows are regrouped by the key extracted from the returned input model, into
+> buckets seeded empty per input key; the result clones the bucket per input
+> key, so inputs sharing a key each receive the same list and unmatched inputs
+> receive an empty `Vec`. A target the caller's `Select` filtered away is
+> absent from the join and so is dropped from the list, and a shared target is
+> cloned into every referencing input. A returned key absent from the seeded
+> buckets is reported as `Err(Error::Query)` on the same terms as
+> `[spec:pgorm:sem:query.loader.regroup+3]`.
+>
+> Because the targets are read by one query rather than reassembled from a
+> key map, an `order_by` on the caller's `Select` orders every bucket. Without
+> one the order within a bucket is the join's, hence unspecified.
 
 > [spec:pgorm:req:query.loader.table-ref-limitation+3]
 > Loader key predicates can only qualify columns for an unaliased

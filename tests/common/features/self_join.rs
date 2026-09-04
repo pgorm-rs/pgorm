@@ -15,15 +15,9 @@ pub enum Relation {
     SelfReferencing,
 }
 
-pub struct SelfReferencingLink;
-
-impl Linked for SelfReferencingLink {
-    type FromEntity = Entity;
-
-    type ToEntity = Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![Relation::SelfReferencing.def()]
+impl Related<Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SelfReferencing.def()
     }
 }
 

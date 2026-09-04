@@ -241,7 +241,7 @@ pub fn derive_primary_key(input: TokenStream) -> TokenStream {
 }
 
 /// The DeriveColumn derive macro will implement `ColumnTrait` for Columns.
-/// It defines the identifier of each column by implementing Iden and IdenStatic.
+/// It defines the identifier of each column by implementing Iden and IdenStr.
 /// The EnumIter is also derived, allowing iteration over all enum variants.
 ///
 /// ### Usage
@@ -280,7 +280,7 @@ pub fn derive_column(input: TokenStream) -> TokenStream {
 ///     VendorId,
 /// }
 ///
-/// impl IdenStatic for Column {
+/// impl IdenStr for Column {
 ///     fn as_str(&self) -> &str {
 ///         match self {
 ///             Self::Id => "id",

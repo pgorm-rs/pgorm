@@ -1,9 +1,9 @@
-use crate::{ColumnTrait, EntityTrait, IdenStatic};
+use crate::{ColumnTrait, EntityTrait, IdenStr};
 use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SeaRc, Value, ValueTuple};
 use std::fmt;
 
 /// List of column identifier
-// [spec:pgorm:def:entity.relation.def+3]
+// [spec:pgorm:def:entity.relation.def+4]
 #[derive(Debug, Clone)]
 pub enum Identity {
     /// Column identifier consists of 1 column
@@ -60,7 +60,7 @@ impl Iden for Identity {
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+3]
+// [spec:pgorm:def:entity.relation.def+4]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (DynIden, DynIden),
@@ -161,7 +161,7 @@ impl IntoIterator for ColumnPairs {
 }
 
 /// Performs a conversion into an [Identity]
-// [spec:pgorm:def:entity.relation.def+3]
+// [spec:pgorm:def:entity.relation.def+4]
 pub trait IntoIdentity {
     /// The shape a boundary value must have to line up with this identity: a
     /// tuple of [`Value`] of the same length, so the arity of a column set and
@@ -181,7 +181,7 @@ pub trait IntoIdentity {
 /// The exception is `K = ValueTuple`, the shape of a runtime-built
 /// [`Identity`], which accepts any tuple and leaves the arity to be checked
 /// when the query runs.
-// [spec:pgorm:def:entity.relation.def+3]
+// [spec:pgorm:def:entity.relation.def+4]
 pub trait IntoBoundary<K>: IntoValueTuple {}
 
 /// Check the [Identity] of an Entity
@@ -223,7 +223,7 @@ impl IntoIdentity for &str {
 
 impl<T> IntoIdentity for T
 where
-    T: IdenStatic,
+    T: IdenStr,
 {
     type ValueType = Value;
 
@@ -234,8 +234,8 @@ where
 
 impl<T, C> IntoIdentity for (T, C)
 where
-    T: IdenStatic,
-    C: IdenStatic,
+    T: IdenStr,
+    C: IdenStr,
 {
     type ValueType = (Value, Value);
 
@@ -253,9 +253,9 @@ where
 
 impl<T, C, R> IntoIdentity for (T, C, R)
 where
-    T: IdenStatic,
-    C: IdenStatic,
-    R: IdenStatic,
+    T: IdenStr,
+    C: IdenStr,
+    R: IdenStr,
 {
     type ValueType = (Value, Value, Value);
 
@@ -284,7 +284,7 @@ macro_rules! impl_into_identity {
     ( $($T:ident : $N:tt),+ $(,)? ) => {
         impl< $($T),+ > IntoIdentity for ( $($T),+ )
         where
-            $($T: IdenStatic),+
+            $($T: IdenStr),+
         {
             type ValueType = ( $(boundary_element!($T)),+ );
 

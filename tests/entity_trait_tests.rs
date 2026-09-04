@@ -272,7 +272,7 @@ mod mistyped_key {
 /// wired the way the spec says.
 fn assert_entity_family<E>()
 where
-    E: EntityTrait + EntityName + IdenStatic + Default,
+    E: EntityTrait + EntityName + IdenStr + Default,
     E::Model: ModelTrait<Entity = E> + FromQueryResult,
     E::ActiveModel: ActiveModelBehavior<Entity = E>,
     E::Column: ColumnTrait,
@@ -287,8 +287,8 @@ fn via_default<E: Default>() -> E {
     E::default()
 }
 
-// [spec:pgorm:def:entity.traits/test]    `IdenStatic` as the base identifier
-// contract (`as_str` alongside `Iden`'s quoting), `EntityName: IdenStatic +
+// [spec:pgorm:def:entity.traits+1/test]    `IdenStr` as the base identifier
+// contract (`as_str` alongside `Iden`'s quoting), `EntityName: IdenStr +
 // Default`, and `EntityTrait`'s five associated types resolving for both a
 // derive-macro entity and a fully hand-written one
 #[test]
@@ -299,15 +299,15 @@ fn entity_trait_family() {
     assert_entity_family::<pair::Entity>();
     assert_entity_family::<too_many_values::Entity>();
 
-    // `IdenStatic::as_str` is the static-string identity, on entities...
+    // `IdenStr::as_str` is the static-string identity, on entities...
     assert_eq!(item::Entity.as_str(), "item");
     assert_eq!(too_many_values::Entity.as_str(), "too_many_values");
-    // ...and on columns and primary keys, which are `IdenStatic` too.
+    // ...and on columns and primary keys, which are `IdenStr` too.
     assert_eq!(item::Column::Id.as_str(), "id");
     assert_eq!(item::Column::Note.as_str(), "note");
     assert_eq!(item::PrimaryKey::Id.as_str(), "id");
 
-    // `IdenStatic: Iden`, so the same identifier renders through `to_string`.
+    // `IdenStr: Iden`, so the same identifier renders through `to_string`.
     assert_eq!(pgorm::Iden::to_string(&item::Entity), "item");
     assert_eq!(pgorm::Iden::to_string(&item::Column::Name), "name");
 
@@ -318,7 +318,7 @@ fn entity_trait_family() {
         "too_many_values"
     );
 
-    // `IdenStatic: Copy`, so passing an entity by value does not move it away.
+    // `IdenStr: Copy`, so passing an entity by value does not move it away.
     let entity = item::Entity;
     let copied = entity;
     assert_eq!(entity.as_str(), copied.as_str());
@@ -638,7 +638,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column+2/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+3/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`
@@ -793,7 +793,7 @@ fn column_trait_expression_surface() {
     let _: ColumnType = pgorm_query::ColumnType::Integer;
 }
 
-// [spec:pgorm:def:entity.traits.column+2/test]    the column-to-column family
+// [spec:pgorm:def:entity.traits.column+3/test]    the column-to-column family
 // `eq_col` / `ne_col` / `gt_col` / `gte_col` / `lt_col` / `lte_col` and the
 // expression form `eq_expr` — each side qualified by its own entity, same SQL as
 // the `Expr::col` escape they replace, and the value-taking `eq` left alone
@@ -932,7 +932,7 @@ fn column_def_defaults_and_builders() {
 // entity.traits.primary-key
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.primary-key+1/test]    `PrimaryKeyArity::ARITY` is
+// [spec:pgorm:def:entity.traits.primary-key+2/test]    `PrimaryKeyArity::ARITY` is
 // 1 for any single scalar and matches the component count for tuples up to 12;
 // `auto_increment` reports whether the key is database-generated; and
 // `PrimaryKeyToColumn` maps variants to columns and back, with `from_column`

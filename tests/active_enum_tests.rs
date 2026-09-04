@@ -466,7 +466,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
             color: None,
             tea: None,
         }
-        .find_linked(active_enum::ActiveEnumChildLink)
+        .find_linked(RelatedLink::to(active_enum_child::Entity))
         .all(db)
         .await?,
         [active_enum_child::Model {
@@ -479,7 +479,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
     );
     assert_eq!(
         ActiveEnumEntity::find()
-            .find_also_linked(active_enum::ActiveEnumChildLink)
+            .find_also_linked(RelatedLink::to(active_enum_child::Entity))
             .all(db)
             .await?,
         [(
@@ -500,7 +500,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
     );
     assert_eq!(
         ActiveEnumEntity::find()
-            .find_with_linked(active_enum::ActiveEnumChildLink)
+            .find_with_linked(RelatedLink::to(active_enum_child::Entity))
             .all(db)
             .await?,
         [(
@@ -528,7 +528,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
             color: None,
             tea: None,
         }
-        .find_linked(active_enum_child::ActiveEnumLink)
+        .find_linked(RelatedLink::to(active_enum::Entity))
         .all(db)
         .await?,
         [active_enum::Model {
@@ -540,7 +540,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
     );
     assert_eq!(
         ActiveEnumChild::find()
-            .find_also_linked(active_enum_child::ActiveEnumLink)
+            .find_also_linked(RelatedLink::to(active_enum::Entity))
             .all(db)
             .await?,
         [(
@@ -561,7 +561,7 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
     );
     assert_eq!(
         ActiveEnumChild::find()
-            .find_with_linked(active_enum_child::ActiveEnumLink)
+            .find_with_linked(RelatedLink::to(active_enum::Entity))
             .all(db)
             .await?,
         [(
@@ -631,7 +631,7 @@ mod tests {
             color: None,
             tea: None,
         };
-        let select = active_enum_model.find_linked(active_enum::ActiveEnumChildLink);
+        let select = active_enum_model.find_linked(RelatedLink::to(active_enum_child::Entity));
         assert_eq!(
             select.as_query().to_string(),
             [
@@ -643,7 +643,8 @@ mod tests {
             .join(" ")
         );
 
-        let select = ActiveEnumEntity::find().find_also_linked(active_enum::ActiveEnumChildLink);
+        let select =
+            ActiveEnumEntity::find().find_also_linked(RelatedLink::to(active_enum_child::Entity));
         assert_eq!(
             select.as_query().to_string(),
             [
@@ -699,7 +700,7 @@ mod tests {
             color: None,
             tea: None,
         };
-        let select = active_enum_child_model.find_linked(active_enum_child::ActiveEnumLink);
+        let select = active_enum_child_model.find_linked(RelatedLink::to(active_enum::Entity));
         assert_eq!(
             select.as_query().to_string(),
             [
@@ -711,7 +712,7 @@ mod tests {
             .join(" ")
         );
 
-        let select = ActiveEnumChild::find().find_also_linked(active_enum_child::ActiveEnumLink);
+        let select = ActiveEnumChild::find().find_also_linked(RelatedLink::to(active_enum::Entity));
         assert_eq!(
             select.as_query().to_string(),
             [

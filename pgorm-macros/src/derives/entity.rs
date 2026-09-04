@@ -122,7 +122,7 @@ impl DeriveEntity {
             #[automatically_derived]
             impl pgorm::Iden for #ident {
                 fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                    write!(s, "{}", pgorm::IdenStatic::as_str(self)).unwrap();
+                    write!(s, "{}", pgorm::IdenStr::as_str(self)).unwrap();
                 }
             }
         )
@@ -133,7 +133,7 @@ impl DeriveEntity {
 
         quote!(
             #[automatically_derived]
-            impl pgorm::IdenStatic for #ident {
+            impl pgorm::IdenStr for #ident {
                 fn as_str(&self) -> &str {
                     <Self as pgorm::EntityName>::table_name(self)
                 }
@@ -142,7 +142,7 @@ impl DeriveEntity {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.entity]
+// [spec:pgorm:sem:macros.derive.entity+1]
 pub fn expand_derive_entity(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     Ok(DeriveEntity::new(input)?.expand())
 }

@@ -720,7 +720,7 @@ pub async fn related() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked/test]    a five-hop `Linked` chain
+// [spec:pgorm:req:entity.relation.linked+1/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
 // [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::find_linked` scopes
@@ -1275,7 +1275,7 @@ pub async fn consolidate_composite_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.join+2/test]    a composite relation constrains
+// [spec:pgorm:sem:query.build.join+3/test]    a composite relation constrains
 // the join on every declared pair: against rows where each column alone is
 // ambiguous, the join still matches exactly one parent per child
 #[pgorm_macros::test]
@@ -1473,7 +1473,7 @@ fn relation_trait_and_ownership_direction() {
     );
 }
 
-// [spec:pgorm:def:entity.relation.def+3/test]    the `RelationDef` record and its
+// [spec:pgorm:def:entity.relation.def+4/test]    the `RelationDef` record and its
 // combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
 // keeps everything else; `from_alias` re-points the source table; `on_condition`
 // replaces any existing custom condition; `condition_type` picks AND vs OR.
@@ -1613,7 +1613,7 @@ fn relation_def_record_and_combinators() {
     );
 
     // `Identity` encodes column-set arity, and `IntoIdentity` reaches it from
-    // `&str`, `String`, any `IdenStatic`, and tuples.
+    // `&str`, `String`, any `IdenStr`, and tuples.
     assert!(matches!("code".into_identity(), Identity::Unary(_)));
     assert!(matches!(
         "code".to_owned().into_identity(),
@@ -1719,7 +1719,7 @@ fn relation_builder_accumulates_a_definition() {
     assert_eq!(full.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:def:entity.relation.def+3/test]    a set of join columns is a
+// [spec:pgorm:def:entity.relation.def+4/test]    a set of join columns is a
 // list of pairs, so both sides always name the same number of columns however
 // the definition is built, reversed or extended
 #[test]
@@ -1895,7 +1895,7 @@ impl Linked for FilteredBakerCakes {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked/test]    `find_linked` walks the chain
+// [spec:pgorm:req:entity.relation.linked+1/test]    `find_linked` walks the chain
 // in reverse, aliasing each hop's source table `r0`, `r1`, ... and inner-joining
 // it to the previous alias while the innermost hop joins the unaliased target
 // table; each hop's `on_condition` closure is added to that hop's join
@@ -1948,6 +1948,65 @@ fn linked_chain_aliasing_and_conditions() {
             r#"FROM "cake""#,
             r#"INNER JOIN "cakes_bakers" AS "r0" ON "r0"."cake_id" = "cake"."id""#,
             r#"INNER JOIN "baker" AS "r1" ON "r1"."id" = "r0"."baker_id" AND "r0"."cake_id" > 10"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:entity.relation.linked+1/test]    `RelatedLink` is the chain
+// the `Related` impl already spells — `[to]` for a direct relation and
+// `[via, to]` for a junction one — so it stands in for a hand-written `Linked`
+// wherever one restated a `Related` impl, and its aliasing is what a
+// self-relation needs
+#[test]
+fn related_link_restates_the_relation() {
+    /// What a hand-written single-hop `Linked` looked like before
+    /// `RelatedLink`: a restatement of the `Related` impl above it.
+    struct BakerToCakes;
+
+    impl Linked for BakerToCakes {
+        type FromEntity = baker::Entity;
+        type ToEntity = cake::Entity;
+
+        fn link(&self) -> Vec<RelationDef> {
+            vec![
+                cakes_bakers::Relation::Baker.def().rev(),
+                cakes_bakers::Relation::Cake.def(),
+            ]
+        }
+    }
+
+    let witness: RelatedLink<baker::Entity, cake::Entity> = RelatedLink::to(cake::Entity);
+
+    assert_eq!(witness.link().len(), BakerToCakes.link().len());
+    assert_eq!(
+        witness.find_linked().as_query().to_string(),
+        BakerToCakes.find_linked().as_query().to_string()
+    );
+    assert_eq!(
+        baker::Entity::find()
+            .find_also_linked(witness)
+            .as_query()
+            .to_string(),
+        baker::Entity::find()
+            .find_also_linked(BakerToCakes)
+            .as_query()
+            .to_string()
+    );
+
+    // A relation with no junction is the one-hop chain.
+    assert_eq!(
+        bakery::Entity::find()
+            .find_also_linked(RelatedLink::to(baker::Entity))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "bakery"."id" AS "A_id", "bakery"."name" AS "A_name","#,
+            r#""bakery"."profit_margin" AS "A_profit_margin","#,
+            r#""r0"."id" AS "B_id", "r0"."name" AS "B_name","#,
+            r#""r0"."contact_details" AS "B_contact_details", "r0"."bakery_id" AS "B_bakery_id""#,
+            r#"FROM "bakery""#,
+            r#"LEFT JOIN "baker" AS "r0" ON "bakery"."id" = "r0"."bakery_id""#,
         ]
         .join(" ")
     );

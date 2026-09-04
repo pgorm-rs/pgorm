@@ -5,24 +5,27 @@
 //! are otherwise unreachable, the `ActiveValue` vocabulary, the CRUD entry
 //! points, the decode targets, and the connection types.
 //!
-//! Two names deliberately stay out. `Order` — the `ASC`/`DESC` enum — is a
+//! One name deliberately stays out. `Order` — the `ASC`/`DESC` enum — is a
 //! plausible table name, and an entity aliased `Order` next to a glob of this
 //! module makes every mention of it ambiguous; `order_by_asc` / `order_by_desc`
-//! cover the common case and the enum is one import away. `IdenStatic` is
-//! here, but `pgorm_query::IdenStatic` is a different trait of the same name,
-//! so glob-importing both modules is an error waiting for its first use.
+//! cover the common case and the enum is one import away.
+//!
+//! `IdenStr` is here. It is not called `IdenStatic` precisely because this
+//! module globs it into every file that uses it: `pgorm_query::IdenStatic` is a
+//! different trait with the same method, and the two names had to differ for
+//! both modules to be glob-imported at once.
 
-// [spec:pgorm:def:entity.prelude]
+// [spec:pgorm:def:entity.prelude+1]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
     ActiveValue::{NotSet, Set, Unchanged},
     ColumnDef, ColumnTrait, ColumnType, ColumnTypeTrait, Condition, ConnectionTrait, CursorTrait,
     DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw, DecodeSelect, Delete,
-    EntityName, EntityTrait, EnumIter, FromQueryResult, Iden, IdenStatic, Insert, IntoActiveModel,
+    EntityName, EntityTrait, EnumIter, FromQueryResult, Iden, IdenStr, Insert, IntoActiveModel,
     IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait, PaginatorTrait,
     PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult,
-    QuerySelect, QueryTrait, Related, RelationDef, RelationTrait, Select, TransactionTrait,
-    TryInsert, TryIntoModel, Update, Value,
+    QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
+    TransactionTrait, TryInsert, TryIntoModel, Update, Value,
     error::*,
     pgorm_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     set,

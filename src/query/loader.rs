@@ -1,11 +1,12 @@
 use crate::{
-    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Identity, ModelTrait, QueryFilter,
-    Related, RelationType, Select, error::*,
+    ColumnTrait, Condition, ConnectionTrait, EntityName, EntityTrait, Error, IdenStr, Identity,
+    Iterable, ModelTrait, QueryFilter, QuerySelect, QueryTrait, Related, RelationType, Select,
+    SelectA, SelectB, SelectTwo, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{
-    ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, NamedTable, SimpleExpr, TableName,
-    ValueTuple,
+    Alias, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, IntoIden, JoinType, NamedTable,
+    SeaRc, SelectExpr, SimpleExpr, TableName, ValueTuple,
 };
 use std::{collections::HashMap, str::FromStr};
 
@@ -16,7 +17,7 @@ pub trait EntityOrSelect<E: EntityTrait>: Send {
 }
 
 /// This trait implements the Data Loader API
-// [spec:pgorm:req:query.loader]
+// [spec:pgorm:req:query.loader+1]
 #[async_trait]
 pub trait LoaderTrait {
     /// Source model
@@ -40,20 +41,16 @@ pub trait LoaderTrait {
         S: EntityOrSelect<R>,
         <<Self as LoaderTrait>::Model as ModelTrait>::Entity: Related<R>;
 
-    /// Used to eager load many_to_many relations
-    async fn load_many_to_many<R, S, V, C>(
-        &self,
-        stmt: S,
-        via: V,
-        db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, Error>
+    /// Used to eager load many-to-many relations.
+    ///
+    /// The junction is the one the relation's `via` already names, so it is
+    /// not passed in: there is no second junction to disagree with it.
+    async fn load_many_via<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
         R::Model: Send + Sync,
         S: EntityOrSelect<R>,
-        V: EntityTrait,
-        V::Model: Send + Sync,
         <<Self as LoaderTrait>::Model as ModelTrait>::Entity: Related<R>;
 }
 
@@ -104,26 +101,19 @@ where
         self.as_slice().load_many(stmt, db).await
     }
 
-    async fn load_many_to_many<R, S, V, C>(
-        &self,
-        stmt: S,
-        via: V,
-        db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, Error>
+    async fn load_many_via<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
         R::Model: Send + Sync,
         S: EntityOrSelect<R>,
-        V: EntityTrait,
-        V::Model: Send + Sync,
         <<Self as LoaderTrait>::Model as ModelTrait>::Entity: Related<R>,
     {
-        self.as_slice().load_many_to_many(stmt, via, db).await
+        self.as_slice().load_many_via(stmt, db).await
     }
 }
 
-// [spec:pgorm:req:query.loader]
+// [spec:pgorm:req:query.loader+1]
 #[async_trait]
 impl<M> LoaderTrait for &[M]
 where
@@ -241,105 +231,95 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.many-to-many+1]
-    async fn load_many_to_many<R, S, V, C>(
-        &self,
-        stmt: S,
-        via: V,
-        db: &C,
-    ) -> Result<Vec<Vec<R::Model>>, Error>
+    // [spec:pgorm:sem:query.loader.many-to-many+2]
+    async fn load_many_via<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
         R: EntityTrait,
         R::Model: Send + Sync,
         S: EntityOrSelect<R>,
-        V: EntityTrait,
-        V::Model: Send + Sync,
         <<Self as LoaderTrait>::Model as ModelTrait>::Entity: Related<R>,
     {
-        if let Some(via_rel) =
+        let Some(via_rel) =
             <<<Self as LoaderTrait>::Model as ModelTrait>::Entity as Related<R>>::via()
-        {
-            let rel_def =
-                <<<Self as LoaderTrait>::Model as ModelTrait>::Entity as Related<R>>::to();
-            if rel_def.rel_type != RelationType::HasOne {
-                return Err(query_err("Relation to is not HasOne"));
-            }
-
-            let via_tbl = FromItem::from(via.table_ref());
-            if !cmp_table_ref(&via_rel.to_tbl, &via_tbl) {
-                return Err(query_err(format!(
-                    "The given via Entity is incorrect: expected: {:?}, given: {via_tbl:?}",
-                    via_rel.to_tbl,
-                )));
-            }
-
-            if self.is_empty() {
-                return Ok(Vec::new());
-            }
-
-            let via_from_col = via_rel.columns.from_identity();
-            let via_to_col = via_rel.columns.to_identity();
-            let from_col = rel_def.columns.from_identity();
-            let to_col = rel_def.columns.to_identity();
-
-            let pkeys: Vec<ValueTuple> = self
-                .iter()
-                .map(|model: &M| extract_key(&via_from_col, model))
-                .collect::<Result<_, Error>>()?;
-
-            // Map of M::PK -> Vec<R::PK>
-            let mut keymap: HashMap<ValueTuple, Vec<ValueTuple>> = Default::default();
-
-            let keys: Vec<ValueTuple> = {
-                let condition = prepare_condition(&via_rel.to_tbl, &via_to_col, &pkeys)?;
-                let stmt = V::find().filter(condition);
-                let data = stmt.all(db).await?;
-                for model in data {
-                    let pk = extract_key(&via_to_col, &model)?;
-                    let fk = extract_key(&from_col, &model)?;
-                    keymap.entry(pk).or_default().push(fk);
-                }
-
-                keymap.values().flatten().cloned().collect()
-            };
-
-            let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
-
-            let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
-
-            // Map of R::PK -> R::Model
-            let mut data: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
-            for model in stmt.all(db).await? {
-                let key = extract_key(&to_col, &model)?;
-                data.insert(key, model);
-            }
-
-            let result: Vec<Vec<R::Model>> = pkeys
-                .into_iter()
-                .map(|pkey| {
-                    let fkeys = keymap.get(&pkey).cloned().unwrap_or_default();
-
-                    let models: Vec<_> = fkeys
-                        .into_iter()
-                        .filter_map(|fkey| data.get(&fkey).cloned())
-                        .collect();
-
-                    models
-                })
-                .collect();
-
-            Ok(result)
-        } else {
+        else {
             return Err(query_err("Relation is not ManyToMany"));
+        };
+
+        let rel_def = <<<Self as LoaderTrait>::Model as ModelTrait>::Entity as Related<R>>::to();
+        if rel_def.rel_type != RelationType::HasOne {
+            return Err(query_err("Relation to is not HasOne"));
         }
+
+        if self.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // The source side of the via relation: the columns the input models
+        // are keyed by, and the columns the junction points back at.
+        let via_from_col = via_rel.columns.from_identity();
+
+        let keys: Vec<ValueTuple> = self
+            .iter()
+            .map(|model: &M| extract_key(&via_from_col, model))
+            .collect::<Result<_, Error>>()?;
+
+        // The source table is joined back in under an alias, so a
+        // self-referencing many-to-many does not name one table twice, and the
+        // key predicate qualifies against the alias rather than the table.
+        let src_alias: DynIden = SeaRc::new(Alias::new(LOADER_SOURCE_ALIAS));
+        let src_tbl = FromItem::from(TableName::Table(SeaRc::clone(&src_alias)));
+        let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
+
+        let select = stmt
+            .select()
+            .join_rev(JoinType::InnerJoin, rel_def)
+            .join_as_rev(JoinType::InnerJoin, via_rel, SeaRc::clone(&src_alias));
+        let select = <Select<R> as QueryFilter>::filter(select, condition);
+
+        // The input entity's own columns are what carries the key back out of
+        // the join: they decode through its `Model`, the same path every other
+        // read takes, so no column has to be decoded against a guessed type.
+        let mut select_two: SelectTwo<R, <M as ModelTrait>::Entity> =
+            SelectTwo::new_without_prepare(select.apply_alias(SelectA.as_str()).into_query());
+        for col in <<<M as ModelTrait>::Entity as EntityTrait>::Column as Iterable>::iter() {
+            let alias = format!("{}{}", SelectB.as_str(), col.as_str());
+            let expr = Expr::col((SeaRc::clone(&src_alias), col.into_iden()));
+            QuerySelect::query(&mut select_two).expr(SelectExpr::new_as(
+                col.select_as(expr),
+                SeaRc::new(Alias::new(alias)),
+            ));
+        }
+
+        let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
+            .iter()
+            .map(|key: &ValueTuple| (key.clone(), Vec::new()))
+            .collect();
+
+        for (target, source) in select_two.all(db).await? {
+            let Some(source) = source else {
+                // The join is inner on both hops, so every returned row has a
+                // source; a row without one carries no key and is not ours.
+                continue;
+            };
+            let key = extract_key(&via_from_col, &source)?;
+            let bucket = buckets
+                .get_mut(&key)
+                .ok_or_else(|| unmatched_key_err(&key, &keys, &via_from_col, &via_from_col))?;
+            bucket.push(target);
+        }
+
+        Ok(keys
+            .iter()
+            .map(|key: &ValueTuple| buckets.get(key).cloned().unwrap_or_default())
+            .collect())
     }
 }
 
-fn cmp_table_ref(left: &FromItem, right: &FromItem) -> bool {
-    // not ideal; but
-    format!("{left:?}") == format!("{right:?}")
-}
+/// The alias the input entity's table is joined back under by
+/// [`LoaderTrait::load_many_via`]. Internal: it is never handed to a caller,
+/// who filters against the target entity by its own name.
+const LOADER_SOURCE_ALIAS: &str = "pgorm_loader_src";
 
 fn identity_columns(identity: &Identity) -> String {
     identity
