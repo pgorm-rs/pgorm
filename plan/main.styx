@@ -2732,6 +2732,57 @@ children (
                     }
                 )
             }
+
+            {
+                id ergo.fluent-pipeline
+                title "The pipeline reads like the PRQL: columns are bare, closures only where binding, arrays not vecs"
+                kind @refactor
+                deps (ergo.pipeline-v1)
+                log (
+                    {
+                        at 2026-09-04T15:00:08.718176Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator directive (2026-09-04): the pipeline's correctness is right but the surface is line noise, not a fluent API. Six mechanical noise sources with agreed directions: (1) bare columns — ColumnTrait carries its entity, so O::Total converts to a qualified pipeline Expr directly (IntoExpr impl); two-arg col() remains for disambiguation only; (2) closures only where binding — value-taking transforms (.sort([..]), .select([..]), .filter(expr)) with _with(|b| ..) variants for parameter-bearing forms; (3) impl IntoIterator everywhere a Vec is taken, so arrays replace vec!; (4) aggregate_by's (vec, vec) tuple dies — .group([keys]).aggregate([aggs]) two-step reading like the PRQL, with the typestate judgment on aggregate-after-group; (5) aliased -> as_ (rename outright, delete-don't-deprecate); (6) comparisons/functions generic over Into<Expr> with Rust literal impls (i64/f64/&str/bool) INLINED as literals exactly like literals in PRQL text — the Binder stays the explicit, only door for runtime values, and the brand invariance guarantee must survive untouched. Target shape shown to operator (top-2-per-customer in 4 lines: window(row_number().as_(\"rn\"), by(O::CustomerId), sort(O::Total.desc())) / filter(out(\"rn\").lte(2)) / select([O::CustomerId, O::Total, out(\"rn\")])) — the exact combinator spellings (by/sort helpers vs WindowDef builder) are implementer taste within that budget. Also consider entity-side entry sugar (order::query() or Entity::pipeline()). All existing tests/doctests churn to the new surface; compile_fail proofs (brand smuggling) must keep failing for the right reason."
+                    }
+
+                    {
+                        at 2026-09-04T15:04:16.426067Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator addition (2026-09-04, mid-flight): stringly out(\"rn\") at every reference site is the wrong shape — the alias should be a value with ONE definition site. Add an alias token: let rn = alias(\"rn\"); a Copy newtype over the name that (a) declares via .as_(rn) — as_ accepts impl Into<AliasName> so bare &str stays legal for one-shot aliases nobody references — and (b) references by behaving as an expression itself (token implements the comparison/sort surface or Into<Expr> as an unqualified ident), so filter(rn.lte(2)) replaces filter(out(\"rn\").lte(2)). out() as a public constructor should disappear from the fluent surface if the token covers it (judgment: keep a low-level escape or delete outright per delete-don't-deprecate). Honest ceiling stands: an unattached token still compiles and the server catches it — state that in the rule; do not build brand machinery to tie tokens to attachment (overkill, operator not asked for it). Update the five before/after pairs and pipeline.surface accordingly."
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-audit
+                title "Design: verbosity audit of the whole ORM surface — where does ceremony outweigh information"
+                kind @refactor
+                sealed true
+                log (
+                    {
+                        at 2026-09-04T15:00:11.582801Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator directive (2026-09-04): tackle the sheer verbosity of the ORM — the pipeline got its own node (ergo.fluent-pipeline); this one audits everything else. Survey the public surface for ceremony that outweighs information: the select_only().column_as(..).into_tuple::<T>() chains for projections, turbofish density, ActiveModel construction noise vs the From sugar, filter expression spelling (ColumnTrait's eq taking Into<Value> vs the pipeline's shapes), Selector/SelectorRaw entry ergonomics, transaction closure signatures, anything where a common task takes 3+ chained calls of boilerplate. Deliverable: a ranked report — each finding with today's spelling, a proposed spelling, breakage class, and effort — for the operator to pick a batch from. No code changes; probes allowed to prove a proposed spelling typechecks."
+                    }
+
+                    {
+                        at 2026-09-04T15:19:49.408003Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Audit verdict (9/9 probes green, corpus = the repo's 58 test files): the ceremony is NOT where the prior put it — the projection chain is mostly fine (columns([..]) batches, into_tuple needs no turbofish when the binding names the type; one .select([..]) combinator closes it) and the transaction Box::pin story is already gone (native AsyncFnOnce, zero occurrences). The volume: (1) ActiveModel's .to_owned() tax, 177 sites — the blanket From pins V exactly so &str has no route in; fix = three targeted From impls + a set() free fn, additive, coherence probed; also pick ONE doc spelling among Set/ActiveValue::Set/ActiveValue::set. (2) The prelude gap, 58 files — QuerySelect/QueryOrder/QueryTrait/PaginatorTrait/Set/NotSet/IntoActiveModel/FromQueryResult all missing from entity::prelude; additive, collision-probed. (3) Selector::<SelectModel<M>>::from_select::<M> double-spelling, 14 sites — extension trait on SelectStatement/(String,Values) (into_model/into_tuple reading left-to-right); TIME-SENSITIVE: pipeline terminals land on exactly this spelling. (4) Stringly aliases, 125 non-pipeline sites incl. the leaked r{N} internal from find_also_linked — the alias token (one Copy type, Iden+IdenStatic gets IntoIden/IntoColumnRef/IntoIdentity free) must be ONE vocabulary shared with the pipeline; relayed to ergo.fluent-pipeline mid-flight. (5) Transaction friction — missing impl ConnectionTrait for &mut DatabaseTransaction forces &*txn at 10 sites; disjointness probed. Also ranked: exec-terminal near-synonyms (do_nothing == on_empty_do_nothing byte-identical; Inserter/Deleter 0 uses; expr_as_ legacy 0 uses — deletions), left_join_rel sugar, eq_col siblings (do NOT widen eq — save_as would be dropped), ModelTrait::into_active (kills the annotation), Linked boilerplate + load_many_to_many's redundant via. Found defect: pgorm defines its own IdenStatic colliding by name with pgorm_query::IdenStatic, incompatible signatures, both in prelude scope. Protected list honored: typestate, pool.get, no save(), typed errors, load-bearing turbofish. Full ranked report with real quotes in the agent transcript; spike archived on the node's branch."
+                    }
+
+                    {
+                        at 2026-09-04T15:20:00.520126Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
         )
     }
 )
