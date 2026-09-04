@@ -15,7 +15,7 @@ use prqlc::{Options, Target};
 pub(super) use prqlc::pr::{BinOp, UnOp};
 
 /// The PL expression node the builder assembles.
-// [spec:pgorm:def:pipeline.adapter+1]
+// [spec:pgorm:def:pipeline.adapter+2]
 pub(super) type PlExpr = Expr;
 
 pub(super) fn ident(name: &str) -> PlExpr {
@@ -166,7 +166,7 @@ pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
 /// The stages become the `main` variable of an anonymous module, the same
 /// shape `prqlc::prql_to_pl` produces for query text, so direct construction
 /// and text compilation are interchangeable.
-// [spec:pgorm:def:pipeline.adapter+1]
+// [spec:pgorm:def:pipeline.adapter+2]
 pub(super) fn compile(stages: Vec<PlExpr>) -> Result<String, String> {
     let module = ModuleDef {
         name: "Project".into(),

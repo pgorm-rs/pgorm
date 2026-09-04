@@ -1,0 +1,5 @@
+error: expected string literal
+ --> tests/compile-fail/prql_not_a_literal.rs:5:19
+  |
+5 |     let _ = prql!(from invoice | take 5);
+  |                   ^^^^

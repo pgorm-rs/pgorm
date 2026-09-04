@@ -50,7 +50,7 @@
 //! leak into a different pipeline. Everything fallible — reserved-alias
 //! screening, prqlc's resolution — surfaces as a typed [`PipelineError`]
 //! from [`Pipeline::into_sql`] or the terminal methods; nothing panics.
-// [spec:pgorm:def:pipeline.adapter+1]
+// [spec:pgorm:def:pipeline.adapter+2]
 
 mod adapter;
 mod binder;

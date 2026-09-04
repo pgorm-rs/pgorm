@@ -1,0 +1,8 @@
+error: PostgreSQL rejected the SQL compiled from this PRQL: syntax error at or near "AS"
+
+         SELECT *, SELEKT !!! ( AS x FROM invoice LIMIT 2
+                                ^
+ --> tests/compile-fail/prql_broken_sstring.rs:6:19
+  |
+6 |     let _ = prql!(r#"from invoice | derive x = s"SELEKT !!! (" | take 2"#);
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

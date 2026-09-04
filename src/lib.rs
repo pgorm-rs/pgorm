@@ -54,9 +54,8 @@ pub use tokio_postgres::row::RowIndex;
 /// Hold a raw SQL string literal to the PostgreSQL grammar at compile time,
 /// expanding to the literal unchanged.
 ///
-/// Available under the off-by-default `sql-macro` feature, which brings the
-/// macro into scope. libpg_query — the PostgreSQL server's own parser, which
-/// performs the check — is compiled either way, since `SelectorRaw`
+/// libpg_query — the PostgreSQL server's own parser, which performs the
+/// check — is compiled into every build regardless, since `SelectorRaw`
 /// pagination parses raw statements with it at runtime. The check is syntax
 /// only: unknown tables and columns pass.
 ///
@@ -70,12 +69,51 @@ pub use tokio_postgres::row::RowIndex;
 /// [`ConnectionTrait::query_raw`](crate::ConnectionTrait::query_raw),
 /// [`ConnectionTrait::execute_raw`](crate::ConnectionTrait::execute_raw), and
 /// [`ConnectionTrait::batch_execute`](crate::ConnectionTrait::batch_execute).
-// [spec:pgorm:def:macros.sql+1]
-#[cfg(feature = "sql-macro")]
+// [spec:pgorm:def:macros.sql+2]
 pub use pgorm_sql_macro::sql;
 
+/// Compile a PRQL string literal to PostgreSQL SQL at build time, expanding
+/// to `(&'static str, Values)` for the raw-SQL entry points.
+///
+/// The text sibling of [`pipeline`](crate::pipeline): the same prqlc
+/// compiler, the same libpg_query oracle over what it emits, but for
+/// queries known whole at compile time. The arguments after the literal are
+/// converted via `Into<`[`Value`](crate::Value)`>` in placeholder order,
+/// and the macro refuses at compile time any PRQL prqlc rejects, any
+/// emitted SQL the PostgreSQL grammar rejects, an argument count that does
+/// not match the `$N` placeholders, or a gap in their numbering.
+///
+/// ```
+/// use pgorm::prql;
+///
+/// let min_total = 5_i64;
+/// let (sql, values) = prql!("from invoice | filter total > $1 | take 5", min_total);
+/// assert_eq!(sql, "SELECT * FROM invoice WHERE total > $1 LIMIT 5");
+/// assert_eq!(values.0.len(), 1);
+/// ```
+///
+/// The result lands on the same escape hatches as [`sql!`](crate::sql):
+///
+/// ```no_run
+/// # use pgorm::{prql, FromQueryResult, SelectModel, SelectorRaw};
+/// # #[derive(FromQueryResult)]
+/// # struct Invoice { total: i64 }
+/// # async fn demo(db: pgorm::DatabaseConnection) -> Result<(), pgorm::Error> {
+/// let (sql, values) = prql!("from invoice | filter total > $1 | take 5", 100_i64);
+/// let rows: Vec<Invoice> = SelectorRaw::<SelectModel<Invoice>>::from_statement::<Invoice>(
+///     sql.to_owned(),
+///     values,
+/// )
+/// .all(&db)
+/// .await?;
+/// # Ok(())
+/// # }
+/// ```
+// [spec:pgorm:def:macros.prql]
+pub use pgorm_sql_macro::prql;
+
 pub use pgorm_query;
-pub use pgorm_query::Iden;
+pub use pgorm_query::{Iden, Values};
 
 pub use pgorm_macros::EnumIter;
 pub use strum;

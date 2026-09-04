@@ -29,7 +29,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 - `pgorm-migration` - Migration runner
 - `pgorm-pool` - Database connection pool (vendored deadpool-postgres fork)
 - `pgorm-query` - SQL query builder (fork of sea-query, PostgreSQL-only), with its own `pgorm-query-attr` and `pgorm-query-derive` members
-- `pgorm-sql-macro` - The `sql!` macro: a raw SQL string literal held to the real PostgreSQL grammar (libpg_query) at compile time. Re-exported as `pgorm::sql` behind the off-by-default `sql-macro` feature, so only builds that use it compile the C dependency
+- `pgorm-sql-macro` - The `sql!` and `prql!` macros, both always in scope (`pgorm::sql`, `pgorm::prql`; there is no gating feature). `sql!` holds a raw SQL string literal to the real PostgreSQL grammar (libpg_query) at compile time; `prql!` compiles PRQL text through prqlc at build time, validates the emitted SQL the same way, and arity-checks its `$N` placeholders against the macro arguments, expanding to `(&'static str, pgorm::Values)`
 
 `pgorm::pipeline` (in-crate module, always compiled) is a PRQL-shaped composable query frontend: relation-to-relation transforms compiled through prqlc's PL AST to PostgreSQL SQL, with bound parameters minted by a per-pipeline binder (branded lifetimes make cross-pipeline placeholder mixing a compile error) and terminals landing on the ordinary decode paths. prqlc (pure Rust) is a plain, exact-pinned dependency.
 

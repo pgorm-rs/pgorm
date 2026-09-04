@@ -1,0 +1,5 @@
+error: PostgreSQL placeholders start at $1: $0 can never be bound
+ --> tests/compile-fail/prql_zero_placeholder.rs:5:19
+  |
+5 |     let _ = prql!("from invoice | filter total > $0", 1_i64);
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

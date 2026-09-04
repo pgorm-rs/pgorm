@@ -3,7 +3,6 @@
 //! Every statement here was held to the PostgreSQL grammar while this file was
 //! compiled; the assertions are that the same text then runs against a live
 //! server unchanged.
-#![cfg(feature = "sql-macro")]
 #![allow(unused_imports, dead_code)]
 
 pub mod common;
@@ -29,7 +28,7 @@ const SCHEMA: &str = sql!(
      INSERT INTO cake (id, name) VALUES (1, 'Chocolate'), (2, 'Lemon');"
 );
 
-// [spec:pgorm:def:macros.sql+1/test]    the literal reaches the server unchanged
+// [spec:pgorm:def:macros.sql+2/test]    the literal reaches the server unchanged
 // [spec:pgorm:sem:macros.sql.script/test]    a validated script through `batch_execute`
 #[pgorm_macros::test]
 async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
@@ -56,7 +55,7 @@ async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:macros.sql+1/test]    the same literal bound as a prepared statement
+// [spec:pgorm:def:macros.sql+2/test]    the same literal bound as a prepared statement
 #[pgorm_macros::test]
 async fn checked_literal_drives_query_raw() -> Result<(), Error> {
     let ctx = TestContext::new("sql_macro_query_raw").await;

@@ -1,0 +1,11 @@
+error: no $2 in the query for this argument: it has 1 placeholder(s)
+ --> tests/compile-fail/prql_excess_argument.rs:6:64
+  |
+6 |     let _ = prql!("from invoice | filter total > $1", 100_i64, 2_i64, 3_i64);
+  |                                                                ^^^^^
+
+error: no $3 in the query for this argument: it has 1 placeholder(s)
+ --> tests/compile-fail/prql_excess_argument.rs:6:71
+  |
+6 |     let _ = prql!("from invoice | filter total > $1", 100_i64, 2_i64, 3_i64);
+  |                                                                       ^^^^^

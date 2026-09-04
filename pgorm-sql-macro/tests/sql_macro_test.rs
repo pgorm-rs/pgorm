@@ -2,7 +2,7 @@
 
 use pgorm_sql_macro::sql;
 
-// [spec:pgorm:def:macros.sql+1/test]    the expansion is the literal, in const position
+// [spec:pgorm:def:macros.sql+2/test]    the expansion is the literal, in const position
 #[test]
 fn expansion_is_the_literal_unchanged() {
     const QUERY: &str = sql!("SELECT id, name FROM cake WHERE id = $1");
@@ -14,7 +14,7 @@ fn expansion_is_the_literal_unchanged() {
     );
 }
 
-// [spec:pgorm:def:macros.sql+1/test]    a `&'static str`, so it outlives any frame
+// [spec:pgorm:def:macros.sql+2/test]    a `&'static str`, so it outlives any frame
 #[test]
 fn expansion_is_a_static_str() {
     fn keep(query: &'static str) -> &'static str {

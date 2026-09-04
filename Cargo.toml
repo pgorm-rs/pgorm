@@ -15,7 +15,7 @@ keywords = ["async", "orm", "postgres"]
 rust-version = "1.88"
 
 [package.metadata.docs.rs]
-features = ["default", "debug-print", "postgres-array", "pgorm-internal", "tests-cfg", "sql-macro", "metrics-fingerprint"]
+features = ["default", "debug-print", "postgres-array", "pgorm-internal", "tests-cfg", "metrics-fingerprint"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
@@ -46,7 +46,7 @@ log = { version = "0.4.34", default-features = false }
 rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-features = false, optional = true }
 pg_query = "6.2.0"
 pgorm-macros = { version = "0.2.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
-pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro", optional = true }
+pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro" }
 # The PRQL compiler behind pgorm::pipeline. Pure Rust but a heavyweight
 # compile; a permanent dependency by decision, like pg_query above. The pin
 # is exact: the PL AST is not a stable API, and the adapter module is
@@ -65,7 +65,7 @@ postgres-protocol = { version = "0.6.12", default-features = false }
 futures = { version = "0.3.34" }
 tokio = { version = "1.53", features = ["full"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-pgorm = { path = ".", features = ["debug-print", "tests-cfg", "postgres-array", "pgorm-internal", "sql-macro", "metrics-fingerprint"] }
+pgorm = { path = ".", features = ["debug-print", "tests-cfg", "postgres-array", "pgorm-internal", "metrics-fingerprint"] }
 pretty_assertions = { version = "1.4" }
 uuid = { version = "1.26", features = ["v4"] }
 arraystring = "0.3"
@@ -87,9 +87,6 @@ default = [
     "macros"
 ]
 macros = ["pgorm-macros/derive"]
-# Off by default: brings `sql!` into scope. libpg_query is compiled either way,
-# since `pg_query` is a plain dependency for `SelectorRaw` pagination.
-sql-macro = ["dep:pgorm-sql-macro"]
 # Off by default: fingerprinting costs a parse per statement, so only builds
 # that want query identities in their metrics pay for it. libpg_query itself is
 # linked either way (see `pg_query` above).

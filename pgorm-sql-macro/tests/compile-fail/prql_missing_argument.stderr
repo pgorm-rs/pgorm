@@ -1,0 +1,5 @@
+error: the query has 2 placeholder(s) but 1 argument(s) were given: nothing binds $2
+ --> tests/compile-fail/prql_missing_argument.rs:6:9
+  |
+6 |         "from invoice | filter total > $1 | filter billing_city == $2",
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

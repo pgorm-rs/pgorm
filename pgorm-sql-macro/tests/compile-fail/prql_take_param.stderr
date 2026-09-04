@@ -1,0 +1,13 @@
+error: PRQL rejected this query:
+       Error:
+          ╭─[ :1:21 ]
+          │
+        1 │ from invoice | take $1
+          │                     ─┬
+          │                      ╰── `take` expected int or range, but found $1
+       ───╯
+
+ --> tests/compile-fail/prql_take_param.rs:5:19
+  |
+5 |     let _ = prql!("from invoice | take $1", 5_i64);
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^

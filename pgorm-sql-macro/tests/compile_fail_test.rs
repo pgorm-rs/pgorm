@@ -1,14 +1,20 @@
-//! Compile-time verification of the macro's contract.
+//! Compile-time verification of both macros' contracts.
 //!
-//! The `compile-fail` fixtures are the refusals — malformed grammar and inputs
-//! that are not a lone string literal — each paired with a `.stderr` snapshot
-//! trybuild asserts against. The `pass` fixtures are compiled *and run*, so the
-//! expansion is checked in expression and const position and their assertions
-//! are part of this test.
+//! The `compile-fail` fixtures are the refusals, each paired with a `.stderr`
+//! snapshot trybuild asserts against: for `sql!`, malformed grammar and inputs
+//! that are not a lone string literal; for `prql!`, PRQL the compiler rejects
+//! (including `take $N`), emitted SQL the oracle rejects (the broken
+//! s-string), and every placeholder mistake — too few arguments, too many,
+//! a gap in the numbering, and `$0`. The `pass` fixtures are compiled *and
+//! run*, so the expansions are checked live and their assertions are part of
+//! this test.
 
 // [spec:pgorm:req:macros.sql.reject/test]    grammar rejections and non-literal input
-// [spec:pgorm:def:macros.sql+1/test]    valid SQL compiles and keeps its text
+// [spec:pgorm:def:macros.sql+2/test]    valid SQL compiles and keeps its text
 // [spec:pgorm:req:macros.sql.ceiling/test]    unknown tables pass; the span is the whole literal
+// [spec:pgorm:req:macros.prql.reject/test]    all five refusals, spanned and named
+// [spec:pgorm:sem:macros.prql.sstring/test]    a broken s-string dies at the oracle
+// [spec:pgorm:def:macros.prql/test]    valid PRQL expands to SQL plus Values
 #[test]
 fn compile_fail_tests() {
     let t = trybuild::TestCases::new();

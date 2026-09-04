@@ -3,7 +3,7 @@ name = "pgorm-sql-macro"
 version = "0.2.0"
 authors = []
 edition = "2024"
-description = "Compile-time PostgreSQL grammar validation for raw SQL string literals"
+description = "Compile-time PostgreSQL grammar validation for raw SQL and PRQL string literals"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/pgorm-rs/pgorm"
 documentation = "https://docs.rs/pgorm-sql-macro"
@@ -20,9 +20,14 @@ proc-macro = true
 [dependencies]
 pg_query = "6.2.0"
 proc-macro2 = { version = "1.0.107", default-features = false }
+# The same exact pin as the root crate's runtime pipeline: the two must move
+# in lockstep so `prql!` and `pgorm::pipeline` emit through one compiler.
+prqlc = { version = "=0.13.14", default-features = false }
 quote = { version = "1.0.47", default-features = false }
-syn = { version = "3", default-features = false, features = ["parsing", "proc-macro", "printing"] }
+serde_json = { version = "1.0.151", default-features = false, features = ["std"] }
+syn = { version = "3", default-features = false, features = ["full", "parsing", "proc-macro", "printing"] }
 
 [dev-dependencies]
+pgorm = { path = ".." }
 pgorm-sql-macro = { path = "." }
 trybuild = "1.0.120"

@@ -1,0 +1,5 @@
+error: the query uses $3 but never $2: placeholders must be contiguous from $1
+ --> tests/compile-fail/prql_gap.rs:7:9
+  |
+7 |         "from invoice | filter total > $1 | filter subtotal < $3",
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,8 +1,11 @@
-//! Compile-time PostgreSQL grammar validation for raw SQL string literals.
+//! Compile-time query validation for pgorm's raw-SQL escape hatches.
 //!
-//! The crate is a sibling of `pgorm-macros` rather than another macro inside it
-//! because validation links libpg_query, the PostgreSQL server's own parser, as
-//! a C dependency, and the entity derives have no use for it.
+//! Two function-like macros live here: [`sql!`] holds a raw SQL string
+//! literal to the PostgreSQL grammar, and [`prql!`] compiles a PRQL string
+//! literal down to PostgreSQL SQL with its placeholder arity checked against
+//! the arguments given. The crate is a sibling of `pgorm-macros` rather than
+//! more macros inside it because the entity derives have no use for either
+//! the libpg_query oracle or the PRQL compiler.
 #![warn(missing_docs)]
 #![deny(
     clippy::expect_used,
@@ -17,9 +20,13 @@
 
 extern crate proc_macro;
 
+mod oracle;
+mod prql;
+mod sql;
+
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Error, LitStr, parse_macro_input};
+use syn::{LitStr, parse_macro_input};
 
 /// Hold a raw SQL string literal to the PostgreSQL grammar at compile time.
 ///
@@ -46,79 +53,78 @@ use syn::{Error, LitStr, parse_macro_input};
 /// The check is syntax only. libpg_query carries no catalog, so a well-formed
 /// statement against tables and columns that do not exist passes happily — this
 /// rules out typos in SQL, not mistakes about the schema.
-// [spec:pgorm:def:macros.sql+1]
+// [spec:pgorm:def:macros.sql+2]
 // [spec:pgorm:req:macros.sql.reject]    non-literal input is `syn`'s own refusal
 #[proc_macro]
 pub fn sql(input: TokenStream) -> TokenStream {
     let literal = parse_macro_input!(input as LitStr);
 
-    match validate(&literal) {
+    match sql::validate(&literal) {
         Ok(()) => quote!(#literal).into(),
         Err(error) => error.to_compile_error().into(),
     }
 }
 
-/// Hold the literal's text to the grammar.
+/// Compile a PRQL string literal to PostgreSQL SQL at build time, expanding
+/// to `(&'static str, pgorm::Values)`.
 ///
-/// `pg_query::parse` walks a whole `;`-separated script in one pass and stops at
-/// the first statement the grammar refuses, so multi-statement literals need no
-/// splitting of their own.
-// [spec:pgorm:sem:macros.sql.script]
-// [spec:pgorm:req:macros.sql.ceiling]    syntax only: the parser has no catalog
-fn validate(literal: &LitStr) -> Result<(), Error> {
-    let sql = literal.value();
-
-    match pg_query::parse(&sql) {
-        Ok(_) => Ok(()),
-        Err(error) => Err(rejection(literal, &sql, &parser_message(&error))),
-    }
-}
-
-/// Build the compile error for a rejected literal.
+/// The literal is compiled by prqlc while your crate compiles; the emitted
+/// SQL is then held to libpg_query — the same oracle behind [`sql!`] — and
+/// its `$N` placeholders are counted against the arguments that follow the
+/// literal. What lands in your code is the finished SQL as a `&'static str`
+/// and the arguments converted via `Into<pgorm::Value>`, in placeholder
+/// order, ready for `SelectorRaw::from_statement` and the other raw-SQL
+/// entry points.
 ///
-/// The span is the whole literal: pointing at the offending byte inside it would
-/// need `proc_macro::Literal::subspan`, which is nightly-only, so the position
-/// rides in the message as a caret under the offending line instead.
-// [spec:pgorm:req:macros.sql.reject]    a grammar rejection, spanned on the literal
-// [spec:pgorm:req:macros.sql.ceiling]    the span is the whole literal
-fn rejection(literal: &LitStr, sql: &str, message: &str) -> Error {
-    let mut text = format!("PostgreSQL rejected this SQL: {message}");
-    if let Some(block) = token_offset(sql, message).and_then(|offset| caret_block(sql, offset)) {
-        text.push_str(&block);
-    }
-
-    Error::new(literal.span(), text)
-}
-
-/// The line of `sql` holding byte `offset`, with a caret beneath that column.
-fn caret_block(sql: &str, offset: usize) -> Option<String> {
-    let (before, after) = sql.split_at_checked(offset)?;
-    let head = before.get(before.rfind('\n').map_or(0, |index| index + 1)..)?;
-    let tail = after.get(..after.find('\n').unwrap_or(after.len()))?;
-    let column = " ".repeat(head.chars().count());
-
-    Some(format!("\n\n  {head}{tail}\n  {column}^"))
-}
-
-/// Where the parser stopped, as a byte offset into `sql`.
+/// ```
+/// use pgorm_sql_macro::prql;
 ///
-/// libpg_query surfaces only the message, not the cursor position, so the offset
-/// is recovered from the token the message names — and messages that name no
-/// token, such as `syntax error at end of input`, get no caret. Matching the
-/// render oracle in `pgorm-query/tests/postgres/oracle.rs`, the last occurrence
-/// is taken: a token the parser choked on rarely reappears past the point it
-/// gave up.
-fn token_offset(sql: &str, message: &str) -> Option<usize> {
-    let token = message.split("at or near \"").nth(1)?.strip_suffix('"')?;
+/// let min_total = 5_i64;
+/// let (sql, values) = prql!("from invoice | filter total > $1 | take 5", min_total);
+/// assert_eq!(sql, "SELECT * FROM invoice WHERE total > $1 LIMIT 5");
+/// assert_eq!(values, pgorm::Values(vec![pgorm::Value::from(5_i64)]));
+/// ```
+///
+/// A placeholder may be reused — `$1` twice in the query is still one
+/// argument, bound once:
+///
+/// ```
+/// use pgorm_sql_macro::prql;
+///
+/// let (sql, values) = prql!(
+///     "from invoice | filter total > $1 | filter subtotal < $1",
+///     100_i64,
+/// );
+/// assert_eq!(sql, "SELECT * FROM invoice WHERE total > $1 AND subtotal < $1");
+/// assert_eq!(values.0.len(), 1);
+/// ```
+///
+/// Five mistakes are compile errors, not runtime surprises: PRQL the
+/// compiler rejects (including `take $1` — PRQL refuses a parameterized
+/// limit), emitted SQL the PostgreSQL grammar rejects (the way a broken
+/// s-string surfaces), an argument count that does not match the
+/// placeholders, and a placeholder sequence with a gap (`$1, $3` and no
+/// `$2`). S-strings pass through as written — they are the escape hatch —
+/// but the final SQL they land in is still validated.
+///
+/// The check ends where the catalog begins: whether `total` is a column and
+/// whether `$1` accepts an `i64` are the server's questions, answered at
+/// prepare time and by `VerifyTrait::verify` at runtime.
+// [spec:pgorm:def:macros.prql]
+// [spec:pgorm:req:macros.prql.reject]    non-literal input is `syn`'s own refusal
+// [spec:pgorm:req:macros.prql.ceiling]    the limits are stated on the macro
+#[proc_macro]
+pub fn prql(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as prql::PrqlInput);
 
-    sql.rfind(token)
-}
-
-/// The parser's own diagnostic, unwrapped from the `pg_query` error variant that
-/// would otherwise prefix it with a stage name.
-fn parser_message(error: &pg_query::Error) -> String {
-    match error {
-        pg_query::Error::Parse(message) => message.clone(),
-        other => other.to_string(),
+    match prql::expand(&input) {
+        Ok(expansion) => expansion.into(),
+        Err(error) => {
+            // A combined error renders as several `compile_error!` statements;
+            // the block keeps them legal in the expression position the tuple
+            // would have occupied, so every span is reported.
+            let errors = error.to_compile_error();
+            quote!({ #errors }).into()
+        }
     }
 }

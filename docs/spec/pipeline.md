@@ -8,7 +8,7 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Architecture
 
-> [spec:pgorm:def:pipeline.adapter+1]
+> [spec:pgorm:def:pipeline.adapter+2]
 > The pipeline lowers typed Rust construction directly into prqlc's PL AST —
 > no PRQL text round-trip — and compiles it with `pl_to_rq` followed by
 > `rq_to_sql` targeting `Dialect::Postgres`, producing a single SQL string
@@ -18,13 +18,18 @@ of the crate, compiled in every build. Rules are grouped under
 > semantics require.
 >
 > The PL AST is not a stable API, so the boundary is confined: every `prqlc`
-> import in the workspace lives in the private `src/pipeline/adapter.rs`, the
-> dependency is pinned exact (`prqlc = "=0.13.14"`, `default-features =
+> import in the root crate lives in the private `src/pipeline/adapter.rs`,
+> the dependency is pinned exact (`prqlc = "=0.13.14"`, `default-features =
 > false`), and no prqlc type appears in the public API. A compiler bump is
 > absorbed by rewriting the adapter alone. prqlc is a plain dependency of the
 > root crate by operator decision — the pipeline is part of the permanent
 > story, and every build pays its compile, the same posture as `pg_query` —
-> but it MUST NOT appear in any other workspace crate's dependencies.
+> and it MUST NOT appear in any other workspace crate's dependencies, with
+> exactly one exception: `pgorm-sql-macro` carries the same exact pin for the
+> `prql!` macro (`[spec:pgorm:def:macros.prql]`), which runs the compiler at
+> build time over PRQL text. The two pins MUST stay identical, so the typed
+> pipeline and the text macro emit through one compiler version and a bump
+> rewrites both consumers in one motion.
 
 ## Surface
 

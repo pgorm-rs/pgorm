@@ -1430,6 +1430,20 @@ children (
                     }
                 )
             }
+
+            {
+                id polish.epoch-return
+                title "Stale/Review epoch bookkeeping: how does a drifted node return to Done?"
+                kind @chore
+                log (
+                    {
+                        at 2026-09-04T14:41:02.371749Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Eight pre-campaign nodes sit in derived Stale/Review after this session's rule bumps: sql.ast, sql.ddl (stale since the campaign), plus the 2026-09-04 sync's batch — orm.binding-types, infra.tx.closure, codegen.generate, decide.migration (Stale), infra.tx.tests, decide.cli (Review). All their rules are 100% covered/tested at current versions with zero stale annotations — the drift IS the re-verification landing after their Done stamps. Attempted and failed: a re-acknowledging chore commit addressing sql.ast+sql.ddl (12f8d400) did not flip them, so the seen-version stamp must come from somewhere else (per-rule nspec-id trailers? only commits whose staged delta touches the rules' files?). Deliverable: understand the actual epoch-return mechanism (read nplan's docs/spec on reconciliation or probe the daemon), then clear all eight properly — no status hand-editing, statuses are derived."
+                    }
+                )
+            }
         )
     }
 
@@ -2701,12 +2715,20 @@ children (
                 title "prql!: PRQL text compiled, validated, and arity-checked at build time"
                 kind @feat
                 deps (ergo.pipeline-api)
+                sealed true
                 log (
                     {
                         at 2026-09-04T14:10:27.954533Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator-approved design (2026-09-04): prql!(\"from invoice | filter total > $1 | take 5\", min_total) expands at build time to (&'static str SQL, Values). The macro compiles the PRQL text through prqlc (text path this time — prql_to_pl -> pl_to_rq -> rq_to_sql, Postgres dialect), validates the emitted SQL through libpg_query exactly as sql! does, and reads the Param nodes from the parse to enforce as COMPILE ERRORS: arity (placeholder count vs argument count, naming the missing $N), contiguity ($1,$3 with no $2 refused), and PRQL's own take-$N rejection surfacing at build. $N reuse = one argument bound once; arguments convert via Into<Value> in placeholder order. S-strings in the text are the caller's escape hatch and still pass the oracle (it validates the final SQL). What cannot be checked at build: value-vs-column typing (no catalog) — runtime prepare + verify::<M> cover it, stated in the rule. Placement: pgorm-sql-macro (the proc-macro crate gains its own exact-pinned prqlc build-dep); whether prql! rides the existing sql-macro feature or the crate's re-export becomes unconditional is implementer judgment — note the operator's permanence posture on prqlc (pipeline-permanent) and justify. Sibling of ergo.pipeline-v1: text form for static queries, typed pipeline for composition/dynamic; the verdict that predicted the macro \"falls out as a byproduct\" is ergo.pipeline-api's."
+                    }
+
+                    {
+                        at 2026-09-04T14:41:22.291401Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -32,7 +32,7 @@ fn sql_of(pipeline: Pipeline) -> String {
     sql
 }
 
-// [spec:pgorm:def:pipeline.adapter+1/test]    direct PL construction is
+// [spec:pgorm:def:pipeline.adapter+2/test]    direct PL construction is
 // interchangeable with compiling the equivalent PRQL text
 #[test]
 fn built_filter_matches_text_compilation() {
