@@ -275,6 +275,14 @@ children (
                         text "Stale epoch closed: sql.ast.select.projection bumped to +1 by sql.empty-select-list (the selects() accessor clause); references re-pinned and the accessor spec'd, tested and verified in that branch (spec_stale clean, 893 tests green). No drift in this node's own implementation — the contract grew, and the growth shipped covered."
                         after_done true
                     }
+
+                    {
+                        at 2026-09-04T14:18:27.527595Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Stale-epoch review: the drift is the campaign's own doing — every rule this node implements was re-verified through the unrep/ergo waves (select.projection under the typestate work, the with/on-conflict/window/order families rewritten with oracle-checked coverage), and nplan_spec_status holds 100% covered/tested with zero stale annotations. Re-acknowledging to open a new Done epoch; no code change belongs to this node itself."
+                        after_done true
+                    }
                 )
             }
 
@@ -336,6 +344,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Stale epoch closed: sql.ddl bumped to +2 by decide.schema-comments (Comment joined the entry-point list) and create-table/column-def bumped +1 in the same commit; every impl and test reference was re-pinned in that branch and verified against the new text there (spec_stale clean, 893 tests green). No drift in this node's own implementation — the contract grew, and the growth shipped covered."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-09-04T14:18:29.724178Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Stale-epoch review: same as sql.ast — the DDL rule family was rewritten wholesale by ddl-empty-builders/ddl-table-target/foreign-key-shape with by-construction guarantees and oracle-checked coverage; the drift this staleness records is that work landing after the node's Done stamp. Re-acknowledging to open a new Done epoch."
                         after_done true
                     }
                 )
@@ -2676,6 +2692,21 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ergo.prql-macro
+                title "prql!: PRQL text compiled, validated, and arity-checked at build time"
+                kind @feat
+                deps (ergo.pipeline-api)
+                log (
+                    {
+                        at 2026-09-04T14:10:27.954533Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator-approved design (2026-09-04): prql!(\"from invoice | filter total > $1 | take 5\", min_total) expands at build time to (&'static str SQL, Values). The macro compiles the PRQL text through prqlc (text path this time — prql_to_pl -> pl_to_rq -> rq_to_sql, Postgres dialect), validates the emitted SQL through libpg_query exactly as sql! does, and reads the Param nodes from the parse to enforce as COMPILE ERRORS: arity (placeholder count vs argument count, naming the missing $N), contiguity ($1,$3 with no $2 refused), and PRQL's own take-$N rejection surfacing at build. $N reuse = one argument bound once; arguments convert via Into<Value> in placeholder order. S-strings in the text are the caller's escape hatch and still pass the oracle (it validates the final SQL). What cannot be checked at build: value-vs-column typing (no catalog) — runtime prepare + verify::<M> cover it, stated in the rule. Placement: pgorm-sql-macro (the proc-macro crate gains its own exact-pinned prqlc build-dep); whether prql! rides the existing sql-macro feature or the crate's re-export becomes unconditional is implementer judgment — note the operator's permanence posture on prqlc (pipeline-permanent) and justify. Sibling of ergo.pipeline-v1: text form for static queries, typed pipeline for composition/dynamic; the verdict that predicted the macro \"falls out as a byproduct\" is ergo.pipeline-api's."
                     }
                 )
             }
