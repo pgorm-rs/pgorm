@@ -18,7 +18,7 @@ impl Pipeline {
     /// This is where everything fallible happens — reserved-alias screening,
     /// then prqlc's name resolution and lowering — and it fails as a
     /// [`PipelineError`], never a panic.
-    // [spec:pgorm:req:pipeline.errors]
+    // [spec:pgorm:req:pipeline.errors+1]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let mut aliases = Vec::new();
         for stage in &self.stages {

@@ -2738,6 +2738,7 @@ children (
                 title "The pipeline reads like the PRQL: columns are bare, closures only where binding, arrays not vecs"
                 kind @refactor
                 deps (ergo.pipeline-v1)
+                sealed true
                 log (
                     {
                         at 2026-09-04T15:00:08.718176Z
@@ -2751,6 +2752,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator addition (2026-09-04, mid-flight): stringly out(\"rn\") at every reference site is the wrong shape — the alias should be a value with ONE definition site. Add an alias token: let rn = alias(\"rn\"); a Copy newtype over the name that (a) declares via .as_(rn) — as_ accepts impl Into<AliasName> so bare &str stays legal for one-shot aliases nobody references — and (b) references by behaving as an expression itself (token implements the comparison/sort surface or Into<Expr> as an unqualified ident), so filter(rn.lte(2)) replaces filter(out(\"rn\").lte(2)). out() as a public constructor should disappear from the fluent surface if the token covers it (judgment: keep a low-level escape or delete outright per delete-don't-deprecate). Honest ceiling stands: an unattached token still compiles and the server catches it — state that in the rule; do not build brand machinery to tie tokens to attachment (overkill, operator not asked for it). Update the five before/after pairs and pipeline.surface accordingly."
+                    }
+
+                    {
+                        at 2026-09-05T12:12:43.627149Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

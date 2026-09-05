@@ -360,6 +360,7 @@ assertions (
     {id ergo.fluent-audit, kind @complete, author "brendan@necessary.nu", at 2026-09-04T15:20:00.520126Z}
     {id ergo.fluent-deletions, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:27:17.172923Z}
     {id ergo.fluent-joins, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:44:09.940572Z}
+    {id ergo.fluent-pipeline, kind @complete, author "brendan@necessary.nu", at 2026-09-05T12:12:43.627149Z}
     {id ergo.fluent-prelude, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:01:11.030623Z}
     {id ergo.fluent-sugar, kind @complete, author "brendan@necessary.nu", at 2026-09-04T15:52:59.018339Z}
     {id ergo.jsonb-vocab, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:48:38.413406Z}

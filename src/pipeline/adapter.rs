@@ -91,7 +91,7 @@ pub(super) fn lit_null() -> PlExpr {
 
 /// A `$N` placeholder. `ExprKind::Param` survives lowering untouched, so the
 /// index minted here is the index the emitted SQL carries.
-// [spec:pgorm:req:pipeline.params]
+// [spec:pgorm:req:pipeline.params+1]
 pub(super) fn param(index: usize) -> PlExpr {
     Expr::new(ExprKind::Param(index.to_string()))
 }

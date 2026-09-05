@@ -8,7 +8,7 @@ pub use std::sync::Arc as RcOrArc;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
-// [spec:pgorm:def:sql.types+2]
+// [spec:pgorm:def:sql.types+3]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
@@ -64,7 +64,7 @@ impl Clone for SeaRc<dyn Iden> {
     }
 }
 
-// [spec:pgorm:def:sql.types+2]
+// [spec:pgorm:def:sql.types+3]
 impl PartialEq for SeaRc<dyn Iden> {
     fn eq(&self, other: &Self) -> bool {
         let (self_vtable, other_vtable) = unsafe {
@@ -406,6 +406,10 @@ pub enum Order {
     Field(Values),
 }
 
+#[path = "types_alias.rs"]
+mod types_alias;
+pub use types_alias::*;
+
 /// Helper for create name alias
 #[derive(Debug, Clone)]
 pub struct Alias(String);
@@ -536,14 +540,14 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+2]
+// [spec:pgorm:def:sql.types+3]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
         SeaRc::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+2]
+// [spec:pgorm:def:sql.types+3]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
         SeaRc::new(Alias::new(self))
@@ -850,7 +854,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+2/test]
+    // [spec:pgorm:def:sql.types+3/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -865,7 +869,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+2/test]
+    // [spec:pgorm:def:sql.types+3/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

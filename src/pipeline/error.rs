@@ -5,7 +5,7 @@
 /// Construction itself is infallible; everything that can go wrong is
 /// reported here, at the [`into_sql`](super::Pipeline::into_sql) boundary,
 /// never as a panic.
-// [spec:pgorm:req:pipeline.errors]
+// [spec:pgorm:req:pipeline.errors+1]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PipelineError {
@@ -21,14 +21,18 @@ pub enum PipelineError {
     ReservedAlias(String),
     /// prqlc rejected the pipeline during lowering.
     ///
-    /// Name-resolution failures — an `out` reference to an alias no stage
-    /// introduced, a column that is not in scope after `select` — surface
-    /// here, carrying the compiler's own diagnostic text.
+    /// Name-resolution failures — a PRQL built-in used as a value, a column
+    /// that is not in scope after `select` — surface here, carrying the
+    /// compiler's own diagnostic text.
+    ///
+    /// A reference to a name no stage introduced is *not* among them: with
+    /// no catalog it resolves as a column of the source relation, and the
+    /// server answers for it at execution.
     #[error("PRQL compilation failed: {0}")]
     Compile(String),
 }
 
-// [spec:pgorm:req:pipeline.errors]
+// [spec:pgorm:req:pipeline.errors+1]
 impl From<PipelineError> for crate::Error {
     fn from(err: PipelineError) -> Self {
         crate::Error::Query(crate::error::RuntimeError::Internal(err.to_string()))
@@ -37,7 +41,7 @@ impl From<PipelineError> for crate::Error {
 
 /// The closed set of names an alias must not take: every top-level binding of
 /// prqlc 0.13's `std` module, its submodule names, and the PRQL keywords.
-// [spec:pgorm:req:pipeline.errors]
+// [spec:pgorm:req:pipeline.errors+1]
 pub(super) const RESERVED: &[&str] = &[
     "_append_by_name",
     "_eq",

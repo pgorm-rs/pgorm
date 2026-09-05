@@ -15,13 +15,21 @@
 pub mod common;
 
 pub use chrono::offset::Utc;
+use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pipeline::{
-    Frame, JoinSide, Pipeline, WindowDef, col, count_rows, out, row_number, sum,
+    AliasName, ExprOps, JoinSide, Pipeline, alias, by, count_rows, row_number, sort_by, sum,
 };
 use pgorm::{ConnectionTrait, entity::*, set};
 use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
+
+/// Names this suite's pipelines introduce: bound once here, referred to by
+/// value everywhere below.
+const SPENT: AliasName = alias("spent");
+const ORDER_COUNT: AliasName = alias("order_count");
+const RN: AliasName = alias("rn");
+const RUNNING: AliasName = alias("running");
 
 struct Seeded {
     alice: i32,
@@ -88,18 +96,12 @@ fn parsed_select(sql: &str) -> pg_query::protobuf::SelectStmt {
 }
 
 fn spending() -> Pipeline {
-    Pipeline::from(order::Entity).aggregate_by(|_| {
-        (
-            vec![col(order::Entity, order::Column::CustomerId)],
-            vec![
-                sum(col(order::Entity, order::Column::Total)).aliased("spent"),
-                count_rows().aliased("order_count"),
-            ],
-        )
-    })
+    Pipeline::from(order::Entity)
+        .group(O::CustomerId)
+        .aggregate((sum(O::Total).as_(SPENT), count_rows().as_(ORDER_COUNT)))
 }
 
-// [spec:pgorm:req:pipeline.surface/test]    HAVING placement with a bound
+// [spec:pgorm:req:pipeline.surface+1/test]    HAVING placement with a bound
 // threshold: the group filter runs against grouped sums, not rows
 #[pgorm_macros::test]
 async fn having_filters_groups_with_bound_param() {
@@ -109,8 +111,8 @@ async fn having_filters_groups_with_bound_param() {
     let seeded = seed(&db).await;
 
     let pipeline = spending()
-        .filter(|binder| out("spent").gt(binder.bind(rust_dec(40.0))))
-        .sort(|_| vec![out("spent").desc()]);
+        .filter_with(|binder| SPENT.gt(binder.bind(rust_dec(40.0))))
+        .sort(SPENT.desc());
     let (sql, _) = pipeline.clone().into_sql().unwrap();
     assert!(parsed_select(&sql).having_clause.is_some());
 
@@ -126,7 +128,7 @@ async fn having_filters_groups_with_bound_param() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface/test]    filter-after-window nests the
+// [spec:pgorm:req:pipeline.surface+1/test]    filter-after-window nests the
 // windowed stage in a CTE and filters outside it, with the rank bound
 #[pgorm_macros::test]
 async fn window_rank_filter_nests_through_cte() {
@@ -136,20 +138,13 @@ async fn window_rank_filter_nests_through_cte() {
     let seeded = seed(&db).await;
 
     let pipeline = Pipeline::from(order::Entity)
-        .window(|_| {
-            WindowDef::derive(vec![row_number().aliased("rn")])
-                .partition_by(vec![col(order::Entity, order::Column::CustomerId)])
-                .sorted(vec![col(order::Entity, order::Column::Total).desc()])
-        })
-        .filter(|binder| out("rn").lte(binder.bind(2_i64)))
-        .select(|_| {
-            vec![
-                col(order::Entity, order::Column::CustomerId),
-                col(order::Entity, order::Column::Total),
-                out("rn"),
-            ]
-        })
-        .sort(|_| vec![col(order::Entity, order::Column::CustomerId), out("rn")]);
+        .window(
+            row_number().as_(RN),
+            by(O::CustomerId).sort_by(O::Total.desc()),
+        )
+        .filter_with(|binder| RN.lte(binder.bind(2_i64)))
+        .select((O::CustomerId, O::Total, RN))
+        .sort((O::CustomerId, RN));
     let (sql, _) = pipeline.clone().into_sql().unwrap();
     let parsed = parsed_select(&sql);
     assert!(parsed.with_clause.is_some());
@@ -170,7 +165,7 @@ async fn window_rank_filter_nests_through_cte() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface/test]    explicit join condition against
+// [spec:pgorm:req:pipeline.surface+1/test]    explicit join condition against
 // live rows, with the customer name bound
 #[pgorm_macros::test]
 async fn join_on_explicit_condition_binds_params() {
@@ -180,18 +175,10 @@ async fn join_on_explicit_condition_binds_params() {
     seed(&db).await;
 
     let rows: Vec<(Decimal, String)> = Pipeline::from(order::Entity)
-        .join(JoinSide::Inner, customer::Entity, |_| {
-            col(order::Entity, order::Column::CustomerId)
-                .eq(col(customer::Entity, customer::Column::Id))
-        })
-        .filter(|binder| col(customer::Entity, customer::Column::Name).eq(binder.bind("Alice")))
-        .select(|_| {
-            vec![
-                col(order::Entity, order::Column::Total),
-                col(customer::Entity, customer::Column::Name),
-            ]
-        })
-        .sort(|_| vec![col(order::Entity, order::Column::Total)])
+        .join(JoinSide::Inner, customer::Entity, O::CustomerId.eq(C::Id))
+        .filter_with(|binder| C::Name.eq(binder.bind("Alice")))
+        .select((O::Total, C::Name))
+        .sort(O::Total)
         .into_tuple()
         .unwrap()
         .all(&db)
@@ -209,8 +196,8 @@ async fn join_on_explicit_condition_binds_params() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface/test]    an explicit ROWS frame computes a
-// running sum per partition on live rows
+// [spec:pgorm:req:pipeline.surface+1/test]    an explicit ROWS frame computes
+// a running sum per partition on live rows
 #[pgorm_macros::test]
 async fn rows_frame_computes_running_sum() {
     let ctx = TestContext::new("pipeline_rows_frame_running_sum").await;
@@ -219,25 +206,13 @@ async fn rows_frame_computes_running_sum() {
     let seeded = seed(&db).await;
 
     let rows: Vec<(i32, Decimal, Decimal)> = Pipeline::from(order::Entity)
-        .window(|_| {
-            WindowDef::derive(vec![
-                sum(col(order::Entity, order::Column::Total)).aliased("running"),
-            ])
-            .partition_by(vec![col(order::Entity, order::Column::CustomerId)])
-            .sorted(vec![col(order::Entity, order::Column::Total)])
-            .frame(Frame::rows(None, Some(0)))
-        })
-        .filter(|binder| {
-            col(order::Entity, order::Column::CustomerId).eq(binder.bind(seeded.alice))
-        })
-        .select(|_| {
-            vec![
-                col(order::Entity, order::Column::CustomerId),
-                col(order::Entity, order::Column::Total),
-                out("running"),
-            ]
-        })
-        .sort(|_| vec![col(order::Entity, order::Column::Total)])
+        .window(
+            sum(O::Total).as_(RUNNING),
+            by(O::CustomerId).sort_by(O::Total).rows(None, Some(0)),
+        )
+        .filter_with(|binder| O::CustomerId.eq(binder.bind(seeded.alice)))
+        .select((O::CustomerId, O::Total, RUNNING))
+        .sort(O::Total)
         .into_tuple()
         .unwrap()
         .all(&db)
@@ -255,7 +230,7 @@ async fn rows_frame_computes_running_sum() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface/test]    fn(Pipeline) -> Pipeline scopes
+// [spec:pgorm:req:pipeline.surface+1/test]    fn(Pipeline) -> Pipeline scopes
 // compose, each binding its own parameters, and the placeholders stay aligned
 #[pgorm_macros::test]
 async fn composed_scopes_bind_params_in_order() {
@@ -265,10 +240,10 @@ async fn composed_scopes_bind_params_in_order() {
     let seeded = seed(&db).await;
 
     fn spent_over(pipeline: Pipeline, threshold: Decimal) -> Pipeline {
-        pipeline.filter(move |binder| out("spent").gt(binder.bind(threshold)))
+        pipeline.filter_with(move |binder| SPENT.gt(binder.bind(threshold)))
     }
     fn fewer_orders_than(pipeline: Pipeline, count: i64) -> Pipeline {
-        pipeline.filter(move |binder| out("order_count").lt(binder.bind(count)))
+        pipeline.filter_with(move |binder| ORDER_COUNT.lt(binder.bind(count)))
     }
 
     let pipeline = fewer_orders_than(spent_over(spending(), rust_dec(40.0)), 3);
@@ -291,9 +266,9 @@ async fn terminal_decodes_entity_models() {
     let db = ctx.db.get().await.unwrap();
     seed(&db).await;
 
-    let customers: Vec<customer::Model> = Pipeline::from_entity::<customer::Entity>()
-        .filter(|binder| col(customer::Entity, customer::Column::Name).ne(binder.bind("Cleo")))
-        .sort(|_| vec![col(customer::Entity, customer::Column::Name)])
+    let customers: Vec<customer::Model> = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.ne(binder.bind("Cleo")))
+        .sort(C::Name)
         .all(&db)
         .await
         .unwrap();
@@ -305,15 +280,15 @@ async fn terminal_decodes_entity_models() {
         vec!["Alice", "Bob"]
     );
 
-    let bob: customer::Model = Pipeline::from_entity::<customer::Entity>()
-        .filter(|binder| col(customer::Entity, customer::Column::Name).eq(binder.bind("Bob")))
+    let bob: customer::Model = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.eq(binder.bind("Bob")))
         .one(&db)
         .await
         .unwrap();
     assert_eq!(bob.name, "Bob");
 
-    let nobody: Option<customer::Model> = Pipeline::from_entity::<customer::Entity>()
-        .filter(|binder| col(customer::Entity, customer::Column::Name).eq(binder.bind("Zed")))
+    let nobody: Option<customer::Model> = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.eq(binder.bind("Zed")))
         .one_opt(&db)
         .await
         .unwrap();

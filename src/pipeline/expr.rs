@@ -1,8 +1,12 @@
-//! Branded scalar expressions and the operators that combine them.
+//! Branded scalar expressions, the operators that combine them, and the
+//! conversions that let a column, an alias token or a Rust literal stand in
+//! for one.
 
 use std::marker::PhantomData;
 
-use pgorm_query::Iden;
+use pgorm_query::{AliasName, Iden};
+
+use crate::ColumnTrait;
 
 use super::adapter::{self, BinOp, PlExpr, UnOp};
 use super::funcs::CastType;
@@ -10,13 +14,14 @@ use super::funcs::CastType;
 /// A scalar expression, branded with the lifetime of the pipeline stage that
 /// is allowed to consume it.
 ///
-/// Expressions built purely from names and literals ([`col`], [`out`], the
-/// constructors in this module) are brand-polymorphic and can appear in any
-/// pipeline. An expression that contains a bound placeholder — anything
-/// touched by [`Binder::bind`](super::Binder::bind) — is pinned to the brand
-/// of the binder that minted it, so carrying it into another pipeline (whose
-/// stages quantify over a fresh brand) does not typecheck.
-// [spec:pgorm:req:pipeline.params]
+/// Expressions built purely from names and literals — [`col`], an entity
+/// column, an [`alias`](pgorm_query::alias) token, a Rust literal — are
+/// brand-polymorphic and can appear in any pipeline. An expression that
+/// contains a bound placeholder — anything touched by
+/// [`Binder::bind`](super::Binder::bind) — is pinned to the brand of the
+/// binder that minted it, so carrying it into another pipeline (whose
+/// binding stages quantify over a fresh brand) does not typecheck.
+// [spec:pgorm:req:pipeline.params+1]
 #[derive(Debug, Clone)]
 pub struct Expr<'brand> {
     pub(super) node: PlExpr,
@@ -30,13 +35,23 @@ pub(super) fn branded<'brand>(node: PlExpr) -> Expr<'brand> {
     }
 }
 
-/// A table-qualified column reference.
+/// A bare, unqualified identifier — the pipeline's own introduced names.
+pub(super) fn name<'brand>(name: &str) -> Expr<'brand> {
+    branded(adapter::ident(name))
+}
+
+/// A table-qualified column reference, for when the column alone will not do.
 ///
-/// Qualification is not optional: prqlc has no catalog, so a bare column name
-/// becomes ambiguous the moment a join enters the pipeline. Minting the
-/// reference from a `(table, column)` [`Iden`] pair — entity and column enums
-/// in the common case — makes the qualified form the only representable one.
-// [spec:pgorm:sem:pipeline.qualify]
+/// An entity column already knows its table, so `O::Total` is the everyday
+/// spelling and this is the disambiguating one: a table spelled some other
+/// way — an [`alias`](pgorm_query::alias) token, an
+/// [`Alias`](pgorm_query::Alias), a table no entity describes.
+///
+/// Qualification is not optional: prqlc has no catalog, so a bare column
+/// name becomes ambiguous the moment a join enters the pipeline. Minting the
+/// reference from a `(table, column)` [`Iden`] pair makes the qualified form
+/// the only representable one.
+// [spec:pgorm:sem:pipeline.qualify+1]
 pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec![Iden::to_string(&table)],
@@ -44,141 +59,349 @@ pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
     ))
 }
 
-/// A reference to a name the pipeline itself introduced — a `derive`,
-/// `aggregate` or window alias. For table columns use [`col`].
-pub fn out<'brand>(name: &str) -> Expr<'brand> {
-    branded(adapter::ident(name))
+/// An entity column is a table-qualified expression: the column enum carries
+/// its entity, so the qualification is recovered rather than restated.
+// [spec:pgorm:sem:pipeline.qualify+1]
+impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
+    fn from(column: C) -> Self {
+        branded(adapter::ident_in(
+            vec![Iden::to_string(&*column.entity_name())],
+            Iden::to_string(&column),
+        ))
+    }
 }
 
-impl<'brand> Expr<'brand> {
-    fn bin(self, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> {
-        branded(adapter::binary(self.node, op, rhs.node))
+/// An alias token reads back the name it declared, unqualified — the name
+/// belongs to the pipeline, not to a table.
+// [spec:pgorm:req:pipeline.surface+1]
+impl<'brand> From<AliasName> for Expr<'brand> {
+    fn from(token: AliasName) -> Self {
+        name(token.as_str())
     }
+}
 
+macro_rules! literal {
+    ($ty:ty, $make:ident, $conv:expr) => {
+        /// A Rust literal is an inline SQL literal, exactly as a literal
+        /// written in PRQL text would be. Runtime values belong in
+        /// [`Binder::bind`](super::Binder::bind).
+        // [spec:pgorm:req:pipeline.params+1]
+        impl<'brand> From<$ty> for Expr<'brand> {
+            fn from(value: $ty) -> Self {
+                let conv = $conv;
+                branded(adapter::$make(conv(value)))
+            }
+        }
+    };
+}
+
+literal!(i32, lit_int, i64::from);
+literal!(i64, lit_int, std::convert::identity);
+literal!(f64, lit_float, std::convert::identity);
+literal!(bool, lit_bool, std::convert::identity);
+literal!(&str, lit_str, std::convert::identity);
+
+fn bin<'brand>(lhs: Expr<'brand>, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> {
+    branded(adapter::binary(lhs.node, op, rhs.node))
+}
+
+/// Everything you can do to an expression.
+///
+/// The operators live on a trait rather than on [`Expr`] so that the things
+/// which *are* expressions — an entity column, an
+/// [`alias`](pgorm_query::alias) token, an `Expr` itself — all carry them,
+/// and a comparison can be written against a Rust literal or another column
+/// with no ceremony:
+///
+/// ```
+/// # use pgorm::pipeline::ExprOps;
+/// # use pgorm::pgorm_query::alias;
+/// # use pgorm::tests_cfg::cake;
+/// let big = alias("big");
+/// let _ = cake::Column::Id.gt(10).as_(big);
+/// ```
+///
+/// Every right-hand side takes `impl Into<Expr>`, so columns, tokens,
+/// literals, bound placeholders and expressions are interchangeable there.
+///
+/// The comparison names (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `is_null`,
+/// `is_not_null`) are also [`ColumnTrait`] method names. Both can be in
+/// scope at once: because these take `self` by value and `ColumnTrait`'s
+/// take `&self`, a column resolves to *this* trait when both are imported,
+/// and the ORM spelling is then `ColumnTrait::gt(&col, v)`. A module usually
+/// speaks one of the two dialects, so importing the pipeline where it is
+/// used keeps them apart.
+// [spec:pgorm:req:pipeline.surface+1]
+// Every operator here consumes its receiver: these build an expression, they
+// never inspect one, so `is_null` takes `self` like the rest of the trait.
+#[allow(clippy::wrong_self_convention)]
+pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     /// `=` (or `IS NULL` when compared against [`null`](super::null)).
-    pub fn eq(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Eq, rhs)
+    fn eq(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Eq, rhs.into())
     }
 
     /// `<>` (or `IS NOT NULL` against [`null`](super::null)).
-    pub fn ne(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Ne, rhs)
+    fn ne(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Ne, rhs.into())
     }
 
     /// `>`
-    pub fn gt(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Gt, rhs)
+    fn gt(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Gt, rhs.into())
     }
 
     /// `>=`
-    pub fn gte(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Gte, rhs)
+    fn gte(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Gte, rhs.into())
     }
 
     /// `<`
-    pub fn lt(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Lt, rhs)
+    fn lt(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Lt, rhs.into())
     }
 
     /// `<=`
-    pub fn lte(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Lte, rhs)
+    fn lte(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Lte, rhs.into())
     }
 
     /// Logical `AND`.
-    pub fn and(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::And, rhs)
+    fn and(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::And, rhs.into())
     }
 
     /// Logical `OR`.
-    pub fn or(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Or, rhs)
+    fn or(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Or, rhs.into())
     }
 
     /// `COALESCE(self, rhs)`.
-    pub fn coalesce(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Coalesce, rhs)
+    fn coalesce(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Coalesce, rhs.into())
+    }
+
+    /// `+`
+    fn add(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Add, rhs.into())
+    }
+
+    /// `-`
+    fn sub(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Sub, rhs.into())
+    }
+
+    /// `*`
+    fn mul(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Mul, rhs.into())
+    }
+
+    /// `/`
+    fn div(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::DivFloat, rhs.into())
+    }
+
+    /// `%`
+    fn rem(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
+        bin(self.into(), BinOp::Mod, rhs.into())
     }
 
     /// `IS NULL`.
-    pub fn is_null(self) -> Expr<'brand> {
-        self.bin(BinOp::Eq, branded(adapter::lit_null()))
+    fn is_null(self) -> Expr<'brand> {
+        bin(self.into(), BinOp::Eq, branded(adapter::lit_null()))
     }
 
     /// `IS NOT NULL`.
-    pub fn is_not_null(self) -> Expr<'brand> {
-        self.bin(BinOp::Ne, branded(adapter::lit_null()))
+    fn is_not_null(self) -> Expr<'brand> {
+        bin(self.into(), BinOp::Ne, branded(adapter::lit_null()))
     }
 
     /// Membership in an explicit list: `self IN (items...)`.
     ///
-    /// Each item is an expression, so the members can be bound placeholders.
-    pub fn in_array(self, items: Vec<Expr<'brand>>) -> Expr<'brand> {
-        let items = items.into_iter().map(|item| item.node).collect();
-        branded(adapter::call("in", vec![adapter::array(items), self.node]))
+    /// Members are expressions, so they can be literals or bound
+    /// placeholders.
+    fn in_array<I>(self, items: I) -> Expr<'brand>
+    where
+        I: IntoIterator,
+        I::Item: Into<Expr<'brand>>,
+    {
+        let items = items
+            .into_iter()
+            .map(|item| item.into().node)
+            .collect::<Vec<_>>();
+        branded(adapter::call(
+            "in",
+            vec![adapter::array(items), self.into().node],
+        ))
     }
 
     /// `CAST(self AS type)`, over the closed [`CastType`] set.
-    pub fn cast(self, ty: CastType) -> Expr<'brand> {
+    fn cast(self, ty: CastType) -> Expr<'brand> {
         branded(adapter::call(
             "as",
-            vec![adapter::ident(ty.name()), self.node],
+            vec![adapter::ident(ty.name()), self.into().node],
         ))
     }
 
     /// Name this expression in a `derive`, `select`, `aggregate` or window
     /// projection.
     ///
-    /// The name must not collide with a PRQL built-in;
-    /// [`into_sql`](super::Pipeline::into_sql) refuses the closed reserved set
-    /// with [`PipelineError::ReservedAlias`](super::PipelineError::ReservedAlias).
-    pub fn aliased(self, alias: &str) -> Expr<'brand> {
-        branded(adapter::aliased(self.node, alias.to_owned()))
+    /// The name is an [`alias`](pgorm_query::alias) token when anything
+    /// refers back to it, and a bare `&'static str` when nothing does. It
+    /// must not collide with a PRQL built-in;
+    /// [`into_sql`](super::Pipeline::into_sql) refuses the closed reserved
+    /// set with
+    /// [`PipelineError::ReservedAlias`](super::PipelineError::ReservedAlias).
+    fn as_(self, name: impl Into<AliasName>) -> Expr<'brand> {
+        let name: AliasName = name.into();
+        branded(adapter::aliased(self.into().node, name.as_str().to_owned()))
     }
 
     /// Mark a sort key descending.
-    pub fn desc(self) -> Expr<'brand> {
-        branded(adapter::unary(UnOp::Neg, self.node))
+    fn desc(self) -> Expr<'brand> {
+        branded(adapter::unary(UnOp::Neg, self.into().node))
     }
 
     /// Mark a sort key ascending (the default; provided for symmetry).
-    pub fn asc(self) -> Expr<'brand> {
-        branded(adapter::unary(UnOp::Add, self.node))
+    fn asc(self) -> Expr<'brand> {
+        branded(adapter::unary(UnOp::Add, self.into().node))
     }
 }
 
-impl<'brand> std::ops::Add for Expr<'brand> {
-    type Output = Expr<'brand>;
-    fn add(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Add, rhs)
+// [spec:pgorm:req:pipeline.surface+1]
+impl<'brand> ExprOps<'brand> for Expr<'brand> {}
+
+// [spec:pgorm:req:pipeline.surface+1]
+impl<'brand> ExprOps<'brand> for AliasName {}
+
+// [spec:pgorm:req:pipeline.surface+1]
+impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
+
+/// A list of expressions, as the transforms that project, group and sort
+/// take one.
+///
+/// A single expression needs no wrapper, a homogeneous list is an array or a
+/// `Vec`, and a mixed list — the usual case, a column beside an aggregate
+/// beside a token — is a tuple, which is how PRQL spells a projection too.
+///
+/// ```
+/// # use pgorm::pipeline::{ExprOps, Pipeline, sum};
+/// # use pgorm::pgorm_query::alias;
+/// # use pgorm::tests_cfg::{cake, cake::Column as C};
+/// let total = alias("total");
+/// let _ = Pipeline::from(cake::Entity)
+///     .select(C::Id)                                  // one
+///     .select([C::Id, C::Name])                       // homogeneous
+///     .select((C::Id, sum(C::Id).as_(total), total)); // mixed
+/// ```
+// [spec:pgorm:req:pipeline.surface+1]
+pub trait ExprList<'brand> {
+    /// The expressions, in the order written.
+    fn into_exprs(self) -> Vec<Expr<'brand>>;
+}
+
+impl<'brand> ExprList<'brand> for Expr<'brand> {
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        vec![self]
     }
 }
 
-impl<'brand> std::ops::Sub for Expr<'brand> {
-    type Output = Expr<'brand>;
-    fn sub(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Sub, rhs)
+impl<'brand> ExprList<'brand> for AliasName {
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        vec![self.into()]
     }
 }
 
-impl<'brand> std::ops::Mul for Expr<'brand> {
-    type Output = Expr<'brand>;
-    fn mul(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Mul, rhs)
+impl<'brand, C: ColumnTrait> ExprList<'brand> for C {
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        vec![self.into()]
     }
 }
 
-impl<'brand> std::ops::Div for Expr<'brand> {
-    type Output = Expr<'brand>;
-    fn div(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::DivFloat, rhs)
+impl<'brand, T, const N: usize> ExprList<'brand> for [T; N]
+where
+    T: Into<Expr<'brand>>,
+{
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        self.into_iter().map(Into::into).collect()
     }
 }
 
-impl<'brand> std::ops::Rem for Expr<'brand> {
+impl<'brand, T> ExprList<'brand> for Vec<T>
+where
+    T: Into<Expr<'brand>>,
+{
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+macro_rules! expr_list_tuple {
+    ($($name:ident),+) => {
+        impl<'brand, $($name),+> ExprList<'brand> for ($($name,)+)
+        where
+            $($name: Into<Expr<'brand>>),+
+        {
+            #[allow(non_snake_case)]
+            fn into_exprs(self) -> Vec<Expr<'brand>> {
+                let ($($name,)+) = self;
+                vec![$($name.into()),+]
+            }
+        }
+    };
+}
+
+expr_list_tuple!(A, B);
+expr_list_tuple!(A, B, C);
+expr_list_tuple!(A, B, C, D);
+expr_list_tuple!(A, B, C, D, E);
+expr_list_tuple!(A, B, C, D, E, F);
+expr_list_tuple!(A, B, C, D, E, F, G);
+expr_list_tuple!(A, B, C, D, E, F, G, H);
+expr_list_tuple!(A, B, C, D, E, F, G, H, I);
+expr_list_tuple!(A, B, C, D, E, F, G, H, I, J);
+expr_list_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+expr_list_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+
+pub(super) fn nodes_of<'brand>(list: impl ExprList<'brand>) -> Vec<PlExpr> {
+    list.into_exprs()
+        .into_iter()
+        .map(|expr| expr.node)
+        .collect()
+}
+
+impl<'brand, R: Into<Expr<'brand>>> std::ops::Add<R> for Expr<'brand> {
     type Output = Expr<'brand>;
-    fn rem(self, rhs: Expr<'brand>) -> Expr<'brand> {
-        self.bin(BinOp::Mod, rhs)
+    fn add(self, rhs: R) -> Expr<'brand> {
+        bin(self, BinOp::Add, rhs.into())
+    }
+}
+
+impl<'brand, R: Into<Expr<'brand>>> std::ops::Sub<R> for Expr<'brand> {
+    type Output = Expr<'brand>;
+    fn sub(self, rhs: R) -> Expr<'brand> {
+        bin(self, BinOp::Sub, rhs.into())
+    }
+}
+
+impl<'brand, R: Into<Expr<'brand>>> std::ops::Mul<R> for Expr<'brand> {
+    type Output = Expr<'brand>;
+    fn mul(self, rhs: R) -> Expr<'brand> {
+        bin(self, BinOp::Mul, rhs.into())
+    }
+}
+
+impl<'brand, R: Into<Expr<'brand>>> std::ops::Div<R> for Expr<'brand> {
+    type Output = Expr<'brand>;
+    fn div(self, rhs: R) -> Expr<'brand> {
+        bin(self, BinOp::DivFloat, rhs.into())
+    }
+}
+
+impl<'brand, R: Into<Expr<'brand>>> std::ops::Rem<R> for Expr<'brand> {
+    type Output = Expr<'brand>;
+    fn rem(self, rhs: R) -> Expr<'brand> {
+        bin(self, BinOp::Mod, rhs.into())
     }
 }
 

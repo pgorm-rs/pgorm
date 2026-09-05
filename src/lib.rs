@@ -23,7 +23,7 @@ pub mod error;
 mod executor;
 /// Holds types and methods to perform metric collection
 pub mod metric;
-/// A PRQL-shaped pipeline query API (off-by-default `pipeline` feature)
+/// A PRQL-shaped pipeline query API, compiled through prqlc
 pub mod pipeline;
 /// Holds types and methods to perform queries
 pub mod query;
@@ -108,7 +108,7 @@ pub use pgorm_sql_macro::sql;
 pub use pgorm_sql_macro::prql;
 
 pub use pgorm_query;
-pub use pgorm_query::{Iden, Values};
+pub use pgorm_query::{AliasName, Iden, Values, alias};
 
 pub use pgorm_macros::EnumIter;
 pub use strum;
