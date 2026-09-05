@@ -2974,12 +2974,20 @@ children (
                 title "Self-joins in the pipeline: table aliases so an entity can meet itself"
                 kind @feat
                 deps (ergo.pipeline-source)
+                sealed true
                 log (
                     {
                         at 2026-09-05T13:35:07.337188Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator-approved (2026-09-05): the v1 omission that blocks top-N-vs-self patterns — join table aliases, so an entity can meet itself (employee/manager, message/parent). PRQL text does this by let-binding or by aliasing in join (join side:left e2=employee ...). Blocked on ergo.pipeline-source because (a) shared files and (b) pipeline-as-join-operand may subsume it: joining from(employee::Entity) as a second pipeline already forces the aliasing machinery — decide whether a dedicated aliased-table form is still needed once source composition exists, or whether self-join falls out (document either way). Column references on the aliased side must qualify by the alias, not the table — the col(Entity, Column) shape needs an aliased variant or the source-pipeline's introduced names cover it. Oracle + live-DB proof: classic employee-manager join decoding both sides."
+                    }
+
+                    {
+                        at 2026-09-05T14:32:12.768802Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -102,6 +102,35 @@
 //! # Ok::<_, pgorm::pipeline::PipelineError>(())
 //! ```
 //!
+//! A relation can also be read under a name of your own, which is how one
+//! table meets itself — the employee beside their manager, the message
+//! beside its parent. [`IntoSource::named`] takes the name, and
+//! [`col`] writes the far side's columns:
+//!
+//! ```
+//! use pgorm::pipeline::{ExprOps, IntoSource, JoinSide, Pipeline, alias, col};
+//! use pgorm::tests_cfg::fruit::{self, Column as F};
+//!
+//! let peer = alias("peer");
+//! let (sql, _) = Pipeline::from(fruit::Entity)
+//!     .join(
+//!         JoinSide::Inner,
+//!         fruit::Entity.named(peer),
+//!         F::CakeId.eq(col(peer, alias("cake_id"))),
+//!     )
+//!     .filter(F::Id.lt(col(peer, alias("id"))))
+//!     .select((F::Name, col(peer, alias("name"))))
+//!     .into_sql()?;
+//!
+//! assert_eq!(
+//!     sql,
+//!     "SELECT fruit.name AS _expr_0, peer.name FROM fruit \
+//!      INNER JOIN fruit AS peer ON fruit.cake_id = peer.cake_id \
+//!      WHERE fruit.id < peer.id"
+//! );
+//! # Ok::<_, pgorm::pipeline::PipelineError>(())
+//! ```
+//!
 //! The pipeline lowers typed Rust construction directly into prqlc's PL AST
 //! (no PRQL text round-trip), then through `pl_to_rq` and `rq_to_sql` with
 //! the PostgreSQL dialect. Every prqlc import lives in the private `adapter`

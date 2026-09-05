@@ -48,7 +48,7 @@ use super::expr::{Expr, ExprList, nodes_of};
 /// assert_eq!(values.0.len(), 1);
 /// # Ok::<_, pgorm::pipeline::PipelineError>(())
 /// ```
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 #[derive(Debug, Clone)]
 pub struct Pipeline {
     pub(super) bindings: Vec<Vec<PlExpr>>,
@@ -91,6 +91,42 @@ impl JoinSide {
 pub trait IntoSource {
     /// The relation, ready to embed.
     fn into_source(self) -> Source;
+
+    /// Read this relation under a name of your own, so a pipeline can meet
+    /// the same table twice.
+    ///
+    /// The name is the relation's only name from then on, as in SQL: an
+    /// aliased entity no longer answers to its table name, and every
+    /// reference to its columns goes through [`col`](super::col).
+    ///
+    /// ```
+    /// # use pgorm::pipeline::{ExprOps, IntoSource, JoinSide, Pipeline, alias, col};
+    /// # use pgorm::tests_cfg::fruit::{self, Column as F};
+    /// let peer = alias("peer");
+    /// let (sql, _) = Pipeline::from(fruit::Entity)
+    ///     .join(
+    ///         JoinSide::Inner,
+    ///         fruit::Entity.named(peer),
+    ///         F::CakeId.eq(col(peer, alias("cake_id"))),
+    ///     )
+    ///     .select((F::Name, col(peer, alias("name"))))
+    ///     .into_sql()?;
+    /// assert_eq!(
+    ///     sql,
+    ///     "SELECT fruit.name AS _expr_0, peer.name FROM fruit \
+    ///      INNER JOIN fruit AS peer ON fruit.cake_id = peer.cake_id"
+    /// );
+    /// # Ok::<_, pgorm::pipeline::PipelineError>(())
+    /// ```
+    // [spec:pgorm:sem:pipeline.self-join]
+    fn named(self, name: impl Into<AliasName>) -> Source
+    where
+        Self: Sized,
+    {
+        let mut source = self.into_source();
+        source.alias = Some(name.into().as_str().to_owned());
+        source
+    }
 }
 
 /// A relation on its way into a pipeline, made by [`IntoSource`].
@@ -103,6 +139,7 @@ pub trait IntoSource {
 #[derive(Debug)]
 pub struct Source {
     kind: SourceKind,
+    alias: Option<String>,
 }
 
 #[derive(Debug)]
@@ -114,6 +151,16 @@ enum SourceKind {
 fn table_source(node: PlExpr) -> Source {
     Source {
         kind: SourceKind::Table(node),
+        alias: None,
+    }
+}
+
+/// A relation already carried as a [`Source`] — what
+/// [`named`](IntoSource::named) returns — passes through unchanged.
+// [spec:pgorm:sem:pipeline.self-join]
+impl IntoSource for Source {
+    fn into_source(self) -> Source {
+        self
     }
 }
 
@@ -152,6 +199,7 @@ impl IntoSource for Pipeline {
     fn into_source(self) -> Source {
         Source {
             kind: SourceKind::Pipeline(self),
+            alias: None,
         }
     }
 }
@@ -175,7 +223,7 @@ impl IntoSource for Pipeline {
 ///     C::Id.gt(1)
 /// });
 /// ```
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 #[derive(Debug, Clone, Default)]
 pub struct Over {
     partition: Vec<PlExpr>,
@@ -267,7 +315,7 @@ impl Over {
 /// is a transform over a body, and a grouping with nothing aggregated is not
 /// a relation — so the only way back to a [`Pipeline`] is
 /// [`aggregate`](Grouped::aggregate).
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 #[derive(Debug, Clone)]
 pub struct Grouped {
     pipeline: Pipeline,
@@ -277,7 +325,7 @@ pub struct Grouped {
 impl Grouped {
     /// Aggregate each group; the resulting relation carries the keys
     /// followed by the aggregates.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn aggregate(self, aggregates: impl ExprList<'static>) -> Pipeline {
         let nodes = nodes_of(aggregates);
         self.finish(nodes)
@@ -311,7 +359,7 @@ impl Grouped {
 impl Pipeline {
     /// Start a pipeline from a relation: an entity (schema and all), a table
     /// named some other way, or another pipeline embedded whole.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn from(source: impl IntoSource) -> Self {
         let mut pipeline = Pipeline {
             bindings: Vec::new(),
@@ -343,9 +391,22 @@ impl Pipeline {
     /// still position `N` in the merged values; its own bindings come along,
     /// renumbered past the ones already present, with every internal
     /// reference rewritten to match.
+    ///
+    /// A [`named`](IntoSource::named) relation carries its alias onto the
+    /// reference, which is what lets the same table appear twice.
     // [spec:pgorm:req:pipeline.compose]
+    // [spec:pgorm:sem:pipeline.self-join]
     fn embed(&mut self, source: Source) -> PlExpr {
-        match source.kind {
+        let Source { kind, alias } = source;
+        let reference = self.embed_kind(kind);
+        match alias {
+            Some(name) => adapter::aliased(reference, name),
+            None => reference,
+        }
+    }
+
+    fn embed_kind(&mut self, kind: SourceKind) -> PlExpr {
+        match kind {
             SourceKind::Table(node) => node,
             SourceKind::Pipeline(other) => {
                 let params = self.values.len();
@@ -392,7 +453,7 @@ impl Pipeline {
     /// this becomes `WHERE`, directly after one it becomes `HAVING`, and after
     /// a [`window`](Self::window) the pipeline so far is wrapped in a CTE and
     /// filtered outside it.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn filter(self, condition: impl Into<Expr<'static>>) -> Self {
         self.stage(adapter::call("filter", vec![condition.into().node]))
     }
@@ -409,7 +470,7 @@ impl Pipeline {
     }
 
     /// Add computed columns, keeping the existing ones.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn derive(self, columns: impl ExprList<'static>) -> Self {
         self.stage(adapter::call(
             "derive",
@@ -428,7 +489,7 @@ impl Pipeline {
     }
 
     /// Replace the projection with exactly these columns.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn select(self, columns: impl ExprList<'static>) -> Self {
         self.stage(adapter::call(
             "select",
@@ -462,7 +523,7 @@ impl Pipeline {
     /// assert!(sql.contains("HAVING"));
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn group(self, keys: impl ExprList<'static>) -> Grouped {
         let keys = nodes_of(keys);
         Grouped {
@@ -489,7 +550,7 @@ impl Pipeline {
     ///
     /// With a partition this compiles to `PARTITION BY` under a `group`
     /// stage; without one the window spans the whole relation.
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn window(self, columns: impl ExprList<'static>, over: Over) -> Self {
         let derive_call = adapter::call("derive", vec![adapter::tuple(nodes_of(columns))]);
         self.staged(over.wrap(derive_call))
@@ -512,7 +573,7 @@ impl Pipeline {
 
     /// Sort by these keys ([`desc`](super::ExprOps::desc) marks one
     /// descending).
-    // [spec:pgorm:req:pipeline.surface+2]
+    // [spec:pgorm:req:pipeline.surface+3]
     pub fn sort(self, keys: impl ExprList<'static>) -> Self {
         self.stage(adapter::call("sort", vec![adapter::tuple(nodes_of(keys))]))
     }
@@ -551,8 +612,10 @@ impl Pipeline {
     /// its table, so the condition is qualified by construction. When the
     /// joined relation is a pipeline, its columns are referred to by their
     /// own names — unqualified — or by [`that`](super::that) where a name
-    /// exists on both sides.
-    // [spec:pgorm:req:pipeline.surface+2]
+    /// exists on both sides. To join a relation to itself, give the operand
+    /// a name of its own with [`named`](IntoSource::named).
+    // [spec:pgorm:req:pipeline.surface+3]
+    // [spec:pgorm:sem:pipeline.self-join]
     pub fn join(
         self,
         side: JoinSide,

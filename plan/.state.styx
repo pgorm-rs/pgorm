@@ -457,6 +457,7 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
+    {id ergo.pipeline-selfjoin, kind @complete, author "brendan@necessary.nu", at 2026-09-05T14:32:12.768802Z}
 )
 
 impl_evidence (
@@ -705,13 +706,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule exec.cursor.binding-coerce}
         {impl_name main, rule sql.render.cast-param-type}
-    ), rule_versions_seen (
-        {id exec.cursor.binding, version 2}
-        {id exec.cursor.binding-coerce, version 0}
-        {id exec.cursor.binding-gaps, version 2}
-        {id query.build.modifiers, version 6}
-        {id sql.render.cast-param-type, version 0}
-        {id sql.render.writer, version 1}
     )}
     {id orm.entity, covered_rules (
         entity.active-model
@@ -907,11 +901,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule exec.stream}
         {impl_name main, rule exec.stream.decode}
-    ), rule_versions_seen (
-        {id conn.pool.conn-trait, version 1}
-        {id exec.stream, version 0}
-        {id exec.stream.decode, version 0}
-        {id metric.layer.delegate, version 1}
     )}
     {id sql.ast, covered_rules (
         sql.ast
@@ -967,35 +956,6 @@ impl_evidence (
         {impl_name main, rule sql.ast.window-statement}
         {impl_name main, rule sql.ast.with}
         {impl_name main, rule sql.ast.with.recursive}
-    ), rule_versions_seen (
-        {id query.build.modifiers, version 6}
-        {id sql.ast, version 0}
-        {id sql.ast.build, version 1}
-        {id sql.ast.case, version 0}
-        {id sql.ast.condition, version 0}
-        {id sql.ast.condition.flattening, version 0}
-        {id sql.ast.condition.holder, version 2}
-        {id sql.ast.delete, version 2}
-        {id sql.ast.expr, version 0}
-        {id sql.ast.expr.in, version 1}
-        {id sql.ast.expr.operators, version 1}
-        {id sql.ast.func, version 0}
-        {id sql.ast.insert, version 1}
-        {id sql.ast.insert.arity, version 0}
-        {id sql.ast.keywords, version 2}
-        {id sql.ast.on-conflict, version 1}
-        {id sql.ast.order, version 1}
-        {id sql.ast.returning, version 0}
-        {id sql.ast.select, version 2}
-        {id sql.ast.select.from, version 1}
-        {id sql.ast.select.join, version 1}
-        {id sql.ast.select.projection, version 1}
-        {id sql.ast.select.union, version 0}
-        {id sql.ast.update, version 2}
-        {id sql.ast.window-statement, version 2}
-        {id sql.ast.with, version 2}
-        {id sql.ast.with.recursive, version 1}
-        {id sql.ddl, version 1}
     )}
     {id sql.ddl, covered_rules (
         sql.ddl
@@ -1025,22 +985,6 @@ impl_evidence (
         {impl_name main, rule sql.ddl.panics}
         {impl_name main, rule sql.ddl.type-alter-drop}
         {impl_name main, rule sql.ddl.type-enum}
-    ), rule_versions_seen (
-        {id query.build.modifiers, version 6}
-        {id sql.ast.condition.holder, version 1}
-        {id sql.ddl, version 5}
-        {id sql.ddl.alter-table, version 3}
-        {id sql.ddl.column-def, version 3}
-        {id sql.ddl.column-types, version 3}
-        {id sql.ddl.create-table, version 6}
-        {id sql.ddl.drop-rename-truncate, version 3}
-        {id sql.ddl.extension, version 3}
-        {id sql.ddl.foreign-key, version 3}
-        {id sql.ddl.index-create, version 4}
-        {id sql.ddl.index-drop, version 2}
-        {id sql.ddl.panics, version 4}
-        {id sql.ddl.type-alter-drop, version 3}
-        {id sql.ddl.type-enum, version 2}
     )}
     {id sql.render, covered_rules (
         sql.render

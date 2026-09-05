@@ -84,14 +84,14 @@ fn entity_columns_are_qualified_by_construction() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn cast_renders_as_postgres_cast() {
     let built = sql_of(Pipeline::from(INVOICE).derive(total().cast(CastType::Integer).as_("t")));
     assert_eq!(built, "SELECT *, CAST(total AS integer) AS t FROM invoice");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn in_array_of_bound_params_renders_in_list() {
     let built = sql_of(
@@ -101,21 +101,21 @@ fn in_array_of_bound_params_renders_in_list() {
     assert_eq!(built, "SELECT * FROM invoice WHERE total IN ($1, $2)");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn in_array_of_literals_inlines_them() {
     let built = sql_of(Pipeline::from(INVOICE).filter(total().in_array([1, 2, 3])));
     assert_eq!(built, "SELECT * FROM invoice WHERE total IN (1, 2, 3)");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn take_range_renders_limit_offset() {
     let built = sql_of(Pipeline::from(INVOICE).take_range(21..=30));
     assert_eq!(built, "SELECT * FROM invoice LIMIT 10 OFFSET 20");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn case_renders_case_when() {
     let built = sql_of(
@@ -136,7 +136,7 @@ fn string_literals_are_escaped() {
     assert_eq!(built, "SELECT * FROM invoice WHERE note = 'o''clock'");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn null_handling_renders_is_null_forms() {
     let built = sql_of(Pipeline::from(INVOICE).filter(total().is_null().or(total().is_not_null())));
@@ -146,7 +146,7 @@ fn null_handling_renders_is_null_forms() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn coalesce_and_arithmetic_render_inline() {
     let built = sql_of(Pipeline::from(INVOICE).derive([
@@ -162,7 +162,7 @@ fn coalesce_and_arithmetic_render_inline() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn aggregate_functions_render_expected_sql() {
     let built = sql_of(
@@ -186,7 +186,7 @@ fn aggregate_functions_render_expected_sql() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn filter_after_aggregate_lands_in_having() {
     let spent = alias("total_spent");
@@ -208,7 +208,7 @@ fn filter_after_aggregate_lands_in_having() {
     assert!(parsed.having_clause.is_some());
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn filter_after_window_nests_through_cte() {
     let rn = alias("rn");
@@ -230,7 +230,7 @@ fn filter_after_window_nests_through_cte() {
     assert!(parsed.where_clause.is_some());
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn window_frame_renders_rows_between() {
     let built = sql_of(Pipeline::from(INVOICE).window(
@@ -243,14 +243,14 @@ fn window_frame_renders_rows_between() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn window_over_the_whole_relation_needs_no_keys() {
     let built = sql_of(Pipeline::from(INVOICE).window(sum(total()).as_(alias("grand")), over()));
     assert_eq!(built, "SELECT *, SUM(total) OVER () AS grand FROM invoice");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn lag_lead_first_last_render_window_calls() {
     let built = sql_of(Pipeline::from(INVOICE).window(
@@ -275,7 +275,7 @@ fn lag_lead_first_last_render_window_calls() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn join_takes_an_explicit_condition() {
     let built = sql_of(Pipeline::from(INVOICE).join(
@@ -322,7 +322,7 @@ fn literals_inline_and_bound_values_do_not() {
     assert_eq!(values.0.len(), 1);
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    one, a list, or a mix
+// [spec:pgorm:req:pipeline.surface+3/test]    one, a list, or a mix
 #[test]
 fn expression_lists_take_every_shape() {
     let one = sql_of(Pipeline::from(cake::Entity).select(cake::Column::Id));
@@ -343,7 +343,7 @@ fn expression_lists_take_every_shape() {
     assert_eq!(mixed, "SELECT name, id + 1 AS n, id * 2 FROM cake");
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]
+// [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn scopes_compose_as_pipeline_functions() {
     fn expensive(pipeline: Pipeline) -> Pipeline {
@@ -711,4 +711,185 @@ fn stages_after_remove_use_bare_names() {
         .into_sql()
         .expect_err("the source qualification is gone after a set op");
     assert!(matches!(err, PipelineError::Compile(_)));
+}
+
+const EMPLOYEE: AliasName = alias("employee");
+const MANAGER: AliasName = alias("manager");
+const NAME: AliasName = alias("name");
+const MANAGER_ID: AliasName = alias("manager_id");
+
+// [spec:pgorm:sem:pipeline.self-join/test]    the classic employee-manager
+// query: one table, two names, both sides selected
+#[test]
+fn a_named_operand_joins_a_table_to_itself() {
+    let built = sql_of(
+        Pipeline::from(EMPLOYEE)
+            .join(
+                JoinSide::Inner,
+                EMPLOYEE.named(MANAGER),
+                col(EMPLOYEE, MANAGER_ID).eq(col(MANAGER, ID)),
+            )
+            .select((col(EMPLOYEE, NAME), col(MANAGER, NAME).as_(alias("boss"))))
+            .sort(col(EMPLOYEE, NAME)),
+    );
+    assert_eq!(
+        built,
+        "SELECT employee.name, manager.name AS boss FROM employee \
+         INNER JOIN employee AS manager ON employee.manager_id = manager.id \
+         ORDER BY employee.name"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    the name reaches every stage
+// after the join, not only the condition
+#[test]
+fn a_source_name_qualifies_later_stages() {
+    let built = sql_of(
+        Pipeline::from(EMPLOYEE)
+            .join(
+                JoinSide::Left,
+                EMPLOYEE.named(MANAGER),
+                col(EMPLOYEE, MANAGER_ID).eq(col(MANAGER, ID)),
+            )
+            .filter(col(MANAGER, NAME).is_not_null())
+            .sort(col(MANAGER, NAME).desc()),
+    );
+    assert_eq!(
+        built,
+        "SELECT employee.*, manager.* FROM employee \
+         LEFT OUTER JOIN employee AS manager ON employee.manager_id = manager.id \
+         WHERE manager.name IS NOT NULL ORDER BY manager.name DESC"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    naming a source replaces the
+// name it had, as SQL's AS does
+#[test]
+fn a_named_source_drops_its_own_name() {
+    let err = Pipeline::from(EMPLOYEE.named(alias("e")))
+        .select(col(EMPLOYEE, NAME))
+        .into_sql()
+        .expect_err("the table name is gone once the source is named");
+    assert!(matches!(err, PipelineError::Compile(ref text) if text.contains("Unknown name")));
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    an entity is named the same
+// way, and its columns then travel through col
+#[test]
+fn an_entity_operand_takes_a_name() {
+    let peer = alias("peer");
+    let built = sql_of(
+        Pipeline::from(fruit::Entity)
+            .join(
+                JoinSide::Inner,
+                fruit::Entity.named(peer),
+                fruit::Column::CakeId.eq(col(peer, alias("cake_id"))),
+            )
+            .filter(fruit::Column::Id.lt(col(peer, ID)))
+            .select((fruit::Column::Name, col(peer, NAME))),
+    );
+    assert_eq!(
+        built,
+        "SELECT fruit.name AS _expr_0, peer.name FROM fruit \
+         INNER JOIN fruit AS peer ON fruit.cake_id = peer.cake_id \
+         WHERE fruit.id < peer.id"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    a named pipeline is a self-join
+// over a derived relation, params and all
+#[test]
+fn a_named_pipeline_joins_as_an_aliased_cte() {
+    let seniors = Pipeline::from(EMPLOYEE)
+        .filter_with(|binder| col(EMPLOYEE, alias("level")).gt(binder.bind(3_i32)));
+    let (sql, values) = Pipeline::from(EMPLOYEE)
+        .join(
+            JoinSide::Inner,
+            seniors.named(MANAGER),
+            col(EMPLOYEE, MANAGER_ID).eq(col(MANAGER, ID)),
+        )
+        .select((col(EMPLOYEE, NAME), col(MANAGER, NAME).as_(alias("boss"))))
+        .into_sql()
+        .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT * FROM employee WHERE level > $1) \
+         SELECT employee.name, manager.name AS boss FROM employee \
+         INNER JOIN table_0 AS manager ON employee.manager_id = manager.id"
+    );
+    assert_eq!(values.0.len(), 1);
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    renaming inside an embedded
+// pipeline reaches both sides without naming the operand
+#[test]
+fn renaming_before_embedding_reaches_both_sides() {
+    let manager_pk = alias("manager_pk");
+    let boss = alias("boss");
+    let managers = Pipeline::from(EMPLOYEE).select((
+        col(EMPLOYEE, ID).as_(manager_pk),
+        col(EMPLOYEE, NAME).as_(boss),
+    ));
+    let built = sql_of(
+        Pipeline::from(EMPLOYEE)
+            .join(
+                JoinSide::Inner,
+                managers,
+                col(EMPLOYEE, MANAGER_ID).eq(manager_pk),
+            )
+            .select((col(EMPLOYEE, NAME), boss)),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT id AS manager_pk, name AS boss FROM employee) \
+         SELECT employee.name, table_0.boss FROM employee \
+         INNER JOIN table_0 ON employee.manager_id = table_0.manager_pk"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    a chain of names: three
+// generations of the same table in one query
+#[test]
+fn named_operands_chain_across_generations() {
+    let grandparent = alias("grandparent");
+    let built = sql_of(
+        Pipeline::from(EMPLOYEE)
+            .join(
+                JoinSide::Inner,
+                EMPLOYEE.named(MANAGER),
+                col(EMPLOYEE, MANAGER_ID).eq(col(MANAGER, ID)),
+            )
+            .join(
+                JoinSide::Inner,
+                EMPLOYEE.named(grandparent),
+                col(MANAGER, MANAGER_ID).eq(col(grandparent, ID)),
+            )
+            .select((
+                col(EMPLOYEE, NAME),
+                col(MANAGER, NAME).as_(alias("boss")),
+                col(grandparent, NAME).as_(alias("skip")),
+            )),
+    );
+    assert_eq!(
+        built,
+        "SELECT employee.name, manager.name AS boss, grandparent.name AS skip \
+         FROM employee INNER JOIN employee AS manager ON employee.manager_id = manager.id \
+         INNER JOIN employee AS grandparent ON manager.manager_id = grandparent.id"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    a name is screened like any
+// other introduced name
+#[test]
+fn a_reserved_source_name_is_refused() {
+    let err = Pipeline::from(EMPLOYEE)
+        .join(
+            JoinSide::Inner,
+            EMPLOYEE.named(alias("sum")),
+            col(EMPLOYEE, MANAGER_ID).eq(col(alias("sum"), ID)),
+        )
+        .into_sql()
+        .expect_err("a reserved name must be refused");
+    assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
 }

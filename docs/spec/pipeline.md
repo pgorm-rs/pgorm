@@ -33,7 +33,7 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Surface
 
-> [spec:pgorm:req:pipeline.surface+2]
+> [spec:pgorm:req:pipeline.surface+3]
 > A `Pipeline` is constructed by `from(impl IntoSource)` or
 > `from_schema(schema, table)` — the only entry points, so a sourceless
 > pipeline is unrepresentable — and grown one whole transform at a time:
@@ -45,7 +45,9 @@ of the crate, compiled in every build. Rules are grouped under
 > and `distinct` ([spec:pgorm:req:pipeline.compose]). Every relation
 > position — the source, the join operand, a set-operation operand — takes
 > `impl IntoSource`, and a whole `Pipeline` is an `IntoSource`, so pipelines
-> compose with each other by the same spellings that name tables.
+> compose with each other by the same spellings that name tables; any of
+> them may be read under a name of its own, which is how a relation meets
+> itself ([spec:pgorm:sem:pipeline.self-join]).
 >
 > Each transform has two forms. The plain one takes its expressions by value
 > — the whole query reads as one chained expression, with constants written
@@ -122,11 +124,10 @@ of the crate, compiled in every build. Rules are grouped under
 >
 > Deliberately cut vocabulary (not quality): `loop`, s-strings and f-strings
 > (raw SQL interpolation holes), the `text` / `date` / `math` std modules,
-> range membership (`between`), join table aliases (and with them
-> self-joins), `group`-scoped bodies other than `aggregate` and `window`,
-> and iterator adapters as list arguments (an `ExprList` is an array, a
-> `Vec`, a tuple or a single expression; a computed sequence is collected
-> into a `Vec` first).
+> range membership (`between`), `group`-scoped bodies other than `aggregate`
+> and `window`, and iterator adapters as list arguments (an `ExprList` is an
+> array, a `Vec`, a tuple or a single expression; a computed sequence is
+> collected into a `Vec` first).
 
 ## Parameters
 
@@ -222,6 +223,42 @@ of the crate, compiled in every build. Rules are grouped under
 > relation is renamed, so later stages refer to its columns by bare name —
 > an entity-qualified reference no longer resolves — while after `append`
 > the left side's naming survives.
+
+## Self-joins
+
+> [spec:pgorm:sem:pipeline.self-join]
+> A relation meets itself by being read twice under two names.
+> `IntoSource::named(name)` is a provided method on the trait every relation
+> position already takes, so `join(side, employee::Entity.named(manager),
+> condition)` needs no second spelling of `join`, no aliased table type and
+> no new expression form: the name is an `AliasName` token, and
+> `col(manager, ID)` — the disambiguating reference that already existed —
+> is how the far side's columns are written. It lowers to PRQL's own operand
+> alias (`join m=employee`) and renders as SQL's, `employee AS manager`,
+> with no CTE: the employee-manager query is one join stage, selecting
+> `Column::Name` beside `col(manager, NAME)`.
+>
+> Naming a relation replaces the name it had, exactly as SQL's `AS` does:
+> after `employee::Entity.named(manager)` the reference `employee.name` no
+> longer resolves, and prqlc refuses it by name
+> ([spec:pgorm:req:pipeline.errors+1]). The ordinary shape therefore names
+> only the second occurrence and leaves the reading pipeline
+> entity-qualified. The name then reaches every stage after the join —
+> `filter`, `sort`, `select` — which is what distinguishes it from `this` /
+> `that`, scoped to the condition alone
+> ([spec:pgorm:req:pipeline.compose]); and names chain, so a third and
+> fourth occurrence of one table are the same motion.
+>
+> A whole `Pipeline` is a relation, so an embedded pipeline takes a name the
+> same way: the binding still lowers to a CTE and the name attaches to the
+> reference (`table_0 AS manager`). Renaming the far side's columns with
+> `as_` inside the embedded pipeline, and reading them unqualified
+> afterwards, remains a working spelling and is the one composition already
+> gave; it costs a rename per column crossed, where a name costs one per
+> relation, and it changes the embedded projection to do it. A name is
+> screened against the reserved set like any `as_` name, and shares the
+> `table_N` namespace the module mints its bindings in — reserved for that
+> reason ([spec:pgorm:req:pipeline.compose]).
 
 ## Failure model
 

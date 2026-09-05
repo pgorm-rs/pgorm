@@ -18,9 +18,10 @@ pub use chrono::offset::Utc;
 use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::pipeline::{
-    AliasName, ExprOps, JoinSide, Pipeline, alias, by, count_rows, row_number, sort_by, sum,
+    AliasName, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows, row_number,
+    sort_by, sum,
 };
-use pgorm::{ConnectionTrait, entity::*, set};
+use pgorm::{ConnectionTrait, Schema, entity::*, set};
 use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
 
@@ -31,6 +32,57 @@ const ORDER_COUNT: AliasName = alias("order_count");
 const RN: AliasName = alias("rn");
 const CUSTOMER_ID: AliasName = alias("customer_id");
 const RUNNING: AliasName = alias("running");
+const MANAGER: AliasName = alias("manager");
+const PARENT: AliasName = alias("parent");
+const ID: AliasName = alias("id");
+const NAME: AliasName = alias("name");
+const BODY: AliasName = alias("body");
+
+/// A table that refers to itself: every employee but the founder reports to
+/// another row of this same table.
+mod employee {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "employee")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub name: String,
+        pub manager_id: Option<i32>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[pgorm(belongs_to = "Entity", from = "Column::ManagerId", to = "Column::Id")]
+        Manager,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The same shape with the reference left unset on the root row, so a left
+/// join has a `NULL` to carry.
+mod message {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "message")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub body: String,
+        pub parent_id: Option<i32>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[pgorm(belongs_to = "Entity", from = "Column::ParentId", to = "Column::Id")]
+        Parent,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
 
 struct Seeded {
     alice: i32,
@@ -102,7 +154,7 @@ fn spending() -> Pipeline {
         .aggregate((sum(O::Total).as_(SPENT), count_rows().as_(ORDER_COUNT)))
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    HAVING placement with a bound
+// [spec:pgorm:req:pipeline.surface+3/test]    HAVING placement with a bound
 // threshold: the group filter runs against grouped sums, not rows
 #[pgorm_macros::test]
 async fn having_filters_groups_with_bound_param() {
@@ -129,7 +181,7 @@ async fn having_filters_groups_with_bound_param() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    filter-after-window nests the
+// [spec:pgorm:req:pipeline.surface+3/test]    filter-after-window nests the
 // windowed stage in a CTE and filters outside it, with the rank bound
 #[pgorm_macros::test]
 async fn window_rank_filter_nests_through_cte() {
@@ -166,7 +218,7 @@ async fn window_rank_filter_nests_through_cte() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    explicit join condition against
+// [spec:pgorm:req:pipeline.surface+3/test]    explicit join condition against
 // live rows, with the customer name bound
 #[pgorm_macros::test]
 async fn join_on_explicit_condition_binds_params() {
@@ -197,7 +249,7 @@ async fn join_on_explicit_condition_binds_params() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    an explicit ROWS frame computes
+// [spec:pgorm:req:pipeline.surface+3/test]    an explicit ROWS frame computes
 // a running sum per partition on live rows
 #[pgorm_macros::test]
 async fn rows_frame_computes_running_sum() {
@@ -231,7 +283,7 @@ async fn rows_frame_computes_running_sum() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+2/test]    fn(Pipeline) -> Pipeline scopes
+// [spec:pgorm:req:pipeline.surface+3/test]    fn(Pipeline) -> Pipeline scopes
 // compose, each binding its own parameters, and the placeholders stay aligned
 #[pgorm_macros::test]
 async fn composed_scopes_bind_params_in_order() {
@@ -382,6 +434,179 @@ async fn remove_pipeline_subtracts_matching_rows() {
 
     let rows: Vec<(i32,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
     assert_eq!(rows, vec![(seeded.alice,), (seeded.alice,)]);
+
+    ctx.delete().await;
+}
+
+async fn create_entity_table<E: EntityTrait>(db: &impl ConnectionTrait, entity: E) {
+    let stmt = Schema::new().create_table_from_entity(entity);
+    create_table_without_asserts(db, &stmt)
+        .await
+        .expect("could not create table");
+}
+
+/// Ada founded the company; Grace and Linus report to her, Alan to Grace.
+async fn seed_employees(db: &impl ConnectionTrait) {
+    let ada = employee::ActiveModel {
+        name: set("Ada"),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .expect("could not insert employee");
+    let grace = employee::ActiveModel {
+        name: set("Grace"),
+        manager_id: set(ada.id),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .expect("could not insert employee");
+    for (name, manager) in [("Linus", ada.id), ("Alan", grace.id)] {
+        employee::ActiveModel {
+            name: set(name),
+            manager_id: set(manager),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .expect("could not insert employee");
+    }
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    the classic employee-manager
+// query on live rows: one table, two names, both sides decoded
+#[pgorm_macros::test]
+async fn self_join_decodes_employee_and_manager() {
+    let ctx = TestContext::new("pipeline_self_join_manager").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, employee::Entity).await;
+    seed_employees(&db).await;
+
+    let pipeline = Pipeline::from(employee::Entity)
+        .join(
+            JoinSide::Inner,
+            employee::Entity.named(MANAGER),
+            employee::Column::ManagerId.eq(col(MANAGER, ID)),
+        )
+        .select((
+            employee::Column::Name,
+            col(MANAGER, NAME).as_(alias("boss")),
+        ))
+        .sort(employee::Column::Name);
+    let (sql, _) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("employee AS manager"), "{sql}");
+    assert!(parsed_select(&sql).with_clause.is_none(), "{sql}");
+
+    let rows: Vec<(String, String)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("Alan".to_owned(), "Grace".to_owned()),
+            ("Grace".to_owned(), "Ada".to_owned()),
+            ("Linus".to_owned(), "Ada".to_owned()),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    a left self-join over a nullable
+// reference keeps the root row, its parent decoding as None
+#[pgorm_macros::test]
+async fn left_self_join_decodes_a_null_parent() {
+    let ctx = TestContext::new("pipeline_self_join_parent").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, message::Entity).await;
+
+    let root = message::ActiveModel {
+        body: set("root"),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let reply = message::ActiveModel {
+        body: set("reply"),
+        parent_id: set(root.id),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    message::ActiveModel {
+        body: set("nested"),
+        parent_id: set(reply.id),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+
+    let pipeline = Pipeline::from(message::Entity)
+        .join(
+            JoinSide::Left,
+            message::Entity.named(PARENT),
+            message::Column::ParentId.eq(col(PARENT, ID)),
+        )
+        .sort(message::Column::Id)
+        .select((
+            message::Column::Body,
+            col(PARENT, BODY).as_(alias("parent_body")),
+        ));
+    let (sql, _) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("LEFT OUTER JOIN message AS parent"), "{sql}");
+
+    let rows: Vec<(String, Option<String>)> =
+        pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("root".to_owned(), None),
+            ("reply".to_owned(), Some("root".to_owned())),
+            ("nested".to_owned(), Some("reply".to_owned())),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.self-join/test]    the same query through an
+// embedded pipeline: the far side is renamed before it crosses
+#[pgorm_macros::test]
+async fn embedded_self_join_renames_before_crossing() {
+    let ctx = TestContext::new("pipeline_self_join_embedded").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, employee::Entity).await;
+    seed_employees(&db).await;
+
+    let boss = alias("boss");
+    let managers = Pipeline::from(employee::Entity)
+        .filter_with(|binder| employee::Column::Name.ne(binder.bind("Grace")))
+        .select((
+            employee::Column::Id.as_(alias("manager_pk")),
+            employee::Column::Name.as_(boss),
+        ));
+    let pipeline = Pipeline::from(employee::Entity)
+        .join(
+            JoinSide::Inner,
+            managers.named(MANAGER),
+            employee::Column::ManagerId.eq(col(MANAGER, alias("manager_pk"))),
+        )
+        .select((employee::Column::Name, col(MANAGER, boss)))
+        .sort(employee::Column::Name);
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(parsed_select(&sql).with_clause.is_some(), "{sql}");
+    assert_eq!(values.0.len(), 1);
+
+    let rows: Vec<(String, String)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("Grace".to_owned(), "Ada".to_owned()),
+            ("Linus".to_owned(), "Ada".to_owned()),
+        ]
+    );
 
     ctx.delete().await;
 }

@@ -102,7 +102,7 @@ impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
 
 /// An alias token reads back the name it declared, unqualified — the name
 /// belongs to the pipeline, not to a table.
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 impl<'brand> From<AliasName> for Expr<'brand> {
     fn from(token: AliasName) -> Self {
         name(token.as_str())
@@ -160,7 +160,7 @@ fn bin<'brand>(lhs: Expr<'brand>, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> 
 /// and the ORM spelling is then `ColumnTrait::gt(&col, v)`. A module usually
 /// speaks one of the two dialects, so importing the pipeline where it is
 /// used keeps them apart.
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 // Every operator here consumes its receiver: these build an expression, they
 // never inspect one, so `is_null` takes `self` like the rest of the trait.
 #[allow(clippy::wrong_self_convention)]
@@ -297,13 +297,13 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     }
 }
 
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 impl<'brand> ExprOps<'brand> for Expr<'brand> {}
 
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 impl<'brand> ExprOps<'brand> for AliasName {}
 
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
 
 /// A list of expressions, as the transforms that project, group and sort
@@ -323,7 +323,7 @@ impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
 ///     .select([C::Id, C::Name])                       // homogeneous
 ///     .select((C::Id, sum(C::Id).as_(total), total)); // mixed
 /// ```
-// [spec:pgorm:req:pipeline.surface+2]
+// [spec:pgorm:req:pipeline.surface+3]
 pub trait ExprList<'brand> {
     /// The expressions, in the order written.
     fn into_exprs(self) -> Vec<Expr<'brand>>;
