@@ -2,13 +2,13 @@ use crate::{
     ColumnPairs, ColumnTrait, EntityTrait, IntoIdentity, IntoSimpleExpr, Iterable, ModelTrait,
     PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
 };
-use pgorm_query::{
-    Alias, ConditionType, Expr, FromItem, FunctionCall, Iden, IntoCondition, IntoIden,
-    LockBehavior, LockType, NullOrdering, RecursiveWithClause, SeaRc, SelectExpr, SelectStatement,
-    SimpleExpr, UnionType, WindowStatement, WithClause,
-};
 pub use pgorm_query::{
     Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
+};
+use pgorm_query::{
+    ConditionType, Expr, FromItem, FunctionCall, Iden, IntoCondition, IntoIden, LockBehavior,
+    LockType, NullOrdering, RecursiveWithClause, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
+    UnionType, WindowStatement, WithClause,
 };
 
 use pgorm_query::IntoColumnRef;
@@ -285,7 +285,7 @@ pub trait QuerySelect: Sized {
 
     /// Add an AND HAVING expression
     /// ```
-    /// use pgorm::{pgorm_query::{Alias, Expr}, entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{alias, pgorm_query::Expr, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -296,13 +296,15 @@ pub trait QuerySelect: Sized {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" HAVING "cake"."id" = 4 AND "cake"."id" = 5"#
     /// );
     ///
+    /// let count = alias("count");
+    ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
-    ///         .column_as(cake::Column::Id.count(), "count")
+    ///         .column_as(cake::Column::Id.count(), count)
     ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
     ///         .group_by(cake::Column::Name)
-    ///         .having(Expr::col(Alias::new("count")).gt(6))
+    ///         .having(Expr::col(count).gt(6))
     ///         .as_query()
     ///         .to_string(),
     ///     r#"SELECT COUNT("cake"."id") AS "count", SUM("cake"."id") AS "sum_of_id" FROM "cake" GROUP BY "cake"."name" HAVING "count" > 6"#
@@ -611,7 +613,7 @@ pub trait QuerySelect: Sized {
 
     /// Select column.
     /// ```
-    /// use pgorm::pgorm_query::{Alias, Expr, Func};
+    /// use pgorm::pgorm_query::{Expr, Func};
     /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
@@ -637,7 +639,7 @@ pub trait QuerySelect: Sized {
     /// Shorthand of `expr_as(Expr::col((T, C)), A)`.
     ///
     /// ```
-    /// use pgorm::pgorm_query::{Alias, Expr, Func};
+    /// use pgorm::pgorm_query::{Expr, Func};
     /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
@@ -668,11 +670,11 @@ pub trait QuerySelect: Sized {
     /// wins.
     ///
     /// ```
-    /// use pgorm::pgorm_query::{Alias, CommonTableExpression, Query, WithClause};
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::pgorm_query::{CommonTableExpression, Query, WithClause};
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::cake};
     ///
     /// let cheap = CommonTableExpression::new(
-    ///     Alias::new("cheap"),
+    ///     alias("cheap"),
     ///     Query::select().column(cake::Column::Id).from(cake::Entity).to_owned(),
     /// );
     ///
@@ -894,7 +896,7 @@ pub trait QueryOrder: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Perform a FILTER opertation on a statement
-// [spec:pgorm:sem:query.build.filter]
+// [spec:pgorm:sem:query.build.filter+1]
 pub trait QueryFilter: Sized {
     #[allow(missing_docs)]
     type QueryStatement: ConditionalStatement;
@@ -1066,13 +1068,14 @@ pub trait QueryFilter: Sized {
     }
 
     /// Perform a check to determine table belongs to a Model through it's name alias
-    fn belongs_to_tbl_alias<M>(mut self, model: &M, tbl_alias: &str) -> Self
+    fn belongs_to_tbl_alias<M>(mut self, model: &M, tbl_alias: impl IntoIden) -> Self
     where
         M: ModelTrait,
     {
+        let tbl_alias = tbl_alias.into_iden();
         for key in <M::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            let expr = Expr::col((Alias::new(tbl_alias), col)).eq(model.get(col));
+            let expr = Expr::col((SeaRc::clone(&tbl_alias), col)).eq(model.get(col));
             self = self.filter(expr);
         }
         self

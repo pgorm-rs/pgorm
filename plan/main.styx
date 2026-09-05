@@ -2885,12 +2885,20 @@ children (
                 title "The shared alias token reaches the ORM: 125 stringly sites and the leaked r{N} internal"
                 kind @refactor
                 deps (ergo.fluent-pipeline)
+                sealed true
                 log (
                     {
                         at 2026-09-04T15:24:48.228271Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Blocked on ergo.fluent-pipeline, which ships the shared Copy alias token (directive: one vocabulary, token implements Iden + IdenStatic so IntoIden/IntoColumnRef/IntoIdentity come free — probe_g on spike/fluent-audit proves every position accepts it with no new conversion trait). Scope when unblocked: convert the 125 non-pipeline stringly sites (column_as/having/order_by/group_by/window/lateral aliases) to the token; kill the leaked r{N} internal — find_also_linked's target alias (join.rs:100) becomes derivable (linked_target_alias(&link) or equivalent, probe_h has the shape) so callers stop hardcoding \"r4\" strings that silently rebind when a link gains a hop; the honest ceiling (unattached token compiles, server catches it) goes in the rule, no brand machinery. Alias::new stays for dynamic runtime names; the token is the static paved road."
+                    }
+
+                    {
+                        at 2026-09-05T12:51:02.500287Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

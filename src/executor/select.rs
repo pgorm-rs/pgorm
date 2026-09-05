@@ -714,7 +714,8 @@ where
     /// # #[cfg(feature = "macros")]
     /// # {
     /// # use pgorm::{DatabasePool, Error, FromQueryResult, SelectModel, Selector, tests_cfg::cake};
-    /// # use pgorm::pgorm_query::{Alias, Expr, Query};
+    /// # use pgorm::alias;
+    /// # use pgorm::pgorm_query::{Expr, Query};
     /// #
     /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
     /// #[derive(Debug, FromQueryResult)]
@@ -723,7 +724,7 @@ where
     /// }
     ///
     /// let statement = Query::select()
-    ///     .expr_as(Expr::col(cake::Column::Name), Alias::new("name"))
+    ///     .expr_as(Expr::col(cake::Column::Name), alias("name"))
     ///     .from(cake::Entity)
     ///     .to_owned();
     ///

@@ -1055,7 +1055,7 @@ mod tests {
         mod hello_expanded {
             use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1098,7 +1098,7 @@ mod tests {
 
                 fn select_as(&self, expr: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => expr.cast_as(Alias::new("integer")),
+                        Self::Two => expr.cast_as(alias("integer")),
                         _ => self.select_enum_as(expr),
                     }
                 }
@@ -1187,7 +1187,7 @@ mod tests {
         mod hello_expanded {
             use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1230,7 +1230,7 @@ mod tests {
 
                 fn save_as(&self, val: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => val.cast_as(Alias::new("text")),
+                        Self::Two => val.cast_as(alias("text")),
                         _ => self.save_enum_as(val),
                     }
                 }
@@ -1319,7 +1319,7 @@ mod tests {
         mod hello_expanded {
             use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::pgorm_query::{Alias, Expr, SimpleExpr};
+            use crate::pgorm_query::{Expr, SimpleExpr};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -1362,14 +1362,14 @@ mod tests {
 
                 fn select_as(&self, expr: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => expr.cast_as(Alias::new("integer")),
+                        Self::Two => expr.cast_as(alias("integer")),
                         _ => self.select_enum_as(expr),
                     }
                 }
 
                 fn save_as(&self, val: Expr) -> SimpleExpr {
                     match self {
-                        Self::Two => val.cast_as(Alias::new("text")),
+                        Self::Two => val.cast_as(alias("text")),
                         _ => self.save_enum_as(val),
                     }
                 }

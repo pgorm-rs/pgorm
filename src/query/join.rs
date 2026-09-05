@@ -1,12 +1,12 @@
 use crate::{
-    ColumnTrait, EntityTrait, IdenStr, Iterable, Linked, QuerySelect, Related, Select, SelectA,
-    SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
+    ColumnTrait, EntityTrait, IdenStr, Iterable, Linked, LinkedAlias, QuerySelect, Related, Select,
+    SelectA, SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
 };
 pub use pgorm_query::JoinType;
 use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
 
 // [spec:pgorm:sem:query.build.join+3]
-// [spec:pgorm:sem:query.build.combine+1]
+// [spec:pgorm:sem:query.build.combine+2]
 impl<E> Select<E>
 where
     E: EntityTrait,
@@ -70,11 +70,12 @@ where
         L: Linked<FromEntity = E, ToEntity = T>,
         T: EntityTrait,
     {
+        let target = l.last_hop_alias();
         let mut slf = self;
         for (i, mut rel) in l.link().into_iter().enumerate() {
-            let to_tbl = Alias::new(format!("r{i}")).into_iden();
+            let to_tbl = LinkedAlias::hop(i).into_iden();
             let from_tbl = if i > 0 {
-                Alias::new(format!("r{}", i - 1)).into_iden()
+                LinkedAlias::hop(i - 1).into_iden()
             } else {
                 unpack_table_ref(&rel.from_tbl)
             };
@@ -96,10 +97,7 @@ where
         let mut select_two = SelectTwo::new_without_prepare(slf.query);
         for col in <T::Column as Iterable>::iter() {
             let alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((
-                Alias::new(format!("r{}", l.link().len() - 1)).into_iden(),
-                col.into_iden(),
-            ));
+            let expr = Expr::col((target.into_iden(), col.into_iden()));
             select_two.query().expr(SelectExpr::new_as(
                 col.select_as(expr),
                 SeaRc::new(Alias::new(alias)),
@@ -114,11 +112,12 @@ where
         L: Linked<FromEntity = E, ToEntity = T>,
         T: EntityTrait,
     {
+        let target = l.last_hop_alias();
         let mut slf = self;
         for (i, mut rel) in l.link().into_iter().enumerate() {
-            let to_tbl = Alias::new(format!("r{i}")).into_iden();
+            let to_tbl = LinkedAlias::hop(i).into_iden();
             let from_tbl = if i > 0 {
-                Alias::new(format!("r{}", i - 1)).into_iden()
+                LinkedAlias::hop(i - 1).into_iden()
             } else {
                 unpack_table_ref(&rel.from_tbl)
             };
@@ -140,10 +139,7 @@ where
         let mut select_two_many = SelectTwoMany::new_without_prepare(slf.query);
         for col in <T::Column as Iterable>::iter() {
             let alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((
-                Alias::new(format!("r{}", l.link().len() - 1)).into_iden(),
-                col.into_iden(),
-            ));
+            let expr = Expr::col((target.into_iden(), col.into_iden()));
             select_two_many.query().expr(SelectExpr::new_as(
                 col.select_as(expr),
                 SeaRc::new(Alias::new(alias)),
@@ -159,7 +155,7 @@ mod tests {
     use crate::{
         ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait, RelationTrait,
     };
-    use pgorm_query::{Alias, ConditionType, Expr, IntoCondition, JoinType};
+    use pgorm_query::{ConditionType, Expr, IntoCondition, JoinType, alias};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -545,12 +541,11 @@ mod tests {
 
     #[test]
     fn join_20() {
+        let fruit_alias = alias("fruit_alias");
+
         assert_eq!(
             cake::Entity::find()
-                .column_as(
-                    Expr::col((Alias::new("fruit_alias"), fruit::Column::Name)),
-                    "fruit_name"
-                )
+                .column_as(Expr::col((fruit_alias, fruit::Column::Name)), "fruit_name")
                 .join_as(
                     JoinType::LeftJoin,
                     cake::Relation::Fruit
@@ -560,7 +555,7 @@ mod tests {
                                 .like("%tropical%")
                                 .into_condition()
                         }),
-                    Alias::new("fruit_alias")
+                    fruit_alias
                 )
                 .as_query()
                 .to_string(),
@@ -574,10 +569,12 @@ mod tests {
 
     #[test]
     fn join_21() {
+        let cf_alias = alias("cake_filling_alias");
+
         assert_eq!(
             cake::Entity::find()
                 .column_as(
-                    Expr::col((Alias::new("cake_filling_alias"), cake_filling::Column::CakeId)),
+                    Expr::col((cf_alias, cake_filling::Column::CakeId)),
                     "cake_filling_cake_id"
                 )
                 .join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def())
@@ -590,7 +587,7 @@ mod tests {
                                 .gt(10)
                                 .into_condition()
                         }),
-                    Alias::new("cake_filling_alias")
+                    cf_alias
                 )
                 .as_query()
                 .to_string(),
@@ -605,10 +602,12 @@ mod tests {
 
     #[test]
     fn join_22() {
+        let cf_alias = alias("cake_filling_alias");
+
         assert_eq!(
             cake::Entity::find()
                 .column_as(
-                    Expr::col((Alias::new("cake_filling_alias"), cake_filling::Column::CakeId)),
+                    Expr::col((cf_alias, cake_filling::Column::CakeId)),
                     "cake_filling_cake_id"
                 )
                 .join(JoinType::LeftJoin, cake::Relation::OrTropicalFruit.def())
@@ -622,7 +621,7 @@ mod tests {
                                 .gt(10)
                                 .into_condition()
                         }),
-                    Alias::new("cake_filling_alias")
+                    cf_alias
                 )
                 .as_query()
                 .to_string(),

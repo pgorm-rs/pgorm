@@ -439,7 +439,8 @@ pub async fn raw_selector_one_semantics() -> Result<(), Error> {
 // [spec:pgorm:req:sql.render.window+3/test]
 #[pgorm_macros::test]
 pub async fn named_window_over_a_real_query() -> Result<(), Error> {
-    use pgorm::pgorm_query::{Alias, Expr, Func, Order, Query, QueryBuilder, WindowStatement};
+    use pgorm::alias;
+    use pgorm::pgorm_query::{Expr, Func, Order, Query, QueryBuilder, WindowStatement};
 
     let ctx = TestContext::new("named_window_over_a_real_query").await;
     create_tables(&ctx.db).await?;
@@ -455,15 +456,13 @@ pub async fn named_window_over_a_real_query() -> Result<(), Error> {
         .await?;
     }
 
+    let margin = alias("margin");
     let sql = Query::select()
         .column(bakery::Column::Name)
-        .expr_window_name(
-            Func::count(Expr::col(bakery::Column::Id)),
-            Alias::new("margin"),
-        )
+        .expr_window_name(Func::count(Expr::col(bakery::Column::Id)), margin)
         .from(bakery::Entity)
         .window(
-            Alias::new("margin"),
+            margin,
             WindowStatement::partition_by(bakery::Column::ProfitMargin),
         )
         .order_by(bakery::Column::Name, Order::Asc)

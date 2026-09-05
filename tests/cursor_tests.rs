@@ -956,11 +956,12 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     use ipnetwork::IpNetwork;
     use mac_address::MacAddress;
     use net_cursor::{Column, Entity, Model};
+    use pgorm::alias;
     use pgorm::{
         ValueHolder,
         types::{ToSql, Type},
     };
-    use pgorm_query::{Alias, ColumnDef, IntoIden, Query, QueryBuilder, Table};
+    use pgorm_query::{ColumnDef, IntoIden, Query, QueryBuilder, Table};
 
     // `accepts` is true for every Postgres type: a `Value` carries no target
     // type, so the whole burden sits in `to_sql`.
@@ -992,8 +993,8 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     let ctx = TestContext::new("cursor_network_type_tests").await;
     let db = ctx.db.get().await?;
 
-    let ip_col = Alias::new("ip");
-    let mac_col = Alias::new("mac");
+    let ip_col = alias("ip");
+    let mac_col = alias("mac");
 
     let create = Table::create(Entity)
         .col(
@@ -1003,8 +1004,8 @@ async fn cursor_over_network_types() -> Result<(), Error> {
                 .primary_key(),
         )
         .col(ColumnDef::new(Column::Label).string().not_null())
-        .col(ColumnDef::new(ip_col.clone()).inet().not_null())
-        .col(ColumnDef::new(mac_col.clone()).mac_address().not_null())
+        .col(ColumnDef::new(ip_col).inet().not_null())
+        .col(ColumnDef::new(mac_col).mac_address().not_null())
         .to_owned();
     create_table_without_asserts(&db, &create).await?;
 
@@ -1024,8 +1025,8 @@ async fn cursor_over_network_types() -> Result<(), Error> {
             .columns([
                 Column::Id.into_iden(),
                 Column::Label.into_iden(),
-                ip_col.clone().into_iden(),
-                mac_col.clone().into_iden(),
+                ip_col.into_iden(),
+                mac_col.into_iden(),
             ])
             .values_panic([(*id).into(), (*label).into(), ip.into(), mac.into()])
             .to_owned()
@@ -1292,8 +1293,9 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
 #[pgorm_macros::test]
 async fn cursor_order_composition() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
+    use pgorm::alias;
     use pgorm::{Identity, IntoIdentity};
-    use pgorm_query::{Alias, IntoIden};
+    use pgorm_query::IntoIden;
 
     let ctx = TestContext::new("cursor_tests_order_composition").await;
     let db = ctx.db.get().await?;
@@ -1334,7 +1336,7 @@ async fn cursor_order_composition() -> Result<(), Error> {
     let mut bad_unary = Entity::find().cursor_by(Column::A);
     bad_unary.set_secondary_order_by(vec![(
         SeaRc::clone(&table),
-        Identity::Unary(Alias::new("no_such_column").into_iden()),
+        Identity::Unary(alias("no_such_column").into_iden()),
     )]);
     assert!(matches!(
         bad_unary.first(8).all(&db).await,
@@ -1347,8 +1349,8 @@ async fn cursor_order_composition() -> Result<(), Error> {
     composite_secondary.set_secondary_order_by(vec![(
         SeaRc::clone(&table),
         Identity::Binary(
-            Alias::new("no_such_column").into_iden(),
-            Alias::new("nor_this_one").into_iden(),
+            alias("no_such_column").into_iden(),
+            alias("nor_this_one").into_iden(),
         ),
     )]);
     assert_eq!(composite_secondary.first(8).all(&db).await?.len(), 8);

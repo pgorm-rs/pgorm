@@ -2,7 +2,7 @@ use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
 use pgorm::{ConnectionTrait, DatabasePool, EntityName, Schema, error::*, pgorm_query};
 use pgorm_query::{
-    Alias, ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, QueryBuilder, StringLen,
+    ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, QueryBuilder, StringLen, alias,
     extension::Type,
 };
 
@@ -19,8 +19,8 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
 
     let create_enum_stmts = {
         let schema = Schema::new();
-        let enum_create_stmt = Type::create(Alias::new("tea"))
-            .values([Alias::new("EverydayTea"), Alias::new("BreakfastTea")])
+        let enum_create_stmt = Type::create(alias("tea"))
+            .values([alias("EverydayTea"), alias("BreakfastTea")])
             .to_owned();
         assert_eq!(
             enum_create_stmt.to_string(),
@@ -430,7 +430,7 @@ where
         )
         .col(
             ColumnDef::new(collection::Column::Name)
-                .custom(Alias::new("citext"))
+                .custom(alias("citext"))
                 .not_null(),
         )
         .col(
@@ -656,32 +656,32 @@ where
         )
         .col(
             ColumnDef::new(bits::Column::Bit0)
-                .custom(Alias::new("BIT"))
+                .custom(alias("BIT"))
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit1)
-                .custom(Alias::new("BIT(1)"))
+                .custom(alias("BIT(1)"))
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit8)
-                .custom(Alias::new("BIT(8)"))
+                .custom(alias("BIT(8)"))
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit16)
-                .custom(Alias::new("BIT(16)"))
+                .custom(alias("BIT(16)"))
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit32)
-                .custom(Alias::new("BIT(32)"))
+                .custom(alias("BIT(32)"))
                 .not_null(),
         )
         .col(
             ColumnDef::new(bits::Column::Bit64)
-                .custom(Alias::new("BIT(64)"))
+                .custom(alias("BIT(64)"))
                 .not_null(),
         )
         .to_owned();

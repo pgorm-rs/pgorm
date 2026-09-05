@@ -89,7 +89,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked+1/test]    a self-relation is the case
+// [spec:pgorm:req:entity.relation.linked+2/test]    a self-relation is the case
 // `RelatedLink` exists for: the link form aliases the joined table, so the
 // entity's own table can be joined a second time without being named twice
 #[test]

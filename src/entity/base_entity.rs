@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
     RelationType, Select,
 };
-use pgorm_query::{Alias, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
+use pgorm_query::{Alias, AliasName, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
 use std::fmt::Debug;
 pub use strum::IntoEnumIterator as Iterable;
 
@@ -23,6 +23,17 @@ pub use strum::IntoEnumIterator as Iterable;
 pub trait IdenStr: Iden + Copy + Debug + 'static {
     /// The identifier as an unquoted string.
     fn as_str(&self) -> &str;
+}
+
+/// A name the query introduces stands where a column does, so the alias token
+/// carries this contract too and reaches the [`Identity`](crate::Identity)
+/// positions that key on it — `cursor_by`, a secondary ordering — and not
+/// only the plain [`Iden`] ones.
+// [spec:pgorm:sem:query.build.alias]
+impl IdenStr for AliasName {
+    fn as_str(&self) -> &str {
+        pgorm_query::IdenStatic::as_str(self)
+    }
 }
 
 /// A Trait for mapping an Entity to a database table

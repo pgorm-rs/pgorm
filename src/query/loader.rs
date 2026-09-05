@@ -5,8 +5,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use pgorm_query::{
-    Alias, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, IntoIden, JoinType, NamedTable,
-    SeaRc, SelectExpr, SimpleExpr, TableName, ValueTuple,
+    Alias, AliasName, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, IntoIden, JoinType,
+    NamedTable, SeaRc, SelectExpr, SimpleExpr, TableName, ValueTuple, alias,
 };
 use std::{collections::HashMap, str::FromStr};
 
@@ -267,7 +267,7 @@ where
         // The source table is joined back in under an alias, so a
         // self-referencing many-to-many does not name one table twice, and the
         // key predicate qualifies against the alias rather than the table.
-        let src_alias: DynIden = SeaRc::new(Alias::new(LOADER_SOURCE_ALIAS));
+        let src_alias: DynIden = SeaRc::new(LOADER_SOURCE_ALIAS);
         let src_tbl = FromItem::from(TableName::Table(SeaRc::clone(&src_alias)));
         let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
 
@@ -283,11 +283,11 @@ where
         let mut select_two: SelectTwo<R, <M as ModelTrait>::Entity> =
             SelectTwo::new_without_prepare(select.apply_alias(SelectA.as_str()).into_query());
         for col in <<<M as ModelTrait>::Entity as EntityTrait>::Column as Iterable>::iter() {
-            let alias = format!("{}{}", SelectB.as_str(), col.as_str());
+            let col_alias = format!("{}{}", SelectB.as_str(), col.as_str());
             let expr = Expr::col((SeaRc::clone(&src_alias), col.into_iden()));
             QuerySelect::query(&mut select_two).expr(SelectExpr::new_as(
                 col.select_as(expr),
-                SeaRc::new(Alias::new(alias)),
+                SeaRc::new(Alias::new(col_alias)),
             ));
         }
 
@@ -319,7 +319,7 @@ where
 /// The alias the input entity's table is joined back under by
 /// [`LoaderTrait::load_many_via`]. Internal: it is never handed to a caller,
 /// who filters against the target entity by its own name.
-const LOADER_SOURCE_ALIAS: &str = "pgorm_loader_src";
+const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
 
 fn identity_columns(identity: &Identity) -> String {
     identity

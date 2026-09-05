@@ -1,8 +1,8 @@
 use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_ref};
 use core::marker::PhantomData;
 use pgorm_query::{
-    Alias, Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden,
-    JoinType, SeaRc, TableForeignKey,
+    Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden, JoinType,
+    SeaRc, TableForeignKey, alias,
 };
 use std::fmt::Debug;
 
@@ -96,10 +96,7 @@ fn debug_on_condition(
         Some(func) => {
             d.field(
                 "on_condition",
-                &func(
-                    SeaRc::new(Alias::new("left")),
-                    SeaRc::new(Alias::new("right")),
-                ),
+                &func(SeaRc::new(alias("left")), SeaRc::new(alias("right"))),
             );
         }
         None => {
@@ -194,16 +191,16 @@ impl RelationDef {
     ///     query::*,
     ///     tests_cfg::{cake, cake_filling},
     /// };
-    /// use pgorm_query::Alias;
+    /// use pgorm::alias;
     ///
-    /// let cf = Alias::new("cf");
+    /// let cf = alias("cf");
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .join_as(
     ///             JoinType::LeftJoin,
     ///             cake_filling::Relation::Cake.def().rev(),
-    ///             cf.clone()
+    ///             cf
     ///         )
     ///         .join(
     ///             JoinType::LeftJoin,
@@ -496,14 +493,14 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{Alias, ConditionType, FromItem, IntoIden, Table, TableName};
-/// use pgorm::{ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
+/// use pgorm_query::{ConditionType, FromItem, IntoIden, Table, TableName};
+/// use pgorm::{alias, ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
 ///     rel_type: RelationType::HasOne,
-///     from_tbl: FromItem::from(TableName::Table(Alias::new("foo").into_iden())),
-///     to_tbl: FromItem::from(TableName::Table(Alias::new("bar").into_iden())),
-///     columns: ColumnPairs::new(Alias::new("bar_id"), Alias::new("bar_id")),
+///     from_tbl: FromItem::from(TableName::Table(alias("foo").into_iden())),
+///     to_tbl: FromItem::from(TableName::Table(alias("bar").into_iden())),
+///     columns: ColumnPairs::new(alias("bar_id"), alias("bar_id")),
 ///     is_owner: false,
 ///     on_delete: None,
 ///     on_update: None,
@@ -512,7 +509,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     condition_type: ConditionType::All,
 /// };
 ///
-/// let alter_table = Table::alter(TableName::Table(Alias::new("foo").into_iden()))
+/// let alter_table = Table::alter(TableName::Table(alias("foo").into_iden()))
 ///     .add_foreign_key(&relation.into());
 /// assert_eq!(
 ///     alter_table.to_string(),

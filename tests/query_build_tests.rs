@@ -9,10 +9,11 @@
 //! Run the test locally:
 //! cargo test --test query_build_tests
 
+use pgorm::alias;
 use pgorm::pgorm_query::{
-    Alias, Asterisk, ConditionType, DeleteStatement, Expr, Func, InsertStatement, IntoCondition,
-    IntoIden, LockBehavior, LockType, NullOrdering, OnConflict, QueryBuilder, SelectStatement,
-    SimpleExpr, UpdateStatement, Value, Values,
+    Asterisk, ConditionType, DeleteStatement, Expr, Func, InsertStatement, IntoCondition, IntoIden,
+    LockBehavior, LockType, NullOrdering, OnConflict, QueryBuilder, SelectStatement, SimpleExpr,
+    UpdateStatement, Value, Values,
 };
 use pgorm::set;
 use pgorm::tests_cfg::{
@@ -21,9 +22,9 @@ use pgorm::tests_cfg::{
 };
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
-    Error, IdenStr, Insert, IntoActiveModel, Iterable, JoinType, ModelTrait, Order, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectTwo, SelectTwoMany,
-    TryInsert, Update, UpdateMany, UpdateOne,
+    Error, IdenStr, Insert, IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectTwo,
+    SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -252,7 +253,7 @@ fn into_simple_expr_accepts_three_shapes() {
     );
 }
 
-// [spec:pgorm:sem:query.build.filter/test]    repeated `filter` calls AND
+// [spec:pgorm:sem:query.build.filter+1/test]    repeated `filter` calls AND
 // together; condition trees, `add_option` and raw pgorm-query expressions all
 // arrive through the same entry point
 #[test]
@@ -398,7 +399,7 @@ fn eq_any_casts_enum_arrays_as_a_whole() {
     );
 }
 
-// [spec:pgorm:sem:query.build.filter/test]    `belongs_to` emits one equality
+// [spec:pgorm:sem:query.build.filter+1/test]    `belongs_to` emits one equality
 // per primary-key column of the model's entity; `belongs_to_tbl_alias`
 // qualifies the same columns with a table alias
 #[test]
@@ -663,11 +664,7 @@ fn join_direction_and_alias_choice() {
     // on both sides of the ON condition.
     assert_eq!(
         cake::Entity::find()
-            .join_as(
-                JoinType::LeftJoin,
-                cake::Relation::Fruit.def(),
-                Alias::new("f")
-            )
+            .join_as(JoinType::LeftJoin, cake::Relation::Fruit.def(), alias("f"))
             .as_query()
             .to_string(),
         [
@@ -678,11 +675,7 @@ fn join_direction_and_alias_choice() {
     );
     assert_eq!(
         fruit::Entity::find()
-            .join_as_rev(
-                JoinType::LeftJoin,
-                cake::Relation::Fruit.def(),
-                Alias::new("c")
-            )
+            .join_as_rev(JoinType::LeftJoin, cake::Relation::Fruit.def(), alias("c"))
             .as_query()
             .to_string(),
         [
@@ -840,7 +833,7 @@ fn relation_named_joins_match_the_long_spelling() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine+1/test]    `select_also` / `select_with`
+// [spec:pgorm:sem:query.build.combine+2/test]    `select_also` / `select_with`
 // rewrite E's select list with the `A_` prefix (alias, plain column and
 // `AsEnum`-wrapped column alike) and append every F column as `B_<column>`
 #[test]
@@ -876,7 +869,7 @@ fn combine_prefixes_both_column_sets() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine+1/test]    `SelectTwoMany::new` appends the
+// [spec:pgorm:sem:query.build.combine+2/test]    `SelectTwoMany::new` appends the
 // primary-key ORDER BY that keeps a left model's rows adjacent; `SelectTwo`
 // adds no ordering. `find_also_related` / `find_with_related` are exactly
 // `left_join` plus `select_also` / `select_with`
@@ -923,7 +916,7 @@ fn select_with_orders_by_primary_key() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine+1/test]    a `Linked` chain LEFT JOINs each
+// [spec:pgorm:sem:query.build.combine+2/test]    a `Linked` chain LEFT JOINs each
 // hop as `r{i}` (joining from `r{i-1}`, or the base table at i = 0) and selects
 // the final target's columns from the last alias; `find_with_linked` skips the
 // primary-key ORDER BY that `find_with_related` adds
@@ -977,7 +970,7 @@ fn find_linked_aliases_every_hop() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine+1/test]    an unaliased asterisk names no
+// [spec:pgorm:sem:query.build.combine+2/test]    an unaliased asterisk names no
 // single column, so it is carried through unprefixed rather than aliased
 #[test]
 fn combine_leaves_asterisk_unprefixed() {
@@ -996,7 +989,7 @@ fn combine_leaves_asterisk_unprefixed() {
     );
 }
 
-// [spec:pgorm:sem:query.build.combine+1/test]    nor does an unaliased expression
+// [spec:pgorm:sem:query.build.combine+2/test]    nor does an unaliased expression
 // that is neither a column nor an `AsEnum`-wrapped column
 #[test]
 fn combine_leaves_bare_expression_unprefixed() {
@@ -1487,5 +1480,81 @@ fn debug_query_is_a_vestigial_holder() {
             Value::Int(Some(1)),
             Value::String(Some(Box::new("Apple Pie".to_owned()))),
         ])
+    );
+}
+
+// [spec:pgorm:sem:query.build.alias/test]    one token binding serves the
+// aliasing position and every reference to the name it introduced, across the
+// `IntoIdentity`, `IntoIden` and `IntoColumnRef` conversions alike
+#[test]
+fn alias_token_declares_and_references_one_name() {
+    let n = alias("n");
+
+    // `column_as` takes the token through `IntoIdentity`, which keys on
+    // `IdenStr`; `having` / `order_by_asc` take it through `IntoColumnRef`.
+    assert_eq!(
+        cake::Entity::find()
+            .select_only()
+            .column_as(cake::Column::Id.count(), n)
+            .group_by(cake::Column::Name)
+            .having(Expr::col(n).gt(1))
+            .order_by_asc(Expr::col(n))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT COUNT("cake"."id") AS "n" FROM "cake""#,
+            r#"GROUP BY "cake"."name" HAVING "n" > 1 ORDER BY "n" ASC"#,
+        ]
+        .join(" ")
+    );
+
+    // The same token stands as a table alias and as the qualifier of a
+    // `(table, column)` pair.
+    let f = alias("f");
+    assert_eq!(
+        cake::Entity::find()
+            .select_only()
+            .column_as(Expr::col((f, fruit::Column::Name)), "fruit_name")
+            .join_as(JoinType::LeftJoin, cake::Relation::Fruit.def(), f)
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "f"."name" AS "fruit_name" FROM "cake""#,
+            r#"LEFT JOIN "fruit" AS "f" ON "cake"."id" = "f"."cake_id""#,
+        ]
+        .join(" ")
+    );
+
+    // The ceiling: a token no projection declared still builds, and only the
+    // server can object to it.
+    let undeclared = cake::Entity::find()
+        .filter(Expr::col(alias("nope")).gt(1))
+        .as_query()
+        .to_string();
+    assert!(undeclared.ends_with(r#"WHERE "nope" > 1"#), "{undeclared}");
+}
+
+// [spec:pgorm:req:entity.relation.linked+2/test]    the alias a linked join
+// binds its last hop to is derived from the chain, not retyped by the caller
+#[test]
+fn last_hop_alias_matches_the_emitted_join() {
+    let three_hop = entity_linked::CakeToFillingVendor;
+    let two_hop = entity_linked::CakeToFilling;
+
+    // One hop shorter, one rung lower: the derivation moves with the chain.
+    assert_eq!(three_hop.last_hop_alias().to_string(), "r2");
+    assert_eq!(two_hop.last_hop_alias().to_string(), "r1");
+
+    // And it is the alias the join actually emitted for the target.
+    let target = three_hop.last_hop_alias();
+    assert_eq!(
+        cake::Entity::find()
+            .find_also_linked(three_hop)
+            .order_by_asc(Expr::col((target, vendor::Column::Id)))
+            .as_query()
+            .to_string()
+            .split(" ORDER BY ")
+            .nth(1),
+        Some(r#""r2"."id" ASC"#)
     );
 }

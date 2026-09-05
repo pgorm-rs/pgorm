@@ -31,7 +31,7 @@ select_def!(SelectB, "B_");
 
 /// The identifier an unaliased column reference can be renamed after; an
 /// asterisk names no single column and so has none.
-// [spec:pgorm:sem:query.build.combine+1]
+// [spec:pgorm:sem:query.build.combine+2]
 fn named_column(col_ref: &ColumnRef) -> Option<&DynIden> {
     match col_ref {
         ColumnRef::Column(col)
@@ -41,7 +41,7 @@ fn named_column(col_ref: &ColumnRef) -> Option<&DynIden> {
     }
 }
 
-// [spec:pgorm:sem:query.build.combine+1]
+// [spec:pgorm:sem:query.build.combine+2]
 impl<E> Select<E>
 where
     E: EntityTrait,

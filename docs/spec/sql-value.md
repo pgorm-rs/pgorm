@@ -212,7 +212,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+3]
+> [spec:pgorm:def:sql.types+4]
 > `Iden` is the identifier trait (bounded `Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
 > which doubles any embedded quote character — and `prepare`, which writes the
@@ -237,17 +237,26 @@ including panic semantics and quirks inherited from sea-query.
 > inside `ColumnDef::take` — is gone
 > (`[dec:pgorm:invalid-states-unrepresentable]`).
 >
-> `AliasName` is the token form of a name the query itself introduces, minted
-> by the free function `alias(name)` over a `&'static str`. It is `Copy`,
-> `Iden` and `IdenStatic`, so `IntoIden`, `IntoColumnRef` and every other
-> identifier position accepts it with no conversion, and one `let rn =
-> alias("rn")` binding serves as both the declaration and every reference —
-> the name is spelled once instead of once per site. The name is
-> `&'static str` by construction because an introduced name is part of the
-> shape of a query, not a runtime value; `Alias` remains for names computed
-> at runtime. The token carries no evidence that its name was ever attached
-> to anything: a token no projection declares still compiles, and the server
-> reports the unknown column exactly as it would for a mistyped string.
+> `AliasName` is the token form of an identifier the query text spells
+> literally, minted by the free function `alias(name)` over a `&'static str`.
+> It is `Copy`, `Iden` and `IdenStatic`, so `IntoIden`, `IntoColumnRef` and
+> every other identifier position accepts it with no conversion, and one
+> `let rn = alias("rn")` binding serves as both the declaration and every
+> reference — the name is spelled once instead of once per site.
+>
+> The motivating case is a name the query itself introduces, where the token
+> is what makes a reference unable to miss its declaration; but the remit is
+> the whole statically-known set, so a cast target, a `CREATE TYPE` name or a
+> custom column type is written the same way rather than in a second spelling
+> that a reader would have to tell apart. The split that matters is against
+> `Alias`, which remains for names computed at runtime — a `format!`-built
+> alias, a `&str` arriving from a caller — and which is where the
+> `&'static str` bound draws the line: a name known only at run time cannot
+> be a token, and no amount of interning would make it one.
+>
+> The token carries no evidence that its name was ever attached to anything:
+> a token no projection declares still compiles, and the server reports the
+> unknown column exactly as it would for a mistyped string.
 
 > [spec:pgorm:def:sql.types.column-ref]
 > `ColumnRef` has five forms: `Column(DynIden)`, `TableColumn(DynIden,

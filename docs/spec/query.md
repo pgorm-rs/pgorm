@@ -44,7 +44,7 @@ is what `EntityTrait::find()` produces.
 > positions: it is implemented for every `ColumnTrait` type (producing a
 > column reference), for `Expr` and for `SimpleExpr` (identity).
 
-> [spec:pgorm:sem:query.build.filter]
+> [spec:pgorm:sem:query.build.filter+1]
 > `QueryFilter::filter` converts its argument through `IntoCondition` and adds
 > it with `cond_where`; repeated `filter` calls accumulate as AND-ed
 > conditions. Condition trees (`Condition::any()` / `Condition::all()`,
@@ -56,7 +56,12 @@ is what `EntityTrait::find()` produces.
 > `QueryFilter::belongs_to(model)` adds one equality filter per primary-key
 > column of the model's entity (`col.eq(model.get(col))`);
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
-> table alias string.
+> table alias. That alias is taken as `impl IntoIden`, not as a `&str`: its
+> in-tree caller is `ModelTrait::find_linked`, which has a `LinkedAlias`
+> (`[spec:pgorm:req:entity.relation.linked+2]`) in hand and would otherwise
+> have to render it back to a string for the callee to parse into an
+> identifier again. A string literal still passes, through
+> `IntoIden for &str`.
 
 > [spec:pgorm:sem:query.build.modifiers+5]
 > `QuerySelect` mutates the select statement in place: `column` appends a
@@ -148,6 +153,39 @@ is what `EntityTrait::find()` produces.
 > `order_by_with_nulls` for `NULLS FIRST`/`LAST`); calls accumulate and are
 > never deduplicated.
 
+> [spec:pgorm:sem:query.build.alias]
+> A name the ORM's own call sites introduce MUST be written as the `AliasName`
+> token (`[spec:pgorm:def:sql.types+4]`), not as a string repeated per site.
+> Every aliasing and referencing position on the builders takes it through the
+> existing conversions and needs no new one: the alias argument of `column_as`
+> / `expr_as` / `tbl_col_as`, the expression positions of `having`, `group_by`,
+> `order_by*` and `filter`, the qualifier of a `(table, column)` pair, the
+> table alias of `join_as` / `join_as_rev` / `from_alias`, a lateral join's
+> alias, a window name, and a CTE's name and columns. `alias` and `AliasName`
+> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+2]`).
+>
+> Reaching the `Identity` positions — `column_as`'s alias, `cursor_by`, a
+> cursor's secondary ordering — takes one more impl, because `IntoIdentity`
+> keys on the entity layer's `IdenStr` (`[spec:pgorm:def:entity.traits+1]`)
+> rather than on `Iden`. `AliasName` implements it, so a single token spelling
+> reaches every position in the crate and there is no position where a caller
+> is pushed back to a string.
+>
+> `Alias` is NOT deprecated by this and MUST remain: a name computed at run
+> time cannot be a `&'static str` token, and the ORM builds such names itself
+> — the `A_`/`B_` column prefixes of the two-model selectors
+> (`query.build.combine`), the loader's join-back alias, an entity's schema
+> qualifier. The token is the paved road for the static case, not a
+> replacement for the dynamic one.
+>
+> The ceiling is the same one the token carries at the query layer, and it is
+> worth restating where a caller meets it: the token is evidence of nothing.
+> `Cake::find().filter(alias("nope").into_column_ref()...)` — a token no
+> projection ever declared — compiles, and the server rejects the unknown
+> column exactly as it would a mistyped string. What the token removes is the
+> second, unchecked spelling of a name that WAS declared; it does not make the
+> declaration itself checkable.
+
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
@@ -186,7 +224,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > the way to join a `RelationDef` that was modified in flight (`.rev()`,
 > `.on_condition(..)`) rather than taken whole from a relation.
 
-> [spec:pgorm:sem:query.build.combine+1]
+> [spec:pgorm:sem:query.build.combine+2]
 > `SelectTwo`/`SelectTwoMany` use a fixed column-aliasing scheme
 > (`combine.rs`): `select_also(F)` / `select_with(F)` first rewrite every
 > select expression of `E` with the `A_` prefix via `apply_alias` (an existing
@@ -218,6 +256,14 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > columns are selected from the last alias as `B_<column>`. Unlike
 > `find_with_related`, `find_with_linked` does not append the primary-key
 > ORDER BY (it constructs the selector with `new_without_prepare`).
+>
+> Those `r{i}` names are generated but observable — a caller ordering by a
+> column of the joined target has to name the table — so they are not a
+> string the builders format and callers retype. They are `LinkedAlias`, and
+> the last of them is derived by `Linked::last_hop_alias`
+> (`[spec:pgorm:req:entity.relation.linked+2]`), which is the same call these
+> two builders make. A chain that gains a hop therefore moves the join and
+> every reference to it together.
 
 The composition clauses — WITH, LATERAL, WINDOW and the set operators — are all
 in-place mutations of the same `SelectStatement`, so none of them changes what a
@@ -499,7 +545,7 @@ what makes it total over partially-set models.
 > table twice and so that the key predicate — the via relation's from side
 > against the input keys — qualifies against that alias. The input entity's
 > columns are appended to the projection as the `B_` side
-> (`[spec:pgorm:sem:query.build.combine+1]`), so each returned row carries its
+> (`[spec:pgorm:sem:query.build.combine+2]`), so each returned row carries its
 > target model and the input model it belongs to.
 >
 > The junction's own columns are never decoded: reading a junction row would

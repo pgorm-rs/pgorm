@@ -17,10 +17,12 @@ use futures::StreamExt;
 use common::bakery_chain::{Bakery, Cake, bakery, cake, create_tables};
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    Alias, CommonTableExpression, Condition, Func, Order, OrderedStatement, Query,
-    RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
+    CommonTableExpression, Condition, Func, Order, OrderedStatement, Query, RecursiveWithClause,
+    SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
 };
-use pgorm::{Error, SelectGetableTuple, SelectModel, Selector, SelectorRaw, entity::prelude::*};
+use pgorm::{
+    Error, SelectGetableTuple, SelectModel, Selector, SelectorRaw, alias, entity::prelude::*,
+};
 use pretty_assertions::assert_eq;
 
 async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
@@ -70,25 +72,23 @@ async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
 /// the CTE's column type as `text` and the step arm's `lo + 10` would have no
 /// operator to resolve.
 fn price_brackets() -> RecursiveWithClause {
-    let bracket = Alias::new("bracket");
-    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+    let bracket = alias("bracket");
+    let lo_col = alias("lo");
+    let lo = || Expr::col((bracket, lo_col));
 
     let mut anchor = Query::select()
-        .expr_as(
-            Expr::val(0i32).cast_as(Alias::new("integer")),
-            Alias::new("lo"),
-        )
+        .expr_as(Expr::val(0i32).cast_as(alias("integer")), lo_col)
         .to_owned();
 
     let step = Query::select()
-        .expr_as(lo().add(10i32), Alias::new("lo"))
-        .from(bracket.clone())
+        .expr_as(lo().add(10i32), lo_col)
+        .from(bracket)
         .and_where(lo().lt(30i32))
         .to_owned();
 
     RecursiveWithClause::new(
         CommonTableExpression::new(bracket, anchor.union(UnionType::All, step).to_owned())
-            .columns([Alias::new("lo")])
+            .columns([lo_col])
             .to_owned(),
     )
 }
@@ -96,14 +96,15 @@ fn price_brackets() -> RecursiveWithClause {
 /// The band-count query whose driving table is the CTE, so no entity is behind
 /// it and `Selector::from_select` is the only typed way in.
 fn bracket_counts() -> SelectStatement {
-    let bracket = Alias::new("bracket");
-    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+    let bracket = alias("bracket");
+    let lo_col = alias("lo");
+    let lo = || Expr::col((bracket, lo_col));
 
     Query::select()
-        .expr_as(lo(), Alias::new("lo"))
+        .expr_as(lo(), lo_col)
         .expr_as(
             Expr::col((cake::Entity, cake::Column::Id)).count(),
-            Alias::new("cakes"),
+            alias("cakes"),
         )
         .from(bracket)
         .join(
@@ -136,9 +137,11 @@ pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     seed(&db).await?;
 
+    let bracket = alias("bracket");
+    let lo = alias("lo");
     let ascending = || {
         bracket_counts()
-            .order_by((Alias::new("bracket"), Alias::new("lo")), Order::Asc)
+            .order_by((bracket, lo), Order::Asc)
             .to_owned()
             .with(price_brackets())
     };
@@ -165,7 +168,7 @@ pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
                 Expr::col((cake::Entity, cake::Column::Id)).count(),
                 Order::Desc,
             )
-            .order_by((Alias::new("bracket"), Alias::new("lo")), Order::Asc)
+            .order_by((bracket, lo), Order::Asc)
             .to_owned()
             .with(price_brackets()),
     )
@@ -197,25 +200,24 @@ pub async fn recursive_cte_anchor_needs_a_cast() -> Result<(), Error> {
     create_tables(&ctx.db).await?;
     let db = ctx.db.get().await?;
 
-    let bracket = Alias::new("bracket");
-    let lo = || Expr::col((Alias::new("bracket"), Alias::new("lo")));
+    let bracket = alias("bracket");
+    let lo_col = alias("lo");
+    let lo = || Expr::col((bracket, lo_col));
 
-    let mut anchor = Query::select()
-        .expr_as(Expr::val(0i32), Alias::new("lo"))
-        .to_owned();
+    let mut anchor = Query::select().expr_as(Expr::val(0i32), lo_col).to_owned();
     let step = Query::select()
-        .expr_as(lo().add(10i32), Alias::new("lo"))
-        .from(bracket.clone())
+        .expr_as(lo().add(10i32), lo_col)
+        .from(bracket)
         .and_where(lo().lt(30i32))
         .to_owned();
 
     let uncast = Query::select()
-        .expr_as(lo(), Alias::new("lo"))
-        .from(bracket.clone())
+        .expr_as(lo(), lo_col)
+        .from(bracket)
         .to_owned()
         .with(RecursiveWithClause::new(
             CommonTableExpression::new(bracket, anchor.union(UnionType::All, step).to_owned())
-                .columns([Alias::new("lo")])
+                .columns([lo_col])
                 .to_owned(),
         ));
 
@@ -244,37 +246,33 @@ pub async fn cte_joins_into_entity_find() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     let (_alpha, beta) = seed(&db).await?;
 
-    let best = Alias::new("best");
+    let best = alias("best");
+    let bakery_id = alias("bakery_id");
+    let top = alias("top");
     let cte = CommonTableExpression::new(
-        best.clone(),
+        best,
         Query::select()
             .column(cake::Column::BakeryId)
-            .expr_as(
-                Expr::col((cake::Entity, cake::Column::Price)).max(),
-                Alias::new("top"),
-            )
+            .expr_as(Expr::col((cake::Entity, cake::Column::Price)).max(), top)
             .from(cake::Entity)
             .group_by_col(cake::Column::BakeryId)
             .to_owned(),
     )
-    .columns([Alias::new("bakery_id"), Alias::new("top")])
+    .columns([bakery_id, top])
     .to_owned();
 
     // A bare projected `$n` is untyped for the same reason a recursive anchor's
     // is, so the marker column is a constant rather than a bound value.
     let dearest = Query::select()
         .expr(SimpleExpr::Constant(1i32.into()))
-        .from(best.clone())
-        .and_where(
-            Expr::col((best.clone(), Alias::new("bakery_id")))
-                .equals((bakery::Entity, bakery::Column::Id)),
-        )
-        .and_where(Expr::col((best.clone(), Alias::new("top"))).gt(rust_dec(30)))
+        .from(best)
+        .and_where(Expr::col((best, bakery_id)).equals((bakery::Entity, bakery::Column::Id)))
+        .and_where(Expr::col((best, top)).gt(rust_dec(30)))
         .to_owned();
 
     let bakeries = Bakery::find()
         .with_cte(WithClause::new(cte))
-        .join_lateral_on_true(JoinType::InnerJoin, dearest, Alias::new("m"))
+        .join_lateral_on_true(JoinType::InnerJoin, dearest, alias("m"))
         .filter(bakery::Column::Name.like("B%"))
         .order_by_asc(bakery::Column::Id)
         .all(&db)
@@ -294,7 +292,7 @@ pub async fn cte_joins_into_entity_find() -> Result<(), Error> {
 /// `bakery CROSS JOIN LATERAL (SELECT … FROM cake WHERE cake.bakery_id =
 /// bakery.id ORDER BY price DESC LIMIT 2) top ON TRUE`.
 fn top_two_per_bakery() -> SelectStatement {
-    let top = Alias::new("top");
+    let top = alias("top");
     let per_bakery = Query::select()
         .column(cake::Column::Name)
         .from(cake::Entity)
@@ -309,8 +307,8 @@ fn top_two_per_bakery() -> SelectStatement {
     Bakery::find()
         .select_only()
         .column_as(bakery::Column::Name, "bakery")
-        .expr_as(Expr::col((top.clone(), cake::Column::Name)), "cake")
-        .join_lateral_on_true(JoinType::InnerJoin, per_bakery, top.clone())
+        .expr_as(Expr::col((top, cake::Column::Name)), "cake")
+        .join_lateral_on_true(JoinType::InnerJoin, per_bakery, top)
         .order_by_asc(bakery::Column::Id)
         .order_by(
             SimpleExpr::from(Expr::col((top, cake::Column::Name))),
@@ -418,17 +416,14 @@ pub async fn window_clause_ranks_rows_per_bakery() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     seed(&db).await?;
 
+    let w = alias("w");
     let ranked = Cake::find()
         .select_only()
         .column(cake::Column::BakeryId)
         .column(cake::Column::Name)
-        .window_expr_as(
-            Func::cust(Alias::new("row_number")),
-            Alias::new("w"),
-            Alias::new("rank"),
-        )
+        .window_expr_as(Func::cust(alias("row_number")), w, alias("rank"))
         .window(
-            Alias::new("w"),
+            w,
             WindowStatement::partition_by(cake::Column::BakeryId)
                 .order_by(cake::Column::Price, Order::Desc)
                 .to_owned(),

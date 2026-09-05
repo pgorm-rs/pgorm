@@ -934,53 +934,54 @@ mod tests {
     fn build_with_query() {
         use pgorm_query::*;
 
+        let id = alias("id");
+        let depth = alias("depth");
+        let next = alias("next");
+        let value = alias("value");
+        let table = alias("table");
+        let traversal = alias("cte_traversal");
+
         let base_query = SelectStatement::new()
-            .column(Alias::new("id"))
+            .column(id)
             .expr(1i32)
-            .column(Alias::new("next"))
-            .column(Alias::new("value"))
-            .from(Alias::new("table"))
+            .column(next)
+            .column(value)
+            .from(table)
             .to_owned();
 
         let cte_referencing = SelectStatement::new()
-            .column(Alias::new("id"))
-            .expr(Expr::col(Alias::new("depth")).add(1i32))
-            .column(Alias::new("next"))
-            .column(Alias::new("value"))
-            .from(Alias::new("table"))
+            .column(id)
+            .expr(Expr::col(depth).add(1i32))
+            .column(next)
+            .column(value)
+            .from(table)
             .join(
                 JoinType::InnerJoin,
-                Alias::new("cte_traversal"),
-                Expr::col((Alias::new("cte_traversal"), Alias::new("next")))
-                    .equals((Alias::new("table"), Alias::new("id"))),
+                traversal,
+                Expr::col((traversal, next)).equals((table, id)),
             )
             .to_owned();
 
         let common_table_expression = CommonTableExpression::new(
-            Alias::new("cte_traversal"),
+            traversal,
             base_query
                 .clone()
                 .union(UnionType::All, cte_referencing)
                 .to_owned(),
         )
-        .columns([
-            Alias::new("id"),
-            Alias::new("depth"),
-            Alias::new("next"),
-            Alias::new("value"),
-        ])
+        .columns([id, depth, next, value])
         .to_owned();
 
         let select = SelectStatement::new()
             .column(ColumnRef::Asterisk)
-            .from(Alias::new("cte_traversal"))
+            .from(traversal)
             .to_owned();
 
         let with_clause = RecursiveWithClause::new(common_table_expression)
             .cycle(Cycle::new(
-                SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_iden())),
-                Alias::new("looped"),
-                Alias::new("traversal_path"),
+                SimpleExpr::Column(ColumnRef::Column(id.into_iden())),
+                alias("looped"),
+                alias("traversal_path"),
             ))
             .to_owned();
 

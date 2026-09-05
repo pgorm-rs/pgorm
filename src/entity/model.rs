@@ -31,12 +31,12 @@ pub trait ModelTrait: Clone + Send + Debug {
     }
 
     /// Find linked Models
-    // [spec:pgorm:req:entity.relation.linked+1]
+    // [spec:pgorm:req:entity.relation.linked+2]
     fn find_linked<L>(&self, l: L) -> Select<L::ToEntity>
     where
         L: Linked<FromEntity = Self::Entity>,
     {
-        let tbl_alias = &format!("r{}", l.link().len() - 1);
+        let tbl_alias = l.last_hop_alias();
         l.find_linked().belongs_to_tbl_alias(self, tbl_alias)
     }
 

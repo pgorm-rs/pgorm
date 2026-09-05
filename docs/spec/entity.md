@@ -394,7 +394,7 @@ explicit limitations.
 > conversion from `NoColumns`, so a relation missing its columns is a compile
 > error rather than a panic.
 
-> [spec:pgorm:req:entity.relation.linked+1]
+> [spec:pgorm:req:entity.relation.linked+2]
 > `Linked` (`src/entity/link.rs`) expresses a multi-hop join: `link()` returns the
 > ordered `Vec<RelationDef>` chain from `FromEntity` to `ToEntity`. `find_linked()`
 > MUST build the join by iterating the chain in reverse, aliasing each hop's source
@@ -403,6 +403,22 @@ explicit limitations.
 > augmented by that relation's `on_condition` closure when present.
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
+>
+> Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
+> `format!` repeated at each site that needs one. The last rung is derived by the
+> provided method `Linked::last_hop_alias`, which every builder walking a chain
+> MUST use and which is public precisely so that callers do too: the name is
+> otherwise an internal that a caller can only reproduce by hardcoding `r4`, and
+> a chain that later gains a hop rebinds that string to a different table without
+> any diagnostic. The method is named for the mechanism rather than for one of
+> its readings because the two ladders run in opposite directions: walking
+> forwards from `FromEntity` (`find_also_linked` / `find_with_linked`) the last
+> rung is the joined target, and walking backwards from `ToEntity`
+> (`find_linked`) it is the source table — which is exactly why it is what
+> scopes `ModelTrait::find_linked`. A chain whose `link()` is empty yields
+> `hop(0)`; the derivation saturates rather than underflowing, and the resulting
+> query names a table the (join-less) statement does not have, which the server
+> reports.
 >
 > A chain a `Related` implementation already describes MUST NOT have to be
 > restated as a hand-written `Linked`: `RelatedLink<E, R>` is that chain, its
@@ -437,7 +453,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+1]
+> [spec:pgorm:def:entity.prelude+2]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -471,7 +487,14 @@ explicit limitations.
 > It also carries the relation vocabulary an entity definition and its call
 > sites write: `Related`, `Linked`, `RelationDef`, `RelationTrait`, and the
 > `RelatedLink` witness that spares a `Related` chain from being restated as a
-> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+1]`).
+> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+2]`).
+>
+> The alias vocabulary `alias` and `AliasName` are members
+> (`[spec:pgorm:sem:query.build.alias]`) on the same grounds as `Expr`: a name
+> the query introduces is written where the query is written, and a token is
+> only cheaper than `Alias::new` when it is already in scope. `LinkedAlias` is
+> NOT a member — it is reached as the return of a `Linked` method, so a caller
+> never has to name the type.
 >
 > `IdenStr` is a member, and it is the reason the base identifier contract is
 > NOT named `IdenStatic` (`[spec:pgorm:def:entity.traits+1]`):

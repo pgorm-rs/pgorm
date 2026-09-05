@@ -3,7 +3,8 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::pgorm_query::{Alias, Expr};
+use pgorm::alias;
+use pgorm::pgorm_query::Expr;
 use pgorm::{DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*, set};
 
 // [spec:pgorm:req:query.loader+1/test]    `load_one` over a `Vec<M>`, taking a
@@ -357,7 +358,7 @@ impl Related<ledger::Entity> for customer::Entity {
         let mut def: RelationDef = customer::Entity::belongs_to(ledger::Entity)
             .columns(customer::Column::Id, ledger::Column::OwnerId)
             .into();
-        def.to_tbl = def.to_tbl.alias(Alias::new("l"));
+        def.to_tbl = def.to_tbl.alias(alias("l"));
         def
     }
 }
@@ -369,7 +370,7 @@ impl Related<ledger::Entity> for baker::Entity {
         let mut def: RelationDef = baker::Entity::belongs_to(ledger::Entity)
             .columns(baker::Column::Id, ledger::Column::OwnerId)
             .into();
-        def.columns = ColumnPairs::new(Alias::new("no_such_column"), ledger::Column::OwnerId);
+        def.columns = ColumnPairs::new(alias("no_such_column"), ledger::Column::OwnerId);
         def
     }
 }

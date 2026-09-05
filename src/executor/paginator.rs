@@ -5,7 +5,7 @@ use crate::{
 use async_stream::stream;
 use futures::Stream;
 use pg_query::{NodeEnum, protobuf::RawStmt};
-use pgorm_query::{Alias, Expr, SelectStatement, Value};
+use pgorm_query::{Expr, SelectStatement, Value, alias};
 use std::{
     fmt::{self, Write as _},
     marker::PhantomData,
@@ -100,7 +100,7 @@ where
         counted.reset_limit().reset_offset().clear_order_by();
         let stmt = SelectStatement::new()
             .expr(Expr::cust("COUNT(*) AS num_items"))
-            .from_subquery(counted, Alias::new("sub_query"))
+            .from_subquery(counted, alias("sub_query"))
             .to_owned();
         let (stmt, values) = stmt.build();
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();

@@ -4,7 +4,7 @@ pub mod common;
 
 pub use chrono::offset::Utc;
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{DerivePartialModel, Error, FromQueryResult, entity::*, query::*, set};
+use pgorm::{DerivePartialModel, Error, FromQueryResult, alias, entity::*, query::*, set};
 use pgorm_query::{Expr, Func, SimpleExpr};
 use pretty_assertions::assert_eq;
 pub use rust_decimal::prelude::*;
@@ -720,7 +720,7 @@ pub async fn related() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked+1/test]    a five-hop `Linked` chain
+// [spec:pgorm:req:entity.relation.linked+2/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
 // [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::find_linked` scopes
@@ -729,7 +729,7 @@ pub async fn related() -> Result<(), Error> {
 pub async fn linked() -> Result<(), Error> {
     use common::bakery_chain::Order;
     use pgorm::{SelectA, SelectB};
-    use pgorm_query::{Alias, Expr};
+    use pgorm_query::Expr;
 
     let ctx = TestContext::new("test_linked").await;
     create_tables(&ctx.db).await?;
@@ -916,20 +916,21 @@ pub async fn linked() -> Result<(), Error> {
     }
 
     // filtered find
+    let customer_tbl = baker::BakedForCustomer.last_hop_alias();
     let baked_for_customers: Vec<(BakerLite, Option<CustomerLite>)> = Baker::find()
         .find_also_linked(baker::BakedForCustomer)
         .select_only()
         .column_as(baker::Column::Name, (SelectA, baker::Column::Name))
         .column_as(
-            Expr::col((Alias::new("r4"), customer::Column::Name)),
+            Expr::col((customer_tbl, customer::Column::Name)),
             (SelectB, customer::Column::Name),
         )
         .group_by(baker::Column::Id)
-        .group_by(Expr::col((Alias::new("r4"), customer::Column::Id)))
+        .group_by(Expr::col((customer_tbl, customer::Column::Id)))
         .group_by(baker::Column::Name)
-        .group_by(Expr::col((Alias::new("r4"), customer::Column::Name)))
+        .group_by(Expr::col((customer_tbl, customer::Column::Name)))
         .order_by_asc(baker::Column::Id)
-        .order_by_asc(Expr::col((Alias::new("r4"), customer::Column::Id)))
+        .order_by_asc(Expr::col((customer_tbl, customer::Column::Id)))
         .into_model()
         .all(&db)
         .await?;
@@ -994,7 +995,7 @@ pub async fn linked() -> Result<(), Error> {
     let select_baker_with_customer = Baker::find()
         .find_with_linked(baker::BakedForCustomer)
         .order_by_asc(baker::Column::Id)
-        .order_by_asc(Expr::col((Alias::new("r4"), customer::Column::Id)));
+        .order_by_asc(Expr::col((customer_tbl, customer::Column::Id)));
 
     assert_eq!(
         select_baker_with_customer.build().0,
@@ -1482,7 +1483,7 @@ fn relation_trait_and_ownership_direction() {
 fn relation_def_record_and_combinators() {
     use pgorm::{Identity, IntoIdentity, RelationType};
     use pgorm_query::{
-        Alias, ConditionType, FromItem, IntoCondition, NamedTable, QueryBuilder, TableName,
+        ConditionType, FromItem, IntoCondition, NamedTable, QueryBuilder, TableName,
     };
 
     // Start from a definition carrying every optional attribute.
@@ -1527,7 +1528,7 @@ fn relation_def_record_and_combinators() {
 
     // `from_alias` re-points `from_tbl` at an alias, which is what makes a
     // self-join disambiguation possible.
-    let aliased = baker::Relation::Bakery.def().from_alias(Alias::new("b2"));
+    let aliased = baker::Relation::Bakery.def().from_alias(alias("b2"));
     assert!(matches!(
         &aliased.from_tbl,
         FromItem::Table(NamedTable { name: TableName::Table(table), alias: Some(alias) })
@@ -1735,7 +1736,7 @@ fn column_pairs_keep_the_two_sides_equal() {
 
     // Hand-built, extended one pair at a time, up to the arity where `Identity`
     // stops having a dedicated variant.
-    let mut columns = ColumnPairs::new(Alias::new("a1"), Alias::new("b1"));
+    let mut columns = ColumnPairs::new(alias("a1"), alias("b1"));
     for n in 2..=5 {
         balanced(&columns);
         columns = columns.and(Alias::new(format!("a{n}")), Alias::new(format!("b{n}")));
@@ -1763,7 +1764,7 @@ fn column_pairs_keep_the_two_sides_equal() {
 #[test]
 fn relation_def_converts_to_foreign_key_forms() {
     use pgorm_query::{
-        Alias, ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder, Table,
+        ConditionType, ForeignKeyCreateStatement, FromItem, IntoIden, QueryBuilder, Table,
         TableForeignKey, TableName,
     };
 
@@ -1840,17 +1841,18 @@ fn relation_def_converts_to_foreign_key_forms() {
 
     // Schema information is reduced away: a schema-qualified `FromItem` becomes
     // a bare table on both sides, and the derived name uses the bare name too.
+    let warehouse = alias("warehouse");
     let qualified = RelationDef {
         rel_type: RelationType::HasOne,
         from_tbl: FromItem::from(TableName::SchemaTable(
-            Alias::new("warehouse").into_iden(),
-            Alias::new("child").into_iden(),
+            warehouse.into_iden(),
+            alias("child").into_iden(),
         )),
         to_tbl: FromItem::from(TableName::SchemaTable(
-            Alias::new("warehouse").into_iden(),
-            Alias::new("parent").into_iden(),
+            warehouse.into_iden(),
+            alias("parent").into_iden(),
         )),
-        columns: ColumnPairs::new(Alias::new("parent_id"), Alias::new("id")),
+        columns: ColumnPairs::new(alias("parent_id"), alias("id")),
         is_owner: false,
         on_delete: None,
         on_update: None,
@@ -1895,7 +1897,7 @@ impl Linked for FilteredBakerCakes {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+1/test]    `find_linked` walks the chain
+// [spec:pgorm:req:entity.relation.linked+2/test]    `find_linked` walks the chain
 // in reverse, aliasing each hop's source table `r0`, `r1`, ... and inner-joining
 // it to the previous alias while the innermost hop joins the unaliased target
 // table; each hop's `on_condition` closure is added to that hop's join
@@ -1953,7 +1955,7 @@ fn linked_chain_aliasing_and_conditions() {
     );
 }
 
-// [spec:pgorm:req:entity.relation.linked+1/test]    `RelatedLink` is the chain
+// [spec:pgorm:req:entity.relation.linked+2/test]    `RelatedLink` is the chain
 // the `Related` impl already spells — `[to]` for a direct relation and
 // `[via, to]` for a junction one — so it stands in for a hand-written `Linked`
 // wherever one restated a `Related` impl, and its aliasing is what a

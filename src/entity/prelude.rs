@@ -14,18 +14,24 @@
 //! module globs it into every file that uses it: `pgorm_query::IdenStatic` is a
 //! different trait with the same method, and the two names had to differ for
 //! both modules to be glob-imported at once.
+//!
+//! `alias` and its `AliasName` are here for the same reason `Expr` is: a name
+//! the query introduces is written at the point the query is written, and
+//! writing it as a token instead of a string is only cheaper than
+//! `Alias::new` if the token is already in scope.
 
-// [spec:pgorm:def:entity.prelude+1]
+// [spec:pgorm:def:entity.prelude+2]
+// [spec:pgorm:sem:query.build.alias]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
     ActiveValue::{NotSet, Set, Unchanged},
-    ColumnDef, ColumnTrait, ColumnType, ColumnTypeTrait, Condition, ConnectionTrait, CursorTrait,
-    DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw, DecodeSelect, Delete,
-    EntityName, EntityTrait, EnumIter, FromQueryResult, Iden, IdenStr, Insert, IntoActiveModel,
-    IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait, PaginatorTrait,
-    PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult,
-    QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
-    TransactionTrait, TryInsert, TryIntoModel, Update, Value,
+    AliasName, ColumnDef, ColumnTrait, ColumnType, ColumnTypeTrait, Condition, ConnectionTrait,
+    CursorTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw, DecodeSelect,
+    Delete, EntityName, EntityTrait, EnumIter, FromQueryResult, Iden, IdenStr, Insert,
+    IntoActiveModel, IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait,
+    PaginatorTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder,
+    QueryResult, QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
+    TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
     error::*,
     pgorm_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
     set,
