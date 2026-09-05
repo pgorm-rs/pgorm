@@ -17,6 +17,9 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new(db_name: &str) -> Self {
+        dotenvy::from_filename(".env.local").ok();
+        dotenvy::from_filename(".env").ok();
+
         let base_url =
             std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");
 
@@ -41,6 +44,12 @@ impl TestContext {
             db_name: db_name.to_owned(),
             db,
         }
+    }
+
+    /// A second, independent pool against the same database — what a second
+    /// deploy replica racing this one would hold.
+    pub fn second_pool(&self) -> DatabasePool {
+        pgorm_migration::pgorm::connect(config(&self.base_url, &self.db_name))
     }
 
     pub async fn delete(&self) {
@@ -70,6 +79,19 @@ pub async fn has_index(db: &DatabasePool, table: &str, index: &str) -> Result<bo
     let row = conn
         .query_one(
             "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = $1 AND indexname = $2)",
+            &params,
+        )
+        .await?;
+    Ok(row.get(0))
+}
+
+pub async fn has_column(db: &DatabasePool, table: &str, column: &str) -> Result<bool, Error> {
+    let conn = db.get().await?;
+    let params: [&(dyn ToSql + Sync); 2] = [&table, &column];
+    let row = conn
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
+             WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2)",
             &params,
         )
         .await?;

@@ -3548,6 +3548,13 @@ children (
                         kind @note
                         text "Audit: pgorm-migration publicly exports src/seaql_migrations.rs as module seaql_migrations, and migrator.rs plus tests/specs use that Rust name. Rename the file/module and all Rust references to pgorm-native ledger vocabulary. This node is intentionally limited to the Rust API/source identity; the persisted table name is owned by migration-ledger-table-name so database upgrade safety cannot be hidden inside a mechanical module rename."
                     }
+
+                    {
+                        at 2026-09-05T20:18:13.949101Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3561,6 +3568,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: seaql_migrations is also the default physical migration-ledger table. A naive rename makes an upgraded database look unmigrated and can rerun every migration. Change the default to pgorm-native vocabulary with an explicit legacy-table detection and migration strategy that preserves every ledger row, plus fresh-install and upgrade-path tests. Update migration docs/spec rules separately from the Rust module rename."
+                    }
+
+                    {
+                        at 2026-09-05T20:18:16.712792Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

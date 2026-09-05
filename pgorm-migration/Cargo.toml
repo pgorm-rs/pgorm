@@ -17,6 +17,7 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 
 [dev-dependencies]
+dotenvy = "0.15.7"
 tokio.workspace = true
 
 [features]

@@ -406,6 +406,12 @@ assertions (
     {id infra.tx.metric-tx, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:08:31.330198Z}
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
+    {id migration-checksums, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:20.974605Z}
+    {id migration-ledger-module-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:13.949101Z}
+    {id migration-ledger-table-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:16.712792Z}
+    {id migration-name-uniqueness, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:17.42509Z}
+    {id migration-run-lock, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:24.510154Z}
+    {id migration-test-database-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:27.556282Z}
     {id nopanic.codegen-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:09:12.032584Z}
     {id nopanic.connect-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:44:54.028454Z}
     {id nopanic.delete-one, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:41:53.878346Z}
