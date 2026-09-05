@@ -93,8 +93,7 @@ async fn paginator_fetch_page() -> Result<(), Error> {
 
     // `PaginatorTrait` is implemented for `Selector<S>` too.
     let names_only: Vec<String> = Bakery::find()
-        .select_only()
-        .column(bakery::Column::Name)
+        .select(bakery::Column::Name)
         .order_by_asc(bakery::Column::Id)
         .into_tuple::<String>()
         .paginate(&db, page_size(2))

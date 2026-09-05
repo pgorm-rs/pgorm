@@ -60,8 +60,7 @@ pub async fn left_join() {
 
     let select = baker::Entity::find()
         .left_join(bakery::Entity)
-        .select_only()
-        .column(baker::Column::Name)
+        .select(baker::Column::Name)
         .column_as(bakery::Column::Name, "bakery_name")
         .filter(baker::Column::Name.contains("Baker 1"));
 
@@ -97,8 +96,7 @@ pub async fn left_join() {
 
     let select = baker::Entity::find()
         .left_join(bakery::Entity)
-        .select_only()
-        .column(baker::Column::Name)
+        .select(baker::Column::Name)
         .column_as(bakery::Column::Name, "bakery_name")
         .filter(baker::Column::Name.contains("Baker 2"));
 
@@ -162,8 +160,7 @@ pub async fn right_join() {
 
     let select = order::Entity::find()
         .right_join(customer::Entity)
-        .select_only()
-        .column(customer::Column::Name)
+        .select(customer::Column::Name)
         .column_as(order::Column::Total, "order_total")
         .filter(customer::Column::Name.contains("Kate"));
 
@@ -172,8 +169,7 @@ pub async fn right_join() {
 
     let select = order::Entity::find()
         .right_join(customer::Entity)
-        .select_only()
-        .column(customer::Column::Name)
+        .select(customer::Column::Name)
         .column_as(order::Column::Total, "order_total")
         .filter(customer::Column::Name.contains("Jim"));
 
@@ -248,8 +244,7 @@ pub async fn inner_join() {
 
     let select = order::Entity::find()
         .inner_join(customer::Entity)
-        .select_only()
-        .column(customer::Column::Name)
+        .select(customer::Column::Name)
         .column_as(order::Column::Total, "order_total");
 
     let results = select.into_model::<SelectResult>().all(&db).await.unwrap();
@@ -331,8 +326,7 @@ pub async fn group_by() {
 
     let select = customer::Entity::find()
         .left_join(order::Entity)
-        .select_only()
-        .column(customer::Column::Name)
+        .select(customer::Column::Name)
         .column_as(order::Column::Total.count(), "number_orders")
         .column_as(order::Column::Total.sum(), "total_spent")
         .column_as(order::Column::Total.min(), "min_spent")
@@ -448,8 +442,7 @@ pub async fn having() {
 
     let results = customer::Entity::find()
         .inner_join(order::Entity)
-        .select_only()
-        .column(customer::Column::Name)
+        .select(customer::Column::Name)
         .column_as(order::Column::Total, "order_total")
         .group_by(customer::Column::Name)
         .group_by(order::Column::Total)

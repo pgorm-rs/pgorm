@@ -451,7 +451,7 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+6/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions
 #[test]
@@ -500,7 +500,99 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+6/test]    `select` clears the list and
+// projects in one call, rendering exactly what `select_only` plus `columns`
+// does, and casting an enum column the same way
+#[test]
+fn select_clears_and_projects_in_one_call() {
+    assert_eq!(
+        cake::Entity::find()
+            .select([cake::Column::Id, cake::Column::Name])
+            .as_query()
+            .to_string(),
+        cake::Entity::find()
+            .select_only()
+            .columns([cake::Column::Id, cake::Column::Name])
+            .as_query()
+            .to_string()
+    );
+
+    assert_eq!(
+        cake::Entity::find()
+            .select(cake::Column::Name)
+            .column_as(cake::Column::Id.count(), "count")
+            .as_query()
+            .to_string(),
+        r#"SELECT "cake"."name", COUNT("cake"."id") AS "count" FROM "cake""#
+    );
+
+    assert_eq!(
+        lunch_set::Entity::find()
+            .select(vec![lunch_set::Column::Name, lunch_set::Column::Tea])
+            .as_query()
+            .to_string(),
+        r#"SELECT "lunch_set"."name", CAST("lunch_set"."tea" AS text) FROM "lunch_set""#
+    );
+
+    // A second call replaces the projection rather than appending to it.
+    assert_eq!(
+        cake::Entity::find()
+            .select(cake::Column::Id)
+            .select(cake::Column::Name)
+            .as_query()
+            .to_string(),
+        r#"SELECT "cake"."name" FROM "cake""#
+    );
+}
+
+// [spec:pgorm:sem:query.build.modifiers+6/test]    a tuple is the mixed list: two
+// entities' columns, a raw expression and an alias token have no common array
+// element type
+#[test]
+fn select_tuple_mixes_columns_and_expressions() {
+    let count = alias("count");
+
+    assert_eq!(
+        cake::Entity::find()
+            .left_join_rel(cake::Relation::Fruit)
+            .select((
+                cake::Column::Name,
+                fruit::Column::Name,
+                Expr::col((cake::Entity, cake::Column::Id)),
+            ))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "cake"."name", "fruit"."name", "cake"."id" FROM "cake""#,
+            r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+        ]
+        .join(" ")
+    );
+
+    assert_eq!(
+        cake::Entity::find()
+            .select_only()
+            .select((cake::Column::Id, count))
+            .as_query()
+            .to_string(),
+        r#"SELECT "cake"."id", "count" FROM "cake""#
+    );
+
+    assert_eq!(
+        cake::Entity::find()
+            .find_also_related(fruit::Entity)
+            .select((cake::Column::Name, fruit::Column::Name))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "cake"."name", "fruit"."name" FROM "cake""#,
+            r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:sem:query.build.modifiers+6/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -512,7 +604,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+6/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -548,7 +640,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+6/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -593,7 +685,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+6/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {

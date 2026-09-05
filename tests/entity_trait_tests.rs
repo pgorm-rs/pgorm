@@ -737,10 +737,7 @@ fn column_trait_expression_surface() {
     );
 
     // Subqueries.
-    let sub = item::Entity::find()
-        .select_only()
-        .column(item::Column::Id)
-        .into_query();
+    let sub = item::Entity::find().select(item::Column::Id).into_query();
     assert_eq!(
         sql(item::Column::Id.in_subquery(sub.clone())),
         format!(r#"{SELECT_ITEM}"item"."id" IN (SELECT "item"."id" FROM "item")"#)

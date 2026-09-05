@@ -1435,12 +1435,27 @@ children (
                 id polish.epoch-return
                 title "Stale/Review epoch bookkeeping: how does a drifted node return to Done?"
                 kind @chore
+                sealed true
                 log (
                     {
                         at 2026-09-04T14:41:02.371749Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Eight pre-campaign nodes sit in derived Stale/Review after this session's rule bumps: sql.ast, sql.ddl (stale since the campaign), plus the 2026-09-04 sync's batch — orm.binding-types, infra.tx.closure, codegen.generate, decide.migration (Stale), infra.tx.tests, decide.cli (Review). All their rules are 100% covered/tested at current versions with zero stale annotations — the drift IS the re-verification landing after their Done stamps. Attempted and failed: a re-acknowledging chore commit addressing sql.ast+sql.ddl (12f8d400) did not flip them, so the seen-version stamp must come from somewhere else (per-rule nspec-id trailers? only commits whose staged delta touches the rules' files?). Deliverable: understand the actual epoch-return mechanism (read nplan's docs/spec on reconciliation or probe the daemon), then clear all eight properly — no status hand-editing, statuses are derived."
+                    }
+
+                    {
+                        at 2026-09-05T13:38:55.58017Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Mechanism found (investigation agent, evidence from nplan's own source + tests at /Users/brendan/git/necessary/nplan): a node's seen_version lives in plan/.state.styx impl_evidence[].rule_versions_seen, compared against the top-level rule_versions block; nplan_sync rebuilds a node's evidence ONLY when the node is named by a commit that also bears >=1 rule trailer (sync.rs:491 bears_rule_claims short-circuit; trailers derive solely from staged annotation diffs, scaffold/trailers.rs) — which is exactly why the id-only re-acknowledge commit 12f8d400 did nothing (pinned by nplan's own id_only_commit_preserves_carried_evidence test). The Review pair (decide.cli, infra.tx.tests) is pure dep propagation via inv.trans-stale+2 and clears when their Stale deps do. Resolution: piggyback the six drifted ids onto the next annotation-touching commit (ergo.fluent-select's), then nplan_sync. Commit-type caution honored: refactor leaves delivered empty so no delivery gate fires on the mixed node kinds. UPSTREAM (nplan) findings for the operator: (1) spec/impl divergence — lc.stale+3 and lc.no-reopen+2 promise clearing on \"a newly-landed commit with coverage at current version\" with no trailer requirement; the bears_rule_claims gate (justified by ix.git-walk-bound+2, a walk-cost rule) makes a node whose rules were bumped by ANOTHER node's work unable to return to Done self-contained — a missing re-acknowledge primitive. (2) A loophole exists (remove rules from implements, sync, re-add, sync — flips Done with no source diff, manufacturing false evidence); should be closed when the primitive is added."
+                    }
+
+                    {
+                        at 2026-09-05T13:39:00.351535Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -2899,6 +2914,58 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ergo.fluent-select
+                title "select([..]) on the ORM builders: clear + project in one call, one verb across both surfaces"
+                kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-09-05T13:12:26.198433Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit finding 6, missed in the wave partitioning (operator approved \"all of them\"; caught 2026-09-05 when asked whether fluency reached the SQL side). Proposed: select([a, b]) = select_only() + columns([a, b]) in one call on the entity builders (Select/SelectTwo/SelectTwoMany/paginated etc. — census which of the four builders the audit meant and which still exist post-deletions), returning the Projected typestate so the E::Model terminals stay absent (probe_b on spike/fluent-audit proved the typestate survives and SQL is identical — git show spike/fluent-audit:spikes/fluent-audit/src/probe_b_select_combinator.rs). Value is vocabulary alignment with the pipeline's .select(...), not line count. Honest limit from the audit: cross-entity aliased projections cannot batch (heterogeneous column enums) and columns_as does not exist — document, don't force. NOTE the deletions node already deleted SelectColumns and moved select_cols onto QuerySelect — read current src/query/helper.rs/select.rs first; the combinator may now belong on QuerySelect directly beside columns(). Bump query.build.select-defaults / query.build.modifiers as touched; re-pin exact-id."
+                    }
+
+                    {
+                        at 2026-09-05T13:39:15.839239Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id ergo.pipeline-source
+                title "Pipelines compose with each other: from(pipeline), join(pipeline), and the set operations"
+                kind @feat
+                deps (ergo.fluent-pipeline)
+                log (
+                    {
+                        at 2026-09-05T13:35:04.998255Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator-approved (2026-09-05) after the composability assessment: pipelines compose within one chain but not with each other — from() takes an entity, so pipeline-as-source, pipeline-as-join-operand, and union/intersect/except of two pipelines are inexpressible. PRQL's own mechanism is let bindings (lowered by prqlc to CTEs): a pipeline bound to a name becomes a relation another pipeline can from/join/append. Build: from(other: Pipeline), join(side, other: Pipeline, on), and the set family (append = UNION ALL in PRQL; distinct via group; or the union/intersect/except forms prqlc's dialect emits — probe which spellings prqlc supports for Postgres and hold every render to the pg_query oracle). BRAND QUESTION is the crux: a source pipeline with bound params must carry its Values into the consumer with placeholder renumbering or a shared binder — probe prqlc first (does a let-bound relation's $N survive?), then design; the invariant stands: cross-pipeline smuggling of an unattached Expr stays a compile error while legitimate whole-pipeline embedding merges the value lists soundly (likely: consuming by value re-brands — the consumed pipeline's params append to the consumer's binder and its SQL-side $N renumber; if prqlc cannot renumber, offsetting at PL construction is ours). Also: alias(name) collision between the two pipelines' introduced names — decide and document. Terminals/decode unchanged. Estimate M. Spec: extend pipeline.surface/params or a new pipeline.compose rule."
+                    }
+                )
+            }
+
+            {
+                id ergo.pipeline-selfjoin
+                title "Self-joins in the pipeline: table aliases so an entity can meet itself"
+                kind @feat
+                deps (ergo.pipeline-source)
+                log (
+                    {
+                        at 2026-09-05T13:35:07.337188Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator-approved (2026-09-05): the v1 omission that blocks top-N-vs-self patterns — join table aliases, so an entity can meet itself (employee/manager, message/parent). PRQL text does this by let-binding or by aliasing in join (join side:left e2=employee ...). Blocked on ergo.pipeline-source because (a) shared files and (b) pipeline-as-join-operand may subsume it: joining from(employee::Entity) as a second pipeline already forces the aliasing machinery — decide whether a dedicated aliased-table form is still needed once source composition exists, or whether self-join falls out (document either way). Column references on the aliased side must qualify by the alias, not the table — the col(Entity, Column) shape needs an aliased variant or the source-pipeline's introduced names cover it. Oracle + live-DB proof: classic employee-manager join decoding both sides."
                     }
                 )
             }

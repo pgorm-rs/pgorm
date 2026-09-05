@@ -105,10 +105,11 @@ async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Erro
 // [spec:pgorm:def:exec.decode.types+1/test]
 async fn decode_inet_and_macaddr_as_tuple(db: &DatabaseConnection) -> Result<(), Error> {
     let decoded: Vec<(IpNetwork, MacAddress, Option<IpNetwork>)> = net_decode::Entity::find()
-        .select_only()
-        .column(net_decode::Column::Ip)
-        .column(net_decode::Column::Mac)
-        .column(net_decode::Column::Gateway)
+        .select([
+            net_decode::Column::Ip,
+            net_decode::Column::Mac,
+            net_decode::Column::Gateway,
+        ])
         .order_by_asc(net_decode::Column::Id)
         .into_tuple()
         .all(db)

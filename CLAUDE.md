@@ -55,6 +55,7 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - ActiveValue fields are written with the free `set(..)` (`name: set("Apple")`) or `.into()`; both convert into the column type, so no `.to_owned()`. `ActiveValue::Set` is the pattern-matching spelling
 - `ColumnTrait` carries `eq_col`/`ne_col`/`gt_col`/`gte_col`/`lt_col`/`lte_col`/`eq_expr` for column-to-column and column-to-expression predicates; `eq` and friends stay value-only so their `save_as` enum cast is never dropped
 - `ModelTrait::into_active()` converts a model to its entity's ActiveModel with no destination annotation
+- `select([..])` on the SELECT builders clears the default projection and projects the given list in one call — the pipeline's verb, in the ORM. A single item needs no wrapper, a homogeneous list is an array or `Vec`, a mixed list (two entities' columns, an expression, an alias token) is a tuple; a computed iterator stays `select_only()` + `columns(..)`, which are unchanged
 - Failsafe behavior for empty `insert_many` operations
 
 ### Connections

@@ -165,8 +165,7 @@ async fn find_baker_least_sales(db: &DatabaseConnection) -> Option<baker::Model>
         .join(JoinType::RightJoin, rel)
         .join(JoinType::LeftJoin, rel2)
         .join(JoinType::LeftJoin, rel3)
-        .select_only()
-        .column(baker::Column::Id)
+        .select(baker::Column::Id)
         .column_as(lineitem::Column::Quantity.sum(), "cakes_sold_opt")
         .group_by(baker::Column::Id);
 

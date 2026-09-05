@@ -63,7 +63,7 @@ is what `EntityTrait::find()` produces.
 > identifier again. A string literal still passes, through
 > `IntoIden for &str`.
 
-> [spec:pgorm:sem:query.build.modifiers+5]
+> [spec:pgorm:sem:query.build.modifiers+6]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` /
@@ -99,6 +99,37 @@ is what `EntityTrait::find()` produces.
 > to start a projection over. `SelectTwoMany<E, F>` and `Cursor<S, K>` —
 > whose select lists their own machinery owns — cannot clear one at all.
 >
+> `select(items)` is that clear and the projection that follows it in one
+> call, under the name the pipeline projects with
+> (`[spec:pgorm:req:pipeline.surface+1]`), so the verb means the same thing
+> on both surfaces. It is inherent on the same six states, for the reason
+> `select_only` is: the destination is per-builder — `Select<E>`,
+> `SelectCustom<E>` and `SelectProjected<E>` land on `SelectProjected<E>`,
+> the two-model trio on `SelectTwoProjected<E, F>` — and a `QuerySelect`
+> method returning `Projected` would hand `Select<E>`, `SelectTwoMany<E, F>`
+> and `Cursor<S, K>` back their own `E::Model`-typed selves over a projection
+> that is no longer that shape. `SelectTwoMany<E, F>` and `Cursor<S, K>`
+> accordingly do not have it. `select_only`, `column` and `columns` are
+> unchanged and stay: `select` is the one-call spelling of the pair, not a
+> replacement, and appending to a projection — including the aliased
+> `column_as` that chains after `select` — remains the pair's work.
+>
+> The argument is a `SelectList`, whose shapes are the pipeline's: a single
+> item needs no wrapper, a homogeneous list is an array or a `Vec`, and a
+> mixed list is a tuple of up to twelve items, because two entities' column
+> enums have no common array element type. An item is a `SelectItem` — a
+> `ColumnTrait` column, projected through `col.select_as(col.into_expr())` so
+> the enum cast is the one `column` applies; an `Expr` or `SimpleExpr`; a
+> `SelectExpr`, which carries its own alias; or an `AliasName`, a bare
+> reference to a name an earlier clause bound. A list computed at run time is
+> an iterator, which no tuple arity covers, so that case stays `select_only`
+> plus `columns`.
+>
+> One name per projection operation covers the name `select` itself: the
+> loader's `EntityOrSelect` conversion (`query.loader+1`), which spelled
+> itself `select` and would be shadowed on `Select<E>` by the inherent
+> method, is `into_select`.
+>
 > Every projection method returns `QuerySelect::Projected` rather than
 > `Self`, under the fixpoint bound
 > `Projected: QuerySelect<Projected = Self::Projected>`. `Select<E>`,
@@ -130,7 +161,7 @@ is what `EntityTrait::find()` produces.
 > and `to_string` / `build` have no `Result` channel, so rendering is not
 > where the mistake is caught. The typestate keeps the ORM's own builders out
 > of the empty-projection state, but two seams remain — an empty
-> `columns([])` / `exprs([])` iterator, and a `SelectStatement` handed
+> `columns([])` / `exprs([])` / `select([])` list, and a `SelectStatement` handed
 > straight to `Selector::with_columns` / `Selector::into_tuple` /
 > `Selector::from_select` (`exec.crud.selector-entry`) — so the
 > execution-boundary guard stays. Every ORM path that would send a SELECT

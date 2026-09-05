@@ -302,9 +302,7 @@ pub async fn select_only_exclude_option_fields() {
     // model it decodes into, so the mismatch is a decode error, not a silent
     // `Vec<customer::Model>`.
     let err = Customer::find()
-        .select_only()
-        .column(customer::Column::Id)
-        .column(customer::Column::Name)
+        .select([customer::Column::Id, customer::Column::Name])
         .into_model::<customer::Model>()
         .all(&db)
         .await
@@ -313,10 +311,11 @@ pub async fn select_only_exclude_option_fields() {
     assert!(matches!(err, Error::Postgres(_)), "unexpected error: {err}");
 
     let customers = Customer::find()
-        .select_only()
-        .column(customer::Column::Id)
-        .column(customer::Column::Name)
-        .column(customer::Column::Notes)
+        .select([
+            customer::Column::Id,
+            customer::Column::Name,
+            customer::Column::Notes,
+        ])
         .into_model::<customer::Model>()
         .all(&db)
         .await

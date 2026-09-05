@@ -12,8 +12,8 @@ use std::{collections::HashMap, str::FromStr};
 
 /// Entity, or a `Select<Entity>`; to be used as parameters in [`LoaderTrait`]
 pub trait EntityOrSelect<E: EntityTrait>: Send {
-    /// If self is Entity, use Entity::find()
-    fn select(self) -> Select<E>;
+    /// The selector, which a bare entity produces with `E::find()`.
+    fn into_select(self) -> Select<E>;
 }
 
 /// This trait implements the Data Loader API
@@ -58,7 +58,7 @@ impl<E> EntityOrSelect<E> for E
 where
     E: EntityTrait,
 {
-    fn select(self) -> Select<E> {
+    fn into_select(self) -> Select<E> {
         E::find()
     }
 }
@@ -67,7 +67,7 @@ impl<E> EntityOrSelect<E> for Select<E>
 where
     E: EntityTrait,
 {
-    fn select(self) -> Select<E> {
+    fn into_select(self) -> Select<E> {
         self
     }
 }
@@ -153,7 +153,7 @@ where
 
         let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
-        let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
+        let stmt = <Select<R> as QueryFilter>::filter(stmt.into_select(), condition);
 
         let data = stmt.all(db).await?;
 
@@ -202,7 +202,7 @@ where
 
         let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
 
-        let stmt = <Select<R> as QueryFilter>::filter(stmt.select(), condition);
+        let stmt = <Select<R> as QueryFilter>::filter(stmt.into_select(), condition);
 
         let data = stmt.all(db).await?;
 
@@ -272,7 +272,7 @@ where
         let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
 
         let select = stmt
-            .select()
+            .into_select()
             .join_rev(JoinType::InnerJoin, rel_def)
             .join_as_rev(JoinType::InnerJoin, via_rel, SeaRc::clone(&src_alias));
         let select = <Select<R> as QueryFilter>::filter(select, condition);

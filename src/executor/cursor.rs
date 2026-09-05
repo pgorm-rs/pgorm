@@ -40,7 +40,7 @@ impl Window {
 /// It is not a [`SelectorTrait`], so [`Cursor::all`] does not exist until
 /// [`Cursor::into_model`] or [`Cursor::into_partial_model`] says what the rows
 /// are.
-// [spec:pgorm:sem:query.build.modifiers+5]
+// [spec:pgorm:sem:query.build.modifiers+6]
 #[derive(Clone, Copy, Debug)]
 pub struct SelectUndecoded;
 
@@ -526,7 +526,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5]
+// [spec:pgorm:sem:query.build.modifiers+6]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -543,7 +543,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+5]
+// [spec:pgorm:sem:query.build.modifiers+6]
 impl<E, F> SelectTwoProjected<E, F>
 where
     E: EntityTrait,
