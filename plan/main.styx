@@ -3315,13 +3315,20 @@ children (
 
             {
                 id sql-value-json
-                title "Make Value-to-JSON conversion total, null-correct, and precision-preserving"
+                title "Eliminate sea_value_to_json_value while resolving Value-to-JSON semantics"
                 log (
                     {
                         at 2026-09-05T14:53:21.032128Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED as a defect, spec-documented as inherited quirk, ZERO in-tree callers but public API via re-export chain (pgorm::pgorm_query::sea_value_to_json_value). Four rots in value.rs:1329-1395: (1) panics on non-UTF-8 Bytes (:1365 from_utf8 unwrap — pgorm-query does NOT deny unwrap_used, no allow needed); (2) chrono None arms missing → ChronoDate(None) becomes JSON string \"NULL\" not Json::Null, Some keeps SQL quotes (\"'2020-01-01'\"); (3) Decimal → to_f64 lossy (28 digits → ~16); (4) Float/Double NaN/inf → serde_json Null, indistinguishable from SQL NULL. u64 arm is exact — no defect there. Spec sem:sql.value.to-json specifies the panic and \"NULL\"-string verbatim (\"current behaviour, inherited and unchanged\"). Fix: make total and typed — Bytes → hex string, Decimal → string, explicit Chrono None → Null + unquoted ISO Some, explicit NaN policy. Effort M; breaking only for consumers of the current shape (none in-tree). Rewrites sem:sql.value.to-json (+1) + /test facet. Candidate for DELETION instead — zero callers; deleting the function entirely is the fork-consistent alternative (like Inserter/Deleter/expr_as_). Decide delete-vs-fix at implementation."
+                    }
+
+                    {
+                        at 2026-09-05T15:35:34.217192Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Sea-naming scan extends this existing defect's acceptance criteria: the public sea_value_to_json_value symbol must not survive. It has zero in-tree production callers, so deletion is preferred if no supported use remains; otherwise replace it with a pgorm-native name while fixing the already-recorded null, byte, decimal, and non-finite-float semantics. Update docs/spec/sql-value.md and tests with the chosen outcome; do not leave a Sea-named compatibility alias."
                     }
                 )
             }
@@ -3382,13 +3389,20 @@ children (
 
             {
                 id seaography-feature-build
-                title "Make the pgorm-macros seaography feature compile in the workspace feature matrix"
+                title "Delete Seaography support and retire its specification surface"
                 log (
                     {
                         at 2026-09-05T14:57:21.318826Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED — and the feature is unusable by construction; DELETION is the consistent remedy. pgorm-macros declares [features] seaography = []; the gated branch (lib.rs:686, related_entity.rs:86-89) emits impl seaography::RelationBuilder + async_graphql paths, but neither crate is a dependency anywhere, the root pgorm crate does not forward the feature, and real seaography targets sea-orm's EntityTrait so no crate could ever satisfy the emitted code. cargo check -p pgorm-macros --features seaography --tests FAILS (feature unification turns it on for pgorm's dev-dep build → E0433 in tests_cfg/cake_seaography.rs:52) — the workspace feature matrix is broken for any configuration enabling it. In-tree tests explicitly rely on it being OFF. Fix: delete the feature + gated branch; decide whether DeriveRelatedEntity (always-empty expansion), codegen's seaography option (writer.rs:60,414-452), and the cake_seaography fixture go too — full deletion matches the fork's philosophy. Effort S-M. Bumps def:macros.derive (describes the gating) + retire sem:codegen.entity.seaography if the codegen option goes."
+                    }
+
+                    {
+                        at 2026-09-05T15:35:33.992609Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator decision (2026-09-05): delete Seaography entirely; this supersedes the node's original build-fix framing. Remove the pgorm-macros feature and DeriveRelatedEntity implementation/module, root and prelude re-exports, the public codegen seaography option and RelatedEntity helpers, all Seaography-specific tests and fixtures, and the with_seaography golden directory. Retire [spec:pgorm:sem:codegen.entity.seaography] and revise the macros derive rule instead of preserving a dead compatibility shim. The proc-macro and public codegen-field removals are intentional API breakage; historical append-only plan log entries remain."
                     }
                 )
             }
@@ -3402,6 +3416,106 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit REFUTED on the stated symptom — with DATABASE_URL unset the tests panic immediately with a clear message naming the variable (tests/common/setup.rs:20-21); no hang, no cryptic failure; skip-when-unset would diverge from the deliberate workspace convention. Narrower real defect behind it: pgorm-migration's tests are the only DB suites that don't load .env/.env.local via dotenvy (zero hits in the crate; root tests and pgorm-pool both do), so a URL in .env per the documented convention is ignored and the \"not set\" panic fires misleadingly. Fix: add dotenvy dev-dependency + the two from_filename(...).ok() lines in TestContext::new. Effort S, test-only, no spec impact. Reframe node to \"load dotenv in pgorm-migration tests\" before working it."
+                    }
+                )
+            }
+
+            {
+                id sea-rc-name
+                title "Replace the public SeaRc type name"
+                log (
+                    {
+                        at 2026-09-05T15:35:34.414193Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: SeaRc is a public pgorm-query type, underpins the public DynIden alias, is re-exported by entity::prelude, appears across 21 production files, and is named verbatim by the SQL-value and entity specs. Replace it with pgorm-native vocabulary throughout query, ORM, macros, codegen, tests, and specs. This is a breaking public rename: choose the replacement deliberately and account for downstream users; a permanent SeaRc alias would fail the cleanup objective."
+                    }
+                )
+            }
+
+            {
+                id migration-ledger-module-name
+                title "Rename the seaql_migrations Rust module"
+                log (
+                    {
+                        at 2026-09-05T15:35:34.703604Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: pgorm-migration publicly exports src/seaql_migrations.rs as module seaql_migrations, and migrator.rs plus tests/specs use that Rust name. Rename the file/module and all Rust references to pgorm-native ledger vocabulary. This node is intentionally limited to the Rust API/source identity; the persisted table name is owned by migration-ledger-table-name so database upgrade safety cannot be hidden inside a mechanical module rename."
+                    }
+                )
+            }
+
+            {
+                id migration-ledger-table-name
+                title "Rename the seaql_migrations ledger table without losing migration history"
+                deps (migration-ledger-module-name)
+                log (
+                    {
+                        at 2026-09-05T15:35:35.015623Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: seaql_migrations is also the default physical migration-ledger table. A naive rename makes an upgraded database look unmigrated and can rerun every migration. Change the default to pgorm-native vocabulary with an explicit legacy-table detection and migration strategy that preserves every ledger row, plus fresh-install and upgrade-path tests. Update migration docs/spec rules separately from the Rust module rename."
+                    }
+                )
+            }
+
+            {
+                id macro-sea-attr-name
+                title "Rename inherited sea_attr macro locals"
+                log (
+                    {
+                        at 2026-09-05T15:35:35.314152Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: local variable sea_attr remains in the entity, model, and relation derive implementations even though its parsed type is derive_attr::Pgorm. After related_entity.rs is deleted with Seaography, twelve live occurrences remain. Rename these internal locals consistently and verify derive output is unchanged; no public compatibility or spec change is expected."
+                    }
+                )
+            }
+
+            {
+                id sea-orm-active-enums-name
+                title "Rename the sea_orm_active_enums test fixture"
+                deps (seaography-feature-build)
+                log (
+                    {
+                        at 2026-09-05T15:35:35.694516Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: src/tests_cfg/sea_orm_active_enums.rs and module sea_orm_active_enums are test-only inherited names imported by lunch-set fixtures and query/update tests. Rename the path, module, and imports to neutral active-enum fixture vocabulary. It depends on Seaography deletion because both changes edit src/tests_cfg/mod.rs; no product API or spec impact is expected."
+                    }
+                )
+            }
+
+            {
+                id sea-config-residue
+                title "Remove obsolete Sea-named manifest and repository configuration"
+                log (
+                    {
+                        at 2026-09-05T15:35:35.861312Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: remove the unused empty sea-orm feature from pgorm-query/pgorm-query-derive/Cargo.toml, the commented sea-schema dependency from pgorm-migration/Cargo.toml, and the obsolete /sea-orm/ entry from .gitignore. Confirm Cargo.lock still contains no active SeaORM, SeaQuery, SeaQL, or Seaography packages, then run a final manifest and tracked-path naming scan."
+                    }
+                )
+            }
+
+            {
+                id seaquery-doc-branding
+                title "Replace current SeaQuery branding while preserving provenance"
+                deps (
+                    seaography-feature-build
+                    sea-rc-name
+                    sql-value-json
+                    migration-ledger-module-name
+                    migration-ledger-table-name
+                )
+                log (
+                    {
+                        at 2026-09-05T15:35:36.107117Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit: pgorm-query's published crate rustdoc still presents the upstream SeaQuery logo, heading, CI badge, Discord invitation, examples, contributor links, and SeaQL rustdoc logo; query/helper.rs also carries a stale mixed sea-query/pgorm docs.rs URL. Rewrite current product documentation around pgorm and its actual repository after the public naming deletions settle. Preserve concise fork provenance and required legal attribution; exclude LICENSE-MIT, append-only plan history, PostgreSQL SEARCH/Sealed terminology, and unrelated SeaSide/SeaBreeze/satellite fixture data from global replacement."
                     }
                 )
             }
