@@ -7,6 +7,7 @@ use pgorm_query::{
     TableCreateStatement,
     extension::{Type, TypeCreateStatement},
 };
+use std::collections::HashSet;
 
 impl Schema {
     /// Creates Postgres enums from an ActiveEnum. See [TypeCreateStatement] for more details.
@@ -147,7 +148,7 @@ impl Schema {
     }
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+2]    from a single ActiveEnum
+// [spec:pgorm:sem:schema.from-entity.enum+3]    from a single ActiveEnum
 pub(crate) fn create_enum_from_active_enum<A>() -> Result<TypeCreateStatement, Error>
 where
     A: ActiveEnum,
@@ -161,8 +162,17 @@ where
     })
 }
 
+/// Looks through one level of [`ColumnType::Array`], so a column holding an
+/// array of a database enum resolves to the enum the array is over.
+fn enum_element_type(col_type: &ColumnType) -> &ColumnType {
+    match col_type {
+        ColumnType::Array(inner) => inner,
+        _ => col_type,
+    }
+}
+
 pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<TypeCreateStatement> {
-    let ColumnType::Enum { name, variants } = col_type else {
+    let ColumnType::Enum { name, variants } = enum_element_type(col_type) else {
         return None;
     };
     Some(
@@ -172,15 +182,22 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<Type
     )
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+2]
+// [spec:pgorm:sem:schema.from-entity.enum+3]
 pub(crate) fn create_enum_from_entity<E>(_: E) -> Vec<TypeCreateStatement>
 where
     E: EntityTrait,
 {
+    let mut seen = HashSet::new();
     let mut vec = Vec::new();
     for col in E::Column::iter() {
         let col_def = col.def();
-        vec.extend(create_enum_from_column_type(col_def.get_column_type()));
+        let col_type = enum_element_type(col_def.get_column_type());
+        let ColumnType::Enum { name, .. } = col_type else {
+            continue;
+        };
+        if seen.insert(name.to_string()) {
+            vec.extend(create_enum_from_column_type(col_type));
+        }
     }
     vec
 }

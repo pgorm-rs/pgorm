@@ -53,14 +53,25 @@ executes SQL.
 
 ## Postgres enum types
 
-> [spec:pgorm:sem:schema.from-entity.enum+2]
+> [spec:pgorm:sem:schema.from-entity.enum+3]
 > `Schema::create_enum_from_entity::<E>()` scans `E::Column` and returns one
-> `TypeCreateStatement` (`CREATE TYPE {name} AS ENUM ({variants})`) per column
-> whose type is `ColumnType::Enum`, preserving declared variant order; a column
-> of any other type contributes no statement, so this form cannot fail.
+> `TypeCreateStatement` (`CREATE TYPE {name} AS ENUM ({variants})`) per enum
+> its columns resolve to, preserving declared variant order; a column that
+> resolves to no enum contributes no statement, so this form cannot fail. A
+> column type resolves through one level of `ColumnType::Array`, so a column
+> holding an array of a database enum names the enum the array is over: the
+> table projection renders such a column as `{name}[]`, which no database can
+> accept unless the element type exists, so an entity reaching an enum only
+> through an array still carries the `CREATE TYPE` that makes its table
+> creatable. The resolved enums are then deduplicated by type name across the
+> entity's columns, first occurrence winning — two columns over one enum (a
+> scalar and an array of it, say) yield one statement, because Postgres has no
+> `CREATE TYPE IF NOT EXISTS` and re-creating a type is an error rather than a
+> no-op. Both halves match the generation path
+> (`[spec:pgorm:sem:codegen.entity.transform+5]`), which registers an
+> `ActiveEnum` for every column whose array-inner type is `ColumnType::Enum`,
+> keyed by enum name.
 > `Schema::create_enum_from_active_enum::<A>()` builds the same statement from
 > `A::db_type()` for a single `ActiveEnum`, and returns `Error::Type` naming the
 > enum if the resolved column type is not `ColumnType::Enum` — an `ActiveEnum`
-> backed by a plain column type has no database enum to create. Emitting
-> duplicates is the caller's problem: two columns sharing one enum type yield
-> two identical statements.
+> backed by a plain column type has no database enum to create.

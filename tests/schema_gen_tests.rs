@@ -157,6 +157,35 @@ mod quirk {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// An entity whose only route to a database enum is an array column — the
+/// scalar form of `Hue` appears on no column of it.
+mod palette {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+    #[pgorm(rs_type = "String", db_type = "Enum", enum_name = "palette_hue")]
+    pub enum Hue {
+        #[pgorm(string_value = "Red")]
+        Red,
+        #[pgorm(string_value = "Blue")]
+        Blue,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "palette")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub hues: Vec<Hue>,
+        pub spare_hues: Option<Vec<Hue>>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// An `ActiveEnum` whose `db_type()` is not `ColumnType::Enum`.
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[pgorm(rs_type = "String", db_type = "String(StringLen::N(1))")]
@@ -433,20 +462,18 @@ fn create_index_from_entity_uses_table_ref() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+2/test]    one statement per enum column, variant order preserved, duplicates kept
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    one statement per resolved enum,
+// variant order preserved, deduplicated by type name across the entity's columns
 #[test]
-fn create_enum_from_entity_emits_per_column() {
+fn create_enum_from_entity_dedups_by_type_name() {
     let schema = Schema::new();
 
     let stmts = schema.create_enum_from_entity(widget::Entity);
     let rendered: Vec<String> = stmts.iter().map(|stmt| stmt.to_string()).collect();
     assert_eq!(
         rendered,
-        vec![
-            r#"CREATE TYPE "widget_grade" AS ENUM ('Gold', 'Silver', 'Bronze')"#.to_owned(),
-            r#"CREATE TYPE "widget_grade" AS ENUM ('Gold', 'Silver', 'Bronze')"#.to_owned(),
-        ],
-        "two columns sharing one enum type yield two identical statements"
+        vec![r#"CREATE TYPE "widget_grade" AS ENUM ('Gold', 'Silver', 'Bronze')"#.to_owned()],
+        "grade and spare_grade share one enum type, so it is created once"
     );
 
     assert!(
@@ -455,7 +482,29 @@ fn create_enum_from_entity_emits_per_column() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+2/test]    the single-ActiveEnum form builds the same statement from A::db_type()
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    an enum reached only through an
+// array column is resolved through the array, and deduplicated the same way
+#[test]
+fn create_enum_from_entity_looks_through_arrays() {
+    let schema = Schema::new();
+
+    assert!(matches!(
+        palette::Column::Hues.def().get_column_type(),
+        ColumnType::Array(_)
+    ));
+    let rendered: Vec<String> = schema
+        .create_enum_from_entity(palette::Entity)
+        .iter()
+        .map(|stmt| stmt.to_string())
+        .collect();
+    assert_eq!(
+        rendered,
+        vec![r#"CREATE TYPE "palette_hue" AS ENUM ('Red', 'Blue')"#.to_owned()],
+        "the enum both array columns are over is created once"
+    );
+}
+
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    the single-ActiveEnum form builds the same statement from A::db_type()
 #[test]
 fn create_enum_from_active_enum_uses_db_type() {
     let schema = Schema::new();
@@ -473,7 +522,7 @@ fn create_enum_from_active_enum_uses_db_type() {
     ));
 }
 
-// [spec:pgorm:sem:schema.from-entity.enum+2/test]    errors when the resolved column type is not an enum
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    errors when the resolved column type is not an enum
 #[test]
 fn create_enum_from_active_enum_errs_non_enum() {
     assert!(!matches!(
@@ -491,21 +540,20 @@ fn create_enum_from_active_enum_errs_non_enum() {
 
 // [spec:pgorm:sem:schema.from-entity+2/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
-// [spec:pgorm:sem:schema.from-entity.enum+2/test]    the projected type is a usable Postgres enum
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
 async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
     let ctx = TestContext::new("schema_gen_executes_schemagen").await;
     let db = ctx.db.get().await?;
     let schema = Schema::new();
 
-    // One CREATE TYPE per enum column: the duplicate is the caller's problem.
+    // Deduplicated by type name, so the whole stream executes: Postgres has no
+    // `CREATE TYPE IF NOT EXISTS` to fall back on.
     let enums = schema.create_enum_from_entity(widget::Entity);
-    db.execute(&enums[0].to_string(), &[]).await?;
-    let duplicate = db
-        .execute(&enums[1].to_string(), &[])
-        .await
-        .expect_err("the second statement re-creates the same type");
-    assert!(matches!(duplicate, Error::Postgres(_)));
+    assert_eq!(enums.len(), 1);
+    for stmt in &enums {
+        db.execute(&stmt.to_string(), &[]).await?;
+    }
 
     for entity_stmt in [
         schema.create_table_from_entity(factory::Entity),
@@ -626,6 +674,48 @@ async fn generated_schema_executes_on_postgres() -> Result<(), Error> {
         composite.sql_error(),
         Some(pgorm::SqlError::UniqueConstraintViolation(_))
     ));
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:schema.from-entity.enum+3/test]    an entity reaching an enum only
+// through an array column carries the CREATE TYPE its own table needs: on a fresh
+// database the two statement streams are sufficient on their own
+#[pgorm_macros::test]
+async fn array_only_enum_schema_executes_on_postgres() -> Result<(), Error> {
+    let ctx = TestContext::new("schema_gen_array_enum_schemagen").await;
+    let db = ctx.db.get().await?;
+    let schema = Schema::new();
+
+    for stmt in schema.create_enum_from_entity(palette::Entity) {
+        db.execute(&stmt.to_string(), &[]).await?;
+    }
+    let table = schema.create_table_from_entity(palette::Entity).to_string();
+    assert!(table.contains(r#""hues" palette_hue[]"#), "{table}");
+    db.execute(&table, &[]).await?;
+
+    let row = palette::ActiveModel {
+        hues: set(vec![palette::Hue::Red, palette::Hue::Blue]),
+        spare_hues: set(Some(vec![palette::Hue::Blue])),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await?;
+    assert_eq!(row.hues, [palette::Hue::Red, palette::Hue::Blue]);
+    assert_eq!(row.spare_hues, Some(vec![palette::Hue::Blue]));
+
+    let stored: String = db
+        .query_one(
+            "SELECT format_type(atttypid, atttypmod) FROM pg_attribute \
+             WHERE attrelid = 'palette'::regclass AND attname = 'hues'",
+            &[],
+        )
+        .await?
+        .get(0);
+    assert_eq!(stored, "palette_hue[]");
 
     drop(db);
     ctx.delete().await;

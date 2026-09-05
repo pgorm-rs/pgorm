@@ -3256,6 +3256,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. create_enum_from_entity matches only top-level ColumnType::Enum (schema/entity.rs:164-167,180-184); a Vec<Tea> column is Array(Enum) and contributes no CREATE TYPE, while create_table_from_entity still renders \"teas\" tea[] → fresh DB gets ERROR: type \"tea\" does not exist (42704). Silent (empty Vec) until execution. The in-tree suite works around it twice (schema.rs:20-31 creates the type via the scalar ActiveEnum entity first; enum_cast_round_trip passes only because casts also has a scalar tea column). Codegen already does the right thing (get_inner_col_type unwraps Array, dedups by name — codegen.md:58-59), so this is subsystem inconsistency, not considered design. Fix: unwrap Array one level before the Enum match. Effort S, BUT MUST land with schema-enum-dedup: the array skip is the only reason scalar+array entities don't emit a fatal duplicate today — the two defects mask each other. One bump of schema.from-entity.enum+2→+3 covers both (array-inner + dedup-by-name, aligning with codegen's rule); re-pin /test annotations in schema_gen_tests.rs."
                     }
+
+                    {
+                        at 2026-09-05T15:38:27.938472Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3269,6 +3276,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit verdict: BY-DESIGN today — behavior exists as claimed (per-column vec.extend, no seen-set, entity.rs:180-184) but is explicitly specified (\"Emitting duplicates is the caller's problem\", schema-gen.md:64-66) and pinned by two tests, one executing the duplicate live and asserting it errors (schema_gen_tests.rs:436-457, :501-508). PostgreSQL has no CREATE TYPE IF NOT EXISTS, so no SQL-level guard exists. Adopting the fix is a spec change, not a plain bugfix — and it becomes NECESSARY the moment schema-enum-arrays lands (scalar+array-of-same-enum entities would then always emit a fatal duplicate; the two defects currently mask each other). Fix: dedup by enum name (first occurrence wins) mirroring codegen's BTreeMap-by-name; update the per-column test and the live expect_err. Effort S. Land as ONE coupled change with schema-enum-arrays under the same schema.from-entity.enum+2→+3 bump. Dep: this node should depend on (or merge with) schema-enum-arrays."
+                    }
+
+                    {
+                        at 2026-09-05T15:38:30.128281Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
