@@ -32,7 +32,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+5]
+> [spec:pgorm:sem:codegen.entity.transform+6]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. The table name is unpacked from either `TableName`
 > form (`Table` and `SchemaTable`, the schema discarded); every statement has
@@ -41,18 +41,17 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > nameless case is gone with the state it guarded
 > (`[spec:pgorm:req:sql.ddl.create-table+6]`), and MUST NOT come back.
 >
-> Per column: `auto_increment` and `not_null` come from the presence of the
-> matching `ColumnSpec` on the column definition; a column with no
-> `ColumnType` yields
+> Per column: `auto_increment`, `not_null` and `unique` come from the
+> presence of the matching `ColumnSpec` on the column definition; a column
+> with no `ColumnType` yields
 > ``TransformError("table `<table>` column `<column>`: column type should
-> not be empty")``. `unique` does not: the transformer overwrites the value
-> the `TryFrom<&ColumnDef> for Column` conversion derived, assigning
-> `unique` solely from the table's
-> indexes — true exactly when some unique index of the table covers that one
-> column and nothing else. A `ColumnSpec::UniqueKey` on the column
-> definition is therefore discarded on this path; it takes effect only when
-> a `ColumnDef` is converted through the public `TryFrom<&ColumnDef> for
-> Column` impl directly, outside `transform`. Primary keys are collected
+> not be empty")``. The table's indexes then widen `unique`, never narrow
+> it: a column is unique when its definition carries
+> `ColumnSpec::UniqueKey`, or some unique index of the table covers that one
+> column and nothing else. The two spellings of one fact therefore agree —
+> a `ColumnSpec::UniqueKey` is no longer dropped on this path while the DDL
+> bridge keeps it as the index Postgres creates for it
+> (`codegen.ddl.tables`). Primary keys are collected
 > from `ColumnSpec::PrimaryKey` markers and extended with the column names
 > of any table-level primary-key index. Every column whose (possibly
 > array-inner) type is `ColumnType::Enum` registers an `ActiveEnum` in a
@@ -66,20 +65,40 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > table, column, primary key, relation target, conjunct relation, enum name
 > and enum value, in each of the snake_case, camel-case and keyword-escaped
 > forms the generators use — has a legal Rust form
-> (`codegen.entity.keywords`); that every primary-key name is the name of a
+> (`codegen.entity.keywords`) and is that one name's alone
+> (`codegen.entity.collisions`); that every primary-key name is the name of a
 > column of its own table, else
 > ``TransformError("table `<table>`: primary key column `<column>` is not a
-> column of the table")``. Every foreign key names a referenced table, so that
-> read cannot fail and the
+> column of the table")``.
+>
+> Once every table has been read, the gate also checks that the schema is
+> closed under its own foreign keys: each relation's referenced table is a
+> table of this schema, each referenced column a column of that table, and
+> each constrained column a column of the table that owns the key. A
+> generated file names its target's module and columns, so an unresolved
+> reference would otherwise reach the caller as Rust that does not compile —
+> a `belongs_to` onto a module nobody generated — while the absent target
+> takes no inverse and no conjunct relation with it, silently. The three
+> failures are
+> ``TransformError("table `<table>`: relation to `<ref table>` names a table
+> the schema does not define")``,
+> ``TransformError("table `<table>`: relation to `<ref table>` references
+> column `<column>`, which `<ref table>` does not have")`` and
+> ``TransformError("table `<table>`: relation to `<ref table>` constrains
+> column `<column>`, which the table does not have")``. Every foreign key
+> names a referenced table, so that read cannot fail and the
 > ``TransformError("... referenced table should not be empty")`` that stood in
 > for the tableless case is gone with the state it guarded
 > (`[spec:pgorm:req:sql.ddl.foreign-key+3]`), and MUST NOT come back: the
 > conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
-> Validation runs over the final
-> entities, after inverse and conjunct relations are synthesised, so the
-> derived relations are covered too. The `format_ident!` and column-lookup
-> sites downstream of the gate are therefore internal invariants, not
-> caller-reachable failures.
+>
+> The reference and collision checks run over the tables as read, before
+> inverse and conjunct relations are synthesised: those are the gate's own
+> work, and these checks are what make the lookups that synthesise them
+> total. Identifier validation runs over the final entities, after that
+> synthesis, so the derived relations are covered too. The `format_ident!`
+> and column-lookup sites downstream of the gate are therefore internal
+> invariants, not caller-reachable failures.
 >
 > Foreign keys become `BelongsTo` relations on the owning table, keeping the
 > FK's columns, referenced columns, `on_update`, and `on_delete` actions. A
@@ -99,21 +118,37 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > are sorted by referenced table name and its `conjunct_relations` by target
 > name.
 
-> [spec:pgorm:sem:codegen.entity.transform.inverse]
+> [spec:pgorm:sem:codegen.entity.transform.inverse+1]
 > For every non-self-referencing relation with `num_suffix == 0`, the
 > transformer adds an inverse relation to the referenced entity, pointing
 > back at the FK-owning table with empty column lists. The inverse type is
-> `HasOne` when the FK is unique — every FK column is a unique column of the
-> owning table, or the FK column set is exactly the owning table's full
-> primary-key set — and `HasMany` otherwise. Self-referencing relations and
+> `HasOne` when the FK is unique and `HasMany` otherwise, and a key is unique
+> in any of three ways: every one of its columns is a unique column of the
+> owning table; some unique index of the owning table covers exactly the
+> key's columns, compared as sets; or the key's column set is exactly the
+> owning table's full primary-key set. The middle case is the one a
+> column-at-a-time reading cannot see — a composite `UNIQUE` over the key's
+> columns constrains the key as a whole while leaving every column of it free
+> on its own — and it is exact in both directions: a unique index over a
+> superset of the key constrains the key not at all, and is not read as
+> uniqueness. Self-referencing relations and
 > suffixed relations produce no inverse (the suffixed case would emit a
 > `Relation` variant with no usable `Related` impl). An inverse relation is
 > dropped when the target entity already has any relation to that table.
 
-> [spec:pgorm:sem:codegen.entity.transform.conjunct]
-> A table with exactly 2 relations and exactly 2 primary-key columns is
-> treated as a many-to-many junction: each of the two referenced entities
-> receives a `ConjunctRelation { via: junction_table, to: other_ref_table }`.
+> [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
+> A table is treated as a many-to-many junction when it is nothing but the
+> join: exactly two of its relations are `BelongsTo` relations carrying
+> columns of their own, and those two column sets together are exactly the
+> table's primary key. Each of the two referenced entities then receives a
+> `ConjunctRelation { via: junction_table, to: other_ref_table }`. Both
+> conditions are load-bearing. Only the table's own foreign keys are legs:
+> the inverse relations synthesised above belong to other tables' keys, so a
+> table that is referenced is no more a junction for it, and a junction that
+> is referenced is no less one — the classification does not depend on the
+> order the transformer works in. And a table keyed by something of its own,
+> with two foreign keys beside that key, joins nothing: its primary key is
+> not the two keys' columns, so the pair is two references and not a join.
 > When an entity accumulates more than one conjunct relation to the same
 > target (duplicated many-to-many paths), all conjunct relations to that
 > target are removed — ambiguity is resolved by generating nothing. When a
@@ -488,6 +523,37 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > in the writer are downstream of that check and cannot panic on validated
 > input.
 
+> [spec:pgorm:req:codegen.entity.collisions]
+> Every identity the writer derives from a DB name MUST be one name's alone,
+> and the `transform` gate refuses a schema in which two names claim one. The
+> namespaces checked are: the module name a table derives — and with it the
+> file name, which is the same string — and the type name a table derives,
+> both across the schema; the field name a column derives, within its table;
+> the type name an enum derives, across the schema; and the variant name a
+> value derives, within its enum. Keyword escaping
+> (`codegen.entity.keywords`) is applied before the comparison, so the rescue
+> cannot itself introduce a collision.
+>
+> A refusal names both DB names and the identity they share:
+> ``TransformError("tables `<first>` and `<second>` both generate the module
+> name `<derived>`")``, and in the same shape
+> ``tables `<first>` and `<second>` both generate the type name `<derived>` ``,
+> ``table `<table>` columns `<first>` and `<second>` both generate the field
+> name `<derived>` ``,
+> ``enums `<first>` and `<second>` both generate the type name `<derived>` ``
+> and ``enum `<enum>` values `<first>` and `<second>` both generate the
+> variant name `<derived>` ``. `<first>` is whichever name the gate reached
+> first, in the order the schema is held in — alphabetical by table name for
+> tables and enums, declaration order for columns and enum values.
+>
+> Case conversion is many-to-one — `CakeFilling`, `cake filling` and
+> `cake_filling` all derive `cake_filling` — so without this check a schema
+> holding two such names generates one file over the other and declares the
+> module twice, and the duplicate definition lands in the caller's build
+> rather than in ours. This is the same contract as
+> `codegen.entity.keywords`, on the other axis: that rule is about a name
+> having a Rust form at all, this one about that form being unshared.
+
 ## Seaography support
 
 > [spec:pgorm:sem:codegen.entity.seaography]
@@ -510,7 +576,7 @@ plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
 build-time tool nothing links into a running application, so the cost of
 compiling the C parser falls on people generating entities and on nobody else.
 
-> [spec:pgorm:def:codegen.ddl+1]
+> [spec:pgorm:def:codegen.ddl+2]
 > `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
 > parses DDL text with `pg_query::parse` and returns one statement per
 > `CREATE TABLE`, in file order, with every other statement it read folded into
@@ -532,13 +598,14 @@ compiling the C parser falls on people generating entities and on nobody else.
 > The bridge is the inverse of the DDL builder: statements built with
 > `pgorm-query` and rendered through their `Display`
 > (`sql.ddl.create-table`, `sql.ddl.type-enum`) MUST, when parsed back, generate
-> the same entity files as the statements themselves. One documented asymmetry:
-> a column carrying `ColumnSpec::UniqueKey`, which `transform` discards on the
-> statement path (`codegen.entity.transform`) but which the bridge preserves as
-> the unique index Postgres creates for it (`codegen.ddl.tables+1`), so the
-> round trip yields a `unique` the statement path drops.
+> the same entity files as the statements themselves — with no asymmetry left
+> to document. There was one: a column carrying `ColumnSpec::UniqueKey`, which
+> the bridge preserves as the unique index Postgres creates for it
+> (`codegen.ddl.tables`) while `transform` discarded it on the statement path,
+> so the round trip gained a `unique` the statement path dropped. `transform`
+> now reads that spec (`codegen.entity.transform`) and the two paths agree.
 
-> [spec:pgorm:req:codegen.ddl.unsupported]
+> [spec:pgorm:req:codegen.ddl.unsupported+1]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -571,7 +638,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not
 > have, and a table or enum type declared twice — both are keyed by name
-> downstream, so a duplicate would otherwise overwrite in silence.
+> downstream, so a duplicate would otherwise overwrite in silence. A foreign
+> key naming a table the file never creates, or a column that table does not
+> have, is refused too, but by the transform gate `entities_from_sql` runs
+> (`codegen.entity.transform`) rather than here: the bridge resolves one
+> statement against the file, and the gate holds every table at once, which is
+> where the answer to a foreign key is known.
 >
 > One construct is accepted without being carried, and only this one: a
 > non-unique `CREATE INDEX`. It states no fact the entity model holds —
@@ -619,7 +691,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+1]
+> [spec:pgorm:sem:codegen.ddl.tables+2]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -630,10 +702,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `ColumnSpec` —
 > `NOT NULL`, `NULL`, `PRIMARY KEY` — and a column-level `REFERENCES` becomes a
 > foreign key on that one column. A column-level `UNIQUE` becomes a one-column
-> unique index on the table, which is both what Postgres creates for it and the
-> only form the entity model reads: `codegen.entity.transform` assigns `unique`
-> from the table's indexes and discards a `ColumnSpec::UniqueKey`, so setting
-> that spec instead would drop the fact. A primary-key column is `NOT NULL`
+> unique index on the table, which is what Postgres itself creates for it and
+> so the truthful form to bridge it as; `codegen.entity.transform` reads that
+> index and a `ColumnSpec::UniqueKey` alike, so the fact survives either
+> spelling. A primary-key column is `NOT NULL`
 > whether or not the DDL spells it, which is Postgres' own rule: the entity
 > model reads nullability off the column alone, so an unstated `NOT NULL` would
 > otherwise generate an `Option` primary key.

@@ -49,6 +49,20 @@ fn variant(value: &str) -> Variant {
 }
 
 impl ActiveEnum {
+    /// Each DB value paired with the Rust variant name it derives, read the way
+    /// the generated variants are: trimmed, in declaration order.
+    // [spec:pgorm:req:codegen.entity.collisions]
+    pub(crate) fn variant_names(&self) -> Vec<(String, String)> {
+        self.values
+            .iter()
+            .map(|value| {
+                let value = value.to_string().trim().to_owned();
+                let name = variant(&value).name;
+                (value, name)
+            })
+            .collect()
+    }
+
     // [spec:pgorm:sem:codegen.entity.enums+1]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {

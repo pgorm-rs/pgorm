@@ -3170,6 +3170,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. Duplicate detection keys on RAW names only (sql_schema/mod.rs:131-137, transformer.rs:18,105); every derived identity (snake file/module names, camel type names, enum variant mangling) is validated individually via safe_ident but never cross-checked, and writer.rs:225 formats filenames with no dedup. Scenario: cake_filling + \"CakeFilling\" → both become cake_filling.rs (last write silently clobbers), mod.rs declares pub mod twice → E0428 in the USER'S build, one entity silently gone; same channel for columns, enum names, enum values. Fix: post-synthesis collision maps in transform (tables, per-table columns, enum names, per-enum variants) returning TransformError naming both source names. Effort S-M, non-breaking. Spec: new rule (req:codegen.entity.collisions) + bump codegen.entity.transform+5→+6 (its \"every failure a caller's schema can cause MUST come back from this one call\" clause is violated in spirit)."
                     }
+
+                    {
+                        at 2026-09-05T20:03:22.63481Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3183,6 +3190,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED (composite half + bonus inline gap). col.unique is overwritten from single-column indexes only (transformer.rs:34-41); inverse uniqueness checks every-FK-column-individually-unique OR FK-set==full-PK (:117-139) — a composite UNIQUE covering exactly the FK's column set is missed → true 1:1 emitted as has_many. Bonus: ColumnSpec::UniqueKey is deliberately discarded by transform, so inline uniqueness is lost on the direct-TableCreateStatement path. Both gaps are codified verbatim in codegen.md (inherited heuristics) — fixing is a spec bump, not a conformance bug. Scenario: registrations with UNIQUE(vendor_id, serial) + composite FK to devices → has_many instead of has_one; compiles clean, wrong API cardinality, silent. Fix: unique if any non-primary unique index's column set equals rel.columns as a set; union ColumnSpec::UniqueKey instead of discarding. Effort S; output-changing for affected schemas. Bumps codegen.entity.transform.inverse (→+1) and codegen.entity.transform+5→+6."
+                    }
+
+                    {
+                        at 2026-09-05T20:03:26.312596Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3198,6 +3212,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. Junction classification is exactly \"2 PK columns AND exactly 2 relations\" (transformer.rs:170-186) — rel_type never inspected, PK columns never compared to FK columns, and the scan runs AFTER inverse relations are pushed (:156-168), so an inbound HasMany with zero structural FK evidence counts as a junction leg. Spec codifies it verbatim (codegen.entity.transform.conjunct — inherited heuristic). Scenario: audit_events(id, version PK) with user_id/org_id FKs → spurious canonical M:N Related<orgs> for users; worse: posts(tenant_id, id PK) with inbound comments HasMany → junction built on an inverse leg. Compiles, fabricates M:N API, suppresses direct Related impls (impl_related=false, :214-221). Fix: junction only when both relations are BelongsTo owned by the table itself (excluding synthesized inverses) AND PK column set == union of the two FKs' column sets. Effort S-M; removes only misfired impls. Bumps codegen.entity.transform.conjunct (→+1)."
                     }
+
+                    {
+                        at 2026-09-05T20:03:30.231473Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3210,6 +3231,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED. FK targets never validated against the described schema: position_of errors on missing tables for indexes/comments ONLY (sql_schema/mod.rs:141-154); references() converts pktable with no existence check (table.rs:378-443); Relation::validate checks identifier legality + column-count parity only (relation.rs:34-52); transformer's get_mut lookups silently skip missing ref tables (:157, :188) — no inverse, no conjunct, no error. Contradicts the module's own contract (\"Anything else in the file is a named error rather than a silent omission\", sql_schema/mod.rs:10-13). Scenario: partial schema dump with orders REFERENCES customers, no customers table → generation succeeds, orders.rs references super::customers::Entity with no customers.rs → E0433 in the user's build, far from cause; bad ref/source columns likewise. Fix: post-map validation pass — ref_table ∈ entities, ref_columns ∈ its columns, own columns ∈ owning entity; TransformError naming table/constraint/column. Effort S, non-breaking. Bumps codegen.ddl.unsupported (→+1, extend \"Unresolved references are named\") + codegen.entity.transform+5→+6."
+                    }
+
+                    {
+                        at 2026-09-05T20:03:19.739973Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -272,3 +272,64 @@ fn non_snake_case_names_preserved_by_column_name() {
         r#"pub enum Column { Id, #[pgorm(column_name = "bakedAt")] BakedAt, }"#,
     );
 }
+
+// [spec:pgorm:req:codegen.entity.collisions/test]    two tables whose names
+// derive one module name are refused by both source names: one file would be
+// written over the other and the module declared twice
+#[test]
+fn colliding_table_names_are_refused() {
+    assert_transform_error(
+        vec![
+            table_with("CakeFilling", vec![serial_pk("id")]),
+            table_with("cake_filling", vec![serial_pk("id")]),
+        ],
+        "tables `CakeFilling` and `cake_filling` both generate the module name `cake_filling`",
+    );
+}
+
+// [spec:pgorm:req:codegen.entity.collisions/test]    two columns of one table
+// whose names derive one field name are refused, naming the table and both
+// columns
+#[test]
+fn colliding_column_names_are_refused() {
+    assert_transform_error(
+        vec![table_with(
+            "cake",
+            vec![
+                serial_pk("id"),
+                typed("bakedAt", ColumnType::Integer),
+                typed("baked_at", ColumnType::Integer),
+            ],
+        )],
+        "table `cake` columns `bakedAt` and `baked_at` both generate the field name `baked_at`",
+    );
+}
+
+// [spec:pgorm:req:codegen.entity.collisions/test]    two enums that derive one
+// type name, and two values of one enum that derive one variant name, are
+// refused the same way
+#[test]
+fn colliding_enum_names_and_variants_are_refused() {
+    assert_transform_error(
+        vec![table_with(
+            "cake",
+            vec![
+                serial_pk("id"),
+                enum_col("kind", "media type", &["photo"]),
+                enum_col("sort", "media_type", &["video"]),
+            ],
+        )],
+        "enums `media type` and `media_type` both generate the type name `MediaType`",
+    );
+
+    assert_transform_error(
+        vec![table_with(
+            "cake",
+            vec![
+                serial_pk("id"),
+                enum_col("kind", "tea", &["Earl Grey", "earl_grey"]),
+            ],
+        )],
+        "enum `tea` values `Earl Grey` and `earl_grey` both generate the variant name `EarlGrey`",
+    );
+}

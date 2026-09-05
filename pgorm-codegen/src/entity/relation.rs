@@ -240,7 +240,7 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5]
+// [spec:pgorm:sem:codegen.entity.transform+6]
 impl From<&TableForeignKey> for Relation {
     fn from(tbl_fk: &TableForeignKey) -> Self {
         Self {

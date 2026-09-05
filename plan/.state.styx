@@ -362,6 +362,10 @@ assertions (
     {id bug.relation-pairing, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:11:36.703806Z}
     {id bug.test-harness, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:15:03.593799Z}
     {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}
+    {id codegen-identity-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:22.63481Z}
+    {id codegen-junction-detection, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:30.231473Z}
+    {id codegen-relation-cardinality, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:26.312596Z}
+    {id codegen-relation-integrity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:19.739973Z}
     {id connect-manager-options, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:14.642639Z}
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
     {id decide.cli, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:33:17.849875Z}

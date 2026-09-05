@@ -5,7 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::{Column, EntityTransformer, Error};
+use pgorm_codegen::Column;
 use pgorm_query::{
     Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, IntoIden, Table,
     TableCreateStatement, TableName,
@@ -28,7 +28,7 @@ fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    one Entity per input
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    one Entity per input
 // statement, held in a BTreeMap so every output is ordered by table name
 #[test]
 fn transform_builds_entity_per_statement_ordered_by_name() {
@@ -52,7 +52,7 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    the table name is unpacked
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    the table name is unpacked
 // from every `TableName` form
 #[test]
 fn transform_unpacks_the_table_name_from_every_form() {
@@ -77,7 +77,7 @@ fn transform_unpacks_the_table_name_from_every_form() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    a column with no
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a column with no
 // `ColumnType` is a `TransformError` naming the table and the column
 #[test]
 fn transform_rejects_a_column_without_column_type() {
@@ -91,7 +91,7 @@ fn transform_rejects_a_column_without_column_type() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    a primary-key index naming
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a primary-key index naming
 // a column the table does not have is a `TransformError`
 #[test]
 fn transform_rejects_primary_key_over_unknown_column() {
@@ -114,7 +114,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    a DB name with no Rust
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a DB name with no Rust
 // identifier form is a `TransformError` naming what it came from
 #[test]
 fn transform_rejects_names_without_identifier_form() {
@@ -138,15 +138,45 @@ fn transform_rejects_names_without_identifier_form() {
     );
 }
 
-#[track_caller]
-fn assert_transform_error(stmts: Vec<TableCreateStatement>, expected: &str) {
-    match EntityTransformer::transform(stmts) {
-        Err(Error::TransformError(msg)) => assert_eq!(msg, expected),
-        other => panic!("expected a TransformError, got {other:?}"),
-    }
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a relation onto a table the
+// schema does not define, or onto a column either end does not have, is a
+// `TransformError` naming the table, the relation and the column
+#[test]
+fn transform_rejects_relations_it_cannot_resolve() {
+    // the partial dump: `orders` references a `customers` nobody passed
+    assert_transform_error(
+        vec![fk("orders", "customer_id", "customers", "id")],
+        "table `orders`: relation to `customers` names a table the schema does not define",
+    );
+
+    assert_transform_error(
+        vec![
+            bare("customers"),
+            fk("orders", "customer_id", "customers", "code"),
+        ],
+        "table `orders`: relation to `customers` references column `code`, which `customers` does \
+         not have",
+    );
+
+    assert_transform_error(
+        vec![
+            bare("customers"),
+            Table::create(Alias::new("orders"))
+                .col(serial_pk("id"))
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("orders"),
+                    Alias::new("customer_id"),
+                    Alias::new("customers"),
+                    Alias::new("id"),
+                ))
+                .to_owned(),
+        ],
+        "table `orders`: relation to `customers` constrains column `customer_id`, which the table \
+         does not have",
+    );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    `auto_increment`,
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    `auto_increment`,
 // `not_null` and `unique` come from the matching `ColumnSpec`
 #[test]
 fn transform_reads_column_specs_off_the_column_definition() {
@@ -195,7 +225,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a single-column unique index
 // over exactly that column also marks it unique
 #[test]
 fn transform_marks_columns_from_single_column_unique_index() {
@@ -242,7 +272,7 @@ fn transform_marks_columns_from_single_column_unique_index() {
     assert_not_contains(vendor, "#[pgorm(unique)] pub tier: String,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    primary keys come from
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    primary keys come from
 // `ColumnSpec::PrimaryKey` and are extended by a table-level primary-key index
 #[test]
 fn transform_collects_pks_from_specs_and_table_indexes() {
@@ -282,7 +312,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    every enum column registers
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    every enum column registers
 // an `ActiveEnum` keyed by enum name, deduplicated across tables and looked
 // through `Array`
 #[test]
@@ -330,7 +360,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
     assert!(position_of(enums, "pub enum Mood") < position_of(enums, "pub enum Tea"));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    foreign keys become
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    foreign keys become
 // `BelongsTo` relations that keep their columns, referenced columns and
 // on_update / on_delete actions
 #[test]
@@ -384,7 +414,7 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    a relation onto its own
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    a relation onto its own
 // table is flagged self-referencing
 #[test]
 fn transform_flags_self_referencing_relations() {
@@ -399,7 +429,7 @@ fn transform_flags_self_referencing_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    several FKs onto the same
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    several FKs onto the same
 // target take 1-based `num_suffix`es in declaration order; a lone FK keeps 0
 #[test]
 fn transform_numbers_repeated_fks_to_same_table() {
@@ -469,7 +499,7 @@ fn transform_numbers_repeated_fks_to_same_table() {
     assert_not_contains(basket, "Cake1,");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+5/test]    relations are sorted by
+// [spec:pgorm:sem:codegen.entity.transform+6/test]    relations are sorted by
 // referenced table name and conjunct relations by target name
 #[test]
 fn transform_sorts_relations_and_conjunct_relations() {
@@ -528,7 +558,7 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
         .to_owned()
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.inverse/test]    a non-unique FK
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    a non-unique FK
 // gives the referenced entity a `HasMany` back-reference
 #[test]
 fn inverse_has_many_for_non_unique_foreign_key() {
@@ -542,7 +572,7 @@ fn inverse_has_many_for_non_unique_foreign_key() {
     assert_not_contains(generated.file("cake.rs"), r#"from = "Column::CakeId""#);
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.inverse/test]    a FK whose every
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    a FK whose every
 // column is unique in the owning table inverts to `HasOne`
 #[test]
 fn inverse_has_one_for_unique_foreign_key() {
@@ -570,7 +600,7 @@ fn inverse_has_one_for_unique_foreign_key() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.inverse/test]    a FK whose column
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    a FK whose column
 // set is exactly the owning table's primary key also inverts to `HasOne`
 #[test]
 fn inverse_has_one_for_whole_primary_key_fk() {
@@ -602,7 +632,128 @@ fn inverse_has_one_for_whole_primary_key_fk() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.inverse/test]    self-referencing and
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    a unique constraint
+// over exactly the FK's columns constrains the key as a whole, which reading one
+// column at a time cannot see: the inverse is `HasOne`
+#[test]
+fn inverse_has_one_for_composite_unique_foreign_key() {
+    let cake = || {
+        table_with(
+            "cake",
+            vec![
+                ColumnDef::new(Alias::new("id"))
+                    .integer()
+                    .not_null()
+                    .primary_key()
+                    .to_owned(),
+                ColumnDef::new(Alias::new("kind"))
+                    .integer()
+                    .not_null()
+                    .primary_key()
+                    .to_owned(),
+            ],
+        )
+    };
+    let cake_key = |table: &'static str| {
+        ForeignKey::create(
+            Alias::new(table),
+            Alias::new("cake_id"),
+            Alias::new("cake"),
+            Alias::new("id"),
+        )
+        .col(Alias::new("cake_kind"), Alias::new("kind"))
+        .to_owned()
+    };
+
+    let generated = generate(
+        vec![
+            cake(),
+            Table::create(Alias::new("fruit"))
+                .col(serial_pk("id"))
+                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
+                .index(
+                    &mut Index::create(Alias::new("fruit"), Alias::new("cake_id"))
+                        .name("idx_fruit_cake")
+                        .col(Alias::new("cake_kind"))
+                        .unique()
+                        .to_owned(),
+                )
+                .foreign_key(&mut cake_key("fruit"))
+                .to_owned(),
+            // the same key under a unique index covering more than the key
+            // constrains nothing about the key
+            Table::create(Alias::new("crumb"))
+                .col(serial_pk("id"))
+                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
+                .col(ColumnDef::new(Alias::new("batch")).integer().to_owned())
+                .index(
+                    &mut Index::create(Alias::new("crumb"), Alias::new("cake_id"))
+                        .name("idx_crumb_cake_batch")
+                        .col(Alias::new("cake_kind"))
+                        .col(Alias::new("batch"))
+                        .unique()
+                        .to_owned(),
+                )
+                .foreign_key(&mut cake_key("crumb"))
+                .to_owned(),
+        ],
+        Opts::default(),
+    );
+    let cake_file = generated.file("cake.rs");
+
+    assert_contains(
+        cake_file,
+        r#"#[pgorm(has_one = "super::fruit::Entity")] Fruit,"#,
+    );
+    assert_contains(
+        cake_file,
+        r#"#[pgorm(has_many = "super::crumb::Entity")] Crumb,"#,
+    );
+    // neither column is unique on its own
+    assert_not_contains(generated.file("fruit.rs"), "#[pgorm(unique)] pub cake_id");
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+6/test]
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    a `UniqueKey` spec
+// on the column definition marks the column unique on this path too, so its FK
+// inverts to `HasOne`
+#[test]
+fn inverse_has_one_for_inline_unique_key_column() {
+    let generated = generate(
+        vec![
+            cake(),
+            Table::create(Alias::new("fruit"))
+                .col(serial_pk("id"))
+                .col(
+                    ColumnDef::new(Alias::new("cake_id"))
+                        .integer()
+                        .unique_key()
+                        .to_owned(),
+                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("fruit"),
+                    Alias::new("cake_id"),
+                    Alias::new("cake"),
+                    Alias::new("id"),
+                ))
+                .to_owned(),
+        ],
+        Opts::default(),
+    );
+
+    assert_contains(
+        generated.file("fruit.rs"),
+        "#[pgorm(unique)] pub cake_id: Option<i32>,",
+    );
+    assert_contains(
+        generated.file("cake.rs"),
+        r#"#[pgorm(has_one = "super::fruit::Entity")] Fruit,"#,
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    self-referencing and
 // suffixed relations produce no inverse
 #[test]
 fn no_inverse_for_self_referencing_or_suffixed_relations() {
@@ -642,7 +793,7 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
     assert_contains(suffixed.file("fruit.rs"), "pub enum Relation { }");
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.inverse/test]    an inverse relation
+// [spec:pgorm:sem:codegen.entity.transform.inverse+1/test]    an inverse relation
 // is dropped when the target entity already relates to that table
 #[test]
 fn inverse_dropped_when_target_already_relates_back() {
@@ -683,7 +834,7 @@ fn inverse_dropped_when_target_already_relates_back() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.conjunct/test]    a table with two
+// [spec:pgorm:sem:codegen.entity.transform.conjunct+1/test]    a table with two
 // relations and two primary-key columns is a junction: both referenced entities
 // gain a `ConjunctRelation`
 #[test]
@@ -710,7 +861,137 @@ fn junction_table_gives_both_sides_a_conjunct_relation() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.conjunct/test]    duplicated
+// [spec:pgorm:sem:codegen.entity.transform.conjunct+1/test]    two foreign keys
+// that are not the table's primary key join nothing: a table keyed by something
+// of its own is a table with two references, not a junction
+#[test]
+fn fks_outside_the_primary_key_are_not_junctions() {
+    let generated = generate(
+        vec![
+            bare("orgs"),
+            bare("users"),
+            Table::create(Alias::new("audit_events"))
+                .col(
+                    ColumnDef::new(Alias::new("id"))
+                        .integer()
+                        .not_null()
+                        .primary_key()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Alias::new("version"))
+                        .integer()
+                        .not_null()
+                        .primary_key()
+                        .to_owned(),
+                )
+                .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
+                .col(ColumnDef::new(Alias::new("org_id")).integer().to_owned())
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("audit_events"),
+                    Alias::new("user_id"),
+                    Alias::new("users"),
+                    Alias::new("id"),
+                ))
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("audit_events"),
+                    Alias::new("org_id"),
+                    Alias::new("orgs"),
+                    Alias::new("id"),
+                ))
+                .to_owned(),
+        ],
+        Opts::default(),
+    );
+
+    for (file, other) in [("users.rs", "orgs"), ("orgs.rs", "users")] {
+        let content = generated.file(file);
+        assert_contains(
+            content,
+            r#"#[pgorm(has_many = "super::audit_events::Entity")] AuditEvents,"#,
+        );
+        assert_not_contains(content, "fn via() -> Option<RelationDef>");
+        assert_not_contains(
+            content,
+            &format!("impl Related<super::{other}::Entity> for Entity"),
+        );
+    }
+}
+
+// [spec:pgorm:sem:codegen.entity.transform.conjunct+1/test]    only the table's
+// own foreign keys are junction legs: a synthesised inverse neither makes a
+// junction nor stops one
+#[test]
+fn inbound_relations_are_not_junction_legs() {
+    // `posts` has one foreign key and a two-column primary key; the `comments`
+    // back-reference is `comments`' key, not a second leg of its own
+    let generated = generate(
+        vec![
+            bare("tenants"),
+            Table::create(Alias::new("posts"))
+                .col(
+                    ColumnDef::new(Alias::new("tenant_id"))
+                        .integer()
+                        .not_null()
+                        .primary_key()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Alias::new("id"))
+                        .integer()
+                        .not_null()
+                        .primary_key()
+                        .to_owned(),
+                )
+                .foreign_key(&mut ForeignKey::create(
+                    Alias::new("posts"),
+                    Alias::new("tenant_id"),
+                    Alias::new("tenants"),
+                    Alias::new("id"),
+                ))
+                .to_owned(),
+            fk("comments", "post_id", "posts", "id"),
+        ],
+        Opts::default(),
+    );
+
+    assert_not_contains(
+        generated.file("tenants.rs"),
+        "fn via() -> Option<RelationDef>",
+    );
+    assert_not_contains(
+        generated.file("tenants.rs"),
+        "impl Related<super::comments::Entity> for Entity",
+    );
+    assert_not_contains(
+        generated.file("comments.rs"),
+        "fn via() -> Option<RelationDef>",
+    );
+
+    // and the junction below keeps its many-to-many despite the inbound
+    // relation `vote_flags` gives it
+    let generated = generate(
+        vec![
+            bare("users"),
+            bare("bills"),
+            junction("users_votes", ("users", "user_id"), ("bills", "bill_id")),
+            fk("vote_flags", "user_id", "users_votes", "user_id"),
+        ],
+        Opts::default(),
+    );
+
+    assert_contains(
+        generated.file("users.rs"),
+        "impl Related<super::bills::Entity> for Entity {
+            fn to() -> RelationDef { super::users_votes::Relation::Bills.def() }
+            fn via() -> Option<RelationDef> {
+                Some(super::users_votes::Relation::Users.def().rev())
+            }
+        }",
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.transform.conjunct+1/test]    duplicated
 // many-to-many paths to the same target are all removed
 #[test]
 fn duplicated_many_to_many_paths_generate_no_conjunct() {
@@ -743,7 +1024,7 @@ fn duplicated_many_to_many_paths_generate_no_conjunct() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform.conjunct/test]    when a conjunct
+// [spec:pgorm:sem:codegen.entity.transform.conjunct+1/test]    when a conjunct
 // relation targets the same table as an ordinary relation, the ordinary
 // relation's `Related` impl is suppressed in favour of the `via` one
 #[test]

@@ -39,7 +39,7 @@ fn assert_error(sql: &str, expected: &str) {
     assert_eq!(error(sql), expected);
 }
 
-// [spec:pgorm:def:codegen.ddl+1/test]    the whole pipeline runs from DDL text:
+// [spec:pgorm:def:codegen.ddl+2/test]    the whole pipeline runs from DDL text:
 // one entity file per CREATE TABLE, plus index, prelude and active enums
 #[test]
 fn schema_sql_generates_one_file_per_table() {
@@ -104,7 +104,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -116,7 +116,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -152,7 +152,7 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a column-level UNIQUE becomes the
+// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a column-level UNIQUE becomes the
 // index Postgres creates for it, which is where the entity model reads unique
 #[test]
 fn column_unique_constraint_marks_the_column() {
@@ -164,7 +164,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+1/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -213,7 +213,7 @@ fn comments_are_folded_into_their_table() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -243,7 +243,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -277,7 +277,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -333,7 +333,7 @@ fn unsupported_types_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+1/test]    a type the builder can spell but codegen
+// [spec:pgorm:def:codegen.ddl+2/test]    a type the builder can spell but codegen
 // cannot render passes the bridge and is refused by the transform gate
 #[test]
 fn types_codegen_cannot_render_reach_the_gate() {
@@ -344,7 +344,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -371,7 +371,7 @@ fn unsupported_index_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -381,7 +381,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -403,7 +403,24 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+1/test]    text the PostgreSQL grammar rejects
+// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a foreign key onto a table
+// or a column the file never declares is named too — by the transform gate the
+// whole pipeline runs, which is where every table is in hand at once
+#[test]
+fn unresolved_foreign_keys_are_named() {
+    assert_error(
+        "CREATE TABLE orders (id serial PRIMARY KEY, customer_id integer REFERENCES customers (id));",
+        "table `orders`: relation to `customers` names a table the schema does not define",
+    );
+    assert_error(
+        "CREATE TABLE customers (id serial PRIMARY KEY);
+         CREATE TABLE orders (id serial PRIMARY KEY, customer_id integer REFERENCES customers (code));",
+        "table `orders`: relation to `customers` references column `code`, which `customers` does \
+         not have",
+    );
+}
+
+// [spec:pgorm:def:codegen.ddl+2/test]    text the PostgreSQL grammar rejects
 // comes back as the parser's own message
 #[test]
 fn invalid_sql_reports_the_parser_message() {
@@ -418,7 +435,7 @@ fn invalid_sql_reports_the_parser_message() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+1/test]    the bridge is the inverse of the DDL
+// [spec:pgorm:def:codegen.ddl+2/test]    the bridge is the inverse of the DDL
 // builder: statements rendered to text and parsed back generate the same
 // entities as the statements themselves
 #[test]

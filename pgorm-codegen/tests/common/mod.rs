@@ -6,7 +6,7 @@
 //! `Relation` and friends all keep `pub(crate)` fields.
 #![allow(dead_code)]
 
-use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions};
+use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions, Error};
 use pgorm_query::{
     Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Table, TableCreateStatement,
 };
@@ -65,6 +65,15 @@ pub fn generate(stmts: Vec<TableCreateStatement>, opts: Opts) -> Generated {
             .into_iter()
             .map(|f| (f.name, f.content))
             .collect(),
+    }
+}
+
+/// The transform gate's refusal of a schema, by its exact message.
+#[track_caller]
+pub fn assert_transform_error(stmts: Vec<TableCreateStatement>, expected: &str) {
+    match EntityTransformer::transform(stmts) {
+        Err(Error::TransformError(msg)) => assert_eq!(msg, expected),
+        other => panic!("expected a TransformError, got {other:?}"),
     }
 }
 

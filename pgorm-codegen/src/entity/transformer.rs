@@ -1,23 +1,37 @@
 use crate::{
     ActiveEnum, Column, ConjunctRelation, Entity, EntityWriter, Error, PrimaryKey, Relation,
-    RelationType,
+    RelationType, util::escape_rust_keyword,
 };
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ColumnSpec, TableCreateStatement};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+5]
-    // [spec:pgorm:sem:codegen.entity.transform.inverse]
-    // [spec:pgorm:sem:codegen.entity.transform.conjunct]
+    // [spec:pgorm:sem:codegen.entity.transform+6]
+    // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
+    // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
+    // [spec:pgorm:req:codegen.entity.collisions]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {
         let mut enums: BTreeMap<String, ActiveEnum> = BTreeMap::new();
         let mut inverse_relations: BTreeMap<String, Vec<Relation>> = BTreeMap::new();
         let mut entities = BTreeMap::new();
         for table_create in table_create_stmts.into_iter() {
             let table_name = table_create.get_table_name().table().to_string();
+            let unique_column_sets: Vec<BTreeSet<String>> = table_create
+                .get_indexes()
+                .iter()
+                .filter(|index| index.is_unique_key())
+                .map(|index| {
+                    index
+                        .get_index_spec()
+                        .get_column_names()
+                        .into_iter()
+                        .collect()
+                })
+                .collect();
             let mut primary_keys: Vec<PrimaryKey> = Vec::new();
             let mut columns: Vec<Column> = Vec::new();
             for col_def in table_create.get_columns() {
@@ -31,14 +45,10 @@ impl EntityTransformer {
                     });
                 }
                 let mut col = Column::try_from(col_def).map_err(|err| err.in_table(&table_name))?;
-                col.unique = table_create
-                    .get_indexes()
-                    .iter()
-                    .filter(|index| index.is_unique_key())
-                    .map(|index| index.get_index_spec().get_column_names())
-                    .filter(|col_names| col_names.len() == 1 && col_names[0] == col.name)
-                    .count()
-                    > 0;
+                col.unique = col.unique
+                    || unique_column_sets
+                        .iter()
+                        .any(|columns| columns.len() == 1 && columns.contains(&col.name));
                 if let pgorm_query::ColumnType::Enum { name, variants } = col.get_inner_col_type() {
                     enums.insert(
                         name.to_string(),
@@ -114,29 +124,23 @@ impl EntityTransformer {
                     continue;
                 }
                 let ref_table = rel.ref_table;
-                let mut unique = true;
-                for column in rel.columns.iter() {
-                    if !entity
+                let key_columns: BTreeSet<String> = rel.columns.iter().cloned().collect();
+                let every_column_unique = rel.columns.iter().all(|column| {
+                    entity
                         .columns
                         .iter()
                         .filter(|col| col.unique)
                         .any(|col| col.name.as_str() == column)
-                    {
-                        unique = false;
-                        break;
-                    }
-                }
-                if rel.columns.len() == entity.primary_keys.len() {
-                    let mut count_pk = 0;
-                    for primary_key in entity.primary_keys.iter() {
-                        if rel.columns.contains(&primary_key.name) {
-                            count_pk += 1;
-                        }
-                    }
-                    if count_pk == entity.primary_keys.len() {
-                        unique = true;
-                    }
-                }
+                });
+                // a unique constraint over exactly the key's columns constrains
+                // the key as a whole, which one-column-at-a-time cannot see
+                let key_is_unique = unique_column_sets.contains(&key_columns);
+                let key_is_primary = key_columns.len() == entity.primary_keys.len()
+                    && entity
+                        .primary_keys
+                        .iter()
+                        .all(|primary_key| key_columns.contains(&primary_key.name));
+                let unique = every_column_unique || key_is_unique || key_is_primary;
                 let rel_type = if unique {
                     RelationType::HasOne
                 } else {
@@ -153,6 +157,8 @@ impl EntityTransformer {
                 }
             }
         }
+        validate_references(&entities)?;
+        validate_identities(&entities, &enums)?;
         for (tbl_name, relations) in inverse_relations.into_iter() {
             if let Some(entity) = entities.get_mut(&tbl_name) {
                 for relation in relations.into_iter() {
@@ -168,12 +174,28 @@ impl EntityTransformer {
         }
         let mut conjunct_relations: Vec<(String, ConjunctRelation)> = Vec::new();
         for (table_name, entity) in entities.iter() {
-            if entity.primary_keys.len() != 2 {
-                continue;
-            }
-            let [one, other] = entity.relations.as_slice() else {
+            // only the table's own foreign keys are junction legs; the inverse
+            // relations synthesised above are relations of other tables' keys
+            let owned: Vec<&Relation> = entity
+                .relations
+                .iter()
+                .filter(|rel| {
+                    matches!(rel.rel_type, RelationType::BelongsTo) && !rel.columns.is_empty()
+                })
+                .collect();
+            let [one, other] = owned.as_slice() else {
                 continue;
             };
+            let key_columns: BTreeSet<&String> =
+                one.columns.iter().chain(other.columns.iter()).collect();
+            let primary_keys: BTreeSet<&String> = entity
+                .primary_keys
+                .iter()
+                .map(|primary_key| &primary_key.name)
+                .collect();
+            if key_columns != primary_keys {
+                continue;
+            }
             for (rel, another_rel) in [(one, other), (other, one)] {
                 conjunct_relations.push((
                     rel.ref_table.clone(),
@@ -233,6 +255,119 @@ impl EntityTransformer {
             active_enum.validate()?;
         }
         Ok(EntityWriter { entities, enums })
+    }
+}
+
+/// Every relation joins tables and columns this schema has: a generated file
+/// names its target's module and columns, so a foreign key onto a table the
+/// caller did not pass would generate Rust that does not compile.
+// [spec:pgorm:sem:codegen.entity.transform+6]
+fn validate_references(entities: &BTreeMap<String, Entity>) -> Result<(), Error> {
+    for (table_name, entity) in entities.iter() {
+        for relation in entity.relations.iter() {
+            let ref_table = relation.ref_table.as_str();
+            let context = format!("table `{table_name}`: relation to `{ref_table}`");
+            let Some(ref_entity) = entities.get(ref_table) else {
+                return Err(Error::TransformError(format!(
+                    "{context} names a table the schema does not define"
+                )));
+            };
+            for column in relation.columns.iter() {
+                if !entity.columns.iter().any(|col| &col.name == column) {
+                    return Err(Error::TransformError(format!(
+                        "{context} constrains column `{column}`, which the table does not have"
+                    )));
+                }
+            }
+            for ref_column in relation.ref_columns.iter() {
+                if !ref_entity.columns.iter().any(|col| &col.name == ref_column) {
+                    return Err(Error::TransformError(format!(
+                        "{context} references column `{ref_column}`, which `{ref_table}` does not \
+                         have"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Every identity the writer derives from a DB name belongs to one name alone.
+/// Two tables that derive one module name would write one file over the other
+/// and declare the module twice; two columns of a table, two enums or two
+/// values of one enum that derive one identifier would each emit a duplicate
+/// definition.
+// [spec:pgorm:req:codegen.entity.collisions]
+fn validate_identities(
+    entities: &BTreeMap<String, Entity>,
+    enums: &BTreeMap<String, ActiveEnum>,
+) -> Result<(), Error> {
+    let mut modules = Claims::default();
+    let mut types = Claims::default();
+    for (table_name, entity) in entities.iter() {
+        modules.claim(
+            "tables",
+            "module name",
+            escape_rust_keyword(entity.get_table_name_snake_case()),
+            table_name,
+        )?;
+        types.claim(
+            "tables",
+            "type name",
+            escape_rust_keyword(entity.get_table_name_camel_case()),
+            table_name,
+        )?;
+        let mut fields = Claims::default();
+        let whose = format!("table `{table_name}` columns");
+        for column in entity.columns.iter() {
+            fields.claim(
+                &whose,
+                "field name",
+                escape_rust_keyword(column.name.to_snake_case()),
+                &column.name,
+            )?;
+        }
+    }
+    let mut enum_types = Claims::default();
+    for (enum_name, active_enum) in enums.iter() {
+        enum_types.claim(
+            "enums",
+            "type name",
+            enum_name.to_upper_camel_case(),
+            enum_name,
+        )?;
+        let mut variants = Claims::default();
+        let whose = format!("enum `{enum_name}` values");
+        for (value, variant) in active_enum.variant_names() {
+            variants.claim(&whose, "variant name", variant, &value)?;
+        }
+    }
+    Ok(())
+}
+
+/// The DB name that claimed each derived identifier, so a second claim on one
+/// can name both sides.
+// [spec:pgorm:req:codegen.entity.collisions]
+#[derive(Default)]
+struct Claims(HashMap<String, String>);
+
+impl Claims {
+    /// Record `source`'s claim on `derived`, or report the name that claimed it
+    /// first. `whose` opens the message with the names in play (`tables`,
+    /// ``table `cake` columns``) and `what` names the identifier they share.
+    fn claim(
+        &mut self,
+        whose: &str,
+        what: &str,
+        derived: String,
+        source: &str,
+    ) -> Result<(), Error> {
+        if let Some(first) = self.0.insert(derived.clone(), source.to_owned()) {
+            return Err(Error::TransformError(format!(
+                "{whose} `{first}` and `{source}` both generate the {what} `{derived}`"
+            )));
+        }
+        Ok(())
     }
 }
 

@@ -229,7 +229,7 @@ fn expanded_pk_value_type_is_type_or_tuple() {
     let single = generate(vec![cake()], expanded());
     assert_contains(single.file("cake.rs"), "type ValueType = i32;");
 
-    let composite = generate(vec![cake_filling()], expanded());
+    let composite = generate(vec![cake(), cake_filling(), filling()], expanded());
     assert_contains(
         composite.file("cake_filling.rs"),
         "type ValueType = (i32, i32);",
@@ -310,7 +310,7 @@ fn compact_primary_key_facts_surface_as_field_attributes() {
     assert_contains(auto.file("cake.rs"), "#[pgorm(primary_key)] pub id: i32,");
     assert_not_contains(auto.file("cake.rs"), "auto_increment = false");
 
-    let composite = generate(vec![cake_filling()], Opts::default());
+    let composite = generate(vec![cake(), cake_filling(), filling()], Opts::default());
     assert_contains(
         composite.file("cake_filling.rs"),
         "#[pgorm(primary_key, auto_increment = false)] pub cake_id: i32,
