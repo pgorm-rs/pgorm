@@ -54,9 +54,9 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+2/test]    `Select::cursor_by`, `asc`/`desc`, and
+// [spec:pgorm:def:exec.cursor+3/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
-// [spec:pgorm:sem:exec.cursor.keyset+2/test]    `before` / `after` comparison
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
 // [spec:pgorm:sem:exec.cursor.window+1/test]    `first` and `last` replacing
 // each other, and `last` reversing the fetched buffer back into logical order
@@ -592,9 +592,9 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+2/test]    `SelectTwo::cursor_by` and
+// [spec:pgorm:def:exec.cursor+3/test]    `SelectTwo::cursor_by` and
 // `cursor_by_other` on a joined select, decoded through `into_model`
-// [spec:pgorm:sem:exec.cursor.order/test]    a joined cursor's automatic
+// [spec:pgorm:sem:exec.cursor.order+1/test]    a joined cursor's automatic
 // secondary order on the other entity's primary key, giving the deterministic
 // tiebreak the row order below depends on
 pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Error> {
@@ -1141,7 +1141,7 @@ fn ids(rows: &[cursor_composite::Model]) -> Vec<i32> {
     rows.iter().map(|row| row.id).collect()
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+2/test]    the row-value emulation of a
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the row-value emulation of a
 // composite boundary, in each arity, in both sort directions
 #[pgorm_macros::test]
 async fn cursor_composite_keyset() -> Result<(), Error> {
@@ -1233,7 +1233,7 @@ async fn cursor_composite_keyset() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+2/test]    a boundary whose arity does not
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    a boundary whose arity does not
 // match a runtime-built `Identity` is an `Error`, not a panic; the typed
 // counterpart of the same mismatch does not compile at all, which the
 // `compile_fail` doctests on `Select::cursor_by` prove
@@ -1287,7 +1287,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.order/test]    ordering clears any pre-existing
+// [spec:pgorm:sem:exec.cursor.order+1/test]    ordering clears any pre-existing
 // ORDER BY, applies the order columns in declared order, then the unary
 // secondary entries, all in the single resolved direction
 #[pgorm_macros::test]
@@ -1354,6 +1354,264 @@ async fn cursor_order_composition() -> Result<(), Error> {
         ),
     )]);
     assert_eq!(composite_secondary.first(8).all(&db).await?.len(), 8);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.cursor.order+1/test]    every execution composes onto a
+// copy of the query, so a moved boundary or a flipped direction replaces the
+// previous execution's WHERE instead of being ANDed onto it
+#[pgorm_macros::test]
+async fn cursor_reuse_replaces_boundary() -> Result<(), Error> {
+    use cursor_composite::{Column, Entity};
+
+    let ctx = TestContext::new("cursor_tests_reuse").await;
+    let db = ctx.db.get().await?;
+    seed_composite(&db).await?;
+
+    // Moving `after` back down the key: an accumulated `id > 5 AND id > 2`
+    // would still start at 6.
+    let mut cursor = Entity::find().cursor_by(Column::Id);
+    cursor.first(2);
+    assert_eq!(ids(&cursor.after(5).all(&db).await?), [6, 7]);
+    assert_eq!(ids(&cursor.after(2).all(&db).await?), [3, 4]);
+    assert_eq!(ids(&cursor.after(6).all(&db).await?), [7, 8]);
+
+    // And `before` the same way — visible only from the far end of the window,
+    // since `id < 3 AND id < 8` and `id < 8` share their first page.
+    let mut cursor = Entity::find().cursor_by(Column::Id);
+    cursor.first(2);
+    assert_eq!(ids(&cursor.before(3).all(&db).await?), [1, 2]);
+    assert_eq!(ids(&cursor.before(8).all(&db).await?), [1, 2]);
+    assert_eq!(ids(&cursor.last(2).all(&db).await?), [6, 7]);
+
+    // Flipping direction re-reads the boundary in the new sense rather than
+    // intersecting both senses into an empty page.
+    let mut cursor = Entity::find().cursor_by(Column::Id);
+    cursor.after(5).first(2);
+    assert_eq!(ids(&cursor.all(&db).await?), [6, 7]);
+    assert_eq!(ids(&cursor.desc().all(&db).await?), [4, 3]);
+    assert_eq!(ids(&cursor.asc().all(&db).await?), [6, 7]);
+
+    // Both boundaries at once, then narrowed.
+    let mut cursor = Entity::find().cursor_by(Column::Id);
+    cursor.after(2).before(7).first(10);
+    assert_eq!(ids(&cursor.all(&db).await?), [3, 4, 5, 6]);
+    assert_eq!(ids(&cursor.after(4).all(&db).await?), [5, 6]);
+
+    // A composite key replaces just as a unary one does.
+    let mut cursor = Entity::find().cursor_by((Column::A, Column::B));
+    cursor.first(2);
+    assert_eq!(ids(&cursor.after((2, 1)).all(&db).await?), [5, 6]);
+    assert_eq!(ids(&cursor.after((1, 1)).all(&db).await?), [2, 3]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    a secondary order column is a
+// trailing keyset column, so `after_with` resumes from inside a run of rows
+// sharing an order-column value where `after` alone skips its remainder
+#[pgorm_macros::test]
+async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
+    use cursor_composite::{Column, Entity};
+    use pgorm::IntoIdentity;
+
+    let ctx = TestContext::new("cursor_tests_secondary_tiebreak").await;
+    let db = ctx.db.get().await?;
+    seed_composite(&db).await?;
+
+    // Ordered by `b` then `id`, the rows run 1, 4, 7, 2, 5, 8, 3, 6 — three
+    // runs of equal `b`.
+    let table: DynIden = SeaRc::new(Entity);
+    let by_b = || {
+        let mut cursor = Entity::find().cursor_by(Column::B);
+        cursor.set_secondary_order_by(vec![(SeaRc::clone(&table), Column::Id.into_identity())]);
+        cursor
+    };
+
+    assert_eq!(ids(&by_b().first(2).all(&db).await?), [1, 4]);
+
+    // Resuming from row 4, mid-run, continues at 7.
+    assert_eq!(
+        ids(&by_b().after_with((1, 4)).first(2).all(&db).await?),
+        [7, 2]
+    );
+
+    // The boundary over the order columns alone is the documented fallback: it
+    // can only say "past every row with b = 1", so 7 is skipped.
+    assert_eq!(ids(&by_b().after(1).first(2).all(&db).await?), [2, 5]);
+
+    // `before_with` mirrors it, and `last` still takes the window from the far
+    // end of the same key.
+    assert_eq!(
+        ids(&by_b().before_with((2, 5)).last(2).all(&db).await?),
+        [7, 2]
+    );
+    assert_eq!(
+        ids(&by_b().before_with((2, 5)).first(2).all(&db).await?),
+        [1, 4]
+    );
+
+    // Descending reverses both the order and the comparison.
+    assert_eq!(ids(&by_b().desc().first(2).all(&db).await?), [6, 3]);
+    assert_eq!(
+        ids(&by_b().after_with((3, 3)).desc().first(3).all(&db).await?),
+        [8, 5, 2]
+    );
+
+    // Either arity is accepted; anything else is reported, not panicked.
+    assert_eq!(
+        by_b()
+            .after_with((1, 2, 3))
+            .first(1)
+            .all(&db)
+            .await
+            .unwrap_err()
+            .to_string(),
+        "Query Error: cursor boundary of arity 3 does not match 1 or 2 order column(s)"
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the tiebreak `SelectTwo::cursor_by`
+// installs on the other entity's primary key is part of the boundary, so a page
+// ending inside a joined row's repeats resumes without skipping or repeating
+#[pgorm_macros::test]
+async fn cursor_joined_tiebreak_boundary() -> Result<(), Error> {
+    let ctx = TestContext::new("cursor_tests_joined_tiebreak").await;
+    bakery_chain_schema::create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let mut bakeries = Vec::new();
+    for name in ["one", "two"] {
+        bakeries.push(
+            bakery::ActiveModel {
+                name: set(name),
+                profit_margin: set(10.4),
+                ..Default::default()
+            }
+            .insert(&db)
+            .await?,
+        );
+    }
+
+    // Three bakers in the first bakery, so a page size of two ends mid-run.
+    let mut bakers = Vec::new();
+    for (bakery, name) in [(0, "a"), (0, "b"), (0, "c"), (1, "d")] {
+        bakers.push(
+            baker::ActiveModel {
+                name: set(name),
+                contact_details: set(serde_json::json!({})),
+                bakery_id: set(Some(bakeries[bakery].id)),
+                ..Default::default()
+            }
+            .insert(&db)
+            .await?,
+        );
+    }
+
+    fn pairs(rows: &[(bakery::Model, Option<baker::Model>)]) -> Vec<(String, String)> {
+        rows.iter()
+            .map(|(bakery, baker)| {
+                let baker = baker.as_ref().map(|baker| baker.name.clone());
+                (bakery.name.clone(), baker.unwrap_or_default())
+            })
+            .collect()
+    }
+
+    let joined = || bakery::Entity::find().find_also_related(Baker);
+    let pair = |bakery: &str, baker: &str| (bakery.to_owned(), baker.to_owned());
+
+    let page = joined()
+        .cursor_by(bakery::Column::Id)
+        .first(2)
+        .all(&db)
+        .await?;
+    assert_eq!(pairs(&page), [pair("one", "a"), pair("one", "b")]);
+
+    // Resuming from the whole key of the page's last row picks up "c".
+    assert_eq!(
+        pairs(
+            &joined()
+                .cursor_by(bakery::Column::Id)
+                .after_with((bakeries[0].id, bakers[1].id))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [pair("one", "c"), pair("two", "d")]
+    );
+
+    // The bakery id alone can only say "past every row of bakery one", which is
+    // the documented fallback: "c" is lost.
+    assert_eq!(
+        pairs(
+            &joined()
+                .cursor_by(bakery::Column::Id)
+                .after(bakeries[0].id)
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [pair("two", "d")]
+    );
+
+    // Descending pages the same run from the other end.
+    let page = joined()
+        .cursor_by(bakery::Column::Id)
+        .desc()
+        .first(2)
+        .all(&db)
+        .await?;
+    assert_eq!(pairs(&page), [pair("two", "d"), pair("one", "c")]);
+    assert_eq!(
+        pairs(
+            &joined()
+                .cursor_by(bakery::Column::Id)
+                .after_with((bakeries[0].id, bakers[2].id))
+                .desc()
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [pair("one", "b"), pair("one", "a")]
+    );
+
+    // `before_with` is the mirror image.
+    assert_eq!(
+        pairs(
+            &joined()
+                .cursor_by(bakery::Column::Id)
+                .before_with((bakeries[1].id, bakers[3].id))
+                .last(2)
+                .all(&db)
+                .await?
+        ),
+        [pair("one", "b"), pair("one", "c")]
+    );
+
+    // The extended arity is checked when the query is composed.
+    assert_eq!(
+        joined()
+            .cursor_by(bakery::Column::Id)
+            .after_with((1, 2, 3))
+            .first(1)
+            .all(&db)
+            .await
+            .unwrap_err()
+            .to_string(),
+        "Query Error: cursor boundary of arity 3 does not match 1 or 2 order column(s)"
+    );
 
     drop(db);
     ctx.delete().await;

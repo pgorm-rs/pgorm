@@ -3017,6 +3017,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. SelectTwo::cursor_by auto-installs the other entity's PKs as tiebreaks (cursor.rs:497-507) but they reach only ORDER BY (:317-321); apply_filter builds the boundary exclusively from order_columns (:143-237), and K = first entity's ValueType means after/before cannot even accept a tiebreak value (:493). Scenario: cursor bakeries with find_also_related, page boundary lands mid-tie → the tie's remaining rows are skipped forever (strict >). Spec-conformant today — paginate.md documents the gap (exec.cursor.order frames secondary entries as order-only); the defect is in the specified design. Fix: include unary secondary entries as trailing keyset columns in the row-value expansion + additive API for tiebreak boundary values (after_with or joined K). Bumps exec.cursor.keyset+2→+3, exec.cursor.order, likely exec.cursor+2. Effort M-L, additive route non-breaking. Existing joined-cursor tests never resume across a tie, so new tie-crossing resume tests required."
                     }
+
+                    {
+                        at 2026-09-05T20:06:49.650565Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3029,6 +3036,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED. all(&mut self) applies limit/order/filters into the stored query each execution (cursor.rs:368-377); apply_filters cond_where's the boundary every call (:122-140) and add_condition ANDs, never replaces (pgorm-query condition.rs:616-633). Window and ORDER BY replace per-call; only the composed WHERE accumulates. Scenario: after(5); all(); after(2); all() → WHERE id > 5 AND id > 2 returns [6,7] instead of [3,4]; asc/desc flip with a boundary set yields an empty page. Suite is green only because tests re-execute with unchanged boundaries (idempotent duplicate predicates). Fix: compose into a clone in all() — self.query stays pristine. Effort S, non-breaking. Bumps exec.cursor.keyset+2→+3 (per-execution composition, replacing prior) and exec.cursor.order. Regression tests: change after between two all() calls; toggle direction with a boundary set."
+                    }
+
+                    {
+                        at 2026-09-05T20:06:45.834515Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

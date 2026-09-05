@@ -6,7 +6,8 @@ use crate::{
     error::query_err,
 };
 use pgorm_query::{
-    Condition, DynIden, Expr, Order, SeaRc, SelectStatement, SimpleExpr, Value, ValueTuple,
+    Condition, DynIden, Expr, IntoValueTuple, Order, SeaRc, SelectStatement, SimpleExpr, Value,
+    ValueTuple,
 };
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -45,7 +46,7 @@ impl Window {
 pub struct SelectUndecoded;
 
 /// Cursor pagination
-// [spec:pgorm:def:exec.cursor+2]
+// [spec:pgorm:def:exec.cursor+3]
 #[derive(Debug, Clone)]
 pub struct Cursor<S, K = ValueTuple> {
     query: SelectStatement,
@@ -60,7 +61,7 @@ pub struct Cursor<S, K = ValueTuple> {
     phantom: PhantomData<(S, K)>,
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+2]
+// [spec:pgorm:sem:exec.cursor.keyset+3]
 fn identity_arity(columns: &Identity) -> usize {
     match columns {
         Identity::Unary(..) => 1,
@@ -70,7 +71,7 @@ fn identity_arity(columns: &Identity) -> usize {
     }
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+2]
+// [spec:pgorm:sem:exec.cursor.keyset+3]
 fn value_tuple_arity(values: &ValueTuple) -> usize {
     match values {
         ValueTuple::One(..) => 1,
@@ -118,122 +119,127 @@ impl<S, K> Cursor<S, K> {
         self
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+2]
-    fn apply_filters(&mut self) -> Result<(), Error> {
+    /// [`Cursor::before`] over the cursor's whole sort key, secondary order
+    /// columns included.
+    ///
+    /// A joined cursor sorts by the other entity's primary key after its own
+    /// order columns, so a page can end part-way through a run of rows sharing
+    /// an order-column value. `before` cannot name that position — its arity is
+    /// the order columns' — so resuming from it drops the rest of the run. This
+    /// takes the full key of the row to resume from: the order-column values
+    /// followed by one value per unary secondary order column, in the order
+    /// they were installed.
+    ///
+    /// The extended arity is not the `K` the order columns fix, so it is
+    /// checked when the query is composed rather than by the compiler.
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
+    pub fn before_with<V>(&mut self, values: V) -> &mut Self
+    where
+        V: IntoValueTuple,
+    {
+        self.before = Some(values.into_value_tuple());
+        self
+    }
+
+    /// [`Cursor::after`] over the cursor's whole sort key, secondary order
+    /// columns included. See [`Cursor::before_with`].
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
+    pub fn after_with<V>(&mut self, values: V) -> &mut Self
+    where
+        V: IntoValueTuple,
+    {
+        self.after = Some(values.into_value_tuple());
+        self
+    }
+
+    /// The cursor's sort key, in comparison order: the order columns on the
+    /// cursor's table, then each unary secondary order entry on its own table.
+    ///
+    /// Both `ORDER BY` and the boundary comparison read this, so the row order
+    /// and the keyset predicate cannot disagree about what a page boundary is.
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
+    fn keyset_columns(&self) -> Vec<(DynIden, DynIden)> {
+        self.order_columns
+            .clone()
+            .into_iter()
+            .map(|col| (SeaRc::clone(&self.table), col))
+            .chain(
+                self.secondary_order_by
+                    .iter()
+                    .filter_map(|(tbl, col)| match col {
+                        Identity::Unary(c1) => Some((SeaRc::clone(tbl), SeaRc::clone(c1))),
+                        _ => None,
+                    }),
+            )
+            .collect()
+    }
+
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
+    fn apply_filters(&self, query: &mut SelectStatement) -> Result<(), Error> {
+        let beyond = |col: Expr, v| if self.sort_asc { col.gt(v) } else { col.lt(v) };
+        let short_of = |col: Expr, v| if self.sort_asc { col.lt(v) } else { col.gt(v) };
+
         if let Some(values) = self.after.clone() {
-            let condition = self.apply_filter(values, |c, v| {
-                let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
-                if self.sort_asc { exp.gt(v) } else { exp.lt(v) }
-            })?;
-            self.query.cond_where(condition);
+            let condition = self.apply_filter(values, beyond)?;
+            query.cond_where(condition);
         }
 
         if let Some(values) = self.before.clone() {
-            let condition = self.apply_filter(values, |c, v| {
-                let exp = Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c)));
-                if self.sort_asc { exp.lt(v) } else { exp.gt(v) }
-            })?;
-            self.query.cond_where(condition);
+            let condition = self.apply_filter(values, short_of)?;
+            query.cond_where(condition);
         }
 
         Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+2]
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
     fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, Error>
     where
-        F: Fn(&DynIden, Value) -> SimpleExpr,
+        F: Fn(Expr, Value) -> SimpleExpr,
     {
-        let condition = match (&self.order_columns, values) {
-            (Identity::Unary(c1), ValueTuple::One(v1)) => Condition::all().add(f(c1, v1)),
-            (Identity::Binary(c1, c2), ValueTuple::Two(v1, v2)) => Condition::any()
-                .add(
-                    Condition::all()
-                        .add(
-                            Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c1))).eq(v1.clone()),
-                        )
-                        .add(f(c2, v2)),
-                )
-                .add(f(c1, v1)),
-            (Identity::Ternary(c1, c2, c3), ValueTuple::Three(v1, v2, v3)) => Condition::any()
-                .add(
-                    Condition::all()
-                        .add(
-                            Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c1))).eq(v1.clone()),
-                        )
-                        .add(
-                            Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c2))).eq(v2.clone()),
-                        )
-                        .add(f(c3, v3)),
-                )
-                .add(
-                    Condition::all()
-                        .add(
-                            Expr::col((SeaRc::clone(&self.table), SeaRc::clone(c1))).eq(v1.clone()),
-                        )
-                        .add(f(c2, v2)),
-                )
-                .add(f(c1, v1)),
-            (Identity::Many(col_vec), ValueTuple::Many(val_vec))
-                if col_vec.len() == val_vec.len() =>
-            {
-                // The length of `col_vec` and `val_vec` should be equal and is denoted by "n".
-                //
-                // The elements of `col_vec` and `val_vec` are denoted by:
-                //   - `col_vec`: "col_1", "col_2", ..., "col_n-1", "col_n"
-                //   - `val_vec`: "val_1", "val_2", ..., "val_n-1", "val_n"
-                //
-                // The general form of the where condition should have "n" number of inner-AND-condition chained by an outer-OR-condition.
-                // The "n"-th inner-AND-condition should have exactly "n" number of column value expressions,
-                // to construct the expression we take the first "n" number of column and value from the respected vector.
-                //   - if it's not the last element, then we construct a "col_1 = val_1" equal expression
-                //   - otherwise, for the last element, we should construct a "col_n > val_n" greater than or "col_n < val_n" less than expression.
-                // i.e.
-                // WHERE
-                //   (col_1 = val_1 AND col_2 = val_2 AND ... AND col_n > val_n)
-                //   OR (col_1 = val_1 AND col_2 = val_2 AND ... AND col_n-1 > val_n-1)
-                //   OR (col_1 = val_1 AND col_2 = val_2 AND ... AND col_n-2 > val_n-2)
-                //   OR ...
-                //   OR (col_1 = val_1 AND col_2 > val_2)
-                //   OR (col_1 > val_1)
+        let keyset = self.keyset_columns();
+        let primary = identity_arity(&self.order_columns);
+        let arity = value_tuple_arity(&values);
 
-                // Counting from 1 to "n" (inclusive) but in reverse, i.e. n, n-1, ..., 2, 1
-                (1..=col_vec.len())
-                    .rev()
-                    .fold(Condition::any(), |cond_any, n| {
-                        // Construct the inner-AND-condition
-                        let inner_cond_all =
-                            // Take the first "n" elements from the column and value vector respectively
-                            col_vec.iter().zip(val_vec.iter()).enumerate().take(n).fold(
-                                Condition::all(),
-                                |inner_cond_all, (i, (col, val))| {
-                                    let val = val.clone();
-                                    // Construct a equal expression,
-                                    // except for the last one being greater than or less than expression
-                                    let expr = if i != (n - 1) {
-                                        Expr::col((SeaRc::clone(&self.table), SeaRc::clone(col)))
-                                            .eq(val)
-                                    } else {
-                                        f(col, val)
-                                    };
-                                    // Chain it with AND operator
-                                    inner_cond_all.add(expr)
-                                },
-                            );
-                        // Chain inner-AND-condition with OR operator
-                        cond_any.add(inner_cond_all)
-                    })
-            }
-            (columns, values) => {
-                return Err(query_err(format!(
-                    "cursor boundary of arity {} does not match {} order column(s)",
-                    value_tuple_arity(&values),
-                    identity_arity(columns),
-                )));
-            }
+        let columns = if arity == primary {
+            &keyset[..primary]
+        } else if arity == keyset.len() {
+            &keyset[..]
+        } else {
+            let expected = if keyset.len() > primary {
+                format!("{primary} or {}", keyset.len())
+            } else {
+                primary.to_string()
+            };
+            return Err(query_err(format!(
+                "cursor boundary of arity {arity} does not match {expected} order column(s)"
+            )));
         };
+        let values: Vec<Value> = values.into_iter().collect();
 
-        Ok(condition)
+        // For a key of n columns the boundary is the row-value comparison
+        // `(c1, ..., cn) ⋈ (v1, ..., vn)` written out as n disjuncts: the n-th
+        // holds the first n-1 columns equal and compares the n-th, so
+        //   (c1 = v1 AND ... AND cn ⋈ vn)
+        //   OR (c1 = v1 AND ... AND c(n-1) ⋈ v(n-1))
+        //   OR ... OR (c1 ⋈ v1)
+        let col =
+            |(tbl, col): &(DynIden, DynIden)| Expr::col((SeaRc::clone(tbl), SeaRc::clone(col)));
+        Ok((1..=columns.len())
+            .rev()
+            .fold(Condition::any(), |disjunction, n| {
+                disjunction.add(columns.iter().zip(values.iter()).take(n).enumerate().fold(
+                    Condition::all(),
+                    |conjunction, (i, (column, val))| {
+                        let val = val.clone();
+                        conjunction.add(if i + 1 == n {
+                            f(col(column), val)
+                        } else {
+                            col(column).eq(val)
+                        })
+                    },
+                ))
+            }))
     }
 
     /// Use ascending sort order
@@ -277,50 +283,34 @@ impl<S, K> Cursor<S, K> {
     }
 
     // [spec:pgorm:sem:exec.cursor.window+1]
-    fn apply_limit(&mut self) -> &mut Self {
+    fn apply_limit(&self, query: &mut SelectStatement) {
         if let Some(window) = self.window {
-            self.query.limit(window.rows());
+            query.limit(window.rows());
         }
-
-        self
     }
 
-    // [spec:pgorm:sem:exec.cursor.order]
-    fn apply_order_by(&mut self) -> &mut Self {
-        self.query.clear_order_by();
+    // [spec:pgorm:sem:exec.cursor.order+1]
+    fn apply_order_by(&mut self, query: &mut SelectStatement) {
+        query.clear_order_by();
         let ord = self.resolve_sort_order();
 
-        let query = &mut self.query;
-        let order = |query: &mut SelectStatement, col| {
-            query.order_by((SeaRc::clone(&self.table), SeaRc::clone(col)), ord.clone());
-        };
-        match &self.order_columns {
-            Identity::Unary(c1) => {
-                order(query, c1);
-            }
-            Identity::Binary(c1, c2) => {
-                order(query, c1);
-                order(query, c2);
-            }
-            Identity::Ternary(c1, c2, c3) => {
-                order(query, c1);
-                order(query, c2);
-                order(query, c3);
-            }
-            Identity::Many(vec) => {
-                for col in vec.iter() {
-                    order(query, col);
-                }
-            }
+        for (tbl, col) in self.keyset_columns() {
+            query.order_by((tbl, col), ord.clone());
         }
+    }
 
-        for (tbl, col) in self.secondary_order_by.iter().cloned() {
-            if let Identity::Unary(c1) = col {
-                query.order_by((tbl, c1), ord.clone());
-            };
-        }
-
-        self
+    /// Build the query to execute: the caller's query with this cursor's
+    /// window, order and boundary applied to a copy of it, so the cursor can be
+    /// re-executed with a moved boundary or a flipped direction without the
+    /// previous execution's clauses still on it.
+    // [spec:pgorm:sem:exec.cursor.order+1]
+    fn compose(&mut self) -> Result<SelectStatement, Error> {
+        let mut query = self.query.clone();
+        self.apply_limit(&mut query);
+        self.apply_order_by(&mut query);
+        self.apply_filters(&mut query)?;
+        ensure_select_list(&query)?;
+        Ok(query)
     }
 
     /// Construct a [Cursor] that fetch any custom struct
@@ -364,17 +354,12 @@ where
     S: SelectorTrait,
 {
     /// Fetch the paginated result
-    // [spec:pgorm:sem:exec.cursor.order]
+    // [spec:pgorm:sem:exec.cursor.order+1]
     pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
-        self.apply_limit();
-        self.apply_order_by();
-        self.apply_filters()?;
-        ensure_select_list(&self.query)?;
-
-        let (stmt, values) = self.query.build();
+        let (stmt, values) = self.compose()?.build();
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -415,7 +400,7 @@ impl<S, K> QueryOrder for Cursor<S, K> {
 }
 
 /// A trait for any type that can be turn into a cursor
-// [spec:pgorm:def:exec.cursor+2]
+// [spec:pgorm:def:exec.cursor+3]
 pub trait CursorTrait {
     /// Select operation
     type Selector: SelectorTrait + Send + Sync;
@@ -463,7 +448,7 @@ where
     /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
     /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
     /// ```
-    // [spec:pgorm:sem:exec.cursor.keyset+2/test]
+    // [spec:pgorm:sem:exec.cursor.keyset+3/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoIdentity,
@@ -490,6 +475,14 @@ where
     N: FromQueryResult + Sized + Send + Sync,
 {
     /// Convert into a cursor using column of first entity
+    ///
+    /// The other entity's primary key is installed as a secondary order column,
+    /// so a join that repeats a row of `E` still has a total order. Resume from
+    /// a page that ended inside such a run with [`Cursor::after_with`] /
+    /// [`Cursor::before_with`], which take those trailing key values too;
+    /// [`Cursor::after`] alone compares only the order columns and skips the
+    /// rest of the run.
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
     where
         C: IdentityOf<E>,
@@ -508,6 +501,11 @@ where
     }
 
     /// Convert into a cursor using column of second entity
+    ///
+    /// The tiebreak on the first entity's primary key resumes through
+    /// [`Cursor::after_with`] / [`Cursor::before_with`], as for
+    /// [`SelectTwo::cursor_by`].
+    // [spec:pgorm:sem:exec.cursor.keyset+3]
     pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
     where
         C: IdentityOf<F>,

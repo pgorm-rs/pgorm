@@ -368,6 +368,8 @@ assertions (
     {id codegen-relation-integrity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:19.739973Z}
     {id connect-manager-options, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:14.642639Z}
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
+    {id cursor-joined-boundary, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:06:49.650565Z}
+    {id cursor-reuse, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:06:45.834515Z}
     {id decide.cli, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:33:17.849875Z}
     {id decide.docs, kind @complete, author "brendan@necessary.nu", at 2026-09-01T21:53:13.404026Z}
     {id decide.schema-comments, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:38:16.477006Z}

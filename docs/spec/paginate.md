@@ -9,21 +9,24 @@ including the remaining gaps in parameter binding.
 
 ## Cursor pagination (`exec.cursor`)
 
-> [spec:pgorm:def:exec.cursor+2]
+> [spec:pgorm:def:exec.cursor+3]
 > `Cursor<S, K>` wraps a `SelectStatement` plus the target table, an
 > `Identity` of one or more order columns, an optional `Window` row
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoIdentity::ValueType`
 > of `[spec:pgorm:def:entity.relation.def+4]` — and defaults to
-> `ValueTuple`. Cursors are created via `Select::cursor_by` (order columns
-> on the entity's table) and, for joined selects, `SelectTwo::cursor_by` /
-> `cursor_by_other` (order columns on the first or second entity
-> respectively), each returning a cursor keyed by its argument's
-> `ValueType`. `CursorTrait` names the `SelectorTrait` used to decode
-> rows; `into_model` and `into_partial_model` re-target the decoded type
-> and carry `K` across unchanged. `Cursor` also implements `QuerySelect`
-> and `QueryOrder` for further query modification.
+> `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
+> fixes, or by `before_with`/`after_with`, which take the cursor's whole
+> sort key including its secondary order columns and so cannot be typed by
+> `K` (`[spec:pgorm:sem:exec.cursor.keyset+3]`). Cursors are created via
+> `Select::cursor_by` (order columns on the entity's table) and, for joined
+> selects, `SelectTwo::cursor_by` / `cursor_by_other` (order columns on the
+> first or second entity respectively), each returning a cursor keyed by
+> its argument's `ValueType`. `CursorTrait` names the `SelectorTrait` used
+> to decode rows; `into_model` and `into_partial_model` re-target the
+> decoded type and carry `K` across unchanged. `Cursor` also implements
+> `QuerySelect` and `QueryOrder` for further query modification.
 >
 > `S` is unconstrained on the struct: only `Cursor::all` requires
 > `S: SelectorTrait`, because only fetching needs to decode. `SelectUndecoded`
@@ -32,29 +35,58 @@ including the remaining gaps in parameter binding.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+2]
+> [spec:pgorm:sem:exec.cursor.keyset+3]
+> A cursor's *keyset* is the column list its rows are totally ordered by:
+> the order columns, qualified with the cursor's table, followed by each
+> unary secondary order entry qualified with its own table
+> (`[spec:pgorm:sem:exec.cursor.order+1]`). `ORDER BY` and the boundary
+> comparison MUST both be built from that one list, so the row order and
+> the predicate that resumes it cannot disagree about where a page ends.
+>
 > `after(values)` filters to rows strictly beyond the boundary in the
 > logical sort direction: column `>` value when ascending, `<` when
 > descending. `before(values)` is the mirror image (`<` ascending, `>`
-> descending). For a composite order key of n columns, the boundary
-> expands to the row-value emulation
+> descending). For a key of n columns the boundary is the row-value
+> comparison `(c1, ..., cn) ⋈ (v1, ..., vn)` written out as
 > `(c1 = v1 AND ... AND cn ⋈ vn) OR (c1 = v1 AND ... AND c(n-1) ⋈ v(n-1)) OR ... OR (c1 ⋈ v1)`
-> where `⋈` is the direction comparison — specialized forms for unary,
-> binary, and ternary identities and a generic fold for `Identity::Many`.
-> Conditions are added to the query's `WHERE` via `cond_where`; both
-> `before` and `after` may be set simultaneously.
+> where `⋈` is the direction comparison — one generic fold over the keyset,
+> at every arity. Conditions are added to the composed query's `WHERE` via
+> `cond_where`; both `before` and `after` may be set simultaneously.
 >
-> Boundary arity is a type error, not a runtime one. `before` and `after`
-> accept any `V: IntoBoundary<K>`, and for the `K` a `cursor_by` argument
-> fixes, the only tuples implementing `IntoBoundary<K>` are those of the
-> same length — so `cursor_by((A, B)).after(1)` does not compile, and
-> neither does `cursor_by(A).after((1, 2))`. The one exception is a
-> runtime-built `Identity`, whose `ValueType` is `ValueTuple`: that `K`
-> admits any `IntoValueTuple`, keeping the arity check for execution.
-> A length that does not match the columns MUST then be reported when the
-> filters are composed, as `Error::Query(RuntimeError::Internal)` reading
-> "cursor boundary of arity {n} does not match {m} order column(s)". No
-> arity mismatch panics.
+> A boundary may be given at either of two arities, and its arity selects
+> how much of the keyset it compares. At the arity of the order columns it
+> compares those alone — the only shape available when there are no
+> secondary entries, and the fallback for a joined cursor: it can say no
+> more than "past every row sharing this order-column value", so resuming a
+> page that ended part-way through such a run drops the rest of that run.
+> At the arity of the whole keyset it compares the whole keyset, which
+> names a single row and resumes from it exactly. Any other length MUST be
+> reported when the filters are composed, as
+> `Error::Query(RuntimeError::Internal)` reading "cursor boundary of arity
+> {n} does not match {m} order column(s)" — with {m} written "{primary} or
+> {keyset}" when the cursor has secondary entries. No arity mismatch
+> panics.
+>
+> The order-column arity is a type error rather than a runtime one.
+> `before` and `after` accept any `V: IntoBoundary<K>`, and for the `K` a
+> `cursor_by` argument fixes, the only tuples implementing
+> `IntoBoundary<K>` are those of the same length — so
+> `cursor_by((A, B)).after(1)` does not compile, and neither does
+> `cursor_by(A).after((1, 2))`. The one exception is a runtime-built
+> `Identity`, whose `ValueType` is `ValueTuple`: that `K` admits any
+> `IntoValueTuple`, keeping the arity check for execution. The extended
+> arity has no such `K` to be checked against — it is the order columns'
+> length plus a secondary count fixed at run time — so `before_with` and
+> `after_with` take any `IntoValueTuple` and are checked when the filters
+> are composed. They accept either arity, so widening a call site is
+> adding `_with` and the trailing values.
+>
+> One limitation follows from comparing a joined table's column: under an
+> outer join a secondary key value may be `NULL`, and a `NULL` operand
+> makes the comparison `NULL` rather than true, so a row whose tiebreak
+> column is null is excluded from the page that `ORDER BY` would place it
+> in. Rows with a null keyset value are reachable through the order-column
+> boundary, not through an extended one.
 >
 > The comparison direction is read when the filters are composed, from the
 > cursor's final `sort_asc` — not at the call to `before`/`after`. So
@@ -75,19 +107,31 @@ including the remaining gaps in parameter binding.
 > decoding, so `all` always returns rows in the cursor's logical
 > (`asc`/`desc`) order regardless of windowing direction.
 
-> [spec:pgorm:sem:exec.cursor.order]
-> `Cursor::all` composes the query by applying the limit, then the order
-> clause, then the boundary filters, before building and executing via
-> `query_all` and decoding each row with the selector. Ordering first
-> clears any pre-existing `ORDER BY` on the query, then orders by each
-> order column (qualified with the cursor's table) in declared order,
-> then by each secondary order entry — all using the single resolved
-> direction of `exec.cursor.window`. Only `Identity::Unary` secondary
-> entries are applied; composite secondary identities are silently
-> ignored. `SelectTwo::cursor_by` automatically installs the other
-> entity's primary-key columns as secondary order entries (and
-> `cursor_by_other` installs the first entity's), giving joined cursors
-> a deterministic tiebreak.
+> [spec:pgorm:sem:exec.cursor.order+1]
+> `Cursor::all` composes each execution onto a *copy* of the stored query:
+> the limit, then the order clause, then the boundary filters are applied
+> to the clone, which is then built and executed via `query_all` and
+> decoded row by row with the selector. The stored query stays the one the
+> caller handed the cursor, so a cursor MUST be re-executable — the clauses
+> a `SelectStatement` replaces per call (`LIMIT`, `ORDER BY`) and the
+> `WHERE` it only ever conjoins to are alike here, and a moved boundary or
+> a flipped direction replaces the previous execution's rather than
+> intersecting with it. `after(5)` then `after(2)` therefore pages from 2,
+> not from `id > 5 AND id > 2`, and toggling `asc`/`desc` with a boundary
+> set does not compose a page that is empty by construction.
+>
+> Ordering first clears any pre-existing `ORDER BY` on the copy, then
+> orders by the cursor's keyset — its order columns qualified with its
+> table, in declared order, then its secondary order entries qualified with
+> theirs — all using the single resolved direction of
+> `exec.cursor.window`. This is the same list the boundary comparison of
+> `[spec:pgorm:sem:exec.cursor.keyset+3]` is built from. Only
+> `Identity::Unary` secondary entries take part; composite secondary
+> identities are silently ignored, in the ordering and in the boundary
+> alike. `SelectTwo::cursor_by` automatically installs the other entity's
+> primary-key columns as secondary order entries (and `cursor_by_other`
+> installs the first entity's), so a joined cursor is totally ordered and
+> can be resumed mid-tie through `after_with` / `before_with`.
 
 > [spec:pgorm:def:exec.cursor.binding+2]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`

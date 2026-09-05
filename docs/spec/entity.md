@@ -372,7 +372,7 @@ explicit limitations.
 > whose arity is only known at runtime. `IntoBoundary<K>` is the matching
 > relation on the value side, implemented exactly for the tuples whose length `K`
 > describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
-> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+2]`)
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+3]`)
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Identity` case is the only one left to check.
 
