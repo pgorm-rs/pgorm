@@ -36,14 +36,14 @@ fn built_filter_matches_text_compilation() {
     assert_eq!(built, text);
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]
+// [spec:pgorm:sem:pipeline.qualify+2/test]
 #[test]
 fn schema_qualified_from_renders_both_parts() {
     let built = sql_of(Pipeline::from_schema(alias("archive"), INVOICE));
     assert_eq!(built, "SELECT * FROM archive.invoice");
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]
+// [spec:pgorm:sem:pipeline.qualify+2/test]
 #[test]
 fn quoted_identifiers_survive_rendering() {
     let table = alias("User Order");
@@ -51,21 +51,21 @@ fn quoted_identifiers_survive_rendering() {
     assert_eq!(built, r#"SELECT "Total Price" FROM "User Order""#);
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]
+// [spec:pgorm:sem:pipeline.qualify+2/test]
 #[test]
 fn entity_source_uses_table_metadata() {
     let built = sql_of(Pipeline::from(cake::Entity));
     assert_eq!(built, "SELECT * FROM cake");
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]
+// [spec:pgorm:sem:pipeline.qualify+2/test]
 #[test]
 fn entity_source_honours_schema_name() {
     let built = sql_of(Pipeline::from(cake_filling_price::Entity));
     assert_eq!(built, "SELECT * FROM public.cake_filling_price");
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]    a column carries its own table
+// [spec:pgorm:sem:pipeline.qualify+2/test]    a column carries its own table
 #[test]
 fn entity_columns_are_qualified_by_construction() {
     let built = sql_of(
@@ -84,14 +84,14 @@ fn entity_columns_are_qualified_by_construction() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn cast_renders_as_postgres_cast() {
     let built = sql_of(Pipeline::from(INVOICE).derive(total().cast(CastType::Integer).as_("t")));
     assert_eq!(built, "SELECT *, CAST(total AS integer) AS t FROM invoice");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn in_array_of_bound_params_renders_in_list() {
     let built = sql_of(
@@ -101,21 +101,21 @@ fn in_array_of_bound_params_renders_in_list() {
     assert_eq!(built, "SELECT * FROM invoice WHERE total IN ($1, $2)");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn in_array_of_literals_inlines_them() {
     let built = sql_of(Pipeline::from(INVOICE).filter(total().in_array([1, 2, 3])));
     assert_eq!(built, "SELECT * FROM invoice WHERE total IN (1, 2, 3)");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn take_range_renders_limit_offset() {
     let built = sql_of(Pipeline::from(INVOICE).take_range(21..=30));
     assert_eq!(built, "SELECT * FROM invoice LIMIT 10 OFFSET 20");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn case_renders_case_when() {
     let built = sql_of(
@@ -128,7 +128,7 @@ fn case_renders_case_when() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+1/test]    a string literal is escaped, not
+// [spec:pgorm:req:pipeline.params+2/test]    a string literal is escaped, not
 // interpolated: it cannot close the quote it is written into
 #[test]
 fn string_literals_are_escaped() {
@@ -136,7 +136,7 @@ fn string_literals_are_escaped() {
     assert_eq!(built, "SELECT * FROM invoice WHERE note = 'o''clock'");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn null_handling_renders_is_null_forms() {
     let built = sql_of(Pipeline::from(INVOICE).filter(total().is_null().or(total().is_not_null())));
@@ -146,7 +146,7 @@ fn null_handling_renders_is_null_forms() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn coalesce_and_arithmetic_render_inline() {
     let built = sql_of(Pipeline::from(INVOICE).derive([
@@ -162,7 +162,7 @@ fn coalesce_and_arithmetic_render_inline() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn aggregate_functions_render_expected_sql() {
     let built = sql_of(
@@ -186,7 +186,7 @@ fn aggregate_functions_render_expected_sql() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn filter_after_aggregate_lands_in_having() {
     let spent = alias("total_spent");
@@ -208,7 +208,7 @@ fn filter_after_aggregate_lands_in_having() {
     assert!(parsed.having_clause.is_some());
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn filter_after_window_nests_through_cte() {
     let rn = alias("rn");
@@ -230,7 +230,7 @@ fn filter_after_window_nests_through_cte() {
     assert!(parsed.where_clause.is_some());
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn window_frame_renders_rows_between() {
     let built = sql_of(Pipeline::from(INVOICE).window(
@@ -243,14 +243,14 @@ fn window_frame_renders_rows_between() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn window_over_the_whole_relation_needs_no_keys() {
     let built = sql_of(Pipeline::from(INVOICE).window(sum(total()).as_(alias("grand")), over()));
     assert_eq!(built, "SELECT *, SUM(total) OVER () AS grand FROM invoice");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn lag_lead_first_last_render_window_calls() {
     let built = sql_of(Pipeline::from(INVOICE).window(
@@ -275,7 +275,7 @@ fn lag_lead_first_last_render_window_calls() {
     );
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn join_takes_an_explicit_condition() {
     let built = sql_of(Pipeline::from(INVOICE).join(
@@ -290,7 +290,7 @@ fn join_takes_an_explicit_condition() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+1/test]
+// [spec:pgorm:req:pipeline.params+2/test]
 #[test]
 fn placeholders_number_in_bind_order_across_stages() {
     let gross = alias("gross");
@@ -306,7 +306,7 @@ fn placeholders_number_in_bind_order_across_stages() {
     }
 }
 
-// [spec:pgorm:req:pipeline.params+1/test]    a literal is inlined, a bound
+// [spec:pgorm:req:pipeline.params+2/test]    a literal is inlined, a bound
 // value is not
 #[test]
 fn literals_inline_and_bound_values_do_not() {
@@ -322,7 +322,7 @@ fn literals_inline_and_bound_values_do_not() {
     assert_eq!(values.0.len(), 1);
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    one, a list, or a mix
+// [spec:pgorm:req:pipeline.surface+2/test]    one, a list, or a mix
 #[test]
 fn expression_lists_take_every_shape() {
     let one = sql_of(Pipeline::from(cake::Entity).select(cake::Column::Id));
@@ -343,7 +343,7 @@ fn expression_lists_take_every_shape() {
     assert_eq!(mixed, "SELECT name, id + 1 AS n, id * 2 FROM cake");
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]
+// [spec:pgorm:req:pipeline.surface+2/test]
 #[test]
 fn scopes_compose_as_pipeline_functions() {
     fn expensive(pipeline: Pipeline) -> Pipeline {
@@ -400,10 +400,315 @@ fn parsed_select(sql: &str) -> pg_query::protobuf::SelectStmt {
     }
 }
 
-// [spec:pgorm:sem:pipeline.qualify+1/test]
+// [spec:pgorm:sem:pipeline.qualify+2/test]
 #[test]
 fn reserved_word_table_is_quoted() {
     let order = alias("order");
     let built = sql_of(Pipeline::from(order).select((col(order, ID), col(order, TOTAL))));
     assert_eq!(built, r#"SELECT id, total FROM "order""#);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a pipeline is a from-source; its
+// params keep their positions and the consumer's continue after them
+#[test]
+fn from_pipeline_binds_as_cte() {
+    let spent = alias("spent");
+    let (sql, values) = Pipeline::from(
+        Pipeline::from(INVOICE)
+            .group(col(INVOICE, CUSTOMER_ID))
+            .aggregate(sum(total()).as_(spent))
+            .filter_with(|binder| spent.gt(binder.bind(10_i64))),
+    )
+    .filter_with(|binder| CUSTOMER_ID.ne(binder.bind(7_i32)))
+    .sort(spent.desc())
+    .into_sql()
+    .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT customer_id, COALESCE(SUM(total), 0) AS spent FROM invoice \
+         GROUP BY customer_id HAVING COALESCE(SUM(total), 0) > $1) \
+         SELECT customer_id, spent FROM table_0 WHERE customer_id <> $2 ORDER BY spent DESC"
+    );
+    assert_eq!(values.0.len(), 2);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    joining an aggregated pipeline:
+// the consumer binds first, the embedded params renumber after it
+#[test]
+fn join_pipeline_renumbers_embedded_params() {
+    let spent = alias("spent");
+    let spenders = Pipeline::from(INVOICE)
+        .group(col(INVOICE, CUSTOMER_ID))
+        .aggregate(sum(total()).as_(spent))
+        .filter_with(|binder| spent.gt(binder.bind(100_i64)));
+    let (sql, values) = Pipeline::from(CUSTOMER)
+        .filter_with(|binder| col(CUSTOMER, alias("active")).eq(binder.bind(true)))
+        .join(JoinSide::Inner, spenders, col(CUSTOMER, ID).eq(CUSTOMER_ID))
+        .select((col(CUSTOMER, alias("name")), spent))
+        .into_sql()
+        .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "WITH table_1 AS (SELECT name, id FROM customer WHERE active = $1), \
+         table_0 AS (SELECT customer_id, COALESCE(SUM(total), 0) AS spent FROM invoice \
+         GROUP BY customer_id HAVING COALESCE(SUM(total), 0) > $2) \
+         SELECT table_1.name, table_0.spent FROM table_1 \
+         INNER JOIN table_0 ON table_1.id = table_0.customer_id"
+    );
+    assert_eq!(values.0.len(), 2);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn append_renders_union_all() {
+    let (sql, values) = Pipeline::from(INVOICE)
+        .filter_with(|binder| total().gt(binder.bind(1_i64)))
+        .append(
+            Pipeline::from(alias("archived_invoice"))
+                .filter_with(|binder| col(alias("archived_invoice"), TOTAL).gt(binder.bind(2_i64))),
+        )
+        .into_sql()
+        .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "SELECT * FROM invoice WHERE total > $1 \
+         UNION ALL SELECT * FROM archived_invoice WHERE total > $2"
+    );
+    assert_eq!(values.0.len(), 2);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    distinct directly after append
+// folds to UNION DISTINCT
+#[test]
+fn append_then_distinct_renders_union_distinct() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .select(col(INVOICE, CUSTOMER_ID))
+            .append(Pipeline::from(alias("archive")).select(col(alias("archive"), CUSTOMER_ID)))
+            .distinct(),
+    );
+    assert_eq!(
+        built,
+        "SELECT customer_id FROM invoice UNION DISTINCT SELECT customer_id FROM archive"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn intersect_renders_intersect_all() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .select(col(INVOICE, CUSTOMER_ID))
+            .intersect(Pipeline::from(alias("refund")).select(col(alias("refund"), CUSTOMER_ID))),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT customer_id FROM refund) \
+         SELECT customer_id FROM invoice INTERSECT ALL SELECT * FROM table_0 AS b"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn remove_renders_except_all() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .select(col(INVOICE, CUSTOMER_ID))
+            .remove(Pipeline::from(alias("refund")).select(col(alias("refund"), CUSTOMER_ID))),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT customer_id FROM refund) \
+         SELECT customer_id FROM invoice EXCEPT ALL SELECT * FROM table_0 AS b"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn distinct_alone_renders_select_distinct() {
+    let built = sql_of(Pipeline::from(INVOICE).distinct());
+    assert_eq!(built, "SELECT DISTINCT * FROM invoice");
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a set operation takes a plain
+// table too
+#[test]
+fn append_accepts_a_table_source() {
+    let built = sql_of(Pipeline::from(INVOICE).append(alias("archived_invoice")));
+    assert_eq!(
+        built,
+        "SELECT * FROM invoice UNION ALL SELECT * FROM archived_invoice"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    sort and take inside an embedded
+// pipeline stay inside its CTE; PRQL's sticky sort carries outward
+#[test]
+fn take_and_sort_survive_embedding() {
+    let (sql, values) = Pipeline::from(
+        Pipeline::from(INVOICE)
+            .filter_with(|binder| total().gt(binder.bind(5_i64)))
+            .sort(total().desc())
+            .take(3),
+    )
+    .filter(CUSTOMER_ID.gt(1))
+    .into_sql()
+    .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT * FROM invoice WHERE total > $1 ORDER BY total DESC LIMIT 3) \
+         SELECT * FROM table_0 WHERE customer_id > 1 ORDER BY total DESC"
+    );
+    assert_eq!(values.0.len(), 1);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    embedding an embedder: bindings
+// renumber past the consumer's and three params stay aligned
+#[test]
+fn nested_embedding_renumbers_bindings_and_params() {
+    let inner = Pipeline::from(INVOICE).filter_with(|binder| total().gt(binder.bind(1_i64)));
+    let middle = Pipeline::from(inner).filter_with(|binder| CUSTOMER_ID.gt(binder.bind(2_i64)));
+    let (sql, values) = Pipeline::from(CUSTOMER)
+        .filter_with(|binder| col(CUSTOMER, ID).gt(binder.bind(3_i64)))
+        .join(
+            JoinSide::Inner,
+            middle,
+            col(CUSTOMER, ID).eq(that(CUSTOMER_ID)),
+        )
+        .into_sql()
+        .expect("pipeline compiles");
+    pg_query::parse(&sql).expect("grammar accepts");
+    assert_eq!(
+        sql,
+        "WITH table_2 AS (SELECT * FROM customer WHERE id > $1), \
+         table_0 AS (SELECT * FROM invoice WHERE total > $2), \
+         table_1 AS (SELECT * FROM table_0 WHERE customer_id > $3) \
+         SELECT table_2.*, table_1.* FROM table_2 \
+         INNER JOIN table_1 ON table_2.id = table_1.customer_id"
+    );
+    assert_eq!(values.0.len(), 3);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    the same alias declared in two
+// composed pipelines lives in two scopes; neither collides
+#[test]
+fn duplicate_aliases_across_pipelines_coexist() {
+    let n = alias("n");
+    let other = Pipeline::from(alias("b")).derive((col(alias("b"), alias("x")) + 1).as_(n));
+    let built = sql_of(
+        Pipeline::from(alias("a"))
+            .derive((col(alias("a"), alias("y")) + 2).as_(n))
+            .join(JoinSide::Left, other, col(alias("a"), ID).eq(that(ID))),
+    );
+    assert_eq!(
+        built,
+        "WITH table_1 AS (SELECT *, y + 2 AS n FROM a), \
+         table_0 AS (SELECT *, x + 1 AS n FROM b) \
+         SELECT table_1.*, table_0.* FROM table_1 \
+         LEFT OUTER JOIN table_0 ON table_1.id = table_0.id"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    an unqualified name both sides
+// export is refused by prqlc, by name
+#[test]
+fn ambiguous_embedded_column_is_a_compile_error() {
+    let x = alias("x");
+    let left = Pipeline::from(alias("a")).select(col(alias("a"), x));
+    let right = Pipeline::from(alias("b")).select(col(alias("b"), x));
+    let err = Pipeline::from(left)
+        .join(JoinSide::Inner, right, x.eq(x))
+        .into_sql()
+        .expect_err("ambiguity must be refused");
+    assert!(matches!(err, PipelineError::Compile(ref text) if text.contains("Ambiguous")));
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    this() and that() name the two
+// sides of the join when neither relation has a writable name
+#[test]
+fn that_qualifies_the_joined_relation() {
+    let x = alias("x");
+    let left = Pipeline::from(alias("a")).select(col(alias("a"), x));
+    let right = Pipeline::from(alias("b")).select(col(alias("b"), x));
+    let built = sql_of(Pipeline::from(left).join(JoinSide::Inner, right, this(x).eq(that(x))));
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT x FROM a), table_1 AS (SELECT x FROM b) \
+         SELECT table_0.x, table_1.x FROM table_0 \
+         INNER JOIN table_1 ON table_0.x = table_1.x"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    mismatched column counts are
+// refused at compile time when prqlc can see both projections
+#[test]
+fn append_column_count_mismatch_is_refused() {
+    let err = Pipeline::from(alias("a"))
+        .select(col(alias("a"), alias("x")))
+        .append(
+            Pipeline::from(alias("b")).select((col(alias("b"), alias("y")), col(alias("b"), ID))),
+        )
+        .into_sql()
+        .expect_err("column count mismatch must be refused");
+    assert!(matches!(err, PipelineError::Compile(_)));
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a reserved alias inside an
+// embedded pipeline is still screened
+#[test]
+fn reserved_alias_inside_embedded_pipeline_is_refused() {
+    let err = Pipeline::from(Pipeline::from(INVOICE).derive(total().as_("sum")))
+        .into_sql()
+        .expect_err("reserved alias must be refused");
+    assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
+}
+
+// [spec:pgorm:def:pipeline.adapter+2/test]    a let-bound composition built
+// directly matches the same query compiled from PRQL text
+#[test]
+fn built_composition_matches_text_compilation() {
+    let built = sql_of(
+        Pipeline::from(
+            Pipeline::from(INVOICE).filter_with(|binder| total().gt(binder.bind(5_i64))),
+        )
+        .filter(CUSTOMER_ID.gt(1)),
+    );
+    let text = compile_text(
+        "let table_0 = (from invoice | filter invoice.total > $1)\n\
+         from table_0 | filter customer_id > 1",
+    )
+    .expect("compiles");
+    assert_eq!(built, text);
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    after remove or intersect the
+// relation is renamed, so later stages refer to columns by bare name
+#[test]
+fn stages_after_remove_use_bare_names() {
+    let refund = Pipeline::from(alias("refund")).select(col(alias("refund"), CUSTOMER_ID));
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .select(col(INVOICE, CUSTOMER_ID))
+            .remove(refund.clone())
+            .sort(CUSTOMER_ID),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT customer_id FROM refund), \
+         table_1 AS (SELECT customer_id FROM invoice \
+         EXCEPT ALL SELECT * FROM table_0 AS b) \
+         SELECT customer_id FROM table_1 ORDER BY customer_id"
+    );
+
+    let err = Pipeline::from(INVOICE)
+        .select(col(INVOICE, CUSTOMER_ID))
+        .remove(refund)
+        .sort(col(INVOICE, CUSTOMER_ID))
+        .into_sql()
+        .expect_err("the source qualification is gone after a set op");
+    assert!(matches!(err, PipelineError::Compile(_)));
 }

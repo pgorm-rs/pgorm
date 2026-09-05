@@ -368,16 +368,19 @@ assertions (
     {id decide.statement, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:07.694429Z}
     {id decide.turso, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:54:51.122793Z}
     {id ergo.eq-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:19:37.671298Z}
+    {id ergo.fluent-alias, kind @complete, author "brendan@necessary.nu", at 2026-09-05T12:51:02.500287Z}
     {id ergo.fluent-audit, kind @complete, author "brendan@necessary.nu", at 2026-09-04T15:20:00.520126Z}
     {id ergo.fluent-deletions, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:27:17.172923Z}
     {id ergo.fluent-joins, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:44:09.940572Z}
     {id ergo.fluent-pipeline, kind @complete, author "brendan@necessary.nu", at 2026-09-05T12:12:43.627149Z}
     {id ergo.fluent-prelude, kind @complete, author "brendan@necessary.nu", at 2026-09-04T16:01:11.030623Z}
+    {id ergo.fluent-select, kind @complete, author "brendan@necessary.nu", at 2026-09-05T13:39:15.839239Z}
     {id ergo.fluent-sugar, kind @complete, author "brendan@necessary.nu", at 2026-09-04T15:52:59.018339Z}
     {id ergo.jsonb-vocab, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:48:38.413406Z}
     {id ergo.orm-bridge, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:22.67587Z}
     {id ergo.pipeline-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:17:19.821969Z}
     {id ergo.pipeline-permanent, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:58:54.622702Z}
+    {id ergo.pipeline-source, kind @complete, author "brendan@necessary.nu", at 2026-09-05T14:06:39.640499Z}
     {id ergo.pipeline-v1, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:30:49.030885Z}
     {id ergo.prql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-04T14:41:22.291401Z}
     {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
@@ -454,8 +457,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id ergo.fluent-alias, kind @complete, author "brendan@necessary.nu", at 2026-09-05T12:51:02.500287Z}
-    {id ergo.fluent-select, kind @complete, author "brendan@necessary.nu", at 2026-09-05T13:39:15.839239Z}
 )
 
 impl_evidence (
@@ -511,33 +512,6 @@ impl_evidence (
         {impl_name main, rule codegen.entity.types}
         {impl_name main, rule codegen.entity.types.datetime}
         {impl_name main, rule codegen.entity.types.unsupported}
-    ), rule_versions_seen (
-        {id codegen.entity, version 0}
-        {id codegen.entity.compact, version 0}
-        {id codegen.entity.compact.attrs, version 1}
-        {id codegen.entity.compact.model, version 0}
-        {id codegen.entity.context, version 1}
-        {id codegen.entity.enums, version 1}
-        {id codegen.entity.expanded, version 0}
-        {id codegen.entity.expanded.blocks, version 0}
-        {id codegen.entity.files, version 0}
-        {id codegen.entity.imports, version 0}
-        {id codegen.entity.keywords, version 1}
-        {id codegen.entity.pk, version 0}
-        {id codegen.entity.relations, version 1}
-        {id codegen.entity.relations.related, version 0}
-        {id codegen.entity.relations.via, version 0}
-        {id codegen.entity.seaography, version 0}
-        {id codegen.entity.serde, version 0}
-        {id codegen.entity.serde.derives, version 0}
-        {id codegen.entity.serde.skip, version 0}
-        {id codegen.entity.transform, version 5}
-        {id codegen.entity.transform.conjunct, version 0}
-        {id codegen.entity.transform.inverse, version 0}
-        {id codegen.entity.types, version 2}
-        {id codegen.entity.types.datetime, version 1}
-        {id codegen.entity.types.unsupported, version 1}
-        {id query.build.modifiers, version 6}
     )}
     {id codegen.macros, covered_rules (
         macros.derive
@@ -679,9 +653,12 @@ impl_evidence (
         {impl_name main, rule exec.cursor.binding-coerce}
         {impl_name main, rule sql.render.cast-param-type}
     ), rule_versions_seen (
+        {id exec.cursor.binding, version 2}
         {id exec.cursor.binding-coerce, version 0}
+        {id exec.cursor.binding-gaps, version 2}
         {id query.build.modifiers, version 6}
         {id sql.render.cast-param-type, version 0}
+        {id sql.render.writer, version 1}
     )}
     {id orm.entity, covered_rules (
         entity.active-model
@@ -735,32 +712,6 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
-    ), rule_versions_seen (
-        {id entity.active-model, version 2}
-        {id entity.active-model.active-value, version 0}
-        {id entity.active-model.active-value.ops, version 0}
-        {id entity.active-model.from-sugar, version 0}
-        {id entity.active-model.hooks, version 0}
-        {id entity.active-model.into, version 1}
-        {id entity.active-model.json, version 2}
-        {id entity.active-model.persistence, version 1}
-        {id entity.active-model.save, version 1}
-        {id entity.relation, version 1}
-        {id entity.relation.builder, version 1}
-        {id entity.relation.def, version 3}
-        {id entity.relation.fk, version 3}
-        {id entity.relation.linked, version 0}
-        {id entity.traits, version 0}
-        {id entity.traits.active-enum, version 1}
-        {id entity.traits.active-enum.limits, version 2}
-        {id entity.traits.column, version 1}
-        {id entity.traits.column-def, version 0}
-        {id entity.traits.column.enum-cast, version 1}
-        {id entity.traits.crud, version 2}
-        {id entity.traits.entity-name, version 1}
-        {id entity.traits.from-query-result, version 2}
-        {id entity.traits.model, version 2}
-        {id entity.traits.primary-key, version 1}
     )}
     {id orm.exec, covered_rules (
         exec.crud
@@ -960,6 +911,7 @@ impl_evidence (
         {id sql.ast.window-statement, version 2}
         {id sql.ast.with, version 2}
         {id sql.ast.with.recursive, version 1}
+        {id sql.ddl, version 1}
     )}
     {id sql.ddl, covered_rules (
         sql.ddl
@@ -991,6 +943,7 @@ impl_evidence (
         {impl_name main, rule sql.ddl.type-enum}
     ), rule_versions_seen (
         {id query.build.modifiers, version 6}
+        {id sql.ast.condition.holder, version 1}
         {id sql.ddl, version 5}
         {id sql.ddl.alter-table, version 3}
         {id sql.ddl.column-def, version 3}

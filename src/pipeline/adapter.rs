@@ -91,7 +91,7 @@ pub(super) fn lit_null() -> PlExpr {
 
 /// A `$N` placeholder. `ExprKind::Param` survives lowering untouched, so the
 /// index minted here is the index the emitted SQL carries.
-// [spec:pgorm:req:pipeline.params+1]
+// [spec:pgorm:req:pipeline.params+2]
 pub(super) fn param(index: usize) -> PlExpr {
     Expr::new(ExprKind::Param(index.to_string()))
 }
@@ -117,6 +117,79 @@ pub(super) fn int_range(start: Option<i64>, end: Option<i64>) -> PlExpr {
         start: start.map(|v| Box::new(lit_int(v))),
         end: end.map(|v| Box::new(lit_int(v))),
     }))
+}
+
+/// The internal name of the `index`-th `let` binding: `table_N`.
+///
+/// The same namespace prqlc mints its own wrapping CTEs in; its namer steps
+/// around taken names, so the two sequences never collide.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn binding_name(index: usize) -> String {
+    format!("table_{index}")
+}
+
+fn binding_index(name: &str) -> Option<usize> {
+    name.strip_prefix("table_")?.parse().ok()
+}
+
+/// Shift an embedded pipeline's frame so it keeps meaning inside its
+/// consumer: every `$N` placeholder moves up by `params`, and every
+/// reference to one of the pipeline's own `bindings` (of which it had
+/// `binding_count`) moves up by `binding_offset`.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn rebase(
+    node: &mut PlExpr,
+    params: usize,
+    binding_count: usize,
+    binding_offset: usize,
+) {
+    match &mut node.kind {
+        ExprKind::Param(index) => {
+            if let Ok(position) = index.parse::<usize>() {
+                *index = (position + params).to_string();
+            }
+        }
+        ExprKind::Ident(ident) => {
+            if ident.path.is_empty()
+                && let Some(index) = binding_index(&ident.name)
+                && index < binding_count
+            {
+                ident.name = binding_name(index + binding_offset);
+            }
+        }
+        ExprKind::Tuple(items) | ExprKind::Array(items) => {
+            for item in items {
+                rebase(item, params, binding_count, binding_offset);
+            }
+        }
+        ExprKind::Pipeline(pipeline) => {
+            for item in &mut pipeline.exprs {
+                rebase(item, params, binding_count, binding_offset);
+            }
+        }
+        ExprKind::Range(range) => {
+            for bound in [&mut range.start, &mut range.end].into_iter().flatten() {
+                rebase(bound, params, binding_count, binding_offset);
+            }
+        }
+        ExprKind::Binary(node) => {
+            rebase(&mut node.left, params, binding_count, binding_offset);
+            rebase(&mut node.right, params, binding_count, binding_offset);
+        }
+        ExprKind::Unary(node) => rebase(&mut node.expr, params, binding_count, binding_offset),
+        ExprKind::FuncCall(node) => {
+            for arg in node.args.iter_mut().chain(node.named_args.values_mut()) {
+                rebase(arg, params, binding_count, binding_offset);
+            }
+        }
+        ExprKind::Case(arms) => {
+            for arm in arms {
+                rebase(&mut arm.condition, params, binding_count, binding_offset);
+                rebase(&mut arm.value, params, binding_count, binding_offset);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Every alias set anywhere in `node`, in construction order.
@@ -161,26 +234,26 @@ pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
     }
 }
 
-/// Lower the assembled stages through prqlc: PL → RQ → PostgreSQL SQL.
+/// Lower the assembled bindings and stages through prqlc: PL → RQ →
+/// PostgreSQL SQL.
 ///
-/// The stages become the `main` variable of an anonymous module, the same
-/// shape `prqlc::prql_to_pl` produces for query text, so direct construction
-/// and text compilation are interchangeable.
+/// Each binding becomes a `let table_N = (...)` statement and the stages
+/// become the `main` variable of an anonymous module — the same shape
+/// `prqlc::prql_to_pl` produces for query text, so direct construction and
+/// text compilation are interchangeable. prqlc lowers each referenced
+/// binding to a CTE (or inlines it where SQL allows).
 // [spec:pgorm:def:pipeline.adapter+2]
-pub(super) fn compile(stages: Vec<PlExpr>) -> Result<String, String> {
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn compile(bindings: Vec<Vec<PlExpr>>, stages: Vec<PlExpr>) -> Result<String, String> {
+    let stmts = bindings
+        .into_iter()
+        .enumerate()
+        .map(|(index, stages)| stmt(VarDefKind::Let, binding_name(index), stages))
+        .chain([stmt(VarDefKind::Main, "main".into(), stages)])
+        .collect();
     let module = ModuleDef {
         name: "Project".into(),
-        stmts: vec![Stmt {
-            kind: StmtKind::VarDef(VarDef {
-                kind: VarDefKind::Main,
-                name: "main".into(),
-                value: Some(Box::new(nested(stages))),
-                ty: None,
-            }),
-            span: None,
-            annotations: vec![],
-            doc_comment: None,
-        }],
+        stmts,
     };
     let options = Options::default()
         .with_target(Target::Sql(Some(Dialect::Postgres)))
@@ -189,6 +262,20 @@ pub(super) fn compile(stages: Vec<PlExpr>) -> Result<String, String> {
     prqlc::pl_to_rq(module)
         .and_then(|rq| prqlc::rq_to_sql(rq, &options))
         .map_err(|errors| errors.to_string())
+}
+
+fn stmt(kind: VarDefKind, name: String, stages: Vec<PlExpr>) -> Stmt {
+    Stmt {
+        kind: StmtKind::VarDef(VarDef {
+            kind,
+            name,
+            value: Some(Box::new(nested(stages))),
+            ty: None,
+        }),
+        span: None,
+        annotations: vec![],
+        doc_comment: None,
+    }
 }
 
 #[cfg(test)]

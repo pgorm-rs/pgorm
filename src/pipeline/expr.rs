@@ -21,7 +21,7 @@ use super::funcs::CastType;
 /// [`Binder::bind`](super::Binder::bind) — is pinned to the brand of the
 /// binder that minted it, so carrying it into another pipeline (whose
 /// binding stages quantify over a fresh brand) does not typecheck.
-// [spec:pgorm:req:pipeline.params+1]
+// [spec:pgorm:req:pipeline.params+2]
 #[derive(Debug, Clone)]
 pub struct Expr<'brand> {
     pub(super) node: PlExpr,
@@ -51,7 +51,7 @@ pub(super) fn name<'brand>(name: &str) -> Expr<'brand> {
 /// name becomes ambiguous the moment a join enters the pipeline. Minting the
 /// reference from a `(table, column)` [`Iden`] pair makes the qualified form
 /// the only representable one.
-// [spec:pgorm:sem:pipeline.qualify+1]
+// [spec:pgorm:sem:pipeline.qualify+2]
 pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec![Iden::to_string(&table)],
@@ -59,9 +59,38 @@ pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
     ))
 }
 
+/// A column of the relation being joined — PRQL's `that` — for the join
+/// condition whose column name exists on both sides.
+///
+/// An embedded pipeline has no name the caller can write
+/// (`[spec:pgorm:req:pipeline.compose]`), so when its column shares a name
+/// with one of the consumer's, `that(column)` qualifies it by role instead:
+/// `that(ID)` is the joined relation's `id`. The qualification is scoped to
+/// the join condition; stages after the join refer to the column by its own
+/// name, renamed in the embedded pipeline's projection if it collides.
+// [spec:pgorm:req:pipeline.compose]
+pub fn that<'brand>(column: impl Iden) -> Expr<'brand> {
+    branded(adapter::ident_in(
+        vec!["that".to_owned()],
+        Iden::to_string(&column),
+    ))
+}
+
+/// A column of the pipeline built so far — PRQL's `this` — the left-hand
+/// counterpart of [`that`], for the join condition whose consumer is itself
+/// an embedded pipeline with no name to qualify by. Scoped to the join
+/// condition, like [`that`].
+// [spec:pgorm:req:pipeline.compose]
+pub fn this<'brand>(column: impl Iden) -> Expr<'brand> {
+    branded(adapter::ident_in(
+        vec!["this".to_owned()],
+        Iden::to_string(&column),
+    ))
+}
+
 /// An entity column is a table-qualified expression: the column enum carries
 /// its entity, so the qualification is recovered rather than restated.
-// [spec:pgorm:sem:pipeline.qualify+1]
+// [spec:pgorm:sem:pipeline.qualify+2]
 impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
     fn from(column: C) -> Self {
         branded(adapter::ident_in(
@@ -73,7 +102,7 @@ impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
 
 /// An alias token reads back the name it declared, unqualified — the name
 /// belongs to the pipeline, not to a table.
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 impl<'brand> From<AliasName> for Expr<'brand> {
     fn from(token: AliasName) -> Self {
         name(token.as_str())
@@ -85,7 +114,7 @@ macro_rules! literal {
         /// A Rust literal is an inline SQL literal, exactly as a literal
         /// written in PRQL text would be. Runtime values belong in
         /// [`Binder::bind`](super::Binder::bind).
-        // [spec:pgorm:req:pipeline.params+1]
+        // [spec:pgorm:req:pipeline.params+2]
         impl<'brand> From<$ty> for Expr<'brand> {
             fn from(value: $ty) -> Self {
                 let conv = $conv;
@@ -131,7 +160,7 @@ fn bin<'brand>(lhs: Expr<'brand>, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> 
 /// and the ORM spelling is then `ColumnTrait::gt(&col, v)`. A module usually
 /// speaks one of the two dialects, so importing the pipeline where it is
 /// used keeps them apart.
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 // Every operator here consumes its receiver: these build an expression, they
 // never inspect one, so `is_null` takes `self` like the rest of the trait.
 #[allow(clippy::wrong_self_convention)]
@@ -268,13 +297,13 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     }
 }
 
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 impl<'brand> ExprOps<'brand> for Expr<'brand> {}
 
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 impl<'brand> ExprOps<'brand> for AliasName {}
 
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
 
 /// A list of expressions, as the transforms that project, group and sort
@@ -294,7 +323,7 @@ impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
 ///     .select([C::Id, C::Name])                       // homogeneous
 ///     .select((C::Id, sum(C::Id).as_(total), total)); // mixed
 /// ```
-// [spec:pgorm:req:pipeline.surface+1]
+// [spec:pgorm:req:pipeline.surface+2]
 pub trait ExprList<'brand> {
     /// The expressions, in the order written.
     fn into_exprs(self) -> Vec<Expr<'brand>>;

@@ -63,6 +63,45 @@
 //! # Ok::<_, pgorm::pipeline::PipelineError>(())
 //! ```
 //!
+//! Pipelines also compose with each other: a whole [`Pipeline`] is a
+//! relation, so it can be the source of [`from`](Pipeline::from), the
+//! operand of a [`join`](Pipeline::join), or one side of
+//! [`append`](Pipeline::append) / [`intersect`](Pipeline::intersect) /
+//! [`remove`](Pipeline::remove). Embedding consumes the pipeline by value
+//! and merges its bound values into the consumer's, placeholders renumbered
+//! to match; prqlc lowers the embedded stages to a CTE. The top spenders,
+//! joined back to their names:
+//!
+//! ```
+//! use pgorm::pipeline::{ExprOps, JoinSide, Pipeline, alias, sum};
+//! use pgorm::tests_cfg::{cake, fruit};
+//!
+//! let sweetness = alias("sweetness");
+//! let sweetest = Pipeline::from(fruit::Entity)
+//!     .group(fruit::Column::CakeId)
+//!     .aggregate(sum(fruit::Column::Id).as_(sweetness))
+//!     .filter_with(|binder| sweetness.gt(binder.bind(10_i64)));
+//!
+//! let (sql, values) = Pipeline::from(cake::Entity)
+//!     .join(
+//!         JoinSide::Inner,
+//!         sweetest,
+//!         cake::Column::Id.eq(alias("cake_id")),
+//!     )
+//!     .select((cake::Column::Name, sweetness))
+//!     .into_sql()?;
+//!
+//! assert_eq!(
+//!     sql,
+//!     "WITH table_0 AS (SELECT cake_id, COALESCE(SUM(id), 0) AS sweetness \
+//!      FROM fruit GROUP BY cake_id HAVING COALESCE(SUM(id), 0) > $1) \
+//!      SELECT cake.name, table_0.sweetness FROM cake \
+//!      INNER JOIN table_0 ON cake.id = table_0.cake_id"
+//! );
+//! assert_eq!(values.0.len(), 1);
+//! # Ok::<_, pgorm::pipeline::PipelineError>(())
+//! ```
+//!
 //! The pipeline lowers typed Rust construction directly into prqlc's PL AST
 //! (no PRQL text round-trip), then through `pl_to_rq` and `rq_to_sql` with
 //! the PostgreSQL dialect. Every prqlc import lives in the private `adapter`
@@ -83,9 +122,9 @@ mod funcs;
 mod terminal;
 
 pub use binder::Binder;
-pub use builder::{Grouped, IntoSource, JoinSide, Over, Pipeline, by, over, sort_by};
+pub use builder::{Grouped, IntoSource, JoinSide, Over, Pipeline, Source, by, over, sort_by};
 pub use error::PipelineError;
-pub use expr::{Expr, ExprList, ExprOps, col};
+pub use expr::{Expr, ExprList, ExprOps, col, that, this};
 pub use funcs::{
     CastType, average, case, count, count_distinct, count_rows, first, lag, last, lead, max, min,
     null, rank, rank_dense, row_number, stddev, sum,

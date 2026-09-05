@@ -33,20 +33,25 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Surface
 
-> [spec:pgorm:req:pipeline.surface+1]
+> [spec:pgorm:req:pipeline.surface+2]
 > A `Pipeline` is constructed by `from(impl IntoSource)` or
 > `from_schema(schema, table)` — the only entry points, so a sourceless
 > pipeline is unrepresentable — and grown one whole transform at a time:
 > `filter`, `derive`, `select`, `group(keys)` followed by `aggregate(aggs)`,
 > `window(columns, over)`, `sort`, `take(i64)`,
-> `take_range(RangeInclusive<i64>)` (1-based, inclusive), and
-> `join(JoinSide, table, condition)` with an explicit condition only.
+> `take_range(RangeInclusive<i64>)` (1-based, inclusive),
+> `join(JoinSide, relation, condition)` with an explicit condition only, the
+> set operations `append` / `intersect` / `remove` over another relation,
+> and `distinct` ([spec:pgorm:req:pipeline.compose]). Every relation
+> position — the source, the join operand, a set-operation operand — takes
+> `impl IntoSource`, and a whole `Pipeline` is an `IntoSource`, so pipelines
+> compose with each other by the same spellings that name tables.
 >
 > Each transform has two forms. The plain one takes its expressions by value
 > — the whole query reads as one chained expression, with constants written
 > as Rust literals. The `_with` one takes a closure and hands it the `Binder`,
 > and exists only where a runtime value has to enter
-> (`[spec:pgorm:req:pipeline.params+1]`). The `_with` closures of the
+> (`[spec:pgorm:req:pipeline.params+2]`). The `_with` closures of the
 > list-taking transforms return a fixed-size `[Expr; N]`: an array is the one
 > list shape whose element type can be written under the higher-ranked brand.
 >
@@ -68,7 +73,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Every scalar position takes `impl Into<Expr>` and every list position takes
 > `impl ExprList`. `Into<Expr>` is implemented for `Expr` itself, for any
 > `ColumnTrait` column (qualified by its own entity,
-> `[spec:pgorm:sem:pipeline.qualify+1]`), for an `AliasName` token, and for
+> `[spec:pgorm:sem:pipeline.qualify+2]`), for an `AliasName` token, and for
 > the Rust literals `i32`, `i64`, `f64`, `bool` and `&str`. `ExprList` is
 > implemented for a single expression, for `[T; N]` and `Vec<T>` of one
 > convertible type, and for tuples of up to twelve mixed ones — the mixed
@@ -112,19 +117,20 @@ of the crate, compiled in every build. Rules are grouped under
 >
 > Because every transform maps relation to relation, any `fn(Pipeline) ->
 > Pipeline` is a composable query scope, and scopes may bind their own
-> parameters.
+> parameters; a finished pipeline composes with other pipelines whole, as a
+> relation ([spec:pgorm:req:pipeline.compose]).
 >
-> Deliberately outside v1 (cut vocabulary, not quality): the set operations
-> (`append`, `intersect`, `remove`), `loop`, s-strings and f-strings (raw
-> SQL interpolation holes), the `text` / `date` / `math` std modules, range
-> membership (`between`), join table aliases (and with them self-joins),
-> `group`-scoped bodies other than `aggregate` and `window`, and iterator
-> adapters as list arguments (an `ExprList` is an array, a `Vec`, a tuple or
-> a single expression; a computed sequence is collected into a `Vec` first).
+> Deliberately cut vocabulary (not quality): `loop`, s-strings and f-strings
+> (raw SQL interpolation holes), the `text` / `date` / `math` std modules,
+> range membership (`between`), join table aliases (and with them
+> self-joins), `group`-scoped bodies other than `aggregate` and `window`,
+> and iterator adapters as list arguments (an `ExprList` is an array, a
+> `Vec`, a tuple or a single expression; a computed sequence is collected
+> into a `Vec` first).
 
 ## Parameters
 
-> [spec:pgorm:req:pipeline.params+1]
+> [spec:pgorm:req:pipeline.params+2]
 > Values reach the SQL by exactly two routes, and the spelling says which.
 > A Rust literal — `1`, `1.5`, `true`, `"text"` — converts into an `Expr` and
 > is inlined into the SQL text, exactly as a literal written in PRQL text
@@ -153,9 +159,69 @@ of the crate, compiled in every build. Rules are grouped under
 > a placeholder cannot enter a partition or a window ordering — where it
 > would mean nothing anyway.
 >
+> The one sanctioned crossing between pipelines is embedding a whole
+> pipeline ([spec:pgorm:req:pipeline.compose]), which is sound where the
+> expression crossing is not because the values move with their
+> placeholders: the embedded pipeline's values append to the consumer's and
+> its placeholders renumber by the same offset, so the alignment invariant —
+> position `N` in the SQL is position `N` in the `Values` — is preserved
+> across the merge.
+>
 > `take` and `take_range` accept integers by value, not expressions: PRQL
 > refuses a parameterized `LIMIT`, so the signature mirrors the one form
 > that compiles.
+
+## Composition
+
+> [spec:pgorm:req:pipeline.compose]
+> A whole `Pipeline` is a relation: `IntoSource` is implemented for
+> `Pipeline` by value, so another pipeline can read it (`from`), join it
+> (`join`), or combine with it (`append` / `intersect` / `remove`). This is
+> PRQL's own composition mechanism, `let` bindings: each embedded pipeline
+> becomes a `let table_N = (...)` statement ahead of `main`, and prqlc
+> lowers each referenced binding to a CTE — or inlines it where SQL allows,
+> as it may for an `append` operand. `sort` and `take` inside an embedded
+> pipeline stay inside its binding (rendered in the CTE), and PRQL's sticky
+> `sort` carries outward to the reading pipeline, as it does in PRQL text.
+>
+> Embedding consumes the pipeline by value, and the consumption is the
+> re-branding: the embedded pipeline's values append to the consumer's, and
+> a rebase walk over its PL nodes shifts every `$N` placeholder up by the
+> count the consumer had already bound — prqlc passes `Param` nodes through
+> verbatim, so renumbering at PL-construction time is this module's job —
+> and shifts its own binding references past the bindings the consumer
+> already holds. Values and placeholders therefore cross together and stay
+> aligned; an unattached `Expr` still cannot cross
+> (`[spec:pgorm:req:pipeline.params+2]`). Nesting is unbounded: an embedded
+> pipeline's own embeddings ride along, renumbered the same way.
+>
+> The binding names are minted by the module — `table_N`, by position — and
+> are internal: no API takes or returns one, and callers refer to an
+> embedded pipeline's columns by their own names instead. prqlc mints its
+> wrapping CTEs in the same `table_N` namespace and steps around taken
+> names, so the two sequences coexist; the namespace is reserved, and a real
+> table sharing a minted name is shadowed by the binding. A name the
+> embedded pipeline introduced with `as_` is referred to unqualified
+> (the alias token); a name known to exactly one side of a join resolves to
+> that side even unqualified; a name both sides export is an ambiguity prqlc
+> refuses at `into_sql`, naming the candidates. In the join condition —
+> where neither an embedded relation nor a mid-pipeline consumer has a name
+> to qualify by — `this(column)` and `that(column)` qualify by role, PRQL's
+> own `this` / `that`, and are scoped to that condition. Alias tokens
+> declared in two composed pipelines never collide: each lives in its own
+> binding's scope, and the same name may be introduced in both.
+>
+> The set operations correspond by column position and emit the `ALL` forms:
+> `append` is `UNION ALL`, `intersect` is `INTERSECT ALL`, `remove` is
+> `EXCEPT ALL` (each row of the operand cancels one matching row, not all).
+> `distinct` is PRQL's `group this (take 1)`, rendered `SELECT DISTINCT`,
+> and folded by prqlc into `UNION DISTINCT` when it directly follows
+> `append`. When both projections are visible to prqlc a column-count
+> mismatch is refused at `into_sql`; relations with wildcard projections
+> are the server's to check. After `intersect` or `remove` the combined
+> relation is renamed, so later stages refer to its columns by bare name —
+> an entity-qualified reference no longer resolves — while after `append`
+> the left side's naming survives.
 
 ## Failure model
 
@@ -184,7 +250,7 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Qualification
 
-> [spec:pgorm:sem:pipeline.qualify+1]
+> [spec:pgorm:sem:pipeline.qualify+2]
 > Column references are table-qualified by construction. An entity column
 > already carries its entity, so `Into<Expr>` for `ColumnTrait` recovers the
 > qualification from `entity_name()` rather than making the caller restate
@@ -193,10 +259,14 @@ of the crate, compiled in every build. Rules are grouped under
 > constructed from a column. `col(table, column)` remains for the tables an
 > entity does not describe and for disambiguation, taking an `Iden` pair.
 >
-> `IntoSource` is what a pipeline reads from, and there are three: an
-> `EntityTrait` entity (which contributes its `table_name` and, when it has
-> one, its `EntityName::schema_name`, so an entity source is schema-correct
-> without a second spelling), an `AliasName` token, and an `Alias`.
+> `IntoSource` is any relation a pipeline can read — the source, the join
+> operand, a set-operation operand — and there are four: an `EntityTrait`
+> entity (which contributes its `table_name` and, when it has one, its
+> `EntityName::schema_name`, so an entity source is schema-correct without a
+> second spelling), an `AliasName` token, an `Alias`, and a whole `Pipeline`
+> ([spec:pgorm:req:pipeline.compose]). `into_source` yields the opaque
+> `Source` carrier, whose contents only the pipeline module can construct,
+> so the set of relation shapes is closed.
 > `from_schema(schema, table)` schema-qualifies a table no entity describes.
 > A schema rides the identifier path through prqlc's `default_db` namespace
 > and renders as `schema.table` — probed against the grammar oracle, with no

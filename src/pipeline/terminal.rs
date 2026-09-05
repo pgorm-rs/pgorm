@@ -21,7 +21,7 @@ impl Pipeline {
     // [spec:pgorm:req:pipeline.errors+1]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let mut aliases = Vec::new();
-        for stage in &self.stages {
+        for stage in self.bindings.iter().flatten().chain(&self.stages) {
             adapter::collect_aliases(stage, &mut aliases);
         }
         if let Some(name) = aliases
@@ -30,7 +30,7 @@ impl Pipeline {
         {
             return Err(PipelineError::ReservedAlias(name));
         }
-        let sql = adapter::compile(self.stages).map_err(PipelineError::Compile)?;
+        let sql = adapter::compile(self.bindings, self.stages).map_err(PipelineError::Compile)?;
         Ok((sql, Values(self.values)))
     }
 

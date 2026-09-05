@@ -29,6 +29,7 @@ use rust_decimal::Decimal;
 const SPENT: AliasName = alias("spent");
 const ORDER_COUNT: AliasName = alias("order_count");
 const RN: AliasName = alias("rn");
+const CUSTOMER_ID: AliasName = alias("customer_id");
 const RUNNING: AliasName = alias("running");
 
 struct Seeded {
@@ -101,7 +102,7 @@ fn spending() -> Pipeline {
         .aggregate((sum(O::Total).as_(SPENT), count_rows().as_(ORDER_COUNT)))
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    HAVING placement with a bound
+// [spec:pgorm:req:pipeline.surface+2/test]    HAVING placement with a bound
 // threshold: the group filter runs against grouped sums, not rows
 #[pgorm_macros::test]
 async fn having_filters_groups_with_bound_param() {
@@ -128,7 +129,7 @@ async fn having_filters_groups_with_bound_param() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    filter-after-window nests the
+// [spec:pgorm:req:pipeline.surface+2/test]    filter-after-window nests the
 // windowed stage in a CTE and filters outside it, with the rank bound
 #[pgorm_macros::test]
 async fn window_rank_filter_nests_through_cte() {
@@ -165,7 +166,7 @@ async fn window_rank_filter_nests_through_cte() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    explicit join condition against
+// [spec:pgorm:req:pipeline.surface+2/test]    explicit join condition against
 // live rows, with the customer name bound
 #[pgorm_macros::test]
 async fn join_on_explicit_condition_binds_params() {
@@ -196,7 +197,7 @@ async fn join_on_explicit_condition_binds_params() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    an explicit ROWS frame computes
+// [spec:pgorm:req:pipeline.surface+2/test]    an explicit ROWS frame computes
 // a running sum per partition on live rows
 #[pgorm_macros::test]
 async fn rows_frame_computes_running_sum() {
@@ -230,7 +231,7 @@ async fn rows_frame_computes_running_sum() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.surface+1/test]    fn(Pipeline) -> Pipeline scopes
+// [spec:pgorm:req:pipeline.surface+2/test]    fn(Pipeline) -> Pipeline scopes
 // compose, each binding its own parameters, and the placeholders stay aligned
 #[pgorm_macros::test]
 async fn composed_scopes_bind_params_in_order() {
@@ -293,6 +294,94 @@ async fn terminal_decodes_entity_models() {
         .await
         .unwrap();
     assert!(nobody.is_none());
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a union of two filtered
+// pipelines, one bound param each: the values interleave with their $N
+#[pgorm_macros::test]
+async fn union_of_filtered_pipelines_binds_both_params() {
+    let ctx = TestContext::new("pipeline_union_two_filtered").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let small = Pipeline::from(order::Entity)
+        .filter_with(|binder| O::Total.lt(binder.bind(rust_dec(6.0))))
+        .select(O::Total);
+    let pipeline = Pipeline::from(order::Entity)
+        .filter_with(|binder| O::Total.gt(binder.bind(rust_dec(25.0))))
+        .select(O::Total)
+        .append(small)
+        .sort(O::Total);
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("UNION ALL"), "{sql}");
+    assert_eq!(values.0.len(), 2);
+
+    let rows: Vec<(Decimal,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![(rust_dec(5.00),), (rust_dec(25.50),), (rust_dec(30.00),),]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    top spenders joined back to
+// their customers: params bound in the consumer and in the embedded pipeline
+#[pgorm_macros::test]
+async fn top_spenders_join_binds_across_pipelines() {
+    let ctx = TestContext::new("pipeline_top_spenders_join").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let spenders = spending().filter_with(|binder| SPENT.gt(binder.bind(rust_dec(40.0))));
+    let pipeline = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.ne(binder.bind("Zed")))
+        .join(JoinSide::Inner, spenders, C::Id.eq(CUSTOMER_ID))
+        .select((C::Name, SPENT))
+        .sort(SPENT.desc());
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(parsed_select(&sql).with_clause.is_some());
+    assert_eq!(values.0.len(), 2);
+
+    let rows: Vec<(String, Decimal)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("Alice".to_owned(), rust_dec(60.00)),
+            ("Bob".to_owned(), rust_dec(50.00)),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    remove drops one matching row
+// per row of the removed pipeline, with a param on each side
+#[pgorm_macros::test]
+async fn remove_pipeline_subtracts_matching_rows() {
+    let ctx = TestContext::new("pipeline_remove_matching").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    let seeded = seed(&db).await;
+
+    let big = Pipeline::from(order::Entity)
+        .filter_with(|binder| O::Total.gt(binder.bind(rust_dec(24.0))))
+        .select(O::CustomerId);
+    let pipeline = Pipeline::from(order::Entity)
+        .filter_with(|binder| O::Total.gt(binder.bind(rust_dec(9.0))))
+        .select(O::CustomerId)
+        .remove(big)
+        .sort(CUSTOMER_ID);
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("EXCEPT ALL"), "{sql}");
+    assert_eq!(values.0.len(), 2);
+
+    let rows: Vec<(i32,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(rows, vec![(seeded.alice,), (seeded.alice,)]);
 
     ctx.delete().await;
 }

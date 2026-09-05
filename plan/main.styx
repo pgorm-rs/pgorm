@@ -2945,12 +2945,20 @@ children (
                 title "Pipelines compose with each other: from(pipeline), join(pipeline), and the set operations"
                 kind @feat
                 deps (ergo.fluent-pipeline)
+                sealed true
                 log (
                     {
                         at 2026-09-05T13:35:04.998255Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator-approved (2026-09-05) after the composability assessment: pipelines compose within one chain but not with each other — from() takes an entity, so pipeline-as-source, pipeline-as-join-operand, and union/intersect/except of two pipelines are inexpressible. PRQL's own mechanism is let bindings (lowered by prqlc to CTEs): a pipeline bound to a name becomes a relation another pipeline can from/join/append. Build: from(other: Pipeline), join(side, other: Pipeline, on), and the set family (append = UNION ALL in PRQL; distinct via group; or the union/intersect/except forms prqlc's dialect emits — probe which spellings prqlc supports for Postgres and hold every render to the pg_query oracle). BRAND QUESTION is the crux: a source pipeline with bound params must carry its Values into the consumer with placeholder renumbering or a shared binder — probe prqlc first (does a let-bound relation's $N survive?), then design; the invariant stands: cross-pipeline smuggling of an unattached Expr stays a compile error while legitimate whole-pipeline embedding merges the value lists soundly (likely: consuming by value re-brands — the consumed pipeline's params append to the consumer's binder and its SQL-side $N renumber; if prqlc cannot renumber, offsetting at PL construction is ours). Also: alias(name) collision between the two pipelines' introduced names — decide and document. Terminals/decode unchanged. Estimate M. Spec: extend pipeline.surface/params or a new pipeline.compose rule."
+                    }
+
+                    {
+                        at 2026-09-05T14:06:39.640499Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

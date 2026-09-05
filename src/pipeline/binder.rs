@@ -42,7 +42,7 @@ use super::expr::{Expr, branded};
 /// assert_eq!(sql, "SELECT * FROM cake WHERE id = $1");
 /// assert_eq!(values.0.len(), 1);
 /// ```
-// [spec:pgorm:req:pipeline.params+1]
+// [spec:pgorm:req:pipeline.params+2]
 #[derive(Debug)]
 pub struct Binder<'brand> {
     values: &'brand mut Vec<Value>,
