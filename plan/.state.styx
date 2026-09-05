@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-05T13:40:35.71002Z
+last_sync_at 2026-09-05T14:09:42.339649Z
 
 rule_versions (
     {id codegen.entity, version 0}
@@ -512,6 +512,32 @@ impl_evidence (
         {impl_name main, rule codegen.entity.types}
         {impl_name main, rule codegen.entity.types.datetime}
         {impl_name main, rule codegen.entity.types.unsupported}
+    ), rule_versions_seen (
+        {id codegen.entity, version 0}
+        {id codegen.entity.compact, version 0}
+        {id codegen.entity.compact.attrs, version 1}
+        {id codegen.entity.compact.model, version 0}
+        {id codegen.entity.context, version 1}
+        {id codegen.entity.enums, version 1}
+        {id codegen.entity.expanded, version 0}
+        {id codegen.entity.expanded.blocks, version 0}
+        {id codegen.entity.files, version 0}
+        {id codegen.entity.imports, version 0}
+        {id codegen.entity.keywords, version 1}
+        {id codegen.entity.pk, version 0}
+        {id codegen.entity.relations, version 1}
+        {id codegen.entity.relations.related, version 0}
+        {id codegen.entity.relations.via, version 0}
+        {id codegen.entity.seaography, version 0}
+        {id codegen.entity.serde, version 0}
+        {id codegen.entity.serde.derives, version 0}
+        {id codegen.entity.serde.skip, version 0}
+        {id codegen.entity.transform, version 5}
+        {id codegen.entity.transform.conjunct, version 0}
+        {id codegen.entity.transform.inverse, version 0}
+        {id codegen.entity.types, version 2}
+        {id codegen.entity.types.datetime, version 1}
+        {id codegen.entity.types.unsupported, version 1}
     )}
     {id codegen.macros, covered_rules (
         macros.derive
@@ -559,6 +585,29 @@ impl_evidence (
         {impl_name main, rule macros.derive.relation}
         {impl_name main, rule macros.derive.test-attr}
         {impl_name main, rule macros.derive.value-type}
+    ), rule_versions_seen (
+        {id macros.derive, version 0}
+        {id macros.derive.active-enum, version 0}
+        {id macros.derive.active-enum.expansion, version 1}
+        {id macros.derive.active-model, version 2}
+        {id macros.derive.column, version 2}
+        {id macros.derive.entity, version 1}
+        {id macros.derive.entity-model, version 0}
+        {id macros.derive.entity-model.attrs, version 0}
+        {id macros.derive.entity-model.casing, version 1}
+        {id macros.derive.entity-model.column-def, version 3}
+        {id macros.derive.entity-model.primary-key, version 1}
+        {id macros.derive.entity-model.reject, version 1}
+        {id macros.derive.enum-def, version 0}
+        {id macros.derive.enum-iter, version 0}
+        {id macros.derive.from-query-result, version 1}
+        {id macros.derive.iden, version 1}
+        {id macros.derive.iden.query, version 0}
+        {id macros.derive.model, version 3}
+        {id macros.derive.partial-model, version 2}
+        {id macros.derive.relation, version 1}
+        {id macros.derive.test-attr, version 1}
+        {id macros.derive.value-type, version 1}
     )}
     {id decide.migration, covered_rules (
         migration.name
@@ -634,6 +683,10 @@ impl_evidence (
         {impl_name main, rule schema.from-entity}
         {impl_name main, rule schema.from-entity.enum}
         {impl_name main, rule schema.from-entity.index}
+    ), rule_versions_seen (
+        {id schema.from-entity, version 2}
+        {id schema.from-entity.enum, version 2}
+        {id schema.from-entity.index, version 1}
     )}
     {id infra.tx.closure, covered_rules (
         conn.tx.closure
@@ -712,6 +765,32 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
+    ), rule_versions_seen (
+        {id entity.active-model, version 2}
+        {id entity.active-model.active-value, version 1}
+        {id entity.active-model.active-value.ops, version 0}
+        {id entity.active-model.from-sugar, version 1}
+        {id entity.active-model.hooks, version 0}
+        {id entity.active-model.into, version 1}
+        {id entity.active-model.json, version 2}
+        {id entity.active-model.persistence, version 2}
+        {id entity.active-model.save, version 1}
+        {id entity.relation, version 1}
+        {id entity.relation.builder, version 1}
+        {id entity.relation.def, version 4}
+        {id entity.relation.fk, version 3}
+        {id entity.relation.linked, version 2}
+        {id entity.traits, version 1}
+        {id entity.traits.active-enum, version 1}
+        {id entity.traits.active-enum.limits, version 2}
+        {id entity.traits.column, version 3}
+        {id entity.traits.column-def, version 0}
+        {id entity.traits.column.enum-cast, version 1}
+        {id entity.traits.crud, version 3}
+        {id entity.traits.entity-name, version 1}
+        {id entity.traits.from-query-result, version 3}
+        {id entity.traits.model, version 3}
+        {id entity.traits.primary-key, version 2}
     )}
     {id orm.exec, covered_rules (
         exec.crud
@@ -828,6 +907,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule exec.stream}
         {impl_name main, rule exec.stream.decode}
+    ), rule_versions_seen (
+        {id conn.pool.conn-trait, version 1}
+        {id exec.stream, version 0}
+        {id exec.stream.decode, version 0}
+        {id metric.layer.delegate, version 1}
     )}
     {id sql.ast, covered_rules (
         sql.ast
