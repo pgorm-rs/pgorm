@@ -3108,6 +3108,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED (inherited verbatim from deadpool-postgres 0.14.1). pgorm_pool::Config declares target_session_attrs/channel_binding/load_balance_hosts (config.rs:113-118) with From conversions to the tokio-postgres enums (:495,:550,:574 — dead code, zero call sites), but get_pg_config (:208-293) never reads any of the three; URL-embedded settings survive (:209-210), struct/env-form settings silently drop. Scenario per the crate's own env-config doc example: target_session_attrs ReadWrite on a two-host HA setup → connections land on the hot standby, every write fails SQLSTATE 25006; channel_binding Require silently unenforced (security-posture downgrade); load_balance_hosts degrades to always-first-host. Note pgorm itself never uses pgorm_pool::Config — direct pgorm-pool consumers only. Fix: three if-let forwarding blocks before Ok(cfg). Effort S, non-breaking. Spec: no rule covers the Config conversion at all — new rule (req:conn.pool.config-forwarding)."
                     }
+
+                    {
+                        at 2026-09-05T19:51:28.002934Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3297,6 +3304,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED narrowly. The leak is pgorm_pool::Config's DERIVED Debug (config.rs:61-71): password and credentialed url print verbatim, and the doc comment actively promotes loading PG__PASSWORD into the struct. pgorm's own chains are safe: DatabasePool → deadpool Pool → Manager's manual Debug → tokio-postgres Config which redacts password as _ (0.7.18 config.rs:776); no tracing/log statement in-tree prints configs. Scenario: app deserializes Config from env per crate docs, does tracing::info!(?cfg) at startup → plaintext password in aggregated logs. Serialize is by-design for config round-tripping — leave it. Fix: hand-written Debug redacting password and url userinfo (tokio-postgres Redaction pattern). Effort S, non-breaking. Spec: nothing covers redaction — new rule (sem:conn.pool.config-redaction: Debug on config/pool types MUST NOT reveal credentials)."
                     }
+
+                    {
+                        at 2026-09-05T19:51:32.292134Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3309,6 +3323,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED, harder than the known gap: there is NO route to a DatabasePool with TLS at all, and the spec's stated workaround is wrong. All three entry points hard-code NoTls (database/mod.rs:37,62,91). pgorm-pool is fully TLS-generic and Pool is TLS-erased (Box<dyn Connect>, lib.rs:94,116-124), so a TLS pgorm_pool::Pool is buildable — but DatabasePool's field is pub(crate) with no constructor/From, and ConnectionTrait is never implemented for pgorm_pool::Object, so the spec's \"assemble a Manager directly\" (conn.md:26-28) yields a pool no ORM machinery runs on. Scenario: any managed PG requiring TLS (RDS force_ssl, Cloud SQL, Azure, Neon, Supabase) — connect fails at handshake and nothing reachable through pgorm fixes it. SEVERITY HIGH: adoption blocker for cloud PostgreSQL. Fix: connect_with_tls<T: MakeTlsConnect<Socket>+...>(config, tls) (+builder variant) or one-line From<pgorm_pool::Pool> for DatabasePool; Pool being TLS-erased makes this additive. Effort S. Bumps conn.pool+2→+3 (rule both mandates NoTls and asserts the false workaround). Shares root cause with connect-manager-options — sealed DatabasePool + manager frozen before any caller hook; consider one combined entry point."
+                    }
+
+                    {
+                        at 2026-09-05T19:51:09.445413Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -3323,6 +3344,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED. All three connect entry points hard-code ManagerConfig { RecyclingMethod::Fast, StatementCacheSize::default() (256) } and build the Manager BEFORE the caller's closure runs (database/mod.rs:32-37, 57-62, 85-91); the PoolBuilder closure surface (config/max_size/timeouts/queue_mode/hooks/runtime) cannot alter recycling or cache size; Manager.config is private, pool.manager() returns &Manager — post-construction mutation impossible. Only the tag escapes (multi's map key). Scenario: dead-but-not-closed connections after a network partition want RecyclingMethod::Verified (the exact case its doc describes), or StatementCacheSize::Disabled behind a DISCARD ALL pooler — inexpressible, and the raw-pool fallback is the same dead end as connect-tls. Fix: connect_with_config(config, mgr: ManagerConfig, build) + re-export ManagerConfig/RecyclingMethod/StatementCacheSize; folds naturally into the TLS entry point (M combined). Effort S alone, non-breaking. Bumps conn.pool+2→+3 (mandates the Fast/no-tag construction), touches conn.pool.multi+2 if multi grows the param; recycle/statement-cache.bound rules unchanged. Land WITH connect-tls (shared root cause, same rule bump)."
+                    }
+
+                    {
+                        at 2026-09-05T19:51:14.642639Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

@@ -1,6 +1,7 @@
 //! Configuration used for [`Pool`] creation.
 
 use std::{
+    borrow::Cow,
     env, fmt,
     net::IpAddr,
     num::NonZeroUsize,
@@ -58,7 +59,7 @@ use super::PoolConfig;
 ///     }
 /// }
 /// ```
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     /// Initialize the configuration by parsing the URL first.
     /// **Note**: All the other options override settings defined
@@ -124,6 +125,90 @@ pub struct Config {
 
     /// [`Pool`] configuration.
     pub pool: Option<PoolConfig>,
+}
+
+/// A value the [`fmt::Debug`] impl refuses to print, spelled `_` as
+/// [`tokio_postgres::Config`] spells it.
+struct Redaction;
+
+impl fmt::Debug for Redaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("_")
+    }
+}
+
+/// [`Config::url`] with its credentials removed.
+///
+/// The field holds whatever [`tokio_postgres::Config::from_str`] accepts, which
+/// is two spellings. In a URL the credentials are the `userinfo` before the
+/// authority's `@`, and everything after it — host, port, database, options —
+/// is what makes the printed value worth having, so only the `userinfo` is
+/// replaced. A libpq keyword/value string has no such delimiter and its quoting
+/// and escaping are not worth re-implementing to find one, so a string that
+/// mentions `password` at all is withheld whole.
+// [spec:pgorm:sem:conn.pool.config-redaction]    url credentials
+fn redact_url(url: &str) -> Cow<'_, str> {
+    let Some(scheme_end) = url.find("://") else {
+        return if url.contains("password") {
+            Cow::Borrowed("_")
+        } else {
+            Cow::Borrowed(url)
+        };
+    };
+
+    let authority_start = scheme_end + "://".len();
+    let authority_end = url[authority_start..]
+        .find(['/', '?', '#'])
+        .map_or(url.len(), |offset| authority_start + offset);
+
+    match url[authority_start..authority_end].rfind('@') {
+        Some(at) => Cow::Owned(format!(
+            "{}_{}",
+            &url[..authority_start],
+            &url[authority_start + at..]
+        )),
+        None => Cow::Borrowed(url),
+    }
+}
+
+/// Hand-written rather than derived because two fields carry credentials, and
+/// the type is built to be deserialized from the environment — the crate's own
+/// example fills it from `PG__PASSWORD` — so a derived impl would put the
+/// password in whatever log a `?cfg` reaches.
+// [spec:pgorm:sem:conn.pool.config-redaction]
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut config_dbg = &mut f.debug_struct("Config");
+        config_dbg = config_dbg
+            .field("url", &self.url.as_deref().map(redact_url))
+            .field("user", &self.user)
+            .field("password", &self.password.as_ref().map(|_| Redaction))
+            .field("dbname", &self.dbname)
+            .field("options", &self.options)
+            .field("application_name", &self.application_name)
+            .field("ssl_mode", &self.ssl_mode)
+            .field("host", &self.host)
+            .field("hosts", &self.hosts)
+            .field("hostaddr", &self.hostaddr)
+            .field("hostaddrs", &self.hostaddrs)
+            .field("port", &self.port)
+            .field("ports", &self.ports)
+            .field("connect_timeout", &self.connect_timeout)
+            .field("keepalives", &self.keepalives);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            config_dbg = config_dbg.field("keepalives_idle", &self.keepalives_idle);
+        }
+
+        config_dbg
+            .field("target_session_attrs", &self.target_session_attrs)
+            .field("channel_binding", &self.channel_binding)
+            .field("load_balance_hosts", &self.load_balance_hosts)
+            .field("manager", &self.manager)
+            .field("pool", &self.pool)
+            .finish()
+    }
 }
 
 /// This error is returned if there is something wrong with the configuration
@@ -204,6 +289,13 @@ impl Config {
 
     /// Returns [`tokio_postgres::Config`] which can be used to connect to
     /// the database.
+    ///
+    /// Every field this struct declares is applied here. A field carried but
+    /// never forwarded would be a setting the caller wrote and the connection
+    /// never saw, which for `target_session_attrs` and `channel_binding` means
+    /// silently connecting to a standby or without the binding that was asked
+    /// for.
+    // [spec:pgorm:req:conn.pool.config-forwarding]
     #[allow(unused_results)]
     pub fn get_pg_config(&self) -> Result<tokio_postgres::Config, ConfigError> {
         let mut cfg = if let Some(url) = &self.url {
@@ -288,6 +380,15 @@ impl Config {
         }
         if let Some(mode) = self.ssl_mode {
             cfg.ssl_mode(mode.into());
+        }
+        if let Some(target_session_attrs) = self.target_session_attrs {
+            cfg.target_session_attrs(target_session_attrs.into());
+        }
+        if let Some(channel_binding) = self.channel_binding {
+            cfg.channel_binding(channel_binding.into());
+        }
+        if let Some(load_balance_hosts) = self.load_balance_hosts {
+            cfg.load_balance_hosts(load_balance_hosts.into());
         }
         Ok(cfg)
     }
@@ -398,7 +499,7 @@ impl RecyclingMethod {
 /// say so with a large [`Bounded`](StatementCacheSize::Bounded). A zero bound
 /// is unrepresentable for the same reason: it would be
 /// [`Disabled`](StatementCacheSize::Disabled) spelled a second way.
-// [spec:pgorm:req:conn.pool.statement-cache.bound]
+// [spec:pgorm:req:conn.pool.statement-cache.bound+1]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum StatementCacheSize {
     /// Hold at most this many statements per connection.
@@ -418,7 +519,7 @@ const DEFAULT_STATEMENT_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(256) 
     None => NonZeroUsize::MIN,
 };
 
-// [spec:pgorm:req:conn.pool.statement-cache.bound]    the default bound
+// [spec:pgorm:req:conn.pool.statement-cache.bound+1]    the default bound
 impl Default for StatementCacheSize {
     fn default() -> Self {
         Self::Bounded(DEFAULT_STATEMENT_CACHE_SIZE)
@@ -492,6 +593,7 @@ pub enum TargetSessionAttrs {
     ReadWrite,
 }
 
+// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
 impl From<TargetSessionAttrs> for PgTargetSessionAttrs {
     fn from(attrs: TargetSessionAttrs) -> Self {
         match attrs {
@@ -547,6 +649,7 @@ pub enum ChannelBinding {
     Require,
 }
 
+// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
 impl From<ChannelBinding> for PgChannelBinding {
     fn from(cb: ChannelBinding) -> Self {
         match cb {
@@ -571,6 +674,7 @@ pub enum LoadBalanceHosts {
     Random,
 }
 
+// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
 impl From<LoadBalanceHosts> for PgLoadBalanceHosts {
     fn from(cb: LoadBalanceHosts) -> Self {
         match cb {

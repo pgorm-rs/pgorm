@@ -59,7 +59,9 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - Failsafe behavior for empty `insert_many` operations
 
 ### Connections
-`pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning an `Error`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is an `Error`, not a panic. TLS is not supported through these entry points (`NoTls` is hard-coded).
+`pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning an `Error`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is an `Error`, not a panic.
+
+`connect_with(config, tls, manager: ManagerConfig, build)` is the general entry point the other three delegate to, and the only route to TLS (any `MakeTlsConnect<Socket>` connector — `tokio-postgres-rustls`, `tokio-postgres-openssl`), to a `RecyclingMethod` other than `Fast`, or to a non-default `StatementCacheSize`. `ManagerConfig`, `RecyclingMethod`, `StatementCacheSize`, `PoolBuilder`, `NoTls`, `Socket`, `MakeTlsConnect` and `TlsConnect` are all re-exported from `pgorm`, so calling it needs no direct dependency on `pgorm-pool` or `tokio-postgres`. `DatabasePool` still has no public constructor beside it.
 
 ### Testing Setup
 Tests use a common setup pattern in `tests/common/setup/mod.rs` that:

@@ -20,7 +20,7 @@ use tokio_postgres::{
 /// `$call` is expanded twice, once per attempt, so it must be replayable: only
 /// the methods whose parameters are a reusable `&[&dyn ToSql]` slice can use
 /// this macro.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    evict, re-prepare, retry once
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    evict, re-prepare, retry once
 macro_rules! cached {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
@@ -50,7 +50,7 @@ macro_rules! cached {
 /// demand a `Send` bound the trait does not carry — so a rejected plan is
 /// evicted, which makes the next call re-prepare, and the error is returned as
 /// it stands.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    evict without a retry
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    evict without a retry
 macro_rules! cached_once {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
@@ -79,7 +79,7 @@ macro_rules! cached_once {
 /// which is localized, so a statement rejected on its own merits is retried
 /// once as well; it fails identically the second time, at the cost of one round
 /// trip on a call that was already failing.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]    the SQLSTATE that means "re-prepare"
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    the SQLSTATE that means "re-prepare"
 fn is_stale_cached_plan(error: &tokio_postgres::Error) -> bool {
     error.code() == Some(&SqlState::FEATURE_NOT_SUPPORTED)
 }

@@ -6,7 +6,11 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::entity::prelude::*;
-use pgorm_pool::{PoolBuilder, PoolConfig};
+use pgorm::{
+    Config, DatabasePool, MakeTlsConnect, ManagerConfig, NoTls, PoolBuilder, RecyclingMethod,
+    Socket, StatementCacheSize, TlsConnect,
+};
+use pgorm_pool::PoolConfig;
 use pretty_assertions::assert_eq;
 
 fn database_url() -> String {
@@ -31,7 +35,7 @@ where
         .get(0))
 }
 
-// [spec:pgorm:req:conn.pool+2/test]    connect() builds an untagged, default-sized, Fast-recycling pool
+// [spec:pgorm:req:conn.pool+3/test]    connect() builds an untagged, default-sized, Fast-recycling pool
 #[pgorm_macros::test]
 pub async fn connect_builds_default_fast_pool() -> Result<(), Error> {
     let pool = pgorm::connect(maintenance_config());
@@ -68,7 +72,7 @@ pub async fn connect_builds_default_fast_pool() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool+2/test]    connect_with_builder applies the closure before the pool is built
+// [spec:pgorm:req:conn.pool+3/test]    connect_with_builder applies the closure before the pool is built
 #[pgorm_macros::test]
 pub async fn connect_with_builder_applies_closure() -> Result<(), Error> {
     let pool = pgorm::connect_with_builder(maintenance_config(), |builder| builder.max_size(2))?;
@@ -97,7 +101,7 @@ pub async fn connect_with_builder_applies_closure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool+2/test]    a builder the caller cannot build yields Error, not a panic
+// [spec:pgorm:req:conn.pool+3/test]    a builder the caller cannot build yields Error, not a panic
 #[pgorm_macros::test]
 pub async fn connect_with_builder_errs_on_build_failure() -> Result<(), Error> {
     // deadpool refuses to build a pool with timeouts but no runtime.
@@ -111,6 +115,103 @@ pub async fn connect_with_builder_errs_on_build_failure() -> Result<(), Error> {
         err.to_string().contains("Timeouts require a runtime"),
         "the builder's own message is carried through, got {err}"
     );
+
+    Ok(())
+}
+
+/// `connect_with` is generic over the TLS connector rather than fixed to
+/// [`NoTls`], which is the whole of what makes a managed PostgreSQL reachable:
+/// this compiles only if an arbitrary `MakeTlsConnect` — a
+/// `tokio-postgres-rustls` or `tokio-postgres-openssl` connector — satisfies
+/// its bounds. The test server speaks no TLS, so there is nothing to hand it
+/// and the function is never called; that it type-checks is the assertion.
+// [spec:pgorm:req:conn.pool+3/test]    any TLS connector, not just NoTls
+fn connect_with_takes_any_tls_connector<T>(config: Config, tls: T) -> Result<DatabasePool, Error>
+where
+    T: MakeTlsConnect<Socket> + Clone + Sync + Send + 'static,
+    T::Stream: Sync + Send,
+    T::TlsConnect: Sync + Send,
+    <T::TlsConnect as TlsConnect<Socket>>::Future: Send,
+{
+    pgorm::connect_with(config, tls, ManagerConfig::default(), |builder| builder)
+}
+
+// [spec:pgorm:req:conn.pool+3/test]    connect_with reaches the ManagerConfig the shorthands fix
+#[pgorm_macros::test]
+pub async fn connect_with_applies_manager_config() -> Result<(), Error> {
+    // The three settings none of the shorthands can express: a caller-chosen
+    // tag, a recycling method other than Fast, and a statement cache that is
+    // not the default bound.
+    let pool = pgorm::connect_with(
+        maintenance_config(),
+        NoTls,
+        ManagerConfig {
+            recycling_method: RecyclingMethod::Clean,
+            tag: Some("connect-with-reader".to_owned()),
+            statement_cache: StatementCacheSize::Disabled,
+        },
+        |builder| builder.max_size(1),
+    )?;
+
+    assert_eq!(
+        pool.tag().as_str(),
+        "connect-with-reader",
+        "the tag comes from the ManagerConfig, not a generated default"
+    );
+    assert_eq!(
+        pool.status().max_size,
+        1,
+        "the builder closure shapes the pool, as it does for connect_with_builder"
+    );
+
+    // Capped at one connection, so the second checkout is the first one put
+    // through Manager::recycle.
+    let conn = pool.get().await?;
+    assert_eq!(conn.query_one("SELECT 1", &[]).await?.get::<_, i32>(0), 1);
+    conn.batch_execute("SET application_name = 'pgorm-connect-with'")
+        .await?;
+    assert_eq!(
+        session_setting(&conn, "application_name").await?,
+        "pgorm-connect-with"
+    );
+    drop(conn);
+
+    let conn = pool.get().await?;
+    assert_ne!(
+        session_setting(&conn, "application_name").await?,
+        "pgorm-connect-with",
+        "RecyclingMethod::Clean runs RESET ALL; Fast, which the shorthands fix, would not"
+    );
+
+    // StatementCacheSize::Disabled: each execution prepares its own statement
+    // and closes it when the last handle drops, so nothing outlives the call.
+    const SQL: &str = "SELECT 'connect-with-uncached'";
+    drop(conn.query_one(SQL, &[]).await?);
+    drop(conn.query_one(SQL, &[]).await?);
+    let live: i64 = conn
+        .query_one(
+            "SELECT count(*) FROM pg_prepared_statements WHERE statement = $1",
+            &[&SQL],
+        )
+        .await?
+        .get(0);
+    assert_eq!(live, 0, "a disabled cache holds no statement open");
+
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.pool+3/test]    connect_with fails like every other caller-input entry point
+#[pgorm_macros::test]
+pub async fn connect_with_errs_on_build_failure() -> Result<(), Error> {
+    let err = pgorm::connect_with(
+        maintenance_config(),
+        NoTls,
+        ManagerConfig::default(),
+        |builder| builder.wait_timeout(Some(Duration::from_secs(1))),
+    )
+    .expect_err("a wait timeout without a runtime cannot build");
+
+    assert!(matches!(err, Error::Custom(_)), "{err:?}");
 
     Ok(())
 }

@@ -51,7 +51,7 @@ async fn repeated_queries_reuse_one_prepared_statement() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    DDL that changes the result type
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2/test]    DDL that changes the result type
 #[pgorm_macros::test]
 async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     let ctx = TestContext::new("added_column_reprepares_stmtcache").await;
@@ -88,7 +88,7 @@ async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    exactly one retry, then the error
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2/test]    exactly one retry, then the error
 #[pgorm_macros::test]
 async fn a_second_stale_plan_error_surfaces() -> Result<(), Error> {
     let ctx = TestContext::new("second_stale_plan_stmtcache").await;
@@ -157,7 +157,7 @@ async fn transaction_shares_the_connection_cache() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+1/test]    ROLLBACK does not discard a Parse
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2/test]    ROLLBACK does not discard a Parse
 #[pgorm_macros::test]
 async fn rolled_back_transaction_keeps_its_statements() -> Result<(), Error> {
     let ctx = TestContext::new("rolled_back_keeps_stmtcache").await;

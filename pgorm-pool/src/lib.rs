@@ -400,7 +400,7 @@ impl StatementCache {
     /// recently used: recency would have to be written on every lookup, turning
     /// the read lock a cache hit takes today into an exclusive one. What the
     /// bound is for is stopping unbounded growth, and any victim achieves that.
-    // [spec:pgorm:req:conn.pool.statement-cache.bound]    evict one to make room
+    // [spec:pgorm:req:conn.pool.statement-cache.bound+1]    evict one to make room
     fn insert(&self, query: &str, types: &[Type], stmt: Statement) {
         let Some(capacity) = self.capacity.limit() else {
             return;
@@ -442,7 +442,7 @@ impl StatementCache {
     /// so this is [`tokio_postgres::Client::prepare_typed()`] itself.
     ///
     /// See [`tokio_postgres::Client::prepare_typed()`].
-    // [spec:pgorm:req:conn.pool.statement-cache.bound]    Disabled prepares afresh
+    // [spec:pgorm:req:conn.pool.statement-cache.bound+1]    Disabled prepares afresh
     pub async fn prepare_typed(
         &self,
         client: &PgClient,
@@ -489,7 +489,7 @@ impl ClientWrapper {
 
     /// [`ClientWrapper::new`] with the size of the connection's
     /// [`StatementCache`] chosen explicitly, as [`ManagerConfig`] does.
-    // [spec:pgorm:req:conn.pool.statement-cache.bound]    per-connection capacity
+    // [spec:pgorm:req:conn.pool.statement-cache.bound+1]    per-connection capacity
     #[must_use]
     pub fn with_cache_size(
         client: PgClient,

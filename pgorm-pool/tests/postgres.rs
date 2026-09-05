@@ -530,7 +530,7 @@ async fn statement_cache_keys_include_param_types() {
     assert_eq!(client.statement_cache.size(), 0);
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.bound/test]    the default bound
+// [spec:pgorm:req:conn.pool.statement-cache.bound+1/test]    the default bound
 #[test]
 fn statement_cache_is_bounded_by_default() {
     assert_eq!(
@@ -539,7 +539,7 @@ fn statement_cache_is_bounded_by_default() {
     );
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.bound/test]    a full cache evicts to make room
+// [spec:pgorm:req:conn.pool.statement-cache.bound+1/test]    a full cache evicts to make room
 #[tokio::test]
 async fn bounded_cache_evicts_to_make_room() {
     let pool = cache_size_pool(StatementCacheSize::Bounded(
@@ -565,7 +565,7 @@ async fn bounded_cache_evicts_to_make_room() {
     );
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.bound/test]    Disabled prepares afresh every time
+// [spec:pgorm:req:conn.pool.statement-cache.bound+1/test]    Disabled prepares afresh every time
 #[tokio::test]
 async fn disabled_cache_stores_nothing() {
     const SQL: &str = "SELECT 'uncacheable'";

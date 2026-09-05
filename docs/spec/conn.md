@@ -7,25 +7,52 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Pool construction and access
 
-> [spec:pgorm:req:conn.pool+2]
-> `connect(config: tokio_postgres::Config) -> DatabasePool` MUST construct a
-> deadpool-backed pool wrapping `pgorm_pool::Pool`: a `Manager` built from the
-> given config with `NoTls`, `RecyclingMethod::Fast`, and no tag, combined with
-> the default deadpool pool configuration. Its signature is infallible by
-> design, not by omission: `config` shapes the `Manager` and no caller input
-> reaches the pool builder, so the only way the build can fail is if pgorm's own
-> defaults are invalid. That is an internal invariant and MUST panic.
+> [spec:pgorm:req:conn.pool+3]
+> `connect_with(config, tls, manager, build)` is the general pool constructor,
+> and the only one: every other entry point delegates to it. It takes the
+> `tokio_postgres::Config`, a TLS connector bounded exactly as
+> `pgorm_pool::Manager::from_config` bounds its own (`T: MakeTlsConnect<Socket>
+> + Clone + Sync + Send + 'static`, plus `Send + Sync` on `T::Stream` and
+> `T::TlsConnect` and `Send` on the connect future), the whole `ManagerConfig`,
+> and a `FnOnce(PoolBuilder) -> PoolBuilder`. It builds the `Manager` from the
+> first three, applies `build` to the resulting `PoolBuilder`, and returns
+> `Result<DatabasePool, Error>`.
 >
-> `connect_with_builder(config, build)` MUST apply the caller's closure to the
-> `PoolBuilder` before building, allowing pool sizing and timeout customization,
-> and MUST return `Result<DatabasePool, Error>`. Because the closure is caller
-> input, a builder shaped into an unbuildable pool — deadpool rejects timeouts
-> configured without a runtime — MUST surface as `Error::Custom` carrying the
-> builder's message, never as a panic.
+> It exists because `DatabasePool` wraps a crate-private `pgorm_pool::Pool` and
+> has no other constructor, which made two things unreachable rather than merely
+> inconvenient. `Pool` is TLS-erased (`Box<dyn Connect>`), so a TLS pool was
+> always buildable inside `pgorm-pool` and never assignable to a `DatabasePool`
+> — leaving every managed PostgreSQL that requires TLS unusable through pgorm.
+> And the `Manager` was fully built before any caller hook could run, so
+> `RecyclingMethod::Verified`/`Clean`/`Custom` and
+> `StatementCacheSize::Bounded`/`Disabled` had no reachable setter at all:
+> `ManagerConfig` is private once the `Manager` holds it, and `PoolBuilder`
+> reaches only the pool. There is deliberately no `From<pgorm_pool::Pool> for
+> DatabasePool` beside it — construction stays funnelled through one function,
+> so a `DatabasePool` always holds a pool pgorm shaped.
 >
-> TLS connections are not supported through these entry points (`NoTls` is
-> hard-coded); a custom-TLS pool requires assembling a `pgorm_pool::Manager`
-> directly.
+> `ManagerConfig`, `RecyclingMethod`, `StatementCacheSize` and `PoolBuilder`,
+> together with `NoTls`, `Socket`, `MakeTlsConnect` and `TlsConnect`, MUST be
+> re-exported from `pgorm`. Every one of them is named in `connect_with`'s
+> signature or its bounds, and calling it should not require depending on
+> `pgorm-pool` or `tokio-postgres` directly.
+>
+> `connect(config: tokio_postgres::Config) -> DatabasePool` MUST delegate to
+> `connect_with` with `NoTls`, `RecyclingMethod::Fast`, no tag, the default
+> `StatementCacheSize`, and an identity builder closure — leaving the default
+> deadpool pool configuration. Its signature is infallible by design, not by
+> omission: `config` shapes the `Manager` and no caller input reaches the pool
+> builder, so the only way the build can fail is if pgorm's own defaults are
+> invalid. That is an internal invariant and MUST panic.
+>
+> `connect_with_builder(config, build)` MUST delegate with that same `NoTls` and
+> those same manager defaults, applying the caller's closure to the
+> `PoolBuilder` before building, and MUST return `Result<DatabasePool, Error>`.
+> Because the closure is caller input, a builder shaped into an unbuildable pool
+> — deadpool rejects timeouts configured without a runtime — MUST surface as
+> `Error::Custom` carrying the builder's message, never as a panic. That is the
+> rule for every fallible entry point here: `connect_with` itself, and
+> `connect_multi_with_builder` (`conn.pool.multi`), fail the same way.
 
 > [spec:pgorm:sem:conn.pool.get+1]
 > `DatabasePool::get()` asynchronously acquires a pooled connection and wraps
@@ -62,6 +89,53 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > public constructor (its field is crate-private and
 > `connect_multi_with_builder` returns the raw `BTreeMap` on success), so
 > outside the crate it is effectively read-only API surface.
+
+> [spec:pgorm:req:conn.pool.config-forwarding]
+> `pgorm_pool::Config` is the deserializable connection configuration — the
+> shape `PG__HOST`, `PG__PASSWORD`, `PG__SSL_MODE` and their siblings land in.
+> Every field it declares MUST reach the `tokio_postgres::Config` that
+> `get_pg_config` builds, or else MUST NOT be declared. A field the struct
+> accepts and the connection never sees is a setting the caller wrote and the
+> database was never told about, and nothing anywhere reports the gap.
+>
+> Three fields were declared, given `From` conversions to their tokio-postgres
+> counterparts, and then never applied: `target_session_attrs`,
+> `channel_binding`, and `load_balance_hosts`. The conversions were dead code,
+> and the settings were dropped in every spelling but one — a value embedded in
+> `url` survived, because `tokio_postgres::Config::from_str` parses it — so the
+> same setting was honoured or ignored depending on which way it was written.
+>
+> Two of the three lose more than configuration. `channel_binding: Require`
+> dropped downgrades the connection to whatever binding the server will settle
+> for, which is the opposite of what `Require` asks and is invisible.
+> `target_session_attrs: ReadWrite` dropped lets a connection land on a hot
+> standby, where the first write fails with SQLSTATE `25006` at run time — this
+> setting exists precisely to move that failure to connect time.
+>
+> `ssl_mode` was already forwarded and stays so. The rule is over the whole
+> struct, not over the three that happened to be missing.
+
+> [spec:pgorm:sem:conn.pool.config-redaction]
+> `Debug` on a pool configuration type MUST NOT reveal a credential.
+> `pgorm_pool::Config` carries two. `password` is one, and the crate's own
+> documentation tells the reader to fill it from `PG__PASSWORD`; `url` is the
+> other, since a connection string's `userinfo` holds the same secret in a
+> different spelling. A derived `Debug` printed both verbatim, so a single
+> `tracing::info!(?cfg)` at startup put the database password in the logs.
+>
+> The impl is therefore hand-written. `password` prints as `_` when set and
+> `None` when not — `tokio_postgres::Config`'s own redaction spelling, and the
+> reason pgorm's `DatabasePool` Debug chain was already safe. `url` prints with
+> its `userinfo` replaced by `_`, keeping the host, port, database and options
+> after it: those are what make the value worth printing, and only the part
+> before the `@` is secret. A `url` in libpq keyword/value form has no `@` to
+> cut at, and its quoting is not worth re-implementing to find the boundary, so
+> one that mentions `password` at all is withheld whole as `_`.
+>
+> `Serialize` is deliberately unchanged. Round-tripping the configuration is
+> what it is for, and a serializer that dropped the password would emit a config
+> that cannot connect; the two traits answer different questions, and only one
+> of them answers into a log.
 
 ## Connection lifecycle in pgorm-pool
 
@@ -110,7 +184,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > cached plan can be invalidated by DDL under it
 > (`conn.pool.statement-cache.invalidate`).
 
-> [spec:pgorm:req:conn.pool.statement-cache.bound]
+> [spec:pgorm:req:conn.pool.statement-cache.bound+1]
 > A `StatementCache` MUST be bounded. Its key space is the SQL text, and one
 > logical query spreads across many texts — an `IN` list rendered with a
 > placeholder per element is a different text at every arity, 25 of them for one
@@ -147,12 +221,12 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > statement it was decoded against. The `Close` reaches the server when that
 > happens, not when the entry leaves the map.
 >
-> pgorm's own `connect`, `connect_with_builder` and `connect_multi_with_builder`
-> (`conn.pool`, `conn.pool.multi`) build their `Manager` themselves and always
-> take the default; reaching the knob means constructing a `pgorm_pool::Manager`
-> directly, as custom TLS does.
+> pgorm's `connect`, `connect_with_builder` and `connect_multi_with_builder`
+> (`conn.pool`, `conn.pool.multi`) always take the default. The knob is reached
+> through `connect_with`, the general entry point those three delegate to, which
+> takes the whole `ManagerConfig`.
 
-> [spec:pgorm:req:conn.pool.statement-cache.invalidate+1]
+> [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]
 > Reusing a prepared statement admits one failure that preparing afresh does
 > not: PostgreSQL raises SQLSTATE `0A000` — *cached plan must not change result
 > type* — when a statement's plan is revalidated and the result it would now
@@ -194,9 +268,9 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > method whose SQL deallocates — `Custom("DISCARD ALL")`, which is exactly what
 > `Clean` avoids (`conn.pool.recycle`) — drops every server-side statement while
 > the cache keeps naming them, and the next use fails with SQLSTATE `26000`,
-> which is not retried. pgorm's own pools recycle with `Fast`, so they cannot
-> reach it; a caller assembling a `Manager` with such a method should pair it
-> with `StatementCacheSize::Disabled`.
+> which is not retried. `connect` and its two sibling shorthands recycle with
+> `Fast` (`conn.pool`), so they cannot reach it; a caller who passes such a
+> method to `connect_with` should pair it with `StatementCacheSize::Disabled`.
 
 ## Statement execution surface
 
