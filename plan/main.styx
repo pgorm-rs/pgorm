@@ -3000,4 +3000,411 @@ children (
             }
         )
     }
+
+    {
+        id defect
+        title "Adversarial review defects"
+        kind @fix
+        children (
+            {
+                id cursor-joined-boundary
+                title "Include automatic joined-cursor tiebreak keys in continuation boundaries"
+                deps (cursor-reuse)
+                log (
+                    {
+                        at 2026-09-05T14:50:34.702156Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. SelectTwo::cursor_by auto-installs the other entity's PKs as tiebreaks (cursor.rs:497-507) but they reach only ORDER BY (:317-321); apply_filter builds the boundary exclusively from order_columns (:143-237), and K = first entity's ValueType means after/before cannot even accept a tiebreak value (:493). Scenario: cursor bakeries with find_also_related, page boundary lands mid-tie → the tie's remaining rows are skipped forever (strict >). Spec-conformant today — paginate.md documents the gap (exec.cursor.order frames secondary entries as order-only); the defect is in the specified design. Fix: include unary secondary entries as trailing keyset columns in the row-value expansion + additive API for tiebreak boundary values (after_with or joined K). Bumps exec.cursor.keyset+2→+3, exec.cursor.order, likely exec.cursor+2. Effort M-L, additive route non-breaking. Existing joined-cursor tests never resume across a tie, so new tie-crossing resume tests required."
+                    }
+                )
+            }
+
+            {
+                id cursor-reuse
+                title "Make repeated cursor execution replace rather than accumulate boundary filters"
+                log (
+                    {
+                        at 2026-09-05T14:50:36.509948Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. all(&mut self) applies limit/order/filters into the stored query each execution (cursor.rs:368-377); apply_filters cond_where's the boundary every call (:122-140) and add_condition ANDs, never replaces (pgorm-query condition.rs:616-633). Window and ORDER BY replace per-call; only the composed WHERE accumulates. Scenario: after(5); all(); after(2); all() → WHERE id > 5 AND id > 2 returns [6,7] instead of [3,4]; asc/desc flip with a boundary set yields an empty page. Suite is green only because tests re-execute with unchanged boundaries (idempotent duplicate predicates). Fix: compose into a clone in all() — self.query stays pristine. Effort S, non-breaking. Bumps exec.cursor.keyset+2→+3 (per-execution composition, replacing prior) and exec.cursor.order. Regression tests: change after between two all() calls; toggle direction with a boundary set."
+                    }
+                )
+            }
+
+            {
+                id value-float-eq-hash
+                title "Restore Eq and Hash contracts for float and vector Value keys"
+                log (
+                    {
+                        at 2026-09-05T14:53:12.822243Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. Value derives PartialEq (IEEE: NaN != NaN, 0.0 == -0.0) but has blanket Eq (value.rs:73,117) and bit-pattern Hash (hash_f32/f64 to_bits, hash_vector transmutes &[f32]→&[u32]; :119-141) — violates Eq reflexivity for NaN and a==b⇒hash(a)==hash(b) for ±0.0; pgvector Vector same via Value::Vector. Real key usage: loader.rs HashMap<ValueTuple,..> keyed on live column values (:160, 209-214, 294-297) with lookup miss → hard unmatched_key_err (:219-221) or silent None from load_one. Scenario: Double relation key 0.0 vs -0.0 — PG matches, Rust hash differs → load_many errors on data PG says matches; NaN key: hash matches, Eq fails → same error. Spec itself asserts the flawed \"usable as a map key\" guarantee (sql-value.md:40-45) without mentioning ±0.0. Fix: manual PartialEq comparing Float/Double/Vector by to_bits so PartialEq/Eq/Hash agree (NaN==NaN, 0.0!=-0.0); bind/render untouched. Effort S-M; flips the existing nan!=nan test. Bumps sql.value+1→+2 and its /test pins."
+                    }
+                )
+            }
+
+            {
+                id active-model-json-error-atomicity
+                title "Preserve ActiveModel primary keys when set_from_json fails"
+                log (
+                    {
+                        at 2026-09-05T14:52:34.038229Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. set_from_json backs up PKs destructively via self.take (active_model.rs:328-331, take swaps NotSet in) BEFORE the fallible from_json (:335); on error the ? returns before the restore loop, dropping the backed-up values — PK left NotSet, violating the doc contract (:317) and entity.active-model.json+2. Scenario: model with id set(1), set_from_json with a type-mismatched body → Err, id now NotSet; recovery update → PrimaryKeyNotSet, insert → new row. Only error-path test uses an all-NotSet model so it can't see this. Fix: parse first, mutate second (from_json into a local, transplant self's PK ActiveValues, then assign). Effort S, non-breaking. Bumps entity.active-model.json+2→+3 (\"on error self MUST be left untouched\"). Same rule bump shared with active-model-json-column-names — coordinate."
+                    }
+                )
+            }
+
+            {
+                id active-model-after-hook-atomicity
+                title "Make fallible after-save and after-delete hooks atomic with persistence"
+                log (
+                    {
+                        at 2026-09-05T14:52:36.046096Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED as described; inherited SeaORM semantics, spec wording overpromises. insert/update/delete run before-hook → exec → after-hook on a plain &C ConnectionTrait (active_model.rs:242-246, 277-280, 303-313); no path opens a transaction (begin needs &mut), so an Err from after_save/after_delete propagates AFTER the row was durably written/deleted. Spec entity.active-model.hooks says \"An Err from any hook aborts the operation\" — true only for before-hooks. Scenario: fallible after_save → insert returns Err yet row exists; retry duplicates. Callers can already pass a DatabaseTransaction for atomicity. Fix options: (a) honest-docs — amend spec+docs to state after-hook errors don't roll back, recommend caller-owned tx (S, non-breaking); (b) true atomicity — entry points demand transactional connection (L, breaking). Verdict leans (a) given scoped-transaction design. Bumps entity.active-model.hooks→+1 either way."
+                    }
+                )
+            }
+
+            {
+                id insert-returning-manual-pk
+                title "Return the database's actual primary key for manual-key inserts and upserts"
+                log (
+                    {
+                        at 2026-09-05T14:53:10.288916Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED for ON CONFLICT DO UPDATE and DB-side PK rewrites. Insert::add caches the caller-supplied PK when not auto-increment (insert.rs:233-238, last row wins); exec_returning_pk appends RETURNING but the Some(cached) branch runs db.execute, DISCARDS the returning rows, and reconstructs the answer from the cached tuple (executor/insert.rs:186-195); only the None branch reads RETURNING. TryInsert maps res==0 to Conflicted, so a DO UPDATE hit (res==1) reports Inserted(cached_pk). Scenario: manual PK id=42 upserting on unique email that hits existing row id=7 → PG updates row 7, pgorm returns 42 — a phantom PK; find_by_id(42) → RecordNotFound, children keyed on it orphan. Violates exec.crud.exec-vocabulary's own contract (\"MUST return the inserted row's primary key\"). Fix: delete the cached-tuple fast path — RETURNING is already appended, query_all in both modes, decode PK from the last row (empty → RecordNotInserted); drop the dead Insert.primary_key field. Effort S-M, signature-compatible. Bumps exec.crud.insert+3→+4 (which codifies the cached mode); exec-vocabulary already states the corrected contract."
+                    }
+                )
+            }
+
+            {
+                id macro-model-type-inference
+                title "Align DeriveEntityModel scalar type inference with PostgreSQL decoding"
+                log (
+                    {
+                        at 2026-09-05T14:57:09.311448Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED for i8, u32, u64, char rows; rest of the table aligned. sql_type_match.rs:95-117 maps i8→SmallInteger, u32/u64→BigInteger, char→Char(None), but decode contradicts: i8's FromSql accepts CHAR only (never int2), u32 reads OID not INT4 (deliberate, exec.decode.u32-oid), u64/char have NO TryGetable at all — so i8/u32 model fields generate DDL that can never SELECT (WrongType at first find()), and u64/char fields don't compile despite the table advertising a type. Spec is internally contradictory: macros.md:115-118 vs exec.md:88-93. Scenario: level: i8 → \"level\" smallint, inserts succeed (binder coerces), every find() fails at runtime. Fix: remove the i8/u64/char rows (fall through to ValueType fallback → compile error, matching the u8/u16 precedent); remove u32 or map to an oid column type. Effort S; breaking only for entities generating DDL from those fields. Bumps macros.derive.entity-model.column-def+3→+4 (reconcile with exec.decode.u32-oid) + touches macros.derive.value-type+1."
+                    }
+                )
+            }
+
+            {
+                id pool-config-forwarding
+                title "Apply target-session, channel-binding, and host-balancing pool settings"
+                log (
+                    {
+                        at 2026-09-05T14:54:34.911245Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (inherited verbatim from deadpool-postgres 0.14.1). pgorm_pool::Config declares target_session_attrs/channel_binding/load_balance_hosts (config.rs:113-118) with From conversions to the tokio-postgres enums (:495,:550,:574 — dead code, zero call sites), but get_pg_config (:208-293) never reads any of the three; URL-embedded settings survive (:209-210), struct/env-form settings silently drop. Scenario per the crate's own env-config doc example: target_session_attrs ReadWrite on a two-host HA setup → connections land on the hot standby, every write fails SQLSTATE 25006; channel_binding Require silently unenforced (security-posture downgrade); load_balance_hosts degrades to always-first-host. Note pgorm itself never uses pgorm_pool::Config — direct pgorm-pool consumers only. Fix: three if-let forwarding blocks before Ok(cfg). Effort S, non-breaking. Spec: no rule covers the Config conversion at all — new rule (req:conn.pool.config-forwarding)."
+                    }
+                )
+            }
+
+            {
+                id big-unsigned-binding
+                title "Reject out-of-range BigUnsigned binds instead of wrapping through i64"
+                log (
+                    {
+                        at 2026-09-05T14:53:16.782458Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. cursor.rs:721 binds BigUnsigned via `x as i64` — wrapping cast before any range check, on the universal ValueHolder bind path used by every executor. u64::MAX binds -1 to INT8/NUMERIC silently (wrong rows matched, wrong data stored); .limit(u64::MAX) → PG \"LIMIT must not be negative\". Inline literal rendering prints the full u64 correctly (query_builder.rs:1031), so the same Value means different numbers inlined vs bound. Spec documents \"taken as i64 throughout\" (paginate.md:103) but the SAME rule says to_sql \"errors on a numeric conversion it cannot make exactly\" (:128) — internal contradiction; only a value of 9 is tested. Exposure low (u64 not TryGetable so no round-trip; explicit binds only) but corruption is silent. Fix: i64::try_from + existing out_of_range error plumbing, ~3 lines. Effort S, non-breaking. Bumps exec.cursor.binding+2→+3 and exec.cursor.binding-coerce; add boundary /test."
+                    }
+                )
+            }
+
+            {
+                id active-model-json-column-names
+                title "Reconcile ActiveModel JSON field detection with serde and SQL column renames"
+                deps (active-model-json-error-atomicity)
+                log (
+                    {
+                        at 2026-09-05T14:52:38.106945Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. set_from_json presence-check uses the SQL column Iden string (json.get(col.to_string()), active_model.rs:360-367) while deserialization uses serde field names — any divergence desynchronizes them. #[pgorm(column_name = \"createdAt\")]: model's own to_value emits created_at, lookup of createdAt is None → column forced NotSet, value silently dropped, update never writes it. #[serde(rename_all = \"camelCase\")]: camel key deserializes but snake lookup fails → dropped; snake key fails deserialization outright. A model's serialization does not round-trip through from_json for any renamed field. Fix: derive emits per-column serde-effective JSON key metadata, or drive presence and decode from one deserialized Map. Effort M, non-breaking. Bumps entity.active-model.json+2→+3 (define the key namespace; presence and decode MUST agree) — same rule as json-error-atomicity, coordinate the bump."
+                    }
+                )
+            }
+
+            {
+                id from-json-serialization
+                title "Surface FromJsonQueryResult serialization failures instead of binding NULL"
+                deps (macro-from-query-result-skip)
+                log (
+                    {
+                        at 2026-09-05T14:52:39.783358Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED; spec documents the wart as current semantics (macros.derive.from-query-result+1: \"a serialisation failure silently becomes Value::Json(None)\"). Generated From<T> for Value does serde_json::to_value(..).ok() (try_getable_from_json.rs:16-20) → None → binds SQL NULL (cursor.rs:733-736 IsNull::Yes). Scenario: FromJsonQueryResult type with non-string map keys → update sets the column to NULL with Ok returned; NOT NULL column → confusing constraint error, nullable → silent data loss. Root cause: From can't return Result. Fix options: generated From panics with clear message (S, loud-bug conversion) or fallible TryFrom/Value::json_or_err route surfacing Error (L, API-breaking). Given the fork's no-silent-corruption stance, panic-with-message is the honest minimum; note crate denies unwrap_used so use expect-style with rationale or explicit match+panic with #[allow]. Bumps macros.derive.from-query-result+1→+2."
+                    }
+                )
+            }
+
+            {
+                id codegen-identity-collisions
+                title "Reject schema, filename, field, and enum identities that collide after codegen normalization"
+                deps (codegen-relation-integrity)
+                log (
+                    {
+                        at 2026-09-05T14:53:51.506806Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. Duplicate detection keys on RAW names only (sql_schema/mod.rs:131-137, transformer.rs:18,105); every derived identity (snake file/module names, camel type names, enum variant mangling) is validated individually via safe_ident but never cross-checked, and writer.rs:225 formats filenames with no dedup. Scenario: cake_filling + \"CakeFilling\" → both become cake_filling.rs (last write silently clobbers), mod.rs declares pub mod twice → E0428 in the USER'S build, one entity silently gone; same channel for columns, enum names, enum values. Fix: post-synthesis collision maps in transform (tables, per-table columns, enum names, per-enum variants) returning TransformError naming both source names. Effort S-M, non-breaking. Spec: new rule (req:codegen.entity.collisions) + bump codegen.entity.transform+5→+6 (its \"every failure a caller's schema can cause MUST come back from this one call\" clause is violated in spirit)."
+                    }
+                )
+            }
+
+            {
+                id codegen-relation-cardinality
+                title "Infer inverse relation cardinality from inline and composite unique constraints"
+                deps (codegen-identity-collisions)
+                log (
+                    {
+                        at 2026-09-05T14:53:53.513554Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (composite half + bonus inline gap). col.unique is overwritten from single-column indexes only (transformer.rs:34-41); inverse uniqueness checks every-FK-column-individually-unique OR FK-set==full-PK (:117-139) — a composite UNIQUE covering exactly the FK's column set is missed → true 1:1 emitted as has_many. Bonus: ColumnSpec::UniqueKey is deliberately discarded by transform, so inline uniqueness is lost on the direct-TableCreateStatement path. Both gaps are codified verbatim in codegen.md (inherited heuristics) — fixing is a spec bump, not a conformance bug. Scenario: registrations with UNIQUE(vendor_id, serial) + composite FK to devices → has_many instead of has_one; compiles clean, wrong API cardinality, silent. Fix: unique if any non-primary unique index's column set equals rel.columns as a set; union ColumnSpec::UniqueKey instead of discarding. Effort S; output-changing for affected schemas. Bumps codegen.entity.transform.inverse (→+1) and codegen.entity.transform+5→+6."
+                    }
+                )
+            }
+
+            {
+                id codegen-junction-detection
+                title "Require structural foreign-key evidence before classifying a table as a junction"
+                deps (codegen-relation-cardinality)
+                log (
+                    {
+                        at 2026-09-05T14:53:55.60109Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. Junction classification is exactly \"2 PK columns AND exactly 2 relations\" (transformer.rs:170-186) — rel_type never inspected, PK columns never compared to FK columns, and the scan runs AFTER inverse relations are pushed (:156-168), so an inbound HasMany with zero structural FK evidence counts as a junction leg. Spec codifies it verbatim (codegen.entity.transform.conjunct — inherited heuristic). Scenario: audit_events(id, version PK) with user_id/org_id FKs → spurious canonical M:N Related<orgs> for users; worse: posts(tenant_id, id PK) with inbound comments HasMany → junction built on an inverse leg. Compiles, fabricates M:N API, suppresses direct Related impls (impl_related=false, :214-221). Fix: junction only when both relations are BelongsTo owned by the table itself (excluding synthesized inverses) AND PK column set == union of the two FKs' column sets. Effort S-M; removes only misfired impls. Bumps codegen.entity.transform.conjunct (→+1)."
+                    }
+                )
+            }
+
+            {
+                id codegen-relation-integrity
+                title "Validate codegen foreign-key tables and columns before emitting Rust"
+                log (
+                    {
+                        at 2026-09-05T14:53:57.648084Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. FK targets never validated against the described schema: position_of errors on missing tables for indexes/comments ONLY (sql_schema/mod.rs:141-154); references() converts pktable with no existence check (table.rs:378-443); Relation::validate checks identifier legality + column-count parity only (relation.rs:34-52); transformer's get_mut lookups silently skip missing ref tables (:157, :188) — no inverse, no conjunct, no error. Contradicts the module's own contract (\"Anything else in the file is a named error rather than a silent omission\", sql_schema/mod.rs:10-13). Scenario: partial schema dump with orders REFERENCES customers, no customers table → generation succeeds, orders.rs references super::customers::Entity with no customers.rs → E0433 in the user's build, far from cause; bad ref/source columns likewise. Fix: post-map validation pass — ref_table ∈ entities, ref_columns ∈ its columns, own columns ∈ owning entity; TransformError naming table/constraint/column. Effort S, non-breaking. Bumps codegen.ddl.unsupported (→+1, extend \"Unresolved references are named\") + codegen.entity.transform+5→+6."
+                    }
+                )
+            }
+
+            {
+                id migration-name-uniqueness
+                title "Reject duplicate migration names before status or execution"
+                log (
+                    {
+                        at 2026-09-05T14:51:33.588834Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. Nothing validates distinct migration names: get_migration_files maps straight through (migrator.rs:66-74), status collapses duplicates in a HashSet so both get the same status (:105-115), exec_up runs both and the second ledger insert hits the version PK with no ON CONFLICT (:229-250, :156-161). Duplicates are realistic — DeriveMigrationName uses only the file stem (util.rs:6-11), so a/m1.rs and b/m1.rs collide. Scenarios: fresh DB → cryptic duplicate-key rollback of the whole batch; partial apply (up with steps) → both marked Applied, the second silently never executed — green status, divergent schemas. Fix: reject duplicates with Error::Custom naming them before any status/apply work. Effort S, non-breaking, no ledger change. Spec: migration.md already asserts unique names inside sem:migration.name+2 without enforcement — bump to +3 or add req:migration.name-unique."
+                    }
+                )
+            }
+
+            {
+                id migration-checksums
+                title "Detect edited applied migrations with ledger checksums"
+                log (
+                    {
+                        at 2026-09-05T14:51:35.591228Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (content-drift detection absent; names-only matching). Ledger is exactly version+applied_at (seaql_migrations.rs:7-11, migrator.rs:154-167, spec pins the two-column shape); matching is name-only set difference (:110-115); no checksum anywhere in the crate. Scenario: edit an already-applied migration's up() body → name matches → Applied → never re-run, no warning; fresh environments diverge from prod with identical ledgers. Fix: nullable checksum TEXT column (MigrationTrait-provided content hash), warn/error on mismatch; install needs ALTER TABLE ADD COLUMN IF NOT EXISTS for existing deployments, old rows grandfathered NULL. Effort M. Spec: new rule (req:migration.checksum) + bump def:migration.runner (pins ledger shape). Compatibility with existing deployed ledgers is the design constraint."
+                    }
+                )
+            }
+
+            {
+                id migration-run-lock
+                title "Take an advisory lock so concurrent migration runners wait instead of erroring"
+                log (
+                    {
+                        at 2026-09-05T14:51:37.850712Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit REFUTED as stated — committed double-apply/partial interleave cannot occur: the whole batch runs in one transaction (migrator.rs:199-209) and the ledger version PK is inserted inside it, so concurrent runners serialize at commit; committed state is always correct. Residual real gap is operational: the losing runner aborts with a raw PG error (\"relation already exists\" / duplicate key, incl. the CREATE TABLE IF NOT EXISTS catalog race on fresh DBs) instead of waiting and no-oping — parallel deploys (k8s replicas migrating on boot) crash-loop intermittently on errors a retry cures. Fix if kept: pg_advisory_xact_lock keyed on migration_table_name as the first in-tx statement, loser re-reads pending and no-ops. Effort S, non-breaking. Bumps sem:migration.up+1→+2. Reframe node from correctness to operational-politeness before working it."
+                    }
+                )
+            }
+
+            {
+                id schema-enum-arrays
+                title "Create PostgreSQL enum types referenced only through array columns"
+                log (
+                    {
+                        at 2026-09-05T14:54:44.805326Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. create_enum_from_entity matches only top-level ColumnType::Enum (schema/entity.rs:164-167,180-184); a Vec<Tea> column is Array(Enum) and contributes no CREATE TYPE, while create_table_from_entity still renders \"teas\" tea[] → fresh DB gets ERROR: type \"tea\" does not exist (42704). Silent (empty Vec) until execution. The in-tree suite works around it twice (schema.rs:20-31 creates the type via the scalar ActiveEnum entity first; enum_cast_round_trip passes only because casts also has a scalar tea column). Codegen already does the right thing (get_inner_col_type unwraps Array, dedups by name — codegen.md:58-59), so this is subsystem inconsistency, not considered design. Fix: unwrap Array one level before the Enum match. Effort S, BUT MUST land with schema-enum-dedup: the array skip is the only reason scalar+array entities don't emit a fatal duplicate today — the two defects mask each other. One bump of schema.from-entity.enum+2→+3 covers both (array-inner + dedup-by-name, aligning with codegen's rule); re-pin /test annotations in schema_gen_tests.rs."
+                    }
+                )
+            }
+
+            {
+                id schema-enum-dedup
+                title "Deduplicate CREATE TYPE output across columns sharing an enum"
+                deps (schema-enum-arrays)
+                log (
+                    {
+                        at 2026-09-05T14:54:47.111138Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit verdict: BY-DESIGN today — behavior exists as claimed (per-column vec.extend, no seen-set, entity.rs:180-184) but is explicitly specified (\"Emitting duplicates is the caller's problem\", schema-gen.md:64-66) and pinned by two tests, one executing the duplicate live and asserting it errors (schema_gen_tests.rs:436-457, :501-508). PostgreSQL has no CREATE TYPE IF NOT EXISTS, so no SQL-level guard exists. Adopting the fix is a spec change, not a plain bugfix — and it becomes NECESSARY the moment schema-enum-arrays lands (scalar+array-of-same-enum entities would then always emit a fatal duplicate; the two defects currently mask each other). Fix: dedup by enum name (first occurrence wins) mirroring codegen's BTreeMap-by-name; update the per-column test and the live expect_err. Effort S. Land as ONE coupled change with schema-enum-arrays under the same schema.from-entity.enum+2→+3 bump. Dep: this node should depend on (or merge with) schema-enum-arrays."
+                    }
+                )
+            }
+
+            {
+                id pool-config-secret-debug
+                title "Redact database URLs and passwords from pool Config debug output"
+                log (
+                    {
+                        at 2026-09-05T14:54:37.014436Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED narrowly. The leak is pgorm_pool::Config's DERIVED Debug (config.rs:61-71): password and credentialed url print verbatim, and the doc comment actively promotes loading PG__PASSWORD into the struct. pgorm's own chains are safe: DatabasePool → deadpool Pool → Manager's manual Debug → tokio-postgres Config which redacts password as _ (0.7.18 config.rs:776); no tracing/log statement in-tree prints configs. Scenario: app deserializes Config from env per crate docs, does tracing::info!(?cfg) at startup → plaintext password in aggregated logs. Serialize is by-design for config round-tripping — leave it. Fix: hand-written Debug redacting password and url userinfo (tokio-postgres Redaction pattern). Effort S, non-breaking. Spec: nothing covers redaction — new rule (sem:conn.pool.config-redaction: Debug on config/pool types MUST NOT reveal credentials)."
+                    }
+                )
+            }
+
+            {
+                id connect-tls
+                title "Expose TLS-capable construction through the standard DatabasePool API"
+                log (
+                    {
+                        at 2026-09-05T14:54:40.040357Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED, harder than the known gap: there is NO route to a DatabasePool with TLS at all, and the spec's stated workaround is wrong. All three entry points hard-code NoTls (database/mod.rs:37,62,91). pgorm-pool is fully TLS-generic and Pool is TLS-erased (Box<dyn Connect>, lib.rs:94,116-124), so a TLS pgorm_pool::Pool is buildable — but DatabasePool's field is pub(crate) with no constructor/From, and ConnectionTrait is never implemented for pgorm_pool::Object, so the spec's \"assemble a Manager directly\" (conn.md:26-28) yields a pool no ORM machinery runs on. Scenario: any managed PG requiring TLS (RDS force_ssl, Cloud SQL, Azure, Neon, Supabase) — connect fails at handshake and nothing reachable through pgorm fixes it. SEVERITY HIGH: adoption blocker for cloud PostgreSQL. Fix: connect_with_tls<T: MakeTlsConnect<Socket>+...>(config, tls) (+builder variant) or one-line From<pgorm_pool::Pool> for DatabasePool; Pool being TLS-erased makes this additive. Effort S. Bumps conn.pool+2→+3 (rule both mandates NoTls and asserts the false workaround). Shares root cause with connect-manager-options — sealed DatabasePool + manager frozen before any caller hook; consider one combined entry point."
+                    }
+                )
+            }
+
+            {
+                id connect-manager-options
+                title "Expose recycling and statement-cache manager options through pgorm connect APIs"
+                deps (connect-tls)
+                log (
+                    {
+                        at 2026-09-05T14:54:42.681567Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED. All three connect entry points hard-code ManagerConfig { RecyclingMethod::Fast, StatementCacheSize::default() (256) } and build the Manager BEFORE the caller's closure runs (database/mod.rs:32-37, 57-62, 85-91); the PoolBuilder closure surface (config/max_size/timeouts/queue_mode/hooks/runtime) cannot alter recycling or cache size; Manager.config is private, pool.manager() returns &Manager — post-construction mutation impossible. Only the tag escapes (multi's map key). Scenario: dead-but-not-closed connections after a network partition want RecyclingMethod::Verified (the exact case its doc describes), or StatementCacheSize::Disabled behind a DISCARD ALL pooler — inexpressible, and the raw-pool fallback is the same dead end as connect-tls. Fix: connect_with_config(config, mgr: ManagerConfig, build) + re-export ManagerConfig/RecyclingMethod/StatementCacheSize; folds naturally into the TLS entry point (M combined). Effort S alone, non-breaking. Bumps conn.pool+2→+3 (mandates the Fast/no-tag construction), touches conn.pool.multi+2 if multi grows the param; recycle/statement-cache.bound rules unchanged. Land WITH connect-tls (shared root cause, same rule bump)."
+                    }
+                )
+            }
+
+            {
+                id sql-value-json
+                title "Make Value-to-JSON conversion total, null-correct, and precision-preserving"
+                log (
+                    {
+                        at 2026-09-05T14:53:21.032128Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED as a defect, spec-documented as inherited quirk, ZERO in-tree callers but public API via re-export chain (pgorm::pgorm_query::sea_value_to_json_value). Four rots in value.rs:1329-1395: (1) panics on non-UTF-8 Bytes (:1365 from_utf8 unwrap — pgorm-query does NOT deny unwrap_used, no allow needed); (2) chrono None arms missing → ChronoDate(None) becomes JSON string \"NULL\" not Json::Null, Some keeps SQL quotes (\"'2020-01-01'\"); (3) Decimal → to_f64 lossy (28 digits → ~16); (4) Float/Double NaN/inf → serde_json Null, indistinguishable from SQL NULL. u64 arm is exact — no defect there. Spec sem:sql.value.to-json specifies the panic and \"NULL\"-string verbatim (\"current behaviour, inherited and unchanged\"). Fix: make total and typed — Bytes → hex string, Decimal → string, explicit Chrono None → Null + unquoted ISO Some, explicit NaN policy. Effort M; breaking only for consumers of the current shape (none in-tree). Rewrites sem:sql.value.to-json (+1) + /test facet. Candidate for DELETION instead — zero callers; deleting the function entirely is the fork-consistent alternative (like Inserter/Deleter/expr_as_). Decide delete-vs-fix at implementation."
+                    }
+                )
+            }
+
+            {
+                id macro-unknown-attrs
+                title "Reject unknown DeriveEntityModel attributes"
+                log (
+                    {
+                        at 2026-09-05T14:57:11.815401Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (spec documents the silent skip as a known limitation — design debt the fork's own DeriveValueType already abandoned: it rejects unknown keys with a spanned error + compile-fail fixture). Fallback arms read-and-discard in entity_model.rs:122-127/:167-172, model.rs:68-71, active_model.rs:57-60, column.rs:38-41. Scenario: #[pgorm(primary_key, auto_incremnt = false)] → typo swallowed, auto_increment stays true, DDL renders bigserial instead of bigint, zero diagnostics. Fix: replace the four fallback arms with Err(meta.error(\"unknown pgorm attribute ...\")); add compile-fail fixtures mirroring value_type's. Effort S; source-breaking for typo'd keys — which is the point. Bumps syn:macros.derive.entity-model.attrs→+1 (delete silent-skip sentence); check model+3/active-model+2/column+2 prose. FOUNDATION for the strict-attr pass — macro-from-query-result-skip and macro-partial-model-attrs fold into the same coordinated parsing change."
+                    }
+                )
+            }
+
+            {
+                id macro-from-query-result-skip
+                title "Make FromQueryResult skip metadata order-independent"
+                deps (macro-unknown-attrs)
+                log (
+                    {
+                        at 2026-09-05T14:57:14.120887Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (spec-acknowledged). from_query_result.rs:78 does plain assignment skip = meta.exists(\"skip\") per meta item, so any subsequent meta (or subsequent #[pgorm] attribute) overwrites skip back to false; attribute parse failures also swallowed (:76 if let Ok). Scenario: #[pgorm(skip, anything)] → skip==false → generated try_get on the skipped field → confusing E0277 or runtime missing-column; reversing the order \"fixes\" it. Composes with the unknown-attr silence. Fix: skip |= meta.exists(\"skip\"), or fold into the strict-attr match that errors on unknown metas (macro-unknown-attrs' pass). Effort S. Bumps sem:macros.derive.from-query-result+1→+2 (remove the recomputation sentence) — NOTE same rule as from-json-serialization's bump; if both land, coordinate a single +2 or sequence +2→+3."
+                    }
+                )
+            }
+
+            {
+                id macro-partial-model-attrs
+                title "Make DerivePartialModel metadata compositional and enforce conflicting-key errors"
+                deps (macro-unknown-attrs)
+                log (
+                    {
+                        at 2026-09-05T14:57:16.620134Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED (spec-acknowledged). partial_model.rs:94-106 reassigns BOTH trackers on every meta (get_as_kv returns None for non-matching), so the last meta nulls whichever key came before; the BothFromColAndFromExpr conflict error (:128, :181-183) is unreachable dead code. Struct-level entity clobbers the same way (:68-75). (\"alias\" from the claim doesn't exist in this fork — only entity/from_col/from_expr.) Scenario: #[pgorm(from_col = \"bar\", from_expr = \"...\")] → silently expands as from_expr, from_col dropped, despite docs promising a compile error; #[pgorm(entity = \"Entity\", any_key)] → entity cleared. The derive silently generates a different SELECT projection than the source states. Fix: accumulate instead of overwrite, keep the conflict variant live, reject unknown keys (folds into macro-unknown-attrs' strict pass). Effort S. Bumps sem:macros.derive.partial-model+2→+3 (drop the Limitation paragraph, promise the guard)."
+                    }
+                )
+            }
+
+            {
+                id macro-dependency-renames
+                title "Resolve generated crate paths when pgorm dependencies are renamed"
+                log (
+                    {
+                        at 2026-09-05T14:57:18.867068Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED as a real limitation with a working workaround; nothing used incorrectly — no found_crate mechanism exists at all (same posture as upstream sea-orm). Every expansion emits call-site-relative pgorm::... paths (entity_model.rs:183 etc.); no proc-macro-crate dep, no #[pgorm(crate = ...)] key. Paths being relative (never ::pgorm) is why `use crate as pgorm;` works in tests_cfg and why `use my_orm as pgorm;` fixes downstream renames; pgorm_query is reached via the pgorm::pgorm_query re-export so renaming pgorm-query is harmless; renaming pgorm or pgorm-migration breaks derives with loud E0433. SEVERITY LOW: exotic setup, loud failure, one-line workaround. Fix options: proc-macro-crate or #[pgorm(crate=...)] override (M, ~20 derives) vs document the alias workaround (S). Recommend docs-only unless the user wants the override. Spec: new rule or sentence in def:macros.derive (crate-path resolution currently uncovered)."
+                    }
+                )
+            }
+
+            {
+                id seaography-feature-build
+                title "Make the pgorm-macros seaography feature compile in the workspace feature matrix"
+                log (
+                    {
+                        at 2026-09-05T14:57:21.318826Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit CONFIRMED — and the feature is unusable by construction; DELETION is the consistent remedy. pgorm-macros declares [features] seaography = []; the gated branch (lib.rs:686, related_entity.rs:86-89) emits impl seaography::RelationBuilder + async_graphql paths, but neither crate is a dependency anywhere, the root pgorm crate does not forward the feature, and real seaography targets sea-orm's EntityTrait so no crate could ever satisfy the emitted code. cargo check -p pgorm-macros --features seaography --tests FAILS (feature unification turns it on for pgorm's dev-dep build → E0433 in tests_cfg/cake_seaography.rs:52) — the workspace feature matrix is broken for any configuration enabling it. In-tree tests explicitly rely on it being OFF. Fix: delete the feature + gated branch; decide whether DeriveRelatedEntity (always-empty expansion), codegen's seaography option (writer.rs:60,414-452), and the cake_seaography fixture go too — full deletion matches the fork's philosophy. Effort S-M. Bumps def:macros.derive (describes the gating) + retire sem:codegen.entity.seaography if the codegen option goes."
+                    }
+                )
+            }
+
+            {
+                id migration-test-database-gate
+                title "Load .env files in pgorm-migration tests like the rest of the workspace"
+                log (
+                    {
+                        at 2026-09-05T14:51:39.64906Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Audit REFUTED on the stated symptom — with DATABASE_URL unset the tests panic immediately with a clear message naming the variable (tests/common/setup.rs:20-21); no hang, no cryptic failure; skip-when-unset would diverge from the deliberate workspace convention. Narrower real defect behind it: pgorm-migration's tests are the only DB suites that don't load .env/.env.local via dotenvy (zero hits in the crate; root tests and pgorm-pool both do), so a URL in .env per the documented convention is ignored and the \"not set\" panic fires misleadingly. Fix: add dotenvy dev-dependency + the two from_filename(...).ok() lines in TestContext::new. Effort S, test-only, no spec impact. Reframe node to \"load dotenv in pgorm-migration tests\" before working it."
+                    }
+                )
+            }
+        )
+    }
 )
