@@ -631,6 +631,7 @@ pub mod table;
 pub mod token;
 pub mod types;
 pub mod value;
+mod value_identity;
 
 #[doc(hidden)]
 #[cfg(feature = "tests-cfg")]

@@ -8,7 +8,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## The Value container
 
-> [spec:pgorm:def:sql.value+1]
+> [spec:pgorm:def:sql.value+2]
 > `Value` is the single enum container for all SQL values. Every variant wraps
 > an `Option` of its payload; `None` encodes SQL NULL while preserving the type
 > tag. Payloads larger than one pointer are boxed so the enum stays small:
@@ -37,12 +37,41 @@ including panic semantics and quirks inherited from sea-query.
 > pgvector are unconditional dependencies of `pgorm-query`, so every variant is
 > always compiled in.
 >
-> `Value` implements `PartialEq` (derived), a blanket `Eq`, and `Hash` — the
-> float variants hash via `to_bits()` (with `None` hashed as a zero byte) and
-> `Vector` hashes its `f32` slice bitwise, so `Value` is usable as a map key
-> even though the float variants keep IEEE `NaN != NaN` equality semantics.
-> `Display` renders the value as a Postgres SQL literal by delegating to
-> `QueryBuilder.value_to_string`.
+> There is no `Value` → `serde_json::Value` conversion. The inherited
+> `sea_value_to_json_value` MUST NOT exist, under that name or any other: it
+> had no in-tree caller, panicked on non-UTF-8 `Bytes`, turned a chrono `None`
+> into the JSON string `"NULL"` rather than JSON null, and rendered a chrono
+> payload as its quoted SQL literal — answers wrong often enough that reviving
+> it would be a defect rather than a restoration.
+>
+> `Value` implements `PartialEq`, `Eq` and `Hash`, and the three MUST agree:
+> a `Value` is a map key, so `a == b` has to imply `hash(a) == hash(b)` and
+> every value has to equal itself. The float-carrying variants therefore
+> compare *bitwise*, by the same `to_bits()` the hash uses — `Float` and
+> `Double` on their payloads, `Vector` element-wise over its `f32` slice, with
+> a `None` payload equal only to another `None` (and hashed as a zero byte).
+> `Array` compares its element tag and then its elements through this same
+> impl, so a float nested in an array is compared bitwise too. Every other
+> variant compares structurally, and values of two different variants are
+> never equal. `Display` renders the value as a Postgres SQL literal by
+> delegating to `QueryBuilder.value_to_string`.
+>
+> Bitwise comparison is a deliberate divergence from both IEEE 754 and
+> PostgreSQL float equality, in the two places they disagree with each other:
+> `NaN` equals itself (IEEE says no; PostgreSQL's `=` operator also says yes),
+> and `0.0` and `-0.0` are *distinct* (both IEEE and PostgreSQL say they are
+> equal). The alternative — IEEE equality with a bitwise hash, as the derived
+> `PartialEq` gave — breaks both `Eq`'s reflexivity and the hash contract, and
+> a `HashMap` keyed on such a value has undefined lookup behaviour rather than
+> merely surprising results.
+>
+> The divergence is observable where a `Value` is a map key over live column
+> data — `LoaderTrait`'s `HashMap<ValueTuple, _>`
+> (`[spec:pgorm:sem:query.loader.regroup+3]`) — because the server and the map
+> then disagree about `-0.0`: a row PostgreSQL matched on `a.k = b.k` can fail
+> to find its bucket, surfacing as the unmatched-key error rather than as a
+> wrong answer. A float is a poor relation key for that reason, and this rule
+> makes the failure loud instead of leaving it to a hash contract violation.
 
 > [spec:pgorm:def:sql.value.conversions+1]
 > `From<T> for Value` covers the Rust primitives one-to-one: `bool`→`Bool`,
@@ -177,25 +206,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Values` is a `Vec<Value>` newtype with `iter()` and `IntoIterator`, used to
 > carry a statement's collected parameters.
 
-## JSON conversion
-
-> [spec:pgorm:sem:sql.value.to-json]
-> `sea_value_to_json_value` (name retained from sea-query) converts a `&Value`
-> into a `serde_json::Value`. `None` payloads of the non-chrono variants map
-> to `Json::Null`. Booleans and all integer/float variants map to native JSON
-> values; `String` and `Char` map to JSON strings; `Json` clones the payload
-> through; `Uuid` becomes its hyphenated string; `Decimal` converts via
-> `to_f64().unwrap()`; `Bytes` becomes a JSON string via
-> `from_utf8(..).unwrap()` and therefore panics on non-UTF-8 payloads;
-> `Array` maps recursively to a JSON array; `Vector` becomes a JSON array of
-> numbers.
->
-> All chrono variants — including their `None` payloads, which are not covered
-> by the null arms — plus `IpNetwork(Some)` and `MacAddress(Some)` are
-> stringified through `QueryBuilder.value_to_string`. Consequently a chrono
-> NULL becomes the JSON string `"NULL"` (not `Json::Null`), and the rendered
-> strings include the surrounding single quotes of the SQL literal (e.g.
-> `"'2020-01-01'"`). This is current behaviour, inherited and unchanged.
+## Literal rendering
 
 > [spec:pgorm:sem:sql.value.render]
 > `QueryBuilder.value_to_string` renders a `Value` as an inline Postgres

@@ -351,6 +351,7 @@ derived_priorities (
 )
 
 assertions (
+    {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
     {id bug.empty-not-in, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:28:52.457567Z}
@@ -444,6 +445,7 @@ assertions (
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id schema-enum-arrays, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:27.938472Z}
     {id schema-enum-dedup, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:30.128281Z}
+    {id sql-value-json, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:29.060218Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
     {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
     {id unrep.condition-chain, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:20:22.136562Z}
@@ -463,6 +465,7 @@ assertions (
     {id unrep.select-only, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:10:14.926388Z}
     {id unrep.tableref-split, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:47:05.432653Z}
     {id unrep.transaction-mode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:45:38.889783Z}
+    {id value-float-eq-hash, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:20.231538Z}
     {id verify.codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:24:36.309541Z}
     {id verify.conn, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:40:21.722896Z}
     {id verify.entity, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:55:08.691426Z}

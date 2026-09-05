@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
 }
 
 // [spec:pgorm:def:exec.decode.types+1/test]
-// [spec:pgorm:def:exec.cursor.binding+2/test]    `IpNetwork` and `MacAddress`
+// [spec:pgorm:def:exec.cursor.binding+3/test]    `IpNetwork` and `MacAddress`
 // values, and a `None` payload emitted as SQL NULL, bound through `ValueHolder`
 async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Error> {
     for model in models() {
@@ -568,6 +568,98 @@ async fn decode_json() -> Result<(), Error> {
     // `from_json_vec` rejects any non-array JSON value.
     assert!(row.non_array_is_json_err);
     assert_eq!(row.non_array_message, "Value is not an Array");
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+mod big_counter {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "big_counter")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub counter: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:req:exec.cursor.binding-coerce+1/test]    a `u64` reaches the
+// server through a checked `i64::try_from`: one above `i64::MAX` is refused by
+// the client rather than wrapping to a negative `int8` that would match the
+// wrong rows, and one below it binds exactly
+#[pgorm_macros::test]
+async fn big_unsigned_binds_checked() -> Result<(), Error> {
+    let ctx = TestContext::new("value_decode_tests_big_unsigned").await;
+    let db = ctx.db.get().await?;
+
+    let schema = Schema::new();
+    create_table_without_asserts(&db, &schema.create_table_from_entity(big_counter::Entity))
+        .await?;
+
+    for (id, counter) in [(1, -1_i64), (2, 7), (3, i64::MAX)] {
+        big_counter::ActiveModel {
+            id: set(id),
+            counter: set(counter),
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    let too_big = i64::MAX as u64 + 1;
+
+    // Wrapped, `u64::MAX` would bind as -1 and quietly return the id-1 row.
+    let wrapped = big_counter::Entity::find()
+        .filter(big_counter::Column::Counter.eq(u64::MAX))
+        .all(&db)
+        .await;
+    assert!(
+        format!("{:?}", wrapped.unwrap_err())
+            .contains("value `18446744073709551615` is out of range"),
+        "an out-of-range u64 filter operand must be refused"
+    );
+
+    // LIMIT is a bound parameter too, and its counts are `BigUnsigned`.
+    let limited = big_counter::Entity::find().limit(too_big).all(&db).await;
+    assert!(
+        format!("{:?}", limited.unwrap_err())
+            .contains("value `9223372036854775808` is out of range"),
+        "an out-of-range u64 LIMIT must be refused"
+    );
+
+    // Everything at or below `i64::MAX` binds as the number it is.
+    assert_eq!(
+        big_counter::Entity::find()
+            .filter(big_counter::Column::Counter.eq(i64::MAX as u64))
+            .all(&db)
+            .await?
+            .len(),
+        1
+    );
+    assert_eq!(
+        big_counter::Entity::find()
+            .filter(big_counter::Column::Counter.eq(7_u64))
+            .one(&db)
+            .await?,
+        big_counter::Model { id: 2, counter: 7 }
+    );
+    assert_eq!(
+        big_counter::Entity::find()
+            .order_by_asc(big_counter::Column::Id)
+            .limit(2_u64)
+            .all(&db)
+            .await?
+            .len(),
+        2
+    );
 
     drop(db);
     ctx.delete().await;

@@ -3,7 +3,6 @@
 use std::{borrow::Cow, hash::Hash};
 
 use serde_json::Value as Json;
-use std::str::from_utf8;
 
 use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 
@@ -67,10 +66,11 @@ pub enum ArrayType {
 ///
 /// We want the inner Value to be exactly 1 pointer sized, so anything larger should be boxed.
 ///
-/// If the `hashable-value` feature is enabled, NaN == NaN, which contradicts Rust's built-in
-/// implementation of NaN != NaN.
-// [spec:pgorm:def:sql.value+1]
-#[derive(Clone, Debug, PartialEq)]
+/// The float-carrying variants (`Float`, `Double` and `Vector`) compare by bit pattern
+/// rather than by IEEE equality, which is what lets `PartialEq`, `Eq` and `Hash` agree:
+/// `NaN` equals itself, and `0.0` and `-0.0` are distinct values.
+// [spec:pgorm:def:sql.value+2]
+#[derive(Clone, Debug)]
 pub enum Value {
     Bool(Option<bool>),
     TinyInt(Option<i8>),
@@ -112,65 +112,6 @@ pub enum Value {
     IpNetwork(Option<Box<IpNetwork>>),
 
     MacAddress(Option<Box<MacAddress>>),
-}
-
-impl Eq for Value {}
-
-fn hash_f32<H: std::hash::Hasher>(value: Option<f32>, state: &mut H) {
-    match value {
-        Some(value) => value.to_bits().hash(state),
-        None => state.write_u8(0),
-    }
-}
-
-fn hash_f64<H: std::hash::Hasher>(value: Option<f64>, state: &mut H) {
-    match value {
-        Some(value) => value.to_bits().hash(state),
-        None => state.write_u8(0),
-    }
-}
-
-fn hash_vector<H: std::hash::Hasher>(value: Option<&pgvector::Vector>, state: &mut H) {
-    match value {
-        Some(value) => {
-            let slice = value.as_slice();
-            unsafe { std::mem::transmute::<&[f32], &[u32]>(slice) }.hash(state);
-        }
-        None => state.write_u8(0),
-    }
-}
-
-// [spec:pgorm:def:sql.value+1]
-impl Hash for Value {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            Value::Bool(value) => value.hash(state),
-            Value::TinyInt(value) => value.hash(state),
-            Value::SmallInt(value) => value.hash(state),
-            Value::Int(value) => value.hash(state),
-            Value::BigInt(value) => value.hash(state),
-            Value::Unsigned(value) => value.hash(state),
-            Value::BigUnsigned(value) => value.hash(state),
-            Value::Float(value) => hash_f32(*value, state),
-            Value::Double(value) => hash_f64(*value, state),
-            Value::String(value) => value.hash(state),
-            Value::Char(value) => value.hash(state),
-            Value::Bytes(value) => value.hash(state),
-            Value::Json(value) => value.hash(state),
-            Value::ChronoDate(value) => value.hash(state),
-            Value::ChronoTime(value) => value.hash(state),
-            Value::ChronoDateTime(value) => value.hash(state),
-            Value::ChronoDateTimeUtc(value) => value.hash(state),
-            Value::ChronoDateTimeLocal(value) => value.hash(state),
-            Value::ChronoDateTimeWithTimeZone(value) => value.hash(state),
-            Value::Uuid(value) => value.hash(state),
-            Value::Decimal(value) => value.hash(state),
-            Value::Array(_, value) => value.hash(state),
-            Value::Vector(value) => hash_vector(value.as_deref(), state),
-            Value::IpNetwork(value) => value.hash(state),
-            Value::MacAddress(value) => value.hash(state),
-        }
-    }
 }
 
 impl std::fmt::Display for Value {
@@ -1321,77 +1262,6 @@ mod impl_try_from_value_tuple {
     impl_try_from_value_tuple!(10, 0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5, 6:T6, 7:T7, 8:T8, 9:T9);
     impl_try_from_value_tuple!(11, 0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5, 6:T6, 7:T7, 8:T8, 9:T9, 10:T10);
     impl_try_from_value_tuple!(12, 0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5, 6:T6, 7:T7, 8:T8, 9:T9, 10:T10, 11:T11);
-}
-
-/// Convert value to json value
-// [spec:pgorm:sem:sql.value.to-json]
-#[allow(clippy::many_single_char_names)]
-pub fn sea_value_to_json_value(value: &Value) -> Json {
-    match value {
-        Value::Bool(None)
-        | Value::TinyInt(None)
-        | Value::SmallInt(None)
-        | Value::Int(None)
-        | Value::BigInt(None)
-        | Value::Unsigned(None)
-        | Value::BigUnsigned(None)
-        | Value::Float(None)
-        | Value::Double(None)
-        | Value::String(None)
-        | Value::Char(None)
-        | Value::Bytes(None)
-        | Value::Json(None) => Json::Null,
-
-        Value::Decimal(None) => Json::Null,
-
-        Value::Uuid(None) => Json::Null,
-        Value::Array(_, None) => Json::Null,
-        Value::Vector(None) => Json::Null,
-
-        Value::IpNetwork(None) => Json::Null,
-
-        Value::MacAddress(None) => Json::Null,
-        Value::Bool(Some(b)) => Json::Bool(*b),
-        Value::TinyInt(Some(v)) => (*v).into(),
-        Value::SmallInt(Some(v)) => (*v).into(),
-        Value::Int(Some(v)) => (*v).into(),
-        Value::BigInt(Some(v)) => (*v).into(),
-        Value::Unsigned(Some(v)) => (*v).into(),
-        Value::BigUnsigned(Some(v)) => (*v).into(),
-        Value::Float(Some(v)) => (*v).into(),
-        Value::Double(Some(v)) => (*v).into(),
-        Value::String(Some(s)) => Json::String(s.as_ref().clone()),
-        Value::Char(Some(v)) => Json::String(v.to_string()),
-        Value::Bytes(Some(s)) => Json::String(from_utf8(s).unwrap().to_string()),
-        Value::Json(Some(v)) => v.as_ref().clone(),
-
-        Value::ChronoDate(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::ChronoTime(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::ChronoDateTime(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::ChronoDateTimeWithTimeZone(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::ChronoDateTimeUtc(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::ChronoDateTimeLocal(_) => QueryBuilder.value_to_string(value).into(),
-
-        Value::Decimal(Some(v)) => {
-            use rust_decimal::prelude::ToPrimitive;
-            v.as_ref().to_f64().unwrap().into()
-        }
-
-        Value::Uuid(Some(v)) => Json::String(v.to_string()),
-        Value::Array(_, Some(v)) => {
-            Json::Array(v.as_ref().iter().map(sea_value_to_json_value).collect())
-        }
-        Value::Vector(Some(v)) => Json::Array(v.as_slice().iter().map(|&v| v.into()).collect()),
-
-        Value::IpNetwork(Some(_)) => QueryBuilder.value_to_string(value).into(),
-
-        Value::MacAddress(Some(_)) => QueryBuilder.value_to_string(value).into(),
-    }
 }
 
 impl Values {

@@ -133,7 +133,7 @@ including the remaining gaps in parameter binding.
 > installs the first entity's), so a joined cursor is totally ordered and
 > can be resumed mid-tie through `after_with` / `before_with`.
 
-> [spec:pgorm:def:exec.cursor.binding+2]
+> [spec:pgorm:def:exec.cursor.binding+3]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
 > implementing `tokio_postgres::types::ToSql`; every executor path
 > (select, insert, update, delete, cursor, paginator) wraps built
@@ -141,10 +141,10 @@ including the remaining gaps in parameter binding.
 > `Bool` to the primitive `bool` impl; the integer variants
 > (`TinyInt`/`SmallInt`/`Int`/`BigInt`/`Unsigned`/`BigUnsigned`) and the
 > float variants (`Float`/`Double`) through the numeric coercion of
-> `[spec:pgorm:req:exec.cursor.binding-coerce]`, which falls back to the
+> `[spec:pgorm:req:exec.cursor.binding-coerce+1]`, which falls back to the
 > corresponding primitive impl when the inferred type is outside the
 > numeric family — `Unsigned` (u32) to tokio-postgres's `u32` impl (which
-> targets `OID`), `BigUnsigned` (u64) taken as `i64` throughout;
+> targets `OID`), `BigUnsigned` (u64) through a checked conversion to `i64`;
 > `Char` is stringified; `String`, `Bytes`, `Json`, the chrono
 > date/time variants, `Uuid`, and `Decimal` bind their payload, with
 > `None` payloads emitted as SQL `NULL` (`IsNull::Yes`); `Array`
@@ -173,19 +173,27 @@ including the remaining gaps in parameter binding.
 > and writes every other variant in its own binary format, leaving genuine
 > mismatches to be reported by the server at execution time.
 
-> [spec:pgorm:req:exec.cursor.binding-coerce]
+> [spec:pgorm:req:exec.cursor.binding-coerce+1]
 > When the Postgres type inferred for a placeholder is in the numeric
 > family (`int2`, `int4`, `int8`, `float4`, `float8`, `numeric`),
 > `ValueHolder::to_sql` MUST bind an integer- or float-valued `Value` in
 > *that* type's wire format rather than in its own:
 >
 > - the integer variants (`TinyInt`, `SmallInt`, `Int`, `BigInt`,
->   `Unsigned`, and `BigUnsigned` taken as `i64`) convert to
->   `int2`/`int4`/`int8` through `i16`/`i32`/`i64::try_from`, and MUST
->   return a `ToSql` error — never panic — when the value does not fit;
->   to `float4`/`float8` by `as` conversion, rounding the way Postgres'
->   own integer-to-float cast does; and to `numeric` through an exact
->   `Decimal`.
+>   `Unsigned`, `BigUnsigned`) convert to `int2`/`int4`/`int8` through
+>   `i16`/`i32`/`i64::try_from`, and MUST return a `ToSql` error — never
+>   panic — when the value does not fit; to `float4`/`float8` by `as`
+>   conversion, rounding the way Postgres' own integer-to-float cast
+>   does; and to `numeric` through an exact `Decimal`.
+> - `BigUnsigned` (u64) reaches all of those through `i64::try_from`,
+>   Postgres having no unsigned 64-bit type to write it in. The
+>   conversion is checked, so a value above `i64::MAX` is the same
+>   `ToSql` error as any other out-of-range integer, whatever the
+>   inferred type — it MUST NOT wrap to a negative `int8`, which would
+>   both store the wrong number and silently match the wrong rows. The
+>   bound form therefore agrees with the inline literal rendering of
+>   `[spec:pgorm:sem:sql.value.render]`, which prints the full `u64`:
+>   the two spellings of a `Value` never mean different numbers.
 > - `Float` and `Double` convert to `float8` by widening and to `float4`
 >   by narrowing, erroring when a finite value narrows to an infinity, and
 >   to `numeric` through `Decimal::try_from`, erroring when the value is
@@ -208,15 +216,15 @@ including the remaining gaps in parameter binding.
 > no arm may `panic!`, `unimplemented!` or `todo!`. The former panicking
 > arms are gone. `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned`
 > (u16) no longer exist as variants at all (see
-> `[spec:pgorm:def:sql.value+1]`), so passing a `u8` or `u16` is a compile
+> `[spec:pgorm:def:sql.value+2]`), so passing a `u8` or `u16` is a compile
 > error rather than a runtime panic; `Value::Vector`, `Value::IpNetwork`
-> and `Value::MacAddress` bind per `[spec:pgorm:def:exec.cursor.binding+2]`.
+> and `Value::MacAddress` bind per `[spec:pgorm:def:exec.cursor.binding+3]`.
 >
 > Two limitations remain, neither of which panics. The commented-out
 > time-crate arms (`TimeDate`, `TimeTime`, `TimeDateTime`,
 > `TimeDateTimeWithTimeZone`) are vestigial — this fork's `Value` has no
 > such variants, so there is nothing to bind. And outside the numeric
-> family of `[spec:pgorm:req:exec.cursor.binding-coerce]` the inferred
+> family of `[spec:pgorm:req:exec.cursor.binding-coerce+1]` the inferred
 > type is still ignored: every other variant is written in its own binary
 > format whatever Postgres inferred, so a `String` bound against a `bytea`
 > placeholder is reported by the server, not the client.

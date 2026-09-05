@@ -1,18 +1,16 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use super::*;
 use crate::oracle::assert_eq;
 
-fn json_of(value: Value) -> serde_json::Value {
-    sea_value_to_json_value(&value)
-}
-
-// [spec:pgorm:def:sql.value+1/test]    every variant wraps an Option; None keeps the type tag
+// [spec:pgorm:def:sql.value+2/test]    every variant wraps an Option; None keeps the type tag
 #[test]
 fn null_is_typed_none_not_shared_null() {
     let int_null: Value = Option::<i32>::None.into();
@@ -27,7 +25,7 @@ fn null_is_typed_none_not_shared_null() {
     assert_eq!(big_int_null.to_string(), "NULL");
 }
 
-// [spec:pgorm:def:sql.value+1/test]    payloads larger than a pointer are boxed
+// [spec:pgorm:def:sql.value+2/test]    payloads larger than a pointer are boxed
 #[test]
 fn oversized_payloads_boxed_to_keep_enum_small() {
     // `String`, `Vec<u8>`, `serde_json::Value`, `DateTime` and friends are all
@@ -36,7 +34,7 @@ fn oversized_payloads_boxed_to_keep_enum_small() {
     assert!(size_of::<Value>() < size_of::<Vec<u8>>() + size_of::<serde_json::Value>());
 }
 
-// [spec:pgorm:def:sql.value+1/test]    derived PartialEq, blanket Eq and Hash
+// [spec:pgorm:def:sql.value+2/test]    PartialEq, Eq and Hash, all three agreeing
 #[test]
 fn value_is_hashable_as_map_key() {
     let mut map: HashMap<Value, &str> = HashMap::new();
@@ -61,17 +59,112 @@ fn value_is_hashable_as_map_key() {
         Some(&"vector")
     );
 
-    // Floats hash by their bits (so a NULL float hashes too), while equality keeps
-    // IEEE semantics: NaN is not equal to itself.
-    let nan = Value::Double(Some(f64::NAN));
-    let also_nan = Value::Double(Some(f64::NAN));
-    assert_ne!(nan, also_nan);
-    let mut nan_map: HashMap<Value, &str> = HashMap::new();
-    nan_map.insert(Value::Float(None), "null float");
-    assert_eq!(nan_map.get(&Value::Float(None)), Some(&"null float"));
+    let mut null_map: HashMap<Value, &str> = HashMap::new();
+    null_map.insert(Value::Float(None), "null float");
+    assert_eq!(null_map.get(&Value::Float(None)), Some(&"null float"));
 }
 
-// [spec:pgorm:def:sql.value+1/test]    Display renders the Postgres SQL literal
+// [spec:pgorm:def:sql.value+2/test]    NaN equals itself, so a NaN key is findable
+#[test]
+fn nan_is_reflexive_and_looks_itself_up() {
+    let nan = Value::Double(Some(f64::NAN));
+    let also_nan = Value::Double(Some(f64::NAN));
+
+    assert_eq!(nan, also_nan);
+    assert_eq!(hash_of(&nan), hash_of(&also_nan));
+
+    let mut map: HashMap<Value, &str> = HashMap::new();
+    map.insert(nan, "not a number");
+    assert_eq!(map.get(&also_nan), Some(&"not a number"));
+
+    // The same for f32, and for a NaN buried in a vector or an array.
+    assert_eq!(Value::Float(Some(f32::NAN)), Value::Float(Some(f32::NAN)));
+    assert_eq!(vector(&[f32::NAN, 1.0]), vector(&[f32::NAN, 1.0]));
+    assert_eq!(doubles(&[f64::NAN]), doubles(&[f64::NAN]));
+}
+
+// [spec:pgorm:def:sql.value+2/test]    `0.0` and `-0.0` are distinct keys, by
+// design: PostgreSQL matches them with `=`, so a relation keyed on a float can
+// have a row the server matched miss its bucket in a `HashMap<ValueTuple, _>`
+#[test]
+fn positive_and_negative_zero_are_distinct_keys() {
+    let zero = Value::Double(Some(0.0));
+    let negative_zero = Value::Double(Some(-0.0));
+
+    assert_ne!(zero, negative_zero);
+    assert_ne!(hash_of(&zero), hash_of(&negative_zero));
+
+    let mut map: HashMap<Value, &str> = HashMap::new();
+    map.insert(zero.clone(), "positive");
+    assert_eq!(map.get(&negative_zero), None);
+
+    map.insert(negative_zero.clone(), "negative");
+    assert_eq!(map.get(&zero), Some(&"positive"));
+    assert_eq!(map.get(&negative_zero), Some(&"negative"));
+    assert_eq!(map.len(), 2);
+
+    assert_ne!(Value::Float(Some(0.0)), Value::Float(Some(-0.0)));
+    assert_ne!(vector(&[0.0]), vector(&[-0.0]));
+    assert_ne!(doubles(&[0.0]), doubles(&[-0.0]));
+}
+
+// [spec:pgorm:def:sql.value+2/test]    equality implies equal hashes across the
+// float variants, which is the contract a map key is required to keep
+#[test]
+fn float_equality_and_hashing_agree() {
+    let cases = [
+        Value::Double(Some(f64::NAN)),
+        Value::Double(Some(0.0)),
+        Value::Double(Some(-0.0)),
+        Value::Double(Some(2.5)),
+        Value::Double(Some(f64::INFINITY)),
+        Value::Double(None),
+        Value::Float(Some(f32::NAN)),
+        Value::Float(Some(0.0)),
+        Value::Float(Some(-0.0)),
+        Value::Float(None),
+        vector(&[f32::NAN, 0.0]),
+        vector(&[f32::NAN, -0.0]),
+        vector(&[f32::NAN]),
+        Value::Vector(None),
+        doubles(&[f64::NAN, 0.0]),
+        doubles(&[f64::NAN, -0.0]),
+    ];
+
+    for a in &cases {
+        assert_eq!(a, a);
+        for b in &cases {
+            if a == b {
+                assert_eq!(hash_of(a), hash_of(b), "{a:?} == {b:?} but hashes differ");
+            }
+        }
+    }
+
+    // A shorter vector is not a prefix-collision of a longer one.
+    assert_ne!(vector(&[1.0, 2.0]), vector(&[1.0]));
+    assert_ne!(hash_of(&vector(&[1.0, 2.0])), hash_of(&vector(&[1.0])));
+}
+
+fn hash_of(value: &Value) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn vector(elements: &[f32]) -> Value {
+    Value::Vector(Some(Box::new(pgvector::Vector::from(elements.to_vec()))))
+}
+
+fn doubles(elements: &[f64]) -> Value {
+    Value::Array(
+        ArrayType::Double,
+        Some(Box::new(
+            elements.iter().map(|v| Value::Double(Some(*v))).collect(),
+        )),
+    )
+}
+
+// [spec:pgorm:def:sql.value+2/test]    Display renders the Postgres SQL literal
 #[test]
 fn display_renders_a_postgres_literal() {
     assert_eq!(Value::Bool(Some(true)).to_string(), "TRUE");
@@ -138,7 +231,7 @@ fn value_array_tags_element_type_from_rust() {
     );
 }
 
-// [spec:pgorm:def:sql.value+1/test]    the two surviving unsigned variants
+// [spec:pgorm:def:sql.value+2/test]    the two surviving unsigned variants
 #[test]
 fn unsigned_variants_carry_oid_and_limit_counts() {
     let oid: Value = 42u32.into();
@@ -267,70 +360,6 @@ fn decimal_to_f64_converts_the_payload() {
     assert_eq!(Value::Decimal(None).decimal_to_f64(), None);
 }
 
-// [spec:pgorm:sem:sql.value.to-json/test]    non-chrono NULLs map to JSON null
-#[test]
-fn to_json_maps_typed_nulls_to_json_null() {
-    for value in [
-        Value::Bool(None),
-        Value::TinyInt(None),
-        Value::SmallInt(None),
-        Value::Int(None),
-        Value::BigInt(None),
-        Value::Unsigned(None),
-        Value::BigUnsigned(None),
-        Value::Float(None),
-        Value::Double(None),
-        Value::String(None),
-        Value::Char(None),
-        Value::Bytes(None),
-        Value::Json(None),
-        Value::Decimal(None),
-        Value::Uuid(None),
-        Value::Array(ArrayType::Int, None),
-        Value::Vector(None),
-        Value::IpNetwork(None),
-        Value::MacAddress(None),
-    ] {
-        assert_eq!(json_of(value), serde_json::Value::Null);
-    }
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    scalars map to native JSON values
-#[test]
-fn to_json_maps_scalars_natively() {
-    assert_eq!(json_of(Value::Bool(Some(true))), json!(true));
-    assert_eq!(json_of(Value::TinyInt(Some(-1))), json!(-1));
-    assert_eq!(json_of(Value::SmallInt(Some(2))), json!(2));
-    assert_eq!(json_of(Value::Int(Some(3))), json!(3));
-    assert_eq!(json_of(Value::BigInt(Some(4))), json!(4));
-    assert_eq!(json_of(Value::Unsigned(Some(5))), json!(5));
-    assert_eq!(json_of(Value::BigUnsigned(Some(6))), json!(6));
-    assert_eq!(json_of(Value::Double(Some(2.5))), json!(2.5));
-    assert_eq!(
-        json_of(Value::String(Some(Box::new("hello".to_owned())))),
-        json!("hello")
-    );
-    assert_eq!(json_of(Value::Char(Some('x'))), json!("x"));
-    assert_eq!(
-        json_of(Value::Json(Some(Box::new(json!({ "a": 1 }))))),
-        json!({ "a": 1 })
-    );
-    assert_eq!(
-        json_of(Value::Uuid(Some(Box::new(Uuid::nil())))),
-        json!("00000000-0000-0000-0000-000000000000")
-    );
-    assert_eq!(
-        json_of(Value::Decimal(Some(Box::new(
-            Decimal::from_str("2.02").unwrap()
-        )))),
-        json!(2.02)
-    );
-    assert_eq!(
-        json_of(Value::Bytes(Some(Box::new(b"bytes".to_vec())))),
-        json!("bytes")
-    );
-}
-
 // [spec:pgorm:def:sql.render.value-literals+2/test]    a char renders as its whole
 // UTF-8 text, quoted and escaped exactly like a one-character string
 #[test]
@@ -362,91 +391,4 @@ fn char_literals_parse_as_postgres_literals() {
             expected
         );
     }
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    a non-ASCII char keeps its scalar value
-#[test]
-fn to_json_keeps_non_ascii_chars_whole() {
-    assert_eq!(json_of(Value::Char(Some('é'))), json!("é"));
-    assert_eq!(json_of(Value::Char(Some('—'))), json!("—"));
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    `Bytes` goes through `from_utf8(..).unwrap()`
-#[test]
-#[should_panic]
-fn to_json_panics_on_non_utf8_bytes() {
-    json_of(Value::Bytes(Some(Box::new(vec![0xFF, 0xFE]))));
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    arrays recurse, vectors become number arrays
-#[test]
-fn to_json_maps_arrays_and_vectors() {
-    assert_eq!(
-        json_of(Value::Array(
-            ArrayType::Int,
-            Some(Box::new(vec![Value::Int(Some(1)), Value::Int(None)]))
-        )),
-        json!([1, null])
-    );
-    assert_eq!(
-        json_of(Value::Vector(Some(Box::new(pgvector::Vector::from(vec![
-            1.0, 2.5
-        ]))))),
-        json!([1.0, 2.5])
-    );
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    chrono values (and their NULLs) are stringified
-// through `value_to_string`, quotes included
-#[test]
-fn to_json_stringifies_chrono_values_including_their_nulls() {
-    let date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
-    assert_eq!(
-        json_of(Value::ChronoDate(Some(Box::new(date)))),
-        json!("'2020-01-01'")
-    );
-
-    let naive = date.and_hms_opt(2, 2, 2).unwrap();
-    assert_eq!(
-        json_of(Value::ChronoDateTime(Some(Box::new(naive)))),
-        json!("'2020-01-01 02:02:02'")
-    );
-    assert_eq!(
-        json_of(Value::ChronoTime(Some(Box::new(naive.time())))),
-        json!("'02:02:02'")
-    );
-    assert_eq!(
-        json_of(Value::ChronoDateTimeUtc(Some(Box::new(
-            DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
-        )))),
-        json!("'2020-01-01 02:02:02 +00:00'")
-    );
-
-    // A chrono NULL is not covered by the null arms, so it becomes the JSON
-    // string "NULL" rather than JSON null.
-    assert_eq!(json_of(Value::ChronoDate(None)), json!("NULL"));
-    assert_eq!(json_of(Value::ChronoDateTime(None)), json!("NULL"));
-    assert_eq!(json_of(Value::ChronoTime(None)), json!("NULL"));
-    assert_eq!(json_of(Value::ChronoDateTimeUtc(None)), json!("NULL"));
-    assert_eq!(json_of(Value::ChronoDateTimeLocal(None)), json!("NULL"));
-    assert_eq!(
-        json_of(Value::ChronoDateTimeWithTimeZone(None)),
-        json!("NULL")
-    );
-}
-
-// [spec:pgorm:sem:sql.value.to-json/test]    IpNetwork and MacAddress are stringified too
-#[test]
-fn to_json_stringifies_network_values() {
-    let net = IpNetwork::from_str("10.1.2.3/32").unwrap();
-    assert_eq!(
-        json_of(Value::IpNetwork(Some(Box::new(net)))),
-        serde_json::Value::String(format!("'{net}'"))
-    );
-
-    let mac = MacAddress::new([0x00, 0x11, 0x22, 0x33, 0x44, 0x55]);
-    assert_eq!(
-        json_of(Value::MacAddress(Some(Box::new(mac)))),
-        serde_json::Value::String(format!("'{mac}'"))
-    );
 }

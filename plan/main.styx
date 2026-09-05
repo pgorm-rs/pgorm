@@ -3057,6 +3057,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. Value derives PartialEq (IEEE: NaN != NaN, 0.0 == -0.0) but has blanket Eq (value.rs:73,117) and bit-pattern Hash (hash_f32/f64 to_bits, hash_vector transmutes &[f32]→&[u32]; :119-141) — violates Eq reflexivity for NaN and a==b⇒hash(a)==hash(b) for ±0.0; pgvector Vector same via Value::Vector. Real key usage: loader.rs HashMap<ValueTuple,..> keyed on live column values (:160, 209-214, 294-297) with lookup miss → hard unmatched_key_err (:219-221) or silent None from load_one. Scenario: Double relation key 0.0 vs -0.0 — PG matches, Rust hash differs → load_many errors on data PG says matches; NaN key: hash matches, Eq fails → same error. Spec itself asserts the flawed \"usable as a map key\" guarantee (sql-value.md:40-45) without mentioning ±0.0. Fix: manual PartialEq comparing Float/Double/Vector by to_bits so PartialEq/Eq/Hash agree (NaN==NaN, 0.0!=-0.0); bind/render untouched. Effort S-M; flips the existing nan!=nan test. Bumps sql.value+1→+2 and its /test pins."
                     }
+
+                    {
+                        at 2026-09-05T20:09:20.231538Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3141,6 +3148,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED. cursor.rs:721 binds BigUnsigned via `x as i64` — wrapping cast before any range check, on the universal ValueHolder bind path used by every executor. u64::MAX binds -1 to INT8/NUMERIC silently (wrong rows matched, wrong data stored); .limit(u64::MAX) → PG \"LIMIT must not be negative\". Inline literal rendering prints the full u64 correctly (query_builder.rs:1031), so the same Value means different numbers inlined vs bound. Spec documents \"taken as i64 throughout\" (paginate.md:103) but the SAME rule says to_sql \"errors on a numeric conversion it cannot make exactly\" (:128) — internal contradiction; only a value of 9 is tested. Exposure low (u64 not TryGetable so no round-trip; explicit binds only) but corruption is silent. Fix: i64::try_from + existing out_of_range error plumbing, ~3 lines. Effort S, non-breaking. Bumps exec.cursor.binding+2→+3 and exec.cursor.binding-coerce; add boundary /test."
+                    }
+
+                    {
+                        at 2026-09-05T20:09:24.191318Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3413,6 +3427,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Sea-naming scan extends this existing defect's acceptance criteria: the public sea_value_to_json_value symbol must not survive. It has zero in-tree production callers, so deletion is preferred if no supported use remains; otherwise replace it with a pgorm-native name while fixing the already-recorded null, byte, decimal, and non-finite-float semantics. Update docs/spec/sql-value.md and tests with the chosen outcome; do not leave a Sea-named compatibility alias."
+                    }
+
+                    {
+                        at 2026-09-05T20:09:29.060218Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

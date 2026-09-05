@@ -587,7 +587,7 @@ where
 
 /// Adapter binding a [`Value`] as a query parameter, converting it to the
 /// Postgres type inferred for that placeholder.
-// [spec:pgorm:def:exec.cursor.binding+2]
+// [spec:pgorm:def:exec.cursor.binding+3]
 pub struct ValueHolder(pub Value);
 
 impl std::fmt::Debug for ValueHolder {
@@ -613,7 +613,7 @@ fn out_of_range(
 /// Bind an integer against the numeric type Postgres inferred for the
 /// placeholder, or `None` when the inferred type is outside the numeric family
 /// and the value should be written in its own format.
-// [spec:pgorm:req:exec.cursor.binding-coerce]
+// [spec:pgorm:req:exec.cursor.binding-coerce+1]
 fn integer_to_sql(value: i64, ty: &Type, out: &mut BytesMut) -> Option<BindResult> {
     let result = if *ty == Type::INT2 {
         match i16::try_from(value) {
@@ -643,7 +643,7 @@ fn integer_to_sql(value: i64, ty: &Type, out: &mut BytesMut) -> Option<BindResul
 /// rounds the way Postgres' own `float8 -> float4` cast does, but a conversion
 /// that would silently drop the fractional part or overflow is an error rather
 /// than a lie.
-// [spec:pgorm:req:exec.cursor.binding-coerce]
+// [spec:pgorm:req:exec.cursor.binding-coerce+1]
 fn float_to_sql(value: f64, ty: &Type, out: &mut BytesMut) -> Option<BindResult> {
     let result = if *ty == Type::FLOAT4 {
         let narrowed = value as f32;
@@ -670,7 +670,7 @@ fn float_to_sql(value: f64, ty: &Type, out: &mut BytesMut) -> Option<BindResult>
     Some(result)
 }
 
-// [spec:pgorm:req:exec.cursor.binding-coerce]
+// [spec:pgorm:req:exec.cursor.binding-coerce+1]
 fn bind_integer<T>(value: Option<T>, ty: &Type, out: &mut BytesMut) -> BindResult
 where
     T: ToSql + Copy + Into<i64>,
@@ -684,7 +684,7 @@ where
     }
 }
 
-// [spec:pgorm:req:exec.cursor.binding-coerce]
+// [spec:pgorm:req:exec.cursor.binding-coerce+1]
 fn bind_float<T>(value: Option<T>, ty: &Type, out: &mut BytesMut) -> BindResult
 where
     T: ToSql + Copy + Into<f64>,
@@ -698,7 +698,20 @@ where
     }
 }
 
-// [spec:pgorm:def:exec.cursor.binding+2]
+/// `u64` is the one integer variant with no `Into<i64>`: Postgres has no
+/// unsigned 64-bit type, so the value has to fit `i64` to be written at all.
+// [spec:pgorm:req:exec.cursor.binding-coerce+1]
+fn bind_big_unsigned(value: Option<u64>, ty: &Type, out: &mut BytesMut) -> BindResult {
+    match value {
+        None => Ok(IsNull::Yes),
+        Some(value) => match i64::try_from(value) {
+            Ok(value) => bind_integer(Some(value), ty, out),
+            Err(_) => Err(out_of_range(value, ty)),
+        },
+    }
+}
+
+// [spec:pgorm:def:exec.cursor.binding+3]
 impl ToSql for ValueHolder {
     // [spec:pgorm:req:exec.cursor.binding-gaps+2]
     fn to_sql(
@@ -716,7 +729,7 @@ impl ToSql for ValueHolder {
             Value::Int(x) => bind_integer(*x, ty, out),
             Value::BigInt(x) => bind_integer(*x, ty, out),
             Value::Unsigned(x) => bind_integer(*x, ty, out),
-            Value::BigUnsigned(x) => bind_integer(x.map(|x| x as i64), ty, out),
+            Value::BigUnsigned(x) => bind_big_unsigned(*x, ty, out),
             Value::Float(x) => bind_float(*x, ty, out),
             Value::Double(x) => bind_float(*x, ty, out),
             Value::String(x) => match x.as_ref() {
@@ -835,7 +848,7 @@ mod tests {
         encode_as(value, ty).unwrap_err()
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn binds_integer_as_float() {
         assert_eq!(
@@ -853,7 +866,7 @@ mod tests {
         assert_eq!(encode_as(Value::Int(None), &Type::FLOAT8), Ok(None));
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn binds_integer_across_widths() {
         assert_eq!(
@@ -882,7 +895,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn binds_integer_as_numeric() {
         assert_eq!(
@@ -891,7 +904,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn rejects_out_of_range_integer() {
         assert_eq!(
@@ -904,7 +917,45 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]    a `u64` above
+    // `i64::MAX` has no `int8` to be written in, so it errors rather than
+    // wrapping to a negative — whatever type Postgres inferred
+    #[test]
+    fn rejects_out_of_range_big_unsigned() {
+        let too_big = i64::MAX as u64 + 1;
+
+        for ty in [
+            &Type::INT8,
+            &Type::INT4,
+            &Type::INT2,
+            &Type::NUMERIC,
+            &Type::FLOAT8,
+            &Type::TEXT,
+        ] {
+            assert_eq!(
+                error(Value::BigUnsigned(Some(too_big)), ty),
+                format!("value `{too_big}` is out of range for Postgres type `{ty}`")
+            );
+        }
+
+        assert_eq!(
+            error(Value::BigUnsigned(Some(u64::MAX)), &Type::INT8),
+            "value `18446744073709551615` is out of range for Postgres type `int8`"
+        );
+
+        // The largest value that does fit is written exactly, not approximated.
+        assert_eq!(
+            bytes(Value::BigUnsigned(Some(i64::MAX as u64)), &Type::INT8),
+            i64::MAX.to_be_bytes()
+        );
+        assert_eq!(
+            bytes(Value::BigUnsigned(Some(7)), &Type::FLOAT8),
+            7.0f64.to_be_bytes()
+        );
+        assert_eq!(encode_as(Value::BigUnsigned(None), &Type::INT8), Ok(None));
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn binds_float_across_widths() {
         assert_eq!(
@@ -921,7 +972,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-coerce/test]
+    // [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
     #[test]
     fn rejects_float_bound_to_integer() {
         assert_eq!(
