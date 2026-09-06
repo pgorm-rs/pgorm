@@ -226,8 +226,6 @@ slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4);
 slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5);
 slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
 
-||||||| parent of 62f58283 (feat: select_sources: the pipeline decodes models, every position honest)
-
 /// THE prefix scheme: the alias the writer gives `column` of the `index`-th
 /// decoded source, `s{index}_{column}`.
 ///
