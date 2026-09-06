@@ -1,8 +1,7 @@
 //! Decoding and terminating an N-ary relational read.
 //!
 //! [`GraphRow<E, S>`] is the [`SelectorTrait`] a [`SelectGraph<E, S>`]
-//! converts into — the N-ary generalization of what `SelectTwoModel` was for
-//! the pair — and the terminals are that conversion plus the ordinary
+//! converts into, and the terminals are that conversion plus the ordinary
 //! [`Selector`] machinery. The graph adds a declaration layer, not a second
 //! execution path.
 
@@ -32,7 +31,7 @@ use crate::{
 ///
 /// The type is nameable because the cursor and paginator signatures need it;
 /// it carries no data and is not constructed by callers.
-// [spec:pgorm:sem:query.graph.decode]
+// [spec:pgorm:sem:query.graph.decode+1]
 pub struct GraphRow<E, S>(PhantomData<(E, S)>);
 
 impl<E, S> fmt::Debug for GraphRow<E, S> {
@@ -55,7 +54,7 @@ impl<E, S> GraphRow<E, S> {
 }
 
 /// A slotless graph is a single-entity read: one model, no tuple.
-// [spec:pgorm:sem:query.graph.decode]
+// [spec:pgorm:sem:query.graph.decode+1]
 impl<E: EntityTrait> SelectorTrait for GraphRow<E, ()> {
     type Item = E::Model;
 
@@ -73,7 +72,7 @@ const ROOT_PREFIX: &str = "s0_";
 /// the row's error, and later sources are not examined.
 macro_rules! graph_row {
     ( $( $s:ident @ $pre:literal ),+ ) => {
-        // [spec:pgorm:sem:query.graph.decode]
+        // [spec:pgorm:sem:query.graph.decode+1]
         impl<E: EntityTrait, $( $s: Slot ),+> SelectorTrait for GraphRow<E, ( $( $s, )+ )> {
             type Item = (E::Model, $( $s::Out ),+ );
 
@@ -97,7 +96,7 @@ graph_row!(S1 @ "s1_", S2 @ "s2_", S3 @ "s3_", S4 @ "s4_", S5 @ "s5_", S6 @ "s6_
 /// What one row of a graph decodes into.
 pub type GraphItem<E, S> = <GraphRow<E, S> as SelectorTrait>::Item;
 
-// [spec:pgorm:sem:query.graph.terminals]
+// [spec:pgorm:sem:query.graph.terminals+1]
 impl<E: EntityTrait, S> SelectGraph<E, S>
 where
     GraphRow<E, S>: SelectorTrait,
@@ -106,7 +105,7 @@ where
     ///
     /// Everything past this conversion is machinery specified elsewhere; the
     /// graph duplicates none of it.
-    // [spec:pgorm:sem:query.graph.terminals]
+    // [spec:pgorm:sem:query.graph.terminals+1]
     pub(crate) fn into_selector(self) -> Selector<GraphRow<E, S>> {
         Selector {
             query: self.query,
@@ -132,7 +131,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:query.graph.terminals]
+    // [spec:pgorm:sem:query.graph.terminals+1]
     pub async fn all<C: ConnectionTrait>(self, db: &C) -> Result<Vec<GraphItem<E, S>>, Error> {
         self.into_selector().all(db).await
     }
@@ -142,7 +141,7 @@ where
     /// `LIMIT 1` is injected, as on [`Selector::one_opt`]. There is no `one`:
     /// a graph row is a join product, so "exactly one" is a claim about the
     /// product rather than about the root.
-    // [spec:pgorm:sem:query.graph.terminals]
+    // [spec:pgorm:sem:query.graph.terminals+1]
     pub async fn one_opt<C: ConnectionTrait>(
         self,
         db: &C,
@@ -154,7 +153,7 @@ where
     ///
     /// A row that fails to decode is yielded as one `Err` item and the stream
     /// continues, as on every other model-typed stream.
-    // [spec:pgorm:sem:query.graph.terminals]
+    // [spec:pgorm:sem:query.graph.terminals+1]
     pub async fn stream<'b, C: ConnectionTrait>(
         self,
         db: &C,
@@ -171,7 +170,7 @@ where
 ///
 /// A unary key — the overwhelming case — is carried inline, so grouping a
 /// result set allocates nothing per row for it.
-// [spec:pgorm:sem:query.graph.grouped]
+// [spec:pgorm:sem:query.graph.grouped+1]
 #[derive(PartialEq, Eq, Hash)]
 enum RootKey {
     /// A single-column primary key.
@@ -182,7 +181,7 @@ enum RootKey {
 
 /// Read the root's primary-key value out of a *decoded* model — the grouping
 /// is keyed on what the row said the root is, not on where the row sat.
-// [spec:pgorm:sem:query.graph.grouped]
+// [spec:pgorm:sem:query.graph.grouped+1]
 fn root_key<E: EntityTrait>(model: &E::Model) -> RootKey {
     let mut keys = <E::PrimaryKey as Iterable>::iter();
     match (keys.next(), keys.next()) {
@@ -205,7 +204,7 @@ fn root_key<E: EntityTrait>(model: &E::Model) -> RootKey {
 /// finds that entry again, so a run torn apart by the ordering merges rather
 /// than emitting the root twice. Children are pushed as they arrive, and a row
 /// whose slot decoded `None` contributes nothing beyond its root.
-// [spec:pgorm:sem:query.graph.grouped]
+// [spec:pgorm:sem:query.graph.grouped+1]
 fn group_rows<E: EntityTrait, F: EntityTrait>(
     rows: Vec<(E::Model, Option<F::Model>)>,
 ) -> Vec<(E::Model, Vec<F::Model>)> {
@@ -232,7 +231,7 @@ fn group_rows<E: EntityTrait, F: EntityTrait>(
 
 /// The grouped read, which exists on exactly one shape: a graph whose slot
 /// tuple is `(Opt<F>,)`.
-// [spec:pgorm:sem:query.graph.grouped]
+// [spec:pgorm:sem:query.graph.grouped+1]
 impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
     /// Fetch every root once, with the slot's matching models collected
     /// beneath it.
@@ -287,7 +286,7 @@ impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:query.graph.grouped]
+    // [spec:pgorm:sem:query.graph.grouped+1]
     pub async fn all_grouped<C: ConnectionTrait>(
         self,
         db: &C,
@@ -298,7 +297,7 @@ impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
 
     /// Append `E`'s primary-key columns, qualified with `E`'s table, ascending
     /// — behind whatever the caller already ordered by.
-    // [spec:pgorm:sem:query.graph.grouped]
+    // [spec:pgorm:sem:query.graph.grouped+1]
     fn key_ordered(mut self) -> Self {
         for pk in <E::PrimaryKey as Iterable>::iter() {
             self.query
@@ -311,7 +310,7 @@ impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
 /// Pagination reaches the graph through the same selector: page boundaries
 /// fall between *rows*, not between root models, so a root with several
 /// matching slot rows spans pages exactly as the underlying SQL does.
-// [spec:pgorm:sem:query.graph.terminals]
+// [spec:pgorm:sem:query.graph.terminals+1]
 impl<'db, C, E, S> PaginatorTrait<'db, C> for SelectGraph<E, S>
 where
     C: ConnectionTrait,
@@ -325,7 +324,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    the primary key is appended
+// [spec:pgorm:sem:query.graph.grouped+1/test]    the primary key is appended
 // behind the caller's ordering rather than in front of it, at any key arity,
 // and the consolidation keys on the decoded root instead of on adjacency
 #[cfg(test)]

@@ -457,7 +457,7 @@ explicit limitations.
 > conversion from `NoColumns`, so a relation missing its columns is a compile
 > error rather than a panic.
 
-> [spec:pgorm:req:entity.relation.linked+2]
+> [spec:pgorm:req:entity.relation.linked+3]
 > `Linked` (`src/entity/link.rs`) expresses a multi-hop join: `link()` returns the
 > ordered `Vec<RelationDef>` chain from `FromEntity` to `ToEntity`. `find_linked()`
 > MUST build the join by iterating the chain in reverse, aliasing each hop's source
@@ -474,11 +474,10 @@ explicit limitations.
 > otherwise an internal that a caller can only reproduce by hardcoding `r4`, and
 > a chain that later gains a hop rebinds that string to a different table without
 > any diagnostic. The method is named for the mechanism rather than for one of
-> its readings because the two ladders run in opposite directions: walking
-> forwards from `FromEntity` (`find_also_linked` / `find_with_linked`) the last
-> rung is the joined target, and walking backwards from `ToEntity`
-> (`find_linked`) it is the source table — which is exactly why it is what
-> scopes `ModelTrait::find_linked`. A chain whose `link()` is empty yields
+> its readings: `find_linked` walks the ladder backwards from `ToEntity`, so
+> its last rung is the *source* table — which is exactly why it is what scopes
+> `ModelTrait::find_linked`, and what a caller ordering or filtering on a
+> `FromEntity` column names. A chain whose `link()` is empty yields
 > `hop(0)`; the derivation saturates rather than underflowing, and the resulting
 > query names a table the (join-less) statement does not have, which the server
 > reports.
@@ -493,9 +492,9 @@ explicit limitations.
 > what a `Related` impl does not — chains of more than one relation, and hops
 > carrying a bespoke `on_condition`.
 >
-> The linked form differs from the `Related` one (`find_also_related`) in
-> aliasing the joined table, so `RelatedLink::to(Entity)` on an entity related
-> to itself is well-formed where the related form would name one table twice.
+> The linked form aliases the joined table, so `RelatedLink::to(Entity)` on an
+> entity related to itself is well-formed where an unaliased join of the
+> `Related` path would name one table twice.
 
 > [spec:pgorm:req:entity.relation.fk+3]
 > A `RelationDef` converts into DDL foreign-key forms via
@@ -550,10 +549,10 @@ explicit limitations.
 > It also carries the relation vocabulary an entity definition and its call
 > sites write: `Related`, `Linked`, `RelationDef`, `RelationTrait`, and the
 > `RelatedLink` witness that spares a `Related` chain from being restated as a
-> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+2]`).
+> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+3]`).
 >
 > The alias vocabulary `alias` and `AliasName` are members
-> (`[spec:pgorm:sem:query.build.alias]`) on the same grounds as `Expr`: a name
+> (`[spec:pgorm:sem:query.build.alias+1]`) on the same grounds as `Expr`: a name
 > the query introduces is written where the query is written, and a token is
 > only cheaper than `Alias::new` when it is already in scope. `LinkedAlias` is
 > NOT a member — it is reached as the return of a `Linked` method, so a caller

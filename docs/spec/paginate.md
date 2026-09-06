@@ -9,7 +9,7 @@ bound parameter is held to.
 
 ## Cursor pagination (`exec.cursor`)
 
-> [spec:pgorm:def:exec.cursor+3]
+> [spec:pgorm:def:exec.cursor+4]
 > `Cursor<S, K>` wraps a `SelectStatement` plus the target table, an
 > `Identity` of one or more order columns, an optional `Window` row
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
@@ -21,9 +21,10 @@ bound parameter is held to.
 > sort key including its secondary order columns and so cannot be typed by
 > `K` (`[spec:pgorm:sem:exec.cursor.keyset+3]`). Cursors are created via
 > `Select::cursor_by` (order columns on the entity's table) and, for joined
-> selects, `SelectTwo::cursor_by` / `cursor_by_other` (order columns on the
-> first or second entity respectively), each returning a cursor keyed by
-> its argument's `ValueType`. `CursorTrait` names the `SelectorTrait` used
+> reads, `SelectGraph::cursor_by` / `cursor_by_on`
+> (`[spec:pgorm:sem:query.graph.cursor]`: order columns on the root or on a
+> positionally-named slot), each returning a cursor keyed by its argument's
+> `ValueType`. `CursorTrait` names the `SelectorTrait` used
 > to decode rows; `into_model` and `into_partial_model` re-target the
 > decoded type and carry `K` across unchanged. `Cursor` also implements
 > `QuerySelect` and `QueryOrder` for further query modification.
@@ -35,20 +36,11 @@ bound parameter is held to.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-**Deprecation.** `SelectTwo::cursor_by` / `cursor_by_other` are re-homed
-onto the graph as `cursor_by` / `cursor_by_on`
-(`[spec:pgorm:sem:query.graph.cursor]`): only the entry points move — the
-`Cursor` type, the keyset machinery of
-`[spec:pgorm:sem:exec.cursor.keyset+3]` and everything else this rule
-states are unchanged. The two pair entry points remain normative while
-`SelectTwo` exists and are retired with the pair surface
-(graph/pair-deletion).
-
 > [spec:pgorm:sem:exec.cursor.keyset+3]
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
-> (`[spec:pgorm:sem:exec.cursor.order+1]`). `ORDER BY` and the boundary
+> (`[spec:pgorm:sem:exec.cursor.order+2]`). `ORDER BY` and the boundary
 > comparison MUST both be built from that one list, so the row order and
 > the predicate that resumes it cannot disagree about where a page ends.
 >
@@ -116,7 +108,7 @@ states are unchanged. The two pair entry points remain normative while
 > decoding, so `all` always returns rows in the cursor's logical
 > (`asc`/`desc`) order regardless of windowing direction.
 
-> [spec:pgorm:sem:exec.cursor.order+1]
+> [spec:pgorm:sem:exec.cursor.order+2]
 > `Cursor::all` composes each execution onto a *copy* of the stored query:
 > the limit, then the order clause, then the boundary filters are applied
 > to the clone, which is then built and executed via `query_all` and
@@ -137,10 +129,10 @@ states are unchanged. The two pair entry points remain normative while
 > `[spec:pgorm:sem:exec.cursor.keyset+3]` is built from. Only
 > `Identity::Unary` secondary entries take part; composite secondary
 > identities are silently ignored, in the ordering and in the boundary
-> alike. `SelectTwo::cursor_by` automatically installs the other entity's
-> primary-key columns as secondary order entries (and `cursor_by_other`
-> installs the first entity's), so a joined cursor is totally ordered and
-> can be resumed mid-tie through `after_with` / `before_with`.
+> alike. A joined read installs those entries from its declaration rather
+> than from a call site (`[spec:pgorm:sem:query.graph.cursor]`), so a joined
+> cursor is totally ordered and can be resumed mid-tie through `after_with`
+> / `before_with`.
 
 > [spec:pgorm:def:exec.cursor.binding+4]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
@@ -334,7 +326,7 @@ states are unchanged. The two pair entry points remain normative while
 
 ## Offset pagination (`exec.paginator`)
 
-> [spec:pgorm:def:exec.paginator+1]
+> [spec:pgorm:def:exec.paginator+2]
 > `Paginator<'db, C, S>` holds either the `SelectStatement` to page over
 > or the report explaining why the source could not be turned into one,
 > plus a zero-based current `page`, a `page_size`, a borrowed connection,
@@ -344,9 +336,10 @@ states are unchanged. The two pair entry points remain normative while
 > inventing SQL to send in its place.
 > `ItemsAndPagesNumber` carries `number_of_items` and `number_of_pages`.
 > `PaginatorTrait::paginate(db, page_size)` constructs a paginator and is
-> implemented for `Selector<S>`, `SelectorRaw<S>`, `Select<E>`, and
-> `SelectTwo<E, F>` (the latter two via `into_model`). The trait also
-> provides `count`, defined as `paginate(db, 1).num_items()`.
+> implemented for `Selector<S>`, `SelectorRaw<S>`, `Select<E>` (via
+> `into_model`), and `SelectGraph<E, S>` (via its own selector,
+> `[spec:pgorm:sem:query.graph.terminals+1]`). The trait also provides
+> `count`, defined as `paginate(db, 1).num_items()`.
 > `PinBoxStream` is the pinned boxed stream alias returned by
 > `into_stream`.
 

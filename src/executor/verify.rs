@@ -100,7 +100,7 @@ pub trait VerifyStatement {
 
 /// Compare `M`'s reported columns against a prepared statement's result columns.
 // [spec:pgorm:def:exec.verify]    name presence then type acceptance
-// [spec:pgorm:req:exec.verify.limits]    and nothing else: the statement's
+// [spec:pgorm:req:exec.verify.limits+1]    and nothing else: the statement's
 // parameters, its columns' nullability, and the columns `M` does not read are
 // all left alone
 fn check<M>(statement: &Statement) -> Result<(), Error>

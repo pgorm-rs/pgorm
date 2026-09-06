@@ -70,7 +70,7 @@ async fn stream_many(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.stream+1/test]    partial models decode from a stream
+// [spec:pgorm:def:exec.stream+2/test]    partial models decode from a stream
 async fn stream_partial(db: &DatabaseConnection) -> Result<(), Error> {
     let streamed: Vec<BakeryName> = Bakery::find()
         .order_by_asc(bakery::Column::Id)
@@ -114,7 +114,7 @@ async fn stream_empty(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.stream+1/test]    streaming through a transaction
+// [spec:pgorm:def:exec.stream+2/test]    streaming through a transaction
 async fn stream_in_transaction(db: &mut DatabaseConnection) -> Result<(), Error> {
     let txn = db.begin().await?;
 

@@ -9,15 +9,13 @@ witness (`[spec:pgorm:req:exec.decode.absent]`), and the terminals land on the
 ordinary `Selector` machinery — the graph adds a declaration layer, not a
 second execution path. Rules are grouped under `[spec:pgorm:def:query.graph]`.
 
-The superseded pair surface — `SelectTwo`, `SelectTwoMany`, their `Custom` /
-`Projected` states, `select_also` / `select_with`, `find_also_related` /
-`find_with_related`, `find_also_linked` / `find_with_linked`, `apply_alias`,
-`SelectA` / `SelectB`, `SelectTwoModel`, the consolidating `all`, the pair
-partial-model and cursor entry points — remains specified where it lives
-(`query.build.combine`, `query.build.modifiers`, `exec.crud.consolidate`,
-`exec.stream`, `exec.cursor`) until its deletion lands; each of those rules
-carries a deprecation note naming its successor here, and dies whole rather
-than being rewritten around a surface that no longer exists.
+The two-entity surface this replaces — a bespoke builder, decoder, cursor
+and consolidating terminal per pair, with its own `A_`/`B_` column-aliasing
+scheme — has been deleted, and the rules that specified it retired with it
+(`query.build.combine`, `exec.crud.consolidate`) or rewritten around the
+graph (`query.build`, `query.build.modifiers`, `exec.crud`, `exec.stream`,
+`exec.cursor`, `exec.paginator`, `entity.relation.linked`). Nothing in this
+chapter is stated twice anywhere else.
 
 ## Declaration
 
@@ -29,9 +27,9 @@ than being rewritten around a surface that no longer exists.
 > construction. Construction initialises the statement with
 > `FROM E::default().table_ref()` and immediately projects `E`'s columns
 > under the `s0_` prefix through the one writer
-> (`[spec:pgorm:sem:query.graph.writer]`), so a graph's select list is
+> (`[spec:pgorm:sem:query.graph.writer+1]`), so a graph's select list is
 > non-empty from the moment the value exists and the empty-projection guard
-> of `[spec:pgorm:sem:query.build.modifiers+6]` has nothing to catch. There
+> of `[spec:pgorm:sem:query.build.modifiers+7]` has nothing to catch. There
 > is no conversion between `Select<E>` and `SelectGraph<E, S>` in either
 > direction: a graph's projection is generated from its declaration, never
 > inherited from a builder whose select list a caller may have edited.
@@ -44,7 +42,7 @@ than being rewritten around a surface that no longer exists.
 > that reads it. Each edge method appends its slot by returning
 > `SelectGraph<E, (…, NewSlot)>`, so the declared tuple, the emitted joins
 > and the decoded row type are one fact stated once
-> (`[spec:pgorm:sem:query.graph.slots]`).
+> (`[spec:pgorm:sem:query.graph.slots+1]`).
 >
 > `via(rel: RelationDef)` joins without declaring a slot: `rel.to_tbl` is
 > LEFT JOINed under `join_condition(rel)` exactly as
@@ -59,18 +57,18 @@ than being rewritten around a surface that no longer exists.
 > `apply_if` work as on every other builder. It deliberately does NOT
 > implement `QuerySelect`: the writer owns the projection, and the fluent
 > surface offers no way to edit it
-> (`[spec:pgorm:sem:query.graph.slots]`). `QueryTrait::query()` remains the
+> (`[spec:pgorm:sem:query.graph.slots+1]`). `QueryTrait::query()` remains the
 > raw escape hatch it is everywhere — a caller mutating the statement
 > through it stands outside every guarantee this family states, on the same
 > terms as handing a hand-built statement to `Selector::from_select`.
 
-> [spec:pgorm:sem:query.graph.slots]
+> [spec:pgorm:sem:query.graph.slots+1]
 > The slot kind is the join type is the decode shape. The three are one
 > declaration, so they cannot disagree:
 >
 > - `join_maybe::<F>(rel)` appends `Opt<F>`: `rel.to_tbl` LEFT JOINed under
 >   `join_condition(rel)`, decoded as `Option<F::Model>` through the absence
->   witness (`[spec:pgorm:sem:query.graph.decode]`).
+>   witness (`[spec:pgorm:sem:query.graph.decode+1]`).
 > - `join_one::<F>(rel)` appends `Req<F>`: an INNER JOIN, decoded as a bare
 >   `F::Model`. The type states that the join cannot miss; there is no
 >   `Option` to unwrap for a row the join guarantees.
@@ -79,8 +77,8 @@ than being rewritten around a surface that no longer exists.
 >   (`[spec:pgorm:req:query.graph.aliases]`).
 > - `related_maybe::<F>()` where `E: Related<F>` folds the described path
 >   in: when `Related::via()` is `Some`, that junction relation is `via()`ed
->   first, then `Related::to()` is `join_maybe`d — one call for the shape
->   `find_also_related` used to spell, junction hop included.
+>   first, then `Related::to()` is `join_maybe`d — the whole described
+>   path in one call, junction hop included.
 >
 > "LEFT-joined but decoded as required" and "INNER-joined but decoded
 > optional" are unrepresentable: no method constructs either pairing, and
@@ -91,10 +89,10 @@ than being rewritten around a surface that no longer exists.
 > compile_fail doctest (E0599). So is decode/declaration mismatch: the row
 > type is `(E::Model, S1::Out, …, Sn::Out)`, computed from `S`, so ascribing
 > a tuple the declaration does not produce is a type error (E0308) — also
-> compile_fail-pinned — not a runtime decode surprise. The pair surface
-> guarded the equivalent mistakes at run time or not at all
-> (`apply_alias`'s unaliasable entries,
-> `[spec:pgorm:sem:query.build.combine+2]`); here they do not compile.
+> compile_fail-pinned — not a runtime decode surprise. The surface this
+> replaces guarded the equivalent mistakes at run time or not at all — a
+> projected expression with no name to take was carried through unaliased
+> and simply never decoded; here they do not compile.
 >
 > `via()` joins LEFT so that a missing middle cannot erase root rows by
 > itself; a `Req` slot joined through it re-tightens the chain, because the
@@ -104,7 +102,7 @@ than being rewritten around a surface that no longer exists.
 > absent anywhere along the path".
 >
 > Slot arity is bounded by the generated impls: the edge methods and the
-> `GraphRow` decode (`[spec:pgorm:sem:query.graph.decode]`) are
+> `GraphRow` decode (`[spec:pgorm:sem:query.graph.decode+1]`) are
 > macro-generated for slot tuples of arity 1 through 6, so a seventh
 > decoded source has no receiver impl and fails to compile. The bound is a
 > macro constant — raising it is a mechanical edit, not a design change —
@@ -112,7 +110,7 @@ than being rewritten around a surface that no longer exists.
 
 ## Projection
 
-> [spec:pgorm:sem:query.graph.writer]
+> [spec:pgorm:sem:query.graph.writer+1]
 > One writer projects every decoded source; nothing else writes the select
 > list. At construction (for the root) and at each slot declaration, the
 > writer appends, for every variant of the source entity's `Column` in
@@ -133,16 +131,15 @@ than being rewritten around a surface that no longer exists.
 > against) — so the projection and the ON clause cannot name one source two
 > ways.
 >
-> The prefixes replace the pair surface's four independently-maintained
-> aliasing copies (`select_also` / `select_with`'s `A_`/`B_` scheme, the
-> linked walk's, the loader's join-back, `prepare_select_two`) with one
+> The prefixes replace the several independently-maintained aliasing
+> schemes the two-entity surface carried — one per builder — with a single
 > implementation. The writer is shared with the pipeline's `select_sources`
 > terminal (`[spec:pgorm:sem:pipeline.select-sources]`), which emits the
 > same per-source blocks over named sources: the prefix scheme and the cast
 > discipline are one code path, not a convention two surfaces repeat.
 >
 > The `s{i}_` names are generated but observable — they are the result
-> set's column names, and `[spec:pgorm:sem:query.graph.decode]` reads
+> set's column names, and `[spec:pgorm:sem:query.graph.decode+1]` reads
 > exactly them. They are not, however, part of the fluent surface: no graph
 > method takes or returns one, and a caller who needs to reference a
 > source in a filter or an ordering qualifies the *source's* identifier
@@ -150,11 +147,11 @@ than being rewritten around a surface that no longer exists.
 
 ## Decoding
 
-> [spec:pgorm:sem:query.graph.decode]
+> [spec:pgorm:sem:query.graph.decode+1]
 > One row decodes as `(E::Model, S1::Out, …, Sn::Out)`; a slotless graph
 > decodes as a bare `E::Model`, not a one-tuple. The selector is
-> `GraphRow<E, S>`, a `SelectorTrait` implementor — the N-ary
-> generalization of what `SelectTwoModel` was for the pair. The root
+> `GraphRow<E, S>`, a `SelectorTrait` implementor
+> (`[spec:pgorm:def:exec.crud+1]`) at every declarable arity. The root
 > decodes via `FromQueryResult::from_query_result` under `"s0_"`, then each
 > slot in declaration order under its own prefix: `Req<F>` through
 > `from_query_result`, `Opt<F>` through `from_query_result_optional` — the
@@ -170,7 +167,7 @@ than being rewritten around a surface that no longer exists.
 > Decode errors abort the row: the first failing source's error is the
 > row's error, and later sources are not examined. Across rows the
 > terminals' own semantics apply — `all` aborts at the first bad row
-> (`[spec:pgorm:sem:exec.crud.select+2]`), `stream` yields the bad row as
+> (`[spec:pgorm:sem:exec.crud.select+3]`), `stream` yields the bad row as
 > one `Err` item and continues (`[spec:pgorm:sem:exec.stream.decode+1]`).
 > A `Req` slot never consults the witness: its INNER JOIN cannot produce
 > the unmatched row, so a NULL arriving in a non-`Option` field of a `Req`
@@ -179,21 +176,22 @@ than being rewritten around a surface that no longer exists.
 
 ## Terminals
 
-> [spec:pgorm:sem:query.graph.terminals]
+> [spec:pgorm:sem:query.graph.terminals+1]
 > The graph terminates by converting into `Selector<GraphRow<E, S>>`;
 > everything past that conversion is machinery specified elsewhere, and the
 > graph MUST NOT duplicate any of it. `all(db)` and `one_opt(db)` are
-> `Selector::all` / `one_opt` (`[spec:pgorm:sem:exec.crud.select+2]`:
+> `Selector::all` / `one_opt` (`[spec:pgorm:sem:exec.crud.select+3]`:
 > `one_opt` injects `LIMIT 1` and answers `Ok(None)` for zero rows).
 > `stream(db)` is `Selector::stream`, yielding
 > `PinBoxSendStream<'db, Result<Item, Error>>` with lazy per-item decode
 > (`[spec:pgorm:sem:exec.stream.decode+1]`). Pagination and `count` reach
 > the graph through `PaginatorTrait` over the same selector
-> (`[spec:pgorm:def:exec.paginator+1]`); page boundaries fall between
+> (`[spec:pgorm:def:exec.paginator+2]`); page boundaries fall between
 > *rows*, not between root models, so a root with several matching slot
 > rows spans pages exactly as the underlying SQL does — the grouped read
-> (`[spec:pgorm:sem:query.graph.grouped]`) is deliberately not paginable,
-> for the reason `SelectTwoMany` never was.
+> (`[spec:pgorm:sem:query.graph.grouped+1]`) is deliberately not paginable,
+> because a page boundary between rows can split one root's children across
+> two pages, so no page is a complete entry.
 >
 > The terminal set is deliberately this small. There is no `one`: a graph
 > row is a join product, and the `Error::RecordNotFound` reading of
@@ -204,7 +202,7 @@ than being rewritten around a surface that no longer exists.
 > a caller-shaped projection is `Select<E>`'s job (or the pipeline's), not
 > the graph's.
 
-> [spec:pgorm:sem:query.graph.grouped]
+> [spec:pgorm:sem:query.graph.grouped+1]
 > `all_grouped(db) -> Vec<(E::Model, Vec<F::Model>)>` exists on exactly one
 > shape: a graph whose slot tuple is `(Opt<F>,)` — one optional slot beside
 > the root, `via()` hops permitted (a junction-mediated has-many is this
@@ -215,13 +213,12 @@ than being rewritten around a surface that no longer exists.
 > Caller ordering dominates. `all_grouped` appends `E`'s primary-key
 > columns, qualified with `E`'s table, ascending, as trailing ORDER BY
 > keys — after every caller-authored ordering, never before it. A caller
-> who ordered by nothing gets pure primary-key order (the behaviour
-> `SelectTwoMany`'s constructor imposed); a caller who ordered by anything
-> gets that ordering with the key appended as a deterministic tiebreak
-> only. The constructor-injected ORDER BY of
-> `[spec:pgorm:sem:query.build.combine+2]` — which preceded, and therefore
-> silently dominated, every ordering the caller wrote — is specified away
-> and MUST NOT be reintroduced.
+> who ordered by nothing gets pure primary-key order; a caller who ordered
+> by anything gets that ordering with the key appended as a deterministic
+> tiebreak only. The constructor-injected ORDER BY the two-entity surface
+> emitted — which preceded, and therefore silently dominated, every
+> ordering the caller wrote — is specified away and MUST NOT be
+> reintroduced.
 >
 > Grouping is keyed, not adjacency-based: rows execute as ordinary
 > `GraphRow` tuples and consolidate on the root's primary-key value (read
@@ -249,14 +246,14 @@ than being rewritten around a surface that no longer exists.
 > root's primary key first, then the remaining decoded slots' in
 > declaration order. Both return `Cursor<GraphRow<E, S>, C::ValueType>`,
 > so the boundary arity is typed by the order columns exactly as
-> `[spec:pgorm:def:exec.cursor+3]` states.
+> `[spec:pgorm:def:exec.cursor+4]` states.
 >
 > The machinery MUST NOT move: the keyset construction, the boundary
 > disjuncts, `before` / `after` at order-column arity and `before_with` /
 > `after_with` at whole-keyset arity, the direction resolution, the
 > arity-mismatch error, and the NULL-tiebreak limitation are
 > `[spec:pgorm:sem:exec.cursor.keyset+3]` and
-> `[spec:pgorm:sem:exec.cursor.order+1]`, unchanged and not restated
+> `[spec:pgorm:sem:exec.cursor.order+2]`, unchanged and not restated
 > here. The NULL limitation is live on a graph: an unmatched `Opt` slot's
 > primary key IS null, so a row whose tiebreak is null is reachable
 > through the order-column boundary, not an extended one — resuming with
@@ -267,9 +264,9 @@ than being rewritten around a surface that no longer exists.
 > no call site naming a column twice.
 >
 > One seam is inherited knowingly: `Cursor` itself implements
-> `QuerySelect` (`[spec:pgorm:def:exec.cursor+3]`), so a graph's cursor
+> `QuerySelect` (`[spec:pgorm:def:exec.cursor+4]`), so a graph's cursor
 > can append to the generated projection even though the graph could not.
-> The unrepresentability claims of `[spec:pgorm:sem:query.graph.slots]`
+> The unrepresentability claims of `[spec:pgorm:sem:query.graph.slots+1]`
 > are claims about `SelectGraph`, not about every value derived from it;
 > a column appended through the cursor is outside the decode's witness
 > set and is simply never read.
@@ -280,7 +277,7 @@ than being rewritten around a surface that no longer exists.
 > The same table enters a graph twice under a caller-bound alias:
 > `join_maybe_as::<F>(rel, alias)` / `join_one_as::<F>(rel, alias)` take
 > the alias as `impl IntoIden` — the `AliasName` token for a static name
-> (`[spec:pgorm:sem:query.build.alias]`), `Alias` for a computed one —
+> (`[spec:pgorm:sem:query.build.alias+1]`), `Alias` for a computed one —
 > re-bind `rel.to_tbl` to it, and that alias is then the slot's one
 > identifier everywhere: the ON condition's right side, the projection
 > qualifier, a cursor tiebreak's qualifier. Distinctness is not checked

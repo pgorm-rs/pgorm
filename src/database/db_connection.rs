@@ -597,7 +597,7 @@ impl ConnectionTrait for DatabaseConnection {
             .await)
     }
 
-    // [spec:pgorm:def:exec.stream+1]    pooled-client row stream
+    // [spec:pgorm:def:exec.stream+2]    pooled-client row stream
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + SqlText + Sync,
@@ -685,7 +685,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
             .await)
     }
 
-    // [spec:pgorm:def:exec.stream+1]    in-transaction row stream
+    // [spec:pgorm:def:exec.stream+2]    in-transaction row stream
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + SqlText + Sync,

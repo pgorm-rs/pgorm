@@ -366,7 +366,7 @@ of the crate, compiled in every build. Rules are grouped under
 > (`[spec:pgorm:sem:pipeline.self-join]`), so two occurrences of one table
 > are told apart exactly as the join told them apart. Before compilation
 > the terminal appends one final projection stage through the same writer
-> as the graph's (`[spec:pgorm:sem:query.graph.writer]`): for the i-th
+> as the graph's (`[spec:pgorm:sem:query.graph.writer+1]`): for the i-th
 > listed source (zero-based), every column of its entity in iteration
 > order, projected `col.select_as(..)` and aliased `s{i}_{col}`,
 > qualified by the source's name — the `named` token, or the entity's own

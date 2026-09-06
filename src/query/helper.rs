@@ -17,7 +17,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -800,7 +800,7 @@ pub trait QuerySelect: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;

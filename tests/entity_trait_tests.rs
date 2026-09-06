@@ -1183,14 +1183,16 @@ struct PrefixProbe {
 impl FromQueryResult for PrefixProbe {
     fn from_query_result(res: &QueryResult, _pre: &str) -> Result<Self, Error> {
         Ok(Self {
-            prefixed: ItemRow::from_query_result(res, "A_")?,
+            prefixed: ItemRow::from_query_result(res, "s0_")?,
             unprefixed_is_err: ItemRow::from_query_result(res, "").is_err(),
             unprefixed_optional_is_err: ItemRow::from_query_result_optional(res, "").is_err(),
-            prefixed_optional: ItemRow::from_query_result_optional(res, "A_")?,
-            absent_optional: ItemRow::from_query_result_optional(res, "B_")?,
-            unreflected_absent_optional: UnreflectedItemRow::from_query_result_optional(res, "B_")?,
+            prefixed_optional: ItemRow::from_query_result_optional(res, "s0_")?,
+            absent_optional: ItemRow::from_query_result_optional(res, "s1_")?,
+            unreflected_absent_optional: UnreflectedItemRow::from_query_result_optional(
+                res, "s1_",
+            )?,
             unreflected_unknown_prefix_is_err: UnreflectedItemRow::from_query_result_optional(
-                res, "C_",
+                res, "s2_",
             )
             .is_err(),
         })
@@ -1246,15 +1248,15 @@ async fn from_query_result_surface() -> Result<(), Error> {
     );
 
     // `from_query_result` reads a row under a column-name prefix. Aliasing the
-    // columns with a prefix is exactly how `find_also_related` addresses them,
-    // and `from_query_result_optional` answers `Ok(None)` for exactly one
-    // shape — every column it reads under the prefix present and `NULL`, the
-    // row an outer join that matched nothing produces. The `B_` columns here
-    // stand in for that unmatched side; every other decode failure is
-    // surfaced.
+    // columns with a prefix is exactly how a source graph addresses each of its
+    // decoded sources, and `from_query_result_optional` answers `Ok(None)` for
+    // exactly one shape — every column it reads under the prefix present and
+    // `NULL`, the row an outer join that matched nothing produces. The `s1_`
+    // columns here stand in for that unmatched side; every other decode failure
+    // is surfaced.
     let probe = PrefixProbe::find_by_statement(
-        r#"SELECT "id" AS "A_id", "name" AS "A_name",
-                  NULL::int AS "B_id", NULL::text AS "B_name"
+        r#"SELECT "id" AS "s0_id", "name" AS "s0_name",
+                  NULL::int AS "s1_id", NULL::text AS "s1_name"
            FROM "item" WHERE "id" = 1"#,
         vec![],
     )

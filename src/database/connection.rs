@@ -119,7 +119,7 @@ pub trait ConnectionTrait: Sync {
 
     /// Execute a statement and return its rows as a stream, without buffering
     /// the whole result set
-    // [spec:pgorm:def:exec.stream+1]
+    // [spec:pgorm:def:exec.stream+2]
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + SqlText + Sync,

@@ -1,12 +1,7 @@
-use crate::{
-    ColumnTrait, EntityTrait, IdenStr, Iterable, Linked, LinkedAlias, QuerySelect, Related, Select,
-    SelectA, SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
-};
+use crate::{EntityTrait, QuerySelect, Related, Select};
 pub use pgorm_query::JoinType;
-use pgorm_query::{Alias, Condition, Expr, IntoIden, SelectExpr, SharedIden};
 
 // [spec:pgorm:sem:query.build.join+3]
-// [spec:pgorm:sem:query.build.combine+2]
 impl<E> Select<E>
 where
     E: EntityTrait,
@@ -44,110 +39,6 @@ where
         R: EntityTrait + Related<E>,
     {
         self.join_rev(JoinType::InnerJoin, R::to())
-    }
-
-    /// Left Join with a Related Entity and select both Entity.
-    pub fn find_also_related<R>(self, r: R) -> SelectTwo<E, R>
-    where
-        R: EntityTrait,
-        E: Related<R>,
-    {
-        self.left_join(r).select_also(r)
-    }
-
-    /// Left Join with a Related Entity and select the related Entity as a `Vec`
-    pub fn find_with_related<R>(self, r: R) -> SelectTwoMany<E, R>
-    where
-        R: EntityTrait,
-        E: Related<R>,
-    {
-        self.left_join(r).select_with(r)
-    }
-
-    /// Left Join with a Linked Entity and select both Entity.
-    pub fn find_also_linked<L, T>(self, l: L) -> SelectTwo<E, T>
-    where
-        L: Linked<FromEntity = E, ToEntity = T>,
-        T: EntityTrait,
-    {
-        let target = l.last_hop_alias();
-        let mut slf = self;
-        for (i, mut rel) in l.link().into_iter().enumerate() {
-            let to_tbl = LinkedAlias::hop(i).into_iden();
-            let from_tbl = if i > 0 {
-                LinkedAlias::hop(i - 1).into_iden()
-            } else {
-                unpack_table_ref(&rel.from_tbl)
-            };
-            let table_ref = rel.to_tbl;
-
-            let mut condition = Condition::all().add(join_tbl_on_condition(
-                SharedIden::clone(&from_tbl),
-                SharedIden::clone(&to_tbl),
-                rel.columns,
-            ));
-            if let Some(f) = rel.on_condition.take() {
-                condition =
-                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
-            }
-
-            slf.query()
-                .join_as(JoinType::LeftJoin, table_ref, to_tbl, condition);
-        }
-        slf = slf.apply_alias(SelectA.as_str());
-        let mut select_two = SelectTwo::new_without_prepare(slf.query);
-        for col in <T::Column as Iterable>::iter() {
-            let alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((target.into_iden(), col.into_iden()));
-            select_two.query().expr(SelectExpr::new_as(
-                col.select_as(expr),
-                SharedIden::new(Alias::new(alias)),
-            ));
-        }
-        select_two
-    }
-
-    /// Left Join with a Linked Entity and select Entity as a `Vec`.
-    pub fn find_with_linked<L, T>(self, l: L) -> SelectTwoMany<E, T>
-    where
-        L: Linked<FromEntity = E, ToEntity = T>,
-        T: EntityTrait,
-    {
-        let target = l.last_hop_alias();
-        let mut slf = self;
-        for (i, mut rel) in l.link().into_iter().enumerate() {
-            let to_tbl = LinkedAlias::hop(i).into_iden();
-            let from_tbl = if i > 0 {
-                LinkedAlias::hop(i - 1).into_iden()
-            } else {
-                unpack_table_ref(&rel.from_tbl)
-            };
-            let table_ref = rel.to_tbl;
-
-            let mut condition = Condition::all().add(join_tbl_on_condition(
-                SharedIden::clone(&from_tbl),
-                SharedIden::clone(&to_tbl),
-                rel.columns,
-            ));
-            if let Some(f) = rel.on_condition.take() {
-                condition =
-                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
-            }
-
-            slf.query()
-                .join_as(JoinType::LeftJoin, table_ref, to_tbl, condition);
-        }
-        slf = slf.apply_alias(SelectA.as_str());
-        let mut select_two_many = SelectTwoMany::new_without_prepare(slf.query);
-        for col in <T::Column as Iterable>::iter() {
-            let alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((target.into_iden(), col.into_iden()));
-            select_two_many.query().expr(SelectExpr::new_as(
-                col.select_as(expr),
-                SharedIden::new(Alias::new(alias)),
-            ));
-        }
-        select_two_many
     }
 }
 
@@ -365,43 +256,6 @@ mod tests {
     }
 
     #[test]
-    fn join_12() {
-        assert_eq!(
-            cake::Entity::find()
-                .find_also_linked(entity_linked::CakeToFilling)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""r1"."id" AS "B_id", "r1"."name" AS "B_name", "r1"."vendor_id" AS "B_vendor_id""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
-    fn join_13() {
-        assert_eq!(
-            cake::Entity::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
     fn join_14() {
         assert_eq!(
             cake::Entity::find()
@@ -460,44 +314,6 @@ mod tests {
                 r#"WHERE "r2"."id" = 18"#,
             ]
             .join(" ")
-        );
-    }
-
-    #[test]
-    fn join_17() {
-        assert_eq!(
-            cake::Entity::find()
-                .find_also_linked(entity_linked::CheeseCakeToFillingVendor)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id" AND "cake"."name" LIKE '%cheese%'"#,
-                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
-    fn join_18() {
-        assert_eq!(
-            cake::Entity::find()
-                .find_also_linked(entity_linked::JoinWithoutReverse)
-                .as_query()
-                .to_string(),
-                [
-                    r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                    r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                    r#"FROM "cake""#,
-                    r#"LEFT JOIN "cake" AS "r0" ON "cake_filling"."cake_id" = "r0"."id" AND "cake_filling"."name" LIKE '%cheese%'"#,
-                    r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                    r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-                ]
-                .join(" ")
         );
     }
 

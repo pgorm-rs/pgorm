@@ -2,22 +2,29 @@
 
 This chapter covers `src/query/`: the fluent builders that turn entities and
 ActiveModels into PostgreSQL statements (`select.rs`, `insert.rs`, `update.rs`,
-`delete.rs`, `join.rs`, `combine.rs`, `helper.rs`, `traits.rs`, `util.rs`) and
+`delete.rs`, `join.rs`, `helper.rs`, `traits.rs`, `util.rs`) and
 the data-loader API (`loader.rs`). Rules are grouped under
-`[spec:pgorm:req:query.build]` and `[spec:pgorm:req:query.loader+1]`.
+`[spec:pgorm:req:query.build+1]` and `[spec:pgorm:req:query.loader+1]`.
 
 ## Query building
 
-> [spec:pgorm:req:query.build]
+> [spec:pgorm:req:query.build+1]
 > The query layer MUST provide fluent, owned-`self` builders for SELECT
-> (`Select<E>`, `SelectTwo<E, F>`, `SelectTwoMany<E, F>`), INSERT (`Insert<A>`,
-> `TryInsert<A>`), UPDATE (`Update`, `UpdateOne<A>`, `UpdateMany<E>`) and DELETE
-> (`Delete`, `DeleteOne<A>`, `DeleteMany<E>`). Each builder wraps exactly one
+> (`Select<E>` and the projection typestates it moves through,
+> `query.build.modifiers`), INSERT (`Insert<A>`, `TryInsert<A>`), UPDATE
+> (`Update`, `UpdateOne<A>`, `UpdateMany<E>`) and DELETE (`Delete`,
+> `DeleteOne<A>`, `DeleteMany<E>`). Each builder wraps exactly one
 > pgorm-query statement (`SelectStatement`, `InsertStatement`,
 > `UpdateStatement`, `DeleteStatement`) and exposes it through `QueryTrait`;
 > the shared query-modification surface is provided by the blanket traits
 > `QuerySelect`, `QueryOrder` and `QueryFilter` over a `query()` accessor
 > returning the underlying statement.
+>
+> A relational read over more than one entity is NOT a builder of this
+> family: `SelectGraph<E, S>` (`[spec:pgorm:def:query.graph]`) is declared
+> rather than modified, wraps its `SelectStatement` through `QueryTrait` and
+> `QueryFilter` / `QueryOrder` like the rest, and deliberately implements no
+> `QuerySelect` at all.
 
 Construction of a plain selector happens in `Select::new` (`select.rs`), which
 is what `EntityTrait::find()` produces.
@@ -58,12 +65,12 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias. That alias is taken as `impl IntoIden`, not as a `&str`: its
 > in-tree caller is `ModelTrait::find_linked`, which has a `LinkedAlias`
-> (`[spec:pgorm:req:entity.relation.linked+2]`) in hand and would otherwise
+> (`[spec:pgorm:req:entity.relation.linked+3]`) in hand and would otherwise
 > have to render it back to a string for the callee to parse into an
 > identifier again. A string literal still passes, through
 > `IntoIden for &str`.
 
-> [spec:pgorm:sem:query.build.modifiers+6]
+> [spec:pgorm:sem:query.build.modifiers+7]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` /
@@ -93,23 +100,22 @@ is what `EntityTrait::find()` produces.
 >
 > Clearing the select list is a typestate transition, not an in-place
 > mutation, and `select_only` is therefore NOT a `QuerySelect` method.
-> `Select<E>::select_only()` returns `SelectCustom<E>` and
-> `SelectTwo<E, F>::select_only()` returns `SelectTwoCustom<E, F>`;
-> `SelectProjected<E>` and `SelectTwoProjected<E, F>` carry the same method
-> to start a projection over. `SelectTwoMany<E, F>` and `Cursor<S, K>` —
-> whose select lists their own machinery owns — cannot clear one at all.
+> `Select<E>::select_only()` returns `SelectCustom<E>`, and
+> `SelectProjected<E>` carries the same method to start a projection over.
+> `Cursor<S, K>` — whose select list its own machinery owns — cannot clear
+> one at all, and neither can `SelectGraph<E, S>`, whose projection is
+> generated (`[spec:pgorm:sem:query.graph.slots+1]`).
 >
 > `select(items)` is that clear and the projection that follows it in one
 > call, under the name the pipeline projects with
 > (`[spec:pgorm:req:pipeline.surface+1]`), so the verb means the same thing
-> on both surfaces. It is inherent on the same six states, for the reason
+> on both surfaces. It is inherent on the same three states, for the reason
 > `select_only` is: the destination is per-builder — `Select<E>`,
-> `SelectCustom<E>` and `SelectProjected<E>` land on `SelectProjected<E>`,
-> the two-model trio on `SelectTwoProjected<E, F>` — and a `QuerySelect`
-> method returning `Projected` would hand `Select<E>`, `SelectTwoMany<E, F>`
-> and `Cursor<S, K>` back their own `E::Model`-typed selves over a projection
-> that is no longer that shape. `SelectTwoMany<E, F>` and `Cursor<S, K>`
-> accordingly do not have it. `select_only`, `column` and `columns` are
+> `SelectCustom<E>` and `SelectProjected<E>` all land on
+> `SelectProjected<E>` — and a `QuerySelect` method returning `Projected`
+> would hand `Select<E>` and `Cursor<S, K>` back their own `E::Model`-typed
+> selves over a projection that is no longer that shape. `Cursor<S, K>`
+> accordingly does not have it. `select_only`, `column` and `columns` are
 > unchanged and stay: `select` is the one-call spelling of the pair, not a
 > replacement, and appending to a projection — including the aliased
 > `column_as` that chains after `select` — remains the pair's work.
@@ -133,28 +139,21 @@ is what `EntityTrait::find()` produces.
 > Every projection method returns `QuerySelect::Projected` rather than
 > `Self`, under the fixpoint bound
 > `Projected: QuerySelect<Projected = Self::Projected>`. `Select<E>`,
-> `SelectTwo<E, F>`, `SelectTwoMany<E, F>`, `Cursor<S, K>`,
-> `SelectProjected<E>` and `SelectTwoProjected<E, F>` project onto
-> themselves; `SelectCustom<E>` projects onto `SelectProjected<E>` and
-> `SelectTwoCustom<E, F>` onto `SelectTwoProjected<E, F>`. This associated
+> `Cursor<S, K>` and `SelectProjected<E>` project onto themselves;
+> `SelectCustom<E>` projects onto `SelectProjected<E>`. This associated
 > type is what lets `PartialModelTrait::select_cols<S: QuerySelect>` return
 > `S::Projected` (`entity.traits.from-query-result`).
 >
-> The two `Custom` states have no execution path at all: no `all` / `one` /
+> `SelectCustom<E>` has no execution path at all: no `all` / `one` /
 > `one_opt` / `stream`, no `into_model` / `into_tuple` / `into_values` /
-> `into_partial_model`, no `paginate` / `count` / `cursor_by`. The two
-> `Projected` states carry the terminals that name a decode target —
+> `into_partial_model`, no `paginate` / `count` / `cursor_by`.
+> `SelectProjected<E>` carries the terminals that name a decode target —
 > `into_model`, `into_tuple`, `into_values`, `into_partial_model` (which
 > re-clears the list, so the partial model owns the whole projection), and
-> `cursor_by` plus `cursor_by_other` on the two-model form — but not the
-> `E::Model`-typed ones, and not `select_also` / `select_with` /
-> `find_also_related` / `find_with_related` / `find_also_linked` /
-> `find_with_linked`: a caller's projection is neither `E::Model`'s shape nor
-> carries the `A_`/`B_` aliases those need (`query.build.combine`).
-> `SelectProjected::cursor_by` and `SelectTwoProjected::cursor_by` /
-> `cursor_by_other` accordingly yield `Cursor<SelectUndecoded, K>`, which is
-> not a `SelectorTrait` and so has no `all` until `Cursor::into_model` or
-> `into_partial_model` names one.
+> `cursor_by` — but not the `E::Model`-typed ones: a caller's projection is
+> not `E::Model`'s shape. `SelectProjected::cursor_by` accordingly yields
+> `Cursor<SelectUndecoded, K>`, which is not a `SelectorTrait` and so has no
+> `all` until `Cursor::into_model` or `into_partial_model` names one.
 >
 > Both `Custom` states keep the whole of `QueryTrait`, `QueryFilter` and
 > `QueryOrder`: a cleared select list still renders as `SELECT  FROM "tbl"`,
@@ -169,8 +168,8 @@ is what `EntityTrait::find()` produces.
 > `Error::Query(RuntimeError::Internal("select list is empty; add at least one
 > column or expression"))` before any statement reaches the server: the paths
 > are `Selector::one` / `one_opt` / `all` / `stream` (and everything routed
-> through them, including `Select::all`, `SelectTwo`/`SelectTwoMany`,
-> `into_tuple`, `into_values`, `into_model` and `into_partial_model`),
+> through them, including `Select::all`, `into_tuple`, `into_values`,
+> `into_model` and `into_partial_model`),
 > `Paginator::fetch_page` (so also `fetch`, `fetch_and_next` and
 > `into_stream`), `Paginator::num_items` — which checks the *inner* query it is
 > about to wrap in `SELECT COUNT(*) FROM (…)`, since the wrapper's own
@@ -184,18 +183,7 @@ is what `EntityTrait::find()` produces.
 > `order_by_with_nulls` for `NULLS FIRST`/`LAST`); calls accumulate and are
 > never deduplicated.
 
-**Deprecation.** This rule's pair clauses — the `SelectTwoCustom` /
-`SelectTwoProjected` typestates, `cursor_by_other`, the pair landing of
-`select`, and the `select_also` / `select_with` / `find_also_*` /
-`find_with_*` exclusions on the `Projected` states — are superseded by the
-N-ary source graph, on which projection editing is not represented at all
-(`[spec:pgorm:sem:query.graph.slots]`) and joined cursors are re-homed
-(`[spec:pgorm:sem:query.graph.cursor]`). They remain normative while the
-pair types exist; when the pair surface is deleted (graph/pair-deletion)
-this rule is rewritten without them, and the single-entity typestate,
-`select`, and everything else here survives unchanged.
-
-> [spec:pgorm:sem:query.build.alias]
+> [spec:pgorm:sem:query.build.alias+1]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
 > token (`[spec:pgorm:def:sql.types+5]`), not as a string repeated per site.
 > Every aliasing and referencing position on the builders takes it through the
@@ -215,10 +203,10 @@ this rule is rewritten without them, and the single-entity typestate,
 >
 > `Alias` is NOT deprecated by this and MUST remain: a name computed at run
 > time cannot be a `&'static str` token, and the ORM builds such names itself
-> — the `A_`/`B_` column prefixes of the two-model selectors
-> (`query.build.combine`), the loader's join-back alias, an entity's schema
-> qualifier. The token is the paved road for the static case, not a
-> replacement for the dynamic one.
+> — the loader's join-back alias, the source graph's `s{i}_` column prefixes
+> (`[spec:pgorm:sem:query.graph.writer+1]`), an entity's schema qualifier. The
+> token is the paved road for the static case, not a replacement for the
+> dynamic one.
 >
 > The ceiling is the same one the token carries at the query layer, and it is
 > worth restating where a caller meets it: the token is evidence of nothing.
@@ -265,57 +253,6 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > This is sugar, not a replacement: `join` / `join_rev` remain, and are still
 > the way to join a `RelationDef` that was modified in flight (`.rev()`,
 > `.on_condition(..)`) rather than taken whole from a relation.
-
-> [spec:pgorm:sem:query.build.combine+2]
-> `SelectTwo`/`SelectTwoMany` use a fixed column-aliasing scheme
-> (`combine.rs`): `select_also(F)` / `select_with(F)` first rewrite every
-> select expression of `E` with the `A_` prefix via `apply_alias` (an existing
-> alias becomes `A_<alias>`; an unaliased plain column, or an
-> `AsEnum`-wrapped one, becomes `A_<column>`), then append every `F::Column`
-> as `<select_as expr> AS B_<column>`.
->
-> An unaliased entry with no column name to take — an asterisk, or an
-> expression that is neither a column nor an `AsEnum`-wrapped column — has no
-> correct `A_` name, so `apply_alias` leaves it exactly as written and MUST
-> NOT panic. Such an entry belongs to neither model and neither model's
-> decode looks for it; the models' own columns are aliased either way.
->
-> These combinators live on `Select<E>` only. A select whose projection was
-> cleared by `select_only` does not carry them at all
-> (`query.build.modifiers`), which is what keeps a wholly caller-authored
-> select list — where every entry could be unaliasable — out of the scheme.
->
-> `SelectTwoMany::new` additionally appends `ORDER BY <E primary key> ASC`
-> for each primary-key column, so that consecutive rows for the same left
-> model are adjacent; `SelectTwo` adds no ordering. `find_also_related(R)` is
-> exactly `left_join(R).select_also(R)` and `find_with_related(R)` is
-> `left_join(R).select_with(R)`.
->
-> `find_also_linked` / `find_with_linked` walk a `Linked` chain instead: the
-> i-th relation is LEFT JOINed with its target aliased `r{i}` (the join
-> source being `r{i-1}`, or the base table for i = 0), custom `on_condition`
-> closures included; `E`'s columns get the `A_` prefix and the final target's
-> columns are selected from the last alias as `B_<column>`. Unlike
-> `find_with_related`, `find_with_linked` does not append the primary-key
-> ORDER BY (it constructs the selector with `new_without_prepare`).
->
-> Those `r{i}` names are generated but observable — a caller ordering by a
-> column of the joined target has to name the table — so they are not a
-> string the builders format and callers retype. They are `LinkedAlias`, and
-> the last of them is derived by `Linked::last_hop_alias`
-> (`[spec:pgorm:req:entity.relation.linked+2]`), which is the same call these
-> two builders make. A chain that gains a hop therefore moves the join and
-> every reference to it together.
-
-**Deprecation.** The surface this rule specifies — `SelectTwo`,
-`SelectTwoMany`, `select_also` / `select_with`, `find_also_related` /
-`find_with_related`, `find_also_linked` / `find_with_linked`, `apply_alias`
-and the `A_`/`B_` scheme — is superseded by the N-ary source graph
-(`[spec:pgorm:def:query.graph]`), whose single projection writer
-(`[spec:pgorm:sem:query.graph.writer]`) replaces this rule's aliasing scheme
-and whose slot declaration replaces these combinators. The rule remains
-normative while the code it describes exists, and is retired whole with the
-pair surface (graph/pair-deletion) rather than rewritten.
 
 The composition clauses — WITH, LATERAL, WINDOW and the set operators — are all
 in-place mutations of the same `SelectStatement`, so none of them changes what a
@@ -600,13 +537,13 @@ what makes it total over partially-set models.
 > (`[spec:pgorm:def:query.graph]`). The caller's target selector is re-rooted
 > as the graph: the statement keeps its FROM, its filters, its ordering and
 > its limit, and gives up only its projection, which the one writer
-> (`[spec:pgorm:sem:query.graph.writer]`) regenerates under `s0_`. Clearing
+> (`[spec:pgorm:sem:query.graph.writer+1]`) regenerates under `s0_`. Clearing
 > the caller's select list before projecting is what keeps a graph's select
 > list generated from its declaration rather than inherited from a builder
 > whose list a caller may have edited. The junction enters as a `via()` hop —
 > joined because the path runs through it, projected never — and the input
 > entity's own table as the single `Req` slot
-> (`[spec:pgorm:sem:query.graph.slots]`), joined back under an internal alias
+> (`[spec:pgorm:sem:query.graph.slots+1]`), joined back under an internal alias
 > so that a self-referencing many-to-many does not name one table twice and so
 > that the key predicate — the via relation's from side against the input
 > keys — qualifies against that alias. Each returned row decodes as

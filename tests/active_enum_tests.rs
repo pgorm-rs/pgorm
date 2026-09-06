@@ -352,9 +352,9 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), Err
         }]
     );
     assert_eq!(
-        ActiveEnumEntity::find()
-            .find_with_related(ActiveEnumChild)
-            .all(db)
+        ActiveEnumEntity::graph()
+            .related_maybe::<active_enum_child::Entity>()
+            .all_grouped(db)
             .await?,
         [(
             active_enum::Model {
@@ -373,8 +373,8 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), Err
         )]
     );
     assert_eq!(
-        ActiveEnumEntity::find()
-            .find_also_related(ActiveEnumChild)
+        ActiveEnumEntity::graph()
+            .related_maybe::<active_enum_child::Entity>()
             .all(db)
             .await?,
         [(
@@ -413,9 +413,9 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), Err
         }]
     );
     assert_eq!(
-        ActiveEnumChild::find()
-            .find_with_related(ActiveEnum)
-            .all(db)
+        ActiveEnumChild::graph()
+            .related_maybe::<active_enum::Entity>()
+            .all_grouped(db)
             .await?,
         [(
             active_enum_child::Model {
@@ -434,8 +434,8 @@ pub async fn find_related_active_enum(db: &DatabaseConnection) -> Result<(), Err
         )]
     );
     assert_eq!(
-        ActiveEnumChild::find()
-            .find_also_related(ActiveEnum)
+        ActiveEnumChild::graph()
+            .related_maybe::<active_enum::Entity>()
             .all(db)
             .await?,
         [(
@@ -478,8 +478,8 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
         }]
     );
     assert_eq!(
-        ActiveEnumEntity::find()
-            .find_also_linked(RelatedLink::to(active_enum_child::Entity))
+        ActiveEnumEntity::graph()
+            .related_maybe::<active_enum_child::Entity>()
             .all(db)
             .await?,
         [(
@@ -499,9 +499,9 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
         )]
     );
     assert_eq!(
-        ActiveEnumEntity::find()
-            .find_with_linked(RelatedLink::to(active_enum_child::Entity))
-            .all(db)
+        ActiveEnumEntity::graph()
+            .related_maybe::<active_enum_child::Entity>()
+            .all_grouped(db)
             .await?,
         [(
             active_enum::Model {
@@ -539,8 +539,8 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
         }]
     );
     assert_eq!(
-        ActiveEnumChild::find()
-            .find_also_linked(RelatedLink::to(active_enum::Entity))
+        ActiveEnumChild::graph()
+            .related_maybe::<active_enum::Entity>()
             .all(db)
             .await?,
         [(
@@ -560,9 +560,9 @@ pub async fn find_linked_active_enum(db: &DatabaseConnection) -> Result<(), Erro
         )]
     );
     assert_eq!(
-        ActiveEnumChild::find()
-            .find_with_linked(RelatedLink::to(active_enum::Entity))
-            .all(db)
+        ActiveEnumChild::graph()
+            .related_maybe::<active_enum::Entity>()
+            .all_grouped(db)
             .await?,
         [(
             active_enum_child::Model {
@@ -610,12 +610,12 @@ mod tests {
             .join(" ")
         );
 
-        let select = ActiveEnumEntity::find().find_also_related(ActiveEnumChild);
+        let select = ActiveEnumEntity::graph().related_maybe::<active_enum_child::Entity>();
         assert_eq!(
             select.as_query().to_string(),
             [
-                r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
-                r#""active_enum_child"."id" AS "B_id", "active_enum_child"."parent_id" AS "B_parent_id", "active_enum_child"."category" AS "B_category", "active_enum_child"."color" AS "B_color", CAST("active_enum_child"."tea" AS text) AS "B_tea""#,
+                r#"SELECT "active_enum"."id" AS "s0_id", "active_enum"."category" AS "s0_category", "active_enum"."color" AS "s0_color", CAST("active_enum"."tea" AS text) AS "s0_tea","#,
+                r#""active_enum_child"."id" AS "s1_id", "active_enum_child"."parent_id" AS "s1_parent_id", "active_enum_child"."category" AS "s1_category", "active_enum_child"."color" AS "s1_color", CAST("active_enum_child"."tea" AS text) AS "s1_tea""#,
                 r#"FROM "active_enum""#,
                 r#"LEFT JOIN "active_enum_child" ON "active_enum"."id" = "active_enum_child"."parent_id""#,
             ]
@@ -642,19 +642,6 @@ mod tests {
             ]
             .join(" ")
         );
-
-        let select =
-            ActiveEnumEntity::find().find_also_linked(RelatedLink::to(active_enum_child::Entity));
-        assert_eq!(
-            select.as_query().to_string(),
-            [
-                r#"SELECT "active_enum"."id" AS "A_id", "active_enum"."category" AS "A_category", "active_enum"."color" AS "A_color", CAST("active_enum"."tea" AS text) AS "A_tea","#,
-                r#""r0"."id" AS "B_id", "r0"."parent_id" AS "B_parent_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
-                r#"FROM "active_enum""#,
-                r#"LEFT JOIN "active_enum_child" AS "r0" ON "active_enum"."id" = "r0"."parent_id""#,
-            ]
-            .join(" ")
-        );
     }
 
     #[test]
@@ -678,12 +665,12 @@ mod tests {
             .join(" ")
         );
 
-        let select = ActiveEnumChild::find().find_also_related(ActiveEnum);
+        let select = ActiveEnumChild::graph().related_maybe::<active_enum::Entity>();
         assert_eq!(
             select.as_query().to_string(),
             [
-                r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
-                r#""active_enum"."id" AS "B_id", "active_enum"."category" AS "B_category", "active_enum"."color" AS "B_color", CAST("active_enum"."tea" AS text) AS "B_tea""#,
+                r#"SELECT "active_enum_child"."id" AS "s0_id", "active_enum_child"."parent_id" AS "s0_parent_id", "active_enum_child"."category" AS "s0_category", "active_enum_child"."color" AS "s0_color", CAST("active_enum_child"."tea" AS text) AS "s0_tea","#,
+                r#""active_enum"."id" AS "s1_id", "active_enum"."category" AS "s1_category", "active_enum"."color" AS "s1_color", CAST("active_enum"."tea" AS text) AS "s1_tea""#,
                 r#"FROM "active_enum_child""#,
                 r#"LEFT JOIN "active_enum" ON "active_enum_child"."parent_id" = "active_enum"."id""#,
             ]
@@ -708,18 +695,6 @@ mod tests {
                 r#"FROM "active_enum""#,
                 r#"INNER JOIN "active_enum_child" AS "r0" ON "r0"."parent_id" = "active_enum"."id""#,
                 r#"WHERE "r0"."id" = 1"#,
-            ]
-            .join(" ")
-        );
-
-        let select = ActiveEnumChild::find().find_also_linked(RelatedLink::to(active_enum::Entity));
-        assert_eq!(
-            select.as_query().to_string(),
-            [
-                r#"SELECT "active_enum_child"."id" AS "A_id", "active_enum_child"."parent_id" AS "A_parent_id", "active_enum_child"."category" AS "A_category", "active_enum_child"."color" AS "A_color", CAST("active_enum_child"."tea" AS text) AS "A_tea","#,
-                r#""r0"."id" AS "B_id", "r0"."category" AS "B_category", "r0"."color" AS "B_color", CAST("r0"."tea" AS text) AS "B_tea""#,
-                r#"FROM "active_enum_child""#,
-                r#"LEFT JOIN "active_enum" AS "r0" ON "active_enum_child"."parent_id" = "r0"."id""#,
             ]
             .join(" ")
         );

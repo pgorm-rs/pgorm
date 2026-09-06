@@ -29,7 +29,7 @@ pub trait IdenStr: Iden + Copy + Debug + 'static {
 /// carries this contract too and reaches the [`Identity`](crate::Identity)
 /// positions that key on it — `cursor_by`, a secondary ordering — and not
 /// only the plain [`Iden`] ones.
-// [spec:pgorm:sem:query.build.alias]
+// [spec:pgorm:sem:query.build.alias+1]
 impl IdenStr for AliasName {
     fn as_str(&self) -> &str {
         pgorm_query::IdenStatic::as_str(self)

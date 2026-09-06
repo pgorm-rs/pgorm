@@ -4074,6 +4074,15 @@ children (
                 id pair-deletion
                 title "Delete the inherited pair surface"
                 deps (cursor grouped loader)
+                sealed true
+                log (
+                    {
+                        at 2026-09-06T16:13:59.32051Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

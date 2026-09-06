@@ -95,7 +95,7 @@ where
     (sql, Values(Vec::new())).into_model::<M>()
 }
 
-// [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding
+// [spec:pgorm:def:exec.crud+1/test]    `SelectorRaw::from_statement` decoding
 // through `SelectModel`, i.e. `SelectorTrait::from_raw_query_result` with an
 // empty prefix
 // [spec:pgorm:sem:macros.derive.from-query-result+2/test]    field-named reads, generics, and `skip`

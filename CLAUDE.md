@@ -43,7 +43,7 @@ There is no CLI crate: the inherited `pgorm-cli` was retired (it targeted sqlx/s
 - **Schema**: `src/schema/` - DDL statement generation from entity definitions (`Schema::create_table_from_entity`, `create_enum_from_entity`, `create_index_from_entity`, `create_comments_from_entity`). This is generation only, not introspection.
 - **Metrics**: `src/metric.rs` - Opt-in instrumentation wrappers
 
-Row streaming is reachable through the public crate: `ConnectionTrait::query_raw` returns a tokio-postgres `RowStream`, and `src/executor/select.rs` decodes it into models — `stream` on `Select`, `SelectTwo`, `Selector`, and `SelectorRaw`, plus `stream_partial_model`, each yielding a `PinBoxSendStream`. pgorm no longer carries its own `Statement`/`StatementBuilder`: `src/database/statement.rs` was deleted, leaving `src/database/` as just `connection.rs` and `db_connection.rs`, and SQL now travels as text (`&str` or `&String`, the sealed `SqlText` bound) alongside its parameters.
+Row streaming is reachable through the public crate: `ConnectionTrait::query_raw` returns a tokio-postgres `RowStream`, and `src/executor/select.rs` decodes it into models — `stream` on `Select`, `SelectGraph`, `Selector`, and `SelectorRaw`, plus `stream_partial_model`, each yielding a `PinBoxSendStream`. pgorm no longer carries its own `Statement`/`StatementBuilder`: `src/database/statement.rs` was deleted, leaving `src/database/` as just `connection.rs` and `db_connection.rs`, and SQL now travels as text (`&str` or `&String`, the sealed `SqlText` bound) alongside its parameters.
 
 ### Key Differences from SeaORM
 - PostgreSQL-only (no multi-database support)

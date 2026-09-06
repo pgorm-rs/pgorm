@@ -115,10 +115,10 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 // [spec:pgorm:def:query.graph/test]    a graph declared as a root plus joined
 // sources executes as one statement whose rows carry every declared source
-// [spec:pgorm:sem:query.graph.writer/test]    three sources each carrying a
+// [spec:pgorm:sem:query.graph.writer+1/test]    three sources each carrying a
 // `name` and an `id` column decode without collision, because each is
 // projected under its own `s{i}_` prefix
-// [spec:pgorm:sem:query.graph.decode/test]    an unmatched LEFT JOIN reads as
+// [spec:pgorm:sem:query.graph.decode+1/test]    an unmatched LEFT JOIN reads as
 // `None` through the absence witness, at the middle of a chain and at its tail
 #[pgorm_macros::test]
 async fn graph_three_sources() -> Result<(), Error> {
@@ -150,7 +150,7 @@ async fn graph_three_sources() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots/test]    a required slot joins INNER and
+// [spec:pgorm:sem:query.graph.slots+1/test]    a required slot joins INNER and
 // decodes as a bare `Model` — "absent" is not a value the caller unwraps —
 // while the same relation as an optional slot keeps the unmatched roots
 #[pgorm_macros::test]
@@ -278,7 +278,7 @@ async fn graph_filtered_join_keeps_unmatched_roots() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots/test]    `related_maybe` folds the whole
+// [spec:pgorm:sem:query.graph.slots+1/test]    `related_maybe` folds the whole
 // described path in — junction hop included — and a required slot joined
 // through a `via` hop re-tightens the chain to INNER semantics end to end
 #[pgorm_macros::test]
@@ -570,7 +570,7 @@ const NULLABLE_SCHEMA: &str = r#"
     INSERT INTO "fruit" VALUES (10, NULL, 1);
 "#;
 
-// [spec:pgorm:sem:query.graph.decode/test]    a decode failure of a *present*
+// [spec:pgorm:sem:query.graph.decode+1/test]    a decode failure of a *present*
 // row propagates rather than being read as absence — on a required slot,
 // which never consults the witness, and on an optional one, whose witness
 // columns are not all NULL
@@ -603,7 +603,7 @@ async fn graph_decode_failure_is_not_absence() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.terminals/test]    `all`, `one_opt`, `stream`
+// [spec:pgorm:sem:query.graph.terminals+1/test]    `all`, `one_opt`, `stream`
 // and `PaginatorTrait` all run through one `Selector<GraphRow<E, S>>`, and
 // page boundaries fall between rows rather than between root models
 #[pgorm_macros::test]
@@ -704,7 +704,7 @@ fn cranberry() -> fruit::Model {
     }
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    the fanout regroups: each root
+// [spec:pgorm:sem:query.graph.grouped+1/test]    the fanout regroups: each root
 // appears once with its matching models beneath it, and a root the slot did
 // not match reads as an empty `Vec` rather than dropping out — with nothing
 // ordered by the caller, the roots come back in pure primary-key order
@@ -753,7 +753,7 @@ async fn graph_grouped_fanout() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    caller ordering dominates: the
+// [spec:pgorm:sem:query.graph.grouped+1/test]    caller ordering dominates: the
 // primary key is appended *behind* what the caller wrote, so a descending
 // order on a root column reverses the entries — the constructor-injected
 // leading ORDER BY of the pair surface would have silently overruled it
@@ -813,7 +813,7 @@ async fn graph_grouped_caller_ordering_dominates() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    a junction-mediated has-many is
+// [spec:pgorm:sem:query.graph.grouped+1/test]    a junction-mediated has-many is
 // this shape: the `via` hop consumes no slot, so `(Opt<F>,)` still holds and
 // the grouped read is available — through `related_maybe` and through the
 // hand-written `via` + `join_maybe` alike
@@ -852,7 +852,7 @@ async fn graph_grouped_through_a_junction() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    grouping keys on the decoded
+// [spec:pgorm:sem:query.graph.grouped+1/test]    grouping keys on the decoded
 // root rather than on adjacency: an ordering that interleaves the roots merges
 // the torn run into the entry at its first appearance instead of emitting the
 // root twice
@@ -903,7 +903,7 @@ async fn graph_grouped_merges_a_torn_run() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.grouped/test]    the key is read at whatever
+// [spec:pgorm:sem:query.graph.grouped+1/test]    the key is read at whatever
 // arity it has: a composite-keyed root groups on every key column, not on the
 // first one
 #[pgorm_macros::test]

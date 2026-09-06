@@ -285,7 +285,7 @@ These rules capture what the code does today, including known gaps.
 > structs, which derive `FromQueryResult` alongside it — are verifiable
 > without further work.
 
-> [spec:pgorm:req:exec.verify.limits]
+> [spec:pgorm:req:exec.verify.limits+1]
 > Verification checks column names and type acceptance, and MUST NOT be
 > read as checking more.
 >
@@ -299,26 +299,27 @@ These rules capture what the code does today, including known gaps.
 >
 > Columns the statement returns but the target does not read are not an
 > error: reading a subset is a legitimate projection. Prefixed decoding is
-> out — only the empty prefix is checked, so the `SelectA`/`SelectB`
-> prefixes of `SelectTwoModel` (`exec.crud`) and the tuple targets of
-> `TryGetableMany` (`exec.decode.many`), which are not `FromQueryResult`
-> types at all, have no verification path. A pass is therefore not a proof
+> out — only the empty prefix is checked, so the `s{i}_` prefixes a source
+> graph decodes under (`[spec:pgorm:sem:query.graph.decode+1]`) and the tuple
+> targets of `TryGetableMany` (`exec.decode.many`), which are not
+> `FromQueryResult` types at all, have no verification path. A pass is
+> therefore not a proof
 > that decoding will succeed; it closes the specific hole where an empty
 > result set hides a target that names a column the statement does not
 > return, or reads one into a type that cannot decode it.
 
 ## CRUD execution (`exec.crud`)
 
-> [spec:pgorm:def:exec.crud]
+> [spec:pgorm:def:exec.crud+1]
 > Statement execution is mediated by selector types: `Selector<S>` holds
 > a `SelectStatement` plus a `SelectorTrait` implementor, and
 > `SelectorRaw<S>` holds a raw SQL string plus `Values`. `SelectorTrait`
 > has a single method, `from_raw_query_result`, turning one `QueryResult`
 > into an item. Implementors: `SelectModel<M>` (one `FromQueryResult`
-> model, empty prefix), `SelectTwoModel<M, N>` (decodes
-> `(M, Option<N>)` using the `SelectA`/`SelectB` column prefixes),
-> `SelectGetableValue<T, C>` (tuple by named columns from the `C` enum),
-> and `SelectGetableTuple<T>` (tuple by ordinal).
+> model, empty prefix), `SelectGetableValue<T, C>` (tuple by named columns
+> from the `C` enum), `SelectGetableTuple<T>` (tuple by ordinal), and
+> `GraphRow<E, S>` (a source graph's declared tuple, one prefix per decoded
+> source — `[spec:pgorm:sem:query.graph.decode+1]`).
 >
 > Conversions from a builder: `Select::into_model`, `into_partial_model`,
 > `into_values`, `into_tuple`, `from_raw_sql`; the constructors that take a
@@ -360,7 +361,7 @@ These rules capture what the code does today, including known gaps.
 > no injected limit, and no projection guard, since a caller-supplied string
 > has no projection list to inspect.
 
-> [spec:pgorm:sem:exec.crud.select+2]
+> [spec:pgorm:sem:exec.crud.select+3]
 > `Selector::one` and `one_opt` set `LIMIT 1` on the query, then execute
 > through the connection's `query_opt`. The limit is set on the statement
 > the selector holds, which for a CTE query is the carrying select and never
@@ -374,27 +375,9 @@ These rules capture what the code does today, including known gaps.
 > case. This is a deliberate pgorm difference from SeaORM, where `one`
 > returns an `Option`. `all` executes via `query_all` and decodes every
 > row through `from_raw_query_result`, aborting on the first decode
-> error. `Select::one`/`one_opt`/`all` and
-> `SelectTwo::one`/`one_opt`/`all` delegate through `into_model`.
-
-> [spec:pgorm:sem:exec.crud.consolidate]
-> `SelectTwoMany::all` executes as a `SelectTwoModel` select and
-> consolidates `(E::Model, Option<F::Model>)` rows into
-> `(E::Model, Vec<F::Model>)`. Grouping keys on the left entity's
-> primary key with arity-specialized keys (unary value, pair, or vector).
-> Children are collected in row order; each distinct left key yields
-> exactly one output entry; left rows with no right model produce an
-> empty `Vec`. `SelectTwoMany` deliberately exposes no `one` and no
-> pagination: `one()` was dropped, and `paginate`/`count` are absent
-> because a page boundary could split one parent's children.
-
-**Deprecation.** This consolidation is superseded by the graph's grouped
-terminal (`[spec:pgorm:sem:query.graph.grouped]`), which keeps the keyed
-grouping and the no-pagination stance but specifies away `SelectTwoMany`'s
-constructor-injected ORDER BY: in the successor the caller's ordering
-dominates and the root's primary key is appended as a tiebreak only. The
-rule remains normative while `SelectTwoMany` exists and is retired with the
-pair surface (graph/pair-deletion).
+> error. `Select::one`/`one_opt`/`all` delegate through `into_model`, and a
+> source graph's terminals through its own selector
+> (`[spec:pgorm:sem:query.graph.terminals+1]`).
 
 > [spec:pgorm:req:exec.crud.exec-vocabulary]
 > A CRUD terminal's name MUST determine the shape of what it returns, so
@@ -540,7 +523,7 @@ pair surface (graph/pair-deletion).
 
 ## Streaming (`exec.stream`)
 
-> [spec:pgorm:def:exec.stream+1]
+> [spec:pgorm:def:exec.stream+2]
 > Row-level streaming is exposed through `ConnectionTrait::query_raw`, which
 > takes the same `BorrowToSql` `ExactSizeIterator` params as `execute_raw`
 > and returns a `tokio_postgres::RowStream`: rows are read from the
@@ -550,24 +533,14 @@ pair surface (graph/pair-deletion).
 > and `InstrumentedTransaction`.
 >
 > On top of it the executor exposes `stream` on `SelectorRaw`, `Selector`,
-> `Select`, and `SelectTwo`, plus `stream_partial_model` on `Select` and
-> `SelectTwo`, each returning
-> `PinBoxSendStream<'db, Result<Item, Error>>` — an alias for
+> `Select`, and `SelectGraph`, plus `stream_partial_model` on `Select`,
+> each returning `PinBoxSendStream<'db, Result<Item, Error>>` — an alias for
 > `Pin<Box<dyn Stream<Item = ..> + Send + 'db>>`. Unlike `PinBoxStream`
 > (used by `Paginator::into_stream`) it is `Send`, so a streamed select can
-> be consumed from a spawned task. `SelectTwoMany` deliberately has no
-> `stream`: its output requires all rows of a parent before any entry is
-> complete (see `exec.crud.consolidate`). Page-batched and keyset-windowed
+> be consumed from a spawned task. The graph's grouped read has no streamed
+> form: its output requires all rows of a root before any entry is complete
+> (`[spec:pgorm:sem:query.graph.grouped+1]`). Page-batched and keyset-windowed
 > consumption remain available through `exec.paginator` and `exec.cursor`.
-
-**Deprecation.** This rule's pair clauses — `stream` on `SelectTwo`, the
-pair form of `stream_partial_model`, and `SelectTwoMany`'s deliberate
-absence — are superseded by the graph's `stream` terminal
-(`[spec:pgorm:sem:query.graph.terminals]`), which reaches the same
-`Selector::stream` through `GraphRow`. When the pair surface is deleted
-(graph/pair-deletion) the enumeration here loses the pair types and gains
-`SelectGraph`; `query_raw`, the `Select`/`Selector`/`SelectorRaw` surface
-and the single-entity `stream_partial_model` are untouched.
 
 > [spec:pgorm:sem:exec.stream.decode+1]
 > `SelectorRaw::stream` binds `Values` through the `ValueHolder` `ToSql`

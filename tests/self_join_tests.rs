@@ -74,8 +74,11 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     );
 
     assert_eq!(
-        self_join::Entity::find()
-            .find_also_linked(RelatedLink::to(self_join::Entity))
+        self_join::Entity::graph()
+            .join_maybe_as::<self_join::Entity>(
+                self_join::Relation::SelfReferencing.def(),
+                alias("r0")
+            )
             .order_by_asc(self_join::Column::Time)
             .all(db)
             .await?,
@@ -89,24 +92,22 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked+2/test]    a self-relation is the case
+// [spec:pgorm:req:entity.relation.linked+3/test]    a self-relation is the case
 // `RelatedLink` exists for: the link form aliases the joined table, so the
 // entity's own table can be joined a second time without being named twice
 #[test]
 fn self_related_link_aliases_the_second_copy() {
-    use pgorm::QueryTrait;
+    use pgorm::{Linked, QueryTrait};
 
     assert_eq!(
-        self_join::Entity::find()
-            .find_also_linked(RelatedLink::to(self_join::Entity))
+        RelatedLink::<self_join::Entity, self_join::Entity>::new()
+            .find_linked()
             .as_query()
             .to_string(),
         [
-            r#"SELECT "self_join"."uuid" AS "A_uuid", "self_join"."uuid_ref" AS "A_uuid_ref","#,
-            r#""self_join"."time" AS "A_time", "r0"."uuid" AS "B_uuid","#,
-            r#""r0"."uuid_ref" AS "B_uuid_ref", "r0"."time" AS "B_time""#,
+            r#"SELECT "self_join"."uuid", "self_join"."uuid_ref", "self_join"."time""#,
             r#"FROM "self_join""#,
-            r#"LEFT JOIN "self_join" AS "r0" ON "self_join"."uuid_ref" = "r0"."uuid""#,
+            r#"INNER JOIN "self_join" AS "r0" ON "r0"."uuid_ref" = "self_join"."uuid""#,
         ]
         .join(" ")
     );

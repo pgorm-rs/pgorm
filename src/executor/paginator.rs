@@ -1,6 +1,6 @@
 use crate::{
-    ConnectionTrait, EntityTrait, FromQueryResult, Select, SelectModel, SelectTwo, SelectTwoModel,
-    Selector, SelectorRaw, SelectorTrait, error::*,
+    ConnectionTrait, EntityTrait, FromQueryResult, Select, SelectModel, Selector, SelectorRaw,
+    SelectorTrait, error::*,
 };
 use async_stream::stream;
 use futures::Stream;
@@ -23,7 +23,7 @@ use super::{QueryResult, ValueHolder, select::ensure_select_list};
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
 
 /// Defined a structure to handle pagination of a result from a query operation on a Model
-// [spec:pgorm:def:exec.paginator+1]
+// [spec:pgorm:def:exec.paginator+2]
 #[derive(Clone, Debug)]
 pub struct Paginator<'db, C, S>
 where
@@ -298,7 +298,7 @@ where
 
 #[async_trait::async_trait]
 /// A Trait for any type that can paginate results
-// [spec:pgorm:def:exec.paginator+1]
+// [spec:pgorm:def:exec.paginator+2]
 pub trait PaginatorTrait<'db, C>
 where
     C: ConnectionTrait,
@@ -546,21 +546,6 @@ where
     M: FromQueryResult + Sized + Send + Sync + 'db,
 {
     type Selector = SelectModel<M>;
-
-    fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector> {
-        self.into_model().paginate(db, page_size)
-    }
-}
-
-impl<'db, C, M, N, E, F> PaginatorTrait<'db, C> for SelectTwo<E, F>
-where
-    C: ConnectionTrait,
-    E: EntityTrait<Model = M>,
-    F: EntityTrait<Model = N>,
-    M: FromQueryResult + Sized + Send + Sync + 'db,
-    N: FromQueryResult + Sized + Send + Sync + 'db,
-{
-    type Selector = SelectTwoModel<M, N>;
 
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector> {
         self.into_model().paginate(db, page_size)

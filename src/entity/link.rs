@@ -21,20 +21,20 @@ use std::{
 /// It is an ordinary [`Iden`], so it stands in any identifier position:
 ///
 /// ```
-/// use pgorm::{EntityTrait, Linked, QueryOrder, QueryTrait, RelatedLink};
+/// use pgorm::{Linked, QueryOrder, QueryTrait, RelatedLink};
 /// use pgorm::tests_cfg::{cake, fruit};
 /// use pgorm_query::Expr;
 ///
-/// let link = RelatedLink::to(fruit::Entity);
-/// let sql = cake::Entity::find()
-///     .find_also_linked(link)
-///     .order_by_asc(Expr::col((link.last_hop_alias(), fruit::Column::Id)))
+/// let link = RelatedLink::<cake::Entity, fruit::Entity>::new();
+/// let sql = link
+///     .find_linked()
+///     .order_by_asc(Expr::col((link.last_hop_alias(), cake::Column::Id)))
 ///     .as_query()
 ///     .to_string();
 ///
 /// assert!(sql.ends_with(r#"ORDER BY "r0"."id" ASC"#), "{sql}");
 /// ```
-// [spec:pgorm:req:entity.relation.linked+2]
+// [spec:pgorm:req:entity.relation.linked+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkedAlias(usize);
 
@@ -45,7 +45,7 @@ impl LinkedAlias {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+2]
+// [spec:pgorm:req:entity.relation.linked+3]
 impl Iden for LinkedAlias {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         let _ = write!(s, "r{}", self.0);
@@ -59,7 +59,7 @@ impl fmt::Display for LinkedAlias {
 }
 
 /// A Trait for links between Entities
-// [spec:pgorm:req:entity.relation.linked+2]
+// [spec:pgorm:req:entity.relation.linked+3]
 pub trait Linked {
     #[allow(missing_docs)]
     type FromEntity: EntityTrait;
@@ -72,20 +72,14 @@ pub trait Linked {
 
     /// The alias bound while the chain's last relation is joined.
     ///
-    /// Which end of the chain that names depends on the direction the ladder
-    /// is walked, and both directions exist.
-    /// [`find_also_linked`](crate::Select::find_also_linked) and
-    /// [`find_with_linked`](crate::Select::find_with_linked) walk it forwards
-    /// from `FromEntity`, so the last rung is the joined *target* — this is
-    /// the alias to name a `ToEntity` column by. [`find_linked`] walks it
-    /// backwards from `ToEntity`, so there the last rung is the *source*
-    /// table, which is why it is what scopes
+    /// [`find_linked`] walks the ladder backwards from `ToEntity`, so the last
+    /// rung is the *source* table — which is why it is what scopes
     /// [`ModelTrait::find_linked`](crate::ModelTrait::find_linked) to one
-    /// model.
+    /// model, and what a caller ordering or filtering on a `FromEntity` column
+    /// has to name.
     ///
-    /// Every builder that walks the chain derives the name here, and so
-    /// should a caller, rather than writing `r3` and hoping the chain never
-    /// grows.
+    /// The builder that walks the chain derives the name here, and so should a
+    /// caller, rather than writing `r3` and hoping the chain never grows.
     ///
     /// [`find_linked`]: Linked::find_linked
     fn last_hop_alias(&self) -> LinkedAlias {
@@ -127,36 +121,34 @@ pub trait Linked {
 /// A one-hop link is the relation itself, and a junction-mediated one is
 /// `[via, to]` — exactly what `Related` carries. Writing a unit struct plus an
 /// eleven-line `Linked` impl to restate that is duplication, so hand this to
-/// [`find_also_linked`](crate::Select::find_also_linked),
-/// [`find_with_linked`](crate::Select::find_with_linked) or
 /// [`ModelTrait::find_linked`](crate::ModelTrait::find_linked) instead.
 ///
 /// The source entity is inferred from the position it is used in; only the
 /// target is named:
 ///
 /// ```
-/// use pgorm::{EntityTrait, QueryTrait, RelatedLink, tests_cfg::{cake, fruit}};
+/// use pgorm::{ModelTrait, QueryTrait, RelatedLink, tests_cfg::{cake, fruit}};
+///
+/// let cake = cake::Model { id: 12, name: "Cheesecake".to_owned() };
 ///
 /// assert_eq!(
-///     cake::Entity::find()
-///         .find_also_linked(RelatedLink::to(fruit::Entity))
+///     cake.find_linked(RelatedLink::to(fruit::Entity))
 ///         .as_query()
 ///         .to_string(),
 ///     [
-///         r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-///         r#""r0"."id" AS "B_id", "r0"."name" AS "B_name", "r0"."cake_id" AS "B_cake_id""#,
-///         r#"FROM "cake""#,
-///         r#"LEFT JOIN "fruit" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
+///         r#"SELECT "fruit"."id", "fruit"."name", "fruit"."cake_id""#,
+///         r#"FROM "fruit""#,
+///         r#"INNER JOIN "cake" AS "r0" ON "r0"."id" = "fruit"."cake_id""#,
+///         r#"WHERE "r0"."id" = 12"#,
 ///     ]
 ///     .join(" ")
 /// );
 /// ```
 ///
-/// Unlike [`find_also_related`](crate::Select::find_also_related), the linked
-/// form aliases the joined table, so it is also what a self-relation needs:
-/// `RelatedLink::to(Entity)` on an entity related to itself joins the table a
-/// second time under `r0` rather than emitting an ambiguous self-join.
-// [spec:pgorm:req:entity.relation.linked+2]
+/// The linked form aliases the joined table, so it is also what a self-relation
+/// needs: `RelatedLink::to(Entity)` on an entity related to itself joins the
+/// table a second time under `r0` rather than emitting an ambiguous self-join.
+// [spec:pgorm:req:entity.relation.linked+3]
 pub struct RelatedLink<E, R>(PhantomData<fn() -> (E, R)>);
 
 impl<E, R> RelatedLink<E, R> {
@@ -192,7 +184,7 @@ impl<E, R> Debug for RelatedLink<E, R> {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+2]
+// [spec:pgorm:req:entity.relation.linked+3]
 impl<E, R> Linked for RelatedLink<E, R>
 where
     E: EntityTrait + Related<R>,

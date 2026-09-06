@@ -93,7 +93,7 @@ impl<S: SelectableSource> SelectableSource for Named<S> {
 /// cast discipline as [`project_source`](crate::query::graph::project_source),
 /// emitted as PL nodes instead of a `SelectStatement`.
 // [spec:pgorm:sem:pipeline.select-sources]
-// [spec:pgorm:sem:query.graph.writer]
+// [spec:pgorm:sem:query.graph.writer+1]
 fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index: usize) {
     for column in <E::Column as Iterable>::iter() {
         let alias = source_column_alias(index, column.as_str());

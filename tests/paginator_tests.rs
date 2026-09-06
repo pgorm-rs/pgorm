@@ -45,7 +45,7 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 const RAW_ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDER BY "id" ASC"#;
 
-// [spec:pgorm:def:exec.paginator+1/test]    paginate is reachable from every
+// [spec:pgorm:def:exec.paginator+2/test]    paginate is reachable from every
 // selector shape, and `count` pages at `NonZeroU64::MIN`
 // [spec:pgorm:sem:exec.paginator.fetch+2/test]    zero-indexed pages, an
 // independent page cursor, and `next` advancing without fetching
@@ -101,9 +101,9 @@ async fn paginator_fetch_page() -> Result<(), Error> {
         .await?;
     assert_eq!(names_only, ["Charlie Bakery", "Delta Bakery"]);
 
-    // ... and for `SelectTwo<E, F>`, via `into_model`.
-    let joined: Vec<(bakery::Model, Option<baker::Model>)> = Bakery::find()
-        .find_also_related(Baker)
+    // ... and for `SelectGraph<E, S>`, via its own selector.
+    let joined: Vec<(bakery::Model, Option<baker::Model>)> = Bakery::graph()
+        .related_maybe::<Baker>()
         .order_by_asc(bakery::Column::Id)
         .paginate(&db, page_size(2))
         .fetch_page(0)
@@ -262,7 +262,7 @@ async fn paginator_iterate() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` builds a
+// [spec:pgorm:def:exec.crud+1/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
 // [spec:pgorm:sem:exec.paginator.raw+3/test]    a parsed single `SELECT` is
 // wrapped whole as a subquery, so its own clauses survive paging

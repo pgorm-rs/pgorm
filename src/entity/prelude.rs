@@ -21,7 +21,7 @@
 //! `Alias::new` if the token is already in scope.
 
 // [spec:pgorm:def:entity.prelude+3]
-// [spec:pgorm:sem:query.build.alias]
+// [spec:pgorm:sem:query.build.alias+1]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
     ActiveValue::{NotSet, Set, Unchanged},

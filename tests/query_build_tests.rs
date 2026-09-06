@@ -23,8 +23,8 @@ use pgorm::tests_cfg::{
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
     Error, IdenStr, Insert, IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, SelectTwo,
-    SelectTwoMany, TryInsert, Update, UpdateMany, UpdateOne,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, TryInsert,
+    Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -49,7 +49,7 @@ where
         .limit(1)
 }
 
-// [spec:pgorm:req:query.build/test]    every builder in the inventory, each
+// [spec:pgorm:req:query.build+1/test]    every builder in the inventory, each
 // wrapping exactly one pgorm-query statement reachable through `QueryTrait`,
 // and the blanket `QuerySelect`/`QueryOrder`/`QueryFilter` surface
 #[test]
@@ -60,14 +60,6 @@ fn every_builder_wraps_one_statement() {
         r#"SELECT "cake"."id", "cake"."name" FROM "cake""#
     );
     let _: SelectStatement = select.into_query();
-
-    let select_two: SelectTwo<cake::Entity, fruit::Entity> =
-        cake::Entity::find().find_also_related(fruit::Entity);
-    let _: SelectStatement = select_two.into_query();
-
-    let select_two_many: SelectTwoMany<cake::Entity, fruit::Entity> =
-        cake::Entity::find().find_with_related(fruit::Entity);
-    let _: SelectStatement = select_two_many.into_query();
 
     let insert: Insert<cake::ActiveModel> = Insert::one(apple());
     assert_eq!(
@@ -107,24 +99,17 @@ fn every_builder_wraps_one_statement() {
     assert_eq!(delete_many.as_query().to_string(), r#"DELETE FROM "cake""#);
     let _: DeleteStatement = delete_many.into_query();
 
-    // The same three blanket traits drive all three SELECT builders.
+    // The same three blanket traits drive the SELECT builder and every
+    // projection state it moves through.
     assert_eq!(
         narrow(cake::Entity::find()).as_query().to_string(),
         r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC LIMIT 1"#
     );
-    assert!(
-        narrow(cake::Entity::find().find_also_related(fruit::Entity))
+    assert_eq!(
+        narrow(cake::Entity::find().select(cake::Column::Name))
             .as_query()
-            .to_string()
-            .ends_with(r#"WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC LIMIT 1"#)
-    );
-    assert!(
-        narrow(cake::Entity::find().find_with_related(fruit::Entity))
-            .as_query()
-            .to_string()
-            .ends_with(
-                r#"WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC, "cake"."id" ASC LIMIT 1"#
-            )
+            .to_string(),
+        r#"SELECT "cake"."name" FROM "cake" WHERE "cake"."id" > 0 ORDER BY "cake"."id" ASC LIMIT 1"#
     );
 }
 
@@ -451,7 +436,7 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+7/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions
 #[test]
@@ -500,7 +485,7 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    `select` clears the list and
+// [spec:pgorm:sem:query.build.modifiers+7/test]    `select` clears the list and
 // projects in one call, rendering exactly what `select_only` plus `columns`
 // does, and casting an enum column the same way
 #[test]
@@ -545,7 +530,7 @@ fn select_clears_and_projects_in_one_call() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    a tuple is the mixed list: two
+// [spec:pgorm:sem:query.build.modifiers+7/test]    a tuple is the mixed list: two
 // entities' columns, a raw expression and an alias token have no common array
 // element type
 #[test]
@@ -580,7 +565,7 @@ fn select_tuple_mixes_columns_and_expressions() {
 
     assert_eq!(
         cake::Entity::find()
-            .find_also_related(fruit::Entity)
+            .left_join(fruit::Entity)
             .select((cake::Column::Name, fruit::Column::Name))
             .as_query()
             .to_string(),
@@ -592,7 +577,7 @@ fn select_tuple_mixes_columns_and_expressions() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+7/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -604,7 +589,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+7/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -640,7 +625,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+7/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -685,7 +670,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+7/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {
@@ -920,181 +905,6 @@ fn relation_named_joins_match_the_long_spelling() {
             r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
             r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
             r#"WHERE "fruit"."name" LIKE '%cherry%'"#,
-        ]
-        .join(" ")
-    );
-}
-
-// [spec:pgorm:sem:query.build.combine+2/test]    `select_also` / `select_with`
-// rewrite E's select list with the `A_` prefix (alias, plain column and
-// `AsEnum`-wrapped column alike) and append every F column as `B_<column>`
-#[test]
-fn combine_prefixes_both_column_sets() {
-    assert_eq!(
-        cake::Entity::find()
-            .column_as(cake::Column::Id, "B")
-            .left_join(fruit::Entity)
-            .select_also(fruit::Entity)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", "cake"."id" AS "A_B","#,
-            r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name","#,
-            r#""fruit"."cake_id" AS "B_cake_id""#,
-            r#"FROM "cake" LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
-        ]
-        .join(" ")
-    );
-
-    // An `AsEnum`-wrapped column takes the name of the wrapped column.
-    assert_eq!(
-        lunch_set::Entity::find()
-            .select_also(vendor::Entity)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "lunch_set"."id" AS "A_id", "lunch_set"."name" AS "A_name","#,
-            r#"CAST("lunch_set"."tea" AS text) AS "A_tea","#,
-            r#""vendor"."id" AS "B_id", "vendor"."name" AS "B_name" FROM "lunch_set""#,
-        ]
-        .join(" ")
-    );
-}
-
-// [spec:pgorm:sem:query.build.combine+2/test]    `SelectTwoMany::new` appends the
-// primary-key ORDER BY that keeps a left model's rows adjacent; `SelectTwo`
-// adds no ordering. `find_also_related` / `find_with_related` are exactly
-// `left_join` plus `select_also` / `select_with`
-#[test]
-fn select_with_orders_by_primary_key() {
-    let also = cake::Entity::find()
-        .find_also_related(fruit::Entity)
-        .as_query()
-        .to_string();
-    let with = cake::Entity::find()
-        .find_with_related(fruit::Entity)
-        .as_query()
-        .to_string();
-
-    assert!(!also.contains("ORDER BY"), "{also}");
-    assert_eq!(with, format!(r#"{also} ORDER BY "cake"."id" ASC"#));
-
-    assert_eq!(
-        also,
-        cake::Entity::find()
-            .left_join(fruit::Entity)
-            .select_also(fruit::Entity)
-            .as_query()
-            .to_string()
-    );
-    assert_eq!(
-        with,
-        cake::Entity::find()
-            .left_join(fruit::Entity)
-            .select_with(fruit::Entity)
-            .as_query()
-            .to_string()
-    );
-
-    // One ORDER BY term per primary-key column.
-    let composite = cake_filling::Entity::find()
-        .find_with_related(cake_filling_price::Entity)
-        .as_query()
-        .to_string();
-    assert!(
-        composite
-            .ends_with(r#"ORDER BY "cake_filling"."cake_id" ASC, "cake_filling"."filling_id" ASC"#),
-        "{composite}"
-    );
-}
-
-// [spec:pgorm:sem:query.build.combine+2/test]    a `Linked` chain LEFT JOINs each
-// hop as `r{i}` (joining from `r{i-1}`, or the base table at i = 0) and selects
-// the final target's columns from the last alias; `find_with_linked` skips the
-// primary-key ORDER BY that `find_with_related` adds
-#[test]
-fn find_linked_aliases_every_hop() {
-    assert_eq!(
-        cake::Entity::find()
-            .find_also_linked(entity_linked::CakeToFillingVendor)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-            r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-            r#"FROM "cake""#,
-            r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-            r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-            r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-        ]
-        .join(" ")
-    );
-
-    // Custom `on_condition` closures ride along on the aliased hop.
-    assert_eq!(
-        cake::Entity::find()
-            .find_also_linked(entity_linked::CheeseCakeToFillingVendor)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-            r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-            r#"FROM "cake""#,
-            r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id" AND "cake"."name" LIKE '%cheese%'"#,
-            r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-            r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-        ]
-        .join(" ")
-    );
-
-    // Unlike `find_with_related`, the linked `SelectTwoMany` has no ORDER BY.
-    let with_linked = cake::Entity::find()
-        .find_with_linked(entity_linked::CakeToFillingVendor)
-        .as_query()
-        .to_string();
-    assert!(!with_linked.contains("ORDER BY"), "{with_linked}");
-    assert_eq!(
-        with_linked,
-        cake::Entity::find()
-            .find_also_linked(entity_linked::CakeToFillingVendor)
-            .as_query()
-            .to_string()
-    );
-}
-
-// [spec:pgorm:sem:query.build.combine+2/test]    an unaliased asterisk names no
-// single column, so it is carried through unprefixed rather than aliased
-#[test]
-fn combine_leaves_asterisk_unprefixed() {
-    assert_eq!(
-        cake::Entity::find()
-            .expr(Expr::col(Asterisk))
-            .select_also(fruit::Entity)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", *,"#,
-            r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-            r#"FROM "cake""#,
-        ]
-        .join(" ")
-    );
-}
-
-// [spec:pgorm:sem:query.build.combine+2/test]    nor does an unaliased expression
-// that is neither a column nor an `AsEnum`-wrapped column
-#[test]
-fn combine_leaves_bare_expression_unprefixed() {
-    assert_eq!(
-        cake::Entity::find()
-            .expr(Func::upper(Expr::col((cake::Entity, cake::Column::Name))))
-            .select_also(fruit::Entity)
-            .as_query()
-            .to_string(),
-        [
-            r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name", UPPER("cake"."name"),"#,
-            r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-            r#"FROM "cake""#,
         ]
         .join(" ")
     );
@@ -1575,7 +1385,7 @@ fn debug_query_is_a_vestigial_holder() {
     );
 }
 
-// [spec:pgorm:sem:query.build.alias/test]    one token binding serves the
+// [spec:pgorm:sem:query.build.alias+1/test]    one token binding serves the
 // aliasing position and every reference to the name it introduced, across the
 // `IntoIdentity`, `IntoIden` and `IntoColumnRef` conversions alike
 #[test]
@@ -1626,7 +1436,7 @@ fn alias_token_declares_and_references_one_name() {
     assert!(undeclared.ends_with(r#"WHERE "nope" > 1"#), "{undeclared}");
 }
 
-// [spec:pgorm:req:entity.relation.linked+2/test]    the alias a linked join
+// [spec:pgorm:req:entity.relation.linked+3/test]    the alias a linked join
 // binds its last hop to is derived from the chain, not retyped by the caller
 #[test]
 fn last_hop_alias_matches_the_emitted_join() {
@@ -1637,12 +1447,12 @@ fn last_hop_alias_matches_the_emitted_join() {
     assert_eq!(three_hop.last_hop_alias().to_string(), "r2");
     assert_eq!(two_hop.last_hop_alias().to_string(), "r1");
 
-    // And it is the alias the join actually emitted for the target.
+    // And it is the alias the join actually emitted for the chain's last rung.
     let target = three_hop.last_hop_alias();
     assert_eq!(
-        cake::Entity::find()
-            .find_also_linked(three_hop)
-            .order_by_asc(Expr::col((target, vendor::Column::Id)))
+        three_hop
+            .find_linked()
+            .order_by_asc(Expr::col((target, cake::Column::Id)))
             .as_query()
             .to_string()
             .split(" ORDER BY ")

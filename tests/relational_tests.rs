@@ -460,19 +460,17 @@ pub async fn having() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:def:exec.crud/test]    `SelectTwoModel` decoding `(M, Option<N>)`
-// through the `SelectA` / `SelectB` column prefixes
-// [spec:pgorm:sem:exec.crud.consolidate/test]    `SelectTwoMany::all` grouping
-// on a unary primary key: children in row order, one entry per left key, and an
-// empty `Vec` for a left row with no right model
+// [spec:pgorm:sem:query.graph.decode+1/test]    a two-source graph decoding
+// `(M, Option<N>)` through the `s0_` / `s1_` column prefixes, against real rows
+// [spec:pgorm:sem:query.graph.grouped+1/test]    `all_grouped` on a unary primary
+// key: children in row order, one entry per root key, and an empty `Vec` for a
+// root row the slot matched nothing for
 // [spec:pgorm:req:entity.relation+1/test]    `Related::find_related` inner-joins
 // `to()` onto a fresh `Select<R>`, exercised against real rows
 // [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::find_related` scopes
 // that select to a single model instance
 #[pgorm_macros::test]
 pub async fn related() -> Result<(), Error> {
-    use pgorm::{SelectA, SelectB};
-
     let ctx = TestContext::new("test_related").await;
     create_tables(&ctx.db).await?;
 
@@ -539,61 +537,24 @@ pub async fn related() -> Result<(), Error> {
     };
     let _stone_bakery_res = Insert::one(stone_bakery).exec(&db).await?;
 
-    #[derive(Debug, FromQueryResult, PartialEq)]
-    struct BakerLite {
-        name: String,
-    }
-
-    #[derive(Debug, FromQueryResult, PartialEq)]
-    struct BakeryLite {
-        name: String,
-    }
-
     // get all bakery and baker's name and put them into tuples
-    let bakers_in_bakery: Vec<(BakeryLite, Option<BakerLite>)> = Bakery::find()
-        .find_also_related(Baker)
-        .select_only()
-        .column_as(bakery::Column::Name, (SelectA, bakery::Column::Name))
-        .column_as(baker::Column::Name, (SelectB, baker::Column::Name))
+    let bakers_in_bakery: Vec<(String, Option<String>)> = Bakery::graph()
+        .related_maybe::<Baker>()
         .order_by_asc(bakery::Column::Id)
         .order_by_asc(baker::Column::Id)
-        .into_model()
         .all(&db)
-        .await?;
+        .await?
+        .into_iter()
+        .map(|(bakery, baker)| (bakery.name, baker.map(|baker| baker.name)))
+        .collect();
 
     assert_eq!(
         bakers_in_bakery,
         [
-            (
-                BakeryLite {
-                    name: "SeaSide Bakery".to_owned(),
-                },
-                Some(BakerLite {
-                    name: "Baker Bob".to_owned(),
-                })
-            ),
-            (
-                BakeryLite {
-                    name: "SeaSide Bakery".to_owned(),
-                },
-                Some(BakerLite {
-                    name: "Baker Bobby".to_owned(),
-                })
-            ),
-            (
-                BakeryLite {
-                    name: "Terres Bakery".to_owned(),
-                },
-                Some(BakerLite {
-                    name: "Baker Ada".to_owned(),
-                })
-            ),
-            (
-                BakeryLite {
-                    name: "Stone Bakery".to_owned(),
-                },
-                None,
-            ),
+            ("SeaSide Bakery".to_owned(), Some("Baker Bob".to_owned())),
+            ("SeaSide Bakery".to_owned(), Some("Baker Bobby".to_owned())),
+            ("Terres Bakery".to_owned(), Some("Baker Ada".to_owned())),
+            ("Stone Bakery".to_owned(), None),
         ]
     );
 
@@ -628,29 +589,31 @@ pub async fn related() -> Result<(), Error> {
         ]
     );
 
-    let select_bakery_with_baker = Bakery::find()
-        .find_with_related(Baker)
+    // The caller's ordering is the whole ORDER BY the graph renders; the
+    // root's primary key is appended behind it by `all_grouped` itself.
+    let select_bakery_with_baker = Bakery::graph()
+        .related_maybe::<Baker>()
         .order_by_asc(baker::Column::Id);
 
     assert_eq!(
         select_bakery_with_baker.build().0,
         [
-            r#"SELECT "bakery"."id" AS "A_id","#,
-            r#""bakery"."name" AS "A_name","#,
-            r#""bakery"."profit_margin" AS "A_profit_margin","#,
-            r#""baker"."id" AS "B_id","#,
-            r#""baker"."name" AS "B_name","#,
-            r#""baker"."contact_details" AS "B_contact_details","#,
-            r#""baker"."bakery_id" AS "B_bakery_id""#,
+            r#"SELECT "bakery"."id" AS "s0_id","#,
+            r#""bakery"."name" AS "s0_name","#,
+            r#""bakery"."profit_margin" AS "s0_profit_margin","#,
+            r#""baker"."id" AS "s1_id","#,
+            r#""baker"."name" AS "s1_name","#,
+            r#""baker"."contact_details" AS "s1_contact_details","#,
+            r#""baker"."bakery_id" AS "s1_bakery_id""#,
             r#"FROM "bakery""#,
             r#"LEFT JOIN "baker" ON "bakery"."id" = "baker"."bakery_id""#,
-            r#"ORDER BY "bakery"."id" ASC, "baker"."id" ASC"#
+            r#"ORDER BY "baker"."id" ASC"#
         ]
         .join(" ")
     );
 
     assert_eq!(
-        select_bakery_with_baker.all(&db).await?,
+        select_bakery_with_baker.all_grouped(&db).await?,
         [
             (
                 bakery::Model {
@@ -713,7 +676,7 @@ pub async fn related() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked+2/test]    a five-hop `Linked` chain
+// [spec:pgorm:req:entity.relation.linked+3/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
 // [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::find_linked` scopes
@@ -721,8 +684,6 @@ pub async fn related() -> Result<(), Error> {
 #[pgorm_macros::test]
 pub async fn linked() -> Result<(), Error> {
     use common::bakery_chain::Order;
-    use pgorm::{SelectA, SelectB};
-    use pgorm_query::Expr;
 
     let ctx = TestContext::new("test_linked").await;
     create_tables(&ctx.db).await?;
@@ -899,68 +860,55 @@ pub async fn linked() -> Result<(), Error> {
     .await?;
 
     #[derive(Debug, FromQueryResult, PartialEq)]
-    struct BakerLite {
-        name: String,
+    struct BakedFor {
+        baker_name: String,
+        customer_name: Option<String>,
     }
 
-    #[derive(Debug, FromQueryResult, PartialEq)]
-    struct CustomerLite {
-        name: String,
-    }
-
-    // filtered find
-    let customer_tbl = baker::BakedForCustomer.last_hop_alias();
-    let baked_for_customers: Vec<(BakerLite, Option<CustomerLite>)> = Baker::find()
-        .find_also_linked(baker::BakedForCustomer)
-        .select_only()
-        .column_as(baker::Column::Name, (SelectA, baker::Column::Name))
-        .column_as(
-            Expr::col((customer_tbl, customer::Column::Name)),
-            (SelectB, customer::Column::Name),
+    // A caller-authored projection over the same chain, walked as ordinary
+    // joins: the source graph generates its projection, so a narrowed,
+    // grouped read is `Select`'s work rather than the graph's.
+    let baked_for_customers: Vec<BakedFor> = Baker::find()
+        .join(
+            JoinType::LeftJoin,
+            cakes_bakers::Relation::Baker.def().rev(),
         )
+        .join(JoinType::LeftJoin, cakes_bakers::Relation::Cake.def())
+        .join(JoinType::LeftJoin, lineitem::Relation::Cake.def().rev())
+        .join(JoinType::LeftJoin, lineitem::Relation::Order.def())
+        .join(JoinType::LeftJoin, order::Relation::Customer.def())
+        .select_only()
+        .column_as(baker::Column::Name, "baker_name")
+        .column_as(customer::Column::Name, "customer_name")
         .group_by(baker::Column::Id)
-        .group_by(Expr::col((customer_tbl, customer::Column::Id)))
+        .group_by(customer::Column::Id)
         .group_by(baker::Column::Name)
-        .group_by(Expr::col((customer_tbl, customer::Column::Name)))
+        .group_by(customer::Column::Name)
         .order_by_asc(baker::Column::Id)
-        .order_by_asc(Expr::col((customer_tbl, customer::Column::Id)))
-        .into_model()
+        .order_by_asc(customer::Column::Id)
+        .into_model::<BakedFor>()
         .all(&db)
         .await?;
 
     assert_eq!(
         baked_for_customers,
         [
-            (
-                BakerLite {
-                    name: "Baker Bob".to_owned(),
-                },
-                Some(CustomerLite {
-                    name: "Kara".to_owned(),
-                })
-            ),
-            (
-                BakerLite {
-                    name: "Baker Bobby".to_owned(),
-                },
-                Some(CustomerLite {
-                    name: "Kate".to_owned(),
-                })
-            ),
-            (
-                BakerLite {
-                    name: "Baker Bobby".to_owned(),
-                },
-                Some(CustomerLite {
-                    name: "Kara".to_owned(),
-                })
-            ),
-            (
-                BakerLite {
-                    name: "Freerider".to_owned(),
-                },
-                None,
-            ),
+            BakedFor {
+                baker_name: "Baker Bob".to_owned(),
+                customer_name: Some("Kara".to_owned()),
+            },
+            BakedFor {
+                baker_name: "Baker Bobby".to_owned(),
+                customer_name: Some("Kate".to_owned()),
+            },
+            BakedFor {
+                baker_name: "Baker Bobby".to_owned(),
+                customer_name: Some("Kara".to_owned()),
+            },
+            BakedFor {
+                baker_name: "Freerider".to_owned(),
+                customer_name: None,
+            },
         ]
     );
 
@@ -984,35 +932,40 @@ pub async fn linked() -> Result<(), Error> {
         }]
     );
 
-    // find full model using with_linked
-    let select_baker_with_customer = Baker::find()
-        .find_with_linked(baker::BakedForCustomer)
+    // The same chain as a source graph: the middle hops are `via`, joined but
+    // never decoded, and only the target takes a slot.
+    let select_baker_with_customer = Baker::graph()
+        .via(cakes_bakers::Relation::Baker.def().rev())
+        .via(cakes_bakers::Relation::Cake.def())
+        .via(lineitem::Relation::Cake.def().rev())
+        .via(lineitem::Relation::Order.def())
+        .join_maybe::<customer::Entity>(order::Relation::Customer.def())
         .order_by_asc(baker::Column::Id)
-        .order_by_asc(Expr::col((customer_tbl, customer::Column::Id)));
+        .order_by_asc(customer::Column::Id);
 
     assert_eq!(
         select_baker_with_customer.build().0,
         [
-            r#"SELECT "baker"."id" AS "A_id","#,
-            r#""baker"."name" AS "A_name","#,
-            r#""baker"."contact_details" AS "A_contact_details","#,
-            r#""baker"."bakery_id" AS "A_bakery_id","#,
-            r#""r4"."id" AS "B_id","#,
-            r#""r4"."name" AS "B_name","#,
-            r#""r4"."notes" AS "B_notes""#,
+            r#"SELECT "baker"."id" AS "s0_id","#,
+            r#""baker"."name" AS "s0_name","#,
+            r#""baker"."contact_details" AS "s0_contact_details","#,
+            r#""baker"."bakery_id" AS "s0_bakery_id","#,
+            r#""customer"."id" AS "s1_id","#,
+            r#""customer"."name" AS "s1_name","#,
+            r#""customer"."notes" AS "s1_notes""#,
             r#"FROM "baker""#,
-            r#"LEFT JOIN "cakes_bakers" AS "r0" ON "baker"."id" = "r0"."baker_id""#,
-            r#"LEFT JOIN "cake" AS "r1" ON "r0"."cake_id" = "r1"."id""#,
-            r#"LEFT JOIN "lineitem" AS "r2" ON "r1"."id" = "r2"."cake_id""#,
-            r#"LEFT JOIN "order" AS "r3" ON "r2"."order_id" = "r3"."id""#,
-            r#"LEFT JOIN "customer" AS "r4" ON "r3"."customer_id" = "r4"."id""#,
-            r#"ORDER BY "baker"."id" ASC, "r4"."id" ASC"#
+            r#"LEFT JOIN "cakes_bakers" ON "baker"."id" = "cakes_bakers"."baker_id""#,
+            r#"LEFT JOIN "cake" ON "cakes_bakers"."cake_id" = "cake"."id""#,
+            r#"LEFT JOIN "lineitem" ON "cake"."id" = "lineitem"."cake_id""#,
+            r#"LEFT JOIN "order" ON "lineitem"."order_id" = "order"."id""#,
+            r#"LEFT JOIN "customer" ON "order"."customer_id" = "customer"."id""#,
+            r#"ORDER BY "baker"."id" ASC, "customer"."id" ASC"#
         ]
         .join(" ")
     );
 
     assert_eq!(
-        select_baker_with_customer.all(&db).await?,
+        select_baker_with_customer.all_grouped(&db).await?,
         [
             (
                 baker::Model {
@@ -1157,8 +1110,8 @@ mod composite_child {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:exec.crud.consolidate/test]    grouping by a composite
-// (pair-arity) left primary key, in row order, with a childless parent still
+// [spec:pgorm:sem:query.graph.grouped+1/test]    grouping by a composite
+// (pair-arity) root primary key, in row order, with a childless parent still
 // producing an entry
 #[pgorm_macros::test]
 pub async fn consolidate_composite_key() -> Result<(), Error> {
@@ -1222,12 +1175,12 @@ pub async fn consolidate_composite_key() -> Result<(), Error> {
         name: name.to_owned(),
     };
 
-    let consolidated = composite_parent::Entity::find()
-        .find_with_related(composite_child::Entity)
+    let consolidated = composite_parent::Entity::graph()
+        .related_maybe::<composite_child::Entity>()
         .order_by_asc(composite_parent::Column::Region)
         .order_by_asc(composite_parent::Column::Code)
         .order_by_asc(composite_child::Column::Id)
-        .all(&db)
+        .all_grouped(&db)
         .await?;
 
     assert_eq!(
@@ -1252,12 +1205,12 @@ pub async fn consolidate_composite_key() -> Result<(), Error> {
     .insert(&db)
     .await?;
 
-    let consolidated = composite_parent::Entity::find()
-        .find_with_related(composite_child::Entity)
+    let consolidated = composite_parent::Entity::graph()
+        .related_maybe::<composite_child::Entity>()
         .order_by_asc(composite_parent::Column::Region)
         .order_by_asc(composite_parent::Column::Code)
         .order_by_asc(composite_child::Column::Id)
-        .all(&db)
+        .all_grouped(&db)
         .await?;
 
     assert_eq!(consolidated.len(), 4);
@@ -1315,7 +1268,7 @@ pub async fn composite_join_constrains_both_columns() -> Result<(), Error> {
         .await?;
     }
 
-    let joined = composite_child::Entity::find().find_also_related(composite_parent::Entity);
+    let joined = composite_child::Entity::graph().related_maybe::<composite_parent::Entity>();
 
     // Both pairs are in the ON clause, ANDed.
     assert!(
@@ -1890,7 +1843,7 @@ impl Linked for FilteredBakerCakes {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+2/test]    `find_linked` walks the chain
+// [spec:pgorm:req:entity.relation.linked+3/test]    `find_linked` walks the chain
 // in reverse, aliasing each hop's source table `r0`, `r1`, ... and inner-joining
 // it to the previous alias while the innermost hop joins the unaliased target
 // table; each hop's `on_condition` closure is added to that hop's join
@@ -1948,7 +1901,7 @@ fn linked_chain_aliasing_and_conditions() {
     );
 }
 
-// [spec:pgorm:req:entity.relation.linked+2/test]    `RelatedLink` is the chain
+// [spec:pgorm:req:entity.relation.linked+3/test]    `RelatedLink` is the chain
 // the `Related` impl already spells — `[to]` for a direct relation and
 // `[via, to]` for a junction one — so it stands in for a hand-written `Linked`
 // wherever one restated a `Related` impl, and its aliasing is what a
@@ -1978,30 +1931,18 @@ fn related_link_restates_the_relation() {
         witness.find_linked().as_query().to_string(),
         BakerToCakes.find_linked().as_query().to_string()
     );
+    // A relation with no junction is the one-hop chain, and the link form
+    // aliases the joined copy of the table.
     assert_eq!(
-        baker::Entity::find()
-            .find_also_linked(witness)
-            .as_query()
-            .to_string(),
-        baker::Entity::find()
-            .find_also_linked(BakerToCakes)
-            .as_query()
-            .to_string()
-    );
-
-    // A relation with no junction is the one-hop chain.
-    assert_eq!(
-        bakery::Entity::find()
-            .find_also_linked(RelatedLink::to(baker::Entity))
+        RelatedLink::<bakery::Entity, baker::Entity>::new()
+            .find_linked()
             .as_query()
             .to_string(),
         [
-            r#"SELECT "bakery"."id" AS "A_id", "bakery"."name" AS "A_name","#,
-            r#""bakery"."profit_margin" AS "A_profit_margin","#,
-            r#""r0"."id" AS "B_id", "r0"."name" AS "B_name","#,
-            r#""r0"."contact_details" AS "B_contact_details", "r0"."bakery_id" AS "B_bakery_id""#,
-            r#"FROM "bakery""#,
-            r#"LEFT JOIN "baker" AS "r0" ON "bakery"."id" = "r0"."bakery_id""#,
+            r#"SELECT "baker"."id", "baker"."name", "baker"."contact_details","#,
+            r#""baker"."bakery_id""#,
+            r#"FROM "baker""#,
+            r#"INNER JOIN "bakery" AS "r0" ON "r0"."id" = "baker"."bakery_id""#,
         ]
         .join(" ")
     );

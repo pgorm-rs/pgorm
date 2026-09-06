@@ -247,7 +247,7 @@ async fn skipped_field_reads_no_column(db: &DatabaseConnection) -> Result<(), Er
     Ok(())
 }
 
-// [spec:pgorm:req:exec.verify.limits/test]    nullability is outside what is checked
+// [spec:pgorm:req:exec.verify.limits+1/test]    nullability is outside what is checked
 // [spec:pgorm:sem:exec.verify.accepts/test]    `Option<T>` accepts what `T` accepts
 async fn nullability_is_not_verified(db: &DatabaseConnection) -> Result<(), Error> {
     db.verify::<Nullable>(NO_ROWS).await?;
@@ -307,7 +307,7 @@ async fn entity_model_target_verifies(db: &DatabaseConnection) -> Result<(), Err
     Ok(())
 }
 
-// [spec:pgorm:req:exec.verify.limits/test]    parameters are left to Bind, which
+// [spec:pgorm:req:exec.verify.limits+1/test]    parameters are left to Bind, which
 // refuses a mismatch on every execution rather than only once rows exist
 async fn parameters_are_left_to_bind(db: &DatabaseConnection) -> Result<(), Error> {
     const PARAMETERISED: &str = r#"SELECT $1::int4 AS "id", 'a'::text AS "name" WHERE false"#;
@@ -323,7 +323,7 @@ async fn parameters_are_left_to_bind(db: &DatabaseConnection) -> Result<(), Erro
     Ok(())
 }
 
-// [spec:pgorm:req:exec.verify.limits/test]    the server refuses the statement first
+// [spec:pgorm:req:exec.verify.limits+1/test]    the server refuses the statement first
 async fn invalid_sql_reports_the_server_error(db: &DatabaseConnection) -> Result<(), Error> {
     let error = db
         .verify::<Matching>(r#"SELECT "id" FROM "no_such_table""#)

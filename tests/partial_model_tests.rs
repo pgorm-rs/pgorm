@@ -88,7 +88,7 @@ struct IntScaledBakery {
     double_margin: f64,
 }
 
-// [spec:pgorm:def:exec.crud/test]    `Select::into_partial_model` re-targets
+// [spec:pgorm:def:exec.crud+1/test]    `Select::into_partial_model` re-targets
 // the decoded type, and `one` / `all` run through the same selector
 #[pgorm_macros::test]
 async fn partial_model_select() -> Result<(), Error> {

@@ -1,14 +1,11 @@
 use crate::{
-    ConnectionTrait, EntityTrait, FromQueryResult, IdenStr, Iterable, ModelTrait,
-    PartialModelTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, Select,
-    SelectA, SelectB, SelectProjected, SelectTwo, SelectTwoMany, SelectTwoProjected,
-    TryGetableMany, error::*,
+    ConnectionTrait, EntityTrait, FromQueryResult, PartialModelTrait, QueryResult, Select,
+    SelectProjected, TryGetableMany, error::*,
 };
 use futures::{Stream, StreamExt};
-use pgorm_query::{SelectStatement, Value, Values};
-use std::collections::HashMap;
+use pgorm_query::{SelectStatement, Values};
+use std::marker::PhantomData;
 use std::pin::Pin;
-use std::{hash::Hash, marker::PhantomData};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
@@ -17,7 +14,7 @@ use super::ValueHolder;
 ///
 /// Unlike [`PinBoxStream`](crate::PinBoxStream) this is `Send`, so it can be
 /// consumed from a spawned task.
-// [spec:pgorm:def:exec.stream+1]
+// [spec:pgorm:def:exec.stream+2]
 pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 'db>>;
 
 /// The guard every ORM path that sends a `SELECT` passes through: a statement
@@ -27,7 +24,7 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(
@@ -38,7 +35,7 @@ pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
 }
 
 /// Defines a type to do `SELECT` operations through a [SelectStatement] on a Model
-// [spec:pgorm:def:exec.crud]
+// [spec:pgorm:def:exec.crud+1]
 #[derive(Clone, Debug)]
 pub struct Selector<S>
 where
@@ -61,7 +58,7 @@ where
 }
 
 /// A Trait for any type that can perform SELECT queries
-// [spec:pgorm:def:exec.crud]
+// [spec:pgorm:def:exec.crud+1]
 pub trait SelectorTrait {
     #[allow(missing_docs)]
     type Item: Sized;
@@ -99,16 +96,6 @@ where
     model: PhantomData<M>,
 }
 
-/// Defines a type to get two Models
-#[derive(Clone, Debug)]
-pub struct SelectTwoModel<M, N>
-where
-    M: FromQueryResult,
-    N: FromQueryResult,
-{
-    model: PhantomData<(M, N)>,
-}
-
 impl<T, C> SelectorTrait for SelectGetableValue<T, C>
 where
     T: TryGetableMany,
@@ -142,21 +129,6 @@ where
     fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
         // tracing::debug!("Got raw query result: {:?}", res);
         M::from_query_result(&res, "")
-    }
-}
-
-impl<M, N> SelectorTrait for SelectTwoModel<M, N>
-where
-    M: FromQueryResult + Sized,
-    N: FromQueryResult + Sized,
-{
-    type Item = (M, Option<N>);
-
-    fn from_raw_query_result(res: QueryResult) -> Result<Self::Item, Error> {
-        Ok((
-            M::from_query_result(&res, SelectA.as_str())?,
-            N::from_query_result_optional(&res, SelectB.as_str())?,
-        ))
     }
 }
 
@@ -414,7 +386,7 @@ where
     }
 
     /// Stream the results of a SELECT operation on a Model
-    // [spec:pgorm:def:exec.stream+1]
+    // [spec:pgorm:def:exec.stream+2]
     pub async fn stream<'b, C>(
         self,
         db: &C,
@@ -427,7 +399,7 @@ where
     }
 
     /// Stream the result of the operation with PartialModel
-    // [spec:pgorm:def:exec.stream+1]
+    // [spec:pgorm:def:exec.stream+2]
     pub async fn stream_partial_model<'b, C, M>(
         self,
         db: &C,
@@ -440,7 +412,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -510,165 +482,6 @@ where
     {
         M::select_cols(self.select_only()).into_model::<M>()
     }
-}
-
-// [spec:pgorm:sem:query.build.modifiers+6]
-impl<E, F> SelectTwoProjected<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Name the pair of types the custom projection decodes into. The `A_` and
-    /// `B_` column-name prefixes still apply, so the projection has to alias
-    /// its expressions accordingly.
-    pub fn into_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: FromQueryResult,
-        N: FromQueryResult,
-    {
-        Selector {
-            query: self.query,
-            selector: SelectTwoModel { model: PhantomData },
-        }
-    }
-
-    /// Replace the projection with the two partial models' declared columns.
-    pub fn into_partial_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: PartialModelTrait,
-        N: PartialModelTrait,
-    {
-        let select = self.select_only();
-        let select = M::select_cols(select);
-        let select = N::select_cols(select);
-        select.into_model::<M, N>()
-    }
-}
-
-impl<E, F> SelectTwo<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Perform a conversion into a [SelectTwoModel]
-    pub fn into_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: FromQueryResult,
-        N: FromQueryResult,
-    {
-        Selector {
-            query: self.query,
-            selector: SelectTwoModel { model: PhantomData },
-        }
-    }
-
-    /// Perform a conversion into a [SelectTwoModel] with [PartialModel](PartialModelTrait)
-    pub fn into_partial_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: PartialModelTrait,
-        N: PartialModelTrait,
-    {
-        let select = self.select_only();
-        let select = M::select_cols(select);
-        let select = N::select_cols(select);
-        select.into_model::<M, N>()
-    }
-
-    /// Get one Model from the Select query
-    pub async fn one<C>(self, db: &C) -> Result<(E::Model, Option<F::Model>), Error>
-    where
-        C: ConnectionTrait,
-    {
-        self.into_model().one(db).await
-    }
-
-    /// Get one Model from the Select query
-    pub async fn one_opt<C>(self, db: &C) -> Result<Option<(E::Model, Option<F::Model>)>, Error>
-    where
-        C: ConnectionTrait,
-    {
-        self.into_model().one_opt(db).await
-    }
-
-    /// Get all Models from the Select query
-    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Option<F::Model>)>, Error>
-    where
-        C: ConnectionTrait,
-    {
-        self.into_model().all(db).await
-    }
-
-    /// Stream the results of a Select operation on a Model
-    // [spec:pgorm:def:exec.stream+1]
-    pub async fn stream<'b, C>(
-        self,
-        db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<(E::Model, Option<F::Model>), Error>>, Error>
-    where
-        C: ConnectionTrait,
-        E::Model: 'b,
-        F::Model: 'b,
-    {
-        self.into_model().stream(db).await
-    }
-
-    /// Stream the result of the operation with PartialModel
-    // [spec:pgorm:def:exec.stream+1]
-    pub async fn stream_partial_model<'b, C, M, N>(
-        self,
-        db: &C,
-    ) -> Result<PinBoxSendStream<'b, Result<(M, Option<N>), Error>>, Error>
-    where
-        C: ConnectionTrait,
-        M: PartialModelTrait + 'b,
-        N: PartialModelTrait + 'b,
-    {
-        self.into_partial_model::<M, N>().stream(db).await
-    }
-}
-
-impl<E, F> SelectTwoMany<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Performs a conversion to [Selector]
-    fn into_model<M, N>(self) -> Selector<SelectTwoModel<M, N>>
-    where
-        M: FromQueryResult,
-        N: FromQueryResult,
-    {
-        Selector {
-            query: self.query,
-            selector: SelectTwoModel { model: PhantomData },
-        }
-    }
-
-    /// Get all Models from the select operation
-    ///
-    /// > `SelectTwoMany::one()` method has been dropped (#486)
-    /// >
-    /// > You can get `(Entity, Vec<relatedEntity>)` by first querying a single model from Entity,
-    /// > then use [`ModelTrait::find_related`] on the model.
-    /// >
-    /// > See <https://github.com/pgorm-rs/pgorm/docs/basic-crud/select#lazy-loading> for details.
-    // [spec:pgorm:sem:exec.crud.consolidate]
-    pub async fn all<C>(self, db: &C) -> Result<Vec<(E::Model, Vec<F::Model>)>, Error>
-    where
-        C: ConnectionTrait,
-    {
-        let rows = self.into_model().all(db).await?;
-        Ok(consolidate_query_result::<E, F>(rows))
-    }
-
-    // pub fn paginate()
-    // we could not implement paginate easily, if the number of children for a
-    // parent is larger than one page, then we will end up splitting it in two pages
-    // so the correct way is actually perform query in two stages
-    // paginate the parent model and then populate the children
-
-    // pub fn count()
-    // we should only count the number of items of the parent model
 }
 
 impl<S> Selector<S>
@@ -759,7 +572,7 @@ where
     }
 
     /// Get an item from the Select query
-    // [spec:pgorm:sem:exec.crud.select+2]
+    // [spec:pgorm:sem:exec.crud.select+3]
     pub async fn one<C>(mut self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
@@ -786,7 +599,7 @@ where
     }
 
     /// Stream the results of the Select operation
-    // [spec:pgorm:def:exec.stream+1]
+    // [spec:pgorm:def:exec.stream+2]
     pub async fn stream<'b, C>(
         self,
         db: &C,
@@ -932,7 +745,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.select+2]
+    // [spec:pgorm:sem:exec.crud.select+3]
     pub async fn one<C>(self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
@@ -1053,223 +866,5 @@ where
             Ok(row) => S::from_raw_query_result(QueryResult { row }),
             Err(err) => Err(Error::Postgres(err)),
         })))
-    }
-}
-
-// [spec:pgorm:sem:exec.crud.consolidate]
-#[allow(clippy::unwrap_used)]
-fn consolidate_query_result<L, R>(
-    rows: Vec<(L::Model, Option<R::Model>)>,
-) -> Vec<(L::Model, Vec<R::Model>)>
-where
-    L: EntityTrait,
-    R: EntityTrait,
-{
-    match <<L::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY {
-        1 => {
-            let col = <L::PrimaryKey as Iterable>::iter()
-                .next()
-                .unwrap()
-                .into_column();
-            consolidate_query_result_of::<L, R, UnitPk<L>>(rows, UnitPk(col))
-        }
-        2 => {
-            let mut iter = <L::PrimaryKey as Iterable>::iter();
-            let col1 = iter.next().unwrap().into_column();
-            let col2 = iter.next().unwrap().into_column();
-            consolidate_query_result_of::<L, R, PairPk<L>>(rows, PairPk(col1, col2))
-        }
-        _ => {
-            let cols: Vec<_> = <L::PrimaryKey as Iterable>::iter()
-                .map(|pk| pk.into_column())
-                .collect();
-            consolidate_query_result_of::<L, R, TuplePk<L>>(rows, TuplePk(cols))
-        }
-    }
-}
-
-trait ModelKey<E: EntityTrait> {
-    type Type: Hash + PartialEq + Eq;
-    fn get(&self, model: &E::Model) -> Self::Type;
-}
-
-// This could have been an array of [E::Column; <E::PrimaryKey as PrimaryKeyTrait>::ARITY], but it still doesn't compile
-struct UnitPk<E: EntityTrait>(E::Column);
-struct PairPk<E: EntityTrait>(E::Column, E::Column);
-struct TuplePk<E: EntityTrait>(Vec<E::Column>);
-
-impl<E: EntityTrait> ModelKey<E> for UnitPk<E> {
-    type Type = Value;
-    fn get(&self, model: &E::Model) -> Self::Type {
-        model.get(self.0)
-    }
-}
-
-impl<E: EntityTrait> ModelKey<E> for PairPk<E> {
-    type Type = (Value, Value);
-    fn get(&self, model: &E::Model) -> Self::Type {
-        (model.get(self.0), model.get(self.1))
-    }
-}
-
-impl<E: EntityTrait> ModelKey<E> for TuplePk<E> {
-    type Type = Vec<Value>;
-    fn get(&self, model: &E::Model) -> Self::Type {
-        let mut key = Vec::new();
-        for col in self.0.iter() {
-            key.push(model.get(*col));
-        }
-        key
-    }
-}
-
-fn consolidate_query_result_of<L, R, KEY: ModelKey<L>>(
-    mut rows: Vec<(L::Model, Option<R::Model>)>,
-    model_key: KEY,
-) -> Vec<(L::Model, Vec<R::Model>)>
-where
-    L: EntityTrait,
-    R: EntityTrait,
-{
-    let mut hashmap: HashMap<KEY::Type, Vec<R::Model>> =
-        rows.iter_mut().fold(HashMap::new(), |mut acc, row| {
-            let key = model_key.get(&row.0);
-            if let Some(value) = row.1.take() {
-                let vec: Option<&mut Vec<R::Model>> = acc.get_mut(&key);
-                if let Some(vec) = vec {
-                    vec.push(value)
-                } else {
-                    acc.insert(key, vec![value]);
-                }
-            } else {
-                acc.entry(key).or_default();
-            }
-
-            acc
-        });
-
-    rows.into_iter()
-        .filter_map(|(l_model, _)| {
-            let l_pk = model_key.get(&l_model);
-            let r_models = hashmap.remove(&l_pk);
-            r_models.map(|r_models| (l_model, r_models))
-        })
-        .collect()
-}
-
-/// This is the legacy consolidate algorithm. Kept for reference
-#[allow(dead_code)]
-fn consolidate_query_result_of_ordered_rows<L, R>(
-    rows: Vec<(L::Model, Option<R::Model>)>,
-) -> Vec<(L::Model, Vec<R::Model>)>
-where
-    L: EntityTrait,
-    R: EntityTrait,
-{
-    let mut acc: Vec<(L::Model, Vec<R::Model>)> = Vec::new();
-    for (l, r) in rows {
-        if let Some((last_l, last_r)) = acc.last_mut() {
-            let mut same_l = true;
-            for pk_col in <L::PrimaryKey as Iterable>::iter() {
-                let col = pk_col.into_column();
-                let val = l.get(col);
-                let last_val = last_l.get(col);
-                if !val.eq(&last_val) {
-                    same_l = false;
-                    break;
-                }
-            }
-            if same_l && let Some(r) = r {
-                last_r.push(r);
-                continue;
-            }
-        }
-        let rows = match r {
-            Some(r) => vec![r],
-            None => vec![],
-        };
-        acc.push((l, rows));
-    }
-    acc
-}
-
-#[cfg(test)]
-mod tests {
-    use pgorm::tests_cfg::*;
-    use pgorm::{EntityTrait, QueryTrait};
-
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn also_related_query() {
-        assert_eq!(
-            Cake::find()
-                .find_also_related(Fruit)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
-    fn with_related_query() {
-        assert_eq!(
-            Cake::find()
-                .find_with_related(Fruit)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""fruit"."id" AS "B_id", "fruit"."name" AS "B_name", "fruit"."cake_id" AS "B_cake_id""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "fruit" ON "cake"."id" = "fruit"."cake_id""#,
-                r#"ORDER BY "cake"."id" ASC"#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
-    fn also_linked_query() {
-        assert_eq!(
-            Cake::find()
-                .find_also_linked(entity_linked::CakeToFillingVendor)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-            ]
-            .join(" ")
-        );
-    }
-
-    #[test]
-    fn with_linked_query() {
-        assert_eq!(
-            Cake::find()
-                .find_with_linked(entity_linked::CakeToFillingVendor)
-                .as_query()
-                .to_string(),
-            [
-                r#"SELECT "cake"."id" AS "A_id", "cake"."name" AS "A_name","#,
-                r#""r2"."id" AS "B_id", "r2"."name" AS "B_name""#,
-                r#"FROM "cake""#,
-                r#"LEFT JOIN "cake_filling" AS "r0" ON "cake"."id" = "r0"."cake_id""#,
-                r#"LEFT JOIN "filling" AS "r1" ON "r0"."filling_id" = "r1"."id""#,
-                r#"LEFT JOIN "vendor" AS "r2" ON "r1"."vendor_id" = "r2"."id""#,
-            ]
-            .join(" ")
-        );
     }
 }

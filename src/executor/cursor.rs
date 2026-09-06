@@ -5,8 +5,7 @@ use crate::query::graph::qualified_pk_tiebreaks;
 use crate::{
     ConnectionTrait, EntityTrait, Error, FromQueryResult, Identity, IdentityOf, IntoBoundary,
     IntoIdentity, PartialModelTrait, QueryOrder, QuerySelect, Select, SelectGraph, SelectModel,
-    SelectProjected, SelectTwo, SelectTwoModel, SelectTwoProjected, SelectorTrait, Slot, SlotAt,
-    Slots, error::query_err,
+    SelectProjected, SelectorTrait, Slot, SlotAt, Slots, error::query_err,
 };
 use pgorm_query::{
     Condition, DynIden, Expr, IntoValueTuple, Order, SelectStatement, SharedIden, SimpleExpr,
@@ -43,12 +42,12 @@ impl Window {
 /// It is not a [`SelectorTrait`], so [`Cursor::all`] does not exist until
 /// [`Cursor::into_model`] or [`Cursor::into_partial_model`] says what the rows
 /// are.
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 #[derive(Clone, Copy, Debug)]
 pub struct SelectUndecoded;
 
 /// Cursor pagination
-// [spec:pgorm:def:exec.cursor+3]
+// [spec:pgorm:def:exec.cursor+4]
 #[derive(Debug, Clone)]
 pub struct Cursor<S, K = ValueTuple> {
     query: SelectStatement,
@@ -294,7 +293,7 @@ impl<S, K> Cursor<S, K> {
         }
     }
 
-    // [spec:pgorm:sem:exec.cursor.order+1]
+    // [spec:pgorm:sem:exec.cursor.order+2]
     fn apply_order_by(&mut self, query: &mut SelectStatement) {
         query.clear_order_by();
         let ord = self.resolve_sort_order();
@@ -308,7 +307,7 @@ impl<S, K> Cursor<S, K> {
     /// window, order and boundary applied to a copy of it, so the cursor can be
     /// re-executed with a moved boundary or a flipped direction without the
     /// previous execution's clauses still on it.
-    // [spec:pgorm:sem:exec.cursor.order+1]
+    // [spec:pgorm:sem:exec.cursor.order+2]
     fn compose(&mut self) -> Result<SelectStatement, Error> {
         let mut query = self.query.clone();
         self.apply_limit(&mut query);
@@ -347,7 +346,8 @@ impl<S, K> Cursor<S, K> {
         M::select_cols(self).into_model::<M>()
     }
 
-    /// Set the cursor ordering for another table when dealing with SelectTwo
+    /// Set the trailing order entries a joined read tiebreaks on, each
+    /// qualified with the table it belongs to.
     pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(DynIden, Identity)>) -> &mut Self {
         self.secondary_order_by = tbl_col;
         self
@@ -359,7 +359,7 @@ where
     S: SelectorTrait,
 {
     /// Fetch the paginated result
-    // [spec:pgorm:sem:exec.cursor.order+1]
+    // [spec:pgorm:sem:exec.cursor.order+2]
     pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
@@ -405,7 +405,7 @@ impl<S, K> QueryOrder for Cursor<S, K> {
 }
 
 /// A trait for any type that can be turn into a cursor
-// [spec:pgorm:def:exec.cursor+3]
+// [spec:pgorm:def:exec.cursor+4]
 pub trait CursorTrait {
     /// Select operation
     type Selector: SelectorTrait + Send + Sync;
@@ -462,61 +462,10 @@ where
     }
 }
 
+/// The root entity's primary key as cursor tiebreaks, qualified with its own
+/// table: what a graph ordered on one of its slots falls back to.
 fn pk_tiebreaks<T: EntityTrait>() -> Vec<(DynIden, Identity)> {
     qualified_pk_tiebreaks::<T>(&SharedIden::new(T::default()))
-}
-
-impl<E, F, M, N> CursorTrait for SelectTwo<E, F>
-where
-    E: EntityTrait<Model = M>,
-    F: EntityTrait<Model = N>,
-    M: FromQueryResult + Sized + Send + Sync,
-    N: FromQueryResult + Sized + Send + Sync,
-{
-    type Selector = SelectTwoModel<M, N>;
-}
-
-impl<E, F, M, N> SelectTwo<E, F>
-where
-    E: EntityTrait<Model = M>,
-    F: EntityTrait<Model = N>,
-    M: FromQueryResult + Sized + Send + Sync,
-    N: FromQueryResult + Sized + Send + Sync,
-{
-    /// Convert into a cursor using column of first entity
-    ///
-    /// The other entity's primary key is installed as a secondary order column,
-    /// so a join that repeats a row of `E` still has a total order. Resume from
-    /// a page that ended inside such a run with [`Cursor::after_with`] /
-    /// [`Cursor::before_with`], which take those trailing key values too;
-    /// [`Cursor::after`] alone compares only the order columns and skips the
-    /// rest of the run.
-    // [spec:pgorm:sem:exec.cursor.keyset+3]
-    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
-    where
-        C: IdentityOf<E>,
-    {
-        let primary_keys = pk_tiebreaks::<F>();
-        let mut cursor = Cursor::new(self.query, SharedIden::new(E::default()), order_columns);
-        cursor.set_secondary_order_by(primary_keys);
-        cursor
-    }
-
-    /// Convert into a cursor using column of second entity
-    ///
-    /// The tiebreak on the first entity's primary key resumes through
-    /// [`Cursor::after_with`] / [`Cursor::before_with`], as for
-    /// [`SelectTwo::cursor_by`].
-    // [spec:pgorm:sem:exec.cursor.keyset+3]
-    pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectTwoModel<M, N>, C::ValueType>
-    where
-        C: IdentityOf<F>,
-    {
-        let primary_keys = pk_tiebreaks::<E>();
-        let mut cursor = Cursor::new(self.query, SharedIden::new(F::default()), order_columns);
-        cursor.set_secondary_order_by(primary_keys);
-        cursor
-    }
 }
 
 /// A graph's rows are decoded by [`GraphRow`], so that is what its cursor
@@ -650,7 +599,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,
@@ -664,36 +613,6 @@ where
         C: IntoIdentity,
     {
         Cursor::new(self.query, SharedIden::new(E::default()), order_columns)
-    }
-}
-
-// [spec:pgorm:sem:query.build.modifiers+6]
-impl<E, F> SelectTwoProjected<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Convert into a cursor using a column of the first entity. As with
-    /// [`SelectProjected::cursor_by`], the decode target is still open.
-    pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
-    where
-        C: IdentityOf<E>,
-    {
-        let primary_keys = pk_tiebreaks::<F>();
-        let mut cursor = Cursor::new(self.query, SharedIden::new(E::default()), order_columns);
-        cursor.set_secondary_order_by(primary_keys);
-        cursor
-    }
-
-    /// Convert into a cursor using a column of the second entity.
-    pub fn cursor_by_other<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
-    where
-        C: IdentityOf<F>,
-    {
-        let primary_keys = pk_tiebreaks::<E>();
-        let mut cursor = Cursor::new(self.query, SharedIden::new(F::default()), order_columns);
-        cursor.set_secondary_order_by(primary_keys);
-        cursor
     }
 }
 

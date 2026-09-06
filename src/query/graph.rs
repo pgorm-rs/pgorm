@@ -48,13 +48,13 @@ mod sealed {
 ///
 /// The type states that the join cannot miss, so there is no `Option` to
 /// unwrap for a row the join guarantees.
-// [spec:pgorm:sem:query.graph.slots]
+// [spec:pgorm:sem:query.graph.slots+1]
 pub struct Req<F>(PhantomData<F>);
 
 /// A joined source that may be absent: `LEFT JOIN`, decoded through the
 /// absence witness ([`FromQueryResult::from_query_result_optional`]) as
 /// `Option<Model>`.
-// [spec:pgorm:sem:query.graph.slots]
+// [spec:pgorm:sem:query.graph.slots+1]
 pub struct Opt<F>(PhantomData<F>);
 
 impl<F> fmt::Debug for Req<F> {
@@ -77,7 +77,7 @@ impl<F: EntityTrait> sealed::Sealed for Opt<F> {}
 ///
 /// The trait is sealed — [`Req<F>`] and [`Opt<F>`] are the only slots — so
 /// the four cannot be recombined into a pairing the graph does not mean.
-// [spec:pgorm:sem:query.graph.slots]
+// [spec:pgorm:sem:query.graph.slots+1]
 pub trait Slot: sealed::Sealed {
     /// The entity behind the slot.
     type Entity: EntityTrait;
@@ -94,25 +94,25 @@ pub trait Slot: sealed::Sealed {
     fn decode(res: &QueryResult, pre: &str) -> Result<Self::Out, Error>;
 }
 
-// [spec:pgorm:sem:query.graph.slots]
+// [spec:pgorm:sem:query.graph.slots+1]
 impl<F: EntityTrait> Slot for Req<F> {
     type Entity = F;
     type Out = F::Model;
     const JOIN: JoinType = JoinType::InnerJoin;
 
-    // [spec:pgorm:sem:query.graph.decode]
+    // [spec:pgorm:sem:query.graph.decode+1]
     fn decode(res: &QueryResult, pre: &str) -> Result<Self::Out, Error> {
         F::Model::from_query_result(res, pre)
     }
 }
 
-// [spec:pgorm:sem:query.graph.slots]
+// [spec:pgorm:sem:query.graph.slots+1]
 impl<F: EntityTrait> Slot for Opt<F> {
     type Entity = F;
     type Out = Option<F::Model>;
     const JOIN: JoinType = JoinType::LeftJoin;
 
-    // [spec:pgorm:sem:query.graph.decode]
+    // [spec:pgorm:sem:query.graph.decode+1]
     fn decode(res: &QueryResult, pre: &str) -> Result<Self::Out, Error> {
         F::Model::from_query_result_optional(res, pre)
     }
@@ -234,7 +234,7 @@ slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
 /// their aliases here, and the per-prefix decode reads exactly these names,
 /// so the scheme is one code path rather than a convention three sites
 /// repeat.
-// [spec:pgorm:sem:query.graph.writer]
+// [spec:pgorm:sem:query.graph.writer+1]
 pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
     format!("s{index}_{column}")
 }
@@ -249,7 +249,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// PRQL nodes rather than [`SimpleExpr`](pgorm_query::SimpleExpr)) casts by
 /// the same rule. A column that *overrides* `select_as` is honoured only by
 /// the [`SelectStatement`] writer, which still calls the method.
-// [spec:pgorm:sem:query.graph.writer]
+// [spec:pgorm:sem:query.graph.writer+1]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> {
     use crate::entity::ColumnTypeTrait;
     let def = col.def();
@@ -273,7 +273,7 @@ pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> 
 /// the source was declared under one, otherwise its bare table — the same
 /// identifier the `ON` clause constrains against, so the projection and the
 /// join cannot name one source two ways.
-// [spec:pgorm:sem:query.graph.writer]
+// [spec:pgorm:sem:query.graph.writer+1]
 pub(crate) fn project_source<F: EntityTrait>(
     query: &mut SelectStatement,
     qualifier: DynIden,
@@ -400,7 +400,7 @@ impl<E: EntityTrait> Default for SelectGraph<E, ()> {
 impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// Project one decoded source under the next prefix, and record the
     /// identifier that prefix belongs to.
-    // [spec:pgorm:sem:query.graph.writer]
+    // [spec:pgorm:sem:query.graph.writer+1]
     pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
         project_source::<F>(
             &mut self.query,
@@ -504,14 +504,14 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
 /// the ceiling is one more entry in the invocation below.
 macro_rules! grow {
     ( $( ( $( $prev:ident ),* ) ),+ $(,)? ) => {$(
-        // [spec:pgorm:sem:query.graph.slots]
+        // [spec:pgorm:sem:query.graph.slots+1]
         impl<E: EntityTrait $(, $prev: Slot )*> SelectGraph<E, ( $( $prev, )* )> {
             /// `LEFT JOIN` a source that may be absent, decoded as
             /// `Option<F::Model>` through the absence witness.
             ///
             /// `rel.to_tbl` is joined under the relation's own condition,
             /// `on_condition` and `condition_type` included.
-            // [spec:pgorm:sem:query.graph.slots]
+            // [spec:pgorm:sem:query.graph.slots+1]
             pub fn join_maybe<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -574,7 +574,7 @@ macro_rules! grow {
 
             /// `INNER JOIN` a source that must match, decoded as a bare
             /// `F::Model` — no `Option` to unwrap for a join that cannot miss.
-            // [spec:pgorm:sem:query.graph.slots]
+            // [spec:pgorm:sem:query.graph.slots+1]
             pub fn join_one<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -601,9 +601,9 @@ macro_rules! grow {
             ///
             /// When [`Related::via`] is `Some`, that junction relation is
             /// [`via`](Self::via)ed first and then [`Related::to`] is
-            /// [`join_maybe`](Self::join_maybe)d — one call for the shape
-            /// `find_also_related` used to spell, junction hop included.
-            // [spec:pgorm:sem:query.graph.slots]
+            /// [`join_maybe`](Self::join_maybe)d — the whole related path in
+            /// one call, junction hop included.
+            // [spec:pgorm:sem:query.graph.slots+1]
             pub fn related_maybe<F: EntityTrait>(
                 self,
             ) -> SelectGraph<E, ( $( $prev, )* Opt<F>, )>
@@ -667,9 +667,9 @@ impl<E: EntityTrait, S> QueryTrait for SelectGraph<E, S> {
 // [spec:pgorm:def:query.graph/test]    construction projects the root under
 // `s0_` and selects from its table, `via` joins without consuming a prefix,
 // and the filter / order / query traits reach the same statement
-// [spec:pgorm:sem:query.graph.slots/test]    the slot kind fixes the join
+// [spec:pgorm:sem:query.graph.slots+1/test]    the slot kind fixes the join
 // type, and the declared tuple grows to the generated ceiling
-// [spec:pgorm:sem:query.graph.writer/test]    one prefixed block per decoded
+// [spec:pgorm:sem:query.graph.writer+1/test]    one prefixed block per decoded
 // source, in declaration order, under the source's effective identifier
 // [spec:pgorm:req:query.graph.aliases/test]    an `_as` slot is named by its
 // alias everywhere, and `join_maybe_filtered` composes with the relation's

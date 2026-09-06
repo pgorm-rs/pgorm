@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use pgorm_query::{AliasName, Expr, IntoColumnRef, SelectExpr, SelectStatement, SimpleExpr};
 
 /// Defines a structure to perform select operations
-// [spec:pgorm:req:query.build]
+// [spec:pgorm:req:query.build+1]
 #[derive(Clone, Debug)]
 pub struct Select<E>
 where
@@ -12,28 +12,6 @@ where
 {
     pub(crate) query: SelectStatement,
     pub(crate) entity: PhantomData<E>,
-}
-
-/// Defines a structure to perform a SELECT operation on two Models
-#[derive(Clone, Debug)]
-pub struct SelectTwo<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    pub(crate) query: SelectStatement,
-    pub(crate) entity: PhantomData<(E, F)>,
-}
-
-/// Defines a structure to perform a SELECT operation on many Models
-#[derive(Clone, Debug)]
-pub struct SelectTwoMany<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    pub(crate) query: SelectStatement,
-    pub(crate) entity: PhantomData<(E, F)>,
 }
 
 /// A [`Select<E>`] whose projection list has been cleared by
@@ -44,7 +22,7 @@ where
 /// `SELECT` with no projection has no rows to decode. Adding any column or
 /// expression moves to [`SelectProjected<E>`], where the terminal operations
 /// live.
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 #[derive(Clone, Debug)]
 pub struct SelectCustom<E>
 where
@@ -61,10 +39,8 @@ where
 /// [`into_model`](SelectProjected::into_model),
 /// [`into_partial_model`](SelectProjected::into_partial_model),
 /// [`into_tuple`](SelectProjected::into_tuple) or
-/// [`into_values`](SelectProjected::into_values). The two-model combinators
-/// are absent for the same reason — their `A_`/`B_` aliasing scheme assumes
-/// `E`'s own select list.
-// [spec:pgorm:sem:query.build.modifiers+6]
+/// [`into_values`](SelectProjected::into_values).
+// [spec:pgorm:sem:query.build.modifiers+7]
 #[derive(Clone, Debug)]
 pub struct SelectProjected<E>
 where
@@ -72,33 +48,6 @@ where
 {
     pub(crate) query: SelectStatement,
     pub(crate) entity: PhantomData<E>,
-}
-
-/// A [`SelectTwo<E, F>`] whose projection list has been cleared by
-/// [`SelectTwo::select_only`]: the two-model counterpart of
-/// [`SelectCustom<E>`].
-// [spec:pgorm:sem:query.build.modifiers+6]
-#[derive(Clone, Debug)]
-pub struct SelectTwoCustom<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    pub(crate) query: SelectStatement,
-    pub(crate) entity: PhantomData<(E, F)>,
-}
-
-/// A two-model select carrying a caller-authored projection: the two-model
-/// counterpart of [`SelectProjected<E>`].
-// [spec:pgorm:sem:query.build.modifiers+6]
-#[derive(Clone, Debug)]
-pub struct SelectTwoProjected<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    pub(crate) query: SelectStatement,
-    pub(crate) entity: PhantomData<(E, F)>,
 }
 
 /// Performs a conversion to [SimpleExpr]
@@ -142,54 +91,6 @@ macro_rules! impl_trait {
                 &mut self.query
             }
         }
-
-        impl<E, F> $trait for SelectTwo<E, F>
-        where
-            E: EntityTrait,
-            F: EntityTrait,
-        {
-            type QueryStatement = SelectStatement;
-
-            fn query(&mut self) -> &mut SelectStatement {
-                &mut self.query
-            }
-        }
-
-        impl<E, F> $trait for SelectTwoCustom<E, F>
-        where
-            E: EntityTrait,
-            F: EntityTrait,
-        {
-            type QueryStatement = SelectStatement;
-
-            fn query(&mut self) -> &mut SelectStatement {
-                &mut self.query
-            }
-        }
-
-        impl<E, F> $trait for SelectTwoProjected<E, F>
-        where
-            E: EntityTrait,
-            F: EntityTrait,
-        {
-            type QueryStatement = SelectStatement;
-
-            fn query(&mut self) -> &mut SelectStatement {
-                &mut self.query
-            }
-        }
-
-        impl<E, F> $trait for SelectTwoMany<E, F>
-        where
-            E: EntityTrait,
-            F: EntityTrait,
-        {
-            type QueryStatement = SelectStatement;
-
-            fn query(&mut self) -> &mut SelectStatement {
-                &mut self.query
-            }
-        }
     };
 }
 
@@ -225,17 +126,6 @@ impl_query_select!(SelectCustom<E>, SelectProjected<E>, |this| {
     }
 });
 impl_query_select!(SelectProjected<E>, Self, |this| this);
-impl_query_select!(SelectTwo<E, F>, Self, |this| this);
-impl_query_select!(
-    SelectTwoCustom<E, F>,
-    SelectTwoProjected<E, F>,
-    |this| SelectTwoProjected {
-        query: this.query,
-        entity: PhantomData,
-    }
-);
-impl_query_select!(SelectTwoProjected<E, F>, Self, |this| this);
-impl_query_select!(SelectTwoMany<E, F>, Self, |this| this);
 
 impl<C> IntoSimpleExpr for C
 where
@@ -268,7 +158,7 @@ impl IntoSimpleExpr for SimpleExpr {
 /// how an aliased item joins a list, though
 /// [`column_as`](QuerySelect::column_as) chained after
 /// [`select`](Select::select) reads better.
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 pub trait SelectItem {
     /// The item as a select expression.
     fn into_select_expr(self) -> SelectExpr;
@@ -335,7 +225,7 @@ impl SelectItem for AliasName {
 /// A list computed at run time is an iterator, which no tuple arity can cover;
 /// that stays [`select_only`](Select::select_only) plus
 /// [`columns`](QuerySelect::columns).
-// [spec:pgorm:sem:query.build.modifiers+6]
+// [spec:pgorm:sem:query.build.modifiers+7]
 pub trait SelectList {
     /// The items, in the order written.
     fn into_select_exprs(self) -> Vec<SelectExpr>;
@@ -466,18 +356,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// Nor can a custom projection be combined with a second model — the
-    /// `A_`/`B_` aliasing scheme assumes `E`'s own select list:
-    ///
-    /// ```compile_fail,E0599
-    /// # use pgorm::{entity::*, query::*, tests_cfg::{cake, fruit}};
-    /// cake::Entity::find()
-    ///     .select_only()
-    ///     .column(cake::Column::Name)
-    ///     .find_also_related(fruit::Entity);
-    /// ```
-    // [spec:pgorm:sem:query.build.modifiers+6]
+    // [spec:pgorm:sem:query.build.modifiers+7]
     pub fn select_only(mut self) -> SelectCustom<E> {
         self.query.clear_selects();
         SelectCustom {
@@ -535,7 +414,7 @@ where
     ///
     /// An empty list projects nothing at all, which the execution-boundary
     /// guard catches for the same reason `columns([])` does.
-    // [spec:pgorm:sem:query.build.modifiers+6]
+    // [spec:pgorm:sem:query.build.modifiers+7]
     pub fn select<L>(mut self, items: L) -> SelectProjected<E>
     where
         L: SelectList,
@@ -554,7 +433,7 @@ where
     E: EntityTrait,
 {
     /// Project exactly these items. See [`Select::select`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
+    // [spec:pgorm:sem:query.build.modifiers+7]
     pub fn select<L>(mut self, items: L) -> SelectProjected<E>
     where
         L: SelectList,
@@ -574,7 +453,7 @@ where
 {
     /// Project exactly these items, discarding the projection built so far.
     /// See [`Select::select`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
+    // [spec:pgorm:sem:query.build.modifiers+7]
     pub fn select<L>(mut self, items: L) -> SelectProjected<E>
     where
         L: SelectList,
@@ -586,91 +465,10 @@ where
 
     /// Discard the projection built so far and start over from
     /// [`SelectCustom<E>`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
+    // [spec:pgorm:sem:query.build.modifiers+7]
     pub fn select_only(mut self) -> SelectCustom<E> {
         self.query.clear_selects();
         SelectCustom {
-            query: self.query,
-            entity: PhantomData,
-        }
-    }
-}
-
-impl<E, F> SelectTwo<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Clear the selection list, moving to the projection-less
-    /// [`SelectTwoCustom<E, F>`] state.
-    // [spec:pgorm:sem:query.build.modifiers+6]
-    pub fn select_only(mut self) -> SelectTwoCustom<E, F> {
-        self.query.clear_selects();
-        SelectTwoCustom {
-            query: self.query,
-            entity: PhantomData,
-        }
-    }
-
-    /// Project exactly these items, replacing the two models' select list.
-    /// See [`Select::select`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
-    pub fn select<L>(mut self, items: L) -> SelectTwoProjected<E, F>
-    where
-        L: SelectList,
-    {
-        self.query.clear_selects();
-        self.query.exprs(items.into_select_exprs());
-        SelectTwoProjected {
-            query: self.query,
-            entity: PhantomData,
-        }
-    }
-}
-
-impl<E, F> SelectTwoCustom<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Project exactly these items. See [`Select::select`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
-    pub fn select<L>(mut self, items: L) -> SelectTwoProjected<E, F>
-    where
-        L: SelectList,
-    {
-        self.query.clear_selects();
-        self.query.exprs(items.into_select_exprs());
-        SelectTwoProjected {
-            query: self.query,
-            entity: PhantomData,
-        }
-    }
-}
-
-impl<E, F> SelectTwoProjected<E, F>
-where
-    E: EntityTrait,
-    F: EntityTrait,
-{
-    /// Project exactly these items, discarding the projection built so far.
-    /// See [`Select::select`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
-    pub fn select<L>(mut self, items: L) -> SelectTwoProjected<E, F>
-    where
-        L: SelectList,
-    {
-        self.query.clear_selects();
-        self.query.exprs(items.into_select_exprs());
-        self
-    }
-
-    /// Discard the projection built so far and start over from
-    /// [`SelectTwoCustom<E, F>`].
-    // [spec:pgorm:sem:query.build.modifiers+6]
-    pub fn select_only(mut self) -> SelectTwoCustom<E, F> {
-        self.query.clear_selects();
-        SelectTwoCustom {
             query: self.query,
             entity: PhantomData,
         }
@@ -700,7 +498,3 @@ macro_rules! impl_query_trait {
 impl_query_trait!(Select<E>);
 impl_query_trait!(SelectCustom<E>);
 impl_query_trait!(SelectProjected<E>);
-impl_query_trait!(SelectTwo<E, F>);
-impl_query_trait!(SelectTwoCustom<E, F>);
-impl_query_trait!(SelectTwoProjected<E, F>);
-impl_query_trait!(SelectTwoMany<E, F>);

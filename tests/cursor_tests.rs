@@ -54,7 +54,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+3/test]    `Select::cursor_by`, `asc`/`desc`, and
+// [spec:pgorm:def:exec.cursor+4/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
 // [spec:pgorm:sem:exec.cursor.keyset+3/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
@@ -534,6 +534,18 @@ fn cakebaker(cake: char, baker: char) -> CakeBakerlite {
     }
 }
 
+/// The graph decodes whole models; the assertions below compare the three
+/// fields the pair's custom projection used to name.
+fn cakebakers(rows: Vec<(cake::Model, Option<baker::Model>)>) -> Vec<CakeBakerlite> {
+    rows.into_iter()
+        .map(|(cake, baker)| CakeBakerlite {
+            cake_name: cake.name,
+            cake_id: cake.id,
+            baker_name: baker.map(|baker| baker.name).unwrap_or_default(),
+        })
+        .collect()
+}
+
 pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     let mut bakeries: Vec<bakery::ActiveModel> = vec![];
     // bakeries named from 1 to 10
@@ -592,11 +604,11 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.cursor+3/test]    `SelectTwo::cursor_by` and
-// `cursor_by_other` on a joined select, decoded through `into_model`
-// [spec:pgorm:sem:exec.cursor.order+1/test]    a joined cursor's automatic
-// secondary order on the other entity's primary key, giving the deterministic
-// tiebreak the row order below depends on
+// [spec:pgorm:def:exec.cursor+4/test]    `SelectGraph::cursor_by` and
+// `cursor_by_on` on a joined read, decoded through the graph's own selector
+// [spec:pgorm:sem:exec.cursor.order+2/test]    a joined cursor's automatic
+// secondary order on every decoded slot's primary key, giving the
+// deterministic tiebreak the row order below depends on
 pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Error> {
     use common::bakery_chain::*;
 
@@ -622,8 +634,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Id)
             .before(5)
             .first(20)
@@ -646,8 +658,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Id)
             .after(5)
             .last(20)
@@ -671,8 +683,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Id)
             .before(5)
             .first(4)
@@ -687,8 +699,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Id)
             .after(5)
             .last(4)
@@ -705,8 +717,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
 
     // since "10" is before "2" lexicologically, it return that first
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Name)
             .after("3")
             .last(4)
@@ -723,8 +735,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
 
     // since "10" is before "2" lexicologically, it return that first
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Name)
             .before("3")
             .first(4)
@@ -740,8 +752,8 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
 
     // since "10" is before "2" lexicologically, it return that first
     assert_eq!(
-        bakery::Entity::find()
-            .find_also_related(Baker)
+        bakery::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(bakery::Column::Name)
             .after("3")
             .last(4)
@@ -756,27 +768,15 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
         ]
     );
 
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
-    enum QueryAs {
-        CakeId,
-        CakeName,
-        BakerName,
-    }
-
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(cake::Column::Name)
             .before("e")
             .first(4)
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![
             cakebaker('a', 'A'),
             cakebaker('a', 'B'),
@@ -786,20 +786,15 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(cake::Column::Name)
             .after("e")
             .last(4)
             .desc()
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![
             cakebaker('b', 'B'),
             cakebaker('b', 'A'),
@@ -809,89 +804,64 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(cake::Column::Name)
             .before("b")
             .first(4)
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![cakebaker('a', 'A'), cakebaker('a', 'B')]
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
             .cursor_by(cake::Column::Name)
             .after("b")
             .last(4)
             .desc()
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![cakebaker('a', 'B'), cakebaker('a', 'A')]
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
-            .cursor_by_other(baker::Column::Name)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
+            .cursor_by_on::<1, _>(baker::Column::Name)
             .before("B")
             .first(4)
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![cakebaker('a', 'A'), cakebaker('b', 'A'),]
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
-            .cursor_by_other(baker::Column::Name)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
+            .cursor_by_on::<1, _>(baker::Column::Name)
             .after("B")
             .last(4)
             .desc()
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![cakebaker('b', 'A'), cakebaker('a', 'A'),]
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
-            .cursor_by_other(baker::Column::Name)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
+            .cursor_by_on::<1, _>(baker::Column::Name)
             .before("E")
             .first(20)
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![
             cakebaker('a', 'A'),
             cakebaker('b', 'A'),
@@ -903,20 +873,15 @@ pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Er
     );
 
     assert_eq!(
-        cake::Entity::find()
-            .find_also_related(Baker)
-            .select_only()
-            .column_as(cake::Column::Id, QueryAs::CakeId)
-            .column_as(cake::Column::Name, QueryAs::CakeName)
-            .column_as(baker::Column::Name, QueryAs::BakerName)
-            .cursor_by_other(baker::Column::Name)
+        cake::Entity::graph()
+            .related_maybe::<Baker>()
+            .cursor_by_on::<1, _>(baker::Column::Name)
             .after("E")
             .last(20)
             .desc()
-            .clone()
-            .into_model::<CakeBakerlite>()
             .all(db)
-            .await?,
+            .await
+            .map(cakebakers)?,
         vec![
             cakebaker('d', 'D'),
             cakebaker('c', 'C'),
@@ -1287,7 +1252,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.order+1/test]    ordering clears any pre-existing
+// [spec:pgorm:sem:exec.cursor.order+2/test]    ordering clears any pre-existing
 // ORDER BY, applies the order columns in declared order, then the unary
 // secondary entries, all in the single resolved direction
 #[pgorm_macros::test]
@@ -1367,7 +1332,7 @@ async fn cursor_order_composition() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.order+1/test]    every execution composes onto a
+// [spec:pgorm:sem:exec.cursor.order+2/test]    every execution composes onto a
 // copy of the query, so a moved boundary or a flipped direction replaces the
 // previous execution's WHERE instead of being ANDed onto it
 #[pgorm_macros::test]
@@ -1492,9 +1457,10 @@ async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the tiebreak `SelectTwo::cursor_by`
-// installs on the other entity's primary key is part of the boundary, so a page
-// ending inside a joined row's repeats resumes without skipping or repeating
+// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the tiebreak
+// `SelectGraph::cursor_by` installs on the decoded slot's primary key is part
+// of the boundary, so a page ending inside a joined row's repeats resumes
+// without skipping or repeating
 #[pgorm_macros::test]
 async fn cursor_joined_tiebreak_boundary() -> Result<(), Error> {
     let ctx = TestContext::new("cursor_tests_joined_tiebreak").await;
@@ -1538,7 +1504,7 @@ async fn cursor_joined_tiebreak_boundary() -> Result<(), Error> {
             .collect()
     }
 
-    let joined = || bakery::Entity::find().find_also_related(Baker);
+    let joined = || bakery::Entity::graph().related_maybe::<Baker>();
     let pair = |bakery: &str, baker: &str| (bakery.to_owned(), baker.to_owned());
 
     let page = joined()

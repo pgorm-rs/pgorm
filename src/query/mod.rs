@@ -1,4 +1,3 @@
-pub(crate) mod combine;
 mod delete;
 pub(crate) mod graph;
 mod helper;
@@ -10,7 +9,6 @@ mod traits;
 mod update;
 mod util;
 
-pub use combine::{SelectA, SelectB};
 pub use delete::*;
 pub use graph::{Opt, Req, SelectGraph, Slot, SlotAt, Slots};
 pub use helper::*;
