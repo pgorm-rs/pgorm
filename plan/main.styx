@@ -3759,6 +3759,111 @@ children (
                     }
                 )
             }
+
+            {
+                id parameter-wire-types
+                title "Reject incompatible parameter wire types instead of silently reinterpreting values"
+                kind @fix
+                deps (orm.binding-types)
+                log (
+                    {
+                        at 2026-09-06T11:34:37.68137Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 1, severity P1 (review severity, not a planning-pass pin). Confirmed on d778f24b despite 1,182 existing workspace tests passing. Source: src/executor/cursor.rs:701-822, especially Value::String at 721 and accepts() returning true. Reproduction: (\"SELECT $1::int4\", Values(vec![\"1234\".into()])).into_tuple::<i32>().one(&db) returns Ok(825373492), interpreting ASCII bytes as the int4 wire representation. The same ValueHolder path serves writes and predicates. Acceptance: reject incompatible Value/target representations through the existing error channel before execution; retain deliberate numeric coercions and supported enum/domain/array encodings; add live mismatched-bind tests proving no wrong row is selected or written, plus valid-binding controls. Spec impact: revise [spec:pgorm:req:exec.cursor.binding-gaps] v2 and related [spec:pgorm:def:exec.cursor.binding] to replace the claim that remaining mismatches are always reported by the server; review [spec:pgorm:req:exec.cursor.binding-coerce] fallback behavior. Follow-up to completed orm.binding-types, whose numeric fixes do not close this nonnumeric gap. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_wire_types; this note is sufficient to recreate it if the temporary file expires."
+                    }
+                )
+            }
+
+            {
+                id joined-row-decode-errors
+                title "Propagate joined-row decode failures instead of reporting missing relations"
+                kind @fix
+                deps (orm.exec)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.557622Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 2, severity P1. Confirmed on d778f24b. Source: src/entity/model.rs:89-90, FromQueryResult::from_query_result_optional calls .ok(); src/executor/select.rs:158 uses it for the joined model. Reproduction: cake(id int, name text) contains (1, 'one'); fruit(id int, name int, cake_id int) contains (2, 123, 1), while the Rust fruit model expects String name. fruit::Entity::find().all(&db) reports WrongType, but cake::Entity::find().find_also_related(fruit::Entity).all(&db) returns Ok([(cake, None)]). Acceptance: a present related row with a wrong type, invalid enum/JSON payload, or missing required projected column must propagate its decode error; a genuinely absent outer-join row must remain None. Cover both one-related and many-related decode paths and partial/custom projections as supported. Spec impact: [spec:pgorm:def:entity.traits.from-query-result] v3 explicitly specifies discarding every decode error, so revise that contract and the relevant decode tests before implementing the new absence/error distinction. Existing rule ownership stays on orm.exec/orm.entity; this is a separate defect follow-up. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_join_decode_error."
+                    }
+                )
+            }
+
+            {
+                id codegen-schema-qualifiers
+                title "Preserve source schema qualifiers through entity generation"
+                kind @fix
+                deps (pgparse.codegen-ddl codegen-identity-collisions)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.636642Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 3, severity P2. Confirmed on d778f24b. Source: pgorm-codegen/src/entity/transformer.rs:22 extracts only table(); the entity representation and writer use a global schema option rather than the source table schema. Reproduction: entities_from_sql(\"CREATE TABLE tenant_a.item (id int PRIMARY KEY);\", EntityWriterOptions::default()) succeeds but emits item.rs with table_name = \"item\" and no schema_name. Resulting CRUD depends on search_path and can target another schema's item table. Acceptance: preserve each source table's schema through transformation and both compact/expanded output; define the interaction with an explicit schema_name override; test generated entities with a conflicting same-named table on search_path and confirm queries target the intended table; retain collision detection and qualify relation identities consistently. Spec impact: [spec:pgorm:sem:codegen.entity.transform] v6 explicitly discards schemas and must be revised; [spec:pgorm:sem:codegen.ddl.tables] v2 already preserves them at parse time. Review writer schema and collision contracts with the implementation. Depends on completed DDL generation and identity validation. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/codegen_probe.rs, probe_schema_identity."
+                    }
+                )
+            }
+
+            {
+                id raw-pagination-placeholder-lexing
+                title "Preserve PostgreSQL comments and dollar quoting when paginating bound raw SQL"
+                kind @fix
+                deps (nopanic.paginator-raw sql.token)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.714663Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 4, severity P2. Confirmed on d778f24b. Sources: src/executor/paginator.rs:306-315 wraps bound SQL in Expr::cust_with_values; pgorm-query/src/backend/query_builder.rs:418-439 uses a tokenizer unaware of PostgreSQL comments/dollar strings and indexes values without validation. Reproductions: SELECT $1::int4 AS n /* $99 is only a comment */ with one int parameter executes directly but panics in fetch_page(0), index 98 into a one-element vector. SELECT $1::int4 AS n, $$hello$$ AS msg executes directly but pagination returns SQLSTATE 42601 after dollar quoting is rewritten. Acceptance: direct and paginated forms preserve SQL literal/comment contents and bind semantics; cover block/line comments, tagged/untagged dollar quotes, repeated/reordered parameters, array subscripts and out-of-range placeholders across fetch_page and count paths; invalid input returns a typed error, never a panic. Spec impact: revise [spec:pgorm:sem:exec.paginator.raw] v2 and whichever of [spec:pgorm:req:sql.render.custom-expr] / [spec:pgorm:sem:sql.token.limits] the chosen PostgreSQL-aware solution changes; the existing custom template $$ escape convention must not be confused with raw SQL. Governed by [dec:pgorm:no-panic]. Temporary reproductions: runtime_probes.rs in /private/tmp/pgorm-review.z9F5GS, probe_raw_pagination_tokens and probe_raw_pagination_comment."
+                    }
+                )
+            }
+
+            {
+                id pipeline-unused-parameters
+                title "Reconcile bound values with placeholders surviving pipeline compilation"
+                kind @fix
+                deps (ergo.pipeline-source)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.792705Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 5, severity P2. Confirmed on d778f24b. Source: src/pipeline/terminal.rs:33-34 returns Values(self.values) unchanged after prqlc compilation. Reproduction: Pipeline::from(cake::Entity).derive_with(|b| [b.bind(42_i32).as_(alias(\"unused\"))]).select(cake::Column::Id).into_sql() returns (\"SELECT id FROM cake\", Values([Int(Some(42))])); execution fails with Parameters(1, 0). Acceptance: discard values whose placeholders were optimized away and maintain a contiguous, correctly mapped placeholder/value set for every surviving parameter; cover removal of first/middle/last/all parameters, repeated parameters, nested and joined pipelines, and valid execution against PostgreSQL. Preserve branded expression isolation. Spec impact: revise [spec:pgorm:req:pipeline.params] v2's claim that a value without its placeholder is unconstructible and its unconditional no-renumbering statement; preserve [spec:pgorm:req:pipeline.compose] alignment. The compiler may prune an expression even though the binder used it correctly. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_pruned_pipeline_parameter."
+                    }
+                )
+            }
+
+            {
+                id transaction-stale-plan-recovery
+                title "Handle stale prepared plans inside transactions without masking the original error"
+                kind @fix
+                deps (infra.statement-cache)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.870478Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 6, severity P2. Confirmed on d778f24b. Source: src/database/db_connection.rs:35-39 retries prepare_cached immediately after SQLSTATE 0A000, including DatabaseTransaction implementations. Reproduction: create stale(id int), cache SELECT * FROM stale, ALTER TABLE stale ADD COLUMN label text, begin a transaction, execute the cached SELECT. The first failure aborts the transaction; re-prepare returns 25P02 and hides the original cached-plan error. Acceptance: choose and document transaction-aware recovery (protect a retry with a savepoint, or evict and preserve the original error for transaction-level recovery); never replace the actionable original error with a futile re-prepare error. Verify top-level/nested transactions, rollback and cache reuse, and retain working autocommit recovery and iterator-parameter semantics. Spec impact: [spec:pgorm:req:conn.pool.statement-cache.invalidate] v2 mandates retry with no transaction exception, so revise it to the selected valid recovery contract and reconcile [dec:pgorm:prepared-statement-reuse]. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_transaction_stale_plan_error."
+                    }
+                )
+            }
+
+            {
+                id minimal-feature-build
+                title "Make pgorm compile when default features and optional Decimal support are disabled"
+                kind @fix
+                deps (parameter-wire-types)
+                log (
+                    {
+                        at 2026-09-06T11:34:46.950359Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-06, finding 7, severity P2. Confirmed on d778f24b with cargo check -p pgorm --no-default-features --lib. Cargo.toml:46 declares rust_decimal optional, but src/executor/cursor.rs:586 imports Decimal unconditionally and the numeric/Value::Decimal binding paths require its ToSql implementation. The command fails with E0432 at the import and E0599 at the Decimal serialization arm. Acceptance: reconcile dependency/feature declarations with the always-built ValueHolder path so the documented minimal library build succeeds; retain the default build and supported numeric coercions; check minimal, macros-only, explicit Decimal-enabled and default configurations without dev-dependency feature unification hiding missing gates. Record the chosen dependency/feature contract in repository documentation or an appropriate spec when implementing. Follow-up to repair.features and orm.binding-types; repair.tests-crates already noted this latent feature rot but no open node tracks it. No production code or spec changes are part of this boarding action."
+                    }
+                )
+            }
         )
     }
 )
