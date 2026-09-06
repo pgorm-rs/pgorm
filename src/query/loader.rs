@@ -1,4 +1,3 @@
-use super::graph::project_source;
 use crate::{
     Condition, ConnectionTrait, EntityName, EntityTrait, Error, Identity, ModelTrait, QueryFilter,
     QueryTrait, Related, RelationDef, RelationType, Req, Select, SelectGraph, error::*,
@@ -343,12 +342,13 @@ where
 fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
     let mut query = select.into_query();
     query.clear_selects();
-    project_source::<R>(&mut query, SharedIden::new(R::default()), 0);
-    SelectGraph {
+    let mut graph = SelectGraph {
         query,
-        sources: 1,
+        qualifiers: Vec::new(),
         marker: PhantomData,
-    }
+    };
+    graph.project::<R>(SharedIden::new(R::default()));
+    graph
 }
 
 /// Reverse a relation for the direction the graph joins it in, without

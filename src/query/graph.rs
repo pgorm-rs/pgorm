@@ -367,7 +367,7 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// Project one decoded source under the next prefix, and record the
     /// identifier that prefix belongs to.
     // [spec:pgorm:sem:query.graph.writer]
-    fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
+    pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
         project_source::<F>(
             &mut self.query,
             SharedIden::clone(&qualifier),
