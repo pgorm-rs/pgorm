@@ -47,7 +47,7 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+4]
+// [spec:pgorm:def:entity.relation.def+5]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,

@@ -388,6 +388,14 @@ These rules capture what the code does today, including known gaps.
 > pagination: `one()` was dropped, and `paginate`/`count` are absent
 > because a page boundary could split one parent's children.
 
+**Deprecation.** This consolidation is superseded by the graph's grouped
+terminal (`[spec:pgorm:sem:query.graph.grouped]`), which keeps the keyed
+grouping and the no-pagination stance but specifies away `SelectTwoMany`'s
+constructor-injected ORDER BY: in the successor the caller's ordering
+dominates and the root's primary key is appended as a tiebreak only. The
+rule remains normative while `SelectTwoMany` exists and is retired with the
+pair surface (graph/pair-deletion).
+
 > [spec:pgorm:req:exec.crud.exec-vocabulary]
 > A CRUD terminal's name MUST determine the shape of what it returns, so
 > that a reader of the call site needs no knowledge of which constructor
@@ -551,6 +559,15 @@ These rules capture what the code does today, including known gaps.
 > `stream`: its output requires all rows of a parent before any entry is
 > complete (see `exec.crud.consolidate`). Page-batched and keyset-windowed
 > consumption remain available through `exec.paginator` and `exec.cursor`.
+
+**Deprecation.** This rule's pair clauses — `stream` on `SelectTwo`, the
+pair form of `stream_partial_model`, and `SelectTwoMany`'s deliberate
+absence — are superseded by the graph's `stream` terminal
+(`[spec:pgorm:sem:query.graph.terminals]`), which reaches the same
+`Selector::stream` through `GraphRow`. When the pair surface is deleted
+(graph/pair-deletion) the enumeration here loses the pair types and gains
+`SelectGraph`; `query_raw`, the `Select`/`Selector`/`SelectorRaw` surface
+and the single-entity `stream_partial_model` are untouched.
 
 > [spec:pgorm:sem:exec.stream.decode+1]
 > `SelectorRaw::stream` binds `Values` through the `ValueHolder` `ToSql`

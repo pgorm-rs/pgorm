@@ -304,6 +304,13 @@ of the crate, compiled in every build. Rules are grouped under
 > attached. Compile-time name checking covers only what prqlc can see: its
 > own std namespace and pipeline-introduced names.
 
+**Pending amendment.** The `select_sources` terminal
+(`[spec:pgorm:sem:pipeline.select-sources]`) adds a third `PipelineError`
+variant — the typed refusal of a model-decode over a reshaped pipeline.
+This rule's two-variant enumeration is bumped when that terminal lands
+(graph/pipeline-sources); until then the code carries exactly the two
+variants stated here.
+
 ## Qualification
 
 > [spec:pgorm:sem:pipeline.qualify+2]
@@ -343,3 +350,67 @@ of the crate, compiled in every build. Rules are grouped under
 > stage before compiling — the pipeline is still a pipeline at that point,
 > so the limit belongs to it, in contrast to `SelectorRaw::one`, which
 > executes its text as written.
+
+> [spec:pgorm:sem:pipeline.select-sources]
+> `select_sources(sources)` is the model-decode terminal: where
+> `into_model::<M>` asks the caller for a row type whose projection the
+> caller must have arranged, `select_sources` takes the relations
+> themselves and arranges the projection. It is the pipeline's complement
+> to the source graph — row-shaped reads that need what the graph excludes
+> (right and full joins, aggregates beside models in a later `derive`,
+> arbitrary composed relations) are written here; reads the graph's slot
+> typing can carry belong there (`[spec:pgorm:def:query.graph]`).
+>
+> The argument is a single source or a tuple of up to six — each an
+> `IntoSource` some stage of the pipeline read (the `from` source or a
+> join operand), restated: an entity for a relation read bare, the same
+> `named(..)` spelling for a relation read under a name
+> (`[spec:pgorm:sem:pipeline.self-join]`), so two occurrences of one table
+> are told apart exactly as the join told them apart. Before compilation
+> the terminal appends one final projection stage through the same writer
+> as the graph's (`[spec:pgorm:sem:query.graph.writer]`): for the i-th
+> listed source (zero-based), every column of its entity in iteration
+> order, projected `col.select_as(..)` and aliased `s{i}_{col}`,
+> qualified by the source's name — the `named` token, or the entity's own
+> qualification (`[spec:pgorm:sem:pipeline.qualify+2]`). An explicitly
+> aliased projection is what dissolves prqlc's `_expr_N` renaming: two
+> sources sharing a column name land under different prefixes by
+> construction, so the compiler never has to invent names the decode
+> cannot predict.
+>
+> Every listed source decodes through the absence witness
+> (`[spec:pgorm:req:exec.decode.absent]`) as `Option<Model>` — every
+> position, the first included. The pipeline's joins carry no missability
+> in their types, and under a right or full join the *left* side is the
+> absent one, so the terminal claims nothing a join could falsify: the
+> row type is `(Option<E1::Model>, …, Option<En::Model>)`, and a source
+> listed alone still decodes as `Option<E1::Model>`. Callers who can
+> prove a side present unwrap it; the graph is the surface whose types
+> state it.
+>
+> `select_sources` yields a `SelectedSources`, a terminal-only value on
+> the pattern of `Grouped`: its only methods are the terminals —
+> `into_sql()`, `all(db)`, `one(db)`, `one_opt(db)`, with the `take 1`
+> semantics of `[spec:pgorm:sem:pipeline.terminal]` — so no transform can
+> follow the selection and reshaping *after* it is unrepresentable.
+> Reshaping *before* it is refused at `into_sql`: a pipeline that already
+> passed through `select`, `group(..).aggregate(..)`, `intersect` or
+> `remove` no longer carries the sources' own column namespaces (a
+> projection replaced them, an aggregation collapsed them, a set-op
+> rename dissolved the entity qualification,
+> `[spec:pgorm:req:pipeline.compose]`), and the terminal MUST fail with a
+> typed `PipelineError` variant naming the offending stage — before prqlc
+> compiles, so the caller reads "select_sources after <stage>" rather
+> than an opaque unresolved-name diagnostic. `filter`, `derive`, `sort`,
+> `take` / `take_range`, `join`, `window`, `distinct` and `append` (whose
+> left-side naming survives) leave every source addressable and compose
+> freely ahead of the terminal; construction itself stays infallible per
+> `[spec:pgorm:req:pipeline.errors+1]`.
+>
+> The catalog-less ceiling stands: a listed source the pipeline never
+> read compiles up to prqlc, which refuses the unresolvable columns as
+> `Compile(diagnostics)` — the terminal checks stage shape, not
+> membership. And as everywhere the witness reads, a matched row whose
+> every projected column is NULL is indistinguishable from an unmatched
+> one only when the projection omits the primary key, which this
+> projection never does.

@@ -15,7 +15,7 @@ bound parameter is held to.
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoIdentity::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+4]` — and defaults to
+> of `[spec:pgorm:def:entity.relation.def+5]` — and defaults to
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
@@ -34,6 +34,15 @@ bound parameter is held to.
 > returns (`query.build.modifiers`), and being no `SelectorTrait` it makes a
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
+
+**Deprecation.** `SelectTwo::cursor_by` / `cursor_by_other` are re-homed
+onto the graph as `cursor_by` / `cursor_by_on`
+(`[spec:pgorm:sem:query.graph.cursor]`): only the entry points move — the
+`Cursor` type, the keyset machinery of
+`[spec:pgorm:sem:exec.cursor.keyset+3]` and everything else this rule
+states are unchanged. The two pair entry points remain normative while
+`SelectTwo` exists and are retired with the pair surface
+(graph/pair-deletion).
 
 > [spec:pgorm:sem:exec.cursor.keyset+3]
 > A cursor's *keyset* is the column list its rows are totally ordered by:

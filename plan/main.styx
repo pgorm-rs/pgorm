@@ -3993,6 +3993,15 @@ children (
             {
                 id spec
                 title "Author the graph rules: slots, one writer, join type from the slot kind"
+                sealed true
+                log (
+                    {
+                        at 2026-09-06T14:24:08.822493Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

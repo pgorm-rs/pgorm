@@ -184,6 +184,17 @@ is what `EntityTrait::find()` produces.
 > `order_by_with_nulls` for `NULLS FIRST`/`LAST`); calls accumulate and are
 > never deduplicated.
 
+**Deprecation.** This rule's pair clauses — the `SelectTwoCustom` /
+`SelectTwoProjected` typestates, `cursor_by_other`, the pair landing of
+`select`, and the `select_also` / `select_with` / `find_also_*` /
+`find_with_*` exclusions on the `Projected` states — are superseded by the
+N-ary source graph, on which projection editing is not represented at all
+(`[spec:pgorm:sem:query.graph.slots]`) and joined cursors are re-homed
+(`[spec:pgorm:sem:query.graph.cursor]`). They remain normative while the
+pair types exist; when the pair surface is deleted (graph/pair-deletion)
+this rule is rewritten without them, and the single-entity typestate,
+`select`, and everything else here survives unchanged.
+
 > [spec:pgorm:sem:query.build.alias]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
 > token (`[spec:pgorm:def:sql.types+5]`), not as a string repeated per site.
@@ -231,7 +242,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+4]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+5]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -295,6 +306,16 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > (`[spec:pgorm:req:entity.relation.linked+2]`), which is the same call these
 > two builders make. A chain that gains a hop therefore moves the join and
 > every reference to it together.
+
+**Deprecation.** The surface this rule specifies — `SelectTwo`,
+`SelectTwoMany`, `select_also` / `select_with`, `find_also_related` /
+`find_with_related`, `find_also_linked` / `find_with_linked`, `apply_alias`
+and the `A_`/`B_` scheme — is superseded by the N-ary source graph
+(`[spec:pgorm:def:query.graph]`), whose single projection writer
+(`[spec:pgorm:sem:query.graph.writer]`) replaces this rule's aliasing scheme
+and whose slot declaration replaces these combinators. The rule remains
+normative while the code it describes exists, and is retired whole with the
+pair surface (graph/pair-deletion) rather than rewritten.
 
 The composition clauses — WITH, LATERAL, WINDOW and the set operators — are all
 in-place mutations of the same `SelectStatement`, so none of them changes what a

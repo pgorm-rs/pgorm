@@ -380,7 +380,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+4]
+> [spec:pgorm:def:entity.relation.def+5]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
@@ -418,6 +418,26 @@ explicit limitations.
 > pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+3]`)
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Identity` case is the only one left to check.
+>
+> The `on_condition` closure receives the two identifiers *so that its
+> predicate can follow the tables under whatever names the join binds them
+> to*: the right identifier is the alias whenever the joined side is
+> re-aliased — `join_as`, the graph's `join_maybe_as` / `join_one_as`
+> (`[spec:pgorm:req:query.graph.aliases]`), a `Linked` hop's `r{i}`. A
+> closure that ignores its parameters and qualifies by a hardcoded table
+> name renders that name verbatim, so under an alias the predicate
+> constrains the un-aliased name — a table absent from the query, or
+> another join of the same table — and nothing errors client-side: the
+> wrong rows match silently. This is a documented sharp edge, not a checked
+> one; the closure is opaque, and no consumer can detect the miswiring. A
+> closure MUST derive every table qualification from its parameters to be
+> sound under aliasing; one that hardcodes is sound only where its relation
+> is never joined re-aliased. The `DeriveRelation` `on_condition = "..."`
+> attribute is where the mistake is easiest to write — its expression
+> string has no parameters in scope, and a `ColumnTrait` operator
+> (`Column::Name.like(..)`) qualifies with the entity's canonical table —
+> and the `tests_cfg` `TropicalFruit` relation is the standing in-tree
+> example.
 
 > [spec:pgorm:req:entity.relation.builder+1]
 > `RelationBuilder<E, R, C>` (`src/entity/relation.rs`) accumulates a
