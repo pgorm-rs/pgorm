@@ -3637,12 +3637,28 @@ children (
             {
                 id sea-config-residue
                 title "Remove obsolete Sea-named manifest and repository configuration"
+                sealed true
                 log (
                     {
                         at 2026-09-05T15:35:35.861312Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: remove the unused empty sea-orm feature from pgorm-query/pgorm-query-derive/Cargo.toml, the commented sea-schema dependency from pgorm-migration/Cargo.toml, and the obsolete /sea-orm/ entry from .gitignore. Confirm Cargo.lock still contains no active SeaORM, SeaQuery, SeaQL, or Seaography packages, then run a final manifest and tracked-path naming scan."
+                    }
+
+                    {
+                        at 2026-09-06T00:40:06.389769Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+
+                    {
+                        at 2026-09-06T00:40:13.247272Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Completed inline on main: removed the empty sea-orm feature from pgorm-query/pgorm-query-derive/Cargo.toml (no cfg references it), the commented sea-schema dep from pgorm-migration/Cargo.toml, and /sea-orm/ from .gitignore. Cargo.lock already carried zero Sea-lineage packages. Final tracked-path scan shows only paths owned by other boarded nodes: with_seaography/* and cake_seaography.rs (seaography-feature-build's deletion, in flight) and sea_orm_active_enums.rs (sea-orm-active-enums-name's rename, in flight); pgorm-macros' seaography feature likewise dies with that node."
+                        after_done true
                     }
                 )
             }

@@ -27,4 +27,3 @@ pgorm-query.workspace = true
 strum = { version = "0.28", features = ["derive"] }
 
 [features]
-sea-orm = []
