@@ -6,8 +6,8 @@ pub use pgorm_query::{
     Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
 };
 use pgorm_query::{
-    ConditionType, Expr, FromItem, FunctionCall, Iden, IntoCondition, IntoIden, LockBehavior,
-    LockType, NullOrdering, RecursiveWithClause, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
+    ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoIden, LockBehavior, LockType,
+    NullOrdering, RecursiveWithClause, SelectExpr, SelectStatement, SharedIden, SimpleExpr,
     UnionType, WindowStatement, WithClause,
 };
 
@@ -97,7 +97,7 @@ pub trait QuerySelect: Sized {
     {
         self.query().expr(SelectExpr::new_as(
             col.into_simple_expr(),
-            SeaRc::new(alias.into_identity()),
+            SharedIden::new(alias.into_identity()),
         ));
         self.into_projected()
     }
@@ -411,7 +411,7 @@ pub trait QuerySelect: Sized {
         I: IntoIden,
     {
         let alias = alias.into_iden();
-        rel.to_tbl = rel.to_tbl.alias(SeaRc::clone(&alias));
+        rel.to_tbl = rel.to_tbl.alias(SharedIden::clone(&alias));
         self.query()
             .join(join, rel.to_tbl.clone(), join_condition(rel));
         self
@@ -425,7 +425,7 @@ pub trait QuerySelect: Sized {
         I: IntoIden,
     {
         let alias = alias.into_iden();
-        rel.from_tbl = rel.from_tbl.alias(SeaRc::clone(&alias));
+        rel.from_tbl = rel.from_tbl.alias(SharedIden::clone(&alias));
         self.query()
             .join(join, rel.from_tbl.clone(), join_condition(rel));
         self
@@ -1075,7 +1075,7 @@ pub trait QueryFilter: Sized {
         let tbl_alias = tbl_alias.into_iden();
         for key in <M::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            let expr = Expr::col((SeaRc::clone(&tbl_alias), col)).eq(model.get(col));
+            let expr = Expr::col((SharedIden::clone(&tbl_alias), col)).eq(model.get(col));
             self = self.filter(expr);
         }
         self
@@ -1085,16 +1085,16 @@ pub trait QueryFilter: Sized {
 // [spec:pgorm:sem:query.build.join+3]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
-    let from_tbl = SeaRc::clone(rel.from_tbl.qualifier());
-    let to_tbl = SeaRc::clone(rel.to_tbl.qualifier());
+    let from_tbl = SharedIden::clone(rel.from_tbl.qualifier());
+    let to_tbl = SharedIden::clone(rel.to_tbl.qualifier());
     let mut condition = match rel.condition_type {
         ConditionType::All => Condition::all(),
         ConditionType::Any => Condition::any(),
     };
 
     condition = condition.add(join_tbl_on_condition(
-        SeaRc::clone(&from_tbl),
-        SeaRc::clone(&to_tbl),
+        SharedIden::clone(&from_tbl),
+        SharedIden::clone(&to_tbl),
         rel.columns,
     ));
     if let Some(f) = rel.on_condition.take() {
@@ -1106,15 +1106,15 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
 
 // [spec:pgorm:sem:query.build.join+3]
 pub(crate) fn join_tbl_on_condition(
-    from_tbl: SeaRc<dyn Iden>,
-    to_tbl: SeaRc<dyn Iden>,
+    from_tbl: SharedIden,
+    to_tbl: SharedIden,
     columns: ColumnPairs,
 ) -> Condition {
     let mut cond = Condition::all();
     for (owner_key, foreign_key) in columns {
         cond = cond.add(
-            Expr::col((SeaRc::clone(&from_tbl), owner_key))
-                .equals((SeaRc::clone(&to_tbl), foreign_key)),
+            Expr::col((SharedIden::clone(&from_tbl), owner_key))
+                .equals((SharedIden::clone(&to_tbl), foreign_key)),
         );
     }
     cond
@@ -1124,9 +1124,9 @@ pub(crate) fn join_tbl_on_condition(
 /// table it names, or the alias the value-producing forms are bound to.
 pub(crate) fn unpack_table_ref(from_item: &FromItem) -> DynIden {
     match from_item {
-        FromItem::Table(table) => SeaRc::clone(table.name.table()),
+        FromItem::Table(table) => SharedIden::clone(table.name.table()),
         FromItem::SubQuery(_, alias)
         | FromItem::ValuesList(_, alias)
-        | FromItem::FunctionCall(_, alias) => SeaRc::clone(alias),
+        | FromItem::FunctionCall(_, alias) => SharedIden::clone(alias),
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, SeaRc,
+    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, SharedIden,
     TableCreateStatement,
     extension::{Type, TypeCreateStatement},
 };
@@ -286,7 +286,7 @@ where
 {
     let orm_column_def = column.def();
     let types = match orm_column_def.col_type {
-        ColumnType::Enum { ref name, .. } => ColumnType::Custom(SeaRc::clone(name)),
+        ColumnType::Enum { ref name, .. } => ColumnType::Custom(SharedIden::clone(name)),
         _ => orm_column_def.col_type,
     };
     let mut column_def = ColumnDef::new_with_type(column, types);

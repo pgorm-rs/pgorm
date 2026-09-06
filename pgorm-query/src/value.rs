@@ -688,7 +688,7 @@ mod with_mac_address {
 // [spec:pgorm:def:sql.value.array+4]
 pub mod with_array {
     use super::*;
-    use crate::RcOrArc;
+    use std::sync::Arc;
 
     // We only imlement conversion from Vec<T> to Array when T is not u8.
     // This is because for u8's case, there is already conversion to Byte defined above.
@@ -780,7 +780,7 @@ pub mod with_array {
 
         fn column_type() -> ColumnType {
             use ColumnType::*;
-            Array(RcOrArc::new(T::column_type()))
+            Array(Arc::new(T::column_type()))
         }
     }
 }

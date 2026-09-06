@@ -20,7 +20,7 @@
 //! writing it as a token instead of a string is only cheaper than
 //! `Alias::new` if the token is already in scope.
 
-// [spec:pgorm:def:entity.prelude+2]
+// [spec:pgorm:def:entity.prelude+3]
 // [spec:pgorm:sem:query.build.alias]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
@@ -33,9 +33,10 @@ pub use crate::{
     QueryResult, QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
     TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
     error::*,
-    pgorm_query::{DynIden, Expr, ForeignKeyAction, RcOrArc, SeaRc, StringLen},
+    pgorm_query::{DynIden, Expr, ForeignKeyAction, SharedIden, StringLen},
     set,
 };
+pub use std::sync::Arc;
 
 #[cfg(feature = "macros")]
 pub use crate::{

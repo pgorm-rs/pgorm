@@ -722,9 +722,9 @@ impl TypeDropStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::drop(SeaRc::new(KycStatus::Type) as DynIden)
+    ///     Type::drop(SharedIden::new(KycStatus::Type) as DynIden)
     ///         .if_exists()
-    ///         .names([SeaRc::new(FontFamily::Type) as DynIden])
+    ///         .names([SharedIden::new(FontFamily::Type) as DynIden])
     ///         .cascade()
     ///         .to_string(),
     ///     r#"DROP TYPE IF EXISTS "kyc_status", "font_family" CASCADE"#

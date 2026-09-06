@@ -2,7 +2,8 @@ use super::{Enums, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
-use pgorm_query::{Alias, ColumnType, IntervalSpec, RcOrArc, SeaRc, StringLen};
+use pgorm_query::{Alias, ColumnType, IntervalSpec, SharedIden, StringLen};
+use std::sync::Arc;
 
 /// A column's type together with the auto-increment fact the `serial` family
 /// carries in its spelling rather than in a constraint.
@@ -38,7 +39,7 @@ pub(super) fn column_kind(
                 return Err(unsupported(format!("an array of serial on {context}"), at));
             }
             Ok(ColumnKind {
-                col_type: ColumnType::Array(RcOrArc::new(kind.col_type)),
+                col_type: ColumnType::Array(Arc::new(kind.col_type)),
                 auto_increment: false,
             })
         }
@@ -94,10 +95,10 @@ fn named_type(
     };
     if !catalog && let Some(variants) = enums.get(name.as_str()) {
         return Ok(plain(ColumnType::Enum {
-            name: SeaRc::new(Alias::new(name.as_str())),
+            name: SharedIden::new(Alias::new(name.as_str())),
             variants: variants
                 .iter()
-                .map(|variant| SeaRc::new(Alias::new(variant.as_str())))
+                .map(|variant| SharedIden::new(Alias::new(variant.as_str())))
                 .collect(),
         }));
     }

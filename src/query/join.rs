@@ -3,7 +3,7 @@ use crate::{
     SelectA, SelectB, SelectTwo, SelectTwoMany, join_tbl_on_condition, unpack_table_ref,
 };
 pub use pgorm_query::JoinType;
-use pgorm_query::{Alias, Condition, Expr, IntoIden, SeaRc, SelectExpr};
+use pgorm_query::{Alias, Condition, Expr, IntoIden, SelectExpr, SharedIden};
 
 // [spec:pgorm:sem:query.build.join+3]
 // [spec:pgorm:sem:query.build.combine+2]
@@ -82,12 +82,13 @@ where
             let table_ref = rel.to_tbl;
 
             let mut condition = Condition::all().add(join_tbl_on_condition(
-                SeaRc::clone(&from_tbl),
-                SeaRc::clone(&to_tbl),
+                SharedIden::clone(&from_tbl),
+                SharedIden::clone(&to_tbl),
                 rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
-                condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));
+                condition =
+                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
             }
 
             slf.query()
@@ -100,7 +101,7 @@ where
             let expr = Expr::col((target.into_iden(), col.into_iden()));
             select_two.query().expr(SelectExpr::new_as(
                 col.select_as(expr),
-                SeaRc::new(Alias::new(alias)),
+                SharedIden::new(Alias::new(alias)),
             ));
         }
         select_two
@@ -124,12 +125,13 @@ where
             let table_ref = rel.to_tbl;
 
             let mut condition = Condition::all().add(join_tbl_on_condition(
-                SeaRc::clone(&from_tbl),
-                SeaRc::clone(&to_tbl),
+                SharedIden::clone(&from_tbl),
+                SharedIden::clone(&to_tbl),
                 rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
-                condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));
+                condition =
+                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
             }
 
             slf.query()
@@ -142,7 +144,7 @@ where
             let expr = Expr::col((target.into_iden(), col.into_iden()));
             select_two_many.query().expr(SelectExpr::new_as(
                 col.select_as(expr),
-                SeaRc::new(Alias::new(alias)),
+                SharedIden::new(Alias::new(alias)),
             ));
         }
         select_two_many

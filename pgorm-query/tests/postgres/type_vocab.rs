@@ -1,5 +1,6 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
+use std::sync::Arc;
 
 // [spec:pgorm:def:sql.types.column-ref/test]    the five forms and what `IntoColumnRef` maps onto them
 #[test]
@@ -498,12 +499,12 @@ fn column_type_equality_semantics() {
 
     // `Array` recurses into its element type.
     assert_eq!(
-        ColumnType::Array(RcOrArc::new(ColumnType::Integer)),
-        ColumnType::Array(RcOrArc::new(ColumnType::Integer))
+        ColumnType::Array(Arc::new(ColumnType::Integer)),
+        ColumnType::Array(Arc::new(ColumnType::Integer))
     );
     assert_ne!(
-        ColumnType::Array(RcOrArc::new(ColumnType::Integer)),
-        ColumnType::Array(RcOrArc::new(ColumnType::Text))
+        ColumnType::Array(Arc::new(ColumnType::Integer)),
+        ColumnType::Array(Arc::new(ColumnType::Text))
     );
 
     // Everything else compares discriminants.

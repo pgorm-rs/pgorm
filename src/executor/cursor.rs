@@ -6,8 +6,8 @@ use crate::{
     error::query_err,
 };
 use pgorm_query::{
-    Condition, DynIden, Expr, IntoValueTuple, Order, SeaRc, SelectStatement, SimpleExpr, Value,
-    ValueTuple,
+    Condition, DynIden, Expr, IntoValueTuple, Order, SelectStatement, SharedIden, SimpleExpr,
+    Value, ValueTuple,
 };
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -162,12 +162,14 @@ impl<S, K> Cursor<S, K> {
         self.order_columns
             .clone()
             .into_iter()
-            .map(|col| (SeaRc::clone(&self.table), col))
+            .map(|col| (SharedIden::clone(&self.table), col))
             .chain(
                 self.secondary_order_by
                     .iter()
                     .filter_map(|(tbl, col)| match col {
-                        Identity::Unary(c1) => Some((SeaRc::clone(tbl), SeaRc::clone(c1))),
+                        Identity::Unary(c1) => {
+                            Some((SharedIden::clone(tbl), SharedIden::clone(c1)))
+                        }
                         _ => None,
                     }),
             )
@@ -223,8 +225,9 @@ impl<S, K> Cursor<S, K> {
         //   (c1 = v1 AND ... AND cn ⋈ vn)
         //   OR (c1 = v1 AND ... AND c(n-1) ⋈ v(n-1))
         //   OR ... OR (c1 ⋈ v1)
-        let col =
-            |(tbl, col): &(DynIden, DynIden)| Expr::col((SeaRc::clone(tbl), SeaRc::clone(col)));
+        let col = |(tbl, col): &(DynIden, DynIden)| {
+            Expr::col((SharedIden::clone(tbl), SharedIden::clone(col)))
+        };
         Ok((1..=columns.len())
             .rev()
             .fold(Condition::any(), |disjunction, n| {
@@ -453,8 +456,19 @@ where
     where
         C: IntoIdentity,
     {
-        Cursor::new(self.query, SeaRc::new(E::default()), order_columns)
+        Cursor::new(self.query, SharedIden::new(E::default()), order_columns)
     }
+}
+
+fn pk_tiebreaks<T: EntityTrait>() -> Vec<(DynIden, Identity)> {
+    <T::PrimaryKey as Iterable>::iter()
+        .map(|pk| {
+            (
+                SharedIden::new(T::default()),
+                Identity::Unary(SharedIden::new(pk.into_column())),
+            )
+        })
+        .collect()
 }
 
 impl<E, F, M, N> CursorTrait for SelectTwo<E, F>
@@ -487,15 +501,8 @@ where
     where
         C: IdentityOf<E>,
     {
-        let primary_keys: Vec<(DynIden, Identity)> = <F::PrimaryKey as Iterable>::iter()
-            .map(|pk| {
-                (
-                    SeaRc::new(F::default()),
-                    Identity::Unary(SeaRc::new(pk.into_column())),
-                )
-            })
-            .collect();
-        let mut cursor = Cursor::new(self.query, SeaRc::new(E::default()), order_columns);
+        let primary_keys = pk_tiebreaks::<F>();
+        let mut cursor = Cursor::new(self.query, SharedIden::new(E::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }
@@ -510,15 +517,8 @@ where
     where
         C: IdentityOf<F>,
     {
-        let primary_keys: Vec<(DynIden, Identity)> = <E::PrimaryKey as Iterable>::iter()
-            .map(|pk| {
-                (
-                    SeaRc::new(E::default()),
-                    Identity::Unary(SeaRc::new(pk.into_column())),
-                )
-            })
-            .collect();
-        let mut cursor = Cursor::new(self.query, SeaRc::new(F::default()), order_columns);
+        let primary_keys = pk_tiebreaks::<E>();
+        let mut cursor = Cursor::new(self.query, SharedIden::new(F::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }
@@ -537,7 +537,7 @@ where
     where
         C: IntoIdentity,
     {
-        Cursor::new(self.query, SeaRc::new(E::default()), order_columns)
+        Cursor::new(self.query, SharedIden::new(E::default()), order_columns)
     }
 }
 
@@ -553,15 +553,8 @@ where
     where
         C: IdentityOf<E>,
     {
-        let primary_keys: Vec<(DynIden, Identity)> = <F::PrimaryKey as Iterable>::iter()
-            .map(|pk| {
-                (
-                    SeaRc::new(F::default()),
-                    Identity::Unary(SeaRc::new(pk.into_column())),
-                )
-            })
-            .collect();
-        let mut cursor = Cursor::new(self.query, SeaRc::new(E::default()), order_columns);
+        let primary_keys = pk_tiebreaks::<F>();
+        let mut cursor = Cursor::new(self.query, SharedIden::new(E::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }
@@ -571,15 +564,8 @@ where
     where
         C: IdentityOf<F>,
     {
-        let primary_keys: Vec<(DynIden, Identity)> = <E::PrimaryKey as Iterable>::iter()
-            .map(|pk| {
-                (
-                    SeaRc::new(E::default()),
-                    Identity::Unary(SeaRc::new(pk.into_column())),
-                )
-            })
-            .collect();
-        let mut cursor = Cursor::new(self.query, SeaRc::new(F::default()), order_columns);
+        let primary_keys = pk_tiebreaks::<E>();
+        let mut cursor = Cursor::new(self.query, SharedIden::new(F::default()), order_columns);
         cursor.set_secondary_order_by(primary_keys);
         cursor
     }

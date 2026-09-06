@@ -1,4 +1,5 @@
 use crate::{expr::*, types::*};
+use std::sync::Arc;
 
 /// Specification of a table column
 // [spec:pgorm:req:sql.ddl.column-def+3]
@@ -78,7 +79,7 @@ pub enum ColumnType {
         name: DynIden,
         variants: Vec<DynIden>,
     },
-    Array(RcOrArc<ColumnType>),
+    Array(Arc<ColumnType>),
     Vector(Option<u32>),
     Cidr,
     Inet,
@@ -570,7 +571,7 @@ impl ColumnDef {
     /// Set column type as an array with a specified element type.
     /// This is only supported on Postgres.
     pub fn array(&mut self, elem_type: ColumnType) -> &mut Self {
-        self.types = Some(ColumnType::Array(RcOrArc::new(elem_type)));
+        self.types = Some(ColumnType::Array(Arc::new(elem_type)));
         self
     }
 

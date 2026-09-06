@@ -3603,12 +3603,20 @@ children (
             {
                 id sea-rc-name
                 title "Replace the public SeaRc type name"
+                sealed true
                 log (
                     {
                         at 2026-09-05T15:35:34.414193Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: SeaRc is a public pgorm-query type, underpins the public DynIden alias, is re-exported by entity::prelude, appears across 21 production files, and is named verbatim by the SQL-value and entity specs. Replace it with pgorm-native vocabulary throughout query, ORM, macros, codegen, tests, and specs. This is a breaking public rename: choose the replacement deliberately and account for downstream users; a permanent SeaRc alias would fail the cleanup objective."
+                    }
+
+                    {
+                        at 2026-09-06T10:49:46.138719Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

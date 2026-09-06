@@ -1,7 +1,7 @@
 use crate::{
     EntityTrait, QuerySelect, Related, RelationDef, Select, join_tbl_on_condition, unpack_table_ref,
 };
-use pgorm_query::{Condition, Iden, IntoIden, JoinType, SeaRc};
+use pgorm_query::{Condition, Iden, IntoIden, JoinType, SharedIden};
 use std::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -105,12 +105,13 @@ pub trait Linked {
             let table_ref = rel.from_tbl;
 
             let mut condition = Condition::all().add(join_tbl_on_condition(
-                SeaRc::clone(&from_tbl),
-                SeaRc::clone(&to_tbl),
+                SharedIden::clone(&from_tbl),
+                SharedIden::clone(&to_tbl),
                 rel.columns,
             ));
             if let Some(f) = rel.on_condition.take() {
-                condition = condition.add(f(SeaRc::clone(&from_tbl), SeaRc::clone(&to_tbl)));
+                condition =
+                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
             }
 
             select

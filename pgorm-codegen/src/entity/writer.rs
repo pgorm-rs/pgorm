@@ -848,11 +848,12 @@ mod tests {
         RelationType, WithSerde,
         entity::writer::{bonus_attributes, bonus_derive},
     };
-    use pgorm_query::{Alias, ColumnType, ForeignKeyAction, RcOrArc, SeaRc, StringLen};
+    use pgorm_query::{Alias, ColumnType, ForeignKeyAction, SharedIden, StringLen};
     use pretty_assertions::assert_eq;
     use proc_macro2::TokenStream;
     use quote::quote;
     use std::io::{self, BufRead, BufReader, Read};
+    use std::sync::Arc;
 
     fn setup() -> Vec<Entity> {
         vec![
@@ -1370,14 +1371,14 @@ mod tests {
                     },
                     Column {
                         name: "integers".to_owned(),
-                        col_type: ColumnType::Array(RcOrArc::new(ColumnType::Integer)),
+                        col_type: ColumnType::Array(Arc::new(ColumnType::Integer)),
                         auto_increment: false,
                         not_null: true,
                         unique: false,
                     },
                     Column {
                         name: "integers_opt".to_owned(),
-                        col_type: ColumnType::Array(RcOrArc::new(ColumnType::Integer)),
+                        col_type: ColumnType::Array(Arc::new(ColumnType::Integer)),
                         auto_increment: false,
                         not_null: false,
                         unique: false,
@@ -1401,14 +1402,14 @@ mod tests {
                     },
                     Column {
                         name: "floats".to_owned(),
-                        col_type: ColumnType::Array(RcOrArc::new(ColumnType::Float)),
+                        col_type: ColumnType::Array(Arc::new(ColumnType::Float)),
                         auto_increment: false,
                         not_null: true,
                         unique: false,
                     },
                     Column {
                         name: "doubles".to_owned(),
-                        col_type: ColumnType::Array(RcOrArc::new(ColumnType::Double)),
+                        col_type: ColumnType::Array(Arc::new(ColumnType::Double)),
                         auto_increment: false,
                         not_null: true,
                         unique: false,
@@ -2243,10 +2244,10 @@ mod tests {
                     Column {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
-                            name: SeaRc::new(Alias::new("tea_enum")),
+                            name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SeaRc::new(Alias::new("everyday_tea")),
-                                SeaRc::new(Alias::new("breakfast_tea")),
+                                SharedIden::new(Alias::new("everyday_tea")),
+                                SharedIden::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2256,10 +2257,10 @@ mod tests {
                     Column {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
-                            name: SeaRc::new(Alias::new("tea_enum")),
+                            name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SeaRc::new(Alias::new("everyday_tea")),
-                                SeaRc::new(Alias::new("breakfast_tea")),
+                                SharedIden::new(Alias::new("everyday_tea")),
+                                SharedIden::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2286,10 +2287,10 @@ mod tests {
                     Column {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
-                            name: SeaRc::new(Alias::new("tea_enum")),
+                            name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SeaRc::new(Alias::new("everyday_tea")),
-                                SeaRc::new(Alias::new("breakfast_tea")),
+                                SharedIden::new(Alias::new("everyday_tea")),
+                                SharedIden::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2299,10 +2300,10 @@ mod tests {
                     Column {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
-                            name: SeaRc::new(Alias::new("tea_enum")),
+                            name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SeaRc::new(Alias::new("everyday_tea")),
-                                SeaRc::new(Alias::new("breakfast_tea")),
+                                SharedIden::new(Alias::new("everyday_tea")),
+                                SharedIden::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2312,11 +2313,11 @@ mod tests {
                     Column {
                         name: "size".to_owned(),
                         col_type: ColumnType::Enum {
-                            name: SeaRc::new(Alias::new("tea_size")),
+                            name: SharedIden::new(Alias::new("tea_size")),
                             variants: vec![
-                                SeaRc::new(Alias::new("small")),
-                                SeaRc::new(Alias::new("medium")),
-                                SeaRc::new(Alias::new("huge")),
+                                SharedIden::new(Alias::new("small")),
+                                SharedIden::new(Alias::new("medium")),
+                                SharedIden::new(Alias::new("huge")),
                             ],
                         },
                         auto_increment: false,

@@ -43,8 +43,8 @@ impl ColumnTrait for Column {
     fn def(&self) -> ColumnDef {
         match self {
             Self::Id => ColumnType::Integer.def(),
-            Self::Floats => ColumnType::Array(RcOrArc::new(ColumnType::Float)).def(),
-            Self::Doubles => ColumnType::Array(RcOrArc::new(ColumnType::Double)).def(),
+            Self::Floats => ColumnType::Array(Arc::new(ColumnType::Float)).def(),
+            Self::Doubles => ColumnType::Array(Arc::new(ColumnType::Double)).def(),
         }
     }
 }

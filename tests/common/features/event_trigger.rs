@@ -67,6 +67,6 @@ impl ValueType for Events {
     }
 
     fn column_type() -> ColumnType {
-        ColumnType::Array(RcOrArc::new(ColumnType::String(StringLen::None)))
+        ColumnType::Array(Arc::new(ColumnType::String(StringLen::None)))
     }
 }

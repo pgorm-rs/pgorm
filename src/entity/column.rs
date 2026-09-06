@@ -1,6 +1,6 @@
 use crate::{EntityName, Iden, IdenStr, IntoSimpleExpr, Iterable};
 use pgorm_query::{
-    Alias, BinOper, DynIden, Expr, Func, IntoColumnRef, IntoIden, SeaRc, SelectStatement,
+    Alias, BinOper, DynIden, Expr, Func, IntoColumnRef, IntoIden, SelectStatement, SharedIden,
     SimpleExpr, Value, ValueType,
 };
 use std::str::FromStr;
@@ -102,12 +102,12 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
 
     /// Get the name of the entity the column belongs to
     fn entity_name(&self) -> DynIden {
-        SeaRc::new(Self::EntityName::default()) as DynIden
+        SharedIden::new(Self::EntityName::default()) as DynIden
     }
 
     /// get the name of the entity the column belongs to
     fn as_column_ref(&self) -> (DynIden, DynIden) {
-        (self.entity_name(), SeaRc::new(*self) as DynIden)
+        (self.entity_name(), SharedIden::new(*self) as DynIden)
     }
 
     /// The key this column occupies in a JSON object, as `serde` names it.

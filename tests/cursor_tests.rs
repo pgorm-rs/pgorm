@@ -1320,22 +1320,28 @@ async fn cursor_order_composition() -> Result<(), Error> {
 
     // Order columns are applied in declared order, so `(b, a)` sorts by `b`
     // first — the opposite grouping to `(a, b)`.
-    let table: DynIden = SeaRc::new(Entity);
+    let table: DynIden = SharedIden::new(Entity);
     let mut by_b_then_a = Entity::find().cursor_by((Column::B, Column::A));
     // A unary secondary entry breaks the remaining tie deterministically.
-    by_b_then_a.set_secondary_order_by(vec![(SeaRc::clone(&table), Column::Id.into_identity())]);
+    by_b_then_a.set_secondary_order_by(vec![(
+        SharedIden::clone(&table),
+        Column::Id.into_identity(),
+    )]);
     assert_eq!(ids(&by_b_then_a.first(4).all(&db).await?), [1, 4, 7, 2]);
 
     // The secondary entry follows the cursor's resolved direction too.
     let mut descending = Entity::find().cursor_by((Column::B, Column::A));
-    descending.set_secondary_order_by(vec![(SeaRc::clone(&table), Column::Id.into_identity())]);
+    descending.set_secondary_order_by(vec![(
+        SharedIden::clone(&table),
+        Column::Id.into_identity(),
+    )]);
     assert_eq!(ids(&descending.desc().first(3).all(&db).await?), [6, 3, 8]);
 
     // Only unary secondary entries are applied. A unary entry naming a column
     // that does not exist reaches the server and is rejected...
     let mut bad_unary = Entity::find().cursor_by(Column::A);
     bad_unary.set_secondary_order_by(vec![(
-        SeaRc::clone(&table),
+        SharedIden::clone(&table),
         Identity::Unary(alias("no_such_column").into_iden()),
     )]);
     assert!(matches!(
@@ -1347,7 +1353,7 @@ async fn cursor_order_composition() -> Result<(), Error> {
     // before the SQL is built, so the query succeeds.
     let mut composite_secondary = Entity::find().cursor_by(Column::A);
     composite_secondary.set_secondary_order_by(vec![(
-        SeaRc::clone(&table),
+        SharedIden::clone(&table),
         Identity::Binary(
             alias("no_such_column").into_iden(),
             alias("nor_this_one").into_iden(),
@@ -1428,10 +1434,13 @@ async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
 
     // Ordered by `b` then `id`, the rows run 1, 4, 7, 2, 5, 8, 3, 6 — three
     // runs of equal `b`.
-    let table: DynIden = SeaRc::new(Entity);
+    let table: DynIden = SharedIden::new(Entity);
     let by_b = || {
         let mut cursor = Entity::find().cursor_by(Column::B);
-        cursor.set_secondary_order_by(vec![(SeaRc::clone(&table), Column::Id.into_identity())]);
+        cursor.set_secondary_order_by(vec![(
+            SharedIden::clone(&table),
+            Column::Id.into_identity(),
+        )]);
         cursor
     };
 

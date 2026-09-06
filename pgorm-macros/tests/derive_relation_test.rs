@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use pgorm::entity::prelude::*;
-use pgorm::pgorm_query::{Alias, ConditionType, SeaRc};
+use pgorm::pgorm_query::{Alias, ConditionType, SharedIden};
 use pgorm::{Iden, Identity, RelationType};
 
 mod cake {
@@ -158,7 +158,10 @@ fn optional_keys_chain_onto_the_relation_builder() {
     // `on_condition` is wrapped in an `IntoCondition` closure taking the two
     // join-side idens.
     let on_condition = def.on_condition.expect("on_condition should be set");
-    let condition = on_condition(SeaRc::new(Alias::new("l")), SeaRc::new(Alias::new("r")));
+    let condition = on_condition(
+        SharedIden::new(Alias::new("l")),
+        SharedIden::new(Alias::new("r")),
+    );
     assert_eq!(
         condition,
         pgorm::pgorm_query::IntoCondition::into_condition(pgorm::pgorm_query::Expr::val(1).eq(1))

@@ -5,7 +5,8 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{Column, DateTimeCrate, EntityTransformer, Error};
-use pgorm_query::{Alias, ColumnDef, ColumnType, RcOrArc, StringLen, Table};
+use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen, Table};
+use std::sync::Arc;
 
 // [spec:pgorm:sem:codegen.entity.types+2/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
@@ -36,7 +37,7 @@ fn column_rust_types_follow_the_mapping_table() {
                     .not_null()
                     .to_owned(),
                 ColumnDef::new(Alias::new("c_nested_array"))
-                    .array(ColumnType::Array(RcOrArc::new(ColumnType::Integer)))
+                    .array(ColumnType::Array(Arc::new(ColumnType::Integer)))
                     .not_null()
                     .to_owned(),
                 // nullable: the same mapping, wrapped in `Option`
@@ -209,7 +210,7 @@ fn transform_rejects_column_type_outside_mapping() {
 fn column_conversion_rejects_unsupported_type() {
     for col_type in [
         ColumnType::Inet,
-        ColumnType::Array(RcOrArc::new(ColumnType::Inet)),
+        ColumnType::Array(Arc::new(ColumnType::Inet)),
     ] {
         let col_def = ColumnDef::new_with_type(Alias::new("address"), col_type).to_owned();
         match Column::try_from(&col_def) {

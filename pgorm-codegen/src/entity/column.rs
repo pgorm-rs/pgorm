@@ -164,7 +164,7 @@ impl Column {
                 }
                 ColumnType::Array(column_type) => {
                     let column_type = write_col_def(column_type);
-                    quote! { ColumnType::Array(RcOrArc::new(#column_type)) }
+                    quote! { ColumnType::Array(Arc::new(#column_type)) }
                 }
                 #[allow(unreachable_patterns)]
                 other => unreachable!(
@@ -330,7 +330,7 @@ impl TryFrom<&ColumnDef> for Column {
 #[cfg(test)]
 mod tests {
     use crate::{Column, DateTimeCrate};
-    use pgorm_query::{Alias, ColumnDef, ColumnType, SeaRc, StringLen};
+    use pgorm_query::{Alias, ColumnDef, ColumnType, SharedIden, StringLen};
     use proc_macro2::TokenStream;
     use quote::quote;
 
@@ -355,7 +355,7 @@ mod tests {
             make_col!("id", ColumnType::String(StringLen::None)),
             make_col!(
                 "cake_id",
-                ColumnType::Custom(SeaRc::new(Alias::new("cus_col")))
+                ColumnType::Custom(SharedIden::new(Alias::new("cus_col")))
             ),
             make_col!("CakeId", ColumnType::SmallInteger),
             make_col!("CakeId", ColumnType::Integer),

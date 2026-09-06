@@ -1,6 +1,7 @@
 use super::*;
 use crate::oracle::{assert_parses, assert_query_eq};
 use pgorm_query::extension::{Extension, Type};
+use std::sync::Arc;
 
 fn sweep(statements: impl IntoIterator<Item = String>) {
     for sql in statements {
@@ -576,7 +577,7 @@ fn sweep_column_type_vocabulary() {
         ColumnType::Json,
         ColumnType::JsonBinary,
         ColumnType::Uuid,
-        ColumnType::Array(RcOrArc::new(ColumnType::Integer)),
+        ColumnType::Array(Arc::new(ColumnType::Integer)),
         ColumnType::Vector(Some(3)),
         ColumnType::Cidr,
         ColumnType::Inet,

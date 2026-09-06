@@ -186,14 +186,14 @@ is what `EntityTrait::find()` produces.
 
 > [spec:pgorm:sem:query.build.alias]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
-> token (`[spec:pgorm:def:sql.types+4]`), not as a string repeated per site.
+> token (`[spec:pgorm:def:sql.types+5]`), not as a string repeated per site.
 > Every aliasing and referencing position on the builders takes it through the
 > existing conversions and needs no new one: the alias argument of `column_as`
 > / `expr_as` / `tbl_col_as`, the expression positions of `having`, `group_by`,
 > `order_by*` and `filter`, the qualifier of a `(table, column)` pair, the
 > table alias of `join_as` / `join_as_rev` / `from_alias`, a lateral join's
 > alias, a window name, and a CTE's name and columns. `alias` and `AliasName`
-> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+2]`).
+> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+3]`).
 >
 > Reaching the `Identity` positions — `column_as`'s alias, `cursor_by`, a
 > cursor's secondary ordering — takes one more impl, because `IntoIdentity`

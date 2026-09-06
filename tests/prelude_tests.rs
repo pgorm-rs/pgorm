@@ -36,7 +36,7 @@ async fn _paged<C: ConnectionTrait>(db: &C) -> Result<u64, Error> {
         .await
 }
 
-// [spec:pgorm:def:entity.prelude+2/test]    a query built, an active model set, a
+// [spec:pgorm:def:entity.prelude+3/test]    a query built, an active model set, a
 // statement decoded and a column enumerated, with the prelude as the only import
 #[test]
 fn prelude_carries_what_a_query_needs() {

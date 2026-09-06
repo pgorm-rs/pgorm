@@ -3,7 +3,7 @@ use crate::{
 };
 use core::marker::PhantomData;
 use pgorm_query::{
-    Alias, ColumnRef, DynIden, Iden, Order, SeaRc, SelectExpr, SelectStatement, SimpleExpr,
+    Alias, ColumnRef, DynIden, Iden, Order, SelectExpr, SelectStatement, SharedIden, SimpleExpr,
 };
 
 macro_rules! select_def {
@@ -51,7 +51,7 @@ where
             match &sel.alias {
                 Some(alias) => {
                     let alias = format!("{}{}", pre, alias.to_string().as_str());
-                    sel.alias = Some(SeaRc::new(Alias::new(alias)));
+                    sel.alias = Some(SharedIden::new(Alias::new(alias)));
                 }
                 None => {
                     // An entry with neither an alias nor a column to name
@@ -68,7 +68,7 @@ where
                     };
                     if let Some(col) = col {
                         let alias = format!("{}{}", pre, col.to_string().as_str());
-                        sel.alias = Some(SeaRc::new(Alias::new(alias)));
+                        sel.alias = Some(SharedIden::new(Alias::new(alias)));
                     }
                 }
             };
@@ -157,7 +157,7 @@ where
         let alias = format!("{}{}", SelectB.as_str(), col.as_str());
         selector.query().expr(SelectExpr::new_as(
             col.select_as(col.into_expr()),
-            SeaRc::new(Alias::new(alias)),
+            SharedIden::new(Alias::new(alias)),
         ));
     }
 }

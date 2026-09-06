@@ -100,7 +100,7 @@ of the crate, compiled in every build. Rules are grouped under
 > signatures —, `lag`, `lead`, `first`, `last`).
 >
 > `as_(name)` names a projected expression. The name is an `AliasName` token
-> (`[spec:pgorm:def:sql.types+4]`) when anything refers back to it, and a
+> (`[spec:pgorm:def:sql.types+5]`) when anything refers back to it, and a
 > bare `&'static str` when nothing does — `as_` takes `impl Into<AliasName>`
 > and both spell the same thing. A token declared once by `let rn =
 > alias("rn")` is also its own reference: it converts to an unqualified

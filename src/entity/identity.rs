@@ -1,5 +1,5 @@
 use crate::{ColumnTrait, EntityTrait, IdenStr};
-use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SeaRc, Value, ValueTuple};
+use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SharedIden, Value, ValueTuple};
 use std::fmt;
 
 /// List of column identifier
@@ -126,12 +126,12 @@ impl ColumnPairs {
 
     /// The `from` side of every pair, as an [`Identity`].
     pub fn from_identity(&self) -> Identity {
-        self.side_identity(|pair| SeaRc::clone(&pair.0))
+        self.side_identity(|pair| SharedIden::clone(&pair.0))
     }
 
     /// The `to` side of every pair, as an [`Identity`].
     pub fn to_identity(&self) -> Identity {
-        self.side_identity(|pair| SeaRc::clone(&pair.1))
+        self.side_identity(|pair| SharedIden::clone(&pair.1))
     }
 
     fn side_identity<F>(&self, col: F) -> Identity
@@ -217,7 +217,7 @@ impl IntoIdentity for &str {
     type ValueType = Value;
 
     fn into_identity(self) -> Identity {
-        Identity::Unary(SeaRc::new(Alias::new(self)))
+        Identity::Unary(SharedIden::new(Alias::new(self)))
     }
 }
 

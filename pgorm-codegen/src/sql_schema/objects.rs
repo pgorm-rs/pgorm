@@ -121,7 +121,7 @@ fn index_type(access_method: &str) -> Option<IndexType> {
         "" | "btree" => None,
         "hash" => Some(IndexType::Hash),
         "gin" => Some(IndexType::FullText),
-        other => Some(IndexType::Custom(pgorm_query::SeaRc::new(Alias::new(
+        other => Some(IndexType::Custom(pgorm_query::SharedIden::new(Alias::new(
             other,
         )))),
     }

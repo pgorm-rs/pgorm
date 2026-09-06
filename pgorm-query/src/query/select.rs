@@ -778,7 +778,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table_as: DynIden = SeaRc::new(Alias::new("char"));
+    /// let table_as: DynIden = SharedIden::new(Alias::new("char"));
     ///
     /// let query = Query::select()
     ///     .from_as(Char::Table, table_as.clone())
@@ -1244,7 +1244,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: DynIden = SeaRc::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: DynIden = SharedIden::new(Alias::new("sub_glyph"));
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)
@@ -1306,7 +1306,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: DynIden = SeaRc::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: DynIden = SharedIden::new(Alias::new("sub_glyph"));
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)

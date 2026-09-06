@@ -2,7 +2,7 @@ use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_tabl
 use core::marker::PhantomData;
 use pgorm_query::{
     Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden, JoinType,
-    SeaRc, TableForeignKey, alias,
+    SharedIden, TableForeignKey, alias,
 };
 use std::fmt::Debug;
 
@@ -96,7 +96,10 @@ fn debug_on_condition(
         Some(func) => {
             d.field(
                 "on_condition",
-                &func(SeaRc::new(alias("left")), SeaRc::new(alias("right"))),
+                &func(
+                    SharedIden::new(alias("left")),
+                    SharedIden::new(alias("right")),
+                ),
             );
         }
         None => {
@@ -456,12 +459,12 @@ macro_rules! foreign_key_from_relation {
         let (from, to) = $relation.columns.first();
         let mut foreign_key = <$ty>::new(
             from_tbl.clone(),
-            SeaRc::clone(from),
+            SharedIden::clone(from),
             to_tbl,
-            SeaRc::clone(to),
+            SharedIden::clone(to),
         );
         for (from, to) in $relation.columns.iter().skip(1) {
-            foreign_key.col(SeaRc::clone(from), SeaRc::clone(to));
+            foreign_key.col(SharedIden::clone(from), SharedIden::clone(to));
         }
         if let Some(action) = $relation.on_delete {
             foreign_key.on_delete(action);

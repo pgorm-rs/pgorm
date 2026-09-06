@@ -493,7 +493,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+2]
+> [spec:pgorm:def:entity.prelude+3]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -511,8 +511,8 @@ explicit limitations.
 > connection types `DatabasePool`, `DatabaseConnection`, `DatabaseTransaction`,
 > `ConnectionTrait`, `TransactionTrait`; `Iterable`, `Condition`, `JoinType`,
 > `Value`, the `error` module's contents, and the handful of `pgorm_query`
-> names an entity definition needs (`Expr`, `DynIden`, `SeaRc`, `StringLen`,
-> `ForeignKeyAction`, `RcOrArc`).
+> names an entity definition needs (`Expr`, `DynIden`, `SharedIden`, `StringLen`,
+> `ForeignKeyAction`, `Arc`).
 >
 > `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.
 > `order` is an ordinary table name, so an entity aliased `Order` is ordinary

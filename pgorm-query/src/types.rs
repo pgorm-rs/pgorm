@@ -1,14 +1,12 @@
 //! Base types used throughout pgorm-query.
 
 use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*};
-use std::{fmt, mem, ops};
-
-pub use std::sync::Arc as RcOrArc;
+use std::{fmt, mem, ops, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
-// [spec:pgorm:def:sql.types+4]
+// [spec:pgorm:def:sql.types+5]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
@@ -42,15 +40,14 @@ macro_rules! iden_trait {
 
 iden_trait!(Send, Sync);
 
-pub type DynIden = SeaRc<dyn Iden>;
-
+/// A shared, type-erased identifier: an `Arc<dyn Iden>` that can be compared.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SeaRc<I>(pub(crate) RcOrArc<I>)
-where
-    I: ?Sized;
+pub struct SharedIden(Arc<dyn Iden>);
 
-impl ops::Deref for SeaRc<dyn Iden> {
+pub type DynIden = SharedIden;
+
+impl ops::Deref for SharedIden {
     type Target = dyn Iden;
 
     fn deref(&self) -> &Self::Target {
@@ -58,14 +55,14 @@ impl ops::Deref for SeaRc<dyn Iden> {
     }
 }
 
-impl Clone for SeaRc<dyn Iden> {
-    fn clone(&self) -> SeaRc<dyn Iden> {
-        SeaRc(RcOrArc::clone(&self.0))
+impl Clone for SharedIden {
+    fn clone(&self) -> SharedIden {
+        SharedIden(Arc::clone(&self.0))
     }
 }
 
-// [spec:pgorm:def:sql.types+4]
-impl PartialEq for SeaRc<dyn Iden> {
+// [spec:pgorm:def:sql.types+5]
+impl PartialEq for SharedIden {
     fn eq(&self, other: &Self) -> bool {
         let (self_vtable, other_vtable) = unsafe {
             let (_, self_vtable) = mem::transmute::<&dyn Iden, (usize, usize)>(&*self.0);
@@ -76,12 +73,12 @@ impl PartialEq for SeaRc<dyn Iden> {
     }
 }
 
-impl SeaRc<dyn Iden> {
-    pub fn new<I>(i: I) -> SeaRc<dyn Iden>
+impl SharedIden {
+    pub fn new<I>(i: I) -> SharedIden
     where
         I: Iden + 'static,
     {
-        SeaRc(RcOrArc::new(i))
+        SharedIden(Arc::new(i))
     }
 }
 
@@ -530,7 +527,7 @@ where
     T: Iden,
 {
     fn into_iden(self) -> DynIden {
-        SeaRc::new(self)
+        SharedIden::new(self)
     }
 }
 
@@ -540,17 +537,17 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+4]
+// [spec:pgorm:def:sql.types+5]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
-        SeaRc::new(Alias::new(self))
+        SharedIden::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+4]
+// [spec:pgorm:def:sql.types+5]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
-        SeaRc::new(Alias::new(self))
+        SharedIden::new(Alias::new(self))
     }
 }
 
@@ -854,7 +851,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+4/test]
+    // [spec:pgorm:def:sql.types+5/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -869,7 +866,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+4/test]
+    // [spec:pgorm:def:sql.types+5/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

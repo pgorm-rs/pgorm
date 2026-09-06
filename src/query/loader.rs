@@ -6,7 +6,7 @@ use crate::{
 use async_trait::async_trait;
 use pgorm_query::{
     Alias, AliasName, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, IntoIden, JoinType,
-    NamedTable, SeaRc, SelectExpr, SimpleExpr, TableName, ValueTuple, alias,
+    NamedTable, SelectExpr, SharedIden, SimpleExpr, TableName, ValueTuple, alias,
 };
 use std::{collections::HashMap, str::FromStr};
 
@@ -267,14 +267,14 @@ where
         // The source table is joined back in under an alias, so a
         // self-referencing many-to-many does not name one table twice, and the
         // key predicate qualifies against the alias rather than the table.
-        let src_alias: DynIden = SeaRc::new(LOADER_SOURCE_ALIAS);
-        let src_tbl = FromItem::from(TableName::Table(SeaRc::clone(&src_alias)));
+        let src_alias: DynIden = SharedIden::new(LOADER_SOURCE_ALIAS);
+        let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
         let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
 
         let select = stmt
             .into_select()
             .join_rev(JoinType::InnerJoin, rel_def)
-            .join_as_rev(JoinType::InnerJoin, via_rel, SeaRc::clone(&src_alias));
+            .join_as_rev(JoinType::InnerJoin, via_rel, SharedIden::clone(&src_alias));
         let select = <Select<R> as QueryFilter>::filter(select, condition);
 
         // The input entity's own columns are what carries the key back out of
@@ -284,10 +284,10 @@ where
             SelectTwo::new_without_prepare(select.apply_alias(SelectA.as_str()).into_query());
         for col in <<<M as ModelTrait>::Entity as EntityTrait>::Column as Iterable>::iter() {
             let col_alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((SeaRc::clone(&src_alias), col.into_iden()));
+            let expr = Expr::col((SharedIden::clone(&src_alias), col.into_iden()));
             QuerySelect::query(&mut select_two).expr(SelectExpr::new_as(
                 col.select_as(expr),
-                SeaRc::new(Alias::new(col_alias)),
+                SharedIden::new(Alias::new(col_alias)),
             ));
         }
 
