@@ -94,16 +94,36 @@ These rules capture what the code does today, including known gaps.
 > every entity model reads it, so the second arises only for a projection
 > that leaves the key out.
 
-> [spec:pgorm:def:exec.decode.types+1]
+> [spec:pgorm:def:exec.decode.types+2]
 > The scalar Rust types implementing `TryGetable` by direct delegation to
 > `Row::try_get` (and therefore accepting exactly the Postgres types
 > tokio-postgres's `FromSql` accepts for them) are: `bool`, `i8`, `i16`,
-> `i32`, `i64`, `f32`, `f64`, `String`, and `Vec<u8>`.
+> `i32`, `i64`, `f32`, `f64`, `String`, `Vec<u8>`, and
+> `rust_decimal::Decimal`.
+>
+> `Decimal` is not feature-gated, and `rust_decimal` is a required
+> dependency of `pgorm` rather than an optional one, because
+> `[spec:pgorm:def:exec.cursor.binding+4]`'s bind path is always compiled
+> and needs `Decimal`'s `ToSql` in every configuration — both for
+> `Value::Decimal`, an unconditional variant of the value model
+> (`[spec:pgorm:def:sql.value+2]`), and for the `numeric` arm of
+> `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which is how *every*
+> integer and float reaches a `numeric` placeholder. `rust_decimal` is
+> compiled in any case, `pgorm-query` depending on it unconditionally; only
+> this edge turns on the `db-tokio-postgres` feature that carries the impl.
+> A `with-rust_decimal` feature would therefore gate nothing it claimed to,
+> and turning it off did not drop a dependency — it only failed to build.
 >
 > Feature-gated additions: `serde_json::Value` (`with-json`);
 > `chrono::NaiveDate`, `NaiveTime`, `NaiveDateTime`,
 > `DateTime<FixedOffset>`, `DateTime<Utc>`, `DateTime<Local>`
-> (`with-chrono`); `rust_decimal::Decimal` (`with-rust_decimal`).
+> (`with-chrono`). These three features are weaker than they look for the
+> same reason — the underlying types are unconditional in `pgorm-query` and
+> their `FromSql`/`ToSql` impls come from `postgres-types` through
+> tokio-postgres's own always-on features — so what they gate is the
+> conversion surface, not the dependency. They still build with the feature
+> off, which is why they remain.
+>
 > There is no time-crate or bigdecimal support: chrono is the only
 > datetime path and `Decimal` the only arbitrary-precision numeric.
 > With `with-uuid`, `uuid::Uuid` and its format wrappers

@@ -3772,6 +3772,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-06, finding 1, severity P1 (review severity, not a planning-pass pin). Confirmed on d778f24b despite 1,182 existing workspace tests passing. Source: src/executor/cursor.rs:701-822, especially Value::String at 721 and accepts() returning true. Reproduction: (\"SELECT $1::int4\", Values(vec![\"1234\".into()])).into_tuple::<i32>().one(&db) returns Ok(825373492), interpreting ASCII bytes as the int4 wire representation. The same ValueHolder path serves writes and predicates. Acceptance: reject incompatible Value/target representations through the existing error channel before execution; retain deliberate numeric coercions and supported enum/domain/array encodings; add live mismatched-bind tests proving no wrong row is selected or written, plus valid-binding controls. Spec impact: revise [spec:pgorm:req:exec.cursor.binding-gaps] v2 and related [spec:pgorm:def:exec.cursor.binding] to replace the claim that remaining mismatches are always reported by the server; review [spec:pgorm:req:exec.cursor.binding-coerce] fallback behavior. Follow-up to completed orm.binding-types, whose numeric fixes do not close this nonnumeric gap. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_wire_types; this note is sufficient to recreate it if the temporary file expires."
                     }
+
+                    {
+                        at 2026-09-06T12:31:53.446847Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3896,6 +3903,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Adversarial review 2026-09-06, finding 7, severity P2. Confirmed on d778f24b with cargo check -p pgorm --no-default-features --lib. Cargo.toml:46 declares rust_decimal optional, but src/executor/cursor.rs:586 imports Decimal unconditionally and the numeric/Value::Decimal binding paths require its ToSql implementation. The command fails with E0432 at the import and E0599 at the Decimal serialization arm. Acceptance: reconcile dependency/feature declarations with the always-built ValueHolder path so the documented minimal library build succeeds; retain the default build and supported numeric coercions; check minimal, macros-only, explicit Decimal-enabled and default configurations without dev-dependency feature unification hiding missing gates. Record the chosen dependency/feature contract in repository documentation or an appropriate spec when implementing. Follow-up to repair.features and orm.binding-types; repair.tests-crates already noted this latent feature rot but no open node tracks it. No production code or spec changes are part of this boarding action."
+                    }
+
+                    {
+                        at 2026-09-06T12:31:55.569282Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

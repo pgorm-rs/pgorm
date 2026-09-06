@@ -93,11 +93,10 @@ pub type ChronoDateTimeUtc = chrono::DateTime<chrono::Utc>;
 #[cfg(feature = "with-chrono")]
 pub type ChronoDateTimeLocal = chrono::DateTime<chrono::Local>;
 
-#[cfg(feature = "with-rust_decimal")]
 pub use rust_decimal::Decimal;
 
 #[cfg(feature = "with-uuid")]
 pub use uuid::Uuid;
 
-// [spec:pgorm:def:exec.decode.types+1]
+// [spec:pgorm:def:exec.decode.types+2]
 pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};

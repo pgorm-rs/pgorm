@@ -947,8 +947,8 @@ mod net_cursor {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:req:exec.cursor.binding-gaps+2/test]
-// [spec:pgorm:def:exec.cursor.binding+3/test]    `IpNetwork` and `MacAddress`
+// [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+// [spec:pgorm:def:exec.cursor.binding+4/test]    `IpNetwork` and `MacAddress`
 // bound by hand through `postgres_protocol`, and the deliberately permissive
 // `accepts`
 #[pgorm_macros::test]

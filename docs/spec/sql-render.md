@@ -124,7 +124,7 @@ an ideal Postgres renderer would emit.
 > A pin names a type the value can be *bound* as, not necessarily the type its
 > own `ToSql` impl would name: `TinyInt` pins to `int2` — rather than to the
 > one-byte `"char"` an `i8` binds as by default — because the numeric coercion
-> of `[spec:pgorm:req:exec.cursor.binding-coerce+1]` widens it, and because
+> of `[spec:pgorm:req:exec.cursor.binding-coerce+2]` widens it, and because
 > `CAST($1::int2 AS text)` yields the digits of the number where
 > `CAST($1::"char" AS text)` would yield the character with that code point.
 > `Unsigned` pins to `int8` rather than `oid` for the same reason. The one

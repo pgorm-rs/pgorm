@@ -147,7 +147,7 @@ async fn partial_model_select() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:exec.cursor.binding-coerce+1/test]
+// [spec:pgorm:req:exec.cursor.binding-coerce+2/test]
 #[pgorm_macros::test]
 async fn integer_operand_against_float_column() -> Result<(), Error> {
     let ctx = TestContext::new("partial_model_int_operand_bindtypes").await;

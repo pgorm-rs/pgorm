@@ -61,7 +61,7 @@ fn models() -> Vec<net_decode::Model> {
     ]
 }
 
-// [spec:pgorm:def:exec.decode.types+1/test]
+// [spec:pgorm:def:exec.decode.types+2/test]
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_valuedecode").await;
@@ -79,8 +79,8 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.types+1/test]
-// [spec:pgorm:def:exec.cursor.binding+3/test]    `IpNetwork` and `MacAddress`
+// [spec:pgorm:def:exec.decode.types+2/test]
+// [spec:pgorm:def:exec.cursor.binding+4/test]    `IpNetwork` and `MacAddress`
 // values, and a `None` payload emitted as SQL NULL, bound through `ValueHolder`
 async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Error> {
     for model in models() {
@@ -102,7 +102,7 @@ async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Erro
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.types+1/test]
+// [spec:pgorm:def:exec.decode.types+2/test]
 async fn decode_inet_and_macaddr_as_tuple(db: &DatabaseConnection) -> Result<(), Error> {
     let decoded: Vec<(IpNetwork, MacAddress, Option<IpNetwork>)> = net_decode::Entity::find()
         .select([
@@ -592,7 +592,7 @@ mod big_counter {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:req:exec.cursor.binding-coerce+1/test]    a `u64` reaches the
+// [spec:pgorm:req:exec.cursor.binding-coerce+2/test]    a `u64` reaches the
 // server through a checked `i64::try_from`: one above `i64::MAX` is refused by
 // the client rather than wrapping to a negative `int8` that would match the
 // wrong rows, and one below it binds exactly

@@ -4,8 +4,8 @@ pgorm offers two pagination mechanisms: keyset ("cursor") pagination over
 ordered columns (`src/executor/cursor.rs`) and classic LIMIT/OFFSET page
 pagination (`src/executor/paginator.rs`). The cursor module also defines
 `ValueHolder`, the `ToSql` adapter used by every executor path to bind
-`pgorm_query::Value` parameters. These rules capture current behavior,
-including the remaining gaps in parameter binding.
+`pgorm_query::Value` parameters, and with it the wire-type contract every
+bound parameter is held to.
 
 ## Cursor pagination (`exec.cursor`)
 
@@ -133,7 +133,7 @@ including the remaining gaps in parameter binding.
 > installs the first entity's), so a joined cursor is totally ordered and
 > can be resumed mid-tie through `after_with` / `before_with`.
 
-> [spec:pgorm:def:exec.cursor.binding+3]
+> [spec:pgorm:def:exec.cursor.binding+4]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
 > implementing `tokio_postgres::types::ToSql`; every executor path
 > (select, insert, update, delete, cursor, paginator) wraps built
@@ -141,11 +141,10 @@ including the remaining gaps in parameter binding.
 > `Bool` to the primitive `bool` impl; the integer variants
 > (`TinyInt`/`SmallInt`/`Int`/`BigInt`/`Unsigned`/`BigUnsigned`) and the
 > float variants (`Float`/`Double`) through the numeric coercion of
-> `[spec:pgorm:req:exec.cursor.binding-coerce+1]`, which falls back to the
-> corresponding primitive impl when the inferred type is outside the
-> numeric family — `Unsigned` (u32) to tokio-postgres's `u32` impl (which
-> targets `OID`), `BigUnsigned` (u64) through a checked conversion to `i64`;
-> `Char` is stringified; `String`, `Bytes`, `Json`, the chrono
+> `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which also covers the
+> `oid` and `"char"` targets the corresponding primitive impls define —
+> `BigUnsigned` (u64) reaching all of them through a checked conversion to
+> `i64`; `Char` is stringified; `String`, `Bytes`, `Json`, the chrono
 > date/time variants, `Uuid`, and `Decimal` bind their payload, with
 > `None` payloads emitted as SQL `NULL` (`IsNull::Yes`); `Array`
 > recursively wraps its elements in `ValueHolder` (a `None` array is
@@ -163,17 +162,15 @@ including the remaining gaps in parameter binding.
 > formats are written by hand using the same helpers `postgres-types` uses
 > for its own `cidr`/`eui48` support.
 >
-> `accepts` returns `true` for every Postgres type. This is deliberate, not
-> an oversight: a `Value` carries no target type, and the types it
-> legitimately binds against include ones no client-side check could
-> enumerate — every enum and domain whose binary format is the text of its
-> label among them — so a faithful `accepts` would reject working queries.
-> The whole burden therefore sits in `to_sql`, which converts within the
-> numeric family, errors on a numeric conversion it cannot make exactly,
-> and writes every other variant in its own binary format, leaving genuine
-> mismatches to be reported by the server at execution time.
+> `accepts` returns `true` for every Postgres type — not because every type
+> is bindable, but because `accepts` is a static method with no access to
+> the `Value` whose representation is the question. The acceptance decision
+> is per-variant, so it lives where the variant is in hand: `to_sql`, which
+> `to_sql_checked!` reaches and which runs client-side while the bind
+> message is being encoded, before anything is sent. What it accepts is
+> `[spec:pgorm:req:exec.cursor.binding-accepts]`.
 
-> [spec:pgorm:req:exec.cursor.binding-coerce+1]
+> [spec:pgorm:req:exec.cursor.binding-coerce+2]
 > When the Postgres type inferred for a placeholder is in the numeric
 > family (`int2`, `int4`, `int8`, `float4`, `float8`, `numeric`),
 > `ValueHolder::to_sql` MUST bind an integer- or float-valued `Value` in
@@ -200,41 +197,131 @@ including the remaining gaps in parameter binding.
 >   not representable. Binding a float against an integer type is an
 >   error rather than a silent truncation.
 >
-> Any other inferred type falls through to the variant's own `ToSql` impl,
-> so a `Unsigned` bound against `OID` and a `TinyInt` bound against
-> `"char"` keep the encodings those impls define. Because `Value::Array`
+> Two further integer targets are converted the same checked way rather
+> than fallen through to a primitive impl: `oid` through `u32::try_from`
+> and `"char"` through `i8::try_from`, so a `Unsigned` bound against `oid`
+> and a `TinyInt` bound against `"char"` keep the encodings those impls
+> define while a value that does not fit is an error instead of a
+> reinterpretation. Every *other* inferred type is refused by
+> `[spec:pgorm:req:exec.cursor.binding-accepts]`: an integer or a float has
+> no representation `bytea`, `text`, `bool` or `uuid` could receive, and
+> writing one anyway is what let a mismatch through. Because `Value::Array`
 > binds through `Vec<ValueHolder>`, which hands each element the array's
-> member type, the same conversions apply element-wise.
+> member type, both the conversions and the refusal apply element-wise.
 >
 > This is what makes an integer operand work against a floating-point
 > column: `Expr::col(c).mul(2)` renders `"c" * $1`, for which Postgres
 > infers `$1 :: float8`, and the `Int` value is written as a `float8`
 > instead of producing an `08P01` protocol error.
 
-> [spec:pgorm:req:exec.cursor.binding-gaps+2]
-> `ValueHolder`'s `ToSql` implementation MUST bind every `Value` variant:
-> no arm may `panic!`, `unimplemented!` or `todo!`. The former panicking
-> arms are gone. `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned`
-> (u16) no longer exist as variants at all (see
-> `[spec:pgorm:def:sql.value+2]`), so passing a `u8` or `u16` is a compile
-> error rather than a runtime panic; `Value::Vector`, `Value::IpNetwork`
-> and `Value::MacAddress` bind per `[spec:pgorm:def:exec.cursor.binding+3]`.
+> [spec:pgorm:req:exec.cursor.binding-gaps+3]
+> `ValueHolder`'s `ToSql` implementation MUST reach every `Value` variant:
+> no arm may `panic!`, `unimplemented!` or `todo!`, and no arm may reach a
+> panic in a delegate. The former panicking arms are gone.
+> `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned` (u16) no longer
+> exist as variants at all (see `[spec:pgorm:def:sql.value+2]`), so passing
+> a `u8` or `u16` is a compile error rather than a runtime panic;
+> `Value::Vector`, `Value::IpNetwork` and `Value::MacAddress` bind per
+> `[spec:pgorm:def:exec.cursor.binding+4]`.
 >
-> Two limitations remain, neither of which panics. The commented-out
+> The `Array` arm is where the delegate clause bites: `Vec<T>`'s own
+> `to_sql` reads its member type out of `Kind::Array` and `panic!`s on
+> anything else, so the arm MUST establish that the target is an array
+> itself and raise the refusal of
+> `[spec:pgorm:req:exec.cursor.binding-accepts]` when it is not. A
+> `Value::Array` against a scalar placeholder is reachable — an active
+> model whose column type is a scalar `jsonb` but whose Rust field is a
+> `Vec` produces exactly that when the JSON-flattening branch of
+> `cast_enum_as` is compiled out — so this is a live path, not a
+> defensive one.
+>
+> One vestige remains, which was never reachable: the commented-out
 > time-crate arms (`TimeDate`, `TimeTime`, `TimeDateTime`,
-> `TimeDateTimeWithTimeZone`) are vestigial — this fork's `Value` has no
-> such variants, so there is nothing to bind. And outside the numeric
-> family of `[spec:pgorm:req:exec.cursor.binding-coerce+1]` the inferred
-> type is still ignored: every other variant is written in its own binary
-> format whatever Postgres inferred, so a `String` bound against a `bytea`
-> placeholder is reported by the server, not the client.
+> `TimeDateTimeWithTimeZone`). This fork's `Value` has no such variants, so
+> there is nothing to bind.
 >
-> The standing example of that gap used to be `bits_tests`, where saving
-> an integer into a `BIT(n)` column made Postgres infer `bit` for a
-> parameter the driver wrote as an `int8` (`22P03`). It is no longer one:
+> An inferred type outside the numeric family is no longer ignored. It was:
+> every non-numeric variant used to be written in its own binary format
+> whatever Postgres inferred, and the claim that the server would report
+> the difference was false — `"1234"` bound to an `int4` placeholder was
+> accepted by the server and read as 825373492, the integer those four
+> ASCII bytes spell. The same path serves predicates and writes, so a
+> mismatch selected and stored wrong values rather than erroring.
+> `[spec:pgorm:req:exec.cursor.binding-accepts]` closes it.
+>
+> `bits_tests` used to be the standing example of the gap, where saving an
+> integer into a `BIT(n)` column made Postgres infer `bit` for a parameter
+> the driver wrote as an `int8` (`22P03`). It is no longer one:
 > `[spec:pgorm:req:sql.render.cast-param-type]` pins a cast operand's
 > placeholder to the type the value is actually written as, and the test
 > runs unignored.
+
+> [spec:pgorm:req:exec.cursor.binding-accepts]
+> A `Value` MUST NOT be written into a placeholder whose inferred Postgres
+> type its binary representation is not the wire format of.
+> `ValueHolder::to_sql` decides this per variant and raises a `ToSql` error
+> — `` cannot bind a `<Variant>` value to Postgres type `<type>` `` — which
+> tokio-postgres surfaces while encoding the bind message, so the statement
+> never reaches the server. The failure arrives as an `Error::Postgres`
+> carrying no `DbError`, the same shape as any other encoding failure (see
+> `[spec:pgorm:sem:error.model.sql-class+3]`).
+>
+> The question the check asks is about *representation*, not about meaning.
+> A type is accepted when the bytes this variant writes are the bytes that
+> type is sent in; whether they mean what the caller intended is the
+> caller's business. That is why `timestamp` and `timestamptz` are
+> interchangeable below and why the numeric family is a family.
+>
+> Two things are transparent to the decision:
+>
+> - **Domains.** A domain's values are sent in the representation of the
+>   type it is built over, so both the acceptance check and the encoding
+>   are made against the base type, unwrapped transitively. Only the
+>   diagnostic names the type as the schema declares it, so a refusal on a
+>   `positive_int` says `positive_int`, not `int4`.
+> - **`NULL`.** A `None` payload is sent as a length of -1 with no bytes at
+>   all. Having no representation, it has none to mismatch, and binds
+>   against whatever type Postgres inferred.
+>
+> The accepted targets, per variant:
+>
+> | `Value` variant | accepted Postgres types |
+> | --- | --- |
+> | `Bool` | `bool` |
+> | `TinyInt`, `SmallInt`, `Int`, `BigInt`, `Unsigned`, `BigUnsigned` | `int2`, `int4`, `int8`, `oid`, `"char"`, `float4`, `float8`, `numeric` — converted per `[spec:pgorm:req:exec.cursor.binding-coerce+2]` |
+> | `Float`, `Double` | `float4`, `float8`, `numeric`; `int2`/`int4`/`int8` are a distinct "without loss" refusal rather than a representation mismatch |
+> | `String`, `Char` | `text`, `varchar`, `bpchar`, `name`, `xml`, `unknown`; every enum (a label is sent as its own text); and `citext`, `ltree`, `lquery`, `ltxtquery` — the text-backed extension types `postgres-types` itself names |
+> | `Bytes` | `bytea` |
+> | `Json` | `json`, `jsonb` |
+> | `ChronoDate` | `date` |
+> | `ChronoTime` | `time` |
+> | `ChronoDateTime`, `ChronoDateTimeUtc`, `ChronoDateTimeLocal`, `ChronoDateTimeWithTimeZone` | `timestamp`, `timestamptz` |
+> | `Uuid` | `uuid` |
+> | `Decimal` | `numeric` |
+> | `Array` | any array type; each element is then held to the member type by the same rule |
+> | `Vector` | a type named `vector` |
+> | `IpNetwork` | `inet`, `cidr` |
+> | `MacAddress` | `macaddr` |
+>
+> All four chrono datetime variants take `timestamp` and `timestamptz`
+> alike because the two share one representation — microseconds since
+> 2000-01-01 — and differ only in whether that instant is read as a wall
+> clock or as UTC. `postgres-types` draws the line in the same place for
+> its own `SystemTime` impl. A `Value`-level check cannot tell the two
+> apart and MUST NOT pretend to.
+>
+> Two consequences are deliberate. Postgres `money` is an `int8` on the
+> wire, not a `numeric`, so a `Decimal` bound against it is now refused
+> rather than writing `numeric` bytes into a parameter that would read them
+> as a 64-bit integer; codegen maps a `money` column to `Decimal`
+> (`pgorm-codegen/src/entity/column.rs`), so this turns a silent corruption
+> into an error at the bind. And a column whose `save_as` cast does not
+> reach its operand — `eq_any` over a `save_as` column, or a cursor keyset
+> filter, both of which build the predicate on a raw `Expr` — leaves the
+> placeholder typed by the column rather than by the cast, and a variant
+> that does not match it is refused where it previously produced a server
+> error or wrong bytes.
+
 
 ## Offset pagination (`exec.paginator`)
 

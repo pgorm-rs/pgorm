@@ -30,4 +30,4 @@ tracing = { version = "0.1.44", default-features = false, features = ["log"] }
 
 [dev-dependencies]
 pretty_assertions = { version = "1.4" }
-pgorm = { path = "../", default-features = false, features = ["macros", "with-rust_decimal"] }
+pgorm = { path = "../", default-features = false, features = ["macros"] }

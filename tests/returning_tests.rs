@@ -15,7 +15,7 @@ fn params(holders: &[ValueHolder]) -> Vec<&(dyn ToSql + Sync)> {
     holders.iter().map(|v| v as &(dyn ToSql + Sync)).collect()
 }
 
-// [spec:pgorm:def:exec.cursor.binding+3/test]    every built statement value is
+// [spec:pgorm:def:exec.cursor.binding+4/test]    every built statement value is
 // wrapped in `ValueHolder` for binding — here `String`, `Double` and `Int`
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {

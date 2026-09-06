@@ -43,7 +43,13 @@ tokio-postgres.workspace = true
 chrono = { version = "0.4.45", default-features = false, optional = true }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 log = { version = "0.4.34", default-features = false }
-rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-features = false, optional = true }
+# Required, not optional. `Value::Decimal` is an unconditional variant of
+# `pgorm-query`'s value model and the `ValueHolder` bind path is always built,
+# so `Decimal` has to be bindable in every configuration — its `numeric`
+# encoding is also how every integer and float reaches a `numeric` placeholder.
+# `db-tokio-postgres` carries that `ToSql` impl and only this dependency edge
+# turns it on; `pgorm-query` takes the same crate without it.
+rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-features = false }
 pg_query = "6.2.0"
 pgorm-macros = { version = "0.2.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
 pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro" }
@@ -80,7 +86,6 @@ default = [
     "macros",
     "with-json",
     "with-chrono",
-    "with-rust_decimal",
     "postgres-array",
     "with-uuid",
     "runtime-tokio",
@@ -93,7 +98,6 @@ macros = ["pgorm-macros/derive"]
 metrics-fingerprint = []
 with-json = ["serde_json", "chrono?/serde", "uuid?/serde"]
 with-chrono = ["chrono"]
-with-rust_decimal = ["rust_decimal"]
 with-uuid = ["uuid"]
 postgres-array = []
 pgorm-internal = []
