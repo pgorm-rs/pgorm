@@ -674,6 +674,11 @@ impl_evidence (
         {impl_name main, rule query.graph.terminals}
         {impl_name main, rule query.graph.writer}
     )}
+    {id cursor, covered_rules (
+        query.graph.cursor
+    ), covered_claims (
+        {impl_name main, rule query.graph.cursor}
+    )}
     {id decide.migration, covered_rules (
         migration.name
         migration.runner

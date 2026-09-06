@@ -28,8 +28,8 @@ use pgorm_query::{
 
 use super::helper::join_condition;
 use crate::{
-    ColumnTrait, EntityTrait, Error, FromQueryResult, IdenStr, Iterable, QueryFilter, QueryOrder,
-    QueryResult, QueryTrait, Related, RelationDef,
+    ColumnTrait, EntityTrait, Error, FromQueryResult, IdenStr, Identity, Iterable,
+    PrimaryKeyToColumn, QueryFilter, QueryOrder, QueryResult, QueryTrait, Related, RelationDef,
 };
 
 /// The closure shape a call-site `ON` predicate takes: the join's left and
@@ -118,6 +118,114 @@ impl<F: EntityTrait> Slot for Opt<F> {
     }
 }
 
+/// The secondary order entries one decoded source contributes to a cursor's
+/// sort key: one unary entry per primary-key column.
+pub(crate) type Tiebreaks = Vec<(DynIden, Identity)>;
+
+/// One decoded source's primary key as cursor tiebreaks, qualified with the
+/// source's *effective* identifier — its bound alias when it has one — so a
+/// tiebreak names the same table the projection and the `ON` clause do.
+// [spec:pgorm:sem:query.graph.cursor]
+pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &DynIden) -> Tiebreaks {
+    <F::PrimaryKey as Iterable>::iter()
+        .map(|pk| {
+            (
+                SharedIden::clone(qualifier),
+                Identity::Unary(SharedIden::new(pk.into_column())),
+            )
+        })
+        .collect()
+}
+
+/// The declared slot tuple read as a list: what a cursor needs to install one
+/// tiebreak per decoded slot without a call site naming a column.
+///
+/// The declaration that fixed the joins fixes the tiebreak set, so the trait
+/// is sealed for the reason [`Slot`] is — an outside implementor could only
+/// make the two disagree. It is implemented for `()` and for every slot tuple
+/// the graph can declare.
+// [spec:pgorm:sem:query.graph.cursor]
+pub trait Slots: sealed::Sealed {
+    /// The primary-key tiebreaks of every declared slot except `skip`, in
+    /// declaration order.
+    ///
+    /// `qualifiers` holds the slots' effective identifiers in declaration
+    /// order — the root's is not among them — and slots are numbered from 1
+    /// as the projection prefixes are (`s1_` is the first slot), so
+    /// `skip == 0` skips nothing.
+    fn tiebreaks(qualifiers: &[DynIden], skip: usize) -> Tiebreaks;
+}
+
+/// The slot declared at position `I`, counted from 1 as the projection
+/// prefixes are: `s1_` is the first slot, the root being source 0.
+///
+/// This is how [`cursor_by_on`](crate::SelectGraph::cursor_by_on) names a
+/// slot — positionally, at compile time. A position no slot occupies has no
+/// implementation, so asking for it is a compile error rather than a silently
+/// mis-qualified column.
+// [spec:pgorm:sem:query.graph.cursor]
+pub trait SlotAt<const I: usize>: Slots {
+    /// The slot at that position, whose entity types the order columns.
+    type Slot: Slot;
+}
+
+/// A slotless graph declares no tiebreaks; its cursor is a single-table one.
+// [spec:pgorm:sem:query.graph.cursor]
+impl Slots for () {
+    fn tiebreaks(_qualifiers: &[DynIden], _skip: usize) -> Tiebreaks {
+        Tiebreaks::new()
+    }
+}
+
+impl sealed::Sealed for () {}
+
+/// Generate the `SlotAt` impls of one slot-tuple arity, one position per
+/// recursion, so each impl sees the whole tuple and the single slot it picks.
+macro_rules! slot_at {
+    ( ( $( $all:ident ),+ ) ; ) => {};
+    ( ( $( $all:ident ),+ ) ; $s:ident @ $i:literal $( , $rest:ident @ $ri:literal )* ) => {
+        // [spec:pgorm:sem:query.graph.cursor]
+        impl< $( $all: Slot ),+ > SlotAt<$i> for ( $( $all, )+ ) {
+            type Slot = $s;
+        }
+
+        slot_at!( ( $( $all ),+ ) ; $( $rest @ $ri ),* );
+    };
+}
+
+/// Generate the slot-list machinery for one slot-tuple arity: the seal, the
+/// tiebreak list, and one `SlotAt` impl per declared position.
+macro_rules! slots {
+    ( $( $s:ident @ $i:literal ),+ ) => {
+        impl< $( $s: Slot ),+ > sealed::Sealed for ( $( $s, )+ ) {}
+
+        // [spec:pgorm:sem:query.graph.cursor]
+        impl< $( $s: Slot ),+ > Slots for ( $( $s, )+ ) {
+            fn tiebreaks(qualifiers: &[DynIden], skip: usize) -> Tiebreaks {
+                let sources: &[fn(&DynIden) -> Tiebreaks] =
+                    &[ $( qualified_pk_tiebreaks::<<$s as Slot>::Entity> ),+ ];
+
+                sources
+                    .iter()
+                    .zip(qualifiers)
+                    .enumerate()
+                    .filter(|(index, _)| index + 1 != skip)
+                    .flat_map(|(_, (tiebreaks, qualifier))| tiebreaks(qualifier))
+                    .collect()
+            }
+        }
+
+        slot_at!( ( $( $s ),+ ) ; $( $s @ $i ),+ );
+    };
+}
+
+slots!(S1 @ 1);
+slots!(S1 @ 1, S2 @ 2);
+slots!(S1 @ 1, S2 @ 2, S3 @ 3);
+slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4);
+slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5);
+slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
+
 /// THE one projection writer: every decoded source of a graph — and of the
 /// pipeline's source-select terminal — passes through here.
 ///
@@ -201,7 +309,11 @@ pub(crate) fn project_source<F: EntityTrait>(
 // [spec:pgorm:def:query.graph]
 pub struct SelectGraph<E: EntityTrait, S = ()> {
     pub(crate) query: SelectStatement,
-    pub(crate) sources: usize,
+    /// The decoded sources' effective identifiers, in declaration order: the
+    /// root at index 0, each slot at its own. It is the writer's prefix index
+    /// and the cursor's tiebreak qualifier, held once so the two cannot
+    /// disagree about what a source is called.
+    pub(crate) qualifiers: Vec<DynIden>,
     pub(crate) marker: PhantomData<(E, S)>,
 }
 
@@ -209,7 +321,7 @@ impl<E: EntityTrait, S> fmt::Debug for SelectGraph<E, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SelectGraph")
             .field("query", &self.query)
-            .field("sources", &self.sources)
+            .field("qualifiers", &self.qualifiers)
             .finish()
     }
 }
@@ -218,7 +330,7 @@ impl<E: EntityTrait, S> Clone for SelectGraph<E, S> {
     fn clone(&self) -> Self {
         SelectGraph {
             query: self.query.clone(),
-            sources: self.sources,
+            qualifiers: self.qualifiers.clone(),
             marker: PhantomData,
         }
     }
@@ -236,7 +348,7 @@ impl<E: EntityTrait> SelectGraph<E, ()> {
         query.from(E::default().table_ref());
         let mut graph = SelectGraph {
             query,
-            sources: 0,
+            qualifiers: Vec::new(),
             marker: PhantomData,
         };
         graph.project::<E>(SharedIden::new(E::default()));
@@ -252,12 +364,30 @@ impl<E: EntityTrait> Default for SelectGraph<E, ()> {
 }
 
 impl<E: EntityTrait, S> SelectGraph<E, S> {
-    /// Project one decoded source under the next prefix, and consume that
-    /// prefix index.
+    /// Project one decoded source under the next prefix, and record the
+    /// identifier that prefix belongs to.
     // [spec:pgorm:sem:query.graph.writer]
     fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
-        project_source::<F>(&mut self.query, qualifier, self.sources);
-        self.sources += 1;
+        project_source::<F>(
+            &mut self.query,
+            SharedIden::clone(&qualifier),
+            self.qualifiers.len(),
+        );
+        self.qualifiers.push(qualifier);
+    }
+
+    /// The declared slots' effective identifiers, in declaration order — the
+    /// root's excluded, so slot `n` sits at index `n - 1`.
+    // [spec:pgorm:sem:query.graph.cursor]
+    pub(crate) fn slot_qualifiers(&self) -> &[DynIden] {
+        self.qualifiers.get(1..).unwrap_or_default()
+    }
+
+    /// The effective identifier of one decoded source: the root at 0, each
+    /// slot at its declared position.
+    // [spec:pgorm:sem:query.graph.cursor]
+    pub(crate) fn qualifier(&self, index: usize) -> Option<DynIden> {
+        self.qualifiers.get(index).cloned()
     }
 
     /// Join a hop that is never decoded — a junction table, a hop of a chain.
@@ -326,7 +456,7 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     fn retype<S2>(self) -> SelectGraph<E, S2> {
         SelectGraph {
             query: self.query,
-            sources: self.sources,
+            qualifiers: self.qualifiers,
             marker: PhantomData,
         }
     }
@@ -742,7 +872,7 @@ mod tests {
             .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), alias("f5"))
             .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), alias("f6"));
 
-        assert_eq!(graph.sources, 7);
+        assert_eq!(graph.qualifiers.len(), 7);
         let sql = graph.as_query().to_string();
         assert!(sql.contains(r#""f6"."cake_id" AS "s6_cake_id""#), "{sql}");
     }
@@ -753,7 +883,7 @@ mod tests {
             .via(cake_filling::Relation::Cake.def().rev())
             .via(cake_filling::Relation::Filling.def());
 
-        assert_eq!(graph.sources, 1);
+        assert_eq!(graph.qualifiers.len(), 1);
         assert_renders(
             graph.as_query().to_string(),
             &[

@@ -333,6 +333,235 @@ async fn graph_related_and_via() -> Result<(), Error> {
     Ok(())
 }
 
+// [spec:pgorm:sem:query.graph.cursor/test]    a graph's cursor orders on the
+// root and tiebreaks on the declared slot's primary key, so a page that ends
+// inside a run of rows sharing a root resumes exactly through `after_with` —
+// where the order-column boundary can only skip the rest of the run — and the
+// keyset's arity check is the machinery's, unmoved
+#[pgorm_macros::test]
+async fn graph_cursor_tie_straddles_a_page_boundary() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_cursor_tie").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+
+    // In key order the rows run (1, Cherry), (1, Peach), (2, -), (3, -): the
+    // first two share a root, so a page of one ends mid-run.
+    let cursor = || {
+        cake::Entity::graph()
+            .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+            .cursor_by(cake::Column::Id)
+    };
+
+    assert_eq!(
+        cursor().first(1).all(&db).await?,
+        [(cheesecake(), Some(cherry()))]
+    );
+
+    // The whole key of that last row resumes from it exactly.
+    assert_eq!(
+        cursor().after_with((1, 10)).first(1).all(&db).await?,
+        [(cheesecake(), Some(peach()))]
+    );
+
+    // The order-column boundary can say no more than "past every row of cake
+    // 1", so Peach is lost — the documented fallback, not a graph novelty.
+    assert_eq!(
+        cursor().after(1).first(1).all(&db).await?,
+        [(lonely(), None)]
+    );
+
+    // Paging on past the matched run reaches the unmatched roots, whose slot
+    // decodes `None`.
+    assert_eq!(
+        cursor().after_with((1, 11)).first(2).all(&db).await?,
+        [(lonely(), None), (mudcake(), None)]
+    );
+
+    // `before_with` mirrors it, and `last` takes the window from the far end.
+    assert_eq!(
+        cursor().before_with((2, 0)).last(2).all(&db).await?,
+        [
+            (cheesecake(), Some(cherry())),
+            (cheesecake(), Some(peach()))
+        ]
+    );
+
+    // Descending pages the same run from the other end.
+    assert_eq!(
+        cursor()
+            .after_with((1, 11))
+            .desc()
+            .first(1)
+            .all(&db)
+            .await?,
+        [(cheesecake(), Some(cherry()))]
+    );
+
+    // Neither arity: reported when the filters are composed, not panicked.
+    assert_eq!(
+        cursor()
+            .after_with((1, 2, 3))
+            .first(1)
+            .all(&db)
+            .await
+            .unwrap_err()
+            .to_string(),
+        "Query Error: cursor boundary of arity 3 does not match 1 or 2 order column(s)"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.cursor/test]    `cursor_by_on` orders on the slot
+// its position names, typed against that slot's entity, and tiebreaks on the
+// root's primary key first
+#[pgorm_macros::test]
+async fn graph_cursor_on_a_slot() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_cursor_on_slot").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+
+    let cursor = || {
+        cake::Entity::graph()
+            .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+            .cursor_by_on::<1, _>(fruit::Column::Name)
+    };
+
+    // Ordered by the slot's name, the fruitless roots sort last: PostgreSQL
+    // puts NULLs at the end of an ascending order.
+    assert_eq!(
+        cursor().first(3).all(&db).await?,
+        [
+            (cheesecake(), Some(cherry())),
+            (cheesecake(), Some(peach())),
+            (lonely(), None),
+        ]
+    );
+
+    // The whole key is the slot's order column then the root's primary key.
+    assert_eq!(
+        cursor().after_with(("Cherry", 1)).first(1).all(&db).await?,
+        [(cheesecake(), Some(peach()))]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.cursor/test]    an `_as` slot's tiebreak is
+// qualified by its alias: the bare table is not in the query at all, so a
+// tiebreak naming it would be SQL PostgreSQL refuses
+#[pgorm_macros::test]
+async fn graph_cursor_alias_qualifies_the_tiebreak() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_cursor_alias").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+
+    let cursor = || {
+        cake::Entity::graph()
+            .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), alias("topping"))
+            .cursor_by(cake::Column::Id)
+    };
+
+    assert_eq!(
+        cursor().first(1).all(&db).await?,
+        [(cheesecake(), Some(cherry()))]
+    );
+    assert_eq!(
+        cursor().after_with((1, 10)).first(1).all(&db).await?,
+        [(cheesecake(), Some(peach()))]
+    );
+
+    // The alias is the slot's one identifier for the order columns too.
+    assert_eq!(
+        cake::Entity::graph()
+            .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), alias("topping"))
+            .cursor_by_on::<1, _>(fruit::Column::Id)
+            .after_with((10, 1))
+            .first(1)
+            .all(&db)
+            .await?,
+        [(cheesecake(), Some(peach()))]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.cursor/test]    the inherited NULL limitation is
+// live on a graph: an unmatched `Opt` slot's primary key is null, so the
+// extended boundary's tie disjunct is dead and such a row is reached through
+// the order-column boundary instead — documented, not worked around
+#[pgorm_macros::test]
+async fn graph_cursor_null_tiebreaks() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_cursor_null_tiebreak").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+
+    let cursor = || {
+        cake::Entity::graph()
+            .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+            .cursor_by(cake::Column::Id)
+    };
+
+    // A null in the extended position makes its comparison null, so the whole
+    // key degenerates to the order-column boundary: cake 1's remaining rows
+    // are skipped exactly as `after` alone would skip them.
+    let past_null = cursor()
+        .after_with((1, Option::<i32>::None))
+        .first(2)
+        .all(&db)
+        .await?;
+    assert_eq!(past_null, [(lonely(), None), (mudcake(), None)]);
+    assert_eq!(past_null, cursor().after(1).first(2).all(&db).await?);
+
+    // Resuming *from* an unmatched root is the same story from the other side:
+    // the order column carries the boundary, the null tiebreak contributes
+    // nothing, and the next unmatched root is still reached.
+    assert_eq!(
+        cursor()
+            .after_with((2, Option::<i32>::None))
+            .first(1)
+            .all(&db)
+            .await?,
+        [(mudcake(), None)]
+    );
+
+    // When the null is in the *order* column instead — ordering on an optional
+    // slot's own column — no boundary reaches past it: nothing compares
+    // against null, and the order-column boundary is that same comparison.
+    let by_name = || {
+        cake::Entity::graph()
+            .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+            .cursor_by_on::<1, _>(fruit::Column::Name)
+    };
+    assert_eq!(by_name().first(4).all(&db).await?.len(), 4);
+    assert_eq!(
+        by_name()
+            .after_with((Option::<String>::None, 2))
+            .first(1)
+            .all(&db)
+            .await?,
+        []
+    );
+    assert_eq!(
+        by_name()
+            .after(Option::<String>::None)
+            .first(1)
+            .all(&db)
+            .await?,
+        []
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 /// A fruit whose `name` is NULL, which `fruit::Model` has no `Option` for.
 const NULLABLE_SCHEMA: &str = r#"
     CREATE TABLE "cake" ("id" int PRIMARY KEY, "name" text NOT NULL);

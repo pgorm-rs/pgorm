@@ -12,7 +12,7 @@ mod util;
 
 pub use combine::{SelectA, SelectB};
 pub use delete::*;
-pub use graph::{Opt, Req, SelectGraph, Slot};
+pub use graph::{Opt, Req, SelectGraph, Slot, SlotAt, Slots};
 pub use helper::*;
 pub use insert::*;
 pub use loader::*;
