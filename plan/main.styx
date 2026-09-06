@@ -3951,6 +3951,13 @@ children (
                         kind @note
                         text "Operator directive (2026-09-06): make invalid states unrepresentable AND no panics — not bounds checks bolted on. Findings (pagination agent, deferred): Expr::cust_with_values in pgorm-query/src/backend/query_builder.rs indexes values[num-1] unchecked, and inject_parameters panics on params[N-1]; both now unreachable from pagination (which stopped consuming the template machinery) but live for direct callers of the template API. Doctrine fix shape: arity is checkable at CONSTRUCTION — a template's $N census is known when the template+values pair is built, so the mismatch should be unconstructible (constructor validates census vs values and returns the existing typed error channel, or the template type carries its arity) rather than discovered at render via panic. Rules: req:sql.render.custom-expr, sem:sql.render.inject; governed by [dec:pgorm:no-panic] and [dec:pgorm:invalid-states-unrepresentable]. Follows the CTE-builders / ddl-empty-builders precedent (complete constructors over render-time failure)."
                     }
+
+                    {
+                        at 2026-09-06T13:30:59.683443Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

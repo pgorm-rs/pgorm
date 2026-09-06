@@ -88,7 +88,7 @@ fn sweep_expression_shapes() {
         Expr::col(Glyph::Id).ne_all(Vec::<i32>::new()),
         Expr::col(Glyph::Aspect).cast_as(Alias::new("text")),
         Expr::cust("now()"),
-        Expr::cust_with_values("$1 + $2", [1, 2]),
+        Expr::cust_with_values("$1 + $2", [1, 2]).expect("template arity"),
         Expr::tuple([Expr::val(1).into(), Expr::val(2).into()]).into(),
         Expr::col(Glyph::Tokens).get_json_field("a"),
         Expr::col(Glyph::Tokens).cast_json_field("b"),

@@ -4,7 +4,7 @@
 //!
 //! [`SimpleExpr`] is the expression common among select fields, where clauses and many other places.
 
-use crate::{func::*, query::*, types::*, value::*};
+use crate::{error::Result, func::*, query::*, template::CustomExpr, types::*, value::*};
 
 #[path = "expr_json.rs"]
 mod json;
@@ -12,7 +12,7 @@ mod json;
 mod membership;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr]
+// [spec:pgorm:def:sql.ast.expr+1]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -25,7 +25,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr]
+// [spec:pgorm:def:sql.ast.expr+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -37,7 +37,7 @@ pub enum SimpleExpr {
     Value(Value),
     Values(Vec<Value>),
     Custom(String),
-    CustomWithExpr(String, Vec<SimpleExpr>),
+    CustomWithExpr(CustomExpr),
     Keyword(Keyword),
     AsEnum(DynIden, Box<SimpleExpr>),
     Case(Box<CaseStatement>),
@@ -291,78 +291,98 @@ impl Expr {
 
     /// Express any custom expression with [`Value`]. Use this if your expression needs variables.
     ///
+    /// The template and its values are paired by [`CustomExpr::new`], which
+    /// refuses a template whose `$N` census is not exactly `1..=v.len()`, so
+    /// an arity mistake is a value you handle here rather than a panic later
+    /// when the query is rendered.
+    ///
     /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
     ///     .and_where(Expr::col(Char::Id).eq(1))
-    ///     .and_where(Expr::cust_with_values("6 = $1 * $2", [2, 3]))
+    ///     .and_where(Expr::cust_with_values("6 = $1 * $2", [2, 3])?)
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "id" = 1 AND (6 = 2 * 3)"#
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("6 = $1 * $2", [2, 3]))
+    ///     .expr(Expr::cust_with_values("6 = $1 * $2", [2, 3])?)
     ///     .to_owned();
     ///
     /// assert_eq!(query.to_string(), r#"SELECT 6 = 2 * 3"#);
+    /// # Ok(())
+    /// # }
     /// ```
     /// Postgres only: use `$$` to escape `$`
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("$1 $$ $2", ["a", "b"]))
+    ///     .expr(Expr::cust_with_values("$1 $$ $2", ["a", "b"])?)
     ///     .to_owned();
     ///
     /// assert_eq!(query.to_string(), r#"SELECT 'a' $ 'b'"#);
+    /// # Ok(())
+    /// # }
     /// ```
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("data @? ($1::JSONPATH)", ["hello"]))
+    ///     .expr(Expr::cust_with_values("data @? ($1::JSONPATH)", ["hello"])?)
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
     ///     r#"SELECT data @? ('hello'::JSONPATH)"#
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn cust_with_values<T, V, I>(s: T, v: I) -> SimpleExpr
+    /// A template that names more values than it was given is refused where it
+    /// is written:
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert!(Expr::cust_with_values("6 = $1 * $2", [2]).is_err());
+    /// ```
+    // [spec:pgorm:req:sql.render.custom-expr+1]
+    pub fn cust_with_values<T, V, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
         V: Into<Value>,
         I: IntoIterator<Item = V>,
     {
-        SimpleExpr::CustomWithExpr(
-            s.into(),
-            v.into_iter()
-                .map(|v| Into::<Value>::into(v).into())
-                .collect(),
-        )
+        CustomExpr::new(s, v.into_iter().map(|v| Into::<Value>::into(v).into()))
+            .map(SimpleExpr::CustomWithExpr)
     }
 
     /// Express any custom expression with [`SimpleExpr`]. Use this if your expression needs other expression.
+    ///
+    /// The single expression is `$1`; see [`Expr::cust_with_values`] for how
+    /// the template's census is checked.
     ///
     /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
     ///     .expr(Expr::val(1).add(2))
-    ///     .expr(Expr::cust_with_expr("data @? ($1::JSONPATH)", "hello"))
+    ///     .expr(Expr::cust_with_expr("data @? ($1::JSONPATH)", "hello")?)
     ///     .to_owned();
     /// let (sql, values) = query.build();
     ///
@@ -371,37 +391,45 @@ impl Expr {
     ///     values,
     ///     Values(vec![1i32.into(), 2i32.into(), "hello".into()])
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
-    ///
+    /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
     ///     .expr(Expr::cust_with_expr(
     ///         "json_agg(DISTINCT $1)",
     ///         Expr::col(Char::Character),
-    ///     ))
+    ///     )?)
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
     ///     r#"SELECT json_agg(DISTINCT "character")"#
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn cust_with_expr<T, E>(s: T, expr: E) -> SimpleExpr
+    // [spec:pgorm:req:sql.render.custom-expr+1]
+    pub fn cust_with_expr<T, E>(s: T, expr: E) -> Result<SimpleExpr>
     where
         T: Into<String>,
         E: Into<SimpleExpr>,
     {
-        SimpleExpr::CustomWithExpr(s.into(), vec![expr.into()])
+        CustomExpr::new(s, [expr.into()]).map(SimpleExpr::CustomWithExpr)
     }
 
     /// Express any custom expression with [`SimpleExpr`]. Use this if your expression needs other expressions.
-    pub fn cust_with_exprs<T, I>(s: T, v: I) -> SimpleExpr
+    ///
+    /// See [`Expr::cust_with_values`] for how the template's census is checked.
+    // [spec:pgorm:req:sql.render.custom-expr+1]
+    pub fn cust_with_exprs<T, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
         I: IntoIterator<Item = SimpleExpr>,
     {
-        SimpleExpr::CustomWithExpr(s.into(), v.into_iter().collect())
+        CustomExpr::new(s, v).map(SimpleExpr::CustomWithExpr)
     }
 
     /// Express an equal (`=`) expression.

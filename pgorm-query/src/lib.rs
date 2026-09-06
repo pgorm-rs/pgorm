@@ -209,6 +209,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
+//! # fn main() -> pgorm_query::error::Result<()> {
 //! assert_eq!(
 //!     Query::select()
 //!         .column(Character::Character)
@@ -221,7 +222,7 @@
 //!         .and_where(
 //!             Expr::col(Character::FontSize).in_subquery(
 //!                 Query::select()
-//!                     .expr(Expr::cust_with_values("ln($1 ^ $2)", [2.4, 1.2]))
+//!                     .expr(Expr::cust_with_values("ln($1 ^ $2)", [2.4, 1.2])?)
 //!                     .take()
 //!             )
 //!         )
@@ -239,6 +240,8 @@
 //!     ]
 //!     .join(" ")
 //! );
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Condition
@@ -606,6 +609,8 @@ pub mod prepare;
 pub mod query;
 pub mod schema;
 pub mod table;
+mod template;
+pub use template::CustomExpr;
 pub mod token;
 pub mod types;
 pub mod value;

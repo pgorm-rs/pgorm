@@ -203,18 +203,25 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr]
+> [spec:pgorm:def:sql.ast.expr+1]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
 > `Value` (parameterised), `Values`, `Custom(String)` (verbatim SQL),
-> `CustomWithExpr(String, Vec<SimpleExpr>)` (template with `$1`-style splices,
-> `$$` escaping a literal `$`), `Keyword`, `AsEnum`, `Case`, and `Constant`
-> (inlined literal). `Expr` is the entry-point builder holding a left operand
-> plus pending unary/binary operator state; `Expr::col`, `Expr::val`,
-> `Expr::expr`, `Expr::tuple`, `Expr::value`, `Expr::cust`,
-> `Expr::cust_with_values`, `Expr::cust_with_expr`, and `Expr::cust_with_exprs`
-> construct expressions from columns, values, other expressions, and raw SQL.
+> `CustomWithExpr(CustomExpr)`, `Keyword`, `AsEnum`, `Case`, and `Constant`
+> (inlined literal). `CustomExpr` holds a template with `$1`-style splices
+> (`$$` escaping a literal `$`) already resolved against the expressions it
+> substitutes; its segments are private and its only constructor is
+> `CustomExpr::new`, which returns `Result`, so the AST cannot hold a template
+> whose placeholders and values disagree — see `sql.render.custom-expr`.
+>
+> `Expr` is the entry-point builder holding a left operand plus pending
+> unary/binary operator state; `Expr::col`, `Expr::val`, `Expr::expr`,
+> `Expr::tuple`, `Expr::value` and `Expr::cust` construct expressions from
+> columns, values, other expressions, and raw SQL, and
+> `Expr::cust_with_values`, `Expr::cust_with_expr` and `Expr::cust_with_exprs`
+> do the same for templates, each returning `Result` because each pairs a
+> template with substitutions.
 >
 > Subquery expressions carry an optional `SubQueryOper`: `Expr::exists`,
 > `Expr::any`, `Expr::some`, and `Expr::all` wrap a `SelectStatement` in

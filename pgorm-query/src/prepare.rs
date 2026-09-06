@@ -1,5 +1,7 @@
 //! Helper for preparing SQL statements.
 
+use crate::error::Result;
+use crate::template::{self, Grammar, Segment};
 use crate::*;
 pub use std::fmt::Write;
 
@@ -98,55 +100,52 @@ impl SqlWriter for SqlWriterValues {
     }
 }
 
-// [spec:pgorm:sem:sql.render.inject+1]
-pub fn inject_parameters<I>(sql: &str, params: I) -> String
+/// Convert a parameterized SQL string back into inline SQL, or refuse the
+/// pairing.
+///
+/// A `$` followed by an unquoted integer `N` references parameter `N`,
+/// counting from 1; every other token — including a `$` that opens a
+/// dollar-quoted body — is reproduced verbatim, because what arrives here is
+/// real SQL rather than a template authored for this machinery. Quoted tokens
+/// are opaque to the tokenizer, so a `$N` inside a string literal or a quoted
+/// identifier is neither substituted nor counted.
+///
+/// The census is settled before anything is written: the distinct indices the
+/// SQL references must be exactly `1..=params.len()`, so `$0`, a reference
+/// past the end, or a parameter the SQL never names comes back as an
+/// [`Error`](crate::error::Error) instead of panicking on the vector index.
+/// Each reference is paired with its parameter up front, which is why the
+/// writing walk holds no indices at all. A parameter may be referenced any
+/// number of times.
+// [spec:pgorm:sem:sql.render.inject+2]
+pub fn inject_parameters<I>(sql: &str, params: I) -> Result<String>
 where
     I: IntoIterator<Item = Value>,
 {
-    let query_builder = &QueryBuilder;
     let params: Vec<Value> = params.into_iter().collect();
-    let tokenizer = Tokenizer::new(sql);
-    let tokens: Vec<Token> = tokenizer.iter().collect();
-    let mut counter = 0;
-    let mut output = Vec::new();
-    let mut i = 0;
-    while i < tokens.len() {
-        let token = &tokens[i];
-        match token {
-            Token::Punctuation(mark) => {
-                if (mark.as_ref(), false) == query_builder.placeholder() {
-                    output.push(query_builder.value_to_string(&params[counter]));
-                    counter += 1;
-                    i += 1;
-                    continue;
-                } else if (mark.as_ref(), true) == query_builder.placeholder()
-                    && i + 1 < tokens.len()
-                    && let Token::Unquoted(next) = &tokens[i + 1]
-                    && let Ok(num) = next.parse::<usize>()
-                {
-                    output.push(query_builder.value_to_string(&params[num - 1]));
-                    i += 2;
-                    continue;
-                }
-                output.push(mark.to_string())
-            }
-            _ => output.push(token.to_string()),
+    let segments = template::resolve(sql, Grammar::Sql, &params)?;
+
+    let mut output = String::with_capacity(sql.len());
+    for segment in segments {
+        match segment {
+            Segment::Text(text) => output.push_str(&text),
+            Segment::Value(value) => output.push_str(&QueryBuilder.value_to_string(&value)),
         }
-        i += 1;
     }
-    output.into_iter().collect()
+    Ok(output)
 }
 
-// [spec:pgorm:sem:sql.render.inject+1/test]
+// [spec:pgorm:sem:sql.render.inject+2/test]
 #[cfg(test)]
 mod tests_postgres {
     use super::*;
+    use crate::error::{Error, TemplateError};
     use pretty_assertions::assert_eq;
 
     #[test]
     fn inject_parameters_5() {
         assert_eq!(
-            inject_parameters("WHERE A = $1 AND C = $2", ["B".into(), "D".into()]),
+            inject_parameters("WHERE A = $1 AND C = $2", ["B".into(), "D".into()]).unwrap(),
             "WHERE A = 'B' AND C = 'D'"
         );
     }
@@ -154,7 +153,7 @@ mod tests_postgres {
     #[test]
     fn inject_parameters_6() {
         assert_eq!(
-            inject_parameters("WHERE A = $2 AND C = $1", ["B".into(), "D".into()]),
+            inject_parameters("WHERE A = $2 AND C = $1", ["B".into(), "D".into()]).unwrap(),
             "WHERE A = 'D' AND C = 'B'"
         );
     }
@@ -162,8 +161,71 @@ mod tests_postgres {
     #[test]
     fn inject_parameters_7() {
         assert_eq!(
-            inject_parameters("WHERE A = $1", ["B'C".into()]),
+            inject_parameters("WHERE A = $1", ["B'C".into()]).unwrap(),
             "WHERE A = E'B\\'C'"
+        );
+    }
+
+    #[test]
+    fn a_parameter_may_be_referenced_repeatedly() {
+        assert_eq!(
+            inject_parameters("WHERE A = $1 OR B = $1", ["B".into()]).unwrap(),
+            "WHERE A = 'B' OR B = 'B'"
+        );
+    }
+
+    #[test]
+    fn a_stray_dollar_is_reproduced_verbatim() {
+        assert_eq!(
+            inject_parameters("WHERE A = $$body$$ AND C = $1", ["D".into()]).unwrap(),
+            "WHERE A = $$body$$ AND C = 'D'"
+        );
+    }
+
+    #[test]
+    fn a_quoted_placeholder_is_not_a_reference() {
+        assert_eq!(
+            inject_parameters("WHERE A = '$2' AND C = $1", ["D".into()]).unwrap(),
+            "WHERE A = '$2' AND C = 'D'"
+        );
+    }
+
+    #[test]
+    fn an_out_of_range_reference_is_refused() {
+        assert_eq!(
+            inject_parameters("WHERE A = $2", ["B".into()]).unwrap_err(),
+            Error::Template {
+                template: "WHERE A = $2".to_owned(),
+                reason: TemplateError::IndexOutOfRange {
+                    index: 2,
+                    supplied: 1
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn an_unreferenced_parameter_is_refused() {
+        assert_eq!(
+            inject_parameters("WHERE A = $1", ["B".into(), "D".into()]).unwrap_err(),
+            Error::Template {
+                template: "WHERE A = $1".to_owned(),
+                reason: TemplateError::UnreferencedValue {
+                    index: 2,
+                    supplied: 2
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn a_zero_reference_is_refused() {
+        assert_eq!(
+            inject_parameters("WHERE A = $0", ["B".into()]).unwrap_err(),
+            Error::Template {
+                template: "WHERE A = $0".to_owned(),
+                reason: TemplateError::ZeroIndex,
+            }
         );
     }
 }

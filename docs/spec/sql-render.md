@@ -473,32 +473,69 @@ an ideal Postgres renderer would emit.
 
 ## Custom expressions
 
-> [spec:pgorm:req:sql.render.custom-expr]
+> [spec:pgorm:req:sql.render.custom-expr+1]
 > `SimpleExpr::Custom(s)` MUST be written verbatim, unescaped.
-> `SimpleExpr::CustomWithExpr(template, values)` tokenizes the template with
-> the SQL tokenizer (`sql.token`) and substitutes placeholder markers: a `$`
-> punctuation token followed by another `$` emits a literal `$` (consuming
-> both); `$` followed by an unquoted integer `N` substitutes the rendered
-> expression `values[N-1]`; a bare `$` followed by anything else substitutes
-> the next expression positionally. Because the template is tokenized,
-> placeholder-like text inside quoted tokens is never substituted. All other
-> tokens pass through verbatim. A `SimpleExpr::AsEnum(type, expr)` at the top
-> level is rewritten to a cast and renders as `CAST(expr AS type)`, with the
-> type name written raw (unquoted) as a Custom expression.
+> `SimpleExpr::CustomWithExpr` carries a `CustomExpr`, whose template and
+> substitutions are resolved against each other at CONSTRUCTION —
+> `CustomExpr::new`, reached through `Expr::cust_with_values`,
+> `cust_with_expr` and `cust_with_exprs`, all of which return
+> `Result` — and never at render.
+>
+> Construction tokenizes the template with the SQL tokenizer (`sql.token`) and
+> reads each `$` punctuation token: `$` followed by another `$` contributes one
+> literal `$` (consuming both); `$` followed by an unquoted token parsing as a
+> non-zero integer `N` denotes substitution `N`, counting from 1, and MAY be
+> written any number of times. Every other `$` — one trailing the template, one
+> standing before a space or punctuation, `$0`, or `$abc` — is a malformed
+> placeholder and MUST be refused with
+> `Error::Template { reason: MalformedPlaceholder | ZeroIndex }`; positional
+> substitution of "the next value" is not a form this template language has.
+> All other tokens pass through as literal text, and because the template is
+> tokenized, placeholder-like text inside quoted tokens is neither substituted
+> nor counted.
+>
+> The census MUST come out exact: the set of distinct `N` referenced MUST equal
+> `1..=values.len()`. A reference past the end is
+> `Error::Template { reason: IndexOutOfRange }`; a supplied value the template
+> never names — including the value stranded by an arity hole such as `$1, $3`
+> over three values — is `Error::Template { reason: UnreferencedValue }`.
+> Rendering a placeholder as literal text, or dropping an unused value, is
+> silent wrongness and is not permitted.
+>
+> What survives construction is a flat sequence of literal-text and
+> resolved-expression segments carrying no indices, so rendering writes each
+> text segment verbatim, renders each expression in place, and cannot fail or
+> index out of range. This closes the render-time index panic that the previous
+> version of this rule described, per `[dec:pgorm:no-panic]` and
+> `[dec:pgorm:invalid-states-unrepresentable]`.
+>
+> A `SimpleExpr::AsEnum(type, expr)` at the top level is rewritten to a cast and
+> renders as `CAST(expr AS type)`, with the type name written raw (unquoted) as
+> a Custom expression.
 
 ## Parameter injection
 
-> [spec:pgorm:sem:sql.render.inject+1]
-> `inject_parameters(sql, params)` (`prepare.rs`) converts a
-> parameterized SQL string back into inline SQL: it tokenizes the input and,
-> for each `$` punctuation token immediately followed by an unquoted token
-> that parses as `usize` `N`, replaces the pair with
-> `value_to_string(params[N-1])`; every other token is reproduced verbatim.
-> Because quoted tokens are opaque to the tokenizer, `$N` sequences inside
-> string literals or quoted identifiers are not substituted. The same
-> parameter may be referenced any number of times, and out-of-range references
-> panic on the vector index. String values are re-escaped on injection (e.g.
-> `B'C` becomes `E'B\'C'`).
+> [spec:pgorm:sem:sql.render.inject+2]
+> `inject_parameters(sql, params)` (`prepare.rs`) converts a parameterized SQL
+> string back into inline SQL and returns `Result`. It tokenizes the input; a
+> `$` punctuation token immediately followed by an unquoted token that parses
+> as a non-zero `usize` `N` references parameter `N`, counting from 1, and MAY
+> be referenced any number of times. Every other token is reproduced verbatim,
+> a `$` that is not followed by such an integer included: unlike
+> `sql.render.custom-expr`, `$$` is NOT an escape here, because what arrives is
+> real SQL, where `$$` opens a dollar-quoted body rather than standing in for a
+> literal `$`. Because quoted tokens are opaque to the tokenizer, `$N`
+> sequences inside string literals or quoted identifiers are neither
+> substituted nor counted.
+>
+> The census is settled before anything is written, and MUST come out exact:
+> the distinct `N` referenced MUST equal `1..=params.len()`. `$0`, a reference
+> past the end, and a parameter the SQL never names each return
+> `Error::Template` — respectively `ZeroIndex`, `IndexOutOfRange` and
+> `UnreferencedValue` — where the previous version of this rule panicked on the
+> vector index. Each reference is paired with its parameter up front, so the
+> writing walk holds no indices at all. String values are re-escaped on
+> injection (e.g. `B'C` becomes `E'B\'C'`).
 
 ## DDL
 

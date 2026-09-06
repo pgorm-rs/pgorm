@@ -4,6 +4,7 @@ use crate::{
         TypeAlterOpt, TypeAlterStatement, TypeAs, TypeCreateStatement, TypeDropOpt,
         TypeDropStatement, TypeRef,
     },
+    template::Segment,
     *,
 };
 use std::ops::Deref;
@@ -27,7 +28,7 @@ impl QueryBuilder {
         ("$", true)
     }
 
-    // [spec:pgorm:req:sql.render.custom-expr] (top-level AsEnum rewritten to CAST)
+    // [spec:pgorm:req:sql.render.custom-expr+1] (top-level AsEnum rewritten to CAST)
     pub(crate) fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::AsEnum(type_name, expr) => {
@@ -348,7 +349,7 @@ impl QueryBuilder {
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
     // [spec:pgorm:req:sql.render.subquery+1] (SubQuery/Tuple/Values expression arms)
-    // [spec:pgorm:req:sql.render.custom-expr]
+    // [spec:pgorm:req:sql.render.custom-expr+1]
     fn prepare_simple_expr_common(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::Column(column_ref) => {
@@ -415,30 +416,13 @@ impl QueryBuilder {
             SimpleExpr::Custom(s) => {
                 write!(sql, "{s}").unwrap();
             }
-            SimpleExpr::CustomWithExpr(expr, values) => {
-                let (placeholder, numbered) = self.placeholder();
-                let mut tokenizer = Tokenizer::new(expr).iter().peekable();
-                let mut count = 0;
-                while let Some(token) = tokenizer.next() {
-                    match token {
-                        Token::Punctuation(mark) if mark == placeholder => match tokenizer.peek() {
-                            Some(Token::Punctuation(mark)) if mark == placeholder => {
-                                write!(sql, "{mark}").unwrap();
-                                tokenizer.next();
-                            }
-                            Some(Token::Unquoted(tok)) if numbered => {
-                                if let Ok(num) = tok.parse::<usize>() {
-                                    self.prepare_simple_expr(&values[num - 1], sql);
-                                }
-                                tokenizer.next();
-                            }
-                            _ => {
-                                self.prepare_simple_expr(&values[count], sql);
-                                count += 1;
-                            }
-                        },
-                        _ => write!(sql, "{token}").unwrap(),
-                    };
+            // [spec:pgorm:req:sql.render.custom-expr+1]
+            SimpleExpr::CustomWithExpr(custom) => {
+                for segment in custom.segments() {
+                    match segment {
+                        Segment::Text(text) => write!(sql, "{text}").unwrap(),
+                        Segment::Value(expr) => self.prepare_simple_expr(expr, sql),
+                    }
                 }
             }
             SimpleExpr::Keyword(keyword) => {

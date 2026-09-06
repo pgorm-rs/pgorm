@@ -17,7 +17,7 @@ fn select_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.expr/test]
+// [spec:pgorm:def:sql.ast.expr+1/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -1049,7 +1049,7 @@ fn select_59() {
 // [spec:pgorm:req:sql.ast.build+1/test]
 // [spec:pgorm:req:sql.render.placeholders/test]
 // [spec:pgorm:req:sql.render.param-vs-inline+1/test]
-// [spec:pgorm:req:sql.render.custom-expr/test]
+// [spec:pgorm:req:sql.render.custom-expr+1/test]
 #[test]
 fn select_60() {
     let (cust_query, cust_values) = Query::select()
@@ -1059,7 +1059,7 @@ fn select_60() {
         .build();
 
     let (statement, values) = Query::select()
-        .expr(Expr::cust_with_values(&cust_query[7..], cust_values.0))
+        .expr(Expr::cust_with_values(&cust_query[7..], cust_values.0).expect("template arity"))
         .limit(5)
         .build();
 

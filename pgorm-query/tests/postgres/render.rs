@@ -1,5 +1,6 @@
 use super::*;
-use crate::oracle::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
+use pgorm_query::error::{Error, TemplateError};
 
 fn select() -> SelectStatement {
     Query::select()
@@ -202,4 +203,138 @@ fn both_sinks_are_reachable_through_the_trait_object() {
     let (sql, values) = collected.into_parts();
     assert_eq!(sql, r#"SELECT "id" FROM "glyph" WHERE "aspect" = $1"#);
     assert_eq!(values, Values(vec![Value::Int(Some(1))]));
+}
+
+fn selecting(expr: SimpleExpr) -> String {
+    Query::select().expr(expr).to_string()
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$N` names the Nth value counting from one,
+// and may be written as often as the template likes
+#[test]
+fn custom_expr_indices_start_at_one_and_repeat() {
+    assert_eq!(
+        selecting(Expr::cust_with_values("6 = $1 * $2", [2, 3]).expect("template arity")),
+        "SELECT 6 = 2 * 3"
+    );
+    assert_eq!(
+        selecting(Expr::cust_with_values("$2 * $1", [2, 3]).expect("template arity")),
+        "SELECT 3 * 2"
+    );
+    assert_eq!(
+        selecting(Expr::cust_with_values("$1 + $1 + $1", [7]).expect("template arity")),
+        "SELECT 7 + 7 + 7"
+    );
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$$` writes one literal `$`, and quoted
+// regions are opaque to the tokenizer so placeholder-shaped text inside them is left alone
+#[test]
+fn custom_expr_escape_and_quoted_regions_survive_untouched() {
+    // A lone `$` is not a PostgreSQL operator, so this one is held to the
+    // escape's own contract rather than to the render oracle.
+    assert_eq_unparsed!(
+        selecting(Expr::cust_with_values("$1 $$ $2", ["a", "b"]).expect("template arity")),
+        "SELECT 'a' $ 'b'"
+    );
+    assert_eq!(
+        selecting(Expr::cust_with_values("'$2' || $1", ["a"]).expect("template arity")),
+        "SELECT '$2' || 'a'"
+    );
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    a template naming more values than it was
+// given is refused where it is written, rather than indexing off the end at render
+#[test]
+fn custom_expr_under_supply_is_refused_at_construction() {
+    assert_eq!(
+        Expr::cust_with_values("6 = $1 * $2", [2]).unwrap_err(),
+        Error::Template {
+            template: "6 = $1 * $2".to_owned(),
+            reason: TemplateError::IndexOutOfRange {
+                index: 2,
+                supplied: 1
+            },
+        }
+    );
+    assert!(Expr::cust_with_exprs("$1 + $2", [Expr::val(1).into()]).is_err());
+    assert!(Expr::cust_with_expr("$1 + $2", Expr::val(1)).is_err());
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    a value the template never names is refused
+// too: silently dropping it would render something the caller did not write
+#[test]
+fn custom_expr_over_supply_is_refused_at_construction() {
+    assert_eq!(
+        Expr::cust_with_values("6 = $1", [2, 3]).unwrap_err(),
+        Error::Template {
+            template: "6 = $1".to_owned(),
+            reason: TemplateError::UnreferencedValue {
+                index: 2,
+                supplied: 2
+            },
+        }
+    );
+    assert!(Expr::cust_with_expr("now()", Expr::val(1)).is_err());
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    the census demands exactly `1..=len`, so a
+// hole in the numbering is a refusal even when the count happens to line up
+#[test]
+fn custom_expr_arity_hole_is_refused_at_construction() {
+    assert_eq!(
+        Expr::cust_with_values("$1 + $3", [1, 2, 3]).unwrap_err(),
+        Error::Template {
+            template: "$1 + $3".to_owned(),
+            reason: TemplateError::UnreferencedValue {
+                index: 2,
+                supplied: 3
+            },
+        }
+    );
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$0` names nothing, and a `$` that is neither
+// an escape nor an index is a malformed placeholder rather than silent text loss
+#[test]
+fn zero_and_malformed_placeholders_are_refused() {
+    assert_eq!(
+        Expr::cust_with_values("$0", [1]).unwrap_err(),
+        Error::Template {
+            template: "$0".to_owned(),
+            reason: TemplateError::ZeroIndex,
+        }
+    );
+    assert_eq!(
+        Expr::cust_with_values("$abc", [1]).unwrap_err(),
+        Error::Template {
+            template: "$abc".to_owned(),
+            reason: TemplateError::MalformedPlaceholder { position: 0 },
+        }
+    );
+    assert!(Expr::cust_with_values("a $ b", [1]).is_err());
+    assert!(Expr::cust_with_values("$1 $", [1]).is_err());
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    a template with no placeholders and no values
+// is a complete pair, and renders verbatim
+#[test]
+fn custom_expr_empty_census_is_a_complete_pair() {
+    assert_eq!(
+        selecting(Expr::cust_with_exprs("now()", []).expect("template arity")),
+        "SELECT now()"
+    );
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+1/test]    every template that survives construction
+// renders, through either sink, without reaching for a value it does not hold
+#[test]
+fn custom_expr_that_was_constructed_always_renders() {
+    let expr = Expr::cust_with_values("$1 $$ $2 || $1", ["a", "b"]).expect("template arity");
+
+    assert_eq_unparsed!(selecting(expr.clone()), "SELECT 'a' $ 'b' || 'a'");
+
+    let (sql, values) = Query::select().expr(expr).build();
+    assert_eq_unparsed!(sql, "SELECT $1 $ $2 || $3");
+    assert_eq!(values, Values(vec!["a".into(), "b".into(), "a".into()]));
 }
