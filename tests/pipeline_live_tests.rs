@@ -610,3 +610,95 @@ async fn embedded_self_join_renames_before_crossing() {
 
     ctx.delete().await;
 }
+
+// [spec:pgorm:req:pipeline.params+3/test]    a bound derivation the
+// optimizer prunes must not leave its value behind: the statement executes
+// with exactly the parameters it asks for
+#[pgorm_macros::test]
+async fn pruned_binding_executes() {
+    let ctx = TestContext::new("pipeline_pruned_binding").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let pipeline = Pipeline::from(customer::Entity)
+        .derive_with(|binder| [binder.bind(42_i32).as_(alias("unused"))])
+        .select(C::Name)
+        .sort(C::Name);
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(!sql.contains('$'), "{sql}");
+    assert!(values.0.is_empty(), "{values:?}");
+
+    let rows: Vec<(String,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("Alice".to_owned(),),
+            ("Bob".to_owned(),),
+            ("Cleo".to_owned(),),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    a surviving placeholder
+// renumbered past a pruned one binds the right value on the server
+#[pgorm_macros::test]
+async fn renumbered_binding_executes() {
+    let ctx = TestContext::new("pipeline_renumbered_binding").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let pipeline = Pipeline::from(customer::Entity)
+        .derive_with(|binder| [binder.bind(999_i32).as_(alias("unused"))])
+        .filter_with(|binder| C::Name.eq(binder.bind("Alice")))
+        .select(C::Name);
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("$1"), "{sql}");
+    assert!(!sql.contains("$2"), "{sql}");
+    assert_eq!(values.0.len(), 1);
+
+    let rows: Vec<(String,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(rows, vec![("Alice".to_owned(),)]);
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    an embedded pipeline's pruned
+// binding and the consumer's surviving one: the rebase offsets and the
+// census compose, and the joined rows decode
+#[pgorm_macros::test]
+async fn composed_prune_renumbers_across_the_join() {
+    let ctx = TestContext::new("pipeline_composed_prune").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let total = alias("total");
+    let totals = Pipeline::from(order::Entity)
+        .derive_with(|binder| [binder.bind(0_i32).as_(alias("unused"))])
+        .select((O::CustomerId, O::Total));
+    let pipeline = Pipeline::from(customer::Entity)
+        .join(JoinSide::Inner, totals, C::Id.eq(CUSTOMER_ID))
+        .filter_with(|binder| total.gt(binder.bind(rust_dec(24.0))))
+        .select((C::Name, total))
+        .sort(total.desc());
+    let (sql, values) = pipeline.clone().into_sql().unwrap();
+    assert!(sql.contains("$1"), "{sql}");
+    assert!(!sql.contains("$2"), "{sql}");
+    assert_eq!(values.0.len(), 1);
+
+    let rows: Vec<(String, Decimal)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            ("Alice".to_owned(), rust_dec(30.00)),
+            ("Bob".to_owned(), rust_dec(25.50)),
+            ("Bob".to_owned(), rust_dec(24.50)),
+        ]
+    );
+
+    ctx.delete().await;
+}

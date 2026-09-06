@@ -89,9 +89,11 @@ pub(super) fn lit_null() -> PlExpr {
     Expr::new(ExprKind::Literal(Literal::Null))
 }
 
-/// A `$N` placeholder. `ExprKind::Param` survives lowering untouched, so the
-/// index minted here is the index the emitted SQL carries.
-// [spec:pgorm:req:pipeline.params+2]
+/// A `$N` placeholder. `ExprKind::Param` passes through lowering verbatim,
+/// so an index minted here that survives is the index the emitted SQL
+/// carries — but the optimizer may prune the expression around it, which is
+/// what the census in `into_sql` accounts for.
+// [spec:pgorm:req:pipeline.params+3]
 pub(super) fn param(index: usize) -> PlExpr {
     Expr::new(ExprKind::Param(index.to_string()))
 }

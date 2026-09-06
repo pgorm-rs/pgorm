@@ -3832,6 +3832,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-06, finding 5, severity P2. Confirmed on d778f24b. Source: src/pipeline/terminal.rs:33-34 returns Values(self.values) unchanged after prqlc compilation. Reproduction: Pipeline::from(cake::Entity).derive_with(|b| [b.bind(42_i32).as_(alias(\"unused\"))]).select(cake::Column::Id).into_sql() returns (\"SELECT id FROM cake\", Values([Int(Some(42))])); execution fails with Parameters(1, 0). Acceptance: discard values whose placeholders were optimized away and maintain a contiguous, correctly mapped placeholder/value set for every surviving parameter; cover removal of first/middle/last/all parameters, repeated parameters, nested and joined pipelines, and valid execution against PostgreSQL. Preserve branded expression isolation. Spec impact: revise [spec:pgorm:req:pipeline.params] v2's claim that a value without its placeholder is unconstructible and its unconditional no-renumbering statement; preserve [spec:pgorm:req:pipeline.compose] alignment. The compiler may prune an expression even though the binder used it correctly. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_pruned_pipeline_parameter."
                     }
+
+                    {
+                        at 2026-09-06T12:16:03.581143Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3840,7 +3847,6 @@ children (
                 title "Handle stale prepared plans inside transactions without masking the original error"
                 kind @fix
                 deps (infra.statement-cache)
-                sealed true
                 log (
                     {
                         at 2026-09-06T11:34:46.870478Z

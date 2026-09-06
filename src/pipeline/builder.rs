@@ -193,7 +193,7 @@ impl IntoSource for Alias {
 /// A whole pipeline is a relation. Embedding consumes it by value, so its
 /// bound values travel with its placeholders and the pair stays aligned; an
 /// expression cannot make the same crossing alone
-/// (`[spec:pgorm:req:pipeline.params+2]`).
+/// (`[spec:pgorm:req:pipeline.params+3]`).
 // [spec:pgorm:req:pipeline.compose]
 impl IntoSource for Pipeline {
     fn into_source(self) -> Source {
@@ -249,7 +249,7 @@ pub fn sort_by(keys: impl ExprList<'static>) -> Over {
 
 impl Over {
     /// `PARTITION BY` these keys.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn by(mut self, keys: impl ExprList<'static>) -> Self {
         self.partition = nodes_of(keys);
         self
@@ -259,7 +259,7 @@ impl Over {
     ///
     /// Without a partition the sort is a real pipeline stage, so it also
     /// orders the output — PRQL semantics, kept rather than hidden.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn sort_by(mut self, keys: impl ExprList<'static>) -> Self {
         self.sort = nodes_of(keys);
         self
@@ -332,7 +332,7 @@ impl Grouped {
     }
 
     /// Aggregate each group, with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn aggregate_with<F, const N: usize>(mut self, f: F) -> Pipeline
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -460,7 +460,7 @@ impl Pipeline {
 
     /// Keep rows the condition holds for, with runtime values bound in the
     /// closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn filter_with<F>(mut self, f: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> Expr<'brand>,
@@ -479,7 +479,7 @@ impl Pipeline {
     }
 
     /// Add computed columns, with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn derive_with<F, const N: usize>(mut self, f: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -498,7 +498,7 @@ impl Pipeline {
     }
 
     /// Replace the projection, with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn select_with<F, const N: usize>(mut self, f: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -533,7 +533,7 @@ impl Pipeline {
     }
 
     /// Group rows by keys computed with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn group_with<F, const N: usize>(mut self, f: F) -> Grouped
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -561,7 +561,7 @@ impl Pipeline {
     ///
     /// The window spec comes first here so that the closure stays last, as
     /// it does in every `_with` transform.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn window_with<F, const N: usize>(mut self, over: Over, f: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -579,7 +579,7 @@ impl Pipeline {
     }
 
     /// Sort by keys computed with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn sort_with<F, const N: usize>(mut self, f: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
@@ -592,13 +592,13 @@ impl Pipeline {
     ///
     /// The count is a value, not an expression: PRQL rejects a parameterized
     /// `take`, so the signature takes the only form that compiles.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn take(self, rows: i64) -> Self {
         self.stage(adapter::call("take", vec![adapter::lit_int(rows)]))
     }
 
     /// Keep an inclusive 1-based row range (`LIMIT`/`OFFSET`).
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn take_range(self, rows: RangeInclusive<i64>) -> Self {
         self.stage(adapter::call(
             "take",
@@ -626,7 +626,7 @@ impl Pipeline {
     }
 
     /// Join another relation, with runtime values bound in the closure.
-    // [spec:pgorm:req:pipeline.params+2]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn join_with<F>(mut self, side: JoinSide, relation: impl IntoSource, on: F) -> Self
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> Expr<'brand>,

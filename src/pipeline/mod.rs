@@ -145,6 +145,7 @@
 mod adapter;
 mod binder;
 mod builder;
+mod census;
 mod error;
 mod expr;
 mod funcs;

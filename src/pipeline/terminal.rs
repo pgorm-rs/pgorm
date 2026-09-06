@@ -9,6 +9,7 @@ use crate::{
 
 use super::adapter;
 use super::builder::Pipeline;
+use super::census;
 use super::error::{PipelineError, RESERVED};
 
 impl Pipeline {
@@ -17,8 +18,13 @@ impl Pipeline {
     ///
     /// This is where everything fallible happens — reserved-alias screening,
     /// then prqlc's name resolution and lowering — and it fails as a
-    /// [`PipelineError`], never a panic.
+    /// [`PipelineError`], never a panic. The optimizer may prune an
+    /// expression nothing reads, placeholder and all, so the emitted SQL is
+    /// censused afterwards: values whose placeholders were optimized away
+    /// are discarded and the survivors renumber contiguously, keeping
+    /// position `N` in the SQL aligned with position `N` in the values.
     // [spec:pgorm:req:pipeline.errors+1]
+    // [spec:pgorm:req:pipeline.params+3]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let mut aliases = Vec::new();
         for stage in self.bindings.iter().flatten().chain(&self.stages) {
@@ -31,7 +37,7 @@ impl Pipeline {
             return Err(PipelineError::ReservedAlias(name));
         }
         let sql = adapter::compile(self.bindings, self.stages).map_err(PipelineError::Compile)?;
-        Ok((sql, Values(self.values)))
+        Ok(census::prune(sql, self.values))
     }
 
     /// Compile and stage the pipeline for decoding into a

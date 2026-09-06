@@ -42,7 +42,7 @@ use super::expr::{Expr, branded};
 /// assert_eq!(sql, "SELECT * FROM cake WHERE id = $1");
 /// assert_eq!(values.0.len(), 1);
 /// ```
-// [spec:pgorm:req:pipeline.params+2]
+// [spec:pgorm:req:pipeline.params+3]
 #[derive(Debug)]
 pub struct Binder<'brand> {
     values: &'brand mut Vec<Value>,
@@ -59,10 +59,12 @@ impl<'brand> Binder<'brand> {
 
     /// Bind `value` and return its `$N` placeholder.
     ///
-    /// Placeholders number in bind order across the whole pipeline, and
-    /// prqlc carries them through lowering untouched, so position `N` in the
-    /// emitted SQL is position `N` in the pipeline's
-    /// [`Values`](pgorm_query::Values).
+    /// Placeholders number in bind order across the whole pipeline. prqlc
+    /// may prune an expression nothing reads, placeholder and all, so
+    /// [`into_sql`](super::Pipeline::into_sql) re-counts what the emitted
+    /// SQL still carries and compacts the [`Values`](pgorm_query::Values) to
+    /// match: position `N` in the SQL is position `N` in the values, whether
+    /// or not every binding survived.
     pub fn bind(&mut self, value: impl Into<Value>) -> Expr<'brand> {
         self.values.push(value.into());
         branded(adapter::param(self.values.len()))

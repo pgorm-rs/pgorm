@@ -1,4 +1,4 @@
-use pgorm_query::{AliasName, alias};
+use pgorm_query::{AliasName, Value, Values, alias};
 
 use crate::tests_cfg::{cake, cake_filling_price, fruit};
 
@@ -128,7 +128,7 @@ fn case_renders_case_when() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+2/test]    a string literal is escaped, not
+// [spec:pgorm:req:pipeline.params+3/test]    a string literal is escaped, not
 // interpolated: it cannot close the quote it is written into
 #[test]
 fn string_literals_are_escaped() {
@@ -290,7 +290,7 @@ fn join_takes_an_explicit_condition() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+2/test]
+// [spec:pgorm:req:pipeline.params+3/test]
 #[test]
 fn placeholders_number_in_bind_order_across_stages() {
     let gross = alias("gross");
@@ -306,7 +306,7 @@ fn placeholders_number_in_bind_order_across_stages() {
     }
 }
 
-// [spec:pgorm:req:pipeline.params+2/test]    a literal is inlined, a bound
+// [spec:pgorm:req:pipeline.params+3/test]    a literal is inlined, a bound
 // value is not
 #[test]
 fn literals_inline_and_bound_values_do_not() {
@@ -892,4 +892,213 @@ fn a_reserved_source_name_is_refused() {
         .into_sql()
         .expect_err("a reserved name must be refused");
     assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
+}
+
+/// Like [`sql_of`], keeping the values: the emitted SQL must pass the
+/// grammar oracle after any census rewrite too.
+// [spec:pgorm:req:pipeline.params+3/test]
+fn sql_and_values_of(pipeline: Pipeline) -> (String, Values) {
+    let (sql, values) = pipeline.into_sql().expect("pipeline compiles");
+    if let Err(err) = pg_query::parse(&sql) {
+        panic!("PostgreSQL grammar rejected the emitted SQL: {err}\n  {sql}");
+    }
+    (sql, values)
+}
+
+fn ints(values: &Values) -> Vec<Value> {
+    values.0.clone()
+}
+
+/// Three bound derivations to prune from: `a = $1`, `b = $2`, `c = $3`.
+fn three_bound() -> Pipeline {
+    Pipeline::from(cake::Entity).derive_with(|binder| {
+        [
+            binder.bind(1_i32).as_(alias("a")),
+            binder.bind(2_i32).as_(alias("b")),
+            binder.bind(3_i32).as_(alias("c")),
+        ]
+    })
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    a bound derivation nothing
+// reads is pruned by the optimizer; its value must not survive it
+#[test]
+fn pruned_binding_drops_its_value() {
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .derive_with(|binder| [binder.bind(42_i32).as_(alias("unused"))])
+            .select(cake::Column::Id),
+    );
+    assert_eq!(sql, "SELECT id FROM cake");
+    assert!(values.0.is_empty(), "{values:?}");
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    pruning the first placeholder
+// renumbers the survivors down
+#[test]
+fn pruning_the_first_placeholder_renumbers_survivors() {
+    let (sql, values) = sql_and_values_of(three_bound().select((alias("b"), alias("c"))));
+    assert_eq!(sql, "SELECT $1 AS b, $2 AS c FROM cake");
+    assert_eq!(ints(&values), vec![2_i32.into(), 3_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    pruning a middle placeholder
+// leaves a gap the census closes
+#[test]
+fn pruning_a_middle_placeholder_renumbers_survivors() {
+    let (sql, values) = sql_and_values_of(three_bound().select((alias("a"), alias("c"))));
+    assert_eq!(sql, "SELECT $1 AS a, $2 AS c FROM cake");
+    assert_eq!(ints(&values), vec![1_i32.into(), 3_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    pruning the last placeholder
+// changes no numbering but still drops the value
+#[test]
+fn pruning_the_last_placeholder_compacts_the_values() {
+    let (sql, values) = sql_and_values_of(three_bound().select((alias("a"), alias("b"))));
+    assert_eq!(sql, "SELECT $1 AS a, $2 AS b FROM cake");
+    assert_eq!(ints(&values), vec![1_i32.into(), 2_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    pruning every placeholder
+// leaves an unparameterized statement and no values at all
+#[test]
+fn pruning_every_placeholder_empties_the_values() {
+    let (sql, values) = sql_and_values_of(three_bound().select(cake::Column::Id));
+    assert_eq!(sql, "SELECT id FROM cake");
+    assert!(values.0.is_empty(), "{values:?}");
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    a placeholder written twice
+// keeps its value once, both occurrences renumbered alike
+#[test]
+fn repeated_placeholder_keeps_one_value() {
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .derive_with(|binder| [binder.bind(9_i32).as_(alias("unused"))])
+            .filter_with(|binder| {
+                let bound = binder.bind(7_i32);
+                bound.clone().gt(0).and(bound.lt(100))
+            })
+            .select(cake::Column::Id),
+    );
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT id FROM cake) \
+         SELECT id FROM table_0 WHERE $1 > 0 AND $1 < 100"
+    );
+    assert_eq!(ints(&values), vec![7_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    an embedded pipeline's pruned
+// binding sits below the consumer's surviving one, which renumbers down
+// past it — the rebase offset and the census compose
+#[test]
+fn pruned_embedded_binding_renumbers_the_consumer() {
+    let inner = Pipeline::from(fruit::Entity)
+        .derive_with(|binder| [binder.bind(5_i32).as_(alias("unused"))])
+        .select(fruit::Column::CakeId);
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Inner,
+                inner,
+                cake::Column::Id.eq(alias("cake_id")),
+            )
+            .filter_with(|binder| cake::Column::Id.gt(binder.bind(3_i32)))
+            .select(cake::Column::Name),
+    );
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT cake_id FROM fruit) \
+         SELECT cake.name FROM cake \
+         INNER JOIN table_0 ON cake.id = table_0.cake_id \
+         WHERE cake.id > $1"
+    );
+    assert_eq!(ints(&values), vec![3_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    the mirror ordering: the
+// consumer's binding survives at $1 and the embedded pipeline's, rebased
+// past it, is the one pruned
+#[test]
+fn pruned_embedded_binding_after_a_surviving_one() {
+    let inner = Pipeline::from(fruit::Entity)
+        .derive_with(|binder| [binder.bind(5_i32).as_(alias("unused"))])
+        .select(fruit::Column::CakeId);
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .filter_with(|binder| cake::Column::Id.gt(binder.bind(3_i32)))
+            .join(
+                JoinSide::Inner,
+                inner,
+                cake::Column::Id.eq(alias("cake_id")),
+            )
+            .select(cake::Column::Name),
+    );
+    assert_eq!(
+        sql,
+        "WITH table_1 AS (SELECT name, id FROM cake WHERE id > $1), \
+         table_0 AS (SELECT cake_id FROM fruit) \
+         SELECT table_1.name FROM table_1 \
+         INNER JOIN table_0 ON table_1.id = table_0.cake_id"
+    );
+    assert_eq!(ints(&values), vec![3_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    a pruned placeholder between
+// two survivors, one on each side of an embedding
+#[test]
+fn prune_between_survivors_across_pipelines() {
+    let inner = Pipeline::from(fruit::Entity)
+        .derive_with(|binder| [binder.bind(5_i32).as_(alias("unused"))])
+        .select(fruit::Column::CakeId);
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .filter_with(|binder| cake::Column::Id.gt(binder.bind(3_i32)))
+            .join(
+                JoinSide::Inner,
+                inner,
+                cake::Column::Id.eq(alias("cake_id")),
+            )
+            .filter_with(|binder| cake::Column::Id.lt(binder.bind(100_i32)))
+            .select(cake::Column::Name),
+    );
+    assert_eq!(
+        sql,
+        "WITH table_1 AS (SELECT name, id FROM cake WHERE id > $1), \
+         table_0 AS (SELECT cake_id FROM fruit) \
+         SELECT table_1.name FROM table_1 \
+         INNER JOIN table_0 ON table_1.id = table_0.cake_id \
+         WHERE table_1.id < $2"
+    );
+    assert_eq!(ints(&values), vec![3_i32.into(), 100_i32.into()]);
+}
+
+// [spec:pgorm:req:pipeline.params+3/test]    nesting rides along: the
+// innermost pipeline's pruned binding crosses two embeddings before the
+// census discards it
+#[test]
+fn nested_embedding_prunes_through_two_levels() {
+    let innermost = Pipeline::from(fruit::Entity)
+        .derive_with(|binder| [binder.bind(1_i32).as_(alias("unused"))])
+        .select(fruit::Column::CakeId);
+    let middle = Pipeline::from(cake::Entity)
+        .join(
+            JoinSide::Inner,
+            innermost,
+            cake::Column::Id.eq(alias("cake_id")),
+        )
+        .filter_with(|binder| cake::Column::Id.gt(binder.bind(2_i32)))
+        .select(cake::Column::Id);
+    let (sql, values) = sql_and_values_of(
+        Pipeline::from(cake::Entity)
+            .filter_with(|binder| cake::Column::Id.lt(binder.bind(50_i32)))
+            .select(cake::Column::Id)
+            .append(middle),
+    );
+    assert!(sql.contains("UNION ALL"), "{sql}");
+    assert!(sql.contains("$1") && sql.contains("$2"), "{sql}");
+    assert!(!sql.contains("$3"), "{sql}");
+    assert_eq!(ints(&values), vec![50_i32.into(), 2_i32.into()]);
 }

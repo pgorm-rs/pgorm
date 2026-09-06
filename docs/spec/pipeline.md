@@ -53,7 +53,7 @@ of the crate, compiled in every build. Rules are grouped under
 > — the whole query reads as one chained expression, with constants written
 > as Rust literals. The `_with` one takes a closure and hands it the `Binder`,
 > and exists only where a runtime value has to enter
-> (`[spec:pgorm:req:pipeline.params+2]`). The `_with` closures of the
+> (`[spec:pgorm:req:pipeline.params+3]`). The `_with` closures of the
 > list-taking transforms return a fixed-size `[Expr; N]`: an array is the one
 > list shape whose element type can be written under the higher-ranked brand.
 >
@@ -131,7 +131,7 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Parameters
 
-> [spec:pgorm:req:pipeline.params+2]
+> [spec:pgorm:req:pipeline.params+3]
 > Values reach the SQL by exactly two routes, and the spelling says which.
 > A Rust literal — `1`, `1.5`, `true`, `"text"` — converts into an `Expr` and
 > is inlined into the SQL text, exactly as a literal written in PRQL text
@@ -141,11 +141,30 @@ of the crate, compiled in every build. Rules are grouped under
 > every expression-taking transform passes one to its closure, and
 > `bind(value)` pushes the `pgorm_query::Value` and mints its `$N`
 > placeholder in a single step, numbering in bind order across the whole
-> pipeline. prqlc carries `ExprKind::Param` through lowering untouched —
-> including inside `HAVING` and aggregate arguments, with no renumbering — so
-> position `N` in the emitted SQL is position `N` in the returned `Values`,
-> and a placeholder without its value (or a value without its placeholder)
-> cannot be constructed.
+> pipeline, so a placeholder without its value cannot be constructed. The
+> converse can arise without being written: prqlc carries `ExprKind::Param`
+> through lowering verbatim — including inside `HAVING` and aggregate
+> arguments — but its optimizer MAY prune an expression nothing reads (a
+> derived column no later stage keeps), and the placeholder vanishes with it
+> while the bound value remains. `into_sql` therefore takes a census of the
+> emitted SQL: `pg_query::scan`, the PostgreSQL lexer pgorm already links,
+> whose `PARAM` tokens cannot be confused with a `$N` inside a string
+> literal. Values whose placeholders were optimized away are discarded and
+> the surviving placeholders renumber contiguously `$1..$K`, the SQL text
+> rewritten and the `Values` compacted in one pass; a repeated placeholder
+> keeps its value exactly once. The invariant the terminals rely on —
+> position `N` in the emitted SQL is position `N` in the returned `Values` —
+> is thus enforced at the boundary rather than assumed of the optimizer. The
+> lexer census is complete here where it has to be argued for in `prql!`
+> ([spec:pgorm:sem:macros.prql.census]): the pipeline has no s-strings
+> (deliberately cut, `[spec:pgorm:req:pipeline.surface+3]`), so every
+> placeholder in the emitted text is a
+> `Param` node the binder minted, and the census can only ever find a subset
+> of the minted numbers — never a foreign `$N` with no value behind it. A
+> census that cannot be trusted (unscannable text, an out-of-range number;
+> neither reachable from the builder's own output) passes the statement
+> through unchanged for the server to judge, keeping `into_sql` panic-free
+> (`[spec:pgorm:req:pipeline.errors+1]`).
 >
 > The binder and the expressions it returns are branded with a
 > higher-ranked, invariant closure lifetime; an expression containing a
@@ -193,7 +212,7 @@ of the crate, compiled in every build. Rules are grouped under
 > and shifts its own binding references past the bindings the consumer
 > already holds. Values and placeholders therefore cross together and stay
 > aligned; an unattached `Expr` still cannot cross
-> (`[spec:pgorm:req:pipeline.params+2]`). Nesting is unbounded: an embedded
+> (`[spec:pgorm:req:pipeline.params+3]`). Nesting is unbounded: an embedded
 > pipeline's own embeddings ride along, renumbered the same way.
 >
 > The binding names are minted by the module — `table_N`, by position — and
