@@ -1,4 +1,4 @@
-use super::case_style::{CaseStyle, CaseStyleHelpers};
+use super::case_style::{CaseStyle, CaseStyleHelpers, convert_case_str};
 use super::sql_type_match::unwrap_option;
 use super::util::{
     column_variant_ident, escape_rust_keyword, parse_derived_ident, trim_starting_raw_identifier,
@@ -6,9 +6,10 @@ use super::util::{
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
+use std::str::FromStr;
 use syn::{
-    Attribute, Data, Expr, Field, Fields, Lit, Type, punctuated::Punctuated, spanned::Spanned,
-    token::Comma,
+    Attribute, Data, Expr, Field, Fields, Lit, LitStr, Token, Type, meta::ParseNestedMeta,
+    parenthesized, punctuated::Punctuated, spanned::Spanned, token::Comma, token::Paren,
 };
 
 /// The field-level `#[pgorm(...)]` configuration of one model field.
@@ -133,8 +134,91 @@ fn parse_field_attrs(
     Ok(parsed)
 }
 
+/// Advances past whatever an unrecognised `#[serde(..)]` parameter carries —
+/// `= expr`, a parenthesised group, or nothing — so that reading the two
+/// parameters that name JSON keys does not fail on the rest.
+fn skip_serde_meta(meta: &ParseNestedMeta) -> syn::Result<()> {
+    if meta.input.peek(Token![=]) {
+        let _: Option<Expr> = meta.value().and_then(|value| value.parse()).ok();
+    } else if meta.input.peek(Paren) {
+        let group;
+        parenthesized!(group in meta.input);
+        let _: TokenStream = group.parse()?;
+    }
+    Ok(())
+}
+
+/// The literal a `serde` renaming parameter carries. `serde` admits both the
+/// single `= "..."` form and the split `(serialize = "..", deserialize = "..")`
+/// one; only the deserialize half names the key a JSON object is read by, so the
+/// split form's serialize half is discarded.
+fn serde_rename_literal(meta: &ParseNestedMeta) -> syn::Result<Option<LitStr>> {
+    if !meta.input.peek(Paren) {
+        return Ok(Some(meta.value()?.parse()?));
+    }
+
+    let group;
+    parenthesized!(group in meta.input);
+    let mut deserialize = None;
+    while !group.is_empty() {
+        let key: Ident = group.parse()?;
+        group.parse::<Token![=]>()?;
+        let value: LitStr = group.parse()?;
+        if key == "deserialize" {
+            deserialize = Some(value);
+        }
+        if !group.is_empty() {
+            group.parse::<Token![,]>()?;
+        }
+    }
+    Ok(deserialize)
+}
+
+/// The `serde` case rule renaming every field of the model, from
+/// `#[serde(rename_all = "..")]`.
+fn serde_rename_all(attrs: &[Attribute]) -> syn::Result<Option<CaseStyle>> {
+    let mut rule = None;
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename_all") {
+                if let Some(literal) = serde_rename_literal(&meta)? {
+                    let value = literal.value();
+                    rule = Some(CaseStyle::from_str(&value).map_err(|()| {
+                        syn::Error::new_spanned(
+                            &literal,
+                            format!("unsupported `serde(rename_all)` case style: `{value}`"),
+                        )
+                    })?);
+                }
+            } else {
+                skip_serde_meta(&meta)?;
+            }
+            Ok(())
+        })?;
+    }
+    Ok(rule)
+}
+
+/// The `serde` key one field is renamed to, from `#[serde(rename = "..")]`.
+fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+    let mut rename = None;
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename") {
+                if let Some(literal) = serde_rename_literal(&meta)? {
+                    rename = Some(literal.value());
+                }
+            } else {
+                skip_serde_meta(&meta)?;
+            }
+            Ok(())
+        })?;
+    }
+    Ok(rename)
+}
+
 /// Method to derive an Model
-// [spec:pgorm:sem:macros.derive.entity-model]
+// [spec:pgorm:sem:macros.derive.entity-model+1]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
@@ -201,9 +285,12 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
         })
         .unwrap_or_default();
 
+    let serde_rename_all = serde_rename_all(&attrs)?;
+
     // generate Column enum and it's ColumnTrait impl
     let mut columns_enum: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_trait: Punctuated<_, Comma> = Punctuated::new();
+    let mut columns_json_key: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_select_as: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_save_as: Punctuated<_, Comma> = Punctuated::new();
     let mut primary_keys: Punctuated<_, Comma> = Punctuated::new();
@@ -218,6 +305,8 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
             #table_field_name
         });
         columns_trait
+            .push(quote! { Self::#table_field_name => panic!("Table cannot be used as a column") });
+        columns_json_key
             .push(quote! { Self::#table_field_name => panic!("Table cannot be used as a column") });
     }
     if let Data::Struct(item_struct) = data
@@ -284,6 +373,11 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                         #variant_attrs
                         #field_name
                     });
+                    let json_key = match serde_field_rename(&field.attrs)? {
+                        Some(rename) => rename,
+                        None => convert_case_str(&original_field_name, serde_rename_all),
+                    };
+                    columns_json_key.push(quote! { Self::#field_name => #json_key });
                 }
 
                 if is_primary_key {
@@ -393,6 +487,12 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
             fn def(&self) -> pgorm::prelude::ColumnDef {
                 match self {
                     #columns_trait
+                }
+            }
+
+            fn json_key(&self) -> &str {
+                match self {
+                    #columns_json_key
                 }
             }
 

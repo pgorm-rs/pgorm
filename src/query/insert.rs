@@ -1,9 +1,9 @@
 use crate::{
     ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IdenStr,
-    IntoActiveModel, Iterable, PrimaryKeyTrait, QueryTrait, RuntimeError,
+    IntoActiveModel, Iterable, QueryTrait, RuntimeError,
 };
 use core::marker::PhantomData;
-use pgorm_query::{Expr, InsertStatement, OnConflict, ValueTuple};
+use pgorm_query::{Expr, InsertStatement, OnConflict};
 
 /// The column shape an [`Insert`] has recorded from the models added to it.
 ///
@@ -95,7 +95,6 @@ where
 {
     pub(crate) query: InsertStatement,
     columns: InsertColumns,
-    pub(crate) primary_key: Option<ValueTuple>,
     pub(crate) model: PhantomData<A>,
 }
 
@@ -108,7 +107,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.insert+2]
+// [spec:pgorm:sem:query.build.insert+3]
 impl<A> Insert<A>
 where
     A: ActiveModelTrait,
@@ -120,7 +119,6 @@ where
                 .or_default_values()
                 .to_owned(),
             columns: InsertColumns::Empty { rows: 0 },
-            primary_key: None,
             model: PhantomData,
         }
     }
@@ -223,19 +221,13 @@ where
     /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
     /// and by every execution path.
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:query.build.insert+2]
+    // [spec:pgorm:sem:query.build.insert+3]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
     where
         M: IntoActiveModel<A>,
     {
         let mut am: A = m.into_active_model();
-        self.primary_key =
-            if !<<A::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::auto_increment() {
-                am.get_primary_key_value()
-            } else {
-                None
-            };
         let mut columns = Vec::new();
         let mut values = Vec::new();
         let mut present = Vec::new();

@@ -134,7 +134,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// #
 /// # impl ActiveModelBehavior for ActiveModel {}
 /// ```
-// [spec:pgorm:sem:macros.derive.entity-model]
+// [spec:pgorm:sem:macros.derive.entity-model+1]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveEntityModel, attributes(pgorm))]

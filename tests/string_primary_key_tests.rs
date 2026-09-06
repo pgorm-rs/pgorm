@@ -22,8 +22,8 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+3/test]    zero rows affected on the
-// client-supplied-key path fails with RecordNotInserted
+// [spec:pgorm:sem:exec.crud.insert+4/test]    an empty `RETURNING` fails with
+// RecordNotInserted, for a client-supplied key exactly as for a generated one
 pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
         id: "unique-id-001".to_owned(),
@@ -116,11 +116,10 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+3/test]    the client-supplied primary-key
-// path: the key is reconstructed from the cached `ValueTuple`
-// [spec:pgorm:sem:query.build.insert+2/test]    the capture that makes that
-// possible: `Insert::add` records the model's primary-key value tuple when the
-// entity's key is not auto-increment
+// [spec:pgorm:sem:exec.crud.insert+4/test]    a client-supplied primary key is
+// answered from the RETURNING row like any other, not echoed back from the model
+// [spec:pgorm:sem:query.build.insert+3/test]    which is why `Insert::add` keeps
+// no primary-key value tuple to echo
 // [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateOne::exec_returning_model`
 // returns the model
 // built from the full-column RETURNING, including a column set back to NULL

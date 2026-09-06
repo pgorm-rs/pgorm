@@ -114,6 +114,51 @@ mod pk4 {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// The SQL column name and the `serde` key pull apart: `#[pgorm(column_name)]`
+/// renames the column, `serde` keeps reading the field's own name.
+mod sql_renamed {
+    use pgorm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+    #[pgorm(table_name = "am_sql_renamed")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(column_name = "createdAt")]
+        pub created_at: String,
+        pub note: Option<String>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The other direction: the SQL columns keep their plain names and `serde`
+/// renames the keys, per struct and per field.
+mod serde_renamed {
+    use pgorm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+    #[pgorm(table_name = "am_serde_renamed")]
+    #[serde(rename_all = "camelCase")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub created_at: String,
+        #[serde(rename = "NOTE")]
+        pub note: Option<String>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 // ---------------------------------------------------------------------------
 // ActiveModelTrait: per-column state access
 // ---------------------------------------------------------------------------
@@ -698,7 +743,7 @@ fn into_active_model_and_into_active_value() {
 // JSON
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model.json+2/test]    `from_json` normalises per
+// [spec:pgorm:req:entity.active-model.json+3/test]    `from_json` normalises per
 // column — keys present in the JSON object become `Set`, everything else `NotSet`
 // — and a deserialization failure surfaces as `Error`
 #[test]
@@ -744,7 +789,7 @@ fn active_model_from_json() {
     );
 }
 
-// [spec:pgorm:req:entity.active-model.json+2/test]    `set_from_json` applies the
+// [spec:pgorm:req:entity.active-model.json+3/test]    `set_from_json` applies the
 // same normalisation in place but MUST NOT alter the primary key: the key states
 // are taken before the overwrite and restored after, so `Set` / `Unchanged`
 // payloads survive and `NotSet` stays `NotSet` whatever the JSON said
@@ -803,6 +848,124 @@ fn active_model_set_from_json_preserves_primary_key() {
     .unwrap();
     assert_eq!(am.id.into_value(), Some(Value::Int(Some(1))));
     assert_eq!(am.name, set("Apple"));
+}
+
+// [spec:pgorm:req:entity.active-model.json+3/test]    a `set_from_json` that
+// fails leaves the model bit-for-bit as it was — primary key included. The
+// conversion happens on a fresh model and only a conversion that succeeded is
+// moved into `self`, so nothing partial can be observed
+#[test]
+fn set_from_json_failure_leaves_the_model_untouched() {
+    use serde_json::json;
+
+    let untouched = row::ActiveModel {
+        id: set(1),
+        name: set("Apple"),
+        note: ActiveValue::Unchanged(Some("crisp".to_owned())),
+    };
+
+    // A type mismatch: `name` is a String, and no amount of primary-key
+    // bookkeeping happens before the deserializer says so.
+    let mut am = untouched.clone();
+    let err = am
+        .set_from_json(json!({ "id": 99, "name": 7, "note": "tart" }))
+        .unwrap_err();
+    assert!(
+        matches!(err, Error::Json(_)),
+        "expected Error::Json, got {err:?}"
+    );
+    assert_eq!(am, untouched);
+
+    // A missing required field fails the same way, with the same guarantee: the
+    // primary key that would name this row for a subsequent `update` survives.
+    let mut am = untouched.clone();
+    assert!(am.set_from_json(json!({ "note": "tart" })).is_err());
+    assert_eq!(am, untouched);
+    assert_eq!(am.id, set(1));
+}
+
+// [spec:pgorm:req:entity.active-model.json+3/test]    presence detection reads
+// `serde`'s key namespace, not the SQL column names: a model's own serialization
+// round-trips back through `from_json` / `set_from_json` with every column `Set`,
+// whichever side renamed what
+// [spec:pgorm:def:entity.traits.column+4/test]    which is what `json_key`
+// reports, next to the SQL name `as_str` reports
+#[test]
+fn active_model_json_reads_serde_keys() {
+    // `#[pgorm(column_name)]` moves the SQL name and leaves the `serde` key put.
+    assert_eq!(sql_renamed::Column::CreatedAt.as_str(), "createdAt");
+    assert_eq!(sql_renamed::Column::CreatedAt.json_key(), "created_at");
+
+    let model = sql_renamed::Model {
+        id: 1,
+        created_at: "2026-01-01".to_owned(),
+        note: Some("crisp".to_owned()),
+    };
+    let serialized = serde_json::to_value(&model).unwrap();
+    assert_eq!(
+        sql_renamed::ActiveModel::from_json(serialized.clone()).unwrap(),
+        sql_renamed::ActiveModel {
+            id: set(1),
+            created_at: set("2026-01-01"),
+            note: set(Some("crisp".to_owned())),
+        }
+    );
+
+    // In place, the primary key aside — nothing is dropped to `NotSet`.
+    let mut am = sql_renamed::ActiveModel {
+        id: set(7),
+        created_at: NotSet,
+        note: NotSet,
+    };
+    am.set_from_json(serialized).unwrap();
+    assert_eq!(
+        am,
+        sql_renamed::ActiveModel {
+            id: set(7),
+            created_at: set("2026-01-01"),
+            note: set(Some("crisp".to_owned())),
+        }
+    );
+
+    // `#[serde(rename_all)]` and `#[serde(rename)]` move the key the other way,
+    // and the SQL names stay where the entity put them.
+    assert_eq!(serde_renamed::Column::CreatedAt.as_str(), "created_at");
+    assert_eq!(serde_renamed::Column::CreatedAt.json_key(), "createdAt");
+    assert_eq!(serde_renamed::Column::Note.as_str(), "note");
+    assert_eq!(serde_renamed::Column::Note.json_key(), "NOTE");
+
+    let model = serde_renamed::Model {
+        id: 2,
+        created_at: "2026-02-02".to_owned(),
+        note: None,
+    };
+    let serialized = serde_json::to_value(&model).unwrap();
+    assert_eq!(
+        serde_renamed::ActiveModel::from_json(serialized).unwrap(),
+        serde_renamed::ActiveModel {
+            id: set(2),
+            created_at: set("2026-02-02"),
+            note: set(None),
+        }
+    );
+
+    // An entity that renames nothing is unaffected: the two namespaces agree.
+    for col in row::Column::iter() {
+        assert_eq!(col.as_str(), col.json_key());
+    }
+    let model = row::Model {
+        id: 3,
+        name: "Apple".to_owned(),
+        note: None,
+    };
+    assert_eq!(
+        row::ActiveModel::from_json(serde_json::to_value(&model).unwrap()).unwrap(),
+        row::ActiveModel {
+            id: set(3),
+            name: set("Apple"),
+            note: set(None),
+        }
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1063,7 +1226,7 @@ mod hooked {
     }
 }
 
-// [spec:pgorm:req:entity.active-model.hooks/test]    the fixed hook ordering:
+// [spec:pgorm:req:entity.active-model.hooks+1/test]    the fixed hook ordering:
 // `insert` calls `before_save(.., true)` then `after_save(model, .., true)`;
 // `update` runs the same pair with `insert: false`; `delete` calls
 // `before_delete` then `after_delete` on a clone of the pre-delete active model
@@ -1158,8 +1321,8 @@ mod hook_abort {
     }
 }
 
-// [spec:pgorm:req:entity.active-model.hooks/test]    an `Err` from a hook aborts
-// the operation: nothing is written, nothing is removed. Also pins the
+// [spec:pgorm:req:entity.active-model.hooks+1/test]    an `Err` from a *before*
+// hook aborts the operation: nothing is written, nothing is removed. Also pins the
 // pass-through defaults and `new()` delegating to `ActiveModelTrait::default()`
 #[pgorm_macros::test]
 async fn active_model_hook_error_aborts() -> Result<(), Error> {
@@ -1215,7 +1378,111 @@ async fn active_model_hook_error_aborts() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.active-model.hooks/test]    `new()` defaults to
+mod after_hook_abort {
+    use pgorm::entity::prelude::async_trait;
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "am_after_hook_abort")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub name: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    #[async_trait::async_trait]
+    impl ActiveModelBehavior for ActiveModel {
+        async fn after_save<C>(_model: Model, _db: &C, _insert: bool) -> Result<Model, Error>
+        where
+            C: ConnectionTrait,
+        {
+            Err(Error::Custom("after_save refused".to_owned()))
+        }
+
+        async fn after_delete<C>(self, _db: &C) -> Result<Self, Error>
+        where
+            C: ConnectionTrait,
+        {
+            Err(Error::Custom("after_delete refused".to_owned()))
+        }
+    }
+}
+
+// [spec:pgorm:req:entity.active-model.hooks+1/test]    an `Err` from an *after*
+// hook is not an abort: the statement already ran on the connection it was
+// handed, so the row is written (or gone) and the caller gets the `Err` anyway.
+// A caller who needs the two to stand or fall together supplies a transaction
+// and lets the `Err` reach the rollback
+#[pgorm_macros::test]
+async fn active_model_after_hook_error_keeps_the_write() -> Result<(), Error> {
+    let ctx = TestContext::new("active_model_after_hook_error").await;
+    let mut db = ctx.db.get().await?;
+    let stmt = Schema::new().create_table_from_entity(after_hook_abort::Entity);
+    db.execute(&stmt.to_string(), &[]).await?;
+
+    // `insert` returns the hook's `Err` — with the row already inserted.
+    let err = after_hook_abort::ActiveModel {
+        id: NotSet,
+        name: set("Apple"),
+    }
+    .insert(&db)
+    .await
+    .unwrap_err();
+    assert_eq!(err.to_string(), "Custom Error: after_save refused");
+    let written = after_hook_abort::Entity::find().all(&db).await?;
+    assert_eq!(written.len(), 1, "the insert is not rolled back");
+    assert_eq!(written[0].name, "Apple");
+
+    // `update` likewise: `after_save` refuses, the new value is already stored.
+    let err = after_hook_abort::ActiveModel {
+        id: ActiveValue::Unchanged(written[0].id),
+        name: set("Apple Pie"),
+    }
+    .update(&db)
+    .await
+    .unwrap_err();
+    assert_eq!(err.to_string(), "Custom Error: after_save refused");
+    assert_eq!(
+        after_hook_abort::Entity::find().one(&db).await?.name,
+        "Apple Pie"
+    );
+
+    // And `after_delete` does not bring the row back.
+    let err = after_hook_abort::ActiveModel {
+        id: set(written[0].id),
+        name: NotSet,
+    }
+    .delete(&db)
+    .await
+    .unwrap_err();
+    assert_eq!(err.to_string(), "Custom Error: after_delete refused");
+    assert_eq!(after_hook_abort::Entity::find().all(&db).await?.len(), 0);
+
+    // The atomicity the hooks do not provide is the caller's to ask for: run the
+    // operation in a transaction and the `Err` leaves it uncommitted.
+    {
+        let txn = db.begin().await?;
+        let err = after_hook_abort::ActiveModel {
+            id: NotSet,
+            name: set("Pear"),
+        }
+        .insert(&txn)
+        .await
+        .unwrap_err();
+        assert_eq!(err.to_string(), "Custom Error: after_save refused");
+        txn.rollback().await?;
+    }
+    assert_eq!(after_hook_abort::Entity::find().all(&db).await?.len(), 0);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:entity.active-model.hooks+1/test]    `new()` defaults to
 // `ActiveModelTrait::default()`, and the un-overridden hooks are pass-throughs —
 // `row::ActiveModel` overrides nothing and still inserts, updates and deletes
 #[test]

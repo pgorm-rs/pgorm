@@ -237,7 +237,34 @@ mod no_table_name {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model/test]
+/// The `serde` side of the naming, with enough unrelated `serde` parameters
+/// around the two the derive reads to prove the attribute walk steps over the
+/// rest instead of failing on it.
+mod serde_keys {
+    use pgorm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+    #[pgorm(table_name = "serde_keys")]
+    #[serde(rename_all(deserialize = "camelCase"), deny_unknown_fields)]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub baked_on: String,
+        #[serde(rename(serialize = "ignored", deserialize = "NOTE"))]
+        pub note: String,
+        #[pgorm(column_name = "SKU")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub sku: Option<String>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model+1/test]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs/test]    struct-level table_name / schema_name / comment
 #[test]
 fn struct_attributes_drive_entity_and_entity_name() {
@@ -253,7 +280,7 @@ fn struct_attributes_drive_entity_and_entity_name() {
     assert_eq!(format!("{:?}", filling::Entity {}), "Entity");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model/test]    one derive yields the whole entity module
+// [spec:pgorm:sem:macros.derive.entity-model+1/test]    one derive yields the whole entity module
 #[test]
 fn one_derive_yields_the_whole_entity_module() {
     // (1) the `Column` enum, with `EnumIter` + `DeriveColumn` behaviour.
@@ -300,7 +327,7 @@ fn one_derive_yields_the_whole_entity_module() {
     assert_eq!(active.id, pgorm::ActiveValue::unchanged(1));
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model/test]    select_as / save_as overrides and their fallback
+// [spec:pgorm:sem:macros.derive.entity-model+1/test]    select_as / save_as overrides and their fallback
 #[test]
 fn select_as_and_save_as_cast_columns() {
     let casted = filling::Column::Casted;
@@ -322,6 +349,51 @@ fn select_as_and_save_as_cast_columns() {
     assert_eq!(
         plain.save_as(Expr::val(1)),
         ColumnTrait::save_enum_as(&plain, Expr::val(1))
+    );
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model+1/test]    the `json_key` arm: the
+// field's own name under `serde`'s renames, with the SQL naming attributes kept
+// out of it and the rest of `serde` stepped over
+// [spec:pgorm:def:entity.traits.column+4/test]    the namespace `json_key` names,
+// beside the SQL one `as_str` names
+#[test]
+fn json_key_reports_the_serde_key() {
+    // Renamed on neither side, so the two namespaces agree.
+    assert_eq!(filling::Column::Name.as_str(), "name");
+    assert_eq!(filling::Column::Name.json_key(), "name");
+
+    // `column_name` moves the SQL name alone; `enum_name` moves the variant, and
+    // with it the SQL name that falls out of the variant — neither reaches the key.
+    assert_eq!(filling::Column::Sku.as_str(), "SKU");
+    assert_eq!(filling::Column::Sku.json_key(), "sku");
+    assert_eq!(filling::Column::Renamed.as_str(), "renamed");
+    assert_eq!(filling::Column::Renamed.json_key(), "original");
+
+    // `serde`'s renames move the key alone, in either spelling.
+    assert_eq!(serde_keys::Column::BakedOn.as_str(), "baked_on");
+    assert_eq!(serde_keys::Column::BakedOn.json_key(), "bakedOn");
+    assert_eq!(serde_keys::Column::Note.as_str(), "note");
+    assert_eq!(serde_keys::Column::Note.json_key(), "NOTE");
+    assert_eq!(serde_keys::Column::Sku.as_str(), "SKU");
+    assert_eq!(serde_keys::Column::Sku.json_key(), "sku");
+
+    // And each computed key is the key `serde` actually reads: an object keyed
+    // by `json_key` deserializes into the model, which is the whole point of
+    // computing it.
+    let mut object: serde_json::Map<String, serde_json::Value> = serde_keys::Column::iter()
+        .map(|col| (col.json_key().to_owned(), serde_json::json!("x")))
+        .collect();
+    object["id"] = serde_json::json!(1);
+    let model: serde_keys::Model = serde_json::from_value(object.into()).unwrap();
+    assert_eq!(
+        model,
+        serde_keys::Model {
+            id: 1,
+            baked_on: "x".to_owned(),
+            note: "x".to_owned(),
+            sku: Some("x".to_owned()),
+        }
     );
 }
 

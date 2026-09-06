@@ -62,7 +62,7 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column+3]
+> [spec:pgorm:def:entity.traits.column+4]
 > `ColumnTrait: IdenStr + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
@@ -89,6 +89,15 @@ explicit limitations.
 > that cast silently. The `_col` and `_expr` forms deliberately do not apply `save_as` —
 > a column or an expression is already typed on the server side, and an enum column
 > compared against another column of the same enum type needs no cast.
+>
+> `json_key()` names the key the column occupies in a JSON object, which is a
+> different namespace from the SQL name `IdenStr::as_str` gives: the `with-json`
+> conversions of `[spec:pgorm:req:entity.active-model.json+3]` deserialize through the
+> entity's `Model`, so the key is the model field's name as `serde` spells it.
+> `DeriveEntityModel` MUST emit it from the field the column was derived from and the
+> `serde` renames declared on that field and its struct; the trait's default falls back
+> to the SQL name, which is what a hand-written `Column` — having no field to read —
+> can offer and what the two namespaces agree on when nothing is renamed.
 >
 > `ColumnType` is a re-export of `pgorm_query::ColumnType`; the crate's own `ColumnType`
 > enum was dropped and `ColumnTypeTrait` (`def()`, `get_enum_name()`) bridges a
@@ -284,15 +293,27 @@ explicit limitations.
 > explicitly through `Insert::on_conflict`. The removal is deliberate and `save` MUST
 > NOT be reintroduced under this or another name (`src/entity/active_model.rs`).
 
-> [spec:pgorm:req:entity.active-model.hooks]
+> [spec:pgorm:req:entity.active-model.hooks+1]
 > `ActiveModelBehavior: ActiveModelTrait` (`src/entity/active_model.rs`) defines
 > lifecycle hooks with pass-through defaults returning `Ok`. Ordering is fixed:
 > `insert` MUST call `before_save(self, db, insert: true)` before executing and
 > `after_save(model, db, true)` on the returned model; `update` does the same with
 > `insert: false`; `delete` MUST call `before_delete(self, db)` before executing and
-> `after_delete` (on a clone of the pre-delete active model) after. An `Err` from any
-> hook aborts the operation. `new()` defaults to `ActiveModelTrait::default()` and is
-> the hook for constructing an active model with default values.
+> `after_delete` (on a clone of the pre-delete active model) after. `new()` defaults to
+> `ActiveModelTrait::default()` and is the hook for constructing an active model with
+> default values.
+>
+> An `Err` from a *before* hook aborts the operation: it returns before the statement
+> is built, so nothing reaches the database. An `Err` from an *after* hook is returned
+> to the caller but MUST NOT be read as an abort — the statement has already executed
+> on the connection, and the row stays written or stays deleted. The three entry points
+> run their hooks and their statement on the `&C` they were handed and MUST NOT open a
+> transaction of their own: a write the caller asked for on a plain connection is not
+> silently widened into one, and the caller who wants the hook and the write to stand
+> or fall together passes a `DatabaseTransaction` as that `&C` and lets the `Err`
+> reach the rollback. The Rust docs on `ActiveModelBehavior`, `insert`, `update` and
+> `delete` MUST state this asymmetry rather than promise an abort the code does not
+> perform.
 
 > [spec:pgorm:req:entity.active-model.into+1]
 > `IntoActiveModel<A>` converts a type into an active model and has a blanket identity
@@ -307,16 +328,35 @@ explicit limitations.
 > feature-gated `Json`/date-time/`Decimal`/`Uuid` types) MUST produce `Set`
 > (`src/entity/active_model.rs`).
 
-> [spec:pgorm:req:entity.active-model.json+2]
+> [spec:pgorm:req:entity.active-model.json+3]
 > Under the `with-json` feature, `ActiveModelTrait::from_json` builds an active model
 > by deserializing the JSON object into the entity's `Model` (errors surface as
 > `Error`), converting it with `IntoActiveModel`, then normalizing states per column:
 > attributes whose key exists in the JSON object become `Set`, and all others MUST be
-> `NotSet`. `set_from_json` applies the same conversion in place but MUST NOT alter
-> the primary-key values: key values are taken before the overwrite and put back
-> afterwards via `set()`, so a `Set` or `Unchanged` key keeps its value but comes
-> back in the `Set` state (an `Unchanged` key is upgraded), while `NotSet` keys are
-> restored as `NotSet` (`src/entity/active_model.rs`).
+> `NotSet` (`src/entity/active_model.rs`).
+>
+> Presence detection and deserialization MUST read the same key namespace, and that
+> namespace is `serde`'s: the key a column occupies is the model field's name as
+> `serde` spells it, read from `ColumnTrait::json_key`
+> (`[spec:pgorm:def:entity.traits.column+4]`) — never the SQL column name, which the
+> deserializer never sees. `DeriveEntityModel` computes each column's key from the
+> field it derived that column from, applying `#[serde(rename = "..")]` and
+> `#[serde(rename_all = "..")]` (the deserialize half where the split form is used);
+> `#[pgorm(column_name)]` and `#[pgorm(rename_all)]` name the SQL column and MUST NOT
+> take part. A model `serde` serializes therefore round-trips back through `from_json`
+> however either side is renamed, where reading SQL names would have silently dropped
+> every renamed column to `NotSet`. A hand-written `Column` has no field to read and
+> keeps the SQL name as its key — the name the two namespaces agree on when nothing is
+> renamed.
+>
+> `set_from_json` applies the same conversion in place, and MUST leave the active
+> model untouched when it fails: the JSON is converted into a whole new active model
+> first, and a conversion that returned `Err` MUST NOT have written anything to
+> `self` — in particular MUST NOT have cleared the primary key, which would leave a
+> caller holding a model that can no longer name its row. On success it MUST NOT alter
+> the primary-key values either: they are read off `self` and put onto the replacement
+> via `set()`, so a `Set` or `Unchanged` key keeps its value but comes back in the
+> `Set` state (an `Unchanged` key is upgraded), while `NotSet` keys stay `NotSet`.
 
 ## Relations
 

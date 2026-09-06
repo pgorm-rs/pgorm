@@ -92,7 +92,7 @@ macro_rules! bind_subquery_func {
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column+3]
+// [spec:pgorm:def:entity.traits.column+4]
 pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -108,6 +108,19 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// get the name of the entity the column belongs to
     fn as_column_ref(&self) -> (DynIden, DynIden) {
         (self.entity_name(), SeaRc::new(*self) as DynIden)
+    }
+
+    /// The key this column occupies in a JSON object, as `serde` names it.
+    ///
+    /// The `with-json` conversions on `ActiveModelTrait` deserialize through the
+    /// entity's `Model`, so the keys they read are `serde`'s — the model field's
+    /// name, spelled the way any `serde` rename spells it — and not the SQL
+    /// column name. `DeriveEntityModel` computes this from the field the column
+    /// was derived from; a hand-written `Column` has no field to read, so it
+    /// falls back to the SQL name, which is what the two agree on when nothing
+    /// is renamed.
+    fn json_key(&self) -> &str {
+        self.as_str()
     }
 
     bind_oper!(eq, Equal);
@@ -484,51 +497,6 @@ impl Iden for Text {
 impl Iden for TextArray {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "text[]").expect("write to sql sink");
-    }
-}
-
-fn cast_enum_as<C, F>(expr: Expr, col: &C, f: F) -> SimpleExpr
-where
-    C: ColumnTrait,
-    F: Fn(Expr, DynIden, &ColumnType) -> SimpleExpr,
-{
-    let col_def = col.def();
-    let col_type = col_def.get_column_type();
-
-    match col_type {
-        #[cfg(all(feature = "with-json", feature = "postgres-array"))]
-        ColumnType::Json | ColumnType::JsonBinary => {
-            use pgorm_query::ArrayType;
-            use serde_json::Value as Json;
-
-            #[allow(clippy::boxed_local)]
-            fn unbox<T>(boxed: Box<T>) -> T {
-                *boxed
-            }
-
-            let expr = expr.into();
-            match expr {
-                SimpleExpr::Value(Value::Array(ArrayType::Json, Some(json_vec))) => {
-                    // flatten Array(Vec<Json>) into Json
-                    let json_vec: Vec<Json> = json_vec
-                        .into_iter()
-                        .filter_map(|val| match val {
-                            Value::Json(Some(json)) => Some(unbox(json)),
-                            _ => None,
-                        })
-                        .collect();
-                    SimpleExpr::Value(Value::Json(Some(Box::new(json_vec.into()))))
-                }
-                SimpleExpr::Value(Value::Array(ArrayType::Json, None)) => {
-                    SimpleExpr::Value(Value::Json(None))
-                }
-                _ => expr,
-            }
-        }
-        _ => match col_type.get_enum_name() {
-            Some(enum_name) => f(expr, SeaRc::clone(enum_name), col_type),
-            None => expr.into(),
-        },
     }
 }
 

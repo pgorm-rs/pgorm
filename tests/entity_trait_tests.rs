@@ -549,9 +549,9 @@ fn delete_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::delete_by_id(1);
 }
 
-// [spec:pgorm:def:sql.value.tuple+2/test]    the conversion `exec_insert` and
-// `find_updated_model_by_id` run a cached primary-key tuple through errs on a
-// shape the entity's `ValueType` does not have, naming both shapes
+// [spec:pgorm:def:sql.value.tuple+2/test]    the conversion the update-side
+// `find_updated_model_by_id` runs a primary-key tuple through errs on a shape
+// the entity's `ValueType` does not have, naming both shapes
 #[test]
 fn primary_key_value_type_errs_on_arity() {
     type ItemKey = <item::PrimaryKey as PrimaryKeyTrait>::ValueType;
@@ -580,13 +580,14 @@ fn primary_key_value_type_errs_on_arity() {
     );
 }
 
-// [spec:pgorm:sem:exec.crud.insert+3/test]    reconstructing the primary key
-// from the cached tuple returns `Error::Type` naming the table and the
-// mismatch when the entity's `ValueType` disagrees, rather than panicking.
-// Only `exec_returning_pk` decodes the key, so only it can raise this; plain
-// `exec` asks for no key and reports the row it wrote.
-// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op re-fetch rebuilds the
-// same typed key and fails the same way
+// [spec:pgorm:sem:exec.crud.insert+4/test]    an insert whose `ValueType`
+// disagrees with the key column fails decoding the `RETURNING` row, with
+// `Error::UnpackInsertId` rather than a panic. There is no cached tuple to
+// reconstruct from, so the `Error::Type` the reconstruction used to raise is not
+// reachable here. Only `exec_returning_pk` decodes the key, so only it can fail
+// this way; plain `exec` asks for no key and reports the row it wrote.
+// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op re-fetch still rebuilds
+// the typed key from a tuple, and still fails with `Error::Type`
 // [spec:pgorm:req:exec.crud.exec-vocabulary/test]    the two insert terminals
 // differ exactly as their names say: a count needs no key and cannot fail on one
 #[pgorm_macros::test]
@@ -605,7 +606,7 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     let inserted = Insert::one(mistyped_key::ActiveModel { id: set(1) })
         .exec_returning_pk(&db)
         .await;
-    assert_eq!(inserted.unwrap_err(), expected);
+    assert_eq!(inserted.unwrap_err(), Error::UnpackInsertId);
 
     // `exec` decodes no key, so the mistyped `ValueType` is never consulted and
     // the insert simply reports the row it wrote.
@@ -638,7 +639,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column+3/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+4/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`
@@ -790,7 +791,7 @@ fn column_trait_expression_surface() {
     let _: ColumnType = pgorm_query::ColumnType::Integer;
 }
 
-// [spec:pgorm:def:entity.traits.column+3/test]    the column-to-column family
+// [spec:pgorm:def:entity.traits.column+4/test]    the column-to-column family
 // `eq_col` / `ne_col` / `gt_col` / `gte_col` / `lt_col` / `lte_col` and the
 // expression form `eq_expr` — each side qualified by its own entity, same SQL as
 // the `Expr::col` escape they replace, and the value-taking `eq` left alone

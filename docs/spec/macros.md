@@ -34,13 +34,14 @@ known limitations.
 
 ## DeriveEntityModel
 
-> [spec:pgorm:sem:macros.derive.entity-model]
+> [spec:pgorm:sem:macros.derive.entity-model+1]
 > `DeriveEntityModel` is the composite derive: applied to a `Model` struct, it expands
 > the entity-model generation and then re-runs `DeriveModel` and `DeriveActiveModel` on
 > the same input, so one derive yields the full entity module. The entity-model portion
 > generates: (1) a `Column` enum deriving `Copy, Clone, Debug, EnumIter, DeriveColumn`
 > with one variant per non-ignored field; (2) an `impl ColumnTrait for Column` with
-> `type EntityName = Entity`, a `def()` match arm per column, and `select_as`/`save_as`
+> `type EntityName = Entity`, a `def()` match arm per column, a `json_key()` match arm
+> per column, and `select_as`/`save_as`
 > overrides that `cast_as` an alias for columns carrying `select_as`/`save_as` attributes
 > and otherwise fall back to `ColumnTrait::select_enum_as`/`save_enum_as`; (3) only when
 > `table_name` is given, a `pub struct Entity;` deriving
@@ -48,6 +49,16 @@ known limitations.
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
 > a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+1]`).
+>
+> The `json_key()` arm is the one place the derive reads an attribute outside the
+> `#[pgorm(...)]` namespace: the key is the field's own name, put through
+> `#[serde(rename_all = "..")]` on the struct and replaced outright by
+> `#[serde(rename = "..")]` on the field, taking the deserialize half where either is
+> written in the split `(serialize = .., deserialize = ..)` form. Every other `serde`
+> parameter is stepped over unread. Column naming does not take part in either
+> direction — `#[pgorm(column_name)]` and `#[pgorm(enum_name)]` move the SQL name and
+> the variant, not the key — which is the point of the two namespaces being separate
+> (`[spec:pgorm:def:entity.traits.column+4]`).
 
 > [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier

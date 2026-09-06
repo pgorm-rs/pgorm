@@ -361,20 +361,30 @@ These rules capture what the code does today, including known gaps.
 > on `UpdateMany`); the old `Insert::exec`, which returned a primary key
 > under a name that promised nothing, is `exec_returning_pk`.
 
-> [spec:pgorm:sem:exec.crud.insert+3]
+> [spec:pgorm:sem:exec.crud.insert+4]
 > `Insert::exec_returning_pk` appends a `RETURNING` clause of the entity's
-> primary-key columns and resolves the key (typed as the
-> entity's `PrimaryKey::ValueType`) in one of two modes. When the insert
-> captured a client-supplied primary-key `ValueTuple`, the statement runs
-> through `execute`; zero rows affected fails with
-> `Error::RecordNotInserted`, and the key is reconstructed from
-> the cached tuple through `sql.value.tuple`. A tuple whose shape or
-> element types disagree with the entity's declared `ValueType` fails with
-> `Error::Type` naming the table and the mismatch, rather than panicking.
-> Otherwise the statement runs through `query_all` and
-> the **last** returned row's primary-key columns are read by name;
-> an empty result fails with `Error::RecordNotInserted`, and a decode
-> failure of the key columns fails with `Error::UnpackInsertId`.
+> primary-key columns and resolves the key (typed as the entity's
+> `PrimaryKey::ValueType`) from that clause and from nothing else. There is
+> exactly one mode: the statement runs through `query_all`, the **last**
+> returned row's primary-key columns are read by name, an empty result fails
+> with `Error::RecordNotInserted`, and a decode failure of the key columns
+> fails with `Error::UnpackInsertId`. This holds whether or not the caller
+> supplied the key: an entity whose key is not auto-increment MUST be answered
+> from the row the database wrote, exactly as an auto-increment one is.
+>
+> The client-supplied-key mode is deleted and MUST NOT return. It ran the
+> statement through `execute`, discarded the `RETURNING` rows it had already
+> asked for, and rebuilt the key from a `ValueTuple` the builder had cached —
+> so the answer was the key the caller *asked* to write rather than the key of
+> the row that got written. Under `ON CONFLICT DO UPDATE` those differ: an
+> insert of `id = 42` that conflicts on some other unique column updates the
+> existing row and reports `42`, a primary key naming no row. Reading
+> `RETURNING` reports the conflict row's own key. With the cache gone, a
+> mistyped `PrimaryKey::ValueType` on an insert surfaces as the
+> `Error::UnpackInsertId` of a failed column decode rather than as the
+> `Error::Type` the tuple reconstruction raised; `sql.value.tuple` still
+> guards `exec.crud.update`'s no-op re-fetch, which does rebuild a key from a
+> tuple.
 >
 > The key is returned bare. There is no `InsertResult` wrapper and no
 > `last_insert_id` field: a one-field struct whose field repeated the

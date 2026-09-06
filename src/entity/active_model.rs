@@ -126,9 +126,14 @@ impl From<&[u8]> for ActiveValue<Vec<u8>> {
 /// indistinguishable to such a guess. For insert-or-update in one statement,
 /// attach an `ON CONFLICT` clause with [`Insert::on_conflict`](crate::Insert::on_conflict).
 ///
+/// Each write is one statement on the connection it is handed, so an `Err` from
+/// an *after* hook reaches the caller with the row already written — see
+/// [`ActiveModelBehavior`] for what the hooks can and cannot undo.
+///
 /// See module level docs [crate::entity] for a full example
 // [spec:pgorm:req:entity.active-model+2]
 // [spec:pgorm:req:entity.active-model.save+1]
+// [spec:pgorm:req:entity.active-model.hooks+1]
 #[async_trait]
 pub trait ActiveModelTrait: Clone + Debug {
     /// The Entity this ActiveModel belongs to
@@ -231,7 +236,15 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// An `Err` from [`ActiveModelBehavior::before_save`] returns before any SQL
+    /// is sent; an `Err` from [`ActiveModelBehavior::after_save`] returns with
+    /// the row already inserted. Pass a [`DatabaseTransaction`][txn] as `db` when
+    /// the two must stand or fall together.
+    ///
+    /// [txn]: crate::DatabaseTransaction
     // [spec:pgorm:req:entity.active-model.persistence+2]
+    // [spec:pgorm:req:entity.active-model.hooks+1]
     async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -267,7 +280,15 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// An `Err` from [`ActiveModelBehavior::before_save`] returns before any SQL
+    /// is sent; an `Err` from [`ActiveModelBehavior::after_save`] returns with
+    /// the row already updated. Pass a [`DatabaseTransaction`][txn] as `db` when
+    /// the two must stand or fall together.
+    ///
+    /// [txn]: crate::DatabaseTransaction
     // [spec:pgorm:req:entity.active-model.persistence+2]
+    // [spec:pgorm:req:entity.active-model.hooks+1]
     async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -299,7 +320,14 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:entity.active-model.hooks]
+    ///
+    /// An `Err` from [`ActiveModelBehavior::before_delete`] returns before any
+    /// SQL is sent; an `Err` from [`ActiveModelBehavior::after_delete`] returns
+    /// with the row already gone. Pass a [`DatabaseTransaction`][txn] as `db`
+    /// when the two must stand or fall together.
+    ///
+    /// [txn]: crate::DatabaseTransaction
+    // [spec:pgorm:req:entity.active-model.hooks+1]
     async fn delete<'a, C>(self, db: &'a C) -> Result<u64, Error>
     where
         Self: ActiveModelBehavior + 'a,
@@ -314,8 +342,11 @@ pub trait ActiveModelTrait: Clone + Debug {
 
     /// Set the corresponding attributes in the ActiveModel from a JSON value
     ///
-    /// Note that this method will not alter the primary key values in ActiveModel.
-    // [spec:pgorm:req:entity.active-model.json+2]
+    /// The primary-key values in the ActiveModel are not altered, and neither is
+    /// anything else when the JSON does not parse: the value is converted into a
+    /// whole new ActiveModel first, and only a conversion that succeeded reaches
+    /// `self`.
+    // [spec:pgorm:req:entity.active-model.json+3]
     #[cfg(feature = "with-json")]
     fn set_from_json(&mut self, json: serde_json::Value) -> Result<(), Error>
     where
@@ -325,28 +356,25 @@ pub trait ActiveModelTrait: Clone + Debug {
     {
         use crate::Iterable;
 
-        // Backup primary key values
-        let primary_key_values: Vec<(<Self::Entity as EntityTrait>::Column, ActiveValue<Value>)> =
-            <<Self::Entity as EntityTrait>::PrimaryKey>::iter()
-                .map(|pk| (pk.into_column(), self.take(pk.into_column())))
-                .collect();
+        // Convert first: a failure here must leave `self` as it was.
+        let mut incoming = Self::from_json(json)?;
 
-        // Replace all values in ActiveModel
-        *self = Self::from_json(json)?;
-
-        // Restore primary key values
-        for (col, active_value) in primary_key_values {
-            match active_value {
-                ActiveValue::Unchanged(v) | ActiveValue::Set(v) => self.set(col, v)?,
-                NotSet => self.not_set(col),
+        // Carry this model's primary key over to the replacement
+        for pk in <<Self::Entity as EntityTrait>::PrimaryKey>::iter() {
+            let col = pk.into_column();
+            match self.get(col) {
+                ActiveValue::Unchanged(v) | ActiveValue::Set(v) => incoming.set(col, v)?,
+                NotSet => incoming.not_set(col),
             }
         }
+
+        *self = incoming;
 
         Ok(())
     }
 
     /// Create ActiveModel from a JSON value
-    // [spec:pgorm:req:entity.active-model.json+2]
+    // [spec:pgorm:req:entity.active-model.json+3]
     #[cfg(feature = "with-json")]
     fn from_json(json: serde_json::Value) -> Result<Self, Error>
     where
@@ -354,12 +382,16 @@ pub trait ActiveModelTrait: Clone + Debug {
         for<'de> <<Self as ActiveModelTrait>::Entity as EntityTrait>::Model:
             serde::de::Deserialize<'de>,
     {
-        use crate::{Iden, Iterable};
+        use crate::{ColumnTrait, Iterable};
 
-        // Mark down which attribute exists in the JSON object
+        // Mark down which attribute exists in the JSON object, keyed the way
+        // the deserialization below reads it
         let json_keys: Vec<(<Self::Entity as EntityTrait>::Column, bool)> =
             <<Self::Entity as EntityTrait>::Column>::iter()
-                .map(|col| (col, json.get(col.to_string()).is_some()))
+                .map(|col| {
+                    let present = json.get(col.json_key()).is_some();
+                    (col, present)
+                })
                 .collect();
 
         // Convert JSON object into ActiveModel via Model
@@ -413,8 +445,43 @@ pub trait ActiveModelTrait: Clone + Debug {
 /// impl ActiveModelBehavior for ActiveModel {}
 /// # }
 /// ```
+///
+/// # What a hook error does
+///
+/// A `before` hook runs ahead of the statement, so its `Err` aborts the write
+/// outright — nothing reaches the database.
+///
+/// An `after` hook runs once the statement has already executed. Its `Err` is
+/// returned to the caller, but the row stays written: the operation opens no
+/// transaction of its own, and pgorm will not silently start one around a write
+/// the caller asked for on a plain connection. An `after` hook is therefore the
+/// place for work that may fail *without* invalidating the write — auditing,
+/// cache invalidation, publishing an event. When the hook and the write must
+/// stand or fall together, run the operation inside a transaction the caller
+/// owns and let the `Err` reach the rollback:
+///
+/// ```no_run
+/// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, TransactionTrait};
+/// #
+/// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
+/// let mut db = pool.get().await?;
+/// let txn = db.begin().await?;
+///
+/// let apple = cake::ActiveModel {
+///     name: set("Apple Pie"),
+///     ..Default::default()
+/// };
+///
+/// // An `Err` from `after_save` propagates out of this `?` with `txn` never
+/// // committed, so the insert is rolled back when `txn` drops.
+/// let apple = apple.insert(&txn).await?;
+/// txn.commit().await?;
+/// # Ok(())
+/// # }
+/// ```
+///
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:req:entity.active-model.hooks]
+// [spec:pgorm:req:entity.active-model.hooks+1]
 #[allow(unused_variables)]
 #[async_trait]
 pub trait ActiveModelBehavior: ActiveModelTrait {
@@ -424,7 +491,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
     }
 
     /// Will be called before `ActiveModel::insert` (`insert: true`) and
-    /// `ActiveModel::update` (`insert: false`)
+    /// `ActiveModel::update` (`insert: false`). An `Err` aborts the write before
+    /// any SQL is sent.
     async fn before_save<C>(self, db: &C, insert: bool) -> Result<Self, Error>
     where
         C: ConnectionTrait,
@@ -433,7 +501,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
     }
 
     /// Will be called after `ActiveModel::insert` (`insert: true`) and
-    /// `ActiveModel::update` (`insert: false`)
+    /// `ActiveModel::update` (`insert: false`). An `Err` is returned to the
+    /// caller but does not undo the row already written.
     async fn after_save<C>(
         model: <Self::Entity as EntityTrait>::Model,
         db: &C,
@@ -445,7 +514,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
         Ok(model)
     }
 
-    /// Will be called before `ActiveModel::delete`
+    /// Will be called before `ActiveModel::delete`. An `Err` aborts the delete
+    /// before any SQL is sent.
     async fn before_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,
@@ -453,7 +523,8 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
         Ok(self)
     }
 
-    /// Will be called after `ActiveModel::delete`
+    /// Will be called after `ActiveModel::delete`. An `Err` is returned to the
+    /// caller but does not bring the deleted row back.
     async fn after_delete<C>(self, db: &C) -> Result<Self, Error>
     where
         C: ConnectionTrait,

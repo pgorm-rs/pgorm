@@ -20,7 +20,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.insert+2/test]    a batch of models that set no
+// [spec:pgorm:sem:query.build.insert+3/test]    a batch of models that set no
 // column inserts one default row per model rather than collapsing into one
 #[pgorm_macros::test]
 async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {

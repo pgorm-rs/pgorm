@@ -398,7 +398,7 @@ builder is or what its rows decode into.
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.
 
-> [spec:pgorm:sem:query.build.insert+2]
+> [spec:pgorm:sem:query.build.insert+3]
 > `Insert::<A>::new` targets `A::Entity`'s table and applies
 > `or_default_values()`, so a builder to which no model was ever added still
 > renders a valid default-values INSERT rather than invalid SQL. `Insert::one`
@@ -412,10 +412,16 @@ what makes it total over partially-set models.
 > contributes no column list and no values row: instead of an arity-zero row
 > it raises the statement's default-values row count, so `n` such models
 > render `VALUES (DEFAULT)` repeated `n` times, one row of database defaults
-> each. When the entity's primary key is not auto-increment, the model's
-> primary-key value tuple is captured on the builder (used later by
-> `exec_returning_pk`); for auto-increment keys it is left `None`.
-> `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
+> each. `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
+>
+> `Insert` MUST NOT cache the added model's primary-key value tuple. It carried
+> one — populated for non-auto-increment keys, last row winning, and read back
+> by `exec_returning_pk` in place of the `RETURNING` row — but the key a caller
+> asked to write is not the key of the row the database wrote, and an
+> `ON CONFLICT DO UPDATE` landing on some other row made the difference
+> observable as a primary key that names no row. The key is now resolved from
+> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+4]`), so the builder has
+> nothing to remember.
 
 > [spec:pgorm:req:query.build.insert.uniform-columns+3]
 > All models added to a single `Insert` MUST have the same set of present

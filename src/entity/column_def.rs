@@ -104,3 +104,48 @@ impl ColumnDef {
         self.null
     }
 }
+
+pub(crate) fn cast_enum_as<C, F>(expr: Expr, col: &C, f: F) -> SimpleExpr
+where
+    C: ColumnTrait,
+    F: Fn(Expr, DynIden, &ColumnType) -> SimpleExpr,
+{
+    let col_def = col.def();
+    let col_type = col_def.get_column_type();
+
+    match col_type {
+        #[cfg(all(feature = "with-json", feature = "postgres-array"))]
+        ColumnType::Json | ColumnType::JsonBinary => {
+            use pgorm_query::ArrayType;
+            use serde_json::Value as Json;
+
+            #[allow(clippy::boxed_local)]
+            fn unbox<T>(boxed: Box<T>) -> T {
+                *boxed
+            }
+
+            let expr = expr.into();
+            match expr {
+                SimpleExpr::Value(Value::Array(ArrayType::Json, Some(json_vec))) => {
+                    // flatten Array(Vec<Json>) into Json
+                    let json_vec: Vec<Json> = json_vec
+                        .into_iter()
+                        .filter_map(|val| match val {
+                            Value::Json(Some(json)) => Some(unbox(json)),
+                            _ => None,
+                        })
+                        .collect();
+                    SimpleExpr::Value(Value::Json(Some(Box::new(json_vec.into()))))
+                }
+                SimpleExpr::Value(Value::Array(ArrayType::Json, None)) => {
+                    SimpleExpr::Value(Value::Json(None))
+                }
+                _ => expr,
+            }
+        }
+        _ => match col_type.get_enum_name() {
+            Some(enum_name) => f(expr, SeaRc::clone(enum_name), col_type),
+            None => expr.into(),
+        },
+    }
+}

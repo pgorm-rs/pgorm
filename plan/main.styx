@@ -3077,6 +3077,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED. set_from_json backs up PKs destructively via self.take (active_model.rs:328-331, take swaps NotSet in) BEFORE the fallible from_json (:335); on error the ? returns before the restore loop, dropping the backed-up values — PK left NotSet, violating the doc contract (:317) and entity.active-model.json+2. Scenario: model with id set(1), set_from_json with a type-mismatched body → Err, id now NotSet; recovery update → PrimaryKeyNotSet, insert → new row. Only error-path test uses an all-NotSet model so it can't see this. Fix: parse first, mutate second (from_json into a local, transplant self's PK ActiveValues, then assign). Effort S, non-breaking. Bumps entity.active-model.json+2→+3 (\"on error self MUST be left untouched\"). Same rule bump shared with active-model-json-column-names — coordinate."
                     }
+
+                    {
+                        at 2026-09-05T22:06:08.030555Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3090,6 +3097,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED as described; inherited SeaORM semantics, spec wording overpromises. insert/update/delete run before-hook → exec → after-hook on a plain &C ConnectionTrait (active_model.rs:242-246, 277-280, 303-313); no path opens a transaction (begin needs &mut), so an Err from after_save/after_delete propagates AFTER the row was durably written/deleted. Spec entity.active-model.hooks says \"An Err from any hook aborts the operation\" — true only for before-hooks. Scenario: fallible after_save → insert returns Err yet row exists; retry duplicates. Callers can already pass a DatabaseTransaction for atomicity. Fix options: (a) honest-docs — amend spec+docs to state after-hook errors don't roll back, recommend caller-owned tx (S, non-breaking); (b) true atomicity — entry points demand transactional connection (L, breaking). Verdict leans (a) given scoped-transaction design. Bumps entity.active-model.hooks→+1 either way."
                     }
+
+                    {
+                        at 2026-09-05T22:05:59.806526Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3102,6 +3116,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED for ON CONFLICT DO UPDATE and DB-side PK rewrites. Insert::add caches the caller-supplied PK when not auto-increment (insert.rs:233-238, last row wins); exec_returning_pk appends RETURNING but the Some(cached) branch runs db.execute, DISCARDS the returning rows, and reconstructs the answer from the cached tuple (executor/insert.rs:186-195); only the None branch reads RETURNING. TryInsert maps res==0 to Conflicted, so a DO UPDATE hit (res==1) reports Inserted(cached_pk). Scenario: manual PK id=42 upserting on unique email that hits existing row id=7 → PG updates row 7, pgorm returns 42 — a phantom PK; find_by_id(42) → RecordNotFound, children keyed on it orphan. Violates exec.crud.exec-vocabulary's own contract (\"MUST return the inserted row's primary key\"). Fix: delete the cached-tuple fast path — RETURNING is already appended, query_all in both modes, decode PK from the last row (empty → RecordNotInserted); drop the dead Insert.primary_key field. Effort S-M, signature-compatible. Bumps exec.crud.insert+3→+4 (which codifies the cached mode); exec-vocabulary already states the corrected contract."
+                    }
+
+                    {
+                        at 2026-09-05T22:06:02.163452Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3169,6 +3190,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED. set_from_json presence-check uses the SQL column Iden string (json.get(col.to_string()), active_model.rs:360-367) while deserialization uses serde field names — any divergence desynchronizes them. #[pgorm(column_name = \"createdAt\")]: model's own to_value emits created_at, lookup of createdAt is None → column forced NotSet, value silently dropped, update never writes it. #[serde(rename_all = \"camelCase\")]: camel key deserializes but snake lookup fails → dropped; snake key fails deserialization outright. A model's serialization does not round-trip through from_json for any renamed field. Fix: derive emits per-column serde-effective JSON key metadata, or drive presence and decode from one deserialized Map. Effort M, non-breaking. Bumps entity.active-model.json+2→+3 (define the key namespace; presence and decode MUST agree) — same rule as json-error-atomicity, coordinate the bump."
+                    }
+
+                    {
+                        at 2026-09-05T22:05:57.55072Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

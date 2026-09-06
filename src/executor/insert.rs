@@ -1,9 +1,9 @@
 use crate::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityName, EntityTrait, Insert,
-    IntoActiveModel, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel,
-    SelectorRaw, TryInsert, error::*,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable,
+    PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert,
+    error::*,
 };
-use pgorm_query::{Iden, InsertStatement, Query, TryFromValueTuple, ValueTuple};
+use pgorm_query::{Iden, InsertStatement, Query};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;
@@ -127,7 +127,7 @@ where
     }
 
     /// Execute the insert and return the inserted row's primary key.
-    // [spec:pgorm:sem:exec.crud.insert+3]
+    // [spec:pgorm:sem:exec.crud.insert+4]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
@@ -142,7 +142,7 @@ where
                     .select_as(c.into_column().into_returning_expr())
             }));
         query.returning(returning);
-        exec_insert_returning_pk::<A, _>(self.primary_key, query, db).await
+        exec_insert_returning_pk::<A, _>(query, db).await
     }
 
     /// Execute the insert and return the inserted row as a model.
@@ -164,9 +164,11 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert+3]
+/// The key comes from the row the database wrote, never from the model that
+/// asked for it: a manually assigned key that an `ON CONFLICT DO UPDATE` did not
+/// land on names a row that does not exist.
+// [spec:pgorm:sem:exec.crud.insert+4]
 async fn exec_insert_returning_pk<A, C>(
-    primary_key: Option<ValueTuple>,
     statement: InsertStatement,
     db: &C,
 ) -> Result<InsertedPrimaryKey<A>, Error>
@@ -183,29 +185,16 @@ where
 
     type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
 
-    match primary_key {
-        Some(value_tuple) => {
-            let res = db.execute(&stmt, &values).await?;
-            if res == 0 {
-                return Err(Error::RecordNotInserted);
-            }
-            TryFromValueTuple::try_from_value_tuple(value_tuple).map_err(|err| {
-                primary_key_type_err(<A::Entity as Default>::default().table_name(), err)
-            })
-        }
-        None => {
-            let mut rows = db.query_all(&stmt, &values).await?;
-            let row = match rows.pop() {
-                Some(row) => QueryResult { row },
-                None => return Err(Error::RecordNotInserted),
-            };
-            let cols = PrimaryKey::<A>::iter()
-                .map(|col| col.to_string())
-                .collect::<Vec<_>>();
-            row.try_get_many("", cols.as_ref())
-                .map_err(|_| Error::UnpackInsertId)
-        }
-    }
+    let mut rows = db.query_all(&stmt, &values).await?;
+    let row = match rows.pop() {
+        Some(row) => QueryResult { row },
+        None => return Err(Error::RecordNotInserted),
+    };
+    let cols = PrimaryKey::<A>::iter()
+        .map(|col| col.to_string())
+        .collect::<Vec<_>>();
+    row.try_get_many("", cols.as_ref())
+        .map_err(|_| Error::UnpackInsertId)
 }
 
 // [spec:pgorm:sem:exec.crud.insert-returning+2]

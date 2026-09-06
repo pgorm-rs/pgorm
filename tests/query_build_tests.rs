@@ -309,7 +309,7 @@ fn filter_accumulates_and_accepts_trees() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.column+3/test]    `eq_any` / `ne_all` spend one
+// [spec:pgorm:def:entity.traits.column+4/test]    `eq_any` / `ne_all` spend one
 // parameter on the whole list, so the statement text is the same at every
 // cardinality, where `is_in` / `is_not_in` spend one per element
 #[test]
@@ -1100,7 +1100,7 @@ fn combine_leaves_bare_expression_unprefixed() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+2/test]    `Insert::new` renders a valid
+// [spec:pgorm:sem:query.build.insert+3/test]    `Insert::new` renders a valid
 // DEFAULT VALUES statement before any model is added, and `one`/`many` /
 // `add`/`add_many` take anything `IntoActiveModel`
 #[test]
@@ -1142,7 +1142,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+2/test]    `add` writes `Set` and
+// [spec:pgorm:sem:query.build.insert+3/test]    `add` writes `Set` and
 // `Unchanged` columns through `col.save_as` and omits `NotSet` ones entirely
 #[test]
 fn insert_add_omits_not_set_columns() {
@@ -1179,7 +1179,7 @@ fn insert_add_omits_not_set_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+2/test]    `on_conflict` attaches the given
+// [spec:pgorm:sem:query.build.insert+3/test]    `on_conflict` attaches the given
 // pgorm-query clause verbatim
 #[test]
 fn insert_on_conflict_is_attached_verbatim() {
@@ -1250,7 +1250,7 @@ fn insert_many_rejects_mismatched_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+2/test]    a model with nothing set
+// [spec:pgorm:sem:query.build.insert+3/test]    a model with nothing set
 // contributes a default-values row rather than an arity-zero column and value
 // list, and one such row per model
 #[test]

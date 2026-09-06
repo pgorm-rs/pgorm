@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+3/test]    the primary key read from the last
+// [spec:pgorm:sem:exec.crud.insert+4/test]    the primary key read from the last
 // RETURNING row of a batch, and RecordNotInserted when nothing is written
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
@@ -38,7 +38,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
     .exec_returning_pk(db)
     .await;
 
-    // [spec:pgorm:sem:exec.crud.insert+3] the key comes from the last
+    // [spec:pgorm:sem:exec.crud.insert+4] the key comes from the last
     // RETURNING row of the batch.
     assert_eq!(res?, 3);
 

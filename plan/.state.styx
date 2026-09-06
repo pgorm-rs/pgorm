@@ -351,6 +351,9 @@ derived_priorities (
 )
 
 assertions (
+    {id active-model-after-hook-atomicity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:05:59.806526Z}
+    {id active-model-json-column-names, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:05:57.55072Z}
+    {id active-model-json-error-atomicity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:08.030555Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
@@ -406,6 +409,7 @@ assertions (
     {id infra.tx.metric-tx, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:08:31.330198Z}
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
+    {id insert-returning-manual-pk, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:02.163452Z}
     {id migration-checksums, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:20.974605Z}
     {id migration-ledger-module-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:13.949101Z}
     {id migration-ledger-table-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:16.712792Z}
