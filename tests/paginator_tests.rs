@@ -264,7 +264,7 @@ async fn paginator_iterate() -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.crud/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
-// [spec:pgorm:sem:exec.paginator.raw+2/test]    a parsed single `SELECT` is
+// [spec:pgorm:sem:exec.paginator.raw+3/test]    a parsed single `SELECT` is
 // wrapped whole as a subquery, so its own clauses survive paging
 #[pgorm_macros::test]
 async fn paginator_raw() -> Result<(), Error> {
@@ -273,7 +273,7 @@ async fn paginator_raw() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     seed(&db).await?;
 
-    // No bind values: the statement is wrapped with `Expr::cust`.
+    // No bind values.
     let mut paginator = Bakery::find()
         .from_raw_sql(RAW_ALL.to_owned(), Values(Vec::new()))
         .paginate(&db, page_size(3));
@@ -287,8 +287,7 @@ async fn paginator_raw() -> Result<(), Error> {
     assert_eq!(paginator.num_pages().await?, 3);
     assert_eq!(paginator.fetch_and_next().await?.map(|p| p.len()), Some(3));
 
-    // With bind values: the statement is wrapped with `Expr::cust_with_values`
-    // and the `$1` marker keeps its value.
+    // With bind values: the `$1` marker keeps both its number and its value.
     let filtered = Bakery::find()
         .from_raw_sql(
             r#"SELECT "id", "name", "profit_margin" FROM "bakery" WHERE "profit_margin" > $1 ORDER BY "id" ASC"#
@@ -343,7 +342,7 @@ async fn paginator_raw() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+2/test]    anything that is not one
+// [spec:pgorm:sem:exec.paginator.raw+3/test]    anything that is not one
 // row-returning `SELECT` is an `Error::Query` naming what it parsed as
 #[pgorm_macros::test]
 async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
@@ -389,6 +388,153 @@ async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
                 "{stmt:?}: {reported} does not name {expected:?}"
             );
         }
+    }
+
+    // Refusal is the paginator's, not the server's: the table is untouched.
+    assert_eq!(Bakery::find().count(&db).await?, 7);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+/// Statements a `$N` walk over the text would corrupt, each paired with the
+/// values it binds. Every one carries a `$99` that is not a marker at all —
+/// comment or string text — or brackets a lexer that reads `[` as a quote
+/// delimiter would swallow. Each selects a single text column so the direct and
+/// paginated answers compare directly.
+fn token_forms() -> Vec<(&'static str, Values)> {
+    let one = || Values(vec![Value::Int(Some(7))]);
+    vec![
+        (
+            "SELECT $1::int4::text AS v /* $99 is only a comment */",
+            one(),
+        ),
+        // PostgreSQL nests block comments, so the inner close does not end it.
+        (
+            "SELECT $1::int4::text AS v /* outer /* $99 */ still outer */",
+            one(),
+        ),
+        ("SELECT $1::int4::text AS v -- $99 to end of line", one()),
+        (r#"SELECT ($1::int4::text || $$ $99 '"` $$) AS v"#, one()),
+        ("SELECT ($1::int4::text || $tag$ $99 $$ x$tag$) AS v", one()),
+        ("SELECT ($1::int4::text || ' it''s $99') AS v", one()),
+        (r"SELECT ($1::int4::text || E' a\'b $99') AS v", one()),
+        // The same value read twice, and two values read out of order.
+        ("SELECT ($1::int4::text || $1::int4::text) AS v", one()),
+        (
+            "SELECT ($2::int4::text || $1::int4::text) AS v",
+            Values(vec![Value::Int(Some(7)), Value::Int(Some(3))]),
+        ),
+        // Subscripts around and after markers.
+        (
+            "SELECT (ARRAY[$1::int4, 8])[$2::int4]::text AS v",
+            Values(vec![Value::Int(Some(7)), Value::Int(Some(2))]),
+        ),
+    ]
+}
+
+// [spec:pgorm:sem:exec.paginator.raw+3/test]    the caller's statement is sent
+// whole, so comments, dollar quotes, string literals and subscripts read the
+// same paginated as they do direct, and the markers keep their values
+#[pgorm_macros::test]
+async fn paginator_raw_token_forms() -> Result<(), Error> {
+    let ctx = TestContext::new("paginator_tests_raw_token_forms").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    for (sql, values) in token_forms() {
+        let direct = (sql, values.clone())
+            .into_tuple::<String>()
+            .one(&db)
+            .await?;
+
+        let paginator = (sql, values.clone())
+            .into_tuple::<String>()
+            .paginate(&db, page_size(10));
+
+        assert_eq!(
+            paginator.fetch_page(0).await?,
+            vec![direct.clone()],
+            "{sql:?} paged differently from the direct answer {direct:?}"
+        );
+        assert_eq!(paginator.num_items().await?, 1, "{sql:?} counted wrong");
+        assert_eq!(paginator.num_pages().await?, 1, "{sql:?} paged wrong");
+    }
+
+    // The two shapes as first reported: a comment holding a marker number
+    // beyond the values, which a text walk read as a marker and indexed past
+    // the end of; and a dollar-quoted string a text walk rewrote into
+    // syntactically invalid SQL.
+    let commented = (
+        "SELECT $1::int4 AS n /* $99 is only a comment */",
+        Values(vec![Value::Int(Some(1))]),
+    );
+    assert_eq!(
+        commented
+            .clone()
+            .into_tuple::<i32>()
+            .paginate(&db, page_size(10))
+            .fetch_page(0)
+            .await?,
+        vec![commented.into_tuple::<i32>().one(&db).await?]
+    );
+
+    let quoted = (
+        "SELECT $1::int4 AS n, $$hello$$ AS msg",
+        Values(vec![Value::Int(Some(1))]),
+    );
+    assert_eq!(
+        quoted
+            .clone()
+            .into_tuple::<(i32, String)>()
+            .paginate(&db, page_size(10))
+            .fetch_page(0)
+            .await?,
+        vec![quoted.into_tuple::<(i32, String)>().one(&db).await?]
+    );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.paginator.raw+3/test]    a marker with no value behind
+// it is an `Error::Query` naming it, on every reader, rather than an index past
+// the end of the values
+#[pgorm_macros::test]
+async fn paginator_raw_rejects_unbound_marker() -> Result<(), Error> {
+    let ctx = TestContext::new("paginator_tests_raw_unbound").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    // Here the `$99` really is a marker: it is not inside a comment.
+    let paginator = (
+        "SELECT $1::int4 AS n, $99::int4 AS m",
+        Values(vec![Value::Int(Some(7))]),
+    )
+        .into_tuple::<(i32, i32)>()
+        .paginate(&db, page_size(10));
+
+    for reported in [
+        paginator.fetch_page(0).await.err(),
+        paginator.num_items().await.err(),
+        paginator.num_pages().await.err(),
+    ] {
+        let reported = reported.expect("an unbound marker was not refused");
+        assert!(
+            matches!(reported, Error::Query(_)),
+            "unexpected error: {reported:?}"
+        );
+        assert!(
+            reported
+                .to_string()
+                .contains("reading $99 when 1 bind value was supplied"),
+            "{reported} does not name the marker"
+        );
     }
 
     // Refusal is the paginator's, not the server's: the table is untouched.

@@ -3831,6 +3831,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-06, finding 4, severity P2. Confirmed on d778f24b. Sources: src/executor/paginator.rs:306-315 wraps bound SQL in Expr::cust_with_values; pgorm-query/src/backend/query_builder.rs:418-439 uses a tokenizer unaware of PostgreSQL comments/dollar strings and indexes values without validation. Reproductions: SELECT $1::int4 AS n /* $99 is only a comment */ with one int parameter executes directly but panics in fetch_page(0), index 98 into a one-element vector. SELECT $1::int4 AS n, $$hello$$ AS msg executes directly but pagination returns SQLSTATE 42601 after dollar quoting is rewritten. Acceptance: direct and paginated forms preserve SQL literal/comment contents and bind semantics; cover block/line comments, tagged/untagged dollar quotes, repeated/reordered parameters, array subscripts and out-of-range placeholders across fetch_page and count paths; invalid input returns a typed error, never a panic. Spec impact: revise [spec:pgorm:sem:exec.paginator.raw] v2 and whichever of [spec:pgorm:req:sql.render.custom-expr] / [spec:pgorm:sem:sql.token.limits] the chosen PostgreSQL-aware solution changes; the existing custom template $$ escape convention must not be confused with raw SQL. Governed by [dec:pgorm:no-panic]. Temporary reproductions: runtime_probes.rs in /private/tmp/pgorm-review.z9F5GS, probe_raw_pagination_tokens and probe_raw_pagination_comment."
                     }
+
+                    {
+                        at 2026-09-06T12:29:03.688424Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

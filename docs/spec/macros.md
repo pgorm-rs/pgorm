@@ -493,7 +493,7 @@ known limitations.
 > crate is a plain dependent and re-exports both as `pgorm::sql` and `pgorm::prql`,
 > unconditionally: the retired `sql-macro` feature only decided whether the name was in
 > scope — never whether anything was compiled, since `pg_query` is a plain dependency
-> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+2]` parses raw statements at
+> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+3]` parses raw statements at
 > runtime) and prqlc is a plain dependency by the same permanence posture
 > (`[spec:pgorm:def:pipeline.adapter+2]`) — and a gate that guards nothing is surface
 > without a state. The call sites are the escape hatches that take SQL as text —

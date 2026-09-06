@@ -297,7 +297,7 @@ including the remaining gaps in parameter binding.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw+2]
+> [spec:pgorm:sem:exec.paginator.raw+3]
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` 6.2.0 the render oracle and `sql!` use
@@ -314,14 +314,35 @@ including the remaining gaps in parameter binding.
 > An accepted statement is taken at the extent the parser reports for it,
 > which excludes any terminating `;` that a subquery position would
 > refuse, and is wrapped whole as
-> `SELECT * FROM (<statement>) AS "sub_statement"` — a custom expression
-> (`Expr::cust_with_values` when bind values are present, `Expr::cust`
-> otherwise) inside a fresh `SelectStatement`. Wrapping rather than
+> `SELECT * FROM (<statement>\n) AS "sub_statement"`. Wrapping rather than
 > splicing means `LIMIT` and `OFFSET` land outside the caller's own
 > clauses instead of colliding with them, so a raw statement that already
 > carries `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will
 > not reorder rows a subquery sorted, so the caller's `ORDER BY` still
-> governs page boundaries.
+> governs page boundaries. The newline before the closing parenthesis is
+> load-bearing: a statement ending in a `--` comment would otherwise
+> swallow it.
+>
+> The wrapped statement's text MUST be copied verbatim and MUST NOT be
+> re-lexed or rewritten — not by the `sql.token` tokenizer, which knows
+> neither PostgreSQL comments nor dollar quoting
+> (`[spec:pgorm:sem:sql.token.limits]`), and not by any other walk over
+> the text. The caller's `$N` markers therefore keep the numbers the
+> caller gave them, which is sound because nothing is bound ahead of
+> them: the page clauses the paginator appends are numbered from `$N+1`
+> where `N` is the count of bind values supplied, and the count query
+> (`[spec:pgorm:sem:exec.paginator.count]`) appends no markers at all.
+> Comment bodies, dollar-quoted strings (tagged and untagged),
+> single-quoted and E-string literals, and bracketed subscripts therefore
+> read the same paginated as they do executed directly, and a `$99`
+> written inside any of them stays text.
+>
+> A marker the caller supplied no value for is refused at `paginate`
+> rather than indexed. Which `$N` are markers is again PostgreSQL's own
+> answer rather than a guess from the text — the statement is scanned
+> with libpg_query's scanner — and any marker numbered above the count of
+> bind values is recorded as the reason there is no statement to page
+> over, naming the marker and how many values were supplied.
 >
 > Everything else — text the grammar rejects, a `;`-separated script, an
 > `INSERT`/`UPDATE`/`DELETE`/DDL statement, a `SELECT ... INTO` — is
