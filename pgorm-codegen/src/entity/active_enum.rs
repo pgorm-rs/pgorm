@@ -51,7 +51,7 @@ fn variant(value: &str) -> Variant {
 impl ActiveEnum {
     /// Each DB value paired with the Rust variant name it derives, read the way
     /// the generated variants are: trimmed, in declaration order.
-    // [spec:pgorm:req:codegen.entity.collisions]
+    // [spec:pgorm:req:codegen.entity.collisions+1]
     pub(crate) fn variant_names(&self) -> Vec<(String, String)> {
         self.values
             .iter()

@@ -1,16 +1,17 @@
-use super::{types, unresolved, unsupported};
-use crate::Error;
+use super::{table, types, unresolved, unsupported};
+use crate::{Error, TableIdent};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
 use pgorm_query::{
-    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _,
+    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _, IntoTableName,
+    TableName,
 };
 
 /// A `CREATE TYPE ... AS ENUM` as the name and values a column of that type
 /// carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects]
+// [spec:pgorm:sem:codegen.ddl.objects+1]
 pub(super) fn enum_type(stmt: &CreateEnumStmt, at: usize) -> Result<(String, Vec<String>), Error> {
     let names = types::idents(&stmt.type_name)
         .ok_or_else(|| unsupported("a computed type name in CREATE TYPE", at))?;
@@ -24,16 +25,19 @@ pub(super) fn enum_type(stmt: &CreateEnumStmt, at: usize) -> Result<(String, Vec
 
 /// A `CREATE INDEX`, and the table it belongs to.
 pub(super) struct ParsedIndex {
-    pub(super) table: String,
+    pub(super) table: TableIdent,
     /// The index as the table statement carries it — `None` for an index that
     /// states no entity fact, which has no place inside a `CREATE TABLE`.
     pub(super) index: Option<IndexCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects]
+// [spec:pgorm:sem:codegen.ddl.objects+1]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
-        Some(relation) if !relation.relname.is_empty() => relation.relname.clone(),
+        Some(relation) if !relation.relname.is_empty() => TableIdent {
+            table: relation.relname.clone(),
+            schema: table::schema_of(relation),
+        },
         _ => return Err(unresolved("CREATE INDEX without a table name", at)),
     };
     let name = if stmt.idxname.is_empty() {
@@ -91,7 +95,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let Some(first) = columns.next() else {
         return Err(on("an index over no columns"));
     };
-    let mut index = Index::create(Alias::new(table.as_str()), first);
+    let mut index = Index::create(target(&table), first);
     if !stmt.idxname.is_empty() {
         index.name(stmt.idxname.as_str());
     }
@@ -116,6 +120,16 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     })
 }
 
+/// A parsed identity back as the name a statement targets.
+// [spec:pgorm:sem:codegen.ddl.objects+1]
+fn target(ident: &TableIdent) -> TableName {
+    let table = Alias::new(ident.table.as_str());
+    match ident.schema.as_deref() {
+        Some(schema) => (Alias::new(schema), table).into_table_name(),
+        None => table.into_table_name(),
+    }
+}
+
 fn index_type(access_method: &str) -> Option<IndexType> {
     match access_method {
         "" | "btree" => None,
@@ -130,28 +144,28 @@ fn index_type(access_method: &str) -> Option<IndexType> {
 /// A `COMMENT ON` the bridge can attach to a table or one of its columns.
 pub(super) enum ParsedComment {
     Table {
-        table: String,
+        table: TableIdent,
         text: String,
     },
     Column {
-        table: String,
+        table: TableIdent,
         column: String,
         text: String,
     },
 }
 
 impl ParsedComment {
-    pub(super) fn table(&self) -> &str {
+    pub(super) fn table(&self) -> &TableIdent {
         match self {
             Self::Table { table, .. } | Self::Column { table, .. } => table,
         }
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects]
+// [spec:pgorm:sem:codegen.ddl.objects+1]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
-    let target = match ObjectType::try_from(stmt.objtype) {
-        Ok(target @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => target,
+    let kind = match ObjectType::try_from(stmt.objtype) {
+        Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,
         _ => {
             return Err(unsupported(
                 "COMMENT ON an object other than a table or column",
@@ -165,18 +179,29 @@ pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Er
     }
     .ok_or_else(|| unsupported("COMMENT ON a computed object name", at))?;
     let text = stmt.comment.clone();
-    match (target, names.as_slice()) {
-        (ObjectType::ObjectTable, [table] | [_, table]) => Ok(ParsedComment::Table {
-            table: table.clone(),
+    let named = |schema: Option<&String>, table: &String| TableIdent {
+        table: table.clone(),
+        schema: schema.cloned(),
+    };
+    match (kind, names.as_slice()) {
+        (ObjectType::ObjectTable, [table]) => Ok(ParsedComment::Table {
+            table: named(None, table),
             text,
         }),
-        (ObjectType::ObjectColumn, [table, column] | [_, table, column]) => {
-            Ok(ParsedComment::Column {
-                table: table.clone(),
-                column: column.clone(),
-                text,
-            })
-        }
+        (ObjectType::ObjectTable, [schema, table]) => Ok(ParsedComment::Table {
+            table: named(Some(schema), table),
+            text,
+        }),
+        (ObjectType::ObjectColumn, [table, column]) => Ok(ParsedComment::Column {
+            table: named(None, table),
+            column: column.clone(),
+            text,
+        }),
+        (ObjectType::ObjectColumn, [schema, table, column]) => Ok(ParsedComment::Column {
+            table: named(Some(schema), table),
+            column: column.clone(),
+            text,
+        }),
         _ => Err(unresolved("COMMENT ON names no readable object", at)),
     }
 }

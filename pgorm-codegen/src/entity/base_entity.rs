@@ -1,17 +1,54 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::ColumnType;
+use pgorm_query::{ColumnType, TableName};
 use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
+use std::fmt;
 
 use crate::{
     Column, ConjunctRelation, DateTimeCrate, Error, PrimaryKey, Relation,
     util::{escape_rust_keyword, safe_ident},
 };
 
+/// Which table a name names: the bare table name, and the schema its DDL
+/// qualified it with, when it carried one.
+///
+/// Ordered by bare name first, so the entity map — and every output that walks
+/// it — stays alphabetical by table name however the schemas sort.
+// [spec:pgorm:sem:codegen.entity.transform+7]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TableIdent {
+    pub table: String,
+    pub schema: Option<String>,
+}
+
+impl TableIdent {
+    /// The identity a DDL statement's table name spells.
+    // [spec:pgorm:sem:codegen.entity.transform+7]
+    pub fn of(name: &TableName) -> Self {
+        Self {
+            table: name.table().to_string(),
+            schema: name.schema().map(|schema| schema.to_string()),
+        }
+    }
+}
+
+/// As the schema wrote it: `schema.table`, or `table` when unqualified.
+// [spec:pgorm:sem:codegen.entity.transform+7]
+impl fmt::Display for TableIdent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.schema {
+            Some(schema) => write!(f, "{schema}.{}", self.table),
+            None => f.write_str(&self.table),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Entity {
     pub(crate) table_name: String,
+    /// The schema the source table was qualified with, kept as written.
+    pub(crate) schema_name: Option<String>,
     pub(crate) columns: Vec<Column>,
     pub(crate) relations: Vec<Relation>,
     pub(crate) conjunct_relations: Vec<ConjunctRelation>,
@@ -19,12 +56,30 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// Which table this entity is generated from.
+    // [spec:pgorm:sem:codegen.entity.transform+7]
+    pub fn ident(&self) -> TableIdent {
+        TableIdent {
+            table: self.table_name.clone(),
+            schema: self.schema_name.clone(),
+        }
+    }
+
+    /// The schema the generated entity names: the source table's own qualifier
+    /// when it had one, else the configured default. A fact the schema states
+    /// is never overridden by an option.
+    // [spec:pgorm:sem:codegen.entity.transform+7]
+    pub fn effective_schema<'a>(&'a self, default: &'a Option<String>) -> Option<&'a str> {
+        self.schema_name.as_deref().or(default.as_deref())
+    }
+
     /// Everything the writer derives from this entity's DB names, checked while
     /// the caller can still be handed the failure.
-    // [spec:pgorm:sem:codegen.entity.transform+6]
+    // [spec:pgorm:sem:codegen.entity.transform+7]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        let table = self.table_name.as_str();
+        let qualified = self.ident().to_string();
+        let table = qualified.as_str();
         let context = format!("table `{table}`");
         safe_ident(
             &context,
@@ -240,6 +295,7 @@ mod tests {
     fn setup() -> Entity {
         Entity {
             table_name: "special_cake".to_owned(),
+            schema_name: None,
             columns: vec![
                 Column {
                     name: "id".to_owned(),
@@ -259,6 +315,7 @@ mod tests {
             relations: vec![
                 Relation {
                     ref_table: "fruit".to_owned(),
+                    ref_schema: None,
                     columns: vec!["id".to_owned()],
                     ref_columns: vec!["cake_id".to_owned()],
                     rel_type: RelationType::HasOne,
@@ -270,6 +327,7 @@ mod tests {
                 },
                 Relation {
                     ref_table: "filling".to_owned(),
+                    ref_schema: None,
                     columns: vec!["id".to_owned()],
                     ref_columns: vec!["cake_id".to_owned()],
                     rel_type: RelationType::HasOne,

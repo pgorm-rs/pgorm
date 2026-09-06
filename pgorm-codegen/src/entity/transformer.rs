@@ -1,6 +1,6 @@
 use crate::{
     ActiveEnum, Column, ConjunctRelation, Entity, EntityWriter, Error, PrimaryKey, Relation,
-    RelationType, util::escape_rust_keyword,
+    RelationType, TableIdent, util::escape_rust_keyword,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ColumnSpec, TableCreateStatement};
@@ -10,16 +10,22 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+6]
+    // [spec:pgorm:sem:codegen.entity.transform+7]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
-    // [spec:pgorm:req:codegen.entity.collisions]
+    // [spec:pgorm:req:codegen.entity.collisions+1]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {
+        let declared: Vec<TableIdent> = table_create_stmts
+            .iter()
+            .map(|table_create| TableIdent::of(table_create.get_table_name()))
+            .collect();
+        validate_distinct_names(&declared)?;
         let mut enums: BTreeMap<String, ActiveEnum> = BTreeMap::new();
-        let mut inverse_relations: BTreeMap<String, Vec<Relation>> = BTreeMap::new();
-        let mut entities = BTreeMap::new();
+        let mut inverse_relations: BTreeMap<TableIdent, Vec<Relation>> = BTreeMap::new();
+        let mut entities: BTreeMap<TableIdent, Entity> = BTreeMap::new();
         for table_create in table_create_stmts.into_iter() {
-            let table_name = table_create.get_table_name().table().to_string();
+            let ident = TableIdent::of(table_create.get_table_name());
+            let table_name = ident.to_string();
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
                 .get_indexes()
                 .iter()
@@ -60,28 +66,34 @@ impl EntityTransformer {
                 }
                 columns.push(col);
             }
-            let mut ref_table_counts: BTreeMap<String, usize> = BTreeMap::new();
+            let mut ref_table_counts: BTreeMap<TableIdent, usize> = BTreeMap::new();
             let foreign_keys: Vec<Relation> = table_create
                 .get_foreign_key_create_stmts()
                 .iter()
-                .map(|fk_create_stmt| Relation::from(fk_create_stmt.get_foreign_key()))
+                .map(|fk_create_stmt| {
+                    let mut relation = Relation::from(fk_create_stmt.get_foreign_key());
+                    if let Some(target) = resolve_reference(&declared, &relation.ref_ident()) {
+                        relation.ref_schema = target.schema.clone();
+                    }
+                    relation
+                })
                 .collect();
             for relation in foreign_keys.iter() {
-                if let Some(count) = ref_table_counts.get_mut(&relation.ref_table) {
+                if let Some(count) = ref_table_counts.get_mut(&relation.ref_ident()) {
                     if *count == 0 {
                         *count = 1;
                     }
                     *count += 1;
                 } else {
-                    ref_table_counts.insert(relation.ref_table.clone(), 0);
+                    ref_table_counts.insert(relation.ref_ident(), 0);
                 }
             }
             let relations: Vec<Relation> = foreign_keys
                 .into_iter()
                 .rev()
                 .map(|mut rel: Relation| {
-                    rel.self_referencing = rel.ref_table == table_name;
-                    if let Some(count) = ref_table_counts.get_mut(&rel.ref_table) {
+                    rel.self_referencing = rel.ref_ident() == ident;
+                    if let Some(count) = ref_table_counts.get_mut(&rel.ref_ident()) {
                         rel.num_suffix = *count;
                         if *count > 0 {
                             *count -= 1;
@@ -106,13 +118,14 @@ impl EntityTransformer {
                     }),
             );
             let entity = Entity {
-                table_name: table_name.clone(),
+                table_name: ident.table.clone(),
+                schema_name: ident.schema.clone(),
                 columns,
                 relations: relations.clone(),
                 conjunct_relations: vec![],
                 primary_keys,
             };
-            entities.insert(table_name.clone(), entity.clone());
+            entities.insert(ident.clone(), entity.clone());
             for mut rel in relations.into_iter() {
                 // This will produce a duplicated relation
                 if rel.self_referencing {
@@ -123,7 +136,7 @@ impl EntityTransformer {
                 if rel.num_suffix > 0 {
                     continue;
                 }
-                let ref_table = rel.ref_table;
+                let ref_table = rel.ref_ident();
                 let key_columns: BTreeSet<String> = rel.columns.iter().cloned().collect();
                 let every_column_unique = rel.columns.iter().all(|column| {
                     entity
@@ -147,7 +160,8 @@ impl EntityTransformer {
                     RelationType::HasMany
                 };
                 rel.rel_type = rel_type;
-                rel.ref_table = table_name.to_string();
+                rel.ref_table = ident.table.clone();
+                rel.ref_schema = ident.schema.clone();
                 rel.columns = Vec::new();
                 rel.ref_columns = Vec::new();
                 if let Some(vec) = inverse_relations.get_mut(&ref_table) {
@@ -172,8 +186,8 @@ impl EntityTransformer {
                 }
             }
         }
-        let mut conjunct_relations: Vec<(String, ConjunctRelation)> = Vec::new();
-        for (table_name, entity) in entities.iter() {
+        let mut conjunct_relations: Vec<(TableIdent, ConjunctRelation)> = Vec::new();
+        for (ident, entity) in entities.iter() {
             // only the table's own foreign keys are junction legs; the inverse
             // relations synthesised above are relations of other tables' keys
             let owned: Vec<&Relation> = entity
@@ -198,9 +212,9 @@ impl EntityTransformer {
             }
             for (rel, another_rel) in [(one, other), (other, one)] {
                 conjunct_relations.push((
-                    rel.ref_table.clone(),
+                    rel.ref_ident(),
                     ConjunctRelation {
-                        via: table_name.clone(),
+                        via: ident.table.clone(),
                         to: another_rel.ref_table.clone(),
                     },
                 ));
@@ -258,16 +272,67 @@ impl EntityTransformer {
     }
 }
 
+/// Which table a foreign key, index or comment names, read against the tables
+/// the schema declares.
+///
+/// A qualified reference names exactly that table. An unqualified one names
+/// the table written without a qualifier, and failing that the one table with
+/// that bare name — the reading `search_path` would give it in any schema that
+/// generates at all, since two tables sharing a bare name are refused before
+/// this is reached (`validate_distinct_names`).
+// [spec:pgorm:sem:codegen.entity.transform+7]
+pub(crate) fn resolve_reference<'a>(
+    declared: &'a [TableIdent],
+    reference: &TableIdent,
+) -> Option<&'a TableIdent> {
+    if let Some(exact) = declared.iter().find(|candidate| *candidate == reference) {
+        return Some(exact);
+    }
+    if reference.schema.is_some() {
+        return None;
+    }
+    let mut by_name = declared
+        .iter()
+        .filter(|candidate| candidate.table == reference.table);
+    let only = by_name.next()?;
+    by_name.next().is_none().then_some(only)
+}
+
+/// One table per bare name. Two tables that share one would be written to a
+/// single file, and an unqualified reference to that name could mean either;
+/// the schemas are what tells them apart, and a generation run has one output
+/// directory to tell them apart in.
+// [spec:pgorm:req:codegen.entity.collisions+1]
+fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
+    let mut claimed: HashMap<&str, &TableIdent> = HashMap::new();
+    for ident in declared.iter() {
+        let Some(first) = claimed.insert(ident.table.as_str(), ident) else {
+            continue;
+        };
+        if first == ident {
+            return Err(Error::TransformError(format!(
+                "table `{ident}` is declared twice"
+            )));
+        }
+        let module = escape_rust_keyword(ident.table.to_snake_case());
+        return Err(Error::TransformError(format!(
+            "tables `{first}` and `{ident}` both generate the module name `{module}`: same-named \
+             tables in different schemas are different tables, and need one generation run each"
+        )));
+    }
+    Ok(())
+}
+
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+6]
-fn validate_references(entities: &BTreeMap<String, Entity>) -> Result<(), Error> {
+// [spec:pgorm:sem:codegen.entity.transform+7]
+fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {
-            let ref_table = relation.ref_table.as_str();
+            let ref_table = relation.ref_ident();
             let context = format!("table `{table_name}`: relation to `{ref_table}`");
-            let Some(ref_entity) = entities.get(ref_table) else {
+            let Some(ref_entity) = entities.get(&ref_table) else {
                 return Err(Error::TransformError(format!(
                     "{context} names a table the schema does not define"
                 )));
@@ -297,25 +362,26 @@ fn validate_references(entities: &BTreeMap<String, Entity>) -> Result<(), Error>
 /// and declare the module twice; two columns of a table, two enums or two
 /// values of one enum that derive one identifier would each emit a duplicate
 /// definition.
-// [spec:pgorm:req:codegen.entity.collisions]
+// [spec:pgorm:req:codegen.entity.collisions+1]
 fn validate_identities(
-    entities: &BTreeMap<String, Entity>,
+    entities: &BTreeMap<TableIdent, Entity>,
     enums: &BTreeMap<String, ActiveEnum>,
 ) -> Result<(), Error> {
     let mut modules = Claims::default();
     let mut types = Claims::default();
-    for (table_name, entity) in entities.iter() {
+    for (ident, entity) in entities.iter() {
+        let table_name = ident.to_string();
         modules.claim(
             "tables",
             "module name",
             escape_rust_keyword(entity.get_table_name_snake_case()),
-            table_name,
+            &table_name,
         )?;
         types.claim(
             "tables",
             "type name",
             escape_rust_keyword(entity.get_table_name_camel_case()),
-            table_name,
+            &table_name,
         )?;
         let mut fields = Claims::default();
         let whose = format!("table `{table_name}` columns");
@@ -347,7 +413,7 @@ fn validate_identities(
 
 /// The DB name that claimed each derived identifier, so a second claim on one
 /// can name both sides.
-// [spec:pgorm:req:codegen.entity.collisions]
+// [spec:pgorm:req:codegen.entity.collisions+1]
 #[derive(Default)]
 struct Claims(HashMap<String, String>);
 

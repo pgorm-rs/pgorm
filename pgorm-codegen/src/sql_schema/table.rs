@@ -1,5 +1,5 @@
 use super::{Enums, types, unresolved, unsupported};
-use crate::Error;
+use crate::{Error, TableIdent};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar};
 use pgorm_query::{
@@ -17,13 +17,23 @@ pub(super) struct Attachments {
     pub(super) column_comments: BTreeMap<String, (usize, String)>,
 }
 
-/// The bare table name, which is the key every other statement — and the
-/// entity transformer — refers to a table by.
-pub(super) fn relname(stmt: &CreateStmt) -> &str {
+/// The identity a `CREATE TABLE` declares — schema and all — which is the key
+/// every other statement, and the entity transformer, refers to a table by.
+// [spec:pgorm:sem:codegen.ddl.objects+1]
+pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
     stmt.relation
         .as_ref()
-        .map(|relation| relation.relname.as_str())
+        .map(|relation| TableIdent {
+            table: relation.relname.clone(),
+            schema: schema_of(relation),
+        })
         .unwrap_or_default()
+}
+
+/// The schema a DDL statement's name is qualified with, if any.
+// [spec:pgorm:sem:codegen.ddl.objects+1]
+pub(super) fn schema_of(relation: &RangeVar) -> Option<String> {
+    Some(relation.schemaname.clone()).filter(|schema| !schema.is_empty())
 }
 
 /// The table name, refusing a `CREATE TABLE` that somehow names nothing.

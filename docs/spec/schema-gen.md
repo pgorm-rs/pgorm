@@ -68,7 +68,7 @@ executes SQL.
 > scalar and an array of it, say) yield one statement, because Postgres has no
 > `CREATE TYPE IF NOT EXISTS` and re-creating a type is an error rather than a
 > no-op. Both halves match the generation path
-> (`[spec:pgorm:sem:codegen.entity.transform+6]`), which registers an
+> (`[spec:pgorm:sem:codegen.entity.transform+7]`), which registers an
 > `ActiveEnum` for every column whose array-inner type is `ColumnType::Enum`,
 > keyed by enum name.
 > `Schema::create_enum_from_active_enum::<A>()` builds the same statement from

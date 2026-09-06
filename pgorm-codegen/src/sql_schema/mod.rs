@@ -34,7 +34,10 @@ mod objects;
 mod table;
 mod types;
 
-use crate::{EntityTransformer, EntityWriterContext, EntityWriterOptions, Error, WriterOutput};
+use crate::{
+    EntityTransformer, EntityWriterContext, EntityWriterOptions, Error, TableIdent, WriterOutput,
+    resolve_reference,
+};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{CommentStmt, CreateStmt, IndexStmt};
 use pgorm_query::TableCreateStatement;
@@ -119,7 +122,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Resolve the collected statements against each other: enum types into the
 /// columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects]
+// [spec:pgorm:sem:codegen.ddl.objects+1]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         enums,
@@ -128,19 +131,39 @@ fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
         comments,
     } = collected;
 
-    let mut positions: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut declared: Vec<TableIdent> = Vec::with_capacity(tables.len());
+    let mut positions: BTreeMap<TableIdent, usize> = BTreeMap::new();
     for (position, (at, stmt)) in tables.iter().enumerate() {
-        let name = table::name(stmt, *at)?;
-        if positions.insert(table::relname(stmt), position).is_some() {
-            return Err(unresolved(format!("table `{name}` is declared twice"), *at));
+        table::name(stmt, *at)?;
+        let ident = table::ident(stmt);
+        if positions.insert(ident.clone(), position).is_some() {
+            return Err(unresolved(
+                format!("table `{ident}` is declared twice"),
+                *at,
+            ));
         }
+        declared.push(ident);
     }
 
     let mut attachments: Vec<table::Attachments> = Vec::new();
     attachments.resize_with(tables.len(), table::Attachments::default);
-    let position_of = |table: &str, at: usize| -> Result<usize, Error> {
+    let position_of = |table: &TableIdent, at: usize| -> Result<usize, Error> {
+        let Some(target) = resolve_reference(&declared, table) else {
+            let ambiguous = table.schema.is_none()
+                && declared
+                    .iter()
+                    .any(|declared| declared.table == table.table);
+            return Err(unresolved(
+                if ambiguous {
+                    format!("`{table}` names more than one table")
+                } else {
+                    format!("no CREATE TABLE for table `{table}`")
+                },
+                at,
+            ));
+        };
         positions
-            .get(table)
+            .get(target)
             .copied()
             .ok_or_else(|| unresolved(format!("no CREATE TABLE for table `{table}`"), at))
     };

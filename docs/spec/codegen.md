@@ -9,12 +9,14 @@ golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
 a live database reach the same pipeline through `sql_schema`, specified under
 [Schema from DDL text](#schema-from-ddl-text).
 
-> [spec:pgorm:def:codegen.entity+1]
+> [spec:pgorm:def:codegen.entity+2]
 > The entity generator is the pipeline
 > `EntityTransformer::transform(Vec<TableCreateStatement>) -> EntityWriter`
 > followed by `EntityWriter::generate(&EntityWriterContext) -> WriterOutput`.
-> An `Entity` carries `table_name`, `columns` (name, `ColumnType`,
-> `auto_increment`, `not_null`, `unique`), `relations`, `conjunct_relations`,
+> An `Entity` carries `table_name`, `schema_name` (the source table's own
+> qualifier, `None` when it had none — `codegen.entity.transform`), `columns`
+> (name, `ColumnType`, `auto_increment`, `not_null`, `unique`), `relations`,
+> `conjunct_relations`,
 > and `primary_keys`. A `WriterOutput` is a list of `OutputFile { name, content }`
 > — the writer never touches the filesystem; callers (e.g. `pgorm-cli`) write
 > the files and run `rustfmt` over them.
@@ -32,14 +34,47 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+6]
+> [spec:pgorm:sem:codegen.entity.transform+7]
 > `EntityTransformer::transform` builds one `Entity` per input
-> `TableCreateStatement`. The table name is unpacked from either `TableName`
-> form (`Table` and `SchemaTable`, the schema discarded); every statement has
-> one, so the read cannot fail and the
+> `TableCreateStatement`. A table's identity is the `TableIdent` its
+> `TableName` spells: the bare name, and the schema qualifying it when the
+> form is `SchemaTable`. The schema is kept, not discarded — it becomes the
+> entity's `schema_name` and, through it, the `schema_name` the generated
+> entity declares (`codegen.entity.context`). Discarding it made every
+> generated statement depend on the session's `search_path`: an entity read
+> from `tenant_a.item` named only `item`, so its CRUD could reach a different
+> schema's `item`, and the schema the DDL bridge had faithfully preserved
+> (`codegen.ddl.tables`) was thrown away one stage later. Every statement has
+> a name, so the read cannot fail and the
 > `TransformError("Table name should not be empty")` that stood in for the
 > nameless case is gone with the state it guarded
 > (`[spec:pgorm:req:sql.ddl.create-table+6]`), and MUST NOT come back.
+>
+> Identity is what every lookup keys on: the entity map, the per-target
+> counters behind `num_suffix`, the `self_referencing` test, and the inverse
+> and conjunct relations synthesised below — `tenant_a.item` and
+> `tenant_b.item` are two tables, and a key onto one is not a key onto the
+> other. A `Relation` carries its target's identity as `ref_schema` beside
+> `ref_table`; only the bare name reaches the generated text, since a module
+> path names one table and the collision gate is what makes that so
+> (`codegen.entity.collisions`).
+>
+> A reference — a foreign key's target here, an index's or comment's table in
+> the DDL bridge (`codegen.ddl.objects`) — resolves by one rule: a
+> schema-qualified reference names exactly that table, and an unqualified one
+> names the table written without a qualifier, failing that the one table
+> with that bare name. The second clause is `search_path`'s reading of an
+> unqualified name in the only case where it has one answer, and it is total
+> wherever generation is possible at all: two tables sharing a bare name are
+> refused before any reference is resolved (`codegen.entity.collisions`), so
+> "the one table with that bare name" cannot be several. A reference that
+> resolves to nothing keeps the name it was written with, and is reported by
+> the closure check below.
+>
+> Every failure this gate reports names a table by its identity —
+> `` table `tenant_a.item` `` for a qualified table, `` table `item` `` for an
+> unqualified one — so a message about one of two same-named tables says
+> which. `<table>` below is that identity.
 >
 > Per column: `auto_increment`, `not_null` and `unique` come from the
 > presence of the matching `ColumnSpec` on the column definition; a column
@@ -112,11 +147,11 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `Fruit2` and `fruit_id2` becomes `Fruit1`). A single FK to a target keeps
 > suffix 0.
 >
-> Entities are held in a `BTreeMap` keyed by table name, so all outputs that
-> iterate entities (entity files, `mod.rs`, `prelude.rs`) are ordered
-> alphabetically by table name. Before writing, each entity's `relations`
-> are sorted by referenced table name and its `conjunct_relations` by target
-> name.
+> Entities are held in a `BTreeMap` keyed by identity, ordered by bare name
+> before schema, so all outputs that iterate entities (entity files,
+> `mod.rs`, `prelude.rs`) are ordered alphabetically by table name whatever
+> the schemas sort like. Before writing, each entity's `relations` are sorted
+> by referenced table name and its `conjunct_relations` by target name.
 
 > [spec:pgorm:sem:codegen.entity.transform.inverse+1]
 > For every non-self-referencing relation with `num_suffix == 0`, the
@@ -175,12 +210,29 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > per entity. Entity-file code blocks are joined with blank lines; content
 > is unformatted `TokenStream` text (callers are expected to run rustfmt).
 
-> [spec:pgorm:sem:codegen.entity.context+1]
+> [spec:pgorm:sem:codegen.entity.context+2]
 > `EntityWriterContext::new` takes one `EntityWriterOptions` struct — every
 > generation option is a named field, and its `Default` is the no-flags
 > shape (compact format, no serde, chrono, `mod.rs`) — and returns
-> `Result<EntityWriterContext, Error>`. It normalizes the option lists at
-> construction:
+> `Result<EntityWriterContext, Error>`.
+>
+> The `schema_name` option is a **default, not an override**: an entity's
+> schema name is the source table's own qualifier when it has one
+> (`codegen.entity.transform`), and the option only when it has none. This is
+> the direction that cannot lie. The qualifier is a fact the schema states
+> about where the table is, and an option that overrode it would generate an
+> entity naming a schema the table is demonstrably not in — the very failure
+> discarding the qualifier used to produce. The option's job is the
+> complementary one: naming the schema that discovery ran against, which is
+> precisely the schema an unqualified name belongs to. So the two never
+> disagree, and generating a mixed-schema DDL with `schema_name` set gives
+> each table the schema it is actually in. `EntityWriter::gen_schema_name`
+> takes the entity and the option and applies that precedence, so no
+> generator can be written that forgets it; "a schema name is configured", in
+> `codegen.entity.compact`, `codegen.entity.compact.model` and
+> `codegen.entity.expanded`, means the result of it.
+>
+> `new` normalizes the option lists at construction:
 > `model_extra_derives` / `enum_extra_derives` pass through `bonus_derive`,
 > which parses each string as a `TokenStream` and folds them into a single
 > leading-comma fragment (`, A, B`); `model_extra_attributes` /
@@ -202,7 +254,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Compact and expanded formats
 
-> [spec:pgorm:def:codegen.entity.compact]
+> [spec:pgorm:def:codegen.entity.compact+1]
 > The compact format (default, `expanded_format == false`) emits per entity,
 > in order: the imports (`use pgorm::entity::prelude::*;`, serde imports,
 > and one `use super::pgorm_active_enums::<EnumName>;` per distinct enum
@@ -210,7 +262,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `Clone, Debug, PartialEq, DeriveEntityModel` (plus `Eq`, serde derives,
 > and extra derives) annotated with
 > `#[pgorm(schema_name = "...", table_name = "...")]` (`schema_name` only
-> when configured); a `Relation` enum deriving
+> when the entity has one — its source table's qualifier, else the configured
+> default, per `codegen.entity.context`); a `Relation` enum deriving
 > `Copy, Clone, Debug, EnumIter, DeriveRelation` whose variants carry
 > `#[pgorm(...)]` relation attributes (an entity with no relations emits the
 > empty `pub enum Relation {}`); the `Related` impls; and
@@ -218,13 +271,16 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expands the Entity/Column/PrimaryKey machinery that the expanded format
 > spells out.
 
-> [spec:pgorm:def:codegen.entity.expanded]
+> [spec:pgorm:def:codegen.entity.expanded+1]
 > The expanded format (`expanded_format == true`) emits per entity, in
 > order: the same imports; `#[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 > pub struct Entity;`; `impl EntityName for Entity` containing
 > `fn schema_name(&self) -> Option<&str>` returning `Some("...")` only when
-> a schema name is configured, and `fn table_name(&self) -> &str` returning
-> the table name literal; a `Model` struct deriving
+> the entity has a schema name — its source table's qualifier, else the
+> configured default, per `codegen.entity.context` — and
+> `fn table_name(&self) -> &str` returning
+> the table name literal, which is the bare name in either case; a `Model`
+> struct deriving
 > `Clone, Debug, PartialEq, DeriveModel, DeriveActiveModel` (plus `Eq`,
 > serde, extras) with no `#[pgorm(...)]` struct attribute; a `Column` enum
 > deriving `Copy, Clone, Debug, EnumIter, DeriveColumn` (variants of
@@ -253,13 +309,15 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > the column is unique. Fields needing none of these carry no `#[pgorm]`
 > attribute.
 
-> [spec:pgorm:sem:codegen.entity.compact.model]
+> [spec:pgorm:sem:codegen.entity.compact.model+1]
 > `gen_compact_model_struct` emits the compact `Model` as one block: the
 > derive attribute `Clone, Debug, PartialEq, DeriveEntityModel` followed by
 > the `Eq` slot, the serde fragment (`codegen.entity.serde.derives`), and
 > `model_extra_derives`; the struct attribute
 > `#[pgorm(schema_name = "...", table_name = "...")]` (the `schema_name =`
-> part present only when a schema name is configured); then
+> part present only when the entity has a schema name, and carrying the
+> entity's, not the option's, when the two differ —
+> `codegen.entity.context`); then
 > `model_extra_attributes` as further attribute lines. Fields follow the
 > entity's column order; each field is the keyword-escaped snake_case
 > column name (`codegen.entity.keywords`) typed per `codegen.entity.types`,
@@ -522,7 +580,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > in the writer are downstream of that check and cannot panic on validated
 > input.
 
-> [spec:pgorm:req:codegen.entity.collisions]
+> [spec:pgorm:req:codegen.entity.collisions+1]
 > Every identity the writer derives from a DB name MUST be one name's alone,
 > and the `transform` gate refuses a schema in which two names claim one. The
 > namespaces checked are: the module name a table derives — and with it the
@@ -533,7 +591,26 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > (`codegen.entity.keywords`) is applied before the comparison, so the rescue
 > cannot itself introduce a collision.
 >
-> A refusal names both DB names and the identity they share:
+> Two tables that share a bare name across schemas — `tenant_a.item` and
+> `tenant_b.item`, or `tenant_a.item` and a bare `item`, whose sameness is
+> `search_path`'s business and not the generator's — are the case where both
+> DB names are right and the collision is the generator's, not the schema's:
+> they each need a module, they cannot be told apart by the only name a
+> module has, and a run has one output directory to put them in.
+> They are refused first, before any table is read, because the schemas that
+> tell them apart are exactly what every later lookup by bare name would have
+> to guess at (`codegen.entity.transform`) — the refusal is what makes the
+> unqualified-reference rule total. The message names both identities and the
+> way out:
+> ``TransformError("tables `tenant_a.item` and `tenant_b.item` both generate
+> the module name `item`: same-named tables in different schemas are different
+> tables, and need one generation run each")``. One identity passed twice is a
+> different mistake and says so: ``TransformError("table `<table>` is declared
+> twice")``, the wording the DDL bridge already uses for it
+> (`codegen.ddl.unsupported`).
+>
+> Every other refusal names both DB names — as identities, so a qualified
+> table is named with its schema — and the identifier they share:
 > ``TransformError("tables `<first>` and `<second>` both generate the module
 > name `<derived>`")``, and in the same shape
 > ``tables `<first>` and `<second>` both generate the type name `<derived>` ``,
@@ -711,7 +788,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects]
+> [spec:pgorm:sem:codegen.ddl.objects+1]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -725,8 +802,26 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `gin` → `IndexType::FullText`, anything else `IndexType::Custom`);
 > `codegen.entity.transform` then reads a single-column unique index as that
 > column's `unique` flag. `COMMENT ON TABLE` becomes the statement's comment and
-> `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column; both accept a
-> schema-qualified target and both attach by table name, the same key the
-> transformer holds tables under. Neither comment reaches the generated
-> entities, which have no comment surface — they ride on the statements so a
-> caller reading `parse_schema`'s output still has them.
+> `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column. Neither
+> comment reaches the generated entities, which have no comment surface — they
+> ride on the statements so a caller reading `parse_schema`'s output still has
+> them.
+>
+> Tables are held by identity — schema and bare name, the same key the
+> transformer holds them under (`codegen.entity.transform`) — and an index or
+> comment attaches by resolving its own target against them, by that rule: a
+> qualified target names exactly that table, an unqualified one the table
+> written without a qualifier, failing that the one table with that bare
+> name. So a schema-qualified `CREATE INDEX` or `COMMENT ON` reaches its own
+> table rather than whichever table happened to share the bare name, and a
+> `CREATE INDEX` a qualifier makes generated for a table the file never
+> creates is ``unresolved("no CREATE TABLE for table `tenant_b.item`")``
+> rather than a fact quietly folded into `tenant_a.item`. The unqualified
+> case is the only one that can be answered by more than one table, and it is
+> named rather than guessed at:
+> ``TransformError("statement <n>: `item` names more than one table")``. Two
+> tables with one bare name cannot be generated at all
+> (`codegen.entity.collisions`), so this is reachable only from
+> `parse_schema` read on its own. `is declared twice` likewise compares
+> identities: two `CREATE TABLE`s for one bare name in different schemas are
+> two tables, and the file is read.

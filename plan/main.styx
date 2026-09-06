@@ -3802,6 +3802,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-06, finding 3, severity P2. Confirmed on d778f24b. Source: pgorm-codegen/src/entity/transformer.rs:22 extracts only table(); the entity representation and writer use a global schema option rather than the source table schema. Reproduction: entities_from_sql(\"CREATE TABLE tenant_a.item (id int PRIMARY KEY);\", EntityWriterOptions::default()) succeeds but emits item.rs with table_name = \"item\" and no schema_name. Resulting CRUD depends on search_path and can target another schema's item table. Acceptance: preserve each source table's schema through transformation and both compact/expanded output; define the interaction with an explicit schema_name override; test generated entities with a conflicting same-named table on search_path and confirm queries target the intended table; retain collision detection and qualify relation identities consistently. Spec impact: [spec:pgorm:sem:codegen.entity.transform] v6 explicitly discards schemas and must be revised; [spec:pgorm:sem:codegen.ddl.tables] v2 already preserves them at parse time. Review writer schema and collision contracts with the implementation. Depends on completed DDL generation and identity validation. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/codegen_probe.rs, probe_schema_identity."
                     }
+
+                    {
+                        at 2026-09-06T12:21:48.870962Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

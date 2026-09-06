@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
 
-// [spec:pgorm:def:codegen.entity+1]
+// [spec:pgorm:def:codegen.entity+2]
 #[derive(Clone, Debug)]
 pub struct EntityWriter {
     pub(crate) entities: Vec<Entity>,
@@ -42,7 +42,7 @@ pub enum DateTimeCrate {
 
 /// Every generation option, named. `Default` is the no-flags shape: compact
 /// format, no serde, chrono, `mod.rs`.
-// [spec:pgorm:sem:codegen.entity.context+1]
+// [spec:pgorm:sem:codegen.entity.context+2]
 #[derive(Debug, Default)]
 pub struct EntityWriterOptions {
     pub expanded_format: bool,
@@ -107,7 +107,7 @@ impl WithSerde {
 
 /// Converts *_extra_derives argument to token stream. `option` names the
 /// option the strings came from, so a rejection points at the caller's field.
-// [spec:pgorm:sem:codegen.entity.context+1]    extra-derive normalization
+// [spec:pgorm:sem:codegen.entity.context+2]    extra-derive normalization
 pub(crate) fn bonus_derive<T, I>(option: &str, extra_derives: I) -> Result<TokenStream, Error>
 where
     T: Into<String>,
@@ -123,7 +123,7 @@ where
 }
 
 /// convert *_extra_attributes argument to token stream
-// [spec:pgorm:sem:codegen.entity.context+1]    extra-attribute normalization
+// [spec:pgorm:sem:codegen.entity.context+2]    extra-attribute normalization
 pub(crate) fn bonus_attributes<T, I>(option: &str, attributes: I) -> Result<TokenStream, Error>
 where
     T: Into<String>,
@@ -141,7 +141,7 @@ where
     )
 }
 
-// [spec:pgorm:sem:codegen.entity.context+1]
+// [spec:pgorm:sem:codegen.entity.context+2]
 fn parse_bonus(option: &str, source: &str) -> Result<TokenStream, Error> {
     source.parse().map_err(|_| {
         Error::TransformError(format!(
@@ -170,7 +170,7 @@ impl FromStr for WithSerde {
 }
 
 impl EntityWriterContext {
-    // [spec:pgorm:sem:codegen.entity.context+1]
+    // [spec:pgorm:sem:codegen.entity.context+2]
     pub fn new(options: EntityWriterOptions) -> Result<Self, Error> {
         Ok(Self {
             expanded_format: options.expanded_format,
@@ -214,7 +214,7 @@ impl EntityWriter {
     }
 
     // [spec:pgorm:sem:codegen.entity.serde.skip]
-    // [spec:pgorm:sem:codegen.entity.context+1]    date_time_crate threading
+    // [spec:pgorm:sem:codegen.entity.context+2]    date_time_crate threading
     pub fn write_entities(&self, context: &EntityWriterContext) -> Vec<OutputFile> {
         self.entities
             .iter()
@@ -367,7 +367,7 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded]
+    // [spec:pgorm:def:codegen.entity.expanded+1]
     // [spec:pgorm:sem:codegen.entity.expanded.blocks+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
@@ -408,7 +408,7 @@ impl EntityWriter {
         code_blocks
     }
 
-    // [spec:pgorm:def:codegen.entity.compact]
+    // [spec:pgorm:def:codegen.entity.compact+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_code_blocks(
         entity: &Entity,
@@ -478,8 +478,9 @@ impl EntityWriter {
         }
     }
 
+    // [spec:pgorm:def:codegen.entity.expanded+1]
     pub fn gen_impl_entity_name(entity: &Entity, schema_name: &Option<String>) -> TokenStream {
-        let schema_name = match Self::gen_schema_name(schema_name) {
+        let schema_name = match Self::gen_schema_name(entity, schema_name) {
             Some(schema_name) => quote! {
                 fn schema_name(&self) -> Option<&str> {
                     Some(#schema_name)
@@ -728,7 +729,7 @@ impl EntityWriter {
     }
 
     // [spec:pgorm:sem:codegen.entity.compact.attrs+1]
-    // [spec:pgorm:sem:codegen.entity.compact.model]
+    // [spec:pgorm:sem:codegen.entity.compact.model+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
         entity: &Entity,
@@ -796,7 +797,7 @@ impl EntityWriter {
                 ts
             })
             .collect();
-        let schema_name = match Self::gen_schema_name(schema_name) {
+        let schema_name = match Self::gen_schema_name(entity, schema_name) {
             Some(schema_name) => quote! {
                 schema_name = #schema_name,
             },
@@ -834,9 +835,13 @@ impl EntityWriter {
         }
     }
 
-    pub fn gen_schema_name(schema_name: &Option<String>) -> Option<TokenStream> {
-        schema_name
-            .as_ref()
+    /// The schema literal an entity's generated attribute carries: the source
+    /// table's own qualifier, and only failing that the configured default. An
+    /// option cannot move a table into a schema the DDL says it is not in.
+    // [spec:pgorm:sem:codegen.entity.context+2]
+    pub fn gen_schema_name(entity: &Entity, schema_name: &Option<String>) -> Option<TokenStream> {
+        entity
+            .effective_schema(schema_name)
             .map(|schema_name| quote! { #schema_name })
     }
 }
@@ -859,6 +864,7 @@ mod tests {
         vec![
             Entity {
                 table_name: "cake".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -877,6 +883,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "fruit".to_owned(),
+                    ref_schema: None,
                     columns: vec![],
                     ref_columns: vec![],
                     rel_type: RelationType::HasMany,
@@ -896,6 +903,7 @@ mod tests {
             },
             Entity {
                 table_name: "_cake_filling_".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "cake_id".to_owned(),
@@ -915,6 +923,7 @@ mod tests {
                 relations: vec![
                     Relation {
                         ref_table: "cake".to_owned(),
+                        ref_schema: None,
                         columns: vec!["cake_id".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -926,6 +935,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "filling".to_owned(),
+                        ref_schema: None,
                         columns: vec!["filling_id".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -948,6 +958,7 @@ mod tests {
             },
             Entity {
                 table_name: "cake_filling_price".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "cake_id".to_owned(),
@@ -973,6 +984,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "cake_filling".to_owned(),
+                    ref_schema: None,
                     columns: vec!["cake_id".to_owned(), "filling_id".to_owned()],
                     ref_columns: vec!["cake_id".to_owned(), "filling_id".to_owned()],
                     rel_type: RelationType::BelongsTo,
@@ -994,6 +1006,7 @@ mod tests {
             },
             Entity {
                 table_name: "filling".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1021,6 +1034,7 @@ mod tests {
             },
             Entity {
                 table_name: "fruit".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1047,6 +1061,7 @@ mod tests {
                 relations: vec![
                     Relation {
                         ref_table: "cake".to_owned(),
+                        ref_schema: None,
                         columns: vec!["cake_id".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1058,6 +1073,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "vendor".to_owned(),
+                        ref_schema: None,
                         columns: vec![],
                         ref_columns: vec![],
                         rel_type: RelationType::HasMany,
@@ -1075,6 +1091,7 @@ mod tests {
             },
             Entity {
                 table_name: "vendor".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1100,6 +1117,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "fruit".to_owned(),
+                    ref_schema: None,
                     columns: vec!["fruitId".to_owned()],
                     ref_columns: vec!["id".to_owned()],
                     rel_type: RelationType::BelongsTo,
@@ -1116,6 +1134,7 @@ mod tests {
             },
             Entity {
                 table_name: "rust_keyword".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1212,6 +1231,7 @@ mod tests {
                 relations: vec![
                     Relation {
                         ref_table: "rust_keyword".to_owned(),
+                        ref_schema: None,
                         columns: vec!["self_id1".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1223,6 +1243,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "rust_keyword".to_owned(),
+                        ref_schema: None,
                         columns: vec!["self_id2".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1234,6 +1255,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "fruit".to_owned(),
+                        ref_schema: None,
                         columns: vec!["fruit_id1".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1245,6 +1267,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "fruit".to_owned(),
+                        ref_schema: None,
                         columns: vec!["fruit_id2".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1256,6 +1279,7 @@ mod tests {
                     },
                     Relation {
                         ref_table: "cake".to_owned(),
+                        ref_schema: None,
                         columns: vec!["cake_id".to_owned()],
                         ref_columns: vec!["id".to_owned()],
                         rel_type: RelationType::BelongsTo,
@@ -1273,6 +1297,7 @@ mod tests {
             },
             Entity {
                 table_name: "cake_with_float".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1298,6 +1323,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "fruit".to_owned(),
+                    ref_schema: None,
                     columns: vec![],
                     ref_columns: vec![],
                     rel_type: RelationType::HasMany,
@@ -1317,6 +1343,7 @@ mod tests {
             },
             Entity {
                 table_name: "cake_with_double".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1342,6 +1369,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "fruit".to_owned(),
+                    ref_schema: None,
                     columns: vec![],
                     ref_columns: vec![],
                     rel_type: RelationType::HasMany,
@@ -1361,6 +1389,7 @@ mod tests {
             },
             Entity {
                 table_name: "collection".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1392,6 +1421,7 @@ mod tests {
             },
             Entity {
                 table_name: "collection_float".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1423,6 +1453,7 @@ mod tests {
             },
             Entity {
                 table_name: "parent".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id1".to_owned(),
@@ -1441,6 +1472,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "child".to_owned(),
+                    ref_schema: None,
                     columns: vec![],
                     ref_columns: vec![],
                     rel_type: RelationType::HasMany,
@@ -1462,6 +1494,7 @@ mod tests {
             },
             Entity {
                 table_name: "child".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -1487,6 +1520,7 @@ mod tests {
                 ],
                 relations: vec![Relation {
                     ref_table: "parent".to_owned(),
+                    ref_schema: None,
                     columns: vec!["parent_id1".to_owned(), "parent_id2".to_owned()],
                     ref_columns: vec!["id1".to_owned(), "id2".to_owned()],
                     rel_type: RelationType::BelongsTo,
@@ -2145,6 +2179,7 @@ mod tests {
             // https://github.com/pgorm-rs/pgorm/issues/1344
             Entity {
                 table_name: "task".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -2233,6 +2268,7 @@ mod tests {
         let entities = [
             Entity {
                 table_name: "tea_pairing".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),
@@ -2276,6 +2312,7 @@ mod tests {
             },
             Entity {
                 table_name: "tea_pairing_with_size".to_owned(),
+                schema_name: None,
                 columns: vec![
                     Column {
                         name: "id".to_owned(),

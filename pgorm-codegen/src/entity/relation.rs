@@ -4,7 +4,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::{
-    Error,
+    Error, TableIdent,
     util::{escape_rust_keyword, safe_ident},
 };
 
@@ -18,6 +18,10 @@ pub enum RelationType {
 #[derive(Clone, Debug)]
 pub struct Relation {
     pub(crate) ref_table: String,
+    /// The schema qualifying the referenced table, once the relation has been
+    /// resolved against the schema's own tables. Never reaches the generated
+    /// text: a module path is the bare name, which is one table's alone.
+    pub(crate) ref_schema: Option<String>,
     pub(crate) columns: Vec<String>,
     pub(crate) ref_columns: Vec<String>,
     pub(crate) rel_type: RelationType,
@@ -29,10 +33,19 @@ pub struct Relation {
 }
 
 impl Relation {
+    /// Which table this relation references.
+    // [spec:pgorm:sem:codegen.entity.transform+7]
+    pub fn ref_ident(&self) -> TableIdent {
+        TableIdent {
+            table: self.ref_table.clone(),
+            schema: self.ref_schema.clone(),
+        }
+    }
+
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     // [spec:pgorm:sem:codegen.entity.relations+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        let context = format!("relation to `{}`", self.ref_table);
+        let context = format!("relation to `{}`", self.ref_ident());
         safe_ident(
             &context,
             &escape_rust_keyword(self.ref_table.to_snake_case()),
@@ -240,11 +253,13 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+6]
+// [spec:pgorm:sem:codegen.entity.transform+7]
 impl From<&TableForeignKey> for Relation {
     fn from(tbl_fk: &TableForeignKey) -> Self {
+        let ref_table = TableIdent::of(tbl_fk.get_ref_table());
         Self {
-            ref_table: tbl_fk.get_ref_table().table().to_string(),
+            ref_table: ref_table.table,
+            ref_schema: ref_table.schema,
             columns: tbl_fk.get_columns(),
             ref_columns: tbl_fk.get_ref_columns(),
             rel_type: RelationType::BelongsTo,
@@ -267,6 +282,7 @@ mod tests {
         vec![
             Relation {
                 ref_table: "fruit".to_owned(),
+                ref_schema: None,
                 columns: vec!["id".to_owned()],
                 ref_columns: vec!["cake_id".to_owned()],
                 rel_type: RelationType::HasOne,
@@ -278,6 +294,7 @@ mod tests {
             },
             Relation {
                 ref_table: "filling".to_owned(),
+                ref_schema: None,
                 columns: vec!["filling_id".to_owned()],
                 ref_columns: vec!["id".to_owned()],
                 rel_type: RelationType::BelongsTo,
@@ -289,6 +306,7 @@ mod tests {
             },
             Relation {
                 ref_table: "filling".to_owned(),
+                ref_schema: None,
                 columns: vec!["filling_id".to_owned()],
                 ref_columns: vec!["id".to_owned()],
                 rel_type: RelationType::HasMany,

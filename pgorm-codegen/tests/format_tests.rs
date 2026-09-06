@@ -7,7 +7,7 @@ use common::*;
 use pgorm_codegen::WithSerde;
 use pgorm_query::{Alias, ColumnDef, ColumnType, IntoIden, StringLen, Table};
 
-// [spec:pgorm:def:codegen.entity.compact/test]    the compact format emits
+// [spec:pgorm:def:codegen.entity.compact+1/test]    the compact format emits
 // imports, Model, Relation, the Related impls and ActiveModelBehavior, in order
 #[test]
 fn compact_format_emits_its_blocks_in_order() {
@@ -33,7 +33,7 @@ fn compact_format_emits_its_blocks_in_order() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.compact/test]    the `schema_name` part of the
+// [spec:pgorm:def:codegen.entity.compact+1/test]    the `schema_name` part of the
 // Model attribute appears only when configured, and an entity with no relations
 // emits the empty `pub enum Relation {}`
 #[test]
@@ -161,7 +161,7 @@ fn compact_fields_without_applicable_parts_carry_no_attribute() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.model/test]    derives, struct
+// [spec:pgorm:sem:codegen.entity.compact.model+1/test]    derives, struct
 // attribute, extra attributes and fields are emitted as one ordered block
 #[test]
 fn compact_model_assembles_derives_attributes_fields_in_order() {
@@ -203,7 +203,7 @@ fn compact_model_assembles_derives_attributes_fields_in_order() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.model/test]    primary-key membership
+// [spec:pgorm:sem:codegen.entity.compact.model+1/test]    primary-key membership
 // is decided against the raw DB column name, not the snake_case field name
 #[test]
 fn compact_model_pk_membership_uses_raw_column_name() {
@@ -226,7 +226,7 @@ fn compact_model_pk_membership_uses_raw_column_name() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded/test]    the expanded format spells
+// [spec:pgorm:def:codegen.entity.expanded+1/test]    the expanded format spells
 // out Entity, EntityName, Model, Column, PrimaryKey, PrimaryKeyTrait, Relation,
 // ColumnTrait, RelationTrait, the Related impls and ActiveModelBehavior
 #[test]
@@ -285,7 +285,7 @@ fn expanded_format_emits_every_block_in_order() {
     assert!(!blocks[3].contains("pgorm"), "{}", blocks[3]);
 }
 
-// [spec:pgorm:def:codegen.entity.expanded/test]    `EntityName::schema_name` is
+// [spec:pgorm:def:codegen.entity.expanded+1/test]    `EntityName::schema_name` is
 // emitted only when a schema name is configured
 #[test]
 fn expanded_entity_name_carries_schema_name_when_configured() {
@@ -312,7 +312,7 @@ fn expanded_entity_name_carries_schema_name_when_configured() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded/test]    `ColumnTrait::def` matches
+// [spec:pgorm:def:codegen.entity.expanded+1/test]    `ColumnTrait::def` matches
 // each column to a ColumnType chain, with `.null()`, `.unique()` and
 // `<Enum>::db_type()` where they apply
 #[test]
@@ -346,7 +346,7 @@ fn expanded_column_def_chains_null_unique_enum_type() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded/test]    `RelationTrait::def` matches
+// [spec:pgorm:def:codegen.entity.expanded+1/test]    `RelationTrait::def` matches
 // the variants, or panics when the entity has no relations
 #[test]
 fn expanded_relation_trait_def_matches_variants_or_panics() {
@@ -373,7 +373,7 @@ fn expanded_relation_trait_def_matches_variants_or_panics() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded/test]    `Column` variants of
+// [spec:pgorm:def:codegen.entity.expanded+1/test]    `Column` variants of
 // non-snake-case columns carry `#[pgorm(column_name = "..")]`
 #[test]
 fn expanded_column_enum_preserves_non_snake_case_names() {
