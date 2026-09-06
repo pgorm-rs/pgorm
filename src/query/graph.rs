@@ -226,14 +226,50 @@ slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4);
 slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5);
 slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
 
+||||||| parent of 62f58283 (feat: select_sources: the pipeline decodes models, every position honest)
+
+/// THE prefix scheme: the alias the writer gives `column` of the `index`-th
+/// decoded source, `s{index}_{column}`.
+///
+/// Both projection writers — [`project_source`] into a [`SelectStatement`]
+/// and the pipeline's `select_sources` terminal into prqlc's PL AST — mint
+/// their aliases here, and the per-prefix decode reads exactly these names,
+/// so the scheme is one code path rather than a convention three sites
+/// repeat.
+// [spec:pgorm:sem:query.graph.writer]
+pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
+    format!("s{index}_{column}")
+}
+
+/// THE read-cast discipline, stated once: the type a projected column is
+/// `CAST` to on selection, or `None` to project it untouched.
+///
+/// This is the decision the default [`ColumnTrait::select_as`] renders on
+/// the SQL side — an enum column reads back as `text`, an array of enums as
+/// `text[]`, everything else as itself — restated as data so the writer
+/// that cannot dispatch through `select_as` (the pipeline's, which emits
+/// PRQL nodes rather than [`SimpleExpr`](pgorm_query::SimpleExpr)) casts by
+/// the same rule. A column that *overrides* `select_as` is honoured only by
+/// the [`SelectStatement`] writer, which still calls the method.
+// [spec:pgorm:sem:query.graph.writer]
+pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> {
+    use crate::entity::ColumnTypeTrait;
+    let def = col.def();
+    def.get_enum_name()?;
+    Some(match def.get_column_type() {
+        pgorm_query::ColumnType::Array(_) => "text[]",
+        _ => "text",
+    })
+}
+
 /// THE one projection writer: every decoded source of a graph — and of the
 /// pipeline's source-select terminal — passes through here.
 ///
 /// Appends, for every variant of `F`'s `Column` in iteration order,
 /// `col.select_as(Expr::col((qualifier, col)))` aliased as
-/// `s{index}_{col}` — the same enum-cast discipline as `Select<E>`'s default
-/// list, with the alias being the plain SQL column name under the prefix,
-/// whatever the cast wrapped.
+/// `s{index}_{col}` ([`source_column_alias`]) — the same enum-cast
+/// discipline as `Select<E>`'s default list, with the alias being the plain
+/// SQL column name under the prefix, whatever the cast wrapped.
 ///
 /// `qualifier` is the source's *effective* identifier: the bound alias when
 /// the source was declared under one, otherwise its bare table — the same
@@ -246,7 +282,7 @@ pub(crate) fn project_source<F: EntityTrait>(
     index: usize,
 ) {
     for col in <F::Column as Iterable>::iter() {
-        let alias = format!("s{index}_{}", col.as_str());
+        let alias = source_column_alias(index, col.as_str());
         let expr = Expr::col((SharedIden::clone(&qualifier), col.into_iden()));
         query.expr(SelectExpr::new_as(
             col.select_as(expr),

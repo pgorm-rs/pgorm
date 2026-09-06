@@ -1,6 +1,6 @@
 use pgorm_query::{AliasName, Value, Values, alias};
 
-use crate::tests_cfg::{cake, cake_filling_price, fruit};
+use crate::tests_cfg::{cake, cake_filling_price, fruit, lunch_set};
 
 use super::adapter::compile_text;
 use super::*;
@@ -17,7 +17,7 @@ fn total<'brand>() -> Expr<'brand> {
 
 /// Golden output plus the pg_query oracle: the emitted SQL must be a string
 /// the real PostgreSQL grammar accepts.
-// [spec:pgorm:req:pipeline.errors+1/test]
+// [spec:pgorm:req:pipeline.errors+2/test]
 fn sql_of(pipeline: Pipeline) -> String {
     let (sql, _) = pipeline.into_sql().expect("pipeline compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -359,7 +359,7 @@ fn scopes_compose_as_pipeline_functions() {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+1/test]
+// [spec:pgorm:req:pipeline.errors+2/test]
 #[test]
 fn reserved_alias_is_a_typed_error() {
     let err = Pipeline::from(INVOICE)
@@ -369,7 +369,7 @@ fn reserved_alias_is_a_typed_error() {
     assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
 }
 
-// [spec:pgorm:req:pipeline.errors+1/test]
+// [spec:pgorm:req:pipeline.errors+2/test]
 #[test]
 fn stdlib_name_reference_is_a_compile_error() {
     let err = Pipeline::from(INVOICE)
@@ -379,7 +379,7 @@ fn stdlib_name_reference_is_a_compile_error() {
     assert!(matches!(err, PipelineError::Compile(_)));
 }
 
-// [spec:pgorm:req:pipeline.errors+1/test]    an unattached token is not a
+// [spec:pgorm:req:pipeline.errors+2/test]    an unattached token is not a
 // compile-time error; the server answers for it
 #[test]
 fn unattached_alias_token_compiles_to_a_column_reference() {
@@ -1101,4 +1101,204 @@ fn nested_embedding_prunes_through_two_levels() {
     assert!(sql.contains("$1") && sql.contains("$2"), "{sql}");
     assert!(!sql.contains("$3"), "{sql}");
     assert_eq!(ints(&values), vec![50_i32.into(), 2_i32.into()]);
+}
+
+/// Like [`sql_of`], for the source-select terminal: golden output plus the
+/// grammar oracle.
+// [spec:pgorm:sem:pipeline.select-sources/test]
+fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
+    let (sql, _) = selected.into_sql().expect("select_sources compiles");
+    if let Err(err) = pg_query::parse(&sql) {
+        panic!("PostgreSQL grammar rejected the emitted SQL: {err}\n  {sql}");
+    }
+    sql
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    two sources with a
+// colliding column name land under different prefixes by construction, so
+// prqlc never mints an _expr_N the decode could not predict
+#[test]
+fn select_sources_prefixes_dissolve_expr_n() {
+    let built = sources_sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Left,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .select_sources((cake::Entity, fruit::Entity)),
+    );
+    assert_eq!(
+        built,
+        "SELECT cake.id AS s0_id, cake.name AS s0_name, fruit.id AS s1_id, \
+         fruit.name AS s1_name, fruit.cake_id AS s1_cake_id FROM cake \
+         LEFT OUTER JOIN fruit ON cake.id = fruit.cake_id"
+    );
+    assert!(!built.contains("_expr_"), "{built}");
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    a single source needs no
+// tuple and projects one block under s0_
+#[test]
+fn select_sources_takes_a_single_source() {
+    let built = sources_sql_of(Pipeline::from(cake::Entity).select_sources(cake::Entity));
+    assert_eq!(built, "SELECT id AS s0_id, name AS s0_name FROM cake");
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    a named restatement
+// qualifies its block by the name, exactly as the join told the two
+// occurrences apart
+#[test]
+fn select_sources_named_self_join_qualifies_by_name() {
+    let peer = alias("peer");
+    let built = sources_sql_of(
+        Pipeline::from(fruit::Entity)
+            .join(
+                JoinSide::Inner,
+                fruit::Entity.named(peer),
+                fruit::Column::CakeId.eq(col(peer, alias("cake_id"))),
+            )
+            .select_sources((fruit::Entity, fruit::Entity.named(peer))),
+    );
+    assert_eq!(
+        built,
+        "SELECT fruit.id AS s0_id, fruit.name AS s0_name, fruit.cake_id AS s0_cake_id, \
+         peer.id AS s1_id, peer.name AS s1_name, peer.cake_id AS s1_cake_id FROM fruit \
+         INNER JOIN fruit AS peer ON fruit.cake_id = peer.cake_id"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    the writer's cast
+// discipline reaches the PRQL side: an enum column reads back as text
+// [spec:pgorm:sem:query.graph.writer/test]
+#[test]
+fn select_sources_casts_enum_columns_to_text() {
+    let built = sources_sql_of(Pipeline::from(lunch_set::Entity).select_sources(lunch_set::Entity));
+    assert_eq!(
+        built,
+        "SELECT id AS s0_id, name AS s0_name, CAST(tea AS text) AS s0_tea FROM lunch_set"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    reshaping before the
+// terminal is refused by the stage's own name, before prqlc compiles
+#[test]
+fn select_sources_refuses_a_reshaped_pipeline() {
+    let err = Pipeline::from(cake::Entity)
+        .select(cake::Column::Id)
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("a projection replaced the source namespace");
+    assert_eq!(err, PipelineError::ReshapedSources("select"));
+
+    let err = Pipeline::from(cake::Entity)
+        .group(cake::Column::Name)
+        .aggregate(count_rows().as_(alias("n")))
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("an aggregation collapsed the source namespace");
+    assert_eq!(err, PipelineError::ReshapedSources("group().aggregate()"));
+
+    let err = Pipeline::from(cake::Entity)
+        .intersect(fruit::Entity)
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("a set-op rename dissolved the source namespace");
+    assert_eq!(err, PipelineError::ReshapedSources("intersect"));
+
+    let err = Pipeline::from(cake::Entity)
+        .remove(fruit::Entity)
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("a set-op rename dissolved the source namespace");
+    assert_eq!(err, PipelineError::ReshapedSources("remove"));
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    the refusal names the
+// stage that did the replacing: the first offender, not the last
+#[test]
+fn select_sources_refusal_names_the_first_offender() {
+    let err = Pipeline::from(cake::Entity)
+        .select(cake::Column::Id)
+        .intersect(fruit::Entity)
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("reshaped twice over");
+    assert_eq!(err, PipelineError::ReshapedSources("select"));
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    the whole allowed set
+// ahead of the terminal: filter, derive, sort, take, join, window, distinct
+// and append leave every source addressable
+#[test]
+fn select_sources_composes_after_the_allowed_stages() {
+    let built = sources_sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Left,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .filter(cake::Column::Id.gt(0))
+            .derive(cake::Column::Id.add(1).as_(alias("next_id")))
+            .window(row_number().as_(alias("rn")), by(cake::Column::Id))
+            .distinct()
+            .sort(cake::Column::Id)
+            .take(10)
+            .select_sources((cake::Entity, fruit::Entity)),
+    );
+    assert!(
+        built.contains("s0_id") && built.contains("s1_cake_id"),
+        "{built}"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    append is in the allowed
+// set because the left side's naming survives it
+#[test]
+fn select_sources_composes_after_append() {
+    let built = sources_sql_of(
+        Pipeline::from(cake::Entity)
+            .append(cake::Entity)
+            .select_sources(cake::Entity),
+    );
+    assert!(
+        built.contains("UNION ALL") && built.contains("s0_id"),
+        "{built}"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    an embedded pipeline's
+// reshaping stays its own: the CTE boundary re-exposes its projection as a
+// table-like namespace, and the consumer's sources are untouched
+#[test]
+fn select_sources_ignores_an_embedded_reshape() {
+    let cake_ids = Pipeline::from(fruit::Entity).select(fruit::Column::CakeId);
+    let built = sources_sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Inner,
+                cake_ids,
+                cake::Column::Id.eq(alias("cake_id")),
+            )
+            .select_sources(cake::Entity),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT cake_id FROM fruit) \
+         SELECT cake.id AS s0_id, cake.name AS s0_name FROM cake \
+         INNER JOIN table_0 ON cake.id = table_0.cake_id"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    the catalog-less ceiling:
+// a listed source the pipeline never read reaches prqlc, which refuses the
+// unresolvable columns as Compile diagnostics
+#[test]
+fn select_sources_unread_source_fails_in_prqlc() {
+    let err = Pipeline::from(cake::Entity)
+        .select_sources((cake::Entity, fruit::Entity))
+        .into_sql()
+        .expect_err("fruit was never read");
+    assert!(matches!(err, PipelineError::Compile(_)), "{err:?}");
 }

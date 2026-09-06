@@ -1,5 +1,6 @@
 //! The pipeline itself: a source and a sequence of whole transforms.
 
+use super::sources::Named;
 use std::ops::RangeInclusive;
 
 use pgorm_query::{Alias, AliasName, Iden, Value};
@@ -54,6 +55,17 @@ pub struct Pipeline {
     pub(super) bindings: Vec<Vec<PlExpr>>,
     pub(super) stages: Vec<PlExpr>,
     pub(super) values: Vec<Value>,
+    /// The first stage of *this* pipeline that replaced its sources' own
+    /// column namespaces — `select`, `group().aggregate()`, `intersect` or
+    /// `remove` — or `None` while every source is still addressable.
+    ///
+    /// [`select_sources`](Pipeline::select_sources) refuses a reshaped
+    /// pipeline by this name. The flag is deliberately per-pipeline: an
+    /// embedded pipeline that reshaped itself is a table-like relation whose
+    /// resulting columns the CTE boundary re-exposes, so embedding does not
+    /// propagate it.
+    // [spec:pgorm:sem:pipeline.select-sources]
+    pub(super) reshaped: Option<&'static str>,
 }
 
 /// Which rows a [`join`](Pipeline::join) keeps.
@@ -97,7 +109,10 @@ pub trait IntoSource {
     ///
     /// The name is the relation's only name from then on, as in SQL: an
     /// aliased entity no longer answers to its table name, and every
-    /// reference to its columns goes through [`col`](super::col).
+    /// reference to its columns goes through [`col`](super::col). The
+    /// returned [`Named`] remembers what it wraps, which is how the same
+    /// spelling restates an entity source to
+    /// [`select_sources`](Pipeline::select_sources).
     ///
     /// ```
     /// # use pgorm::pipeline::{ExprOps, IntoSource, JoinSide, Pipeline, alias, col};
@@ -119,13 +134,15 @@ pub trait IntoSource {
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
     // [spec:pgorm:sem:pipeline.self-join]
-    fn named(self, name: impl Into<AliasName>) -> Source
+    // [spec:pgorm:sem:pipeline.select-sources]
+    fn named(self, name: impl Into<AliasName>) -> Named<Self>
     where
         Self: Sized,
     {
-        let mut source = self.into_source();
-        source.alias = Some(name.into().as_str().to_owned());
-        source
+        Named {
+            relation: self,
+            name: name.into().as_str().to_owned(),
+        }
     }
 }
 
@@ -139,7 +156,7 @@ pub trait IntoSource {
 #[derive(Debug)]
 pub struct Source {
     kind: SourceKind,
-    alias: Option<String>,
+    pub(super) alias: Option<String>,
 }
 
 #[derive(Debug)]
@@ -155,8 +172,7 @@ fn table_source(node: PlExpr) -> Source {
     }
 }
 
-/// A relation already carried as a [`Source`] — what
-/// [`named`](IntoSource::named) returns — passes through unchanged.
+/// A relation already carried as a [`Source`] passes through unchanged.
 // [spec:pgorm:sem:pipeline.self-join]
 impl IntoSource for Source {
     fn into_source(self) -> Source {
@@ -352,7 +368,7 @@ impl Grouped {
                 adapter::call("aggregate", vec![adapter::tuple(aggregates)]),
             ],
         );
-        self.pipeline.stage(stage)
+        self.pipeline.stage(stage).reshaping("group().aggregate()")
     }
 }
 
@@ -365,6 +381,7 @@ impl Pipeline {
             bindings: Vec::new(),
             stages: Vec::new(),
             values: Vec::new(),
+            reshaped: None,
         };
         let reference = pipeline.embed(source.into_source());
         pipeline.stages.push(adapter::call("from", vec![reference]));
@@ -379,6 +396,7 @@ impl Pipeline {
             bindings: Vec::new(),
             stages: vec![adapter::call("from", vec![source])],
             values: Vec::new(),
+            reshaped: None,
         }
     }
 
@@ -432,6 +450,14 @@ impl Pipeline {
 
     fn stage(mut self, node: PlExpr) -> Self {
         self.stages.push(node);
+        self
+    }
+
+    /// Record that `stage` replaced this pipeline's source namespaces,
+    /// keeping the *first* offender — the one that did the replacing.
+    // [spec:pgorm:sem:pipeline.select-sources]
+    fn reshaping(mut self, stage: &'static str) -> Self {
+        self.reshaped.get_or_insert(stage);
         self
     }
 
@@ -495,6 +521,7 @@ impl Pipeline {
             "select",
             vec![adapter::tuple(nodes_of(columns))],
         ))
+        .reshaping("select")
     }
 
     /// Replace the projection, with runtime values bound in the closure.
@@ -505,6 +532,7 @@ impl Pipeline {
     {
         let nodes = self.bound_nodes(f);
         self.stage(adapter::call("select", vec![adapter::tuple(nodes)]))
+            .reshaping("select")
     }
 
     /// Group rows by these keys; the aggregates follow.
@@ -662,7 +690,7 @@ impl Pipeline {
     /// The result is a renamed relation, as under [`remove`](Self::remove).
     // [spec:pgorm:req:pipeline.compose]
     pub fn intersect(self, other: impl IntoSource) -> Self {
-        self.set_op("intersect", other)
+        self.set_op("intersect", other).reshaping("intersect")
     }
 
     /// Drop rows that appear in `other`: PRQL's `remove`, SQL's
@@ -675,7 +703,7 @@ impl Pipeline {
     /// [`append`](Self::append) the left side's naming survives.
     // [spec:pgorm:req:pipeline.compose]
     pub fn remove(self, other: impl IntoSource) -> Self {
-        self.set_op("remove", other)
+        self.set_op("remove", other).reshaping("remove")
     }
 
     fn set_op(mut self, op: &str, other: impl IntoSource) -> Self {

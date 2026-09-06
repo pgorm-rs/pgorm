@@ -108,7 +108,7 @@ of the crate, compiled in every build. Rules are grouped under
 > introduced, and the name exists in the program exactly once. The token
 > carries no evidence that it was ever attached: a reference to a name no
 > stage introduced compiles, and the server answers for it
-> (`[spec:pgorm:req:pipeline.errors+1]`).
+> (`[spec:pgorm:req:pipeline.errors+2]`).
 >
 > `ExprOps`'s comparison names are also `ColumnTrait`'s. Both traits can be
 > in scope: the pipeline's methods take `self` by value and `ColumnTrait`'s
@@ -164,7 +164,7 @@ of the crate, compiled in every build. Rules are grouped under
 > census that cannot be trusted (unscannable text, an out-of-range number;
 > neither reachable from the builder's own output) passes the statement
 > through unchanged for the server to judge, keeping `into_sql` panic-free
-> (`[spec:pgorm:req:pipeline.errors+1]`).
+> (`[spec:pgorm:req:pipeline.errors+2]`).
 >
 > The binder and the expressions it returns are branded with a
 > higher-ranked, invariant closure lifetime; an expression containing a
@@ -260,7 +260,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Naming a relation replaces the name it had, exactly as SQL's `AS` does:
 > after `employee::Entity.named(manager)` the reference `employee.name` no
 > longer resolves, and prqlc refuses it by name
-> ([spec:pgorm:req:pipeline.errors+1]). The ordinary shape therefore names
+> ([spec:pgorm:req:pipeline.errors+2]). The ordinary shape therefore names
 > only the second occurrence and leaves the reading pipeline
 > entity-qualified. The name then reaches every stage after the join —
 > `filter`, `sort`, `select` — which is what distinguishes it from `this` /
@@ -281,18 +281,23 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Failure model
 
-> [spec:pgorm:req:pipeline.errors+1]
+> [spec:pgorm:req:pipeline.errors+2]
 > Pipeline construction is infallible; `into_sql()` is the fallible
 > boundary, returning `PipelineError` and never panicking, per
-> `[dec:pgorm:no-panic]`. Two variants: `ReservedAlias(name)` — a name given
-> to `as_` collides with the closed reserved set (the top-level bindings of
-> prqlc 0.13's `std` module, its submodule names `math` / `text` / `date`,
-> and the PRQL keywords), screened before compilation so the collision is
-> named instead of surfacing as an opaque resolution failure — and
-> `Compile(diagnostics)`, carrying prqlc's own rendered diagnostics for
-> everything its resolver rejects (a `std` name used as a value, ill-typed
-> stages). `From<PipelineError> for Error` lifts into `Error::Query` so the
-> terminals can fail through the ordinary channel.
+> `[dec:pgorm:no-panic]`. Three variants: `ReservedAlias(name)` — a name
+> given to `as_` collides with the closed reserved set (the top-level
+> bindings of prqlc 0.13's `std` module, its submodule names `math` /
+> `text` / `date`, and the PRQL keywords), screened before compilation so
+> the collision is named instead of surfacing as an opaque resolution
+> failure; `Compile(diagnostics)`, carrying prqlc's own rendered
+> diagnostics for everything its resolver rejects (a `std` name used as a
+> value, ill-typed stages); and `ReshapedSources(stage)` — the
+> `select_sources` terminal (`[spec:pgorm:sem:pipeline.select-sources]`)
+> was asked to project entity models out of a pipeline whose sources'
+> column namespaces a `select`, `group().aggregate()`, `intersect` or
+> `remove` stage had already replaced, refused before prqlc compiles and
+> naming the stage. `From<PipelineError> for Error` lifts into
+> `Error::Query` so the terminals can fail through the ordinary channel.
 >
 > Compilation has no catalog, and this is the honest ceiling of the alias
 > token: a token whose name no stage introduced still compiles, resolving as
@@ -303,13 +308,6 @@ of the crate, compiled in every build. Rules are grouped under
 > guarantee the token buys is that the name is written once, not that it was
 > attached. Compile-time name checking covers only what prqlc can see: its
 > own std namespace and pipeline-introduced names.
-
-**Pending amendment.** The `select_sources` terminal
-(`[spec:pgorm:sem:pipeline.select-sources]`) adds a third `PipelineError`
-variant — the typed refusal of a model-decode over a reshaped pipeline.
-This rule's two-variant enumeration is bumped when that terminal lands
-(graph/pipeline-sources); until then the code carries exactly the two
-variants stated here.
 
 ## Qualification
 
@@ -405,7 +403,7 @@ variants stated here.
 > `take` / `take_range`, `join`, `window`, `distinct` and `append` (whose
 > left-side naming survives) leave every source addressable and compose
 > freely ahead of the terminal; construction itself stays infallible per
-> `[spec:pgorm:req:pipeline.errors+1]`.
+> `[spec:pgorm:req:pipeline.errors+2]`.
 >
 > The catalog-less ceiling stands: a listed source the pipeline never
 > read compiles up to prqlc, which refuses the unresolvable columns as

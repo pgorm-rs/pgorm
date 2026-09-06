@@ -23,7 +23,7 @@ impl Pipeline {
     /// censused afterwards: values whose placeholders were optimized away
     /// are discarded and the survivors renumber contiguously, keeping
     /// position `N` in the SQL aligned with position `N` in the values.
-    // [spec:pgorm:req:pipeline.errors+1]
+    // [spec:pgorm:req:pipeline.errors+2]
     // [spec:pgorm:req:pipeline.params+3]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let mut aliases = Vec::new();

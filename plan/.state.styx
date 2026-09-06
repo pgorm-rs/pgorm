@@ -982,6 +982,11 @@ impl_evidence (
         {id exec.stream, version 1}
         {id exec.stream.decode, version 1}
     )}
+    {id pipeline-sources, covered_rules (
+        pipeline.select-sources
+    ), covered_claims (
+        {impl_name main, rule pipeline.select-sources}
+    )}
     {id sql.ast, covered_rules (
         sql.ast
         sql.ast.build

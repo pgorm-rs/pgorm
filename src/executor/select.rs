@@ -57,7 +57,7 @@ where
     pub(crate) stmt: String,
     pub(crate) values: Values,
     #[allow(dead_code)]
-    selector: S,
+    pub(crate) selector: S,
 }
 
 /// A Trait for any type that can perform SELECT queries

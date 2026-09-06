@@ -5,7 +5,7 @@
 /// Construction itself is infallible; everything that can go wrong is
 /// reported here, at the [`into_sql`](super::Pipeline::into_sql) boundary,
 /// never as a panic.
-// [spec:pgorm:req:pipeline.errors+1]
+// [spec:pgorm:req:pipeline.errors+2]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PipelineError {
@@ -30,9 +30,30 @@ pub enum PipelineError {
     /// server answers for it at execution.
     #[error("PRQL compilation failed: {0}")]
     Compile(String),
+    /// [`select_sources`](super::Pipeline::select_sources) was asked to
+    /// project entity models out of a pipeline that no longer carries its
+    /// sources' column namespaces.
+    ///
+    /// The named stage — `select`, `group().aggregate()`, `intersect` or
+    /// `remove` — replaced, collapsed or renamed the sources' own columns,
+    /// so a per-source projection can no longer resolve. Refused before
+    /// prqlc compiles, so the answer names the stage rather than an opaque
+    /// unresolved-name diagnostic; decode a reshaped pipeline with
+    /// [`into_model`](super::Pipeline::into_model) or
+    /// [`into_tuple`](super::Pipeline::into_tuple) instead, or move the
+    /// reshaping after the terminal cannot-follow boundary by not doing it
+    /// at all — `filter`, `derive`, `sort`, `take`, `join`, `window`,
+    /// `distinct` and `append` all leave the sources addressable.
+    // [spec:pgorm:sem:pipeline.select-sources]
+    #[error(
+        "select_sources after `{0}`: the stage replaced the sources' own column namespaces, \
+         so entity models can no longer be projected; list sources before reshaping, or decode \
+         with into_model / into_tuple"
+    )]
+    ReshapedSources(&'static str),
 }
 
-// [spec:pgorm:req:pipeline.errors+1]
+// [spec:pgorm:req:pipeline.errors+2]
 impl From<PipelineError> for crate::Error {
     fn from(err: PipelineError) -> Self {
         crate::Error::Query(crate::error::RuntimeError::Internal(err.to_string()))
@@ -41,7 +62,7 @@ impl From<PipelineError> for crate::Error {
 
 /// The closed set of names an alias must not take: every top-level binding of
 /// prqlc 0.13's `std` module, its submodule names, and the PRQL keywords.
-// [spec:pgorm:req:pipeline.errors+1]
+// [spec:pgorm:req:pipeline.errors+2]
 pub(super) const RESERVED: &[&str] = &[
     "_append_by_name",
     "_eq",

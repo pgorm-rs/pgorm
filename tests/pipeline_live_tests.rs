@@ -702,3 +702,256 @@ async fn composed_prune_renumbers_across_the_join() {
 
     ctx.delete().await;
 }
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    two sources whose column
+// names collide decode whole models under their own prefixes — the
+// _expr_N dissolution, proven by rows rather than by the emitted string
+#[pgorm_macros::test]
+async fn select_sources_decodes_colliding_columns() {
+    let ctx = TestContext::new("pipeline_select_sources_collide").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let pipeline = Pipeline::from(order::Entity)
+        .join(JoinSide::Inner, customer::Entity, O::CustomerId.eq(C::Id))
+        .sort(O::Total);
+    let (sql, _) = pipeline
+        .clone()
+        .select_sources((order::Entity, customer::Entity))
+        .into_sql()
+        .unwrap();
+    assert!(!sql.contains("_expr_"), "{sql}");
+
+    let rows: Vec<(Option<order::Model>, Option<customer::Model>)> = pipeline
+        .select_sources((order::Entity, customer::Entity))
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 6);
+    for (order, customer) in &rows {
+        let (order, customer) = (order.as_ref().unwrap(), customer.as_ref().unwrap());
+        assert_eq!(order.customer_id, customer.id);
+    }
+    let named: Vec<(Decimal, &str)> = rows
+        .iter()
+        .map(|(order, customer)| {
+            (
+                order.as_ref().unwrap().total,
+                customer.as_ref().unwrap().name.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        named,
+        vec![
+            (rust_dec(5.00), "Cleo"),
+            (rust_dec(10.00), "Alice"),
+            (rust_dec(20.00), "Alice"),
+            (rust_dec(24.50), "Bob"),
+            (rust_dec(25.50), "Bob"),
+            (rust_dec(30.00), "Alice"),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    a named restatement
+// decodes both occurrences of one table: employee beside manager, whole
+// models on each side
+#[pgorm_macros::test]
+async fn select_sources_named_self_join_decodes_both_sides() {
+    let ctx = TestContext::new("pipeline_select_sources_self_join").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, employee::Entity).await;
+    seed_employees(&db).await;
+
+    let rows: Vec<(Option<employee::Model>, Option<employee::Model>)> =
+        Pipeline::from(employee::Entity)
+            .join(
+                JoinSide::Inner,
+                employee::Entity.named(MANAGER),
+                employee::Column::ManagerId.eq(col(MANAGER, ID)),
+            )
+            .sort(employee::Column::Name)
+            .select_sources((employee::Entity, employee::Entity.named(MANAGER)))
+            .all(&db)
+            .await
+            .unwrap();
+
+    let named: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|(employee, manager)| {
+            (
+                employee.as_ref().unwrap().name.as_str(),
+                manager.as_ref().unwrap().name.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        named,
+        vec![("Alan", "Grace"), ("Grace", "Ada"), ("Linus", "Ada")]
+    );
+    for (employee, manager) in &rows {
+        assert_eq!(
+            employee.as_ref().unwrap().manager_id,
+            Some(manager.as_ref().unwrap().id)
+        );
+    }
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    under a right join the
+// *left* side is the absent one, and the first listed source decodes None —
+// what the all-optional row type exists to carry
+#[pgorm_macros::test]
+async fn right_join_leaves_the_first_position_none() {
+    let ctx = TestContext::new("pipeline_select_sources_right").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, message::Entity).await;
+
+    let root = message::ActiveModel {
+        body: set("root"),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let reply = message::ActiveModel {
+        body: set("reply"),
+        parent_id: set(root.id),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    message::ActiveModel {
+        body: set("nested"),
+        parent_id: set(reply.id),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+
+    let pipeline = Pipeline::from(message::Entity)
+        .join(
+            JoinSide::Right,
+            message::Entity.named(PARENT),
+            message::Column::ParentId.eq(col(PARENT, ID)),
+        )
+        .sort(col(PARENT, ID));
+    let (sql, _) = pipeline
+        .clone()
+        .select_sources((message::Entity, message::Entity.named(PARENT)))
+        .into_sql()
+        .unwrap();
+    assert!(sql.contains("RIGHT"), "{sql}");
+
+    let rows: Vec<(Option<message::Model>, Option<message::Model>)> = pipeline
+        .select_sources((message::Entity, message::Entity.named(PARENT)))
+        .all(&db)
+        .await
+        .unwrap();
+    let named: Vec<(Option<&str>, Option<&str>)> = rows
+        .iter()
+        .map(|(child, parent)| {
+            (
+                child.as_ref().map(|m| m.body.as_str()),
+                parent.as_ref().map(|m| m.body.as_str()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        named,
+        vec![
+            (Some("reply"), Some("root")),
+            (Some("nested"), Some("reply")),
+            (None, Some("nested")),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    the allowed set composes
+// live ahead of the terminal: filter, derive, sort, take and a join, then
+// whole models out
+#[pgorm_macros::test]
+async fn select_sources_composes_with_allowed_stages_live() {
+    let ctx = TestContext::new("pipeline_select_sources_allowed").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let rows: Vec<(Option<order::Model>, Option<customer::Model>)> = Pipeline::from(order::Entity)
+        .join(JoinSide::Inner, customer::Entity, O::CustomerId.eq(C::Id))
+        .filter_with(|binder| O::Total.gt(binder.bind(rust_dec(9.0))))
+        .derive(O::Total.mul(2).as_(alias("doubled")))
+        .sort(O::Total.desc())
+        .take(2)
+        .select_sources((order::Entity, customer::Entity))
+        .all(&db)
+        .await
+        .unwrap();
+    let named: Vec<(Decimal, &str)> = rows
+        .iter()
+        .map(|(order, customer)| {
+            (
+                order.as_ref().unwrap().total,
+                customer.as_ref().unwrap().name.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        named,
+        vec![(rust_dec(30.00), "Alice"), (rust_dec(25.50), "Bob")]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.select-sources/test]    one and one_opt carry the
+// terminal's take-1 semantics: first row of the sorted pipeline, RecordNotFound
+// or None when nothing matches
+#[pgorm_macros::test]
+async fn select_sources_one_takes_one() {
+    let ctx = TestContext::new("pipeline_select_sources_one").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    let biggest = Pipeline::from(order::Entity)
+        .join(JoinSide::Inner, customer::Entity, O::CustomerId.eq(C::Id))
+        .sort(O::Total.desc());
+    let (order, customer) = biggest
+        .clone()
+        .select_sources((order::Entity, customer::Entity))
+        .one(&db)
+        .await
+        .unwrap();
+    assert_eq!(order.unwrap().total, rust_dec(30.00));
+    assert_eq!(customer.unwrap().name, "Alice");
+
+    let none = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.eq(binder.bind("Zed")))
+        .select_sources(customer::Entity)
+        .one(&db)
+        .await;
+    assert!(
+        matches!(none, Err(pgorm::Error::RecordNotFound)),
+        "{none:?}"
+    );
+
+    let nobody: Option<Option<customer::Model>> = Pipeline::from(customer::Entity)
+        .filter_with(|binder| C::Name.eq(binder.bind("Zed")))
+        .select_sources(customer::Entity)
+        .one_opt(&db)
+        .await
+        .unwrap();
+    assert!(nobody.is_none());
+
+    ctx.delete().await;
+}

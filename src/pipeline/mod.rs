@@ -131,6 +131,28 @@
 //! # Ok::<_, pgorm::pipeline::PipelineError>(())
 //! ```
 //!
+//! When the rows you want are the entities themselves, the source-select
+//! terminal arranges the projection instead of asking you for a row type:
+//! restate the relations the pipeline read — an entity bare, or through the
+//! same `named(..)` spelling the join used — and each listed source decodes
+//! as an `Option` of its model, every position optional because a right or
+//! full join can leave either side absent.
+//!
+//! ```
+//! use pgorm::pipeline::{ExprOps, JoinSide, Pipeline};
+//! use pgorm::tests_cfg::{cake, fruit};
+//!
+//! let selected = Pipeline::from(cake::Entity)
+//!     .join(
+//!         JoinSide::Left,
+//!         fruit::Entity,
+//!         cake::Column::Id.eq(fruit::Column::CakeId),
+//!     )
+//!     .select_sources((cake::Entity, fruit::Entity));
+//! // selected.all(&db).await? decodes Vec<(Option<cake::Model>, Option<fruit::Model>)>
+//! # let _ = selected;
+//! ```
+//!
 //! The pipeline lowers typed Rust construction directly into prqlc's PL AST
 //! (no PRQL text round-trip), then through `pl_to_rq` and `rq_to_sql` with
 //! the PostgreSQL dialect. Every prqlc import lives in the private `adapter`
@@ -149,6 +171,7 @@ mod census;
 mod error;
 mod expr;
 mod funcs;
+mod sources;
 mod terminal;
 
 pub use binder::Binder;
@@ -160,6 +183,8 @@ pub use funcs::{
     null, rank, rank_dense, row_number, stddev, sum,
 };
 pub use pgorm_query::{AliasName, alias};
+pub use sources::Named;
+pub use sources::{SelectableSource, SelectedSources, SourceList};
 
 #[cfg(test)]
 mod tests;
