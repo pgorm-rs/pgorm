@@ -69,7 +69,7 @@ impl SqlText for String {
 /// ```
 ///
 /// [`batch_execute`]: ConnectionTrait::batch_execute
-// [spec:pgorm:def:conn.pool.conn-trait+7]
+// [spec:pgorm:def:conn.pool.conn-trait+8]
 #[async_trait::async_trait]
 pub trait ConnectionTrait: Sync {
     /// Execute a SQL statement with its bound parameters, returning the number

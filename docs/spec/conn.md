@@ -226,7 +226,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > through `connect_with`, the general entry point those three delegate to, which
 > takes the whole `ManagerConfig`.
 
-> [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]
+> [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]
 > Reusing a prepared statement admits one failure that preparing afresh does
 > not: PostgreSQL raises SQLSTATE `0A000` — *cached plan must not change result
 > type* — when a statement's plan is revalidated and the result it would now
@@ -243,26 +243,66 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `ROLLBACK`, and the cached entry keeps working.
 >
 > When a statement resolved through the cache fails with `0A000`, pgorm MUST
-> evict that key and re-prepare it exactly once, then execute again. A second
-> `0A000` MUST reach the caller as the `Error::Postgres` it is: the recovery is
-> a single retry, never a loop, because a plan that is stale twice running is
-> not a plan going stale.
+> evict that key. Whether it then retries depends on whether a transaction is
+> open, because `0A000` is an error and an error aborts an open transaction.
 >
-> Only the four methods whose parameters are a reusable `&[&(dyn ToSql + Sync)]`
-> slice can retry. `execute_raw` and `query_raw` take an `IntoIterator` consumed
-> by the first attempt, which is not `Clone` and cannot be held across the retry
-> without a `Send` bound `ConnectionTrait` does not carry, so they evict the
-> rejected key and return the error — which leaves the next call to re-prepare,
-> making the recovery one call later rather than absent. The recovery has no
-> other exception: every statement `ConnectionTrait` accepts is text
-> (`conn.sql-text`), so every one is cache-resolved and every one can be
-> prepared again from what the caller passed.
+> Outside a transaction, pgorm MUST re-prepare the evicted key exactly once and
+> execute again. A second `0A000` MUST reach the caller as the `Error::Postgres`
+> it is: the recovery is a single retry, never a loop, because a plan that is
+> stale twice running is not a plan going stale.
+>
+> Inside a transaction, pgorm MUST NOT retry, and MUST surface the `0A000`
+> unchanged. The transaction is already aborted by the time the error arrives,
+> so the re-prepare fails on its own account with SQLSTATE `25P02`, *current
+> transaction is aborted*, and it is that error the caller would be handed: the
+> one fact they can act on, displaced by a consequence of pgorm's own retry.
+> More generally, no recovery pgorm attempts may substitute its own failure for
+> the failure it was recovering from. The eviction still happens, so the
+> caller's next attempt prepares afresh, and the recovery is theirs to run at
+> the boundary they own — retry the transaction (`conn.tx.retry`), or roll back
+> to a savepoint opened as a nested transaction (`conn.tx`) and re-run inside
+> the still-live outer one.
+>
+> Retrying under an implicit savepoint is rejected rather than merely
+> unimplemented. It is the only shape recovery inside a transaction could take,
+> since an abort cannot be undone after the fact and the savepoint would
+> therefore have to be taken before every cached execution rather than on
+> failure — two extra round trips on every in-transaction statement, to hide a
+> DDL race, spent by machinery whose purpose (`conn.pool.statement-cache`) is to
+> remove round trips. It would also duplicate a facility callers already reach
+> explicitly: a nested transaction is a savepoint (`conn.tx`), so whoever wants a
+> statement fenced can fence it, and whoever does not is not charged for it.
+>
+> Which of the two applies is decided by the type, not by asking the server.
+> `ConnectionTrait` on `DatabaseConnection` and `&DatabaseConnection` is the
+> retrying path, and on `DatabaseTransaction` — with `&mut DatabaseTransaction`
+> forwarding to it (`conn.pool.conn-trait`) — the evict-only one. No third case
+> hides between them: `TransactionTrait::begin` borrows the connection
+> exclusively (`conn.tx`), so while a transaction handle is alive the borrow
+> checker forbids reaching the connection's impls at all.
+>
+> `execute_raw` and `query_raw` never retry, transaction or no transaction. They
+> take an `IntoIterator` consumed by the first attempt, which is not `Clone` and
+> cannot be held across the retry without a `Send` bound `ConnectionTrait` does
+> not carry, so they evict the rejected key and return the error — which leaves
+> the next call to re-prepare, making the recovery one call later rather than
+> absent. The four methods whose parameters are a reusable `&[&(dyn ToSql +
+> Sync)]` slice are the ones that *can* retry, and outside a transaction they
+> do. Eviction itself has no exception: every statement `ConnectionTrait`
+> accepts is text (`conn.sql-text`), so every one is cache-resolved and every
+> one can be prepared again from what the caller passed.
 >
 > `0A000` is also PostgreSQL's generic *feature not supported*, and nothing but
 > the message text — which is localized — separates the two. A statement
-> rejected on its own merits is therefore retried once as well and fails
-> identically, costing one round trip on a call that was already failing. That
-> is preferred to matching on prose.
+> rejected on its own merits is therefore treated the same way: outside a
+> transaction it is retried once and fails identically, costing one round trip
+> on a call that was already failing; inside one it costs an eviction, so the
+> next call parses the text again. That is preferred to matching on prose, and
+> it is also why `0A000` is NOT added to the retryable SQLSTATEs of
+> `conn.tx.retry` — `transaction_with_retry` would replay whole transactions
+> against a permanently unsupported feature. A caller who knows their statements
+> reach no such feature can classify it as retryable themselves, since
+> `RetryableError` is implemented on the closure's own error type.
 >
 > One case is out of reach of this rule rather than absent from it. A recycling
 > method whose SQL deallocates — `Custom("DISCARD ALL")`, which is exactly what
@@ -307,7 +347,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > particular connection already in hand, and there a prepared `Statement` is
 > the point rather than the hazard.
 
-> [spec:pgorm:def:conn.pool.conn-trait+7]
+> [spec:pgorm:def:conn.pool.conn-trait+8]
 > `ConnectionTrait` is the uniform statement-execution surface over
 > connections and transactions. It defines seven async methods. Six are
 > generic over `T: ?Sized + SqlText + Sync` — the statement is SQL text and
@@ -329,8 +369,10 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > inserted on a miss. There is no second route, because there is no statement
 > without text to take one. What the cache returns is prepared on, and used
 > only on, the connection the call is running on, so no prepared statement
-> crosses connections at all. A rejected cached plan is evicted and retried
-> under `conn.pool.statement-cache.invalidate`.
+> crosses connections at all. A rejected cached plan is evicted under
+> `conn.pool.statement-cache.invalidate`, and retried there only outside a
+> transaction: inside one the rejection has already aborted the transaction, so
+> the original error is what the caller gets.
 >
 > The seventh, `batch_execute(sql: &str) -> ()`, is neither generic nor
 > parameterized: it sends `sql` through the simple-query protocol, so the

@@ -245,7 +245,7 @@ pub async fn query_opt_reports_one_row_or_zero() -> Result<(), Error> {
 }
 
 // [spec:pgorm:req:metric.layer.delegate+4/test]    a cache hit is still a reported call
-// [spec:pgorm:def:conn.pool.conn-trait+7/test]    the wrapper inherits the routing it delegates to
+// [spec:pgorm:def:conn.pool.conn-trait+8/test]    the wrapper inherits the routing it delegates to
 #[pgorm_macros::test]
 pub async fn cached_statements_still_report_each_call() -> Result<(), Error> {
     const SQL: &str = "SELECT id FROM widget WHERE id = 1";

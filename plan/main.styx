@@ -3840,12 +3840,20 @@ children (
                 title "Handle stale prepared plans inside transactions without masking the original error"
                 kind @fix
                 deps (infra.statement-cache)
+                sealed true
                 log (
                     {
                         at 2026-09-06T11:34:46.870478Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Adversarial review 2026-09-06, finding 6, severity P2. Confirmed on d778f24b. Source: src/database/db_connection.rs:35-39 retries prepare_cached immediately after SQLSTATE 0A000, including DatabaseTransaction implementations. Reproduction: create stale(id int), cache SELECT * FROM stale, ALTER TABLE stale ADD COLUMN label text, begin a transaction, execute the cached SELECT. The first failure aborts the transaction; re-prepare returns 25P02 and hides the original cached-plan error. Acceptance: choose and document transaction-aware recovery (protect a retry with a savepoint, or evict and preserve the original error for transaction-level recovery); never replace the actionable original error with a futile re-prepare error. Verify top-level/nested transactions, rollback and cache reuse, and retain working autocommit recovery and iterator-parameter semantics. Spec impact: [spec:pgorm:req:conn.pool.statement-cache.invalidate] v2 mandates retry with no transaction exception, so revise it to the selected valid recovery contract and reconcile [dec:pgorm:prepared-statement-reuse]. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_transaction_stale_plan_error."
+                    }
+
+                    {
+                        at 2026-09-06T12:12:04.84501Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

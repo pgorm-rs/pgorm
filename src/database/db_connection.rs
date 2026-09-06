@@ -9,19 +9,20 @@ use tokio_postgres::{
     types::{BorrowToSql, ToSql},
 };
 
-/// Run a statement against the connection's statement cache, re-preparing once
-/// if PostgreSQL rejects the cached plan.
+/// Run a statement against the connection's statement cache, re-preparing it
+/// and running it again once if PostgreSQL rejects the cached plan.
 ///
-/// `$owner` is whatever holds the cache — a pooled client or a transaction on
-/// one. Every statement carries its SQL text (`conn.sql-text`), so every one is
-/// resolved through the cache and the same text is parsed once per connection
-/// rather than once per call; there is no second path.
+/// `$owner` is the pooled client holding the cache. Every statement carries its
+/// SQL text (`conn.sql-text`), so every one is resolved through the cache and
+/// the same text is parsed once per connection rather than once per call; there
+/// is no second path.
 ///
 /// `$call` is expanded twice, once per attempt, so it must be replayable: only
 /// the methods whose parameters are a reusable `&[&dyn ToSql]` slice can use
-/// this macro.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    evict, re-prepare, retry once
-macro_rules! cached {
+/// this macro, and only outside a transaction — see [`cached_evict`] for why an
+/// open transaction takes the other one.
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    evict, re-prepare, retry once
+macro_rules! cached_retry {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
         let sql = $statement.sql_text();
@@ -43,15 +44,24 @@ macro_rules! cached {
     }};
 }
 
-/// [`cached`] for the two methods whose parameters are an `IntoIterator`.
+/// [`cached_retry`] without the second attempt: a rejected plan is evicted, so
+/// the next call re-prepares, and the error is returned exactly as it came.
 ///
-/// Those parameters are consumed by the first attempt and cannot be re-supplied
-/// — the iterator is not `Clone`, and holding its items across the retry would
-/// demand a `Send` bound the trait does not carry — so a rejected plan is
-/// evicted, which makes the next call re-prepare, and the error is returned as
-/// it stands.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    evict without a retry
-macro_rules! cached_once {
+/// Two callers need this, for unrelated reasons.
+///
+/// `execute_raw` and `query_raw` take an `IntoIterator` consumed by the first
+/// attempt, which is not `Clone` and cannot be held across a retry without a
+/// `Send` bound `ConnectionTrait` does not carry, so the recovery is one call
+/// later rather than absent.
+///
+/// Every method on a [`DatabaseTransaction`] needs it because the rejected plan
+/// has already aborted the transaction. The re-prepare would fail with `25P02`,
+/// *current transaction is aborted*, and returning that would replace the
+/// caller's actionable error with a consequence of pgorm's own retry. Recovery
+/// inside a transaction belongs to whoever owns the transaction's boundary: the
+/// eviction guarantees their next attempt prepares afresh.
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    evict without a retry
+macro_rules! cached_evict {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
         let sql = $statement.sql_text();
@@ -65,6 +75,7 @@ macro_rules! cached_once {
             && is_stale_cached_plan(error)
         {
             drop(owner.statement_cache.remove(sql, &[]));
+            tracing::debug!(sql, "cached plan rejected; evicted without a retry");
         }
 
         Ok(outcome?)
@@ -76,10 +87,11 @@ macro_rules! cached_once {
 ///
 /// The server reports it as SQLSTATE `0A000`, which is also its generic
 /// *feature not supported*. Nothing distinguishes the two but the message text,
-/// which is localized, so a statement rejected on its own merits is retried
-/// once as well; it fails identically the second time, at the cost of one round
-/// trip on a call that was already failing.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+2]    the SQLSTATE that means "re-prepare"
+/// which is localized, so a statement rejected on its own merits is treated the
+/// same way: outside a transaction it is retried once and fails identically, at
+/// the cost of one round trip on a call that was already failing, and inside
+/// one it costs an eviction that makes the next call parse the text again.
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    the SQLSTATE that means "re-prepare"
 fn is_stale_cached_plan(error: &tokio_postgres::Error) -> bool {
     error.code() == Some(&SqlState::FEATURE_NOT_SUPPORTED)
 }
@@ -435,7 +447,7 @@ impl ConnectionTrait for &DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .execute(prepared, params)
             .await)
@@ -449,7 +461,7 @@ impl ConnectionTrait for &DatabaseConnection {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(&self.0, statement, |prepared| self
+        cached_evict!(&self.0, statement, |prepared| self
             .0
             .execute_raw(prepared, params)
             .await)
@@ -463,7 +475,7 @@ impl ConnectionTrait for &DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query_one(prepared, params)
             .await)
@@ -477,7 +489,7 @@ impl ConnectionTrait for &DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query_opt(prepared, params)
             .await)
@@ -491,7 +503,7 @@ impl ConnectionTrait for &DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query(prepared, params)
             .await)
@@ -504,7 +516,7 @@ impl ConnectionTrait for &DatabaseConnection {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(&self.0, statement, |prepared| self
+        cached_evict!(&self.0, statement, |prepared| self
             .0
             .query_raw(prepared, params)
             .await)
@@ -515,7 +527,7 @@ impl ConnectionTrait for &DatabaseConnection {
     }
 }
 
-// [spec:pgorm:def:conn.pool.conn-trait+7]    cache-routing impls
+// [spec:pgorm:def:conn.pool.conn-trait+8]    cache-routing impls
 #[async_trait::async_trait]
 impl ConnectionTrait for DatabaseConnection {
     // #[instrument(level = "trace")]
@@ -523,7 +535,7 @@ impl ConnectionTrait for DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .execute(prepared, params)
             .await)
@@ -537,7 +549,7 @@ impl ConnectionTrait for DatabaseConnection {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(&self.0, statement, |prepared| self
+        cached_evict!(&self.0, statement, |prepared| self
             .0
             .execute_raw(prepared, params)
             .await)
@@ -551,7 +563,7 @@ impl ConnectionTrait for DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query_one(prepared, params)
             .await)
@@ -565,7 +577,7 @@ impl ConnectionTrait for DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query_opt(prepared, params)
             .await)
@@ -579,7 +591,7 @@ impl ConnectionTrait for DatabaseConnection {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(&self.0, statement, |prepared| self
+        cached_retry!(&self.0, statement, |prepared| self
             .0
             .query(prepared, params)
             .await)
@@ -593,7 +605,7 @@ impl ConnectionTrait for DatabaseConnection {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(&self.0, statement, |prepared| self
+        cached_evict!(&self.0, statement, |prepared| self
             .0
             .query_raw(prepared, params)
             .await)
@@ -611,7 +623,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .execute(prepared, params)
             .await)
@@ -625,7 +637,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .execute_raw(prepared, params)
             .await)
@@ -639,7 +651,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .query_one(prepared, params)
             .await)
@@ -653,7 +665,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .query_opt(prepared, params)
             .await)
@@ -667,7 +679,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
     where
         T: ?Sized + SqlText + Sync,
     {
-        cached!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .query(prepared, params)
             .await)
@@ -681,7 +693,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
         I: IntoIterator<Item = P> + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        cached_once!(self.tx(), statement, |prepared| self
+        cached_evict!(self.tx(), statement, |prepared| self
             .tx()
             .query_raw(prepared, params)
             .await)
@@ -697,7 +709,7 @@ impl ConnectionTrait for DatabaseTransaction<'_> {
 /// into the inference variable `C`. Forwarding through the exclusive borrow
 /// makes the closure's handle spell a connection the same way the transaction
 /// itself does.
-// [spec:pgorm:def:conn.pool.conn-trait+7]    the closure's handle is itself a connection
+// [spec:pgorm:def:conn.pool.conn-trait+8]    the closure's handle is itself a connection
 #[async_trait::async_trait]
 impl ConnectionTrait for &mut DatabaseTransaction<'_> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>

@@ -4,7 +4,7 @@ epitome "Reuse prepared statements through the per-connection cache on the ordin
 state @tentative
 category @executive
 scope {
-    rules ([spec:pgorm:sem:conn.pool.statement-cache] [spec:pgorm:def:conn.pool.conn-trait] [spec:pgorm:def:exec.decode])
+    rules ([spec:pgorm:sem:conn.pool.statement-cache] [spec:pgorm:def:conn.pool.conn-trait] [spec:pgorm:req:conn.pool.statement-cache.invalidate] [spec:pgorm:def:exec.decode])
 }
 author "brendan@necessary.nu"
 alternatives (
@@ -24,7 +24,7 @@ alternatives (
 consequences {
     accepted (
         "ConnectionTrait's six extended-protocol methods resolve SqlText::sql_text() through the connection's StatementCache; since infra.statement-identity sealed the bound to str/String there is no second route. Measured 2.30x on real ORM queries at a 4ms round trip."
-        "Reuse introduces one failure mode the re-prepare-every-time path lacks: SQLSTATE 0A000, cached plan must not change result type, after DDL that alters a result column. The cache evicts and re-prepares once; a second failure surfaces to the caller."
+        "Reuse introduces one failure mode the re-prepare-every-time path lacks: SQLSTATE 0A000, cached plan must not change result type, after DDL that alters a result column. Recovery is split by whether a transaction is open — and the split is decided by the type, since begin borrows the connection exclusively. Outside one the cache evicts and re-prepares once, and a second failure surfaces to the caller. Inside one it evicts and surfaces the 0A000 unchanged: the rejection has already aborted the transaction, so a retry's re-prepare would fail with 25P02 and mask the actionable error. Recovery inside a transaction is the caller's, at the boundary they own — an implicit savepoint per cached execution was rejected as two round trips spent to defeat the round trips this decision exists to remove, and as a duplicate of the nested transaction callers can already open."
         "The cache key space is unbounded — variable-arity IN lists alone produced 25 entries for one logical query — so the cache carries a capacity bound and an opt-out."
         "Prepare-time verification of a FromQueryResult target against Statement::columns() is offered as a utility, not as a handle type. It is the only thing that catches a wrong target when the query returns no rows, which today returns Ok(vec![]) and ships."
     )
