@@ -427,3 +427,297 @@ async fn graph_terminals() -> Result<(), Error> {
     ctx.delete().await;
     Ok(())
 }
+
+/// The grouped fixture: a cake with two of everything, a cake with nothing at
+/// all, and a cake whose one filling is shared with the first — so a junction
+/// hop fans out, and an ordering on a child column tears the first cake's run
+/// in two.
+const GROUPED_SCHEMA: &str = r#"
+    CREATE TABLE "cake" ("id" int PRIMARY KEY, "name" text NOT NULL);
+    CREATE TABLE "vendor" ("id" int PRIMARY KEY, "name" text NOT NULL);
+    CREATE TABLE "filling" ("id" int PRIMARY KEY, "name" text NOT NULL, "vendor_id" int);
+    CREATE TABLE "cake_filling" (
+        "cake_id" int, "filling_id" int, PRIMARY KEY ("cake_id", "filling_id")
+    );
+    CREATE TABLE "fruit" ("id" int PRIMARY KEY, "name" text NOT NULL, "cake_id" int);
+    INSERT INTO "cake" VALUES (1, 'Cheesecake'), (2, 'Lonely'), (3, 'Mudcake');
+    INSERT INTO "vendor" VALUES (7, 'Sweet Supplies');
+    INSERT INTO "filling" VALUES (5, 'Cream', 7), (6, 'Orphanite', NULL);
+    INSERT INTO "cake_filling" VALUES (1, 5), (1, 6), (3, 6);
+    INSERT INTO "fruit" VALUES (10, 'Apricot', 1), (11, 'Blueberry', 3), (12, 'Cranberry', 1);
+"#;
+
+async fn grouped_schema(db: &DatabaseConnection) -> Result<(), Error> {
+    db.batch_execute(GROUPED_SCHEMA).await
+}
+
+fn apricot() -> fruit::Model {
+    fruit::Model {
+        id: 10,
+        name: "Apricot".to_owned(),
+        cake_id: Some(1),
+    }
+}
+
+fn blueberry() -> fruit::Model {
+    fruit::Model {
+        id: 11,
+        name: "Blueberry".to_owned(),
+        cake_id: Some(3),
+    }
+}
+
+fn cranberry() -> fruit::Model {
+    fruit::Model {
+        id: 12,
+        name: "Cranberry".to_owned(),
+        cake_id: Some(1),
+    }
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    the fanout regroups: each root
+// appears once with its matching models beneath it, and a root the slot did
+// not match reads as an empty `Vec` rather than dropping out — with nothing
+// ordered by the caller, the roots come back in pure primary-key order
+#[pgorm_macros::test]
+async fn graph_grouped_fanout() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_grouped_fanout").await;
+    let db = ctx.db.get().await?;
+    grouped_schema(&db).await?;
+
+    let grouped: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_asc(fruit::Column::Id)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(
+        grouped,
+        [
+            (cheesecake(), vec![apricot(), cranberry()]),
+            (mudcake(), vec![blueberry()]),
+            // Matched nothing, so an empty `Vec` — the root is not dropped.
+            (lonely(), vec![]),
+        ]
+    );
+
+    // Ordering by nothing is pure primary-key order. Within a bucket the row
+    // order is then the server's, so the children are compared as a set.
+    let by_key: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .all_grouped(&db)
+        .await?;
+
+    let shape: Vec<(i32, Vec<i32>)> = by_key
+        .into_iter()
+        .map(|(cake, fruits)| {
+            let mut ids: Vec<i32> = fruits.into_iter().map(|fruit| fruit.id).collect();
+            ids.sort_unstable();
+            (cake.id, ids)
+        })
+        .collect();
+
+    assert_eq!(shape, [(1, vec![10, 12]), (2, vec![]), (3, vec![11])]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    caller ordering dominates: the
+// primary key is appended *behind* what the caller wrote, so a descending
+// order on a root column reverses the entries — the constructor-injected
+// leading ORDER BY of the pair surface would have silently overruled it
+#[pgorm_macros::test]
+async fn graph_grouped_caller_ordering_dominates() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_grouped_ordering").await;
+    let db = ctx.db.get().await?;
+    grouped_schema(&db).await?;
+
+    // Descending on the very column the appended key orders ascending: only a
+    // trailing key leaves this ordering standing.
+    let by_id_desc: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_desc(cake::Column::Id)
+        .order_by_asc(fruit::Column::Id)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(
+        by_id_desc,
+        [
+            (mudcake(), vec![blueberry()]),
+            (lonely(), vec![]),
+            (cheesecake(), vec![apricot(), cranberry()]),
+        ]
+    );
+
+    // The same domination over a non-key column, where the appended key is a
+    // tiebreak only.
+    let by_name_desc: Vec<cake::Model> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_desc(cake::Column::Name)
+        .all_grouped(&db)
+        .await?
+        .into_iter()
+        .map(|(cake, _)| cake)
+        .collect();
+
+    assert_eq!(by_name_desc, [mudcake(), lonely(), cheesecake()]);
+
+    // Children arrive in row order, so the caller's ordering orders the
+    // buckets too.
+    let children_desc: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_asc(cake::Column::Id)
+        .order_by_desc(fruit::Column::Id)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(
+        children_desc.first().map(|(_, fruits)| fruits.clone()),
+        Some(vec![cranberry(), apricot()])
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    a junction-mediated has-many is
+// this shape: the `via` hop consumes no slot, so `(Opt<F>,)` still holds and
+// the grouped read is available — through `related_maybe` and through the
+// hand-written `via` + `join_maybe` alike
+#[pgorm_macros::test]
+async fn graph_grouped_through_a_junction() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_grouped_junction").await;
+    let db = ctx.db.get().await?;
+    grouped_schema(&db).await?;
+
+    let folded: Vec<(cake::Model, Vec<filling::Model>)> = cake::Entity::graph()
+        .related_maybe::<filling::Entity>()
+        .order_by_asc(filling::Column::Id)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(
+        folded,
+        [
+            (cheesecake(), vec![cream(), orphanite()]),
+            (mudcake(), vec![orphanite()]),
+            (lonely(), vec![]),
+        ]
+    );
+
+    let by_hand: Vec<(cake::Model, Vec<filling::Model>)> = cake::Entity::graph()
+        .via(cake_filling::Relation::Cake.def().rev())
+        .join_maybe::<filling::Entity>(cake_filling::Relation::Filling.def())
+        .order_by_asc(filling::Column::Id)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(by_hand, folded);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    grouping keys on the decoded
+// root rather than on adjacency: an ordering that interleaves the roots merges
+// the torn run into the entry at its first appearance instead of emitting the
+// root twice
+#[pgorm_macros::test]
+async fn graph_grouped_merges_a_torn_run() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_grouped_torn_run").await;
+    let db = ctx.db.get().await?;
+    grouped_schema(&db).await?;
+
+    // Ordering on the child's name interleaves the roots: Apricot (cake 1),
+    // Blueberry (cake 3), Cranberry (cake 1), then the unmatched cake, whose
+    // NULL name sorts last.
+    let rows: Vec<(cake::Model, Option<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_asc(fruit::Column::Name)
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        rows,
+        [
+            (cheesecake(), Some(apricot())),
+            (mudcake(), Some(blueberry())),
+            (cheesecake(), Some(cranberry())),
+            (lonely(), None),
+        ],
+        "the fixture must actually tear cake 1's run apart"
+    );
+
+    let grouped: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+        .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+        .order_by_asc(fruit::Column::Name)
+        .all_grouped(&db)
+        .await?;
+
+    assert_eq!(
+        grouped,
+        [
+            // One entry, at the first occurrence, carrying both children.
+            (cheesecake(), vec![apricot(), cranberry()]),
+            (mudcake(), vec![blueberry()]),
+            (lonely(), vec![]),
+        ]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    the key is read at whatever
+// arity it has: a composite-keyed root groups on every key column, not on the
+// first one
+#[pgorm_macros::test]
+async fn graph_grouped_composite_key() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_grouped_composite").await;
+    let db = ctx.db.get().await?;
+    grouped_schema(&db).await?;
+
+    let grouped: Vec<(cake_filling::Model, Vec<filling::Model>)> = cake_filling::Entity::graph()
+        .join_maybe::<filling::Entity>(cake_filling::Relation::Filling.def())
+        .all_grouped(&db)
+        .await?;
+
+    // Three junction rows, two of which share a `cake_id`: keying on the whole
+    // key keeps them apart.
+    assert_eq!(
+        grouped,
+        [
+            (
+                cake_filling::Model {
+                    cake_id: 1,
+                    filling_id: 5,
+                },
+                vec![cream()]
+            ),
+            (
+                cake_filling::Model {
+                    cake_id: 1,
+                    filling_id: 6,
+                },
+                vec![orphanite()]
+            ),
+            (
+                cake_filling::Model {
+                    cake_id: 3,
+                    filling_id: 6,
+                },
+                vec![orphanite()]
+            ),
+        ]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}

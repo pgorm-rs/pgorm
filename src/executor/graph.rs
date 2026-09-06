@@ -7,12 +7,17 @@
 //! execution path.
 
 use core::marker::PhantomData;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt;
 use std::num::NonZeroU64;
 
+use pgorm_query::{Order, Value};
+
 use crate::{
-    ConnectionTrait, EntityTrait, Error, FromQueryResult, Paginator, PaginatorTrait,
-    PinBoxSendStream, QueryResult, SelectGraph, Selector, SelectorTrait, Slot,
+    ConnectionTrait, EntityTrait, Error, FromQueryResult, Iterable, ModelTrait, Opt, Paginator,
+    PaginatorTrait, PinBoxSendStream, PrimaryKeyToColumn, QueryResult, SelectGraph, Selector,
+    SelectorTrait, Slot,
 };
 
 /// The selector that decodes one graph row: the root under `s0_`, then each
@@ -161,6 +166,148 @@ where
     }
 }
 
+/// The grouping key: the root's decoded primary-key value, at whatever arity
+/// the key has.
+///
+/// A unary key — the overwhelming case — is carried inline, so grouping a
+/// result set allocates nothing per row for it.
+// [spec:pgorm:sem:query.graph.grouped]
+#[derive(PartialEq, Eq, Hash)]
+enum RootKey {
+    /// A single-column primary key.
+    Unit(Value),
+    /// A composite primary key, in `PrimaryKey` iteration order.
+    Composite(Vec<Value>),
+}
+
+/// Read the root's primary-key value out of a *decoded* model — the grouping
+/// is keyed on what the row said the root is, not on where the row sat.
+// [spec:pgorm:sem:query.graph.grouped]
+fn root_key<E: EntityTrait>(model: &E::Model) -> RootKey {
+    let mut keys = <E::PrimaryKey as Iterable>::iter();
+    match (keys.next(), keys.next()) {
+        (Some(only), None) => RootKey::Unit(model.get(only.into_column())),
+        (first, second) => RootKey::Composite(
+            first
+                .into_iter()
+                .chain(second)
+                .chain(keys)
+                .map(|pk| model.get(pk.into_column()))
+                .collect(),
+        ),
+    }
+}
+
+/// Consolidate decoded rows into one entry per distinct root key.
+///
+/// One pass in row order: a key not seen before appends its root with an empty
+/// child list, so entries sit at their first occurrence; a key seen before
+/// finds that entry again, so a run torn apart by the ordering merges rather
+/// than emitting the root twice. Children are pushed as they arrive, and a row
+/// whose slot decoded `None` contributes nothing beyond its root.
+// [spec:pgorm:sem:query.graph.grouped]
+fn group_rows<E: EntityTrait, F: EntityTrait>(
+    rows: Vec<(E::Model, Option<F::Model>)>,
+) -> Vec<(E::Model, Vec<F::Model>)> {
+    let mut grouped: Vec<(E::Model, Vec<F::Model>)> = Vec::new();
+    let mut seen: HashMap<RootKey, usize> = HashMap::new();
+
+    for (root, child) in rows {
+        let at = match seen.entry(root_key::<E>(&root)) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let at = grouped.len();
+                entry.insert(at);
+                grouped.push((root, Vec::new()));
+                at
+            }
+        };
+        if let Some(child) = child {
+            grouped[at].1.push(child);
+        }
+    }
+
+    grouped
+}
+
+/// The grouped read, which exists on exactly one shape: a graph whose slot
+/// tuple is `(Opt<F>,)`.
+// [spec:pgorm:sem:query.graph.grouped]
+impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
+    /// Fetch every root once, with the slot's matching models collected
+    /// beneath it.
+    ///
+    /// The method exists only here — one optional slot beside the root,
+    /// `via()` hops permitted, which is the shape a junction-mediated has-many
+    /// takes. Asking for it on any other slot tuple is a compile error, so a
+    /// grouped read over two slots — whose meaning is not defined — cannot be
+    /// written:
+    ///
+    /// ```compile_fail,E0599
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::{cake, fruit}, DatabaseConnection};
+    ///
+    /// async fn two_slots(db: &DatabaseConnection) {
+    ///     let _ = cake::Entity::graph()
+    ///         .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+    ///         .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), alias("other"))
+    ///         .all_grouped(db)
+    ///         .await;
+    /// }
+    /// ```
+    ///
+    /// **Caller ordering dominates.** `E`'s primary-key columns, qualified
+    /// with `E`'s table, are appended ascending as *trailing* `ORDER BY` keys
+    /// — after every ordering the caller wrote, never before it. Order by
+    /// nothing and the result is pure primary-key order; order by anything and
+    /// that ordering stands, with the key appended as a deterministic tiebreak
+    /// only.
+    ///
+    /// Grouping is keyed, not adjacency-based: rows consolidate on the root's
+    /// decoded primary-key value. Each distinct key yields exactly one entry,
+    /// positioned at its first occurrence in row order; children are pushed in
+    /// row order, so the caller's ordering orders each bucket too; a root the
+    /// slot did not match reads as an empty `Vec`. An ordering that
+    /// interleaves roots therefore merges the torn run into the entry at its
+    /// first appearance rather than repeating the root.
+    ///
+    /// There is no paginated form, for the reason page boundaries fall between
+    /// rows rather than between roots.
+    ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::{cake, fruit}, DatabasePool};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
+    /// let db = pool.get().await?;
+    ///
+    /// let cakes: Vec<(cake::Model, Vec<fruit::Model>)> = cake::Entity::graph()
+    ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+    ///     .order_by_desc(cake::Column::Name)
+    ///     .all_grouped(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    // [spec:pgorm:sem:query.graph.grouped]
+    pub async fn all_grouped<C: ConnectionTrait>(
+        self,
+        db: &C,
+    ) -> Result<Vec<(E::Model, Vec<F::Model>)>, Error> {
+        let rows = self.key_ordered().into_selector().all(db).await?;
+        Ok(group_rows::<E, F>(rows))
+    }
+
+    /// Append `E`'s primary-key columns, qualified with `E`'s table, ascending
+    /// — behind whatever the caller already ordered by.
+    // [spec:pgorm:sem:query.graph.grouped]
+    fn key_ordered(mut self) -> Self {
+        for pk in <E::PrimaryKey as Iterable>::iter() {
+            self.query
+                .order_by((E::default(), pk.into_column()), Order::Asc);
+        }
+        self
+    }
+}
+
 /// Pagination reaches the graph through the same selector: page boundaries
 /// fall between *rows*, not between root models, so a root with several
 /// matching slot rows spans pages exactly as the underlying SQL does.
@@ -175,5 +322,134 @@ where
 
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, Self::Selector> {
         self.into_selector().paginate(db, page_size)
+    }
+}
+
+// [spec:pgorm:sem:query.graph.grouped/test]    the primary key is appended
+// behind the caller's ordering rather than in front of it, at any key arity,
+// and the consolidation keys on the decoded root instead of on adjacency
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests_cfg::{cake, cake_filling, filling, fruit};
+    use crate::{QueryOrder, QueryTrait, RelationTrait};
+    use pretty_assertions::assert_eq;
+
+    fn cake_of(id: i32, name: &str) -> cake::Model {
+        cake::Model {
+            id,
+            name: name.to_owned(),
+        }
+    }
+
+    fn fruit_of(id: i32, cake_id: i32) -> fruit::Model {
+        fruit::Model {
+            id,
+            name: format!("fruit-{id}"),
+            cake_id: Some(cake_id),
+        }
+    }
+
+    #[track_caller]
+    fn assert_order(sql: &str, tail: &str) {
+        assert!(sql.ends_with(tail), "expected to end with `{tail}`: {sql}");
+    }
+
+    #[test]
+    fn an_unordered_read_gets_pure_key_order() {
+        assert_order(
+            &cake::Entity::graph()
+                .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+                .key_ordered()
+                .as_query()
+                .to_string(),
+            r#"ORDER BY "cake"."id" ASC"#,
+        );
+    }
+
+    #[test]
+    fn caller_ordering_dominates_the_key() {
+        assert_order(
+            &cake::Entity::graph()
+                .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+                .order_by_desc(cake::Column::Name)
+                .order_by_asc(fruit::Column::Id)
+                .key_ordered()
+                .as_query()
+                .to_string(),
+            r#"ORDER BY "cake"."name" DESC, "fruit"."id" ASC, "cake"."id" ASC"#,
+        );
+    }
+
+    #[test]
+    fn every_key_column_appends_root_qualified() {
+        assert_order(
+            &cake_filling::Entity::graph()
+                .join_maybe::<filling::Entity>(cake_filling::Relation::Filling.def())
+                .order_by_desc(filling::Column::Name)
+                .key_ordered()
+                .as_query()
+                .to_string(),
+            r#"ORDER BY "filling"."name" DESC, "cake_filling"."cake_id" ASC, "cake_filling"."filling_id" ASC"#,
+        );
+    }
+
+    #[test]
+    fn grouping_keys_on_the_root_not_on_adjacency() {
+        // A torn run: cake 1 appears either side of cake 3, and cake 2 matched
+        // nothing at all.
+        let grouped = group_rows::<cake::Entity, fruit::Entity>(vec![
+            (cake_of(1, "Cheesecake"), Some(fruit_of(10, 1))),
+            (cake_of(3, "Mudcake"), Some(fruit_of(11, 3))),
+            (cake_of(1, "Cheesecake"), Some(fruit_of(12, 1))),
+            (cake_of(2, "Lonely"), None),
+        ]);
+
+        assert_eq!(
+            grouped,
+            [
+                // One entry, at the first occurrence, holding both children in
+                // row order.
+                (
+                    cake_of(1, "Cheesecake"),
+                    vec![fruit_of(10, 1), fruit_of(12, 1)]
+                ),
+                (cake_of(3, "Mudcake"), vec![fruit_of(11, 3)]),
+                (cake_of(2, "Lonely"), vec![]),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_composite_key_groups_on_every_column() {
+        let rows = vec![
+            (
+                cake_filling::Model {
+                    cake_id: 1,
+                    filling_id: 5,
+                },
+                None,
+            ),
+            (
+                cake_filling::Model {
+                    cake_id: 1,
+                    filling_id: 6,
+                },
+                None,
+            ),
+            (
+                cake_filling::Model {
+                    cake_id: 1,
+                    filling_id: 5,
+                },
+                None,
+            ),
+        ];
+
+        // Two distinct pairs, not one group keyed on `cake_id` alone.
+        assert_eq!(
+            group_rows::<cake_filling::Entity, filling::Entity>(rows).len(),
+            2
+        );
     }
 }

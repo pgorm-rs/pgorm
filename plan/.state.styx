@@ -525,7 +525,6 @@ impl_evidence (
         codegen.entity.relations
         codegen.entity.relations.related
         codegen.entity.relations.via
-        codegen.entity.seaography
         codegen.entity.serde
         codegen.entity.serde.derives
         codegen.entity.serde.skip
@@ -551,7 +550,6 @@ impl_evidence (
         {impl_name main, rule codegen.entity.relations}
         {impl_name main, rule codegen.entity.relations.related}
         {impl_name main, rule codegen.entity.relations.via}
-        {impl_name main, rule codegen.entity.seaography}
         {impl_name main, rule codegen.entity.serde}
         {impl_name main, rule codegen.entity.serde.derives}
         {impl_name main, rule codegen.entity.serde.skip}
@@ -561,32 +559,6 @@ impl_evidence (
         {impl_name main, rule codegen.entity.types}
         {impl_name main, rule codegen.entity.types.datetime}
         {impl_name main, rule codegen.entity.types.unsupported}
-    ), rule_versions_seen (
-        {id codegen.entity, version 0}
-        {id codegen.entity.compact, version 0}
-        {id codegen.entity.compact.attrs, version 1}
-        {id codegen.entity.compact.model, version 0}
-        {id codegen.entity.context, version 1}
-        {id codegen.entity.enums, version 1}
-        {id codegen.entity.expanded, version 0}
-        {id codegen.entity.expanded.blocks, version 0}
-        {id codegen.entity.files, version 0}
-        {id codegen.entity.imports, version 0}
-        {id codegen.entity.keywords, version 1}
-        {id codegen.entity.pk, version 0}
-        {id codegen.entity.relations, version 1}
-        {id codegen.entity.relations.related, version 0}
-        {id codegen.entity.relations.via, version 0}
-        {id codegen.entity.seaography, version 0}
-        {id codegen.entity.serde, version 0}
-        {id codegen.entity.serde.derives, version 0}
-        {id codegen.entity.serde.skip, version 0}
-        {id codegen.entity.transform, version 5}
-        {id codegen.entity.transform.conjunct, version 0}
-        {id codegen.entity.transform.inverse, version 0}
-        {id codegen.entity.types, version 2}
-        {id codegen.entity.types.datetime, version 1}
-        {id codegen.entity.types.unsupported, version 1}
     )}
     {id codegen.macros, covered_rules (
         macros.derive
@@ -634,29 +606,6 @@ impl_evidence (
         {impl_name main, rule macros.derive.relation}
         {impl_name main, rule macros.derive.test-attr}
         {impl_name main, rule macros.derive.value-type}
-    ), rule_versions_seen (
-        {id macros.derive, version 0}
-        {id macros.derive.active-enum, version 0}
-        {id macros.derive.active-enum.expansion, version 1}
-        {id macros.derive.active-model, version 2}
-        {id macros.derive.column, version 2}
-        {id macros.derive.entity, version 1}
-        {id macros.derive.entity-model, version 0}
-        {id macros.derive.entity-model.attrs, version 0}
-        {id macros.derive.entity-model.casing, version 1}
-        {id macros.derive.entity-model.column-def, version 3}
-        {id macros.derive.entity-model.primary-key, version 1}
-        {id macros.derive.entity-model.reject, version 1}
-        {id macros.derive.enum-def, version 0}
-        {id macros.derive.enum-iter, version 0}
-        {id macros.derive.from-query-result, version 1}
-        {id macros.derive.iden, version 1}
-        {id macros.derive.iden.query, version 0}
-        {id macros.derive.model, version 3}
-        {id macros.derive.partial-model, version 2}
-        {id macros.derive.relation, version 1}
-        {id macros.derive.test-attr, version 1}
-        {id macros.derive.value-type, version 1}
     )}
     {id decide.migration, covered_rules (
         migration.name
@@ -668,12 +617,6 @@ impl_evidence (
         {impl_name main, rule migration.runner}
         {impl_name main, rule migration.up}
         {impl_name main, rule migration.up-only}
-    ), rule_versions_seen (
-        {id migration.name, version 2}
-        {id migration.runner, version 0}
-        {id migration.up, version 1}
-        {id migration.up-only, version 0}
-        {id query.build.modifiers, version 6}
     )}
     {id infra.conn, covered_rules (
         conn.pool
@@ -732,10 +675,6 @@ impl_evidence (
         {impl_name main, rule schema.from-entity}
         {impl_name main, rule schema.from-entity.enum}
         {impl_name main, rule schema.from-entity.index}
-    ), rule_versions_seen (
-        {id schema.from-entity, version 2}
-        {id schema.from-entity.enum, version 2}
-        {id schema.from-entity.index, version 1}
     )}
     {id infra.tx.closure, covered_rules (
         conn.tx.closure
@@ -754,9 +693,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule exec.cursor.binding-coerce}
         {impl_name main, rule sql.render.cast-param-type}
-    ), rule_versions_seen (
-        {id exec.cursor.binding-coerce, version 0}
-        {id sql.render.cast-param-type, version 0}
     )}
     {id orm.entity, covered_rules (
         entity.active-model
@@ -810,32 +746,6 @@ impl_evidence (
         {impl_name main, rule entity.traits.from-query-result}
         {impl_name main, rule entity.traits.model}
         {impl_name main, rule entity.traits.primary-key}
-    ), rule_versions_seen (
-        {id entity.active-model, version 2}
-        {id entity.active-model.active-value, version 1}
-        {id entity.active-model.active-value.ops, version 0}
-        {id entity.active-model.from-sugar, version 1}
-        {id entity.active-model.hooks, version 0}
-        {id entity.active-model.into, version 1}
-        {id entity.active-model.json, version 2}
-        {id entity.active-model.persistence, version 2}
-        {id entity.active-model.save, version 1}
-        {id entity.relation, version 1}
-        {id entity.relation.builder, version 1}
-        {id entity.relation.def, version 4}
-        {id entity.relation.fk, version 3}
-        {id entity.relation.linked, version 2}
-        {id entity.traits, version 1}
-        {id entity.traits.active-enum, version 1}
-        {id entity.traits.active-enum.limits, version 2}
-        {id entity.traits.column, version 3}
-        {id entity.traits.column-def, version 0}
-        {id entity.traits.column.enum-cast, version 1}
-        {id entity.traits.crud, version 3}
-        {id entity.traits.entity-name, version 1}
-        {id entity.traits.from-query-result, version 3}
-        {id entity.traits.model, version 3}
-        {id entity.traits.primary-key, version 2}
     )}
     {id orm.exec, covered_rules (
         exec.crud
@@ -1010,33 +920,6 @@ impl_evidence (
         {impl_name main, rule sql.ast.window-statement}
         {impl_name main, rule sql.ast.with}
         {impl_name main, rule sql.ast.with.recursive}
-    ), rule_versions_seen (
-        {id sql.ast, version 0}
-        {id sql.ast.build, version 1}
-        {id sql.ast.case, version 0}
-        {id sql.ast.condition, version 0}
-        {id sql.ast.condition.flattening, version 0}
-        {id sql.ast.condition.holder, version 2}
-        {id sql.ast.delete, version 2}
-        {id sql.ast.expr, version 0}
-        {id sql.ast.expr.in, version 1}
-        {id sql.ast.expr.operators, version 1}
-        {id sql.ast.func, version 0}
-        {id sql.ast.insert, version 1}
-        {id sql.ast.insert.arity, version 0}
-        {id sql.ast.keywords, version 2}
-        {id sql.ast.on-conflict, version 1}
-        {id sql.ast.order, version 1}
-        {id sql.ast.returning, version 0}
-        {id sql.ast.select, version 2}
-        {id sql.ast.select.from, version 1}
-        {id sql.ast.select.join, version 1}
-        {id sql.ast.select.projection, version 1}
-        {id sql.ast.select.union, version 0}
-        {id sql.ast.update, version 2}
-        {id sql.ast.window-statement, version 2}
-        {id sql.ast.with, version 2}
-        {id sql.ast.with.recursive, version 1}
     )}
     {id sql.ddl, covered_rules (
         sql.ddl
@@ -1200,6 +1083,11 @@ impl_evidence (
         {impl_name main, rule query.graph.slots}
         {impl_name main, rule query.graph.terminals}
         {impl_name main, rule query.graph.writer}
+    )}
+    {id grouped, covered_rules (
+        query.graph.grouped
+    ), covered_claims (
+        {impl_name main, rule query.graph.grouped}
     )}
 )
 
