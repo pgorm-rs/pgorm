@@ -595,21 +595,40 @@ what makes it total over partially-set models.
 > value types are named) together with both sides' column lists, making the
 > asymmetry diagnosable from the error alone.
 
-> [spec:pgorm:sem:query.loader.many-to-many+2]
-> `load_many_via` issues one query. The caller's target selector is inner
-> joined backwards through the target relation to the junction and through the
-> via relation to the input entity's own table, which is joined under an
-> internal alias so that a self-referencing many-to-many does not name one
-> table twice and so that the key predicate — the via relation's from side
-> against the input keys — qualifies against that alias. The input entity's
-> columns are appended to the projection as the `B_` side
-> (`[spec:pgorm:sem:query.build.combine+2]`), so each returned row carries its
-> target model and the input model it belongs to.
+> [spec:pgorm:sem:query.loader.many-to-many+3]
+> `load_many_via` issues one query, and that query is a graph read
+> (`[spec:pgorm:def:query.graph]`). The caller's target selector is re-rooted
+> as the graph: the statement keeps its FROM, its filters, its ordering and
+> its limit, and gives up only its projection, which the one writer
+> (`[spec:pgorm:sem:query.graph.writer]`) regenerates under `s0_`. Clearing
+> the caller's select list before projecting is what keeps a graph's select
+> list generated from its declaration rather than inherited from a builder
+> whose list a caller may have edited. The junction enters as a `via()` hop —
+> joined because the path runs through it, projected never — and the input
+> entity's own table as the single `Req` slot
+> (`[spec:pgorm:sem:query.graph.slots]`), joined back under an internal alias
+> so that a self-referencing many-to-many does not name one table twice and so
+> that the key predicate — the via relation's from side against the input
+> keys — qualifies against that alias. Each returned row decodes as
+> `(R::Model, input model)` under the `s0_` / `s1_` prefixes, so it carries
+> its target model and the input model it belongs to. The loader MUST NOT
+> carry its own copy of that aliasing: the writer is the only thing that
+> projects a decoded source.
 >
-> The junction's own columns are never decoded: reading a junction row would
-> mean decoding a column whose Rust type the loader cannot name, whereas both
-> entities' models decode through the path every other read takes. The price
-> is that the input entity's row is transmitted once per matching target row.
+> Both hops are walked backwards, because the root is the caller's selector
+> rather than the input entity. That reversal is a direction, not a change of
+> meaning: an authored `on_condition` MUST still receive its two identifiers
+> in the roles the relation was written with
+> (`[spec:pgorm:def:entity.relation.def+5]`), so the loader re-swaps the
+> closure's arguments when it reverses a def. The `via()` hop joins LEFT and
+> the slot INNER, which selects the rows two INNER joins did: the slot's ON
+> references the junction's columns and NULLs do not satisfy it.
+>
+> The junction's own columns are never decoded — a junction is named by a
+> `RelationDef` and not by a type the loader can name a `Model` for — whereas
+> both entities' models decode through the path every other read takes. The
+> price is that the input entity's row is transmitted once per matching target
+> row.
 >
 > Rows are regrouped by the key extracted from the returned input model, into
 > buckets seeded empty per input key; the result clones the bucket per input

@@ -1,14 +1,14 @@
+use super::graph::project_source;
 use crate::{
-    ColumnTrait, Condition, ConnectionTrait, EntityName, EntityTrait, Error, IdenStr, Identity,
-    Iterable, ModelTrait, QueryFilter, QuerySelect, QueryTrait, Related, RelationType, Select,
-    SelectA, SelectB, SelectTwo, error::*,
+    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Identity, ModelTrait, QueryFilter,
+    QueryTrait, Related, RelationDef, RelationType, Req, Select, SelectGraph, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{
-    Alias, AliasName, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, IntoIden, JoinType,
-    NamedTable, SelectExpr, SharedIden, SimpleExpr, TableName, ValueTuple, alias,
+    AliasName, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, NamedTable, SharedIden,
+    SimpleExpr, TableName, ValueTuple, alias,
 };
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
 /// Entity, or a `Select<Entity>`; to be used as parameters in [`LoaderTrait`]
 pub trait EntityOrSelect<E: EntityTrait>: Send {
@@ -231,7 +231,7 @@ where
         Ok(result)
     }
 
-    // [spec:pgorm:sem:query.loader.many-to-many+2]
+    // [spec:pgorm:sem:query.loader.many-to-many+3]
     async fn load_many_via<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -271,37 +271,26 @@ where
         let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
         let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
 
-        let select = stmt
-            .into_select()
-            .join_rev(JoinType::InnerJoin, rel_def)
-            .join_as_rev(JoinType::InnerJoin, via_rel, SharedIden::clone(&src_alias));
-        let select = <Select<R> as QueryFilter>::filter(select, condition);
-
-        // The input entity's own columns are what carries the key back out of
-        // the join: they decode through its `Model`, the same path every other
-        // read takes, so no column has to be decoded against a guessed type.
-        let mut select_two: SelectTwo<R, <M as ModelTrait>::Entity> =
-            SelectTwo::new_without_prepare(select.apply_alias(SelectA.as_str()).into_query());
-        for col in <<<M as ModelTrait>::Entity as EntityTrait>::Column as Iterable>::iter() {
-            let col_alias = format!("{}{}", SelectB.as_str(), col.as_str());
-            let expr = Expr::col((SharedIden::clone(&src_alias), col.into_iden()));
-            QuerySelect::query(&mut select_two).expr(SelectExpr::new_as(
-                col.select_as(expr),
-                SharedIden::new(Alias::new(col_alias)),
-            ));
-        }
+        // One graph read: the caller's target selector is the root, the
+        // junction is a hop nobody decodes, and the input entity is the one
+        // required slot, which is what carries the key back out of the join.
+        // The hop joins LEFT and the slot INNER, which is INNER end to end:
+        // the slot's ON references the junction's columns, and NULLs do not
+        // satisfy it.
+        let graph = many_to_many_graph::<R, <M as ModelTrait>::Entity>(
+            stmt.into_select(),
+            rel_def,
+            via_rel,
+            SharedIden::clone(&src_alias),
+        );
+        let graph = QueryFilter::filter(graph, condition);
 
         let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
             .iter()
             .map(|key: &ValueTuple| (key.clone(), Vec::new()))
             .collect();
 
-        for (target, source) in select_two.all(db).await? {
-            let Some(source) = source else {
-                // The join is inner on both hops, so every returned row has a
-                // source; a row without one carries no key and is not ours.
-                continue;
-            };
+        for (target, source) in graph.all(db).await? {
             let key = extract_key(&via_from_col, &source)?;
             let bucket = buckets
                 .get_mut(&key)
@@ -320,6 +309,66 @@ where
 /// [`LoaderTrait::load_many_via`]. Internal: it is never handed to a caller,
 /// who filters against the target entity by its own name.
 const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
+
+/// The one graph read [`LoaderTrait::load_many_via`] issues: the caller's
+/// target selector rooted as the graph, the junction joined as a `via` hop
+/// nobody decodes, and the input entity `F` joined back under `src_alias` as
+/// the single required slot the key is read from.
+// [spec:pgorm:sem:query.loader.many-to-many+3]
+fn many_to_many_graph<R, F>(
+    select: Select<R>,
+    rel_def: RelationDef,
+    via_rel: RelationDef,
+    src_alias: DynIden,
+) -> SelectGraph<R, (Req<F>,)>
+where
+    R: EntityTrait,
+    F: EntityTrait,
+{
+    root_graph::<R>(select)
+        .via(rev(rel_def))
+        .join_one_as::<F>(rev(via_rel), src_alias)
+}
+
+/// Re-root the caller's target selector as a graph.
+///
+/// The statement keeps everything the caller put on it — its FROM, its
+/// filters, its ordering, its limit — and gives up only its projection, which
+/// the graph's one writer regenerates under `s0_`. That is the whole reason
+/// this is not a `Select<R>` conversion: a graph's select list is generated
+/// from its declaration, never inherited from a builder a caller may have
+/// edited, and clearing before projecting is what makes the two statements
+/// the same one.
+// [spec:pgorm:sem:query.loader.many-to-many+3]
+fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
+    let mut query = select.into_query();
+    query.clear_selects();
+    project_source::<R>(&mut query, SharedIden::new(R::default()), 0);
+    SelectGraph {
+        query,
+        sources: 1,
+        marker: PhantomData,
+    }
+}
+
+/// Reverse a relation for the direction the graph joins it in, without
+/// reversing what an authored `on_condition` is told.
+///
+/// [`RelationDef::rev`] hands the closure the swapped identifiers, so a
+/// predicate written for `(junction, target)` would silently start receiving
+/// `(target, junction)`. The loader walks both hops backwards purely because
+/// the caller's selector is the root, which is no reason for a caller's
+/// predicate to change meaning.
+// [spec:pgorm:sem:query.loader.many-to-many+3]
+fn rev(mut rel: RelationDef) -> RelationDef {
+    let on_condition = rel.on_condition.take();
+    let mut rel = rel.rev();
+    rel.on_condition = on_condition.map(|f| {
+        Box::new(move |left: DynIden, right: DynIden| f(right, left))
+            as Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>
+    });
+    rel
+}
 
 fn identity_columns(identity: &Identity) -> String {
     identity
@@ -446,5 +495,77 @@ fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
              unaliased `FromItem::Table` relation targets are supported",
             col.to_string(),
         ))),
+    }
+}
+
+// [spec:pgorm:sem:query.loader.many-to-many+3/test]    the one read the
+// junction-mediated load issues: the caller's selector rooted and reprojected
+// under the graph's prefixes, the junction joined but never projected, and the
+// input entity joined back under the alias the key predicate qualifies against
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests_cfg::{cake, filling};
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn many_to_many_reads_one_graph() {
+        let via_rel = <cake::Entity as Related<filling::Entity>>::via()
+            .expect("cake is related to filling through a junction");
+        let rel_def = <cake::Entity as Related<filling::Entity>>::to();
+        let via_from_col = via_rel.columns.from_identity();
+
+        let src_alias: DynIden = SharedIden::new(LOADER_SOURCE_ALIAS);
+        let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
+        let keys = vec![ValueTuple::One(1i32.into()), ValueTuple::One(2i32.into())];
+        let condition = prepare_condition(&src_tbl, &via_from_col, &keys)
+            .expect("a bare table qualifies the key column");
+
+        let graph = many_to_many_graph::<filling::Entity, cake::Entity>(
+            filling::Entity::find(),
+            rel_def,
+            via_rel,
+            SharedIden::clone(&src_alias),
+        );
+
+        assert_eq!(
+            QueryFilter::filter(graph, condition).as_query().to_string(),
+            [
+                r#"SELECT "filling"."id" AS "s0_id", "filling"."name" AS "s0_name","#,
+                r#""filling"."vendor_id" AS "s0_vendor_id","#,
+                r#""pgorm_loader_src"."id" AS "s1_id", "pgorm_loader_src"."name" AS "s1_name""#,
+                r#"FROM "filling""#,
+                r#"LEFT JOIN "cake_filling" ON "filling"."id" = "cake_filling"."filling_id""#,
+                r#"INNER JOIN "cake" AS "pgorm_loader_src""#,
+                r#"ON "cake_filling"."cake_id" = "pgorm_loader_src"."id""#,
+                r#"WHERE "pgorm_loader_src"."id" IN (1, 2)"#,
+            ]
+            .join(" ")
+        );
+    }
+
+    #[test]
+    fn caller_clauses_survive_the_reroot() {
+        use crate::{ColumnTrait, QueryOrder};
+
+        let sql = root_graph::<filling::Entity>(
+            filling::Entity::find()
+                .filter(filling::Column::Name.like("Ch%"))
+                .order_by_desc(filling::Column::Id),
+        )
+        .as_query()
+        .to_string();
+
+        assert_eq!(
+            sql,
+            [
+                r#"SELECT "filling"."id" AS "s0_id", "filling"."name" AS "s0_name","#,
+                r#""filling"."vendor_id" AS "s0_vendor_id""#,
+                r#"FROM "filling""#,
+                r#"WHERE "filling"."name" LIKE 'Ch%'"#,
+                r#"ORDER BY "filling"."id" DESC"#,
+            ]
+            .join(" ")
+        );
     }
 }

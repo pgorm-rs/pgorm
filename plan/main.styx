@@ -4050,6 +4050,15 @@ children (
                 id loader
                 title "Rewrite load_many_via internally onto the graph"
                 deps (core)
+                sealed true
+                log (
+                    {
+                        at 2026-09-06T15:14:29.949545Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
 
             {

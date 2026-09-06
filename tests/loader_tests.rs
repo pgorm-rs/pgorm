@@ -169,7 +169,7 @@ async fn loader_load_many_multi() -> Result<(), Error> {
 // [spec:pgorm:req:query.loader+1/test]    `load_many_via` across a junction,
 // from a bare entity and from a pre-filtered `Select<R>` — the junction entity
 // is never named by the caller
-// [spec:pgorm:sem:query.loader.many-to-many+2/test]    one join carries the
+// [spec:pgorm:sem:query.loader.many-to-many+3/test]    one join carries the
 // input key back with each target row: a shared target is cloned into every
 // referencing input, a target the caller's `Select` filtered away is dropped
 // from that input's list, and the caller's `order_by` orders every bucket
