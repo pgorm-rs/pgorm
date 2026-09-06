@@ -1186,6 +1186,21 @@ impl_evidence (
         {impl_name main, rule sql.value.tuple}
         {impl_name main, rule sql.value.value-type}
     )}
+    {id core, covered_rules (
+        query.graph
+        query.graph.aliases
+        query.graph.decode
+        query.graph.slots
+        query.graph.terminals
+        query.graph.writer
+    ), covered_claims (
+        {impl_name main, rule query.graph}
+        {impl_name main, rule query.graph.aliases}
+        {impl_name main, rule query.graph.decode}
+        {impl_name main, rule query.graph.slots}
+        {impl_name main, rule query.graph.terminals}
+        {impl_name main, rule query.graph.writer}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

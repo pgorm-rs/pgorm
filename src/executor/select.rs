@@ -45,7 +45,7 @@ where
     S: SelectorTrait,
 {
     pub(crate) query: SelectStatement,
-    selector: S,
+    pub(crate) selector: S,
 }
 
 /// Performs a raw `SELECT` operation on a model

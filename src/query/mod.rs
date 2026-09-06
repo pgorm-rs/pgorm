@@ -1,5 +1,6 @@
 pub(crate) mod combine;
 mod delete;
+pub(crate) mod graph;
 mod helper;
 mod insert;
 mod join;
@@ -11,6 +12,7 @@ mod util;
 
 pub use combine::{SelectA, SelectB};
 pub use delete::*;
+pub use graph::{Opt, Req, SelectGraph, Slot};
 pub use helper::*;
 pub use insert::*;
 pub use loader::*;

@@ -1,7 +1,7 @@
 use crate::{
     ActiveModelBehavior, ColumnTrait, Delete, DeleteMany, FromQueryResult, ModelTrait, NoColumns,
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
-    RelationType, Select,
+    RelationType, Select, SelectGraph,
 };
 use pgorm_query::{Alias, AliasName, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
 use std::fmt::Debug;
@@ -156,6 +156,40 @@ pub trait EntityTrait: EntityName {
     /// ```
     fn find() -> Select<Self> {
         Select::new()
+    }
+
+    /// Construct an N-ary relational read rooted at this entity.
+    ///
+    /// Where [`find`](EntityTrait::find) produces a
+    /// [`Select<E>`](crate::Select), this produces a
+    /// [`SelectGraph<E>`](crate::SelectGraph): a root plus a typed list of
+    /// joined, decoded sources, each declared with the join type its decode
+    /// shape implies. The root is projected under the `s0_` prefix at
+    /// construction, and each slot under the next.
+    ///
+    /// ```no_run
+    /// # use pgorm::{entity::*, error::*, query::*, tests_cfg::{cake, fruit, vendor}, DatabasePool};
+    /// #
+    /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
+    /// let db = pool.get().await?;
+    ///
+    /// // An optional source decodes as `Option<Model>`, a required one as a
+    /// // bare `Model` — the join type and the decode are one declaration.
+    /// let rows: Vec<(cake::Model, Option<fruit::Model>)> = cake::Entity::graph()
+    ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+    ///     .all(&db)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// There is no conversion between `Select<E>` and `SelectGraph<E, S>` in
+    /// either direction: a graph's projection is generated from its
+    /// declaration, never inherited from a builder whose select list a caller
+    /// may have edited.
+    // [spec:pgorm:def:query.graph]
+    fn graph() -> SelectGraph<Self> {
+        SelectGraph::new()
     }
 
     /// Find a model by primary key
