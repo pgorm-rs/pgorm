@@ -4087,6 +4087,15 @@ children (
                 id linked-fold
                 title "Fold the linked walkers into the graph's edge walker"
                 deps (pair-deletion)
+                sealed true
+                log (
+                    {
+                        at 2026-09-06T16:32:33.531154Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }

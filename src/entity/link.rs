@@ -1,7 +1,5 @@
-use crate::{
-    EntityTrait, QuerySelect, Related, RelationDef, Select, join_tbl_on_condition, unpack_table_ref,
-};
-use pgorm_query::{Condition, Iden, IntoIden, JoinType, SharedIden};
+use crate::{EntityTrait, QuerySelect, Related, RelationDef, Select};
+use pgorm_query::{Iden, JoinType};
 use std::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -34,7 +32,7 @@ use std::{
 ///
 /// assert!(sql.ends_with(r#"ORDER BY "r0"."id" ASC"#), "{sql}");
 /// ```
-// [spec:pgorm:req:entity.relation.linked+3]
+// [spec:pgorm:req:entity.relation.linked+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkedAlias(usize);
 
@@ -45,7 +43,7 @@ impl LinkedAlias {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+3]
+// [spec:pgorm:req:entity.relation.linked+4]
 impl Iden for LinkedAlias {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         let _ = write!(s, "r{}", self.0);
@@ -59,7 +57,7 @@ impl fmt::Display for LinkedAlias {
 }
 
 /// A Trait for links between Entities
-// [spec:pgorm:req:entity.relation.linked+3]
+// [spec:pgorm:req:entity.relation.linked+4]
 pub trait Linked {
     #[allow(missing_docs)]
     type FromEntity: EntityTrait;
@@ -87,30 +85,26 @@ pub trait Linked {
     }
 
     /// Find all the Entities that are linked to the Entity
+    ///
+    /// The chain is walked backwards from `ToEntity`, so each hop is joined in
+    /// the reverse of the direction its [`RelationDef`] was written in — which
+    /// is [`QuerySelect::join_as_rev`], the crate's one reverse edge. Walking
+    /// is therefore only a matter of binding the two ends of each hop: the
+    /// joined side takes this hop's alias, and the far side is re-pointed at
+    /// the alias the previous hop bound it under, the innermost hop's far side
+    /// being the target table the statement already selects from.
+    ///
+    /// Because the ON clause is then the ordinary one every other join in the
+    /// crate emits, a hop honours everything its relation declares — its
+    /// `condition_type` and its `on_condition`, the closure receiving the two
+    /// aliases in the roles the relation was written with.
     fn find_linked(&self) -> Select<Self::ToEntity> {
         let mut select = Select::new();
         for (i, mut rel) in self.link().into_iter().rev().enumerate() {
-            let from_tbl = LinkedAlias::hop(i).into_iden();
-            let to_tbl = if i > 0 {
-                LinkedAlias::hop(i - 1).into_iden()
-            } else {
-                unpack_table_ref(&rel.to_tbl)
-            };
-            let table_ref = rel.from_tbl;
-
-            let mut condition = Condition::all().add(join_tbl_on_condition(
-                SharedIden::clone(&from_tbl),
-                SharedIden::clone(&to_tbl),
-                rel.columns,
-            ));
-            if let Some(f) = rel.on_condition.take() {
-                condition =
-                    condition.add(f(SharedIden::clone(&from_tbl), SharedIden::clone(&to_tbl)));
+            if i > 0 {
+                rel.to_tbl = rel.to_tbl.alias(LinkedAlias::hop(i - 1));
             }
-
-            select
-                .query()
-                .join_as(JoinType::InnerJoin, table_ref, from_tbl, condition);
+            select = select.join_as_rev(JoinType::InnerJoin, rel, LinkedAlias::hop(i));
         }
         select
     }
@@ -148,7 +142,7 @@ pub trait Linked {
 /// The linked form aliases the joined table, so it is also what a self-relation
 /// needs: `RelatedLink::to(Entity)` on an entity related to itself joins the
 /// table a second time under `r0` rather than emitting an ambiguous self-join.
-// [spec:pgorm:req:entity.relation.linked+3]
+// [spec:pgorm:req:entity.relation.linked+4]
 pub struct RelatedLink<E, R>(PhantomData<fn() -> (E, R)>);
 
 impl<E, R> RelatedLink<E, R> {
@@ -184,7 +178,7 @@ impl<E, R> Debug for RelatedLink<E, R> {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+3]
+// [spec:pgorm:req:entity.relation.linked+4]
 impl<E, R> Linked for RelatedLink<E, R>
 where
     E: EntityTrait + Related<R>,
@@ -199,5 +193,92 @@ where
             Some(via) => vec![via, <E as Related<R>>::to()],
             None => vec![<E as Related<R>>::to()],
         }
+    }
+}
+
+// [spec:pgorm:req:entity.relation.linked+4/test]    walking a chain is only the
+// binding of each hop's two ends, the join itself being the crate's reverse
+// edge — so a hop carries the whole relation, `condition_type` included
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests_cfg::{cake, cake_filling, entity_linked, filling};
+    use crate::{QueryTrait, RelationTrait};
+    use pgorm_query::{ConditionType, Expr, IntoCondition};
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn a_chain_walk_is_the_reverse_edge_twice() {
+        // The same two hops written by hand: each relation's source side
+        // re-aliased as this hop's rung, its far side re-pointed at the rung
+        // the previous hop bound — and nothing else.
+        let mut inner = cake_filling::Relation::Cake.def().rev();
+        inner.to_tbl = inner.to_tbl.alias(LinkedAlias::hop(0));
+
+        let by_hand = Select::<filling::Entity>::new()
+            .join_as_rev(
+                JoinType::InnerJoin,
+                cake_filling::Relation::Filling.def(),
+                LinkedAlias::hop(0),
+            )
+            .join_as_rev(JoinType::InnerJoin, inner, LinkedAlias::hop(1));
+
+        assert_eq!(
+            entity_linked::CakeToFilling
+                .find_linked()
+                .as_query()
+                .to_string(),
+            by_hand.as_query().to_string()
+        );
+    }
+
+    /// A hop whose relation combines its ON clauses with `OR`. Nothing in
+    /// `tests_cfg` links through one, and the walk used to drop the setting on
+    /// the floor by always building `Condition::all()`.
+    #[derive(Debug)]
+    struct OrLink;
+
+    impl Linked for OrLink {
+        type FromEntity = cake_filling::Entity;
+        type ToEntity = filling::Entity;
+
+        fn link(&self) -> Vec<RelationDef> {
+            vec![
+                cake_filling::Relation::Filling
+                    .def()
+                    .condition_type(ConditionType::Any)
+                    .on_condition(|left, _right| {
+                        Expr::col((left, cake_filling::Column::CakeId))
+                            .gt(10)
+                            .into_condition()
+                    }),
+            ]
+        }
+    }
+
+    #[test]
+    fn a_hop_combines_on_clauses_per_the_relation() {
+        assert_eq!(
+            OrLink.find_linked().as_query().to_string(),
+            [
+                r#"SELECT "filling"."id", "filling"."name", "filling"."vendor_id""#,
+                r#"FROM "filling""#,
+                r#"INNER JOIN "cake_filling" AS "r0""#,
+                r#"ON "r0"."filling_id" = "filling"."id" OR "r0"."cake_id" > 10"#,
+            ]
+            .join(" ")
+        );
+    }
+
+    #[test]
+    fn the_last_rung_is_the_source_table() {
+        let link = RelatedLink::<cake::Entity, filling::Entity>::new();
+        assert_eq!(link.last_hop_alias(), LinkedAlias::hop(1));
+
+        let sql = link.find_linked().as_query().to_string();
+        assert!(
+            sql.contains(r#"INNER JOIN "cake" AS "r1" ON "r1"."id" = "r0"."cake_id""#),
+            "{sql}"
+        );
     }
 }

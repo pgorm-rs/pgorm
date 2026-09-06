@@ -508,6 +508,7 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id pair-deletion, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:13:59.32051Z}
+    {id linked-fold, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:32:33.531154Z}
 )
 
 impl_evidence (
@@ -709,10 +710,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule conn.tx.closure}
         {impl_name main, rule conn.tx.retry}
-    ), rule_versions_seen (
-        {id conn.tx.closure, version 2}
-        {id conn.tx.retry, version 1}
-        {id query.build.modifiers, version 6}
     )}
     {id orm.binding-types, covered_rules (
         exec.cursor.binding-coerce
@@ -889,9 +886,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule exec.stream}
         {impl_name main, rule exec.stream.decode}
-    ), rule_versions_seen (
-        {id exec.stream, version 1}
-        {id exec.stream.decode, version 1}
     )}
     {id pipeline-sources, covered_rules (
         pipeline.select-sources

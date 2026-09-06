@@ -31,7 +31,7 @@ pub trait ModelTrait: Clone + Send + Debug {
     }
 
     /// Find linked Models
-    // [spec:pgorm:req:entity.relation.linked+3]
+    // [spec:pgorm:req:entity.relation.linked+4]
     fn find_linked<L>(&self, l: L) -> Select<L::ToEntity>
     where
         L: Linked<FromEntity = Self::Entity>,

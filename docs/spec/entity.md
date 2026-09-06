@@ -457,15 +457,27 @@ explicit limitations.
 > conversion from `NoColumns`, so a relation missing its columns is a compile
 > error rather than a panic.
 
-> [spec:pgorm:req:entity.relation.linked+3]
+> [spec:pgorm:req:entity.relation.linked+4]
 > `Linked` (`src/entity/link.rs`) expresses a multi-hop join: `link()` returns the
 > ordered `Vec<RelationDef>` chain from `FromEntity` to `ToEntity`. `find_linked()`
 > MUST build the join by iterating the chain in reverse, aliasing each hop's source
 > table as `r0`, `r1`, ... and inner-joining it to the previous alias (the innermost
-> hop joins the unaliased target table), with each hop's `join_tbl_on_condition`
-> augmented by that relation's `on_condition` closure when present.
+> hop joins the target table the statement already selects from).
 > `ModelTrait::find_linked` scopes the result to a model instance by filtering on the
 > final alias `r{len - 1}` (`src/entity/model.rs`).
+>
+> A hop is not a bespoke join, and `find_linked` MUST NOT carry join machinery of
+> its own. Walking a chain is only the binding of each hop's two ends to the names
+> the walk gives them — the joined side re-aliased `r{i}`, the far side re-pointed
+> at `r{i-1}`, which the innermost hop leaves at whatever identifier its relation
+> already qualifies by — and the join itself is the crate's reverse edge,
+> `QuerySelect::join_as_rev` (`[spec:pgorm:sem:query.build.join+3]`). The ON
+> clause is therefore the one `join_condition` every other join in the crate
+> emits, so a hop honours everything its relation declares: every `(from, to)`
+> column pair, the `condition_type` that combines them, and the `on_condition`
+> closure, which receives the two bound names in the roles the relation was
+> written with (`[spec:pgorm:def:entity.relation.def+5]`). There is no second
+> walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
 > `format!` repeated at each site that needs one. The last rung is derived by the
@@ -549,7 +561,7 @@ explicit limitations.
 > It also carries the relation vocabulary an entity definition and its call
 > sites write: `Related`, `Linked`, `RelationDef`, `RelationTrait`, and the
 > `RelatedLink` witness that spares a `Related` chain from being restated as a
-> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+3]`).
+> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+4]`).
 >
 > The alias vocabulary `alias` and `AliasName` are members
 > (`[spec:pgorm:sem:query.build.alias+1]`) on the same grounds as `Expr`: a name

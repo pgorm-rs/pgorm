@@ -676,7 +676,7 @@ pub async fn related() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.relation.linked+3/test]    a five-hop `Linked` chain
+// [spec:pgorm:req:entity.relation.linked+4/test]    a five-hop `Linked` chain
 // resolving to the `r0`..`r4` alias ladder, and `ModelTrait::find_linked`
 // filtering on the final alias, both verified against real rows
 // [spec:pgorm:def:entity.traits.model+3/test]    `ModelTrait::find_linked` scopes
@@ -1843,7 +1843,7 @@ impl Linked for FilteredBakerCakes {
     }
 }
 
-// [spec:pgorm:req:entity.relation.linked+3/test]    `find_linked` walks the chain
+// [spec:pgorm:req:entity.relation.linked+4/test]    `find_linked` walks the chain
 // in reverse, aliasing each hop's source table `r0`, `r1`, ... and inner-joining
 // it to the previous alias while the innermost hop joins the unaliased target
 // table; each hop's `on_condition` closure is added to that hop's join
@@ -1901,7 +1901,7 @@ fn linked_chain_aliasing_and_conditions() {
     );
 }
 
-// [spec:pgorm:req:entity.relation.linked+3/test]    `RelatedLink` is the chain
+// [spec:pgorm:req:entity.relation.linked+4/test]    `RelatedLink` is the chain
 // the `Related` impl already spells — `[to]` for a direct relation and
 // `[via, to]` for a junction one — so it stands in for a hand-written `Linked`
 // wherever one restated a `Related` impl, and its aliasing is what a

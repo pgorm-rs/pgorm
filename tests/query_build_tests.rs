@@ -1436,7 +1436,7 @@ fn alias_token_declares_and_references_one_name() {
     assert!(undeclared.ends_with(r#"WHERE "nope" > 1"#), "{undeclared}");
 }
 
-// [spec:pgorm:req:entity.relation.linked+3/test]    the alias a linked join
+// [spec:pgorm:req:entity.relation.linked+4/test]    the alias a linked join
 // binds its last hop to is derived from the chain, not retyped by the caller
 #[test]
 fn last_hop_alias_matches_the_emitted_join() {

@@ -1105,7 +1105,7 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
 }
 
 // [spec:pgorm:sem:query.build.join+3]
-pub(crate) fn join_tbl_on_condition(
+fn join_tbl_on_condition(
     from_tbl: SharedIden,
     to_tbl: SharedIden,
     columns: ColumnPairs,

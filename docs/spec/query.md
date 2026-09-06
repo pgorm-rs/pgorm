@@ -65,7 +65,7 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias. That alias is taken as `impl IntoIden`, not as a `&str`: its
 > in-tree caller is `ModelTrait::find_linked`, which has a `LinkedAlias`
-> (`[spec:pgorm:req:entity.relation.linked+3]`) in hand and would otherwise
+> (`[spec:pgorm:req:entity.relation.linked+4]`) in hand and would otherwise
 > have to render it back to a string for the callee to parse into an
 > identifier again. A string literal still passes, through
 > `IntoIden for &str`.
