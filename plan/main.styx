@@ -1201,6 +1201,19 @@ children (
                     }
                 )
             }
+
+            {
+                id selecttwo
+                title "Reconsider the two-entity select surface from core principles"
+                log (
+                    {
+                        at 2026-09-06T13:02:24.600154Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator directive (2026-09-06): \"The entire principle of SelectTwo needs to be considered from core principles because a lot of these APIs are hacky nonsense.\" Trigger: the joined-decode work exposed SelectTwo::into_partial_model / stream_partial_model as pre-existingly broken (M::select_cols adds bare field names, decode reads A_/B_ prefixes — untested anywhere), and the surface accreted piecemeal: SelectTwo vs SelectTwoMany vs SelectTwoProjected, find_also_related vs find_with_related vs find_also_linked, the A_/B_ prefix convention, consolidate_query_result regroup, per-variant cursor_by shims, and the pipeline now offering a principled alternative for multi-relation reads. Deliverable: a design spike on a branch (spike/selecttwo) — inventory the surface and its real uses, evaluate against the fork's doctrines (unrepresentable invalid states, one vocabulary with the pipeline, no decode ambiguity), and return a verdict: redesign shape, deletions, and what the partial-model story should be. No production code lands from the spike; implementing nodes get boarded from the verdict."
+                    }
+                )
+            }
         )
     }
 
@@ -3910,6 +3923,19 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id custom-expr-arity
+                title "Make custom-expression placeholder arity unrepresentable, never a panic"
+                log (
+                    {
+                        at 2026-09-06T13:02:27.619033Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator directive (2026-09-06): make invalid states unrepresentable AND no panics — not bounds checks bolted on. Findings (pagination agent, deferred): Expr::cust_with_values in pgorm-query/src/backend/query_builder.rs indexes values[num-1] unchecked, and inject_parameters panics on params[N-1]; both now unreachable from pagination (which stopped consuming the template machinery) but live for direct callers of the template API. Doctrine fix shape: arity is checkable at CONSTRUCTION — a template's $N census is known when the template+values pair is built, so the mismatch should be unconstructible (constructor validates census vs values and returns the existing typed error channel, or the template type carries its arity) rather than discovered at render via panic. Rules: req:sql.render.custom-expr, sem:sql.render.inject; governed by [dec:pgorm:no-panic] and [dec:pgorm:invalid-states-unrepresentable]. Follows the CTE-builders / ddl-empty-builders precedent (complete constructors over render-time failure)."
                     }
                 )
             }
