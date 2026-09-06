@@ -4007,18 +4007,42 @@ children (
             {
                 id core
                 title "Build SelectGraph: typed slots, one projection writer, tuple decode"
+                implements {
+                    main (
+                        [spec:pgorm:def:query.graph]
+                        [spec:pgorm:sem:query.graph.slots]
+                        [spec:pgorm:sem:query.graph.writer]
+                        [spec:pgorm:sem:query.graph.decode]
+                        [spec:pgorm:sem:query.graph.terminals]
+                        [spec:pgorm:req:query.graph.aliases]
+                    )
+                }
                 deps (spec)
+                log (
+                    {
+                        at 2026-09-06T14:26:40.505011Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Open questions the spec deliberately leaves to the implementer (from the spec agent's report): (1) no `one` terminal is specified — its absence has stated rationale; adding one needs a terminals-rule bump. (2) related_one (INNER junction fold over Related) is unspecified — only related_maybe was adopted. (3) cursor_by_on's slot-selection spelling (const-generic index vs marker type) is implementer's choice; the contract pins positional compile-time selection. (4) GraphRow public nameability (needed for Cursor signatures — likely yes) and the Slot sealing surface are implied, exports are judgment. (5) The spike prototype on spike/relational-read (src/query/graph_spike.rs + tests/spike_graph_live_tests.rs) is ~80% of core — treat as reference material to be productionized against the rules, not merged wholesale. (6) Pair-deletion sweep list of rules to rewrite when graph.pair-deletion lands is recorded in the spec agent's report and should ride that node, not core."
+                    }
+                )
             }
 
             {
                 id cursor
                 title "Re-home joined keyset cursors onto the graph, machinery unchanged"
+                implements {
+                    main ([spec:pgorm:sem:query.graph.cursor])
+                }
                 deps (core)
             }
 
             {
                 id grouped
                 title "all_grouped on one-slot graphs with caller ordering dominating"
+                implements {
+                    main ([spec:pgorm:sem:query.graph.grouped])
+                }
                 deps (core)
             }
 
@@ -4031,6 +4055,9 @@ children (
             {
                 id pipeline-sources
                 title "Give the pipeline a select_sources model terminal"
+                implements {
+                    main ([spec:pgorm:sem:pipeline.select-sources])
+                }
                 deps (core)
             }
 
