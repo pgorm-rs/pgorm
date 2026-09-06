@@ -1137,6 +1137,24 @@ struct ItemNameOnly {
     label: String,
 }
 
+/// The same two columns, read through a hand-written implementation that does
+/// not report the columns it reads — the fallback branch of the optional
+/// decode's absence rule.
+#[derive(Debug, PartialEq)]
+struct UnreflectedItemRow {
+    id: i32,
+    name: String,
+}
+
+impl FromQueryResult for UnreflectedItemRow {
+    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error> {
+        Ok(Self {
+            id: res.try_get(pre, "id")?,
+            name: res.try_get(pre, "name")?,
+        })
+    }
+}
+
 /// `QueryResult` cannot be constructed outside the crate, so the prefix-handling
 /// claims are probed from inside a `FromQueryResult` impl driven by a real row.
 #[derive(Debug, PartialEq)]
@@ -1145,10 +1163,21 @@ struct PrefixProbe {
     prefixed: ItemRow,
     /// The same decode under the empty prefix cannot find those columns.
     unprefixed_is_err: bool,
-    /// `from_query_result_optional` turns that error into `Ok(None)`.
-    unprefixed_optional: Option<ItemRow>,
+    /// `from_query_result_optional` reports that miss rather than answering
+    /// `None`: a column the statement never projected is a projection mistake,
+    /// not an absent row.
+    unprefixed_optional_is_err: bool,
     /// ...and still returns `Some` when the row does decode.
     prefixed_optional: Option<ItemRow>,
+    /// Every column under the prefix present and `NULL` is the one shape read
+    /// as an absent row.
+    absent_optional: Option<ItemRow>,
+    /// A type that reports no columns is judged on the result set instead, so
+    /// the same all-`NULL` prefix is absent for it too...
+    unreflected_absent_optional: Option<UnreflectedItemRow>,
+    /// ...while a prefix the result set carries no column for is a miss it
+    /// reports rather than swallows.
+    unreflected_unknown_prefix_is_err: bool,
 }
 
 impl FromQueryResult for PrefixProbe {
@@ -1156,17 +1185,25 @@ impl FromQueryResult for PrefixProbe {
         Ok(Self {
             prefixed: ItemRow::from_query_result(res, "A_")?,
             unprefixed_is_err: ItemRow::from_query_result(res, "").is_err(),
-            unprefixed_optional: ItemRow::from_query_result_optional(res, "")?,
+            unprefixed_optional_is_err: ItemRow::from_query_result_optional(res, "").is_err(),
             prefixed_optional: ItemRow::from_query_result_optional(res, "A_")?,
+            absent_optional: ItemRow::from_query_result_optional(res, "B_")?,
+            unreflected_absent_optional: UnreflectedItemRow::from_query_result_optional(res, "B_")?,
+            unreflected_unknown_prefix_is_err: UnreflectedItemRow::from_query_result_optional(
+                res, "C_",
+            )
+            .is_err(),
         })
     }
 }
 
-// [spec:pgorm:def:entity.traits.from-query-result+3/test]    `from_query_result`
+// [spec:pgorm:def:entity.traits.from-query-result+4/test]    `from_query_result`
 // instantiates a type from a row under a column-name prefix,
-// `from_query_result_optional` turns any decode error into `Ok(None)` and
-// discards the error, `find_by_statement` runs raw SQL into typed rows, and
-// `PartialModelTrait::select_cols` narrows a select to the columns it needs
+// `from_query_result_optional` answers `Ok(None)` for an absent row and reports
+// every other decode failure, `find_by_statement` runs raw SQL into typed rows,
+// and `PartialModelTrait::select_cols` narrows a select to the columns it needs
+// [spec:pgorm:req:exec.decode.absent/test]    the witness both branches of the
+// absence rule are decided on
 #[pgorm_macros::test]
 async fn from_query_result_surface() -> Result<(), Error> {
     let ctx = TestContext::new("from_query_result_surface").await;
@@ -1210,10 +1247,15 @@ async fn from_query_result_surface() -> Result<(), Error> {
 
     // `from_query_result` reads a row under a column-name prefix. Aliasing the
     // columns with a prefix is exactly how `find_also_related` addresses them,
-    // and `from_query_result_optional` converts a decode miss into `Ok(None)`
-    // — the error value itself is discarded, never surfaced.
+    // and `from_query_result_optional` answers `Ok(None)` for exactly one
+    // shape — every column it reads under the prefix present and `NULL`, the
+    // row an outer join that matched nothing produces. The `B_` columns here
+    // stand in for that unmatched side; every other decode failure is
+    // surfaced.
     let probe = PrefixProbe::find_by_statement(
-        r#"SELECT "id" AS "A_id", "name" AS "A_name" FROM "item" WHERE "id" = 1"#,
+        r#"SELECT "id" AS "A_id", "name" AS "A_name",
+                  NULL::int AS "B_id", NULL::text AS "B_name"
+           FROM "item" WHERE "id" = 1"#,
         vec![],
     )
     .one(&db)
@@ -1230,8 +1272,11 @@ async fn from_query_result_surface() -> Result<(), Error> {
                 name: "Apple".to_owned()
             },
             unprefixed_is_err: true,
-            unprefixed_optional: None,
+            unprefixed_optional_is_err: true,
             prefixed_optional: Some(apple),
+            absent_optional: None,
+            unreflected_absent_optional: None,
+            unreflected_unknown_prefix_is_err: true,
         }
     );
 

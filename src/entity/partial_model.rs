@@ -1,7 +1,7 @@
 use crate::{FromQueryResult, QuerySelect};
 
 /// A trait for a part of [Model](super::model::ModelTrait)
-// [spec:pgorm:def:entity.traits.from-query-result+3]
+// [spec:pgorm:def:entity.traits.from-query-result+4]
 pub trait PartialModelTrait: FromQueryResult {
     /// Select specific columns this partial model needs.
     ///

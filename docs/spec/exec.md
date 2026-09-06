@@ -39,15 +39,60 @@ These rules capture what the code does today, including known gaps.
 > `From<TryGetError> for Error` renders the null case as
 > `Error::Type("A null value was encountered while decoding {s}")`.
 
-> [spec:pgorm:sem:exec.decode.null-context]
+> [spec:pgorm:sem:exec.decode.null-context+1]
 > Null-decode errors do not carry structured column context. The payload
 > of `TryGetError::Null` is the `Display` output of the underlying
 > `tokio_postgres::Error` (e.g. "error deserializing column 0"), not the
 > requested column name or prefix. The internal helper
-> `err_null_idx_col` (query.rs:304) that would format the index is dead
+> `err_null_idx_col` (query.rs:494) that would format the index is dead
 > code (`#[allow(dead_code)]`) and returns the literal string `"TODO"`;
 > the index formatting is commented out. This is a known limitation of
-> the current behavior, not a contract to preserve.
+> the current behavior, not a contract to preserve. The absent-row test of
+> `exec.decode.absent` therefore reads nullness off the row itself rather
+> than off this payload.
+
+> [spec:pgorm:req:exec.decode.absent]
+> A `LEFT JOIN` that matched nothing still produces a row, one whose
+> right-hand columns are all `NULL`. The joined decode reads its related
+> side through `FromQueryResult::from_query_result_optional`, which MUST
+> tell that unmatched row apart from a related row that is present and
+> fails to decode: a decode failure MUST NOT be reported as a missing row.
+>
+> The witness is the set of columns the target reads under the prefix
+> `pre`:
+>
+> - When `expected_columns` reports them
+>   (`entity.traits.from-query-result`), the row is absent only if every
+>   reported column — looked up as `{pre}{name}`, exactly as
+>   `TryGetable::try_get` looks it up — is a column of the result set
+>   *and* holds SQL `NULL`. A reported column the statement does not
+>   return leaves the witness incomplete; that is a projection mistake
+>   rather than an absent row, so the decode error MUST propagate.
+> - A target that reports no columns (a hand-written implementation) is
+>   judged against the result set instead: absent only if the row carries
+>   at least one column whose name starts with `pre` *and* every such
+>   column is `NULL`. An empty `pre` names every column of the row.
+>
+> Only that shape is `Ok(None)`. Every other decode failure propagates —
+> a column whose PostgreSQL type the field cannot decode, an enum label
+> with no Rust variant, a malformed JSON payload, or a `NULL` read into a
+> non-`Option` field of a row whose remaining witness columns are not
+> `NULL`.
+>
+> The nullness test is `QueryResult::all_null(pre, cols)` and
+> `QueryResult::all_null_under(pre)`. Both read each column as
+> `Option<AnyValue>`, where `AnyValue` is a private `FromSql` target that
+> accepts every PostgreSQL type and reads none of the bytes, so a column
+> holding a value the caller could not decode still counts as present.
+> `all_null` answers `false` for an empty column list and for a column the
+> result set does not carry; `all_null_under` answers `false` when no
+> column carries the prefix.
+>
+> Two shapes are indistinguishable in the result set and are both read as
+> absent: an unmatched outer join, and a matched row whose every witness
+> column is genuinely `NULL`. An entity's primary key is `NOT NULL` and
+> every entity model reads it, so the second arises only for a projection
+> that leaves the key out.
 
 > [spec:pgorm:def:exec.decode.types+1]
 > The scalar Rust types implementing `TryGetable` by direct delegation to

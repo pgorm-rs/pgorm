@@ -412,6 +412,7 @@ assertions (
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
     {id insert-returning-manual-pk, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:02.163452Z}
+    {id joined-row-decode-errors, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:26:15.432338Z}
     {id macro-dependency-renames, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:06.458967Z}
     {id macro-from-query-result-skip, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:45:59.257788Z}
     {id macro-model-type-inference, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:03.943434Z}

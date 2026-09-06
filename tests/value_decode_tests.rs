@@ -236,7 +236,7 @@ impl FromQueryResult for NullProbe {
 
 // [spec:pgorm:sem:exec.decode.null+1/test]    `Option<T>` swallows only the null
 // case; every other decode error propagates
-// [spec:pgorm:sem:exec.decode.null-context/test]    the null payload is the
+// [spec:pgorm:sem:exec.decode.null-context+1/test]    the null payload is the
 // driver's ordinal-based message, not the requested column name
 #[pgorm_macros::test]
 async fn decode_null_handling() -> Result<(), Error> {

@@ -79,15 +79,47 @@ pub trait ModelTrait: Clone + Send + Debug {
 }
 
 /// A Trait for implementing a [QueryResult]
-// [spec:pgorm:def:entity.traits.from-query-result+3]
+// [spec:pgorm:def:entity.traits.from-query-result+4]
 pub trait FromQueryResult: Sized {
     /// Instantiate a Model from a [QueryResult]
     fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error>;
 
-    /// Transform the error from instantiating a Model from a [QueryResult]
-    /// and converting it to an [Option]
+    /// Instantiate a Model from a row that may not carry one, telling an
+    /// absent row apart from a present one that fails to decode.
+    ///
+    /// This is how the joined decode reads the related side: a `LEFT JOIN`
+    /// that matched nothing still yields a row, one whose right-hand columns
+    /// are all `NULL`. That shape, and only that shape, is `Ok(None)`.
+    ///
+    /// The witness is the set of columns this type reads under `pre`:
+    ///
+    /// - When [`expected_columns`](FromQueryResult::expected_columns) reports
+    ///   them, the row counts as absent only if every one of them is a column
+    ///   of the result set and holds SQL `NULL`. A column the statement never
+    ///   projected is a projection mistake rather than an absent row, so its
+    ///   error propagates.
+    /// - A type that reports no columns is judged against the result set
+    ///   instead: absent only if the row carries at least one column named
+    ///   with `pre` and every such column is `NULL`.
+    ///
+    /// Every other decode failure propagates — a column of the wrong type, an
+    /// unrecognised enum label, a malformed JSON payload. A related row that
+    /// is present but undecodable is an error, never a missing row.
+    ///
+    /// A present row whose witness columns are genuinely all `NULL` is
+    /// indistinguishable from an unmatched outer join in the result set, and
+    /// is reported absent. An entity's primary key is `NOT NULL`, so this only
+    /// arises for a projection that leaves the key out.
+    // [spec:pgorm:req:exec.decode.absent]
     fn from_query_result_optional(res: &QueryResult, pre: &str) -> Result<Option<Self>, Error> {
-        Ok(Self::from_query_result(res, pre).ok())
+        match Self::from_query_result(res, pre) {
+            Ok(model) => Ok(Some(model)),
+            Err(err) => match Self::expected_columns() {
+                Some(cols) if res.all_null(pre, cols.iter().map(ExpectedColumn::name)) => Ok(None),
+                None if res.all_null_under(pre) => Ok(None),
+                _ => Err(err),
+            },
+        }
     }
 
     /// The columns [`from_query_result`](FromQueryResult::from_query_result)

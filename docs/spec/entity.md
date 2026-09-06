@@ -158,15 +158,18 @@ explicit limitations.
 > `ActiveModelTrait::delete`, so behavior hooks run. `TryIntoModel<M>` is the fallible
 > reverse conversion with a blanket identity impl for any model.
 
-> [spec:pgorm:def:entity.traits.from-query-result+3]
+> [spec:pgorm:def:entity.traits.from-query-result+4]
 > `FromQueryResult` (`src/entity/model.rs`) instantiates a type from a `QueryResult`
 > row given a column-name prefix: `from_query_result(res, pre)`.
-> `from_query_result_optional` converts any decode error into `Ok(None)` — the error
-> value itself is discarded. `find_by_statement(stmt, values)` builds a
+> `from_query_result_optional` reads a row that may not carry the type at all —
+> the related side of an outer join — answering `Ok(None)` for an absent row and
+> propagating every other decode failure, against the witness `exec.decode.absent`
+> defines. `find_by_statement(stmt, values)` builds a
 > `SelectorRaw<SelectModel<Self>>` for running raw SQL into typed rows.
 > `expected_columns` reports the columns `from_query_result` reads, so a statement can
-> be checked against the type before a row exists; it defaults to `None`, the answer of
-> an implementation that does not report them (`exec.verify`).
+> be checked against the type before a row exists (`exec.verify`) and so the optional
+> decode knows which columns witness an absent row; it defaults to `None`, the answer
+> of an implementation that does not report them.
 > `PartialModelTrait: FromQueryResult` (`src/entity/partial_model.rs`) adds
 > `select_cols<S: QuerySelect>(S) -> S::Projected`, letting a partial model declare
 > exactly the columns it needs on a select. The return type is the *projected* state,

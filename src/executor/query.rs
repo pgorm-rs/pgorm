@@ -142,6 +142,83 @@ impl QueryResult {
             .map(|c| c.name().to_string())
             .collect()
     }
+
+    /// Whether every one of `cols`, read under `pre` exactly as
+    /// [`TryGetable::try_get`] reads it, is a column of this row holding SQL
+    /// `NULL`.
+    ///
+    /// The answer is `false` when the list is empty, when the result set does
+    /// not carry one of the named columns, and when any of them holds a value
+    /// — including a value of a PostgreSQL type the caller cannot decode,
+    /// which is read here without being interpreted.
+    ///
+    /// This is the witness
+    /// [`from_query_result_optional`](crate::FromQueryResult::from_query_result_optional)
+    /// tests to tell an outer join that matched nothing from a related row
+    /// that is present but fails to decode.
+    // [spec:pgorm:req:exec.decode.absent]
+    pub fn all_null<'c>(&self, pre: &str, cols: impl IntoIterator<Item = &'c str>) -> bool {
+        let mut named_any = false;
+        for col in cols {
+            named_any = true;
+            let present = if pre.is_empty() {
+                self.row.try_get::<_, Option<AnyValue>>(col)
+            } else {
+                self.row
+                    .try_get::<_, Option<AnyValue>>(format!("{pre}{col}").as_str())
+            };
+            if !matches!(present, Ok(None)) {
+                return false;
+            }
+        }
+        named_any
+    }
+
+    /// Whether every column of the result set whose name starts with `pre`
+    /// holds SQL `NULL`.
+    ///
+    /// The answer is `false` when no column carries the prefix at all. An
+    /// empty `pre` names every column of the row.
+    ///
+    /// This is the witness
+    /// [`from_query_result_optional`](crate::FromQueryResult::from_query_result_optional)
+    /// falls back on for a target that does not report the columns it reads
+    /// ([`expected_columns`](crate::FromQueryResult::expected_columns)).
+    // [spec:pgorm:req:exec.decode.absent]
+    pub fn all_null_under(&self, pre: &str) -> bool {
+        let mut named_any = false;
+        for (idx, column) in self.row.columns().iter().enumerate() {
+            if !column.name().starts_with(pre) {
+                continue;
+            }
+            named_any = true;
+            if !matches!(self.row.try_get::<_, Option<AnyValue>>(idx), Ok(None)) {
+                return false;
+            }
+        }
+        named_any
+    }
+}
+
+/// A decode target that accepts every PostgreSQL type and reads none of the
+/// bytes, so `Option<AnyValue>` answers whether a column held SQL `NULL` and
+/// nothing else.
+// [spec:pgorm:req:exec.decode.absent]
+#[derive(Debug)]
+struct AnyValue;
+
+// [spec:pgorm:req:exec.decode.absent]
+impl<'a> FromSql<'a> for AnyValue {
+    fn from_sql(
+        _ty: &Type,
+        _raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(Self)
+    }
+
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
 }
 
 // TryGetable //
@@ -412,7 +489,7 @@ impl TryGetable for u32 {
     }
 }
 
-// [spec:pgorm:sem:exec.decode.null-context]
+// [spec:pgorm:sem:exec.decode.null-context+1]
 #[allow(dead_code)]
 fn err_null_idx_col<I: RowIndex + std::fmt::Display>(_idx: I) -> TryGetError {
     TryGetError::Null("TODO".into()) //format!("{_idx:?}"))

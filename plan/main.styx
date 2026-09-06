@@ -3787,6 +3787,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-06, finding 2, severity P1. Confirmed on d778f24b. Source: src/entity/model.rs:89-90, FromQueryResult::from_query_result_optional calls .ok(); src/executor/select.rs:158 uses it for the joined model. Reproduction: cake(id int, name text) contains (1, 'one'); fruit(id int, name int, cake_id int) contains (2, 123, 1), while the Rust fruit model expects String name. fruit::Entity::find().all(&db) reports WrongType, but cake::Entity::find().find_also_related(fruit::Entity).all(&db) returns Ok([(cake, None)]). Acceptance: a present related row with a wrong type, invalid enum/JSON payload, or missing required projected column must propagate its decode error; a genuinely absent outer-join row must remain None. Cover both one-related and many-related decode paths and partial/custom projections as supported. Spec impact: [spec:pgorm:def:entity.traits.from-query-result] v3 explicitly specifies discarding every decode error, so revise that contract and the relevant decode tests before implementing the new absence/error distinction. Existing rule ownership stays on orm.exec/orm.entity; this is a separate defect follow-up. Temporary reproduction: /private/tmp/pgorm-review.z9F5GS/runtime_probes.rs, probe_join_decode_error."
                     }
+
+                    {
+                        at 2026-09-06T12:26:15.432338Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
