@@ -1205,6 +1205,7 @@ children (
             {
                 id selecttwo
                 title "Reconsider the two-entity select surface from core principles"
+                sealed true
                 log (
                     {
                         at 2026-09-06T13:02:24.600154Z
@@ -1232,6 +1233,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Spike 2 verdict (spike/relational-read; 4 unit + 5 live probes + 2 compile_fail proofs, all green): BUILD THE N-ARY SOURCE GRAPH; DELETE THE ENTIRE PAIR SURFACE INCLUDING SPIKE 1'S KEEP-LIST. SelectGraph<E, Slots>: root + typed slot list in join order; join type derived from the slot kind (join_maybe → LEFT → Option<Model> via the untouched absence witness; join_one → INNER → bare Model — no Option to unwrap for a join that cannot miss); via() joins-without-decoding (junctions, chain hops); join_maybe_as for the same table twice with caller-bound alias tokens + call-site ON predicates; one projection writer (s{i}_ prefixes, select_as discipline) replacing the FOUR aliasing copies; projection editing and slot mismatch unrepresentable (compile_fail proven). all/one_opt/stream/paginate via ordinary Selector; all_grouped fixes the caller-ordering override. CURSORS DO NOT MOVE — the existing Cursor machinery hosts the graph unchanged (live-proven with after_with resume + NULL tiebreaks); only SelectTwo's entry points re-home. Pipeline gets select_sources((E1, E2.named(t))) as the complement for row-shaped reads (dissolves _expr_N via controlled projection; aggregates-beside-models and right/full joins live there); pipeline-as-sole-surface rejected on cursor evidence; include-tree and full minimalism rejected with numbers (~101 call sites incl. the joined-cursor block would die homeless). Loader stays; load_many_via rewrites internally onto the graph. Kill-list: SelectTwo/Many/Custom/Projected/Model, select_also/with, find_also/with_related, find_also/with_linked, apply_alias, prepare_select_two, SelectA/B, both consolidates, pair partials. Migration ~101 mechanical sites in 9 test files. Node sequence: graph-core → {graph-cursor, graph-grouped, loader-on-graph, pipeline-select-sources} → pair-surface-deletion → linked-fold (optional). Bonus finding to spec: authored on_condition closures that ignore their right param silently misqualify under aliases. AWAITING OPERATOR RULING."
+                    }
+
+                    {
+                        at 2026-09-06T14:08:53.465041Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator ruling (2026-09-06): ADOPTED — \"spec it up and then opus subagents for implementation.\" The SelectGraph verdict stands as reported: N-ary typed source graph with join type derived from the slot kind, one projection writer under s{i}_ prefixes, the untouched absence witness as decoder, cursors re-homed with machinery unchanged, pipeline select_sources as the row-shaped complement, loader retained and internally rewritten, the full inherited pair surface deleted. Boarded as the graph tree: spec → core → {cursor, grouped, loader, pipeline-sources} → pair-deletion → linked-fold. Spec authored first; implementing nodes claim the new rules after they land."
+                    }
+
+                    {
+                        at 2026-09-06T14:08:58.856007Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3966,6 +3981,60 @@ children (
                         text "Doing → Done (nplan complete)"
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id graph
+        title "The relational-read graph"
+        kind @feat
+        children (
+            {
+                id spec
+                title "Author the graph rules: slots, one writer, join type from the slot kind"
+            }
+
+            {
+                id core
+                title "Build SelectGraph: typed slots, one projection writer, tuple decode"
+                deps (spec)
+            }
+
+            {
+                id cursor
+                title "Re-home joined keyset cursors onto the graph, machinery unchanged"
+                deps (core)
+            }
+
+            {
+                id grouped
+                title "all_grouped on one-slot graphs with caller ordering dominating"
+                deps (core)
+            }
+
+            {
+                id loader
+                title "Rewrite load_many_via internally onto the graph"
+                deps (core)
+            }
+
+            {
+                id pipeline-sources
+                title "Give the pipeline a select_sources model terminal"
+                deps (core)
+            }
+
+            {
+                id pair-deletion
+                title "Delete the inherited pair surface"
+                deps (cursor grouped loader)
+            }
+
+            {
+                id linked-fold
+                title "Fold the linked walkers into the graph's edge walker"
+                deps (pair-deletion)
             }
         )
     }
