@@ -495,6 +495,7 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id sea-rc-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:49:46.138719Z}
+    {id seaquery-doc-branding, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:57:15.3319Z}
 )
 
 impl_evidence (

@@ -1,37 +1,18 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_debug_implementations)]
 
-//! <div align="center">
+//! # pgorm-query
 //!
-//!   <img src="https://raw.githubusercontent.com/SeaQL/sea-query/master/docs/SeaQuery logo.png" width="280" alt="SeaQuery logo"/>
+//! A dynamic, PostgreSQL-only SQL query builder: expressions, queries and
+//! schema statements built as abstract syntax trees through an ergonomic
+//! API, rendered against the real PostgreSQL grammar.
 //!
-//!   <p>
-//!     <strong>🔱 A dynamic query builder for Postgres</strong>
-//!   </p>
-//!
-//!   [![crate](https://img.shields.io/crates/v/pgorm-query.svg)](https://crates.io/crates/pgorm-query)
-//!   [![docs](https://docs.rs/pgorm-query/badge.svg)](https://docs.rs/pgorm-query)
-//!   [![build status](https://github.com/SeaQL/sea-query/actions/workflows/rust.yml/badge.svg)](https://github.com/SeaQL/sea-query/actions/workflows/rust.yml)
-//!
-//! </div>
-//!
-//! ## SeaQuery
-//!
-//! SeaQuery is a query builder to help you construct dynamic SQL queries in Rust.
-//! You can construct expressions, queries and schema as abstract syntax trees using an ergonomic API.
-//! We support Postgres behind a common interface that aligns their behaviour where appropriate.
-//!
-//! We provide integration for [SQLx](https://crates.io/crates/sqlx),
-//! [postgres](https://crates.io/crates/postgres) and [rusqlite](https://crates.io/crates/rusqlite).
-//! See [examples](https://github.com/SeaQL/sea-query/blob/master/examples) for usage.
-//!
-//! SeaQuery is the foundation of [pgorm](https://github.com/pgorm-rs/pgorm), an async & dynamic ORM for Rust.
-//!
-//! [![GitHub stars](https://img.shields.io/github/stars/SeaQL/sea-query.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-query/stargazers/)
-//! If you like what we do, consider starring, commenting, sharing and contributing!
-//!
-//! [![Discord](https://img.shields.io/discord/873880840487206962?label=Discord)](https://discord.com/invite/uCPdDXzbdv)
-//! Join our Discord server to chat with others in the SeaQL community!
+//! pgorm-query is the query layer of [pgorm](https://github.com/pgorm-rs/pgorm),
+//! an async PostgreSQL ORM for Rust, and lives in the same repository. It is
+//! a hard fork of [SeaQuery](https://github.com/SeaQL/sea-query) by SeaQL,
+//! rebuilt around a single database: everything non-Postgres is deleted, and
+//! statements the server would reject are unrepresentable where the type
+//! system can make them so.
 //!
 //! ## Install
 //!
@@ -89,7 +70,7 @@
 //!
 //! 1. Parameter bindings
 //!
-//! One of the headaches when using raw SQL is parameter binding. With SeaQuery you can:
+//! One of the headaches when using raw SQL is parameter binding. With pgorm-query you can:
 //!
 //! ```
 //! # use pgorm_query::{*, tests_cfg::*};
@@ -176,8 +157,8 @@
 //! If you're okay with running another procedural macro, you can activate
 //! the `derive` or `attr` feature on the crate to save you some boilerplate.
 //! For more usage information, look at
-//! [the derive examples](https://github.com/SeaQL/sea-query/tree/master/pgorm-query-derive/tests/pass)
-//! or [the attribute examples](https://github.com/SeaQL/sea-query/tree/master/pgorm-query-attr/tests/pass).
+//! [the derive examples](https://github.com/pgorm-rs/pgorm/tree/main/pgorm-query/pgorm-query-derive/tests/pass)
+//! or [the attribute examples](https://github.com/pgorm-rs/pgorm/tree/main/pgorm-query/pgorm-query-attr/tests/pass).
 //!
 //! ```rust
 //! #[cfg(feature = "derive")]
@@ -607,14 +588,11 @@
 //! for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 //! dual licensed as above, without any additional terms or conditions.
 //!
-//! SeaQuery is a community driven project. We welcome you to participate, contribute and together build for Rust's future.
+//! ## Provenance
 //!
-//! A big shout out to our contributors:
-//!
-//! [![Contributors](https://opencollective.com/pgorm-query/contributors.svg?width=1000&button=false)](https://github.com/SeaQL/sea-query/graphs/contributors)
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/SeaQL/sea-query/master/docs/SeaQL icon dark.png"
-)]
+//! This crate began as [SeaQuery](https://github.com/SeaQL/sea-query) by SeaQL
+//! and its contributors; the fork keeps their license and gratefully builds on
+//! their work.
 
 pub mod backend;
 pub mod comment;

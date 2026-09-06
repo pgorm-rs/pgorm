@@ -3742,12 +3742,20 @@ children (
                     migration-ledger-module-name
                     migration-ledger-table-name
                 )
+                sealed true
                 log (
                     {
                         at 2026-09-05T15:35:36.107117Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: pgorm-query's published crate rustdoc still presents the upstream SeaQuery logo, heading, CI badge, Discord invitation, examples, contributor links, and SeaQL rustdoc logo; query/helper.rs also carries a stale mixed sea-query/pgorm docs.rs URL. Rewrite current product documentation around pgorm and its actual repository after the public naming deletions settle. Preserve concise fork provenance and required legal attribution; exclude LICENSE-MIT, append-only plan history, PostgreSQL SEARCH/Sealed terminology, and unrelated SeaSide/SeaBreeze/satellite fixture data from global replacement."
+                    }
+
+                    {
+                        at 2026-09-06T10:57:15.3319Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
