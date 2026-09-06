@@ -1,0 +1,5 @@
+error: unknown pgorm attribute `auto_incremnt`
+ --> tests/compile-fail/entity_model_unknown_field_attribute.rs:6:26
+  |
+6 |     #[pgorm(primary_key, auto_incremnt = false)]
+  |                          ^^^^^^^^^^^^^

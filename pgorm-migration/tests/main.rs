@@ -12,7 +12,7 @@ use pgorm_migration::prelude::*;
 // [spec:pgorm:sem:migration.up+2/test]
 // [spec:pgorm:sem:migration.name+3/test]    asserted names are file stems
 // [spec:pgorm:req:migration.ledger-upgrade/test]    the fresh-install half: the legacy name is never created
-// [spec:pgorm:def:macros.derive/test]    `DeriveMigrationName` names each migration after the file stem
+// [spec:pgorm:def:macros.derive+1/test]    `DeriveMigrationName` names each migration after the file stem
 #[tokio::test]
 async fn fresh_install_applies_all_pending() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_fresh").await;

@@ -236,7 +236,7 @@ async fn manual_impl_can_opt_back_in(db: &DatabaseConnection) -> Result<(), Erro
     Ok(())
 }
 
-// [spec:pgorm:sem:macros.derive.from-query-result+1/test]    `skip` reads no column
+// [spec:pgorm:sem:macros.derive.from-query-result+2/test]    `skip` reads no column
 async fn skipped_field_reads_no_column(db: &DatabaseConnection) -> Result<(), Error> {
     let columns = Skipping::expected_columns().expect("the derive reports columns");
     assert_eq!(columns.len(), 1);

@@ -76,13 +76,16 @@ struct RawIdentifierTest {
     r#type: String,
 }
 
-// The skip flag is recomputed for every meta item in the list, so it only
-// survives if it is the last one. Here it is not, and the field is read from
-// the row like any other.
+// `skip` accumulates rather than being recomputed, so it holds wherever it is
+// written: ahead of another key in the same list, and split across two
+// `#[pgorm(...)]` attributes. Both fields here are skipped.
 #[derive(FromQueryResult)]
-struct SkipNotLastTest {
-    #[pgorm(skip, something_else)]
+struct SkipAnywhereTest {
+    #[pgorm(skip, from_col = "read by DerivePartialModel, not by this derive")]
     _foo: i32,
+    #[pgorm(from_col = "read by DerivePartialModel, not by this derive")]
+    #[pgorm(skip)]
+    _bar: i32,
 }
 
 fn raw<M>(sql: &str) -> SelectorRaw<SelectModel<M>>
@@ -95,7 +98,7 @@ where
 // [spec:pgorm:def:exec.crud/test]    `SelectorRaw::from_statement` decoding
 // through `SelectModel`, i.e. `SelectorTrait::from_raw_query_result` with an
 // empty prefix
-// [spec:pgorm:sem:macros.derive.from-query-result+1/test]    field-named reads, generics, and `skip`
+// [spec:pgorm:sem:macros.derive.from-query-result+2/test]    field-named reads, generics, and `skip`
 #[pgorm_macros::test]
 async fn from_query_result_derive() -> Result<(), Error> {
     let ctx = TestContext::new("derive_tests_from_query_result").await;
@@ -133,12 +136,13 @@ async fn from_query_result_derive() -> Result<(), Error> {
         .await?;
     assert_eq!(row.r#type, "four");
 
-    // `skip` was not the last meta item, so it was overwritten and the field is
-    // read from the row after all.
-    let row = raw::<SkipNotLastTest>(r#"SELECT 5 AS "_foo""#)
+    // `skip` holds from any position, so neither field is read and the statement
+    // needs no columns at all.
+    let row = raw::<SkipAnywhereTest>(r#"SELECT 5 AS "unrelated""#)
         .one(&db)
         .await?;
-    assert_eq!(row._foo, 5);
+    assert_eq!(row._foo, 0);
+    assert_eq!(row._bar, 0);
 
     drop(db);
     ctx.delete().await;

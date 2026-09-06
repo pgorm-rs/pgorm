@@ -1,7 +1,14 @@
+use super::util::skip_known_key;
 use heck::{ToLowerCamelCase, ToSnakeCase};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::{Data, DataEnum, Expr, Fields, LitStr, Variant};
+use syn::{Data, DataEnum, Fields, LitStr, Variant};
+
+/// Variant-level `#[pgorm(...)]` keys a `Column` enum may carry. `column_name` is the
+/// override this derive reads; `table_name` rides on the `Table` variant
+/// `DeriveEntityModel` generates for `table_iden`, which has no column name at all.
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
+const COLUMN_VARIANT_KEYS: [&str; 2] = ["column_name", "table_name"];
 
 /// Derive a Column name for an enum type
 pub fn impl_default_as_str(ident: &Ident, data: &Data) -> syn::Result<TokenStream> {
@@ -35,10 +42,7 @@ pub fn impl_default_as_str(ident: &Ident, data: &Data) -> syn::Result<TokenStrea
                     if meta.path.is_ident("column_name") {
                         column_name = meta.value()?.parse::<LitStr>()?.value();
                     } else {
-                        // Reads the value expression to advance the parse stream.
-                        // Some parameters, such as `primary_key`, do not have any value,
-                        // so ignoring an error occurred here.
-                        let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+                        skip_known_key(&meta, &COLUMN_VARIANT_KEYS)?;
                     }
                     Ok(())
                 })?;

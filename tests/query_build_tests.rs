@@ -17,8 +17,8 @@ use pgorm::pgorm_query::{
 };
 use pgorm::set;
 use pgorm::tests_cfg::{
-    cake, cake_filling, cake_filling_price, entity_linked, filling, fruit, lunch_set,
-    sea_orm_active_enums::Tea, vendor,
+    active_enums::Tea, cake, cake_filling, cake_filling_price, entity_linked, filling, fruit,
+    lunch_set, vendor,
 };
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,

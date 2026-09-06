@@ -1,10 +1,23 @@
+//! Derive macros for pgorm.
+//!
+//! Every derive here expands to call-site-relative `pgorm::...` paths, never
+//! `::pgorm::...`, so the name `pgorm` has to resolve wherever a derive is
+//! written. Renaming the dependency in `Cargo.toml`
+//! (`my_orm = { package = "pgorm", .. }`) breaks the expansions with a loud
+//! `E0433`; alias it back with `use my_orm as pgorm;` in the module holding the
+//! entities, or at the crate root. Relative paths are also what lets pgorm's own
+//! test fixtures write `use crate as pgorm;`. `pgorm-query` needs no alias — the
+//! expansions reach it through the `pgorm::pgorm_query` re-export — while
+//! `pgorm-migration`, which `DeriveMigrationName` names directly, follows the
+//! same rule as `pgorm`. There is no `#[pgorm(crate = ...)]` override.
+
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
 
 use syn::{DeriveInput, Error, parse_macro_input};
 
-// [spec:pgorm:def:macros.derive]
+// [spec:pgorm:def:macros.derive+1]
 #[cfg(feature = "derive")]
 mod derives;
 
@@ -134,6 +147,13 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// #
 /// # impl ActiveModelBehavior for ActiveModel {}
 /// ```
+///
+/// The expansion writes call-site-relative `pgorm::...` paths, so the name `pgorm` has
+/// to resolve in the module holding the entities. If the dependency is renamed in
+/// `Cargo.toml` (`my_orm = { package = "pgorm", .. }`), alias it back with
+/// `use my_orm as pgorm;` there or at the crate root; otherwise every generated path is
+/// an `E0433`. There is no `#[pgorm(crate = ...)]` override.
+// [spec:pgorm:def:macros.derive+1]
 // [spec:pgorm:sem:macros.derive.entity-model+1]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
@@ -652,46 +672,6 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// The DeriveRelatedEntity derive macro will implement seaography::RelationBuilder for RelatedEntity enumeration.
-///
-/// ### Usage
-///
-/// ```ignore
-/// use pgorm::entity::prelude::*;
-///
-/// // ...
-/// // Model, Relation enum, etc.
-/// // ...
-///
-/// #[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
-/// pub enum RelatedEntity {
-///     #[pgorm(entity = "super::address::Entity")]
-///     Address,
-///     #[pgorm(entity = "super::payment::Entity")]
-///     Payment,
-///     #[pgorm(entity = "super::rental::Entity")]
-///     Rental,
-///     #[pgorm(entity = "Entity", def = "Relation::SelfRef.def()")]
-///     SelfRef,
-///     #[pgorm(entity = "super::store::Entity")]
-///     Store,
-///     #[pgorm(entity = "Entity", def = "Relation::SelfRef.def().rev()")]
-///     SelfRefRev,
-/// }
-/// ```
-#[cfg(feature = "derive")]
-#[proc_macro_derive(DeriveRelatedEntity, attributes(pgorm))]
-pub fn derive_related_entity(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    if cfg!(feature = "seaography") {
-        derives::expand_derive_related_entity(input)
-            .unwrap_or_else(Error::into_compile_error)
-            .into()
-    } else {
-        TokenStream::new()
-    }
-}
-
 /// The DeriveMigrationName derive macro will implement `pgorm_migration::MigrationName` for a migration.
 ///
 /// ### Usage
@@ -711,6 +691,13 @@ pub fn derive_related_entity(input: TokenStream) -> TokenStream {
 ///     }
 /// }
 /// ```
+///
+/// The expansion names `pgorm_migration` by a call-site-relative path, so a renamed
+/// `pgorm-migration` dependency has to be aliased back
+/// (`use my_migration as pgorm_migration;`) in the module holding the migration or at
+/// the crate root, exactly as `pgorm` itself does. There is no `#[pgorm(crate = ...)]`
+/// override.
+// [spec:pgorm:def:macros.derive+1]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveMigrationName)]
 pub fn derive_migration_name(input: TokenStream) -> TokenStream {
@@ -720,6 +707,20 @@ pub fn derive_migration_name(input: TokenStream) -> TokenStream {
         .into()
 }
 
+/// Store a `Serialize + Deserialize` type in a `json`/`jsonb` column.
+///
+/// The derive generates the `TryGetableFromJson` marker, `From<Self> for Value`,
+/// `ValueType`, and `Nullable`, so the type binds and decodes like any other column
+/// value.
+///
+/// # Panics
+///
+/// The generated `From<Self> for Value` panics when `serde_json::to_value` refuses the
+/// value — a map with non-string keys, or a `Serialize` impl that returns an error.
+/// `From` has no channel to report failure, and the alternative is binding SQL NULL for
+/// a value that was never null: a confusing constraint violation against a `NOT NULL`
+/// column, and silent data loss against a nullable one. The panic message names the
+/// type and carries serde's own error.
 #[cfg(feature = "derive")]
 #[proc_macro_derive(FromJsonQueryResult)]
 pub fn derive_from_json_query_result(input: TokenStream) -> TokenStream {

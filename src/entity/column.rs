@@ -595,7 +595,7 @@ mod tests {
                 pub id: i32,
                 pub one: i32,
                 #[pgorm(unique)]
-                pub two: i8,
+                pub two: i16,
                 #[pgorm(indexed)]
                 pub three: i16,
                 #[pgorm(nullable)]
@@ -603,11 +603,11 @@ mod tests {
                 #[pgorm(unique, indexed, nullable)]
                 pub five: i64,
                 #[pgorm(nullable)]
-                pub eight: u32,
+                pub eight: i64,
                 #[pgorm(default_expr = "Expr::current_timestamp()")]
                 pub ten: DateTimeUtc,
                 #[pgorm(default_value = 7)]
-                pub eleven: i8,
+                pub eleven: i16,
                 #[pgorm(default_value = "twelve_value")]
                 pub twelve: String,
                 #[pgorm(default_expr = "\"twelve_value\"")]

@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Lit, Type, spanned::Spanned};
 
-// [spec:pgorm:sem:macros.derive.value-type+1]
+// [spec:pgorm:sem:macros.derive.value-type+2]
 pub fn expand_derive_value_type(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let syn::DeriveInput {
         ident: name,
@@ -70,7 +70,7 @@ pub fn expand_derive_value_type(input: syn::DeriveInput) -> syn::Result<TokenStr
     Ok(impl_value_type(
         &name,
         &ty,
-        &col_type_match(col_type, inner_type, field_span),
+        &col_type_match(col_type, inner_type, field_span)?,
         &arr_type_match(arr_type, inner_type, field_span),
     ))
 }

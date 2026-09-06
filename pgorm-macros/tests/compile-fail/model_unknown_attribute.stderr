@@ -1,0 +1,5 @@
+error: unknown pgorm attribute `primary_ke`
+ --> tests/compile-fail/model_unknown_attribute.rs:5:13
+  |
+5 |     #[pgorm(primary_ke)]
+  |             ^^^^^^^^^^

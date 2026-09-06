@@ -1,11 +1,7 @@
-use self::util::GetMeta;
-use super::util::spell_type;
+use super::util::{PROJECTION_FIELD_KEYS, skip_known_key, spell_type};
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
-use syn::{
-    Data, DataStruct, Fields, Generics, Meta, Type, ext::IdentExt, punctuated::Punctuated,
-    token::Comma,
-};
+use syn::{Data, DataStruct, Fields, Generics, Type, ext::IdentExt};
 
 pub struct FromQueryResultItem {
     pub skip: bool,
@@ -31,7 +27,7 @@ impl ToTokens for FromQueryResultItem {
 impl FromQueryResultItem {
     /// The column this field reads, as an `ExpectedColumn`, or `None` for a
     /// skipped field, which reads no column at all.
-    // [spec:pgorm:sem:macros.derive.from-query-result+1]    the reflected column
+    // [spec:pgorm:sem:macros.derive.from-query-result+2]    the reflected column
     fn expected_column(&self) -> Option<TokenStream> {
         if self.skip {
             return None;
@@ -48,7 +44,7 @@ impl FromQueryResultItem {
 }
 
 /// Method to derive a [QueryResult](pgorm::QueryResult)
-// [spec:pgorm:sem:macros.derive.from-query-result+1]
+// [spec:pgorm:sem:macros.derive.from-query-result+2]
 pub fn expand_derive_from_query_result(
     ident: Ident,
     data: Data,
@@ -68,16 +64,21 @@ pub fn expand_derive_from_query_result(
     let mut field = Vec::with_capacity(fields.len());
 
     for parsed_field in fields.into_iter() {
+        // `skip` accumulates across every meta item of every `#[pgorm(...)]` attribute on
+        // the field: once asked for, it cannot be un-asked by a later key.
         let mut skip = false;
         for attr in parsed_field.attrs.iter() {
             if !attr.path().is_ident("pgorm") {
                 continue;
             }
-            if let Ok(list) = attr.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated) {
-                for meta in list.iter() {
-                    skip = meta.exists("skip");
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("skip") {
+                    skip = true;
+                    Ok(())
+                } else {
+                    skip_known_key(&meta, &PROJECTION_FIELD_KEYS)
                 }
-            }
+            })?;
         }
         let ty = parsed_field.ty;
         let ident = format_ident!("{}", parsed_field.ident.unwrap().to_string());
@@ -105,20 +106,4 @@ pub fn expand_derive_from_query_result(
             }
         }
     ))
-}
-mod util {
-    use syn::Meta;
-
-    pub(super) trait GetMeta {
-        fn exists(&self, k: &str) -> bool;
-    }
-
-    impl GetMeta for Meta {
-        fn exists(&self, k: &str) -> bool {
-            let Meta::Path(path) = self else {
-                return false;
-            };
-            path.is_ident(k)
-        }
-    }
 }

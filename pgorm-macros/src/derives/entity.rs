@@ -18,23 +18,23 @@ struct DeriveEntity {
 
 impl DeriveEntity {
     fn new(input: syn::DeriveInput) -> Result<Self, syn::Error> {
-        let sea_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)?.unwrap_or_default();
+        let pgorm_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)?.unwrap_or_default();
 
         let ident = input.ident;
-        let column_ident = sea_attr.column.unwrap_or_else(|| format_ident!("Column"));
-        let model_ident = sea_attr.model.unwrap_or_else(|| format_ident!("Model"));
-        let active_model_ident = sea_attr
+        let column_ident = pgorm_attr.column.unwrap_or_else(|| format_ident!("Column"));
+        let model_ident = pgorm_attr.model.unwrap_or_else(|| format_ident!("Model"));
+        let active_model_ident = pgorm_attr
             .active_model
             .unwrap_or_else(|| format_ident!("ActiveModel"));
-        let primary_key_ident = sea_attr
+        let primary_key_ident = pgorm_attr
             .primary_key
             .unwrap_or_else(|| format_ident!("PrimaryKey"));
-        let relation_ident = sea_attr
+        let relation_ident = pgorm_attr
             .relation
             .unwrap_or_else(|| format_ident!("Relation"));
 
-        let table_name = sea_attr.table_name;
-        let schema_name = sea_attr.schema_name;
+        let table_name = pgorm_attr.table_name;
+        let schema_name = pgorm_attr.schema_name;
 
         Ok(DeriveEntity {
             column_ident,

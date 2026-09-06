@@ -1,4 +1,4 @@
-use super::sea_orm_active_enums::*;
+use super::active_enums::*;
 use crate as pgorm;
 use crate::entity::prelude::*;
 

@@ -10,23 +10,37 @@ known limitations.
 
 ## The macro suite
 
-> [spec:pgorm:def:macros.derive]
+> [spec:pgorm:def:macros.derive+1]
 > The `pgorm-macros` crate exposes the ORM's derive macros, all gated behind the crate's
 > `derive` feature except `EnumIter`, which is gated behind `strum`: `DeriveEntity`,
 > `DeriveEntityModel`, `DerivePrimaryKey`, `DeriveColumn`, `DeriveCustomColumn`,
 > `DeriveModel`, `DeriveActiveModel`, `DeriveIntoActiveModel`, `DeriveActiveModelBehavior`,
-> `DeriveActiveEnum`, `FromQueryResult`, `DeriveRelation`, `DeriveRelatedEntity`,
+> `DeriveActiveEnum`, `FromQueryResult`, `DeriveRelation`,
 > `DeriveMigrationName`, `FromJsonQueryResult`, `DerivePartialModel`, `DeriveValueType`,
 > `DeriveDisplay`, `DeriveIden`, and `EnumIter`, plus the `#[pgorm_macros::test]`
 > attribute macro. Every entity-side derive reads its configuration from the shared
 > `#[pgorm(...)]` helper attribute (`EnumIter` uses `#[strum(...)]`).
 >
-> Two auxiliary macros are defined in the same crate: `DeriveMigrationName` implements
-> `pgorm_migration::MigrationName` by taking the file stem of `file!()`, and
-> `DeriveRelatedEntity` generates a `seaography::RelationBuilder` impl but expands to an
-> empty token stream unless the `seaography` feature is enabled (each variant requires an
-> `entity` attribute and takes an optional `def`; relation names are the lowerCamelCase
-> variant name).
+> There is no Seaography support: the `seaography` cargo feature, the
+> `DeriveRelatedEntity` derive it gated, and the codegen option that emitted a
+> `RelatedEntity` enum are all deleted rather than kept as a shim. The gated expansion
+> named `seaography::RelationBuilder` and `async_graphql` paths no crate in the
+> dependency graph provided, and the real Seaography targets sea-orm's `EntityTrait`, so
+> no crate could have satisfied it; with the feature off the derive expanded to nothing,
+> which made it a no-op that still broke the workspace feature matrix when enabled.
+>
+> One auxiliary macro is defined in the same crate: `DeriveMigrationName` implements
+> `pgorm_migration::MigrationName` by taking the file stem of `file!()`.
+>
+> Every expansion emits call-site-relative `pgorm::...` paths, never `::pgorm::...`, and
+> there is no `#[pgorm(crate = ...)]` override or `proc-macro-crate` lookup. The name
+> `pgorm` MUST therefore resolve where the derive is written: renaming the dependency in
+> `Cargo.toml` is a loud `E0433`, fixed by aliasing the name back
+> (`use my_orm as pgorm;`) in the module holding the entities or at the crate root. The
+> same relative spelling is why pgorm's own fixtures can write `use crate as pgorm;`.
+> Renaming `pgorm-query` needs no alias, since the expansions reach it through the
+> `pgorm::pgorm_query` re-export; `pgorm-migration`, which `DeriveMigrationName` names
+> directly, follows the same rule as `pgorm`.
 >
 > Separately, `pgorm-query-derive` provides `Iden` and `IdenStatic` derives using the
 > `iden` and `method` helper attributes, and `pgorm-query-attr` provides the `#[enum_def]`
@@ -69,7 +83,7 @@ known limitations.
 > have a primary key column. See <https://github.com/pgorm-rs/pgorm/issues/485> for
 > details."
 
-> [spec:pgorm:syn:macros.derive.entity-model.attrs]
+> [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 > Struct-level `#[pgorm(...)]` keys recognised by `DeriveEntityModel`: `table_name = Lit`,
 > `schema_name = Lit`, `comment = Lit`, bare `table_iden`, and `rename_all = "style"`
 > (case styles per the strum-derived list: `camelCase`, `PascalCase`, `kebab-case`,
@@ -83,9 +97,19 @@ known limitations.
 > `auto_increment = bool`; `column_type = "ColumnType expr"`; `column_name = "string"`;
 > `enum_name = "Ident"`; `default_value = Lit`; `default_expr = "expr"`; `comment = Lit`;
 > `select_as = "sql type"`; `save_as = "sql type"`. String-typed keys reject non-string
-> literals with an `Invalid <key> ...` error. Unrecognised keys at both levels are
-> silently skipped (their value expression is parsed only to advance the stream), so
-> typos in attribute names are not diagnosed.
+> literals with an `Invalid <key> ...` error.
+>
+> A key outside the recognised set, at either level, MUST be the compile error
+> "unknown pgorm attribute `<key>`" spanned at the key itself, so a typo — a
+> `auto_incremnt = false` that would otherwise leave `auto_increment` at its `true`
+> default and render `bigserial` where the author asked for `bigint` — is diagnosed
+> rather than dropped. The same refusal governs the three derives that read a subset of
+> this vocabulary off the same input: `DeriveModel` and `DeriveActiveModel` read only
+> `enum_name` (and `ignore`) but MUST accept every field-level key above, because
+> `DeriveEntityModel` re-runs both over the whole entity model; `DeriveColumn` reads
+> `column_name` and MUST also accept the `table_name` that rides on the `table_iden`
+> variant. Keys a derive accepts but does not read are consumed — including their
+> `= value` when they carry one — to advance the parse stream.
 
 > [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 > Column-variant naming: the field identifier is stripped of a leading `r#`, converted
@@ -111,22 +135,20 @@ known limitations.
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
 > parsed `column_type` attribute if present; otherwise it is inferred by matching the
 > field's Rust type structurally — against the `syn::Type`, never against a
-> whitespace-stripped rendering of it: `char`→`Char(None)`,
+> whitespace-stripped rendering of it:
 > `String`/`&str`→`string(None)`,
-> `i8`/`i16`→`SmallInteger`, `i32`→`Integer`,
-> `i64`/`u32`/`u64`→`BigInteger`,
+> `i16`→`SmallInteger`, `i32`→`Integer`, `i64`→`BigInteger`,
 > `f32`→`Float`, `f64`→`Double`, `bool`→`Boolean`,
 > `Date`/`NaiveDate`→`Date`, `Time`/`NaiveTime`→`Time`, `DateTime`/`NaiveDateTime`→
 > `Timestamp`, `DateTimeUtc`/`DateTimeLocal`/`DateTimeWithTimeZone`→
 > `TimestampWithTimeZone`, `Uuid`→`Uuid`, `Json`→`Json`, `Decimal`→`Decimal(None)`,
-> `Vec<u8>`→`Bytea`. Every row names a `ColumnType` Postgres has, so a
-> narrower Rust integer widens to the Postgres type that holds it rather than
-> naming a type the server lacks — `i8` to `smallint`, `u32` and `u64` to the
-> `int8` their `Value` binds as. A named row matches only a bare,
+> `Vec<u8>`→`Bytea`. Every row names a `ColumnType` Postgres has, and every row round
+> trips: what the type's `Value` binds is what its `TryGetable` reads back.
+> A named row matches only a bare,
 > single-segment path carrying no generic arguments, so a qualified spelling
 > (`std::string::String`) is not in the table; `&str` matches only a shared reference
 > with neither lifetime nor `mut`, and `Vec<u8>` only that exact one-argument spelling.
@@ -139,15 +161,29 @@ known limitations.
 > the table: they fall through to that `ValueType` path and, since neither
 > implements `ValueType` (see `[spec:pgorm:def:sql.value.conversions+1]`), a `u8`
 > or `u16` field is a compile error rather than a column type that panics when
-> bound. An `Option<T>` wrapper — a bare, single-segment `Option` with exactly one type
+> bound.
+>
+> `i8`, `u32`, `u64` and `char` are absent for the neighbouring reason, and MUST be a
+> spanned compile error naming the type, the reason, and `column_type` as the escape
+> hatch — not a silent fall-through and not an inferred type. Each binds a `Value` its
+> own decode cannot read back: `i8` binds `int2` but its `FromSql` accepts only the
+> Postgres `"char"` type, `u32` binds `int8` but reads `OID`
+> (`[spec:pgorm:sem:exec.decode.u32-oid]`), and `u64` and `char` have no `TryGetable` at
+> all. Inferring for them generates DDL that inserts fine and then fails
+> `WrongType` on the first `find()`, which is exactly the column type this rule exists
+> to refuse. An explicit `column_type` is taken as written and never second-guessed.
+>
+> An `Option<T>` wrapper — a bare, single-segment `Option` with exactly one type
 > argument — is unwrapped one level to `T` and forces `nullable`. Modifier calls are
 > then chained in order: `.nullable()`, `.indexed()`, `.unique()`,
 > `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`).
 >
 > The parallel `ArrayType` table that `DeriveValueType` reads
-> (`[spec:pgorm:sem:macros.derive.value-type+1]`) is matched the same way and carries the
+> (`[spec:pgorm:sem:macros.derive.value-type+2]`) is matched the same way and carries the
 > same rows mapped to their `ArrayType` counterparts, except `Vec<u8>`, which it does not
-> carry at all.
+> carry at all. The refusal above is on the `ColumnType` path only, so it reaches
+> `DeriveValueType` too: a newtype over one of the four refused types is the same
+> compile error.
 
 > [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
@@ -300,7 +336,7 @@ known limitations.
 
 ## Projection and value derives
 
-> [spec:pgorm:sem:macros.derive.partial-model+2]
+> [spec:pgorm:sem:macros.derive.partial-model+3]
 > `DerivePartialModel` accepts only non-generic named-field structs (generics and other
 > shapes are compile errors). The container attribute `entity = "Type"` names the source
 > entity; it is required unless every field carries `from_expr`, and its absence
@@ -311,17 +347,30 @@ known limitations.
 > `PartialModelTrait::select_cols` by chaining `QuerySelect::column` /
 > `column_as` calls; the chain's type is `S::Projected`, so a struct with no
 > fields — whose chain is empty and whose body is therefore the unprojected `S` — does
-> not compile. Limitation: although supplying both `from_col` and
-> `from_expr` is a documented compile error, the parser overwrites both trackers on
-> every meta item in a `#[pgorm(...)]` list, so only the last recognised key of the last
-> attribute takes effect and the both-keys guard is unreachable in practice.
+> not compile.
+>
+> Every key accumulates across all meta items of all `#[pgorm(...)]` attributes on the
+> item, so a later key cannot erase an earlier one and the derive can never generate a
+> projection the source does not state. Consequently: a repeated `entity`, `from_col` or
+> `from_expr` is the compile error "duplicate `<key>`"; supplying both `from_col` and
+> `from_expr` on one field reaches the guard and is the compile error "you can only use
+> one of `from_col` or `from_expr`"; and any key outside `entity` at the container level,
+> or outside `from_col`/`from_expr`/`skip` at the field level, is
+> "unknown pgorm attribute `<key>`" spanned at the key. `skip` is accepted and unread
+> here because `FromQueryResult`, which reads it, is routinely derived on the same
+> struct (`[spec:pgorm:sem:macros.derive.from-query-result+2]`).
 
-> [spec:pgorm:sem:macros.derive.from-query-result+1]
+> [spec:pgorm:sem:macros.derive.from-query-result+2]
 > `FromQueryResult` (named-field structs only; generics supported) implements
 > `from_query_result(row, pre)` by `row.try_get(pre, "<field>")` for each field, using
 > the un-rawed field identifier as the column name; fields marked `#[pgorm(skip)]` are
-> filled with `Default::default()`. The skip flag is recomputed for every meta item in
-> an attribute list, so `skip` is only honoured as the last (or sole) item.
+> filled with `Default::default()`. `skip` accumulates across every meta item of every
+> `#[pgorm(...)]` attribute on the field, so once asked for it cannot be un-asked by a
+> later key or a second attribute. Any key other than `skip`, `from_col` or `from_expr`
+> is the compile error "unknown pgorm attribute `<key>`" spanned at the key; the latter
+> two are accepted and unread because `DerivePartialModel`, which reads them, is
+> routinely derived on the same struct
+> (`[spec:pgorm:sem:macros.derive.partial-model+3]`).
 >
 > It also implements `expected_columns`, reporting one `ExpectedColumn` per read field
 > in declaration order: the same un-rawed identifier, the field type as written (with
@@ -333,12 +382,18 @@ known limitations.
 >
 > `FromJsonQueryResult` performs no input validation at all (only the identifier is
 > used). It generates the `TryGetableFromJson` marker; `From<T> for Value` serialising
-> through `serde_json::to_value` — a serialisation failure silently becomes
-> `Value::Json(None)`; a `ValueType` impl accepting only `Value::Json(Some(_))` (column
-> type and array type are `Json`); `Nullable` returning `Value::Json(None)`; and the
-> `NotU8` marker.
+> through `serde_json::to_value`; a `ValueType` impl accepting only `Value::Json(Some(_))`
+> (column type and array type are `Json`); `Nullable` returning `Value::Json(None)`; and
+> the `NotU8` marker.
+>
+> A `serde_json::to_value` failure — a map with keys JSON cannot spell, or a `Serialize`
+> impl that errors — MUST panic, with a message naming the type and carrying serde's own
+> error. `From` has no channel to report failure, and the alternative is binding SQL NULL
+> for a value that was never null: a confusing constraint violation against a `NOT NULL`
+> column, and silent data loss against a nullable one. The panic is documented on the
+> derive.
 
-> [spec:pgorm:sem:macros.derive.value-type+1]
+> [spec:pgorm:sem:macros.derive.value-type+2]
 > `DeriveValueType` targets newtype tuple structs; it reads only the first unnamed
 > field. Any other input shape is a compile error spanned at the struct identifier —
 > "DeriveValueType can only be derived on a tuple struct", or "DeriveValueType requires
@@ -346,8 +401,9 @@ known limitations.
 > attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+3]`, falling back to
-> `<T as ValueType>::column_type()`/`array_type()`. Attribute errors propagate: a
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+4]`, falling back to
+> `<T as ValueType>::column_type()`/`array_type()` — and inheriting that rule's refusal
+> of `i8`, `u32`, `u64` and `char` on the `ColumnType` side. Attribute errors propagate: a
 > non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a
 > spanned compile error rather than being silently ignored. The expansion implements
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to

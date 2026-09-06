@@ -9,7 +9,7 @@ golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
 a live database reach the same pipeline through `sql_schema`, specified under
 [Schema from DDL text](#schema-from-ddl-text).
 
-> [spec:pgorm:def:codegen.entity]
+> [spec:pgorm:def:codegen.entity+1]
 > The entity generator is the pipeline
 > `EntityTransformer::transform(Vec<TableCreateStatement>) -> EntityWriter`
 > followed by `EntityWriter::generate(&EntityWriterContext) -> WriterOutput`.
@@ -23,8 +23,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `with_serde`, `with_copy_enums`, `date_time_crate`, `schema_name`, `lib`,
 > `serde_skip_deserializing_primary_key`, `serde_skip_hidden_column`,
 > `model_extra_derives`, `model_extra_attributes`, `enum_extra_derives`,
-> `enum_extra_attributes`, and `seaography`. Extra derives are appended to the
-> generated derive lists; extra attributes are emitted as additional
+> `enum_extra_derives`, and `enum_extra_attributes`. Extra derives are appended
+> to the generated derive lists; extra attributes are emitted as additional
 > `#[...]` lines on the Model struct or enum.
 >
 > Errors are the two-variant `Error` enum: `StdIoError(io::Error)` and
@@ -269,7 +269,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > is decided by matching the raw DB column name against the entity's
 > `primary_keys` list.
 
-> [spec:pgorm:sem:codegen.entity.expanded.blocks]
+> [spec:pgorm:sem:codegen.entity.expanded.blocks+1]
 > `gen_expanded_code_blocks` assembles an entity's expanded file as an
 > ordered `Vec<TokenStream>`, one block per section, each produced by a
 > dedicated generator: a single import block (`gen_import` extended with
@@ -277,9 +277,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `gen_model_struct`; `gen_column_enum`; `gen_primary_key_enum`;
 > `gen_impl_primary_key`; `gen_relation_enum`; `gen_impl_column_trait`;
 > `gen_impl_relation_trait`; then zero or more `gen_impl_related` blocks,
-> zero or more `gen_impl_conjunct_related` blocks,
-> `gen_impl_active_model_behavior`, and — only with the `seaography` flag —
-> `gen_related_entity` last. `write_entities` prepends the generated-file
+> zero or more `gen_impl_conjunct_related` blocks, then
+> `gen_impl_active_model_behavior` last. `write_entities` prepends the generated-file
 > header and joins the stringified blocks with blank lines, so each section
 > is one contiguous block in the output (rendered shapes pinned by
 > `tests/expanded/`).
@@ -350,7 +349,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `timestamp` is; mapping it to `DateTimeUtc` claimed a time zone the column
 > does not carry, and disagreed with the inference table's
 > `NaiveDateTime`→`Timestamp` direction
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+3]`).
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+4]`).
 >
 > Limitation: only `Chrono` is usable in practice. The `TimeDate`-family
 > aliases in `pgorm::entity::prelude` are gated behind a `with-time` cargo
@@ -553,19 +552,6 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > rather than in ours. This is the same contract as
 > `codegen.entity.keywords`, on the other axis: that rule is about a name
 > having a Rust form at all, this one about that form being unshared.
-
-## Seaography support
-
-> [spec:pgorm:sem:codegen.entity.seaography]
-> With the `seaography` flag, both formats append a final
-> `#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)] pub enum RelatedEntity`
-> whose variants are, in order: every `Relation` variant name; a
-> `<Name>Reverse` variant for every self-referencing relation; and the
-> UpperCamelCase target of every conjunct relation. Each variant carries
-> `#[pgorm(entity = "<Entity path>")]`, and relations that lack a `Related`
-> impl (self-referencing, conjunct-shadowed, or suffixed) additionally carry
-> `def = "Relation::<Variant>.def()"` — with `.def().rev()` for the
-> `Reverse` variants — so Seaography can resolve them without `Related`.
 
 ## Schema from DDL text
 

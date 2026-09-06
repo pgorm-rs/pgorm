@@ -21,12 +21,12 @@ impl DeriveRelation {
             _ => return Err(Error::InputNotEnum),
         };
 
-        let sea_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
+        let pgorm_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 
         let ident = input.ident;
-        let entity_ident = sea_attr.entity.unwrap_or_else(|| format_ident!("Entity"));
+        let entity_ident = pgorm_attr.entity.unwrap_or_else(|| format_ident!("Entity"));
 
         Ok(DeriveRelation {
             entity_ident,

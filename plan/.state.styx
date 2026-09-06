@@ -397,6 +397,7 @@ assertions (
     {id ergo.pipeline-v1, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:30:49.030885Z}
     {id ergo.prql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-04T14:41:22.291401Z}
     {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
+    {id from-json-serialization, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:10.825951Z}
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
@@ -410,6 +411,12 @@ assertions (
     {id infra.tx.rollback, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:00:13.457041Z}
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
     {id insert-returning-manual-pk, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:02.163452Z}
+    {id macro-dependency-renames, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:06.458967Z}
+    {id macro-from-query-result-skip, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:45:59.257788Z}
+    {id macro-model-type-inference, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:03.943434Z}
+    {id macro-partial-model-attrs, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:01.627583Z}
+    {id macro-sea-attr-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:13.386141Z}
+    {id macro-unknown-attrs, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:45:57.119701Z}
     {id migration-checksums, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:20.974605Z}
     {id migration-ledger-module-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:13.949101Z}
     {id migration-ledger-table-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:16.712792Z}
@@ -455,6 +462,9 @@ assertions (
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
     {id schema-enum-arrays, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:27.938472Z}
     {id schema-enum-dedup, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:30.128281Z}
+    {id sea-config-residue, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:40:06.389769Z}
+    {id sea-orm-active-enums-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:15.78141Z}
+    {id seaography-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:08.718488Z}
     {id sql-value-json, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:29.060218Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
     {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
@@ -484,7 +494,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id sea-config-residue, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:40:06.389769Z}
 )
 
 impl_evidence (

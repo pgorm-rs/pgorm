@@ -2,6 +2,7 @@ use super::case_style::{CaseStyle, CaseStyleHelpers, convert_case_str};
 use super::sql_type_match::unwrap_option;
 use super::util::{
     column_variant_ident, escape_rust_keyword, parse_derived_ident, trim_starting_raw_identifier,
+    unknown_pgorm_key,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Ident, Span, TokenStream};
@@ -33,7 +34,7 @@ struct FieldAttrs {
 /// `column_name` carries the name derived before any attribute is read, which an
 /// explicit `column_name` key overrides. `auto_increment` and `primary_key_types`
 /// are entity-wide and accumulate across every field.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 fn parse_field_attrs(
     field: &Field,
     column_name: Option<String>,
@@ -121,10 +122,7 @@ fn parse_field_attrs(
             } else if meta.path.is_ident("unique") {
                 parsed.unique = true;
             } else {
-                // Reads the value expression to advance the parse stream.
-                // Some parameters, such as `primary_key`, do not have any value,
-                // so ignoring an error occurred here.
-                let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+                return Err(unknown_pgorm_key(&meta));
             }
 
             Ok(())
@@ -219,9 +217,9 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 
 /// Method to derive an Model
 // [spec:pgorm:sem:macros.derive.entity-model+1]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+3]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
 // [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
@@ -249,10 +247,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                 } else if meta.path.is_ident("rename_all") {
                     rename_all = Some((&meta).try_into()?);
                 } else {
-                    // Reads the value expression to advance the parse stream.
-                    // Some parameters, such as `primary_key`, do not have any value,
-                    // so ignoring an error occurred here.
-                    let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+                    return Err(unknown_pgorm_key(&meta));
                 }
 
                 Ok(())
@@ -409,7 +404,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
 
                 let pgorm_query_col_type = crate::derives::sql_type_match::col_type_match(
                     sql_type, field_type, field_span,
-                );
+                )?;
 
                 let col_def =
                     quote! { pgorm::prelude::ColumnTypeTrait::def(#pgorm_query_col_type) };

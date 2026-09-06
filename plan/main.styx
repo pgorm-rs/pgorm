@@ -3137,6 +3137,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED for i8, u32, u64, char rows; rest of the table aligned. sql_type_match.rs:95-117 maps i8→SmallInteger, u32/u64→BigInteger, char→Char(None), but decode contradicts: i8's FromSql accepts CHAR only (never int2), u32 reads OID not INT4 (deliberate, exec.decode.u32-oid), u64/char have NO TryGetable at all — so i8/u32 model fields generate DDL that can never SELECT (WrongType at first find()), and u64/char fields don't compile despite the table advertising a type. Spec is internally contradictory: macros.md:115-118 vs exec.md:88-93. Scenario: level: i8 → \"level\" smallint, inserts succeed (binder coerces), every find() fails at runtime. Fix: remove the i8/u64/char rows (fall through to ValueType fallback → compile error, matching the u8/u16 precedent); remove u32 or map to an oid column type. Effort S; breaking only for entities generating DDL from those fields. Bumps macros.derive.entity-model.column-def+3→+4 (reconcile with exec.decode.u32-oid) + touches macros.derive.value-type+1."
                     }
+
+                    {
+                        at 2026-09-06T00:46:03.943434Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3211,6 +3218,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED; spec documents the wart as current semantics (macros.derive.from-query-result+1: \"a serialisation failure silently becomes Value::Json(None)\"). Generated From<T> for Value does serde_json::to_value(..).ok() (try_getable_from_json.rs:16-20) → None → binds SQL NULL (cursor.rs:733-736 IsNull::Yes). Scenario: FromJsonQueryResult type with non-string map keys → update sets the column to NULL with Ok returned; NOT NULL column → confusing constraint error, nullable → silent data loss. Root cause: From can't return Result. Fix options: generated From panics with clear message (S, loud-bug conversion) or fallible TryFrom/Value::json_or_err route surfacing Error (L, API-breaking). Given the fork's no-silent-corruption stance, panic-with-message is the honest minimum; note crate denies unwrap_used so use expect-style with rationale or explicit match+panic with #[allow]. Bumps macros.derive.from-query-result+1→+2."
+                    }
+
+                    {
+                        at 2026-09-06T00:46:10.825951Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3476,6 +3490,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED (spec documents the silent skip as a known limitation — design debt the fork's own DeriveValueType already abandoned: it rejects unknown keys with a spanned error + compile-fail fixture). Fallback arms read-and-discard in entity_model.rs:122-127/:167-172, model.rs:68-71, active_model.rs:57-60, column.rs:38-41. Scenario: #[pgorm(primary_key, auto_incremnt = false)] → typo swallowed, auto_increment stays true, DDL renders bigserial instead of bigint, zero diagnostics. Fix: replace the four fallback arms with Err(meta.error(\"unknown pgorm attribute ...\")); add compile-fail fixtures mirroring value_type's. Effort S; source-breaking for typo'd keys — which is the point. Bumps syn:macros.derive.entity-model.attrs→+1 (delete silent-skip sentence); check model+3/active-model+2/column+2 prose. FOUNDATION for the strict-attr pass — macro-from-query-result-skip and macro-partial-model-attrs fold into the same coordinated parsing change."
                     }
+
+                    {
+                        at 2026-09-06T00:45:57.119701Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3489,6 +3510,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED (spec-acknowledged). from_query_result.rs:78 does plain assignment skip = meta.exists(\"skip\") per meta item, so any subsequent meta (or subsequent #[pgorm] attribute) overwrites skip back to false; attribute parse failures also swallowed (:76 if let Ok). Scenario: #[pgorm(skip, anything)] → skip==false → generated try_get on the skipped field → confusing E0277 or runtime missing-column; reversing the order \"fixes\" it. Composes with the unknown-attr silence. Fix: skip |= meta.exists(\"skip\"), or fold into the strict-attr match that errors on unknown metas (macro-unknown-attrs' pass). Effort S. Bumps sem:macros.derive.from-query-result+1→+2 (remove the recomputation sentence) — NOTE same rule as from-json-serialization's bump; if both land, coordinate a single +2 or sequence +2→+3."
+                    }
+
+                    {
+                        at 2026-09-06T00:45:59.257788Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3504,6 +3532,13 @@ children (
                         kind @note
                         text "Audit CONFIRMED (spec-acknowledged). partial_model.rs:94-106 reassigns BOTH trackers on every meta (get_as_kv returns None for non-matching), so the last meta nulls whichever key came before; the BothFromColAndFromExpr conflict error (:128, :181-183) is unreachable dead code. Struct-level entity clobbers the same way (:68-75). (\"alias\" from the claim doesn't exist in this fork — only entity/from_col/from_expr.) Scenario: #[pgorm(from_col = \"bar\", from_expr = \"...\")] → silently expands as from_expr, from_col dropped, despite docs promising a compile error; #[pgorm(entity = \"Entity\", any_key)] → entity cleared. The derive silently generates a different SELECT projection than the source states. Fix: accumulate instead of overwrite, keep the conflict variant live, reject unknown keys (folds into macro-unknown-attrs' strict pass). Effort S. Bumps sem:macros.derive.partial-model+2→+3 (drop the Limitation paragraph, promise the guard)."
                     }
+
+                    {
+                        at 2026-09-06T00:46:01.627583Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3516,6 +3551,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit CONFIRMED as a real limitation with a working workaround; nothing used incorrectly — no found_crate mechanism exists at all (same posture as upstream sea-orm). Every expansion emits call-site-relative pgorm::... paths (entity_model.rs:183 etc.); no proc-macro-crate dep, no #[pgorm(crate = ...)] key. Paths being relative (never ::pgorm) is why `use crate as pgorm;` works in tests_cfg and why `use my_orm as pgorm;` fixes downstream renames; pgorm_query is reached via the pgorm::pgorm_query re-export so renaming pgorm-query is harmless; renaming pgorm or pgorm-migration breaks derives with loud E0433. SEVERITY LOW: exotic setup, loud failure, one-line workaround. Fix options: proc-macro-crate or #[pgorm(crate=...)] override (M, ~20 derives) vs document the alias workaround (S). Recommend docs-only unless the user wants the override. Spec: new rule or sentence in def:macros.derive (crate-path resolution currently uncovered)."
+                    }
+
+                    {
+                        at 2026-09-06T00:46:06.458967Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3536,6 +3578,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator decision (2026-09-05): delete Seaography entirely; this supersedes the node's original build-fix framing. Remove the pgorm-macros feature and DeriveRelatedEntity implementation/module, root and prelude re-exports, the public codegen seaography option and RelatedEntity helpers, all Seaography-specific tests and fixtures, and the with_seaography golden directory. Retire [spec:pgorm:sem:codegen.entity.seaography] and revise the macros derive rule instead of preserving a dead compatibility shim. The proc-macro and public codegen-field removals are intentional API breakage; historical append-only plan log entries remain."
+                    }
+
+                    {
+                        at 2026-09-06T00:46:08.718488Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -3617,6 +3666,13 @@ children (
                         kind @note
                         text "Audit: local variable sea_attr remains in the entity, model, and relation derive implementations even though its parsed type is derive_attr::Pgorm. After related_entity.rs is deleted with Seaography, twelve live occurrences remain. Rename these internal locals consistently and verify derive output is unchanged; no public compatibility or spec change is expected."
                     }
+
+                    {
+                        at 2026-09-06T00:46:13.386141Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -3630,6 +3686,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Audit: src/tests_cfg/sea_orm_active_enums.rs and module sea_orm_active_enums are test-only inherited names imported by lunch-set fixtures and query/update tests. Rename the path, module, and imports to neutral active-enum fixture vocabulary. It depends on Seaography deletion because both changes edit src/tests_cfg/mod.rs; no product API or spec impact is expected."
+                    }
+
+                    {
+                        at 2026-09-06T00:46:15.78141Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }

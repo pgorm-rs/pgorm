@@ -3,6 +3,22 @@
 //! Entities are declared as Rust types, queries are composed through the
 //! [`pgorm_query`] builder and executed with their values bound as parameters
 //! rather than interpolated.
+//!
+//! # Renaming the dependency
+//!
+//! Every derive expands to call-site-relative `pgorm::...` paths, so the name
+//! `pgorm` has to resolve where the derive is written. Renaming the dependency
+//! in `Cargo.toml` (`my_orm = { package = "pgorm", .. }`) therefore breaks the
+//! derives with a loud `E0433` naming the unresolved `pgorm`. Restore the name
+//! with an alias in the module the entities live in, or at the crate root:
+//!
+//! ```ignore
+//! use my_orm as pgorm;
+//! ```
+//!
+//! Renaming `pgorm-query` needs nothing — the derives reach it through this
+//! crate's [`pgorm_query`] re-export. `pgorm-migration` is subject to the same
+//! rule as `pgorm`, since `DeriveMigrationName` names `pgorm_migration`.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![warn(missing_docs)]
 #![deny(
@@ -46,7 +62,7 @@ pub use pgorm_macros::{
     DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
     DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIden,
     DeriveIntoActiveModel, DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey,
-    DeriveRelatedEntity, DeriveRelation, DeriveValueType, FromJsonQueryResult, FromQueryResult,
+    DeriveRelation, DeriveValueType, FromJsonQueryResult, FromQueryResult,
 };
 #[cfg(feature = "macros")]
 pub use tokio_postgres::row::RowIndex;

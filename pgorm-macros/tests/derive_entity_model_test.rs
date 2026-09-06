@@ -38,7 +38,6 @@ mod filling {
         pub casted: String,
         #[pgorm(ignore)]
         pub not_a_column: i32,
-        #[pgorm(no_such_field_key = "silently skipped")]
         pub plain: i32,
     }
 
@@ -48,11 +47,10 @@ mod filling {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// Every branch of the Rust-type -> `ColumnType` inference table that a `Model`
-/// field can actually hold. `char` and `u64` are omitted because neither
-/// implements `TryGetable`, so the `FromQueryResult` impl that
-/// `DeriveEntityModel` re-runs would not compile; they are covered through
-/// `DeriveValueType`, which shares the same table, in `derive_value_type_test`.
+/// Every branch of the Rust-type -> `ColumnType` inference table. `char`, `i8`,
+/// `u32` and `u64` are not in it: each is refused outright, because what its
+/// `Value` binds is not what its decode can read back (see the `sql_type_match`
+/// unit tests).
 mod scalars {
     use pgorm::entity::prelude::*;
 
@@ -62,10 +60,8 @@ mod scalars {
         #[pgorm(primary_key)]
         pub id: i32,
         pub txt: String,
-        pub tiny: i8,
         pub small: i16,
         pub big: i64,
-        pub uns: u32,
         pub single: f32,
         pub dbl: f64,
         pub flag: bool,
@@ -265,7 +261,7 @@ mod serde_keys {
 }
 
 // [spec:pgorm:sem:macros.derive.entity-model+1/test]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs/test]    struct-level table_name / schema_name / comment
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    struct-level table_name / schema_name / comment
 #[test]
 fn struct_attributes_drive_entity_and_entity_name() {
     // (3) `table_name` present, so `pub struct Entity;` plus a hand-rolled
@@ -397,7 +393,7 @@ fn json_key_reports_the_serde_key() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs/test]    `table_iden` adds a Table variant
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    `table_iden` adds a Table variant
 #[test]
 fn table_iden_variant_is_skipped_by_enum_iter() {
     // The variant exists...
@@ -410,14 +406,14 @@ fn table_iden_variant_is_skipped_by_enum_iter() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs/test]    the Table variant has no column def
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    the Table variant has no column def
 #[test]
 #[should_panic(expected = "Table cannot be used as a column")]
 fn table_iden_variant_has_no_column_def() {
     let _ = filling::Column::Table.def();
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs/test]    field-level keys, and unknown keys skipped
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    field-level keys
 #[test]
 fn field_level_attributes_shape_the_column_defs() {
     use pgorm::ColumnTypeTrait;
@@ -447,23 +443,21 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Sku.to_string(), "SKU");
     // `enum_name`
     assert_eq!(filling::Column::Renamed.to_string(), "renamed");
-    // `ignore` keeps the field out of `Column` entirely; an unrecognised key is
-    // silently skipped rather than diagnosed, so `plain` is still a column.
+    // `ignore` keeps the field out of `Column` entirely; a field carrying no
+    // attribute at all is an ordinary column.
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
     use scalars::Column as C;
 
     assert_eq!(C::Txt.def(), ColumnType::string(None).def());
-    assert_eq!(C::Tiny.def(), ColumnType::SmallInteger.def());
     assert_eq!(C::Small.def(), ColumnType::SmallInteger.def());
     assert_eq!(C::Id.def(), ColumnType::Integer.def());
     assert_eq!(C::Big.def(), ColumnType::BigInteger.def());
-    assert_eq!(C::Uns.def(), ColumnType::BigInteger.def());
     assert_eq!(C::Single.def(), ColumnType::Float.def());
     assert_eq!(C::Dbl.def(), ColumnType::Double.def());
     assert_eq!(C::Flag.def(), ColumnType::Boolean.def());
@@ -489,7 +483,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+3/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.

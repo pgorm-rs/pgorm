@@ -39,7 +39,7 @@ fn enum_schema() -> Vec<pgorm_query::TableCreateStatement> {
     )]
 }
 
-// [spec:pgorm:def:codegen.entity/test]    transform -> generate hands back named
+// [spec:pgorm:def:codegen.entity+1/test]    transform -> generate hands back named
 // files in memory; the writer itself never touches the filesystem
 #[test]
 fn pipeline_returns_output_files_without_writing_to_disk() {
@@ -65,7 +65,7 @@ fn pipeline_returns_output_files_without_writing_to_disk() {
     }
 }
 
-// [spec:pgorm:def:codegen.entity/test]    the Entity model's table name, column
+// [spec:pgorm:def:codegen.entity+1/test]    the Entity model's table name, column
 // facts (type, auto_increment, not_null, unique), relations, conjunct relations
 // and primary keys all reach the generated output
 #[test]
@@ -96,7 +96,7 @@ fn entity_model_carries_column_relation_and_pk_facts() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity/test]    errors are the two-variant `Error` enum
+// [spec:pgorm:def:codegen.entity+1/test]    errors are the two-variant `Error` enum
 #[test]
 fn errors_are_the_two_variant_error_enum() {
     let untyped = Table::create(Alias::new("cake"))
@@ -114,7 +114,7 @@ fn errors_are_the_two_variant_error_enum() {
     assert!(matches!(from_io, Error::StdIoError(_)));
 }
 
-// [spec:pgorm:def:codegen.entity/test]    every `EntityWriterContext` option
+// [spec:pgorm:def:codegen.entity+1/test]    every `EntityWriterContext` option
 // selects something in the generated output
 #[test]
 fn every_context_option_selects_generated_output() {
@@ -232,19 +232,6 @@ fn every_context_option_selects_generated_output() {
     assert_contains(
         model_extras.file("task.rs"),
         r#"#[serde(rename_all = "camelCase")]"#,
-    );
-
-    // seaography
-    assert_contains(
-        generate(
-            schema(),
-            Opts {
-                seaography: true,
-                ..Default::default()
-            },
-        )
-        .file("task.rs"),
-        "pub enum RelatedEntity",
     );
 }
 

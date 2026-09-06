@@ -5,14 +5,9 @@ use quote::format_ident;
 use quote::quote;
 use quote::quote_spanned;
 use syn::Expr;
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::Comma;
 
-use syn::Meta;
-
-use self::util::GetAsKVMeta;
-use super::util::parse_derived_ident;
+use super::util::{PROJECTION_FIELD_KEYS, parse_derived_ident, skip_known_key, unknown_pgorm_key};
 
 #[derive(Debug)]
 enum Error {
@@ -58,21 +53,25 @@ impl DerivePartialModel {
             return Err(Error::InputNotStruct);
         };
 
-        let mut entity = None;
+        let mut entity: Option<syn::Type> = None;
 
         for attr in input.attrs.iter() {
             if !attr.path().is_ident("pgorm") {
                 continue;
             }
 
-            if let Ok(list) = attr.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated) {
-                for meta in list {
-                    entity = meta
-                        .get_as_kv("entity")
-                        .map(|s| syn::parse_str::<syn::Type>(&s).map_err(Error::Syn))
-                        .transpose()?;
+            attr.parse_nested_meta(|meta| {
+                if !meta.path.is_ident("entity") {
+                    return Err(unknown_pgorm_key(&meta));
                 }
-            }
+                if entity.is_some() {
+                    return Err(meta.error("duplicate `entity`"));
+                }
+                let litstr: syn::LitStr = meta.value()?.parse()?;
+                entity = Some(syn::parse_str::<syn::Type>(&litstr.value())?);
+                Ok(())
+            })
+            .map_err(Error::Syn)?;
         }
 
         let mut column_as_list = Vec::with_capacity(fields.len());
@@ -81,30 +80,40 @@ impl DerivePartialModel {
             let field_span = field.span();
             let field_name = field.ident.ok_or(Error::InputNotStruct)?;
 
-            let mut from_col = None;
-            let mut from_expr = None;
+            // Both trackers accumulate across every meta item of every `#[pgorm(...)]`
+            // attribute on the field, so a second key cannot erase the first: a repeat of
+            // one key is a duplicate, and one of each is the conflict guarded below.
+            let mut from_col: Option<syn::Ident> = None;
+            let mut from_expr: Option<Expr> = None;
 
             for attr in field.attrs.iter() {
                 if !attr.path().is_ident("pgorm") {
                     continue;
                 }
 
-                if let Ok(list) = attr.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated)
-                {
-                    for meta in list.iter() {
-                        from_col = meta
-                            .get_as_kv("from_col")
-                            .map(|s| {
-                                parse_derived_ident(&s.to_upper_camel_case(), &field_name)
-                                    .map_err(Error::Syn)
-                            })
-                            .transpose()?;
-                        from_expr = meta
-                            .get_as_kv("from_expr")
-                            .map(|s| syn::parse_str::<Expr>(&s).map_err(Error::Syn))
-                            .transpose()?;
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("from_col") {
+                        if from_col.is_some() {
+                            return Err(meta.error("duplicate `from_col`"));
+                        }
+                        let litstr: syn::LitStr = meta.value()?.parse()?;
+                        from_col = Some(parse_derived_ident(
+                            &litstr.value().to_upper_camel_case(),
+                            &field_name,
+                        )?);
+                        Ok(())
+                    } else if meta.path.is_ident("from_expr") {
+                        if from_expr.is_some() {
+                            return Err(meta.error("duplicate `from_expr`"));
+                        }
+                        let litstr: syn::LitStr = meta.value()?.parse()?;
+                        from_expr = Some(syn::parse_str::<Expr>(&litstr.value())?);
+                        Ok(())
+                    } else {
+                        skip_known_key(&meta, &PROJECTION_FIELD_KEYS)
                     }
-                }
+                })
+                .map_err(Error::Syn)?;
             }
 
             let col_as = match (from_col, from_expr) {
@@ -169,7 +178,7 @@ impl DerivePartialModel {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.partial-model+2]
+// [spec:pgorm:sem:macros.derive.partial-model+3]
 pub fn expand_derive_partial_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 
@@ -188,37 +197,6 @@ pub fn expand_derive_partial_model(input: syn::DeriveInput) -> syn::Result<Token
             ident_span => compile_error!("you can only derive `DerivePartialModel` on named struct");
         }),
         Err(Error::Syn(err)) => Err(err),
-    }
-}
-
-mod util {
-    use syn::{Meta, MetaNameValue};
-
-    pub(super) trait GetAsKVMeta {
-        fn get_as_kv(&self, k: &str) -> Option<String>;
-    }
-
-    impl GetAsKVMeta for Meta {
-        fn get_as_kv(&self, k: &str) -> Option<String> {
-            let Meta::NameValue(MetaNameValue {
-                path,
-                value: syn::Expr::Lit(exprlit),
-                ..
-            }) = self
-            else {
-                return None;
-            };
-
-            let syn::Lit::Str(litstr) = &exprlit.lit else {
-                return None;
-            };
-
-            if path.is_ident(k) {
-                Some(litstr.value())
-            } else {
-                None
-            }
-        }
     }
 }
 
@@ -245,7 +223,7 @@ struct PartialModel{
     expr_field : i32
 }
 "#;
-    // [spec:pgorm:sem:macros.derive.partial-model+2/test]
+    // [spec:pgorm:sem:macros.derive.partial-model+3/test]
     #[test]
     fn test_load_macro_input() -> StdResult<()> {
         let input = parse_str::<DeriveInput>(CODE_SNIPPET)?;

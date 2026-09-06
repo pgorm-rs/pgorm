@@ -1,15 +1,15 @@
 use super::{
     attributes::derive_attr,
     util::{
-        escape_rust_keyword, field_not_ignored, parse_derived_ident, parse_enum_name, spell_type,
-        trim_starting_raw_identifier,
+        MODEL_FIELD_KEYS, escape_rust_keyword, field_not_ignored, parse_derived_ident,
+        parse_enum_name, skip_known_key, spell_type, trim_starting_raw_identifier,
     },
 };
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, quote_spanned};
 use std::iter::FromIterator;
-use syn::{Expr, Ident, LitStr};
+use syn::{Ident, LitStr};
 
 enum Error {
     InputNotStruct,
@@ -35,12 +35,12 @@ impl DeriveModel {
             _ => return Err(Error::InputNotStruct),
         };
 
-        let sea_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
+        let pgorm_attr = derive_attr::Pgorm::try_from_attributes(&input.attrs)
             .map_err(Error::Syn)?
             .unwrap_or_default();
 
         let ident = input.ident;
-        let entity_ident = sea_attr.entity.unwrap_or_else(|| format_ident!("Entity"));
+        let entity_ident = pgorm_attr.entity.unwrap_or_else(|| format_ident!("Entity"));
 
         let field_idents = fields
             .iter()
@@ -65,10 +65,7 @@ impl DeriveModel {
                             if meta.path.is_ident("enum_name") {
                                 ident = parse_enum_name(&meta.value()?.parse::<LitStr>()?)?;
                             } else {
-                                // Reads the value expression to advance the parse stream.
-                                // Some parameters, such as `primary_key`, do not have any value,
-                                // so ignoring an error occurred here.
-                                let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+                                skip_known_key(&meta, &MODEL_FIELD_KEYS)?;
                             }
 
                             Ok(())
@@ -215,6 +212,8 @@ impl DeriveModel {
 
 /// Method to derive an ActiveModel
 // [spec:pgorm:sem:macros.derive.model+3]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]    the field-key vocabulary this
+// derive shares with `DeriveEntityModel`
 pub fn expand_derive_model(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
     match DeriveModel::new(input) {

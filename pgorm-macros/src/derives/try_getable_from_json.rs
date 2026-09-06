@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-// [spec:pgorm:sem:macros.derive.from-query-result+1]
+// [spec:pgorm:sem:macros.derive.from-query-result+2]
 pub fn expand_derive_from_json_query_result(ident: Ident) -> syn::Result<TokenStream> {
     let impl_not_u8 = quote!(
         #[automatically_derived]
@@ -14,8 +14,19 @@ pub fn expand_derive_from_json_query_result(ident: Ident) -> syn::Result<TokenSt
 
         #[automatically_derived]
         impl std::convert::From<#ident> for pgorm::Value {
+            // `From` cannot report failure, and the alternative to panicking is binding
+            // SQL NULL for a value that was never null: a confusing constraint violation
+            // on a NOT NULL column, and silent data loss on a nullable one.
+            #[allow(clippy::panic)]
             fn from(source: #ident) -> Self {
-                pgorm::Value::Json(serde_json::to_value(&source).ok().map(|s| std::boxed::Box::new(s)))
+                match serde_json::to_value(&source) {
+                    Ok(json) => pgorm::Value::Json(Some(std::boxed::Box::new(json))),
+                    Err(err) => panic!(
+                        "`{}` could not be serialized to JSON and cannot be bound as a value: {}",
+                        stringify!(#ident),
+                        err,
+                    ),
+                }
             }
         }
 

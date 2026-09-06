@@ -232,7 +232,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::ActiveValue::Unchanged;
-    use crate::tests_cfg::{cake, fruit, lunch_set, sea_orm_active_enums::Tea};
+    use crate::tests_cfg::{active_enums::Tea, cake, fruit, lunch_set};
     use crate::{entity::*, query::*};
     use pgorm_query::{Expr, Value};
 

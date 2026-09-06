@@ -1,0 +1,5 @@
+error: unknown pgorm attribute `from_colum`
+ --> tests/compile-fail/partial_model_unknown_attribute.rs:6:13
+  |
+6 |     #[pgorm(from_colum = "name")]
+  |             ^^^^^^^^^^

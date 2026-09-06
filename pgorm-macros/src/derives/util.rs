@@ -1,7 +1,61 @@
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use quote::{ToTokens, format_ident};
-use syn::{Field, Ident, Meta, Type, punctuated::Punctuated, token::Comma};
+use syn::{
+    Expr, Field, Ident, Meta, Type, meta::ParseNestedMeta, punctuated::Punctuated, token::Comma,
+};
+
+/// The refusal for a `#[pgorm(...)]` key none of a derive's arms read, spanned at the
+/// key and naming it, so a typo is diagnosed rather than dropped.
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
+pub(crate) fn unknown_pgorm_key(meta: &ParseNestedMeta<'_>) -> syn::Error {
+    let name = match meta.path.get_ident() {
+        Some(ident) => ident.to_string(),
+        None => meta.path.to_token_stream().to_string().replace(' ', ""),
+    };
+    meta.error(format!("unknown pgorm attribute `{name}`"))
+}
+
+/// Accept a key this derive recognises but does not read, consuming its `= value` when
+/// it carries one so the parse stream advances past it; refuse anything else.
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
+pub(crate) fn skip_known_key(meta: &ParseNestedMeta<'_>, known: &[&str]) -> syn::Result<()> {
+    if !known.iter().any(|key| meta.path.is_ident(key)) {
+        return Err(unknown_pgorm_key(meta));
+    }
+    // Bare markers such as `primary_key` carry no value, so a missing `=` is not an error.
+    let _: Option<Expr> = meta.value().and_then(|value| value.parse()).ok();
+    Ok(())
+}
+
+/// The field-level keys `FromQueryResult` and `DerivePartialModel` define between them.
+/// The two are routinely derived on one struct — a partial model is decoded through
+/// `FromQueryResult` — so each has to recognise the other's vocabulary.
+// [spec:pgorm:sem:macros.derive.from-query-result+2]
+// [spec:pgorm:sem:macros.derive.partial-model+3]
+pub(crate) const PROJECTION_FIELD_KEYS: [&str; 3] = ["from_col", "from_expr", "skip"];
+
+/// Every field-level `#[pgorm(...)]` key `DeriveEntityModel` defines. `DeriveModel` and
+/// `DeriveActiveModel` read only `enum_name` (and `ignore`, through `field_not_ignored`)
+/// out of the set, but the composite derive re-runs both over the same input, so each
+/// has to recognise the whole vocabulary or a legal entity model would stop compiling.
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
+pub(crate) const MODEL_FIELD_KEYS: [&str; 14] = [
+    "auto_increment",
+    "column_name",
+    "column_type",
+    "comment",
+    "default_expr",
+    "default_value",
+    "enum_name",
+    "ignore",
+    "indexed",
+    "nullable",
+    "primary_key",
+    "save_as",
+    "select_as",
+    "unique",
+];
 
 pub(crate) fn field_not_ignored(field: &Field) -> bool {
     for attr in field.attrs.iter() {

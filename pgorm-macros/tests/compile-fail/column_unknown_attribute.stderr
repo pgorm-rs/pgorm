@@ -1,0 +1,5 @@
+error: unknown pgorm attribute `colum_name`
+ --> tests/compile-fail/column_unknown_attribute.rs:5:13
+  |
+5 |     #[pgorm(colum_name = "id")]
+  |             ^^^^^^^^^^

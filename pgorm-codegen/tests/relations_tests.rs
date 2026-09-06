@@ -1,5 +1,5 @@
-//! Relation variants and attributes, the `Related` impls, the many-to-many
-//! `via` impls, and the Seaography `RelatedEntity` enum.
+//! Relation variants and attributes, the `Related` impls, and the many-to-many
+//! `via` impls.
 
 mod common;
 
@@ -413,97 +413,4 @@ fn via_impls_follow_the_plain_related_impls() {
             "expected the via impl before ActiveModelBehavior"
         );
     }
-}
-
-// [spec:pgorm:sem:codegen.entity.seaography/test]    `RelatedEntity` lists every
-// Relation variant, then a `<Name>Reverse` per self-referencing relation, then
-// the UpperCamelCase target of every conjunct relation
-#[test]
-fn seaography_lists_relations_reverses_then_conjuncts() {
-    let schema = [
-        self_referencing_cake(),
-        bare("filling"),
-        fruit(),
-        junction(
-            "cake_filling",
-            ("cake", "cake_id"),
-            ("filling", "filling_id"),
-        ),
-    ];
-
-    for opts in [
-        Opts {
-            seaography: true,
-            ..Default::default()
-        },
-        Opts {
-            expanded_format: true,
-            seaography: true,
-            ..Default::default()
-        },
-    ] {
-        let generated = generate(schema.to_vec(), opts);
-
-        assert_contains(
-            generated.file("cake.rs"),
-            r#"#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
-               pub enum RelatedEntity {
-                   #[pgorm(entity = "Entity", def = "Relation::SelfRef.def()")]
-                   SelfRef,
-                   #[pgorm(entity = "super::cake_filling::Entity")]
-                   CakeFilling,
-                   #[pgorm(entity = "super::fruit::Entity")]
-                   Fruit,
-                   #[pgorm(entity = "Entity", def = "Relation::SelfRef.def().rev()")]
-                   SelfRefReverse,
-                   #[pgorm(entity = "super::filling::Entity")]
-                   Filling
-               }"#,
-        );
-    }
-}
-
-// [spec:pgorm:sem:codegen.entity.seaography/test]    relations without a
-// `Related` impl — conjunct-shadowed or suffixed — carry an explicit `def`
-#[test]
-fn seaography_adds_def_for_relations_without_related_impl() {
-    let shadowed = generate(
-        vec![
-            bare("users"),
-            Table::create(Alias::new("bills"))
-                .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
-                    Alias::new("bills"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
-                ))
-                .to_owned(),
-            junction("users_votes", ("users", "user_id"), ("bills", "bill_id")),
-        ],
-        Opts {
-            seaography: true,
-            ..Default::default()
-        },
-    );
-    assert_contains(
-        shadowed.file("users.rs"),
-        r#"#[pgorm(entity = "super::bills::Entity", def = "Relation::Bills.def()")] Bills,"#,
-    );
-
-    let suffixed = generate(
-        vec![bare("fruit"), basket_with_two_fruit_keys()],
-        Opts {
-            seaography: true,
-            ..Default::default()
-        },
-    );
-    assert_contains(
-        suffixed.file("basket.rs"),
-        r#"#[pgorm(entity = "super::fruit::Entity", def = "Relation::Fruit2.def()")]
-           Fruit2,
-           #[pgorm(entity = "super::fruit::Entity", def = "Relation::Fruit1.def()")]
-           Fruit1"#,
-    );
 }

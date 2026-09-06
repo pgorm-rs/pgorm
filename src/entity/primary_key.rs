@@ -263,13 +263,13 @@ mod tests {
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_1: String,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_2: i8,
+                pub id_2: i16,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_3: i16,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_4: i32,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_5: u32,
+                pub id_5: i32,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_6: i64,
                 #[pgorm(primary_key, auto_increment = false)]

@@ -1,0 +1,5 @@
+error: unknown pgorm attribute `skp`
+ --> tests/compile-fail/from_query_result_unknown_attribute.rs:5:13
+  |
+5 |     #[pgorm(skp)]
+  |             ^^^

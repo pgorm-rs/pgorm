@@ -400,7 +400,7 @@ fn expanded_column_enum_preserves_non_snake_case_names() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.expanded.blocks/test]    each section is one
+// [spec:pgorm:sem:codegen.entity.expanded.blocks+1/test]    each section is one
 // contiguous blank-line-separated block, with the generated header prepended
 #[test]
 fn expanded_sections_are_one_contiguous_block_each() {
@@ -418,7 +418,7 @@ fn expanded_sections_are_one_contiguous_block_each() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.expanded.blocks/test]    the expanded Model
+// [spec:pgorm:sem:codegen.entity.expanded.blocks+1/test]    the expanded Model
 // block derives DeriveModel + DeriveActiveModel, renders extra attributes
 // between the derive and the struct, and carries only serde field attributes
 #[test]
@@ -447,31 +447,6 @@ fn expanded_model_block_layout() {
                pub id: i32,
                pub note: Option<String>,
            }"#,
-    );
-}
-
-// [spec:pgorm:sem:codegen.entity.expanded.blocks/test]    the seaography
-// `RelatedEntity` block, when enabled, is appended last
-#[test]
-fn expanded_seaography_block_is_appended_last() {
-    let generated = generate(
-        vec![cake(), fruit()],
-        Opts {
-            expanded_format: true,
-            seaography: true,
-            ..Default::default()
-        },
-    );
-    let blocks = blocks(generated.file("fruit.rs"));
-
-    assert_eq!(blocks.len(), 13);
-    assert_eq!(
-        norm(blocks[11]),
-        norm("impl ActiveModelBehavior for ActiveModel {}")
-    );
-    assert_starts_with(
-        blocks[12],
-        "#[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)] pub enum RelatedEntity",
     );
 }
 

@@ -1,14 +1,16 @@
 use super::util::{
-    escape_rust_keyword, field_not_ignored, format_field_ident, parse_derived_ident,
-    parse_enum_name, trim_starting_raw_identifier,
+    MODEL_FIELD_KEYS, escape_rust_keyword, field_not_ignored, format_field_ident,
+    parse_derived_ident, parse_enum_name, skip_known_key, trim_starting_raw_identifier,
 };
 use heck::ToUpperCamelCase;
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::{Data, DataStruct, Expr, Field, Fields, LitStr, Type, punctuated::IntoIter};
+use syn::{Data, DataStruct, Field, Fields, LitStr, Type, punctuated::IntoIter};
 
 /// Method to derive an [ActiveModel](pgorm::ActiveModel)
 // [spec:pgorm:sem:macros.derive.active-model+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]    the field-key vocabulary this
+// derive shares with `DeriveEntityModel`
 pub fn expand_derive_active_model(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     // including ignored fields
     let all_fields = match data {
@@ -54,10 +56,7 @@ fn derive_active_model(all_fields: IntoIter<Field>) -> syn::Result<TokenStream> 
                             let litstr: LitStr = meta.value()?.parse()?;
                             ident = parse_enum_name(&litstr)?;
                         } else {
-                            // Reads the value expression to advance the parse stream.
-                            // Some parameters, such as `primary_key`, do not have any value,
-                            // so ignoring an error occurred here.
-                            let _: Option<Expr> = meta.value().and_then(|v| v.parse()).ok();
+                            skip_known_key(&meta, &MODEL_FIELD_KEYS)?;
                         }
 
                         Ok(())

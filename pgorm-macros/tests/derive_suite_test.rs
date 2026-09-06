@@ -1,7 +1,7 @@
 //! Verification for the macro catalogue itself: every derive `pgorm-macros`
 //! exposes is reachable, they all read their configuration from the shared
 //! `#[pgorm(...)]` helper attribute (except `EnumIter`, which uses
-//! `#[strum(...)]`), and the two auxiliary derives behave as documented.
+//! `#[strum(...)]`), and the auxiliary derives behave as documented.
 
 #![allow(dead_code)]
 
@@ -12,8 +12,8 @@ use pgorm::{
 };
 use serde::{Deserialize, Serialize};
 
-/// `DeriveEntityModel` (which re-runs `DeriveModel` + `DeriveActiveModel`),
-/// `DeriveRelation`, `DeriveRelatedEntity`.
+/// `DeriveEntityModel` (which re-runs `DeriveModel` + `DeriveActiveModel`) and
+/// `DeriveRelation`.
 mod cake {
     use pgorm::entity::prelude::*;
 
@@ -27,16 +27,6 @@ mod cake {
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
-
-    // `DeriveRelatedEntity` expands to an *empty* token stream unless the
-    // `seaography` feature is on. It is off here — nothing in this test's
-    // dependency graph provides `seaography` — so the fact that this compiles
-    // is the proof.
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelatedEntity)]
-    pub enum RelatedEntity {
-        #[pgorm(entity = "Entity")]
-        SelfRef,
-    }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
@@ -160,7 +150,7 @@ pub enum Flavour {
     Secret,
 }
 
-// [spec:pgorm:def:macros.derive/test]    every derive in the catalogue is reachable and wired up
+// [spec:pgorm:def:macros.derive+1/test]    every derive in the catalogue is reachable and wired up
 #[test]
 fn the_whole_derive_catalogue_is_exposed() {
     // Entity-side derives, composite and longhand.
@@ -170,10 +160,6 @@ fn the_whole_derive_catalogue_is_exposed() {
     assert_eq!(fruit::Column::iter().count(), 2);
     assert!(fruit::PrimaryKey::auto_increment());
     assert_eq!(CustomCol::Id.to_string(), "id");
-
-    // `DeriveRelatedEntity` produced nothing (no seaography feature), so
-    // `RelatedEntity` is just an ordinary enum.
-    assert_eq!(cake::RelatedEntity::iter().count(), 1);
 
     // Model / ActiveModel derives.
     let model = fruit::Model {
