@@ -15,7 +15,7 @@ bound parameter is held to.
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoIdentity::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+6]` — and defaults to
+> of `[spec:pgorm:def:entity.relation.def+7]` — and defaults to
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
@@ -135,7 +135,7 @@ bound parameter is held to.
 > `exec.cursor.window`. This is the same list the boundary comparison of
 > `[spec:pgorm:sem:exec.cursor.keyset+4]` is built from. Only
 > unary secondary entries take part — those whose `Identity` has arity 1
-> (`[spec:pgorm:def:entity.relation.def+6]`), a length now read rather than
+> (`[spec:pgorm:def:entity.relation.def+7]`), a length now read rather than
 > matched on; composite secondary identities are silently ignored, in the
 > ordering and in the boundary alike. A joined read installs those entries from its declaration rather
 > than from a call site (`[spec:pgorm:sem:query.graph.cursor]`), so a joined

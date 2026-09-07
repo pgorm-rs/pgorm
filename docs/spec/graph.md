@@ -307,7 +307,7 @@ chapter is stated twice anywhere else.
 > shape and ANDs the produced condition into the join's ON clause *in
 > addition to* whatever `on_condition` the relation already carries —
 > where `RelationDef::on_condition` replaces
-> (`[spec:pgorm:def:entity.relation.def+6]`), the sugar composes, so a
+> (`[spec:pgorm:def:entity.relation.def+7]`), the sugar composes, so a
 > call-site narrowing cannot silently drop an authored predicate. ON
 > versus WHERE is the point of its existence: under a LEFT JOIN a
 > predicate in ON narrows which rows *match* (unmatched roots survive,
@@ -318,7 +318,7 @@ chapter is stated twice anywhere else.
 > spells it.
 >
 > The standing hazard is the authored closure that ignores its
-> parameters (`[spec:pgorm:def:entity.relation.def+6]`): a hardcoded
+> parameters (`[spec:pgorm:def:entity.relation.def+7]`): a hardcoded
 > table qualification renders verbatim, so under an `_as` slot the
 > predicate constrains the un-aliased name — a table not in the query,
 > or another join of it — and nothing errors client-side. The graph

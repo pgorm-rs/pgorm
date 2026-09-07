@@ -662,7 +662,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+5/test]    keys are collected in input
+// [spec:pgorm:sem:query.loader.batching+6/test]    keys are collected in input
 // order and become a single IN predicate on the relation's from side, over a
 // relation that is also self-referencing: a composite key renders as a tuple
 // `IN` list through `in_tuples` (the unary `col IN (..)` form is what every
@@ -810,7 +810,7 @@ async fn loader_errors_on_aliased_from_item() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+5/test]    a relation naming a column
+// [spec:pgorm:sem:query.loader.batching+6/test]    a relation naming a column
 // its source model does not have is reported as an `Err` naming that column and
 // the model's table, not a panic
 #[pgorm_macros::test]
@@ -917,7 +917,7 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+5/test]    the relation reaches SQL
+// [spec:pgorm:sem:query.loader.batching+6/test]    the relation reaches SQL
 // whole: a `HasMany` narrowed by its own `on_condition` loads exactly what the
 // equivalent graph read returns, the excluded row included in neither, and a
 // caller filter still composes onto the same statement
@@ -966,7 +966,7 @@ async fn loader_load_many_applies_relation_predicate() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+5/test]    a self-referencing `HasOne`
+// [spec:pgorm:sem:query.loader.batching+6/test]    a self-referencing `HasOne`
 // — the input entity joined back under the loader's alias against its own
 // table — resolves to what the equivalent aliased graph read resolves to, the
 // relation's predicate excluding the same rows in both

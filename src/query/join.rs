@@ -357,6 +357,46 @@ mod tests {
         );
     }
 
+    // [spec:pgorm:def:entity.relation.def+7/test]    a condition attached
+    // before `rev` keeps its authored roles — the closure's `left` still
+    // receives the side it was written against — and a double `rev` renders
+    // the same join as the unreversed def
+    #[test]
+    fn rev_preserves_authored_condition_roles() {
+        let guarded = || {
+            cake_filling::Relation::Cake
+                .def()
+                .on_condition(|left, _right| {
+                    Expr::col((left, cake_filling::Column::CakeId))
+                        .gt(10)
+                        .into_condition()
+                })
+        };
+
+        assert_eq!(
+            cake::Entity::find()
+                .join(JoinType::LeftJoin, guarded().rev())
+                .as_query()
+                .to_string(),
+            [
+                r#"SELECT "cake"."id", "cake"."name" FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id" AND "cake_filling"."cake_id" > 10"#,
+            ]
+            .join(" ")
+        );
+
+        assert_eq!(
+            filling::Entity::find()
+                .join(JoinType::LeftJoin, guarded().rev().rev())
+                .as_query()
+                .to_string(),
+            filling::Entity::find()
+                .join(JoinType::LeftJoin, guarded())
+                .as_query()
+                .to_string(),
+        );
+    }
+
     #[test]
     fn join_20() {
         let fruit_alias = alias("fruit_alias");

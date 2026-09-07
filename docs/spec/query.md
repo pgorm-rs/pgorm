@@ -230,7 +230,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+6]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+7]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -510,7 +510,7 @@ what makes it total over partially-set models.
 > `via` junction or if the target relation is not `HasOne`. An empty input
 > slice short-circuits to an empty result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+5]
+> [spec:pgorm:sem:query.loader.batching+6]
 > Every loader operation issues one graph read (`[spec:pgorm:def:query.graph]`),
 > built the same way: the caller's target selector is re-rooted as the graph and
 > the input entity's own table is joined back as the single `Req` slot
@@ -519,8 +519,9 @@ what makes it total over partially-set models.
 > relation therefore reaches SQL through the graph's one edge walker and the
 > `join_condition` behind it (`[spec:pgorm:sem:query.build.join+3]`), whole: its
 > column pairs, its authored `on_condition` — receiving its two identifiers in
-> the roles it was written with, the loader re-swapping them when it reverses a
-> def — and its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
+> the roles it was written with, `RelationDef::rev` itself re-swapping them
+> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+7]`) — and
+> its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
 > part of a relation as a predicate of its own, which is what makes dropping a
 > part of one unrepresentable rather than merely unintended.
 >
@@ -535,7 +536,7 @@ what makes it total over partially-set models.
 >
 > Keys are collected in input order: for each input model, `extract_key` walks
 > the from side of the relation's `columns`, projected as an `Identity`
-> (`[spec:pgorm:def:entity.relation.def+6]`), into one `ValueTuple` — one walk
+> (`[spec:pgorm:def:entity.relation.def+7]`), into one `ValueTuple` — one walk
 > at every arity, resolving each column name back to the entity's `Column` enum
 > via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
@@ -615,7 +616,7 @@ what makes it total over partially-set models.
 > rather than the input entity. That reversal is a direction, not a change of
 > meaning: an authored `on_condition` MUST still receive its two identifiers
 > in the roles the relation was written with
-> (`[spec:pgorm:def:entity.relation.def+6]`), so the loader re-swaps the
+> (`[spec:pgorm:def:entity.relation.def+7]`), so the loader re-swaps the
 > closure's arguments when it reverses a def. The `via()` hop joins LEFT and
 > the slot INNER, which selects the rows two INNER joins did: the slot's ON
 > references the junction's columns and NULLs do not satisfy it.

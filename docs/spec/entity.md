@@ -391,7 +391,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+6]
+> [spec:pgorm:def:entity.relation.def+7]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
@@ -400,7 +400,10 @@ explicit limitations.
 > boxed `on_condition` closure receiving the left and right join idens, an optional
 > `fk_name`, and a `condition_type` (`All` = AND, `Any` = OR). `rev()` swaps the
 > from/to tables and columns, negates `is_owner`, clears `fk_name`, and keeps the
-> remaining attributes. `from_alias(alias)` re-points `from_tbl` at a table alias for
+> remaining attributes; an attached `on_condition` keeps its authored roles, its
+> arguments re-swapped along with the tables, so reversing a def MUST NOT change
+> what a predicate written for `(source, target)` receives. A closure attached
+> after reversing is authored against the reversed roles. `from_alias(alias)` re-points `from_tbl` at a table alias for
 > self-join disambiguation; `on_condition(f)` replaces any existing custom condition;
 > `condition_type(t)` sets how the ON clauses combine.
 >
@@ -491,7 +494,7 @@ explicit limitations.
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+6]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def+7]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a

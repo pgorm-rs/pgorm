@@ -47,7 +47,7 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
@@ -162,8 +162,19 @@ where
 }
 
 impl RelationDef {
-    /// Reverse this relation (swap from and to)
-    pub fn rev(self) -> Self {
+    /// Reverse this relation (swap from and to).
+    ///
+    /// An `on_condition` closure already attached keeps its authored roles:
+    /// its arguments are re-swapped along with the tables, so a predicate
+    /// written for `(source, target)` never silently starts receiving
+    /// `(target, source)`. A closure attached *after* reversing is authored
+    /// against the reversed roles, as its author sees them.
+    // [spec:pgorm:def:entity.relation.def+7]
+    pub fn rev(mut self) -> Self {
+        let on_condition = self.on_condition.take().map(|f| {
+            Box::new(move |left: DynIden, right: DynIden| f(right, left))
+                as Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>
+        });
         Self {
             rel_type: self.rel_type,
             from_tbl: self.to_tbl,
@@ -172,7 +183,7 @@ impl RelationDef {
             is_owner: !self.is_owner,
             on_delete: self.on_delete,
             on_update: self.on_update,
-            on_condition: self.on_condition,
+            on_condition,
             fk_name: None,
             condition_type: self.condition_type,
         }

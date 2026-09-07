@@ -7,19 +7,19 @@ use std::fmt;
 /// One arity-agnostic representation, whether the key is a single column or a
 /// composite: every consumer walks the columns rather than dispatching on how
 /// many there are, and a column set of a given width has exactly one spelling.
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 #[derive(Debug, Clone)]
 pub struct Identity(Vec<DynIden>);
 
 impl Identity {
     /// The number of columns.
-    // [spec:pgorm:def:entity.relation.def+6]
+    // [spec:pgorm:def:entity.relation.def+7]
     pub fn arity(&self) -> usize {
         self.0.len()
     }
 
     /// Iterate the columns in declared order.
-    // [spec:pgorm:def:entity.relation.def+6]
+    // [spec:pgorm:def:entity.relation.def+7]
     pub fn iter(&self) -> impl Iterator<Item = &DynIden> {
         self.0.iter()
     }
@@ -27,7 +27,7 @@ impl Identity {
     /// The one column of a unary set, or `None` when the set is wider: what a
     /// consumer that can only act on one column asks, instead of dispatching on
     /// arity.
-    // [spec:pgorm:def:entity.relation.def+6]
+    // [spec:pgorm:def:entity.relation.def+7]
     pub fn single(&self) -> Option<&DynIden> {
         match self.0.as_slice() {
             [only] => Some(only),
@@ -36,21 +36,21 @@ impl Identity {
     }
 }
 
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 impl From<DynIden> for Identity {
     fn from(iden: DynIden) -> Self {
         Self(vec![iden])
     }
 }
 
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 impl From<Vec<DynIden>> for Identity {
     fn from(idens: Vec<DynIden>) -> Self {
         Self(idens)
     }
 }
 
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 impl FromIterator<DynIden> for Identity {
     fn from_iter<I: IntoIterator<Item = DynIden>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
@@ -80,7 +80,7 @@ impl Iden for Identity {
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (DynIden, DynIden),
@@ -172,7 +172,7 @@ impl IntoIterator for ColumnPairs {
 }
 
 /// Performs a conversion into an [Identity]
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 pub trait IntoIdentity {
     /// The shape a boundary value must have to line up with this identity: a
     /// tuple of [`Value`] of the same length, so the arity of a column set and
@@ -192,7 +192,7 @@ pub trait IntoIdentity {
 /// The exception is `K = ValueTuple`, the shape of a runtime-built
 /// [`Identity`], which accepts any tuple and leaves the arity to be checked
 /// when the query runs.
-// [spec:pgorm:def:entity.relation.def+6]
+// [spec:pgorm:def:entity.relation.def+7]
 pub trait IntoBoundary<K>: IntoValueTuple {}
 
 /// Check the [Identity] of an Entity

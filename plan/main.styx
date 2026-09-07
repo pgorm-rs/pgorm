@@ -1551,12 +1551,27 @@ children (
                 id relation-def-rev
                 title "Promote RelationDef reversal to the public surface, consolidating both private copies"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-07T11:39:37.517597Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Evidence: two private reversal helpers exist — src/entity/relation.rs:166 (left by the linked-fold, single caller) and src/query/loader.rs:363 (the loader's own copy) — the same from/to + ownership flip written twice. Deferred during linked-fold as single-caller; the duplicate makes promotion worth it. SPEC IMPACT (bump rides the fix commit): bump entity.relation.def — define reversal (from/to swap, FK-ownership flip, condition side preservation) as public RelationDef surface. FIX SKETCH: one public RelationDef::rev, both private copies deleted, loader and link.rs call it; test asserting rev(rev(r)) round-trips the def."
+                    }
+
+                    {
+                        at 2026-09-07T14:06:54.357369Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T14:13:12.176232Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
