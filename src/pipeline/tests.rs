@@ -1170,7 +1170,7 @@ fn select_sources_named_self_join_qualifies_by_name() {
 
 // [spec:pgorm:sem:pipeline.select-sources+2/test]    the writer's cast
 // discipline reaches the PRQL side: an enum column reads back as text
-// [spec:pgorm:sem:query.graph.writer+3/test]
+// [spec:pgorm:sem:query.graph.writer+4/test]
 #[test]
 fn select_sources_casts_enum_columns_to_text() {
     let built = sources_sql_of(Pipeline::from(lunch_set::Entity).select_sources(lunch_set::Entity));

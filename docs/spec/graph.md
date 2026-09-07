@@ -27,7 +27,7 @@ chapter is stated twice anywhere else.
 > construction. Construction initialises the statement with
 > `FROM E::default().table_ref()` and immediately projects `E`'s columns
 > under the `s0_` prefix through the one writer
-> (`[spec:pgorm:sem:query.graph.writer+3]`), so a graph's select list is
+> (`[spec:pgorm:sem:query.graph.writer+4]`), so a graph's select list is
 > non-empty from the moment the value exists and the empty-projection guard
 > of `[spec:pgorm:sem:query.build.modifiers+7]` has nothing to catch. There
 > is no conversion between `Select<E>` and `SelectGraph<E, S>` in either
@@ -110,7 +110,7 @@ chapter is stated twice anywhere else.
 
 ## Projection
 
-> [spec:pgorm:sem:query.graph.writer+3]
+> [spec:pgorm:sem:query.graph.writer+4]
 > One writer projects every decoded source; nothing else writes the select
 > list. At construction (for the root) and at each slot declaration, the
 > writer appends, for every variant of the source entity's `Column` in
@@ -124,16 +124,22 @@ chapter is stated twice anywhere else.
 > The alias MUST respect PostgreSQL's 63-byte identifier bound: the server
 > truncates a longer alias silently, so a projection minting 64 bytes and a
 > decode requesting all of them would never meet. A prefixed name of 63
-> bytes or more is spelled as the longest UTF-8-whole head within 47 bytes
-> followed by the 64-bit FNV-1a hash of the full name as 16 hex digits —
-> deterministic, release-stable, and distinct for names sharing a head. A
-> name strictly under the bound passes through as the plain concatenation.
-> The two namespaces MUST NOT meet: a composition of exactly 63 bytes is
-> re-spelled though it would fit, so every plain spelling is shorter than
-> every bounded one and a column literally named like a bounded spelling
-> composes to its own alias rather than silently reading another column's
-> slot. What remains is two distinct long names hashing alike — a 64-bit
-> FNV collision this contract accepts and does not check for. The
+> bytes or more is spelled as the longest UTF-8-whole head within 47 bytes,
+> padded with `_` back to exactly 47 when a multibyte boundary shortened
+> it, followed by the 64-bit FNV-1a hash of the full name as 16 hex
+> digits — deterministic, release-stable, and distinct for names sharing a
+> head. A name strictly under the bound passes through as the plain
+> concatenation. The two namespaces MUST NOT meet at any UTF-8 retreat
+> width: every bounded spelling is exactly 63 bytes — the padding is what
+> keeps that true for multibyte names — while a composition of exactly 63
+> bytes is re-spelled though it would fit, so every plain spelling is
+> strictly shorter than every bounded one and a column literally named
+> like a bounded spelling composes to its own alias rather than silently
+> reading another column's slot. The hash owns a bounded spelling's final
+> 16 bytes unconditionally, so equal spellings decompose into equal heads
+> and equal hashes; what remains is two distinct long names hashing
+> alike — a 64-bit FNV collision this contract accepts and does not check
+> for. The
 > composition is one function (`result_column_name`) that the writers mint
 > through and every prefixed read (`TryGetable::try_get`, the absence
 > witness's `all_null`) composes through, so the generated alias and the

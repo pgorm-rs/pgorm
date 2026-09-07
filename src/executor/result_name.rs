@@ -12,28 +12,35 @@ const IDENT_MAX_BYTES: usize = 63;
 
 /// The result-set name of `col` under `pre`: the plain concatenation when it
 /// is strictly under PostgreSQL's 63-byte identifier bound, otherwise the
-/// longest UTF-8-whole head within 47 bytes followed by the 64-bit FNV-1a
-/// hash of the full name as 16 hex digits. The hash covers the whole name,
-/// so two long names sharing a head still get distinct spellings.
+/// longest UTF-8-whole head within 47 bytes, padded with `_` back to 47 when
+/// a multibyte boundary shortened it, followed by the 64-bit FNV-1a hash of
+/// the full name as 16 hex digits. The hash covers the whole name, so two
+/// long names sharing a head still get distinct spellings.
 ///
-/// A composition of exactly 63 bytes is re-spelled too, though it would fit:
-/// every plain spelling is therefore shorter than every bounded one, so a
-/// column literally named like a bounded spelling composes to a different
-/// alias instead of silently reading another column's slot. What remains is
-/// two distinct long names hashing alike — a 64-bit FNV collision the
-/// contract accepts and does not check for.
-// [spec:pgorm:sem:query.graph.writer+3]
+/// Every bounded spelling is therefore exactly 63 bytes — the padding is
+/// what keeps that true across every UTF-8 retreat — and a composition of
+/// exactly 63 bytes is re-spelled though it would fit, so every plain
+/// spelling is strictly shorter than every bounded one and a column
+/// literally named like a bounded spelling composes to a different alias
+/// instead of silently reading another column's slot. Within the bounded
+/// namespace the hash owns the final 16 bytes unconditionally, so equal
+/// spellings mean equal hashes of equal-or-colliding full names. What
+/// remains is two distinct long names hashing alike — a 64-bit FNV
+/// collision the contract accepts and does not check for.
+// [spec:pgorm:sem:query.graph.writer+4]
 pub(crate) fn result_column_name(pre: &str, col: &str) -> String {
     let full = format!("{pre}{col}");
     if full.len() < IDENT_MAX_BYTES {
         return full;
     }
+    let head_max = IDENT_MAX_BYTES - 16;
     let hash = fnv1a(full.as_bytes());
-    let mut end = IDENT_MAX_BYTES - 16;
+    let mut end = head_max;
     while !full.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}{hash:016x}", &full[..end])
+    let pad = "_".repeat(head_max - end);
+    format!("{}{pad}{hash:016x}", &full[..end])
 }
 
 /// 64-bit FNV-1a. The spelling of a bounded alias must be reproducible by
@@ -52,7 +59,7 @@ fn fnv1a(bytes: &[u8]) -> u64 {
 mod tests {
     use super::*;
 
-    // [spec:pgorm:sem:query.graph.writer+3/test]    names under the bound pass
+    // [spec:pgorm:sem:query.graph.writer+4/test]    names under the bound pass
     // through untouched; names at or past it are bounded, deterministic,
     // distinct for shared heads, and never split a UTF-8 sequence
     #[test]
@@ -71,14 +78,15 @@ mod tests {
         let long_b = format!("{}b", "a".repeat(60));
         assert_ne!(bounded, result_column_name("s0_", &long_b));
 
-        // A multibyte name: the head never splits a UTF-8 sequence.
+        // A multibyte name: the head never splits a UTF-8 sequence, and the
+        // padding brings the spelling back to the full 63 bytes.
         let wide = "å".repeat(40);
         let bounded = result_column_name("s0_", &wide);
-        assert!(bounded.len() <= IDENT_MAX_BYTES);
+        assert_eq!(bounded.len(), IDENT_MAX_BYTES);
         assert!(bounded.starts_with("s0_å"));
     }
 
-    // [spec:pgorm:sem:query.graph.writer+3/test]    the plain and bounded
+    // [spec:pgorm:sem:query.graph.writer+4/test]    the plain and bounded
     // namespaces cannot meet: a column literally named like a bounded
     // spelling composes at 63 bytes and is re-spelled through its own hash,
     // so it never aliases the long column's slot
@@ -107,5 +115,28 @@ mod tests {
             result_column_name("s0_", &under_bound),
             format!("s0_{under_bound}")
         );
+    }
+
+    // [spec:pgorm:sem:query.graph.writer+4/test]    a UTF-8 boundary retreat
+    // cannot shorten a bounded spelling back into the plain namespace: the
+    // head is padded to 47 bytes, so the spelling stays exactly 63 for every
+    // retreat width a 2-, 3- or 4-byte character can force
+    #[test]
+    fn utf8_retreat_keeps_bounded_spellings_at_full_width() {
+        // Each character straddles byte 47 of the composition (3-byte prefix
+        // plus 44 ASCII bytes puts the boundary one byte into it), forcing a
+        // retreat of 1, 2 or 3 bytes respectively.
+        for wide in ['å', '€', '𝄞'] {
+            let col = format!("{}{wide}{}", "a".repeat(43), "b".repeat(16));
+            let bounded = result_column_name("s0_", &col);
+            assert_eq!(bounded.len(), IDENT_MAX_BYTES, "for {wide}");
+            assert!(!bounded.contains(wide), "the head stops before {wide}");
+
+            // The deterministic adversary: a valid plain column spelling the
+            // retreated head plus the hash, without the padding.
+            let mimic = format!("{}{}", "a".repeat(43), &bounded[47..]);
+            assert!(format!("s0_{mimic}").len() < IDENT_MAX_BYTES);
+            assert_ne!(result_column_name("s0_", &mimic), bounded, "for {wide}");
+        }
     }
 }

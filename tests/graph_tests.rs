@@ -115,7 +115,7 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 // [spec:pgorm:def:query.graph/test]    a graph declared as a root plus joined
 // sources executes as one statement whose rows carry every declared source
-// [spec:pgorm:sem:query.graph.writer+3/test]    three sources each carrying a
+// [spec:pgorm:sem:query.graph.writer+4/test]    three sources each carrying a
 // `name` and an `id` column decode without collision, because each is
 // projected under its own `s{i}_` prefix
 // [spec:pgorm:sem:query.graph.decode+1/test]    an unmatched LEFT JOIN reads as
@@ -1009,7 +1009,7 @@ mod alias_collision {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:query.graph.writer+3/test]    a column literally named like
+// [spec:pgorm:sem:query.graph.writer+4/test]    a column literally named like
 // another column's bounded spelling keeps its own value through the graph and
 // select_sources: the plain and bounded alias namespaces cannot meet
 #[pgorm_macros::test]
@@ -1054,6 +1054,74 @@ async fn bounded_alias_never_shadows_a_short_column() -> Result<(), Error> {
     Ok(())
 }
 
+/// The multibyte collision pair: `victim`'s bounded head retreats off a
+/// UTF-8 boundary, and `mimic`'s plain composition spelled the retreated
+/// alias exactly under the old contract.
+mod unicode_collision {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "review_unicode_collision")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaåbbbbbbbbbbbbbbbb")]
+        pub victim: String,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaad9004b29644599f8")]
+        pub mimic: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:query.graph.writer+4/test]    a multibyte name whose head
+// retreats off a UTF-8 boundary still cannot be shadowed: the padded spelling
+// stays out of the plain namespace through the graph and select_sources
+#[pgorm_macros::test]
+async fn unicode_bounded_alias_never_shadows_a_short_column() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_unicode_alias_collision").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(&format!(
+        r#"CREATE TABLE review_unicode_collision (
+               id integer PRIMARY KEY,
+               "{victim}" text NOT NULL,
+               {mimic} text NOT NULL
+           );
+           INSERT INTO review_unicode_collision VALUES (1, 'left', 'right');"#,
+        victim = "a".repeat(43) + "å" + &"b".repeat(16),
+        mimic = "a".repeat(43) + "d9004b29644599f8",
+    ))
+    .await?;
+
+    let expected = unicode_collision::Model {
+        id: 1,
+        victim: "left".to_owned(),
+        mimic: "right".to_owned(),
+    };
+    assert_eq!(
+        unicode_collision::Entity::find().all(&db).await?,
+        std::slice::from_ref(&expected)
+    );
+    assert_eq!(
+        unicode_collision::Entity::graph().all(&db).await?,
+        std::slice::from_ref(&expected)
+    );
+    assert_eq!(
+        pgorm::pipeline::Pipeline::from(unicode_collision::Entity)
+            .select_sources(unicode_collision::Entity)
+            .all(&db)
+            .await?,
+        [Some(expected)]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 mod long_name {
     use pgorm::entity::prelude::*;
 
@@ -1076,7 +1144,7 @@ mod long_name {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:query.graph.writer+3/test]    every valid PostgreSQL column
+// [spec:pgorm:sem:query.graph.writer+4/test]    every valid PostgreSQL column
 // identifier projects and decodes through the graph: a 61-byte name whose
 // prefixed alias passes the 63-byte bound, a sibling sharing its whole head,
 // and a multibyte name — through `find`, the graph, and `select_sources`

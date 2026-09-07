@@ -598,6 +598,7 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id enum-schema-codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-07T15:32:00.624163Z}
     {id graph-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T17:40:27.266491Z}
+    {id graph-unicode-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T21:59:36.946216Z}
 )
 
 impl_evidence (

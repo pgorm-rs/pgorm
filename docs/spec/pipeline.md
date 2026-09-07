@@ -366,7 +366,7 @@ of the crate, compiled in every build. Rules are grouped under
 > (`[spec:pgorm:sem:pipeline.self-join]`), so two occurrences of one table
 > are told apart exactly as the join told them apart. Before compilation
 > the terminal appends one final projection stage through the same writer
-> as the graph's (`[spec:pgorm:sem:query.graph.writer+3]`): for the i-th
+> as the graph's (`[spec:pgorm:sem:query.graph.writer+4]`): for the i-th
 > listed source (zero-based), every column of its entity in iteration
 > order, projected under the read cast derived from the column's own
 > `select_as` answer — the enum default's `text` / `text[]` and a
