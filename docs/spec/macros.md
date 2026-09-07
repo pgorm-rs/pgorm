@@ -273,14 +273,17 @@ known limitations.
 
 ## Active enums
 
-> [spec:pgorm:syn:macros.derive.active-enum]
+> [spec:pgorm:syn:macros.derive.active-enum+1]
 > `DeriveActiveEnum` applies to enums only ("you can only derive ActiveEnum on enums").
 > Container attributes: `rs_type = "Type"` and `db_type = "ColumnType expr"` are
 > mandatory — missing either produces the compile error "Missing macro attribute
 > `rs_type`"/"`db_type`" — while `enum_name = "string"` (defaulting to the
-> UpperCamelCase of the enum name) and `rename_all = "style"` are optional. The special
+> UpperCamelCase of the enum name), `schema_name = "string"` and
+> `rename_all = "style"` are optional. The special
 > spelling `db_type = "Enum"` expands to
-> `Enum { name: Self::name(), variants: Self::iden_values() }`. Variant attributes:
+> `Enum { name: Self::name(), schema, variants: Self::iden_values() }`, where
+> `schema` is the `schema_name` attribute as an iden when given and `None`
+> otherwise — attribute order does not matter. Variant attributes:
 > `string_value = "s"`, `num_value = int`, `rename = "style"`, and `display_value`
 > (accepted only as a placeholder for `DeriveDisplay`). Unknown keys at either level are
 > rejected with "Unknown attribute parameter found" — unlike the entity derives, which

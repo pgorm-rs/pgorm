@@ -531,13 +531,19 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Active enums
 
-> [spec:pgorm:sem:codegen.entity.enums+1]
+> [spec:pgorm:sem:codegen.entity.enums+2]
 > All discovered database enums are generated into a single
 > `pgorm_active_enums.rs`, in alphabetical order by enum name. Each becomes
 > `#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]`
 > (plus `Copy` when `with_copy_enums`, then serde derives, then
 > `enum_extra_derives`) with
-> `#[pgorm(rs_type = "String", db_type = "Enum", enum_name = "<db name>")]`
+> `#[pgorm(rs_type = "String", db_type = "Enum", enum_name = "<db name>")]` —
+> plus `schema_name = "<schema>"` when the described type is
+> schema-qualified, so the generated entity round-trips the full type
+> identity. Enums are keyed by that identity; two same-named enums under
+> different qualifications MUST be refused ("enum `<n>` is used under two
+> qualifications; the generated Rust enum can carry only one") rather than
+> generated as one colliding Rust enum.
 > and `enum_extra_attributes` as further attribute lines. The Rust enum
 > name is the UpperCamelCase of the DB enum name; each variant carries
 > `#[pgorm(string_value = "<db value>")]`. Variant naming: values starting
@@ -715,11 +721,14 @@ compiling the C parser falls on people generating entities and on nobody else.
 > constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
 > rejects. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+2]
+> [spec:pgorm:sem:codegen.ddl.types+3]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
-> spellings arrive qualified as `pg_catalog.<name>`, everything else bare, and
-> both forms are accepted. `bpchar` → `Char`, `varchar` → `String`,
+> spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
+> schema-qualified. An enum reference resolves by its exact identity —
+> `(schema, name)`, `None` for unqualified — and MUST NOT fall back to a
+> same-named enum under a different qualification: the mismatch is reported
+> as unresolved, naming the reference as spelled. `bpchar` → `Char`, `varchar` → `String`,
 > `text` → `Text`, `int2`/`int4`/`int8` →
 > `SmallInteger`/`Integer`/`BigInteger`, `float4`/`float8` → `Float`/`Double`,
 > `numeric` → `Decimal`, `timestamp` → `Timestamp`,
@@ -788,11 +797,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+1]
+> [spec:pgorm:sem:codegen.ddl.objects+2]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
-> its name and values to every column typed with it (`codegen.ddl.types`), which
+> its full identity — schema and name — and values to every column typed with
+> it (`codegen.ddl.types`), which
 > is where `transform` discovers enums; an enum type no column names contributes
 > nothing and is returned as no statement of its own.
 >

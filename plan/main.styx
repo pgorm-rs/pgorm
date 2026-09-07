@@ -4108,6 +4108,7 @@ children (
                 title "Codegen and macros drop schema qualifiers on generated enum types"
                 kind @fix
                 deps (enum-schema-surface)
+                sealed true
                 log (
                     {
                         at 2026-09-07T11:39:07.944984Z
@@ -4121,6 +4122,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 5, severity P2, folded into this existing defect rather than duplicated. Additional sources: pgorm-codegen/src/sql_schema/objects.rs:15-23 keeps only names.last() for CREATE TYPE; pgorm-codegen/src/sql_schema/types.rs:90-98 discards the schema during lookup and output construction. Reproduction 1 (qualified_enum_preserves_schema): entities_from_sql(\"CREATE TYPE custom.status AS ENUM ('open'); CREATE TABLE custom.task (id integer PRIMARY KEY, status custom.status NOT NULL);\", defaults) emits an active enum with enum_name = \"status\", losing custom. Reproduction 2 (qualified_enum_does_not_resolve_another_schema): declare only a.status, then reference b.status in a table; generation succeeds by silently using a.status's labels rather than rejecting unresolved b.status. Extend this node's acceptance to the DDL bridge: enum definitions and references must be keyed by full schema/type identity; qualified lookups must never fall back to another schema, and qualifiers must survive generated casts and DDL. Cover same-named enums in distinct schemas according to an explicit supported-or-rejected policy and a conflicting type on search_path, plus unqualified controls. Extend the planned spec impact to codegen.ddl.types+2, codegen.ddl.objects+1 and codegen.ddl.unsupported+1 alongside codegen.entity.enums/macros.derive.active-enum. Keep dependency enum-schema-surface; the type-reference representation must exist before it can be threaded through generation."
+                    }
+
+                    {
+                        at 2026-09-07T15:31:55.505455Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T15:32:00.624163Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

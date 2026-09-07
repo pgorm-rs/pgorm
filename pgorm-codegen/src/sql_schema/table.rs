@@ -19,7 +19,7 @@ pub(super) struct Attachments {
 
 /// The identity a `CREATE TABLE` declares — schema and all — which is the key
 /// every other statement, and the entity transformer, refers to a table by.
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
     stmt.relation
         .as_ref()
@@ -31,7 +31,7 @@ pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
 }
 
 /// The schema a DDL statement's name is qualified with, if any.
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 pub(super) fn schema_of(relation: &RangeVar) -> Option<String> {
     Some(relation.schemaname.clone()).filter(|schema| !schema.is_empty())
 }

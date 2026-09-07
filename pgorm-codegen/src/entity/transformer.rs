@@ -55,13 +55,31 @@ impl EntityTransformer {
                     || unique_column_sets
                         .iter()
                         .any(|columns| columns.len() == 1 && columns.contains(&col.name));
-                if let pgorm_query::ColumnType::Enum { name, variants, .. } =
-                    col.get_inner_col_type()
+                if let pgorm_query::ColumnType::Enum {
+                    name,
+                    schema,
+                    variants,
+                } = col.get_inner_col_type()
                 {
+                    let key = match schema {
+                        Some(schema) => format!("{}.{}", schema.to_string(), name.to_string()),
+                        None => name.to_string(),
+                    };
+                    let colliding = enums.iter().any(|(existing_key, existing)| {
+                        existing.enum_name.to_string() == name.to_string() && *existing_key != key
+                    });
+                    if colliding {
+                        return Err(Error::TransformError(format!(
+                            "enum `{}` is used under two qualifications; the generated \
+                             Rust enum can carry only one",
+                            name.to_string()
+                        )));
+                    }
                     enums.insert(
-                        name.to_string(),
+                        key,
                         ActiveEnum {
                             enum_name: name.clone(),
+                            schema: schema.clone(),
                             values: variants.clone(),
                         },
                     );

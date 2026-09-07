@@ -1,4 +1,4 @@
-use super::{Enums, unsupported};
+use super::{Enums, unresolved, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
@@ -16,7 +16,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+2]
+// [spec:pgorm:sem:codegen.ddl.types+3]
 pub(super) fn column_kind(
     type_name: &TypeName,
     enums: &Enums,
@@ -79,7 +79,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+2]
+// [spec:pgorm:sem:codegen.ddl.types+3]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
@@ -87,21 +87,43 @@ fn named_type(
     context: &str,
     at: usize,
 ) -> Result<ColumnKind, Error> {
-    let (catalog, name) = match names {
-        [name] => (false, name),
-        [schema, name] if schema == "pg_catalog" => (true, name),
-        [_, name] => (false, name),
+    let (catalog, schema, name) = match names {
+        [name] => (false, None, name),
+        [schema, name] if schema == "pg_catalog" => (true, None, name),
+        [schema, name] => (false, Some(schema), name),
         _ => return Err(unsupported(format!("a type name on {context}"), at)),
     };
-    if !catalog && let Some(variants) = enums.get(name.as_str()) {
-        return Ok(plain(ColumnType::Enum {
-            schema: None,
-            name: SharedIden::new(Alias::new(name.as_str())),
-            variants: variants
-                .iter()
-                .map(|variant| SharedIden::new(Alias::new(variant.as_str())))
-                .collect(),
-        }));
+    if !catalog {
+        let identity = (schema.cloned(), name.clone());
+        if let Some(variants) = enums.get(&identity) {
+            return Ok(plain(ColumnType::Enum {
+                schema: identity
+                    .0
+                    .map(|schema| SharedIden::new(Alias::new(schema)) as _),
+                name: SharedIden::new(Alias::new(name.as_str())),
+                variants: variants
+                    .iter()
+                    .map(|variant| SharedIden::new(Alias::new(variant.as_str())))
+                    .collect(),
+            }));
+        }
+        // A reference that names some declared enum's bare name under the
+        // wrong qualification MUST NOT resolve to another schema's type.
+        if enums.keys().any(|(_, declared)| declared == name) {
+            let spelled = spell_enum_identity(&(schema.cloned(), name.clone()));
+            return Err(unresolved(
+                format!(
+                    "type `{spelled}` on {context} is not declared; a same-named enum under a different qualification does not resolve it"
+                ),
+                at,
+            ));
+        }
+        if let Some(schema) = schema {
+            return Err(unsupported(
+                format!("type `{schema}.{name}` on {context}"),
+                at,
+            ));
+        }
     }
     let col_type = match (name.as_str(), modifiers) {
         ("serial" | "serial4", []) => return Ok(serial(ColumnType::Integer)),
@@ -183,4 +205,12 @@ pub(super) fn idents(nodes: &[pg_query::protobuf::Node]) -> Option<Vec<String>> 
             _ => None,
         })
         .collect()
+}
+
+/// The human spelling of an enum identity: `schema.name` or the bare name.
+pub(super) fn spell_enum_identity(identity: &super::EnumIdentity) -> String {
+    match identity {
+        (Some(schema), name) => format!("{schema}.{name}"),
+        (None, name) => name.clone(),
+    }
 }

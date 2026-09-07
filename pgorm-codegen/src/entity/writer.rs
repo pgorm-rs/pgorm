@@ -318,7 +318,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.enums+1]
+    // [spec:pgorm:sem:codegen.entity.enums+2]
     pub fn write_pgorm_active_enums(
         &self,
         with_serde: &WithSerde,

@@ -9,18 +9,29 @@ use pgorm_query::{
     TableName,
 };
 
-/// A `CREATE TYPE ... AS ENUM` as the name and values a column of that type
-/// carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+1]
-pub(super) fn enum_type(stmt: &CreateEnumStmt, at: usize) -> Result<(String, Vec<String>), Error> {
+/// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
+/// values a column of that type carries into `ColumnType::Enum`.
+// [spec:pgorm:sem:codegen.ddl.objects+2]
+pub(super) fn enum_type(
+    stmt: &CreateEnumStmt,
+    at: usize,
+) -> Result<(super::EnumIdentity, Vec<String>), Error> {
     let names = types::idents(&stmt.type_name)
         .ok_or_else(|| unsupported("a computed type name in CREATE TYPE", at))?;
-    let Some(name) = names.last() else {
-        return Err(unresolved("CREATE TYPE without a type name", at));
+    let identity = match names.as_slice() {
+        [name] => (None, name.clone()),
+        [schema, name] => (Some(schema.clone()), name.clone()),
+        [] => return Err(unresolved("CREATE TYPE without a type name", at)),
+        _ => {
+            return Err(unsupported(
+                "a catalog-qualified type name in CREATE TYPE",
+                at,
+            ));
+        }
     };
     let values = types::idents(&stmt.vals)
         .ok_or_else(|| unsupported("a computed value in CREATE TYPE", at))?;
-    Ok((name.clone(), values))
+    Ok((identity, values))
 }
 
 /// A `CREATE INDEX`, and the table it belongs to.
@@ -31,7 +42,7 @@ pub(super) struct ParsedIndex {
     pub(super) index: Option<IndexCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -121,7 +132,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
 }
 
 /// A parsed identity back as the name a statement targets.
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 fn target(ident: &TableIdent) -> TableName {
     let table = Alias::new(ident.table.as_str());
     match ident.schema.as_deref() {
@@ -162,7 +173,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

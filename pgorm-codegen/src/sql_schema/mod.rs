@@ -45,7 +45,13 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 
 /// Enum type name → its values, in declaration order.
-type Enums = BTreeMap<String, Vec<String>>;
+/// An enum type's full identity: `(schema, name)`, `None` for an unqualified
+/// declaration. A qualified and an unqualified declaration of one name are
+/// distinct types, exactly as they are to PostgreSQL.
+pub(crate) type EnumIdentity = (Option<String>, String);
+
+/// Declared enum types keyed by full identity.
+type Enums = BTreeMap<EnumIdentity, Vec<String>>;
 
 /// Read DDL text as the schema statements the entity transformer consumes.
 ///
@@ -109,9 +115,13 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
             NodeEnum::IndexStmt(stmt) => collected.indexes.push((at, stmt.as_ref())),
             NodeEnum::CommentStmt(stmt) => collected.comments.push((at, stmt.as_ref())),
             NodeEnum::CreateEnumStmt(stmt) => {
-                let (name, values) = objects::enum_type(stmt, at)?;
-                if collected.enums.insert(name.clone(), values).is_some() {
-                    return Err(unresolved(format!("type `{name}` is declared twice"), at));
+                let (identity, values) = objects::enum_type(stmt, at)?;
+                if collected.enums.insert(identity.clone(), values).is_some() {
+                    let spelled = types::spell_enum_identity(&identity);
+                    return Err(unresolved(
+                        format!("type `{spelled}` is declared twice"),
+                        at,
+                    ));
                 }
             }
             other => return Err(unsupported(statement_kind(other), at)),
@@ -122,7 +132,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Resolve the collected statements against each other: enum types into the
 /// columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+1]
+// [spec:pgorm:sem:codegen.ddl.objects+2]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         enums,

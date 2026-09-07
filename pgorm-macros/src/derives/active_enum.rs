@@ -29,7 +29,7 @@ struct ActiveEnumVariant {
 }
 
 impl ActiveEnum {
-    // [spec:pgorm:syn:macros.derive.active-enum]
+    // [spec:pgorm:syn:macros.derive.active-enum+1]
     fn new(input: syn::DeriveInput) -> Result<Self, Error> {
         let ident_span = input.ident.span();
         let ident = input.ident;
@@ -42,6 +42,8 @@ impl ActiveEnum {
             ident_span => compile_error!("Missing macro attribute `db_type`");
         }));
         let mut rename_all = None;
+        let mut schema_name: Option<String> = None;
+        let mut db_type_is_enum = false;
 
         input
             .attrs
@@ -58,18 +60,16 @@ impl ActiveEnum {
                         let s = litstr.value();
                         match s.as_ref() {
                             "Enum" => {
-                                db_type = Ok(quote! {
-                                    Enum {
-                                        name: Self::name(),
-                                        schema: None,
-                                        variants: Self::iden_values(),
-                                    }
-                                })
+                                db_type_is_enum = true;
+                                db_type = Ok(TokenStream::new());
                             }
                             _ => {
                                 db_type = syn::parse_str::<TokenStream>(&s).map_err(Error::Syn);
                             }
                         }
+                    } else if meta.path.is_ident("schema_name") {
+                        let litstr: LitStr = meta.value()?.parse()?;
+                        schema_name = Some(litstr.value());
                     } else if meta.path.is_ident("enum_name") {
                         let litstr: LitStr = meta.value()?.parse()?;
                         enum_name = litstr.value();
@@ -85,6 +85,24 @@ impl ActiveEnum {
                 })
                 .map_err(Error::Syn)
             })?;
+
+        if db_type_is_enum {
+            let schema = match &schema_name {
+                Some(schema) => quote! {
+                    Some(pgorm::pgorm_query::SharedIden::new(
+                        pgorm::pgorm_query::Alias::new(#schema),
+                    ))
+                },
+                None => quote! { None },
+            };
+            db_type = Ok(quote! {
+                Enum {
+                    name: Self::name(),
+                    schema: #schema,
+                    variants: Self::iden_values(),
+                }
+            });
+        }
 
         let variant_vec = match input.data {
             syn::Data::Enum(syn::DataEnum { variants, .. }) => variants,

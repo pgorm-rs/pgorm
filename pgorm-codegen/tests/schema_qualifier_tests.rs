@@ -252,7 +252,7 @@ fn a_refusal_names_the_qualified_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1/test]    an index attaches to the table
+// [spec:pgorm:sem:codegen.ddl.objects+2/test]    an index attaches to the table
 // its own name resolves to, not to whatever shares the bare name
 #[test]
 fn an_index_attaches_by_qualified_name() {
@@ -263,7 +263,7 @@ fn an_index_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1/test]    and a qualified index that does
+// [spec:pgorm:sem:codegen.ddl.objects+2/test]    and a qualified index that does
 // name its table is folded into it, giving the column its `unique`
 #[test]
 fn a_qualified_index_reaches_its_own_table() {
@@ -279,7 +279,7 @@ fn a_qualified_index_reaches_its_own_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1/test]    a comment resolves the same way
+// [spec:pgorm:sem:codegen.ddl.objects+2/test]    a comment resolves the same way
 #[test]
 fn a_comment_attaches_by_qualified_name() {
     assert_error(
@@ -289,7 +289,7 @@ fn a_comment_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+1/test]    an unqualified reference that
+// [spec:pgorm:sem:codegen.ddl.objects+2/test]    an unqualified reference that
 // two tables answer to is named as such, rather than attached to one of them
 #[test]
 fn an_ambiguous_unqualified_index_is_refused() {
@@ -321,5 +321,62 @@ fn bridge_and_generated_entity_agree_on_schema() {
     assert_contains(
         from_sql(QUALIFIED, Opts::default()).file("item.rs"),
         r#"schema_name = "tenant_a""#,
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.enums+2/test]    a schema-qualified enum's
+// schema survives into the generated DeriveActiveEnum attribute, so the
+// entity round-trips the type it was described with
+#[test]
+fn qualified_enum_preserves_its_schema() {
+    let generated = from_sql(
+        "CREATE TYPE custom.status AS ENUM ('open'); \
+         CREATE TABLE custom.task (id integer PRIMARY KEY, status custom.status NOT NULL);",
+        Opts::default(),
+    );
+
+    assert_contains(
+        generated.file("pgorm_active_enums.rs"),
+        r#"schema_name = "custom""#,
+    );
+}
+
+// [spec:pgorm:sem:codegen.ddl.types+3/test]    a qualified reference resolves
+// only its exact identity: a same-named enum under another qualification MUST
+// NOT satisfy it
+#[test]
+fn qualified_enum_does_not_resolve_another_schema() {
+    assert_error(
+        "CREATE TYPE a.status AS ENUM ('open'); \
+         CREATE TABLE task (id integer PRIMARY KEY, status b.status NOT NULL);",
+        "statement 2: type `b.status` on column `task`.`status` is not declared; \
+         a same-named enum under a different qualification does not resolve it",
+    );
+}
+
+// [spec:pgorm:sem:codegen.ddl.types+3/test]    nor does an unqualified
+// reference resolve a type declared only under a schema
+#[test]
+fn unqualified_reference_needs_an_unqualified_declaration() {
+    assert_error(
+        "CREATE TYPE a.status AS ENUM ('open'); \
+         CREATE TABLE task (id integer PRIMARY KEY, status status NOT NULL);",
+        "statement 2: type `status` on column `task`.`status` is not declared; \
+         a same-named enum under a different qualification does not resolve it",
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.enums+2/test]    one bare Rust enum cannot
+// stand for two differently-qualified database types: the collision is
+// refused rather than generated
+#[test]
+fn same_named_enums_in_two_schemas_are_refused() {
+    assert_error(
+        "CREATE TYPE a.status AS ENUM ('open'); \
+         CREATE TYPE b.status AS ENUM ('closed'); \
+         CREATE TABLE t1 (id integer PRIMARY KEY, s a.status NOT NULL); \
+         CREATE TABLE t2 (id integer PRIMARY KEY, s b.status NOT NULL);",
+        "enum `status` is used under two qualifications; the generated Rust \
+         enum can carry only one",
     );
 }

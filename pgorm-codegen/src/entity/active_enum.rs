@@ -9,6 +9,7 @@ use crate::{Error, WithSerde, util::safe_ident};
 #[derive(Clone, Debug)]
 pub struct ActiveEnum {
     pub(crate) enum_name: DynIden,
+    pub(crate) schema: Option<DynIden>,
     pub(crate) values: Vec<DynIden>,
 }
 
@@ -19,7 +20,7 @@ struct Variant {
     encoded: bool,
 }
 
-// [spec:pgorm:sem:codegen.entity.enums+1]
+// [spec:pgorm:sem:codegen.entity.enums+2]
 fn variant(value: &str) -> Variant {
     if value.chars().next().map(char::is_numeric).unwrap_or(false) {
         return Variant {
@@ -63,7 +64,7 @@ impl ActiveEnum {
             .collect()
     }
 
-    // [spec:pgorm:sem:codegen.entity.enums+1]
+    // [spec:pgorm:sem:codegen.entity.enums+2]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let enum_name = self.enum_name.to_string();
@@ -82,7 +83,7 @@ impl ActiveEnum {
         Ok(())
     }
 
-    // [spec:pgorm:sem:codegen.entity.enums+1]
+    // [spec:pgorm:sem:codegen.entity.enums+2]
     pub fn impl_active_enum(
         &self,
         with_serde: &WithSerde,
@@ -104,9 +105,14 @@ impl ActiveEnum {
             quote! {}
         };
 
+        let schema_attr = self.schema.as_ref().map(|schema| {
+            let schema = schema.to_string();
+            quote! { , schema_name = #schema }
+        });
+
         quote! {
             #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum #copy_derive #serde_derive #extra_derives)]
-            #[pgorm(rs_type = "String", db_type = "Enum", enum_name = #enum_name)]
+            #[pgorm(rs_type = "String", db_type = "Enum", enum_name = #enum_name #schema_attr)]
             #extra_attributes
             pub enum #enum_iden {
                 #(
@@ -129,6 +135,7 @@ mod tests {
     fn test_enum_variant_starts_with_number() {
         assert_eq!(
             ActiveEnum {
+                schema: None,
                 enum_name: Alias::new("media_type").into_iden(),
                 values: vec![
                     "UNKNOWN",
@@ -190,6 +197,7 @@ mod tests {
     fn test_enum_extra_derives() {
         assert_eq!(
             ActiveEnum {
+                schema: None,
                 enum_name: Alias::new("media_type").into_iden(),
                 values: vec!["UNKNOWN", "BITMAP",]
                     .into_iter()
@@ -227,6 +235,7 @@ mod tests {
     fn test_enum_extra_attributes() {
         assert_eq!(
             ActiveEnum {
+                schema: None,
                 enum_name: Alias::new("coinflip_result_type").into_iden(),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
@@ -263,6 +272,7 @@ mod tests {
         );
         assert_eq!(
             ActiveEnum {
+                schema: None,
                 enum_name: Alias::new("coinflip_result_type").into_iden(),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
@@ -304,6 +314,7 @@ mod tests {
     fn test_enum_variant_utf8_encode() {
         assert_eq!(
             ActiveEnum {
+                schema: None,
                 enum_name: Alias::new("ty").into_iden(),
                 values: vec![
                     "Question",
