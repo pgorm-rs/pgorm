@@ -1,16 +1,16 @@
 schema_version 7
 
-last_sync_at 2026-09-05T14:33:16.978746Z
+last_sync_at 2026-09-06T16:36:02.710141Z
 
 rule_versions (
-    {id codegen.entity, version 0}
-    {id codegen.entity.compact, version 0}
+    {id codegen.entity, version 2}
+    {id codegen.entity.compact, version 1}
     {id codegen.entity.compact.attrs, version 1}
-    {id codegen.entity.compact.model, version 0}
-    {id codegen.entity.context, version 1}
+    {id codegen.entity.compact.model, version 1}
+    {id codegen.entity.context, version 2}
     {id codegen.entity.enums, version 1}
-    {id codegen.entity.expanded, version 0}
-    {id codegen.entity.expanded.blocks, version 0}
+    {id codegen.entity.expanded, version 1}
+    {id codegen.entity.expanded.blocks, version 1}
     {id codegen.entity.files, version 0}
     {id codegen.entity.imports, version 0}
     {id codegen.entity.keywords, version 1}
@@ -18,18 +18,17 @@ rule_versions (
     {id codegen.entity.relations, version 1}
     {id codegen.entity.relations.related, version 0}
     {id codegen.entity.relations.via, version 0}
-    {id codegen.entity.seaography, version 0}
     {id codegen.entity.serde, version 0}
     {id codegen.entity.serde.derives, version 0}
     {id codegen.entity.serde.skip, version 0}
-    {id codegen.entity.transform, version 5}
-    {id codegen.entity.transform.conjunct, version 0}
-    {id codegen.entity.transform.inverse, version 0}
+    {id codegen.entity.transform, version 7}
+    {id codegen.entity.transform.conjunct, version 1}
+    {id codegen.entity.transform.inverse, version 1}
     {id codegen.entity.types, version 2}
     {id codegen.entity.types.datetime, version 1}
     {id codegen.entity.types.unsupported, version 1}
-    {id conn.pool, version 2}
-    {id conn.pool.conn-trait, version 7}
+    {id conn.pool, version 3}
+    {id conn.pool.conn-trait, version 8}
     {id conn.pool.generic-client, version 0}
     {id conn.pool.get, version 1}
     {id conn.pool.lifecycle, version 0}
@@ -45,45 +44,44 @@ rule_versions (
     {id entity.active-model.active-value, version 1}
     {id entity.active-model.active-value.ops, version 0}
     {id entity.active-model.from-sugar, version 1}
-    {id entity.active-model.hooks, version 0}
+    {id entity.active-model.hooks, version 1}
     {id entity.active-model.into, version 1}
-    {id entity.active-model.json, version 2}
+    {id entity.active-model.json, version 3}
     {id entity.active-model.persistence, version 2}
     {id entity.active-model.save, version 1}
     {id entity.relation, version 1}
     {id entity.relation.builder, version 1}
-    {id entity.relation.def, version 4}
+    {id entity.relation.def, version 5}
     {id entity.relation.fk, version 3}
-    {id entity.relation.linked, version 2}
+    {id entity.relation.linked, version 4}
     {id entity.traits, version 1}
     {id entity.traits.active-enum, version 1}
     {id entity.traits.active-enum.limits, version 2}
-    {id entity.traits.column, version 3}
+    {id entity.traits.column, version 4}
     {id entity.traits.column-def, version 0}
     {id entity.traits.column.enum-cast, version 1}
     {id entity.traits.crud, version 3}
     {id entity.traits.entity-name, version 1}
-    {id entity.traits.from-query-result, version 3}
+    {id entity.traits.from-query-result, version 4}
     {id entity.traits.model, version 3}
     {id entity.traits.primary-key, version 2}
     {id error.model, version 6}
     {id error.model.runtime, version 3}
     {id error.model.sql-class, version 3}
-    {id exec.crud, version 0}
-    {id exec.crud.consolidate, version 0}
+    {id exec.crud, version 1}
     {id exec.crud.delete, version 1}
     {id exec.crud.exec-result, version 1}
-    {id exec.crud.insert, version 3}
+    {id exec.crud.insert, version 4}
     {id exec.crud.insert-returning, version 2}
-    {id exec.crud.select, version 2}
+    {id exec.crud.select, version 3}
     {id exec.crud.try-insert, version 3}
     {id exec.crud.update, version 5}
-    {id exec.cursor, version 2}
-    {id exec.cursor.binding, version 2}
-    {id exec.cursor.binding-coerce, version 0}
-    {id exec.cursor.binding-gaps, version 2}
-    {id exec.cursor.keyset, version 2}
-    {id exec.cursor.order, version 0}
+    {id exec.cursor, version 4}
+    {id exec.cursor.binding, version 4}
+    {id exec.cursor.binding-coerce, version 2}
+    {id exec.cursor.binding-gaps, version 3}
+    {id exec.cursor.keyset, version 3}
+    {id exec.cursor.order, version 2}
     {id exec.cursor.window, version 1}
     {id exec.decode, version 2}
     {id exec.decode.array, version 1}
@@ -92,67 +90,75 @@ rule_versions (
     {id exec.decode.many, version 0}
     {id exec.decode.many-arity, version 0}
     {id exec.decode.null, version 1}
-    {id exec.decode.null-context, version 0}
-    {id exec.decode.types, version 1}
+    {id exec.decode.null-context, version 1}
+    {id exec.decode.types, version 2}
     {id exec.decode.u32-oid, version 0}
-    {id exec.paginator, version 1}
+    {id exec.paginator, version 2}
     {id exec.paginator.count, version 0}
     {id exec.paginator.fetch, version 2}
     {id exec.paginator.iterate, version 0}
     {id exec.paginator.page-size, version 2}
-    {id exec.paginator.raw, version 2}
-    {id exec.stream, version 1}
+    {id exec.paginator.raw, version 3}
+    {id exec.stream, version 2}
     {id exec.stream.decode, version 1}
-    {id macros.derive, version 0}
+    {id macros.derive, version 1}
     {id macros.derive.active-enum, version 0}
     {id macros.derive.active-enum.expansion, version 1}
     {id macros.derive.active-model, version 2}
     {id macros.derive.column, version 2}
     {id macros.derive.entity, version 1}
-    {id macros.derive.entity-model, version 0}
-    {id macros.derive.entity-model.attrs, version 0}
+    {id macros.derive.entity-model, version 1}
+    {id macros.derive.entity-model.attrs, version 1}
     {id macros.derive.entity-model.casing, version 1}
-    {id macros.derive.entity-model.column-def, version 3}
+    {id macros.derive.entity-model.column-def, version 4}
     {id macros.derive.entity-model.primary-key, version 1}
     {id macros.derive.entity-model.reject, version 1}
     {id macros.derive.enum-def, version 0}
     {id macros.derive.enum-iter, version 0}
-    {id macros.derive.from-query-result, version 1}
+    {id macros.derive.from-query-result, version 2}
     {id macros.derive.iden, version 1}
     {id macros.derive.iden.query, version 0}
     {id macros.derive.model, version 3}
-    {id macros.derive.partial-model, version 2}
+    {id macros.derive.partial-model, version 3}
     {id macros.derive.relation, version 1}
     {id macros.derive.test-attr, version 1}
-    {id macros.derive.value-type, version 1}
+    {id macros.derive.value-type, version 2}
     {id metric.layer, version 1}
     {id metric.layer.collector, version 1}
     {id metric.layer.delegate, version 4}
     {id metric.layer.tx, version 2}
-    {id migration.name, version 2}
-    {id migration.runner, version 0}
-    {id migration.up, version 1}
+    {id migration.name, version 3}
+    {id migration.runner, version 1}
+    {id migration.up, version 2}
     {id migration.up-only, version 0}
-    {id query.build, version 0}
-    {id query.build.combine, version 2}
+    {id pipeline.select-sources, version 0}
+    {id query.build, version 1}
     {id query.build.debug-query, version 0}
     {id query.build.delete, version 2}
     {id query.build.filter, version 1}
-    {id query.build.insert, version 2}
+    {id query.build.insert, version 3}
     {id query.build.insert.empty-failsafe, version 3}
     {id query.build.insert.uniform-columns, version 3}
     {id query.build.join, version 3}
-    {id query.build.modifiers, version 6}
+    {id query.build.modifiers, version 7}
     {id query.build.query-trait, version 0}
     {id query.build.select-defaults, version 0}
     {id query.build.update, version 3}
+    {id query.graph, version 0}
+    {id query.graph.aliases, version 0}
+    {id query.graph.cursor, version 0}
+    {id query.graph.decode, version 1}
+    {id query.graph.grouped, version 1}
+    {id query.graph.slots, version 1}
+    {id query.graph.terminals, version 1}
+    {id query.graph.writer, version 1}
     {id query.loader, version 1}
     {id query.loader.batching, version 3}
-    {id query.loader.many-to-many, version 2}
+    {id query.loader.many-to-many, version 3}
     {id query.loader.regroup, version 3}
     {id query.loader.table-ref-limitation, version 3}
     {id schema.from-entity, version 2}
-    {id schema.from-entity.enum, version 2}
+    {id schema.from-entity.enum, version 3}
     {id schema.from-entity.index, version 1}
     {id sql.ast, version 0}
     {id sql.ast.build, version 1}
@@ -161,7 +167,7 @@ rule_versions (
     {id sql.ast.condition.flattening, version 0}
     {id sql.ast.condition.holder, version 2}
     {id sql.ast.delete, version 2}
-    {id sql.ast.expr, version 0}
+    {id sql.ast.expr, version 1}
     {id sql.ast.expr.in, version 1}
     {id sql.ast.expr.operators, version 1}
     {id sql.ast.func, version 0}
@@ -197,13 +203,13 @@ rule_versions (
     {id sql.render.cast-param-type, version 0}
     {id sql.render.condition-chain, version 1}
     {id sql.render.cte, version 2}
-    {id sql.render.custom-expr, version 0}
+    {id sql.render.custom-expr, version 1}
     {id sql.render.ddl.enum-type, version 1}
     {id sql.render.ddl.extension, version 1}
     {id sql.render.ddl.types, version 3}
     {id sql.render.empty-in, version 1}
     {id sql.render.ident-quoting, version 0}
-    {id sql.render.inject, version 1}
+    {id sql.render.inject, version 2}
     {id sql.render.insert, version 0}
     {id sql.render.joins, version 2}
     {id sql.render.locking, version 0}
@@ -229,22 +235,25 @@ rule_versions (
     {id sql.token.space, version 0}
     {id sql.token.unquote, version 0}
     {id sql.token.word, version 0}
-    {id sql.types, version 4}
+    {id sql.types, version 5}
     {id sql.types.column-ref, version 0}
     {id sql.types.column-type, version 3}
     {id sql.types.opers, version 2}
     {id sql.types.table-ref, version 2}
-    {id sql.value, version 1}
+    {id sql.value, version 2}
     {id sql.value.accessor-panics, version 2}
     {id sql.value.array, version 4}
     {id sql.value.conversions, version 1}
     {id sql.value.render, version 0}
-    {id sql.value.to-json, version 0}
     {id sql.value.tuple, version 2}
     {id sql.value.value-type, version 3}
 )
 
 derived_priorities (
+    {id active-model-after-hook-atomicity, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id active-model-json-column-names, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id active-model-json-error-atomicity, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id big-unsigned-binding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id bug.char-render, priority 1, derived_at 2026-09-02T14:40:48.714779Z}
     {id bug.crate-metadata, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id bug.empty-not-in, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
@@ -256,6 +265,18 @@ derived_priorities (
     {id bug.relation-pairing, priority 2, derived_at 2026-09-02T14:40:48.714779Z}
     {id bug.test-harness, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id bug.window-position, priority 2, derived_at 2026-09-02T14:40:48.714779Z}
+    {id codegen-identity-collisions, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id codegen-junction-detection, priority 3, derived_at 2026-09-06T16:36:02.710141Z}
+    {id codegen-relation-cardinality, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id codegen-relation-integrity, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id codegen-schema-qualifiers, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id connect-manager-options, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id connect-tls, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id core, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id cursor, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id cursor-joined-boundary, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id cursor-reuse, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id custom-expr-arity, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id decide.schema-comments, priority 1, derived_at 2026-09-02T14:40:48.714779Z}
     {id decide.statement, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id decide.turso, priority 0, derived_at 2026-09-02T00:45:23.577997Z}
@@ -277,6 +298,8 @@ derived_priorities (
     {id ergo.pipeline-v1, priority 2, derived_at 2026-09-04T14:19:01.307427Z}
     {id ergo.prql-macro, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id ergo.with-carry, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
+    {id from-json-serialization, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id grouped, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id infra.prepared-api, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id infra.schema-index-qualify, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id infra.sql-err, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
@@ -290,6 +313,23 @@ derived_priorities (
     {id infra.tx.metric-tx, priority 1, derived_at 2026-09-01T22:48:19.179922Z}
     {id infra.tx.rollback, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
     {id infra.tx.tests, priority 2, derived_at 2026-09-01T22:48:19.179922Z}
+    {id insert-returning-manual-pk, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id joined-row-decode-errors, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id linked-fold, priority 3, derived_at 2026-09-06T16:36:02.710141Z}
+    {id loader, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-dependency-renames, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-from-query-result-skip, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-model-type-inference, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-partial-model-attrs, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-sea-attr-name, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id macro-unknown-attrs, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-checksums, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-ledger-module-name, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-ledger-table-name, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-name-uniqueness, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-run-lock, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id migration-test-database-gate, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id minimal-feature-build, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id nopanic.codegen-gate, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id nopanic.connect-builders, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id nopanic.delete-one, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
@@ -303,10 +343,14 @@ derived_priorities (
     {id orm.binding-types, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
     {id orm.try-insert-conflicted, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id orm.value-decode, priority 0, derived_at 2026-09-01T22:48:19.179922Z}
+    {id pair-deletion, priority 3, derived_at 2026-09-06T16:36:02.710141Z}
+    {id parameter-wire-types, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
     {id pgparse.codegen-ddl, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id pgparse.fingerprint, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id pgparse.oracle, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id pgparse.sql-macro, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
+    {id pipeline-sources, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id pipeline-unused-parameters, priority 3, derived_at 2026-09-06T16:36:02.710141Z}
     {id polish.bare-gates, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id polish.conn-acquire, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id polish.deps-latest, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
@@ -320,8 +364,22 @@ derived_priorities (
     {id polish.sea-bae, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id polish.version-unify, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id polish.warnings, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
+    {id pool-config-forwarding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id pool-config-secret-debug, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id raw-pagination-placeholder-lexing, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id repair.doctests, priority 2, derived_at 2026-09-01T22:48:19.179922Z}
+    {id schema-enum-arrays, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id schema-enum-dedup, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id sea-config-residue, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id sea-orm-active-enums-name, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
+    {id sea-rc-name, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id seaography-feature-build, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id seaquery-doc-branding, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id selecttwo, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id spec, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id sql-value-json, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id sql.empty-select-list, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
+    {id transaction-stale-plan-recovery, priority 1, derived_at 2026-09-06T16:36:02.710141Z}
     {id unrep.build-any, priority 3, derived_at 2026-09-02T14:40:48.714779Z}
     {id unrep.condition-chain, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id unrep.cte-builders, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
@@ -340,6 +398,7 @@ derived_priorities (
     {id unrep.select-only, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id unrep.tableref-split, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
     {id unrep.transaction-mode, priority 0, derived_at 2026-09-02T14:40:48.714779Z}
+    {id value-float-eq-hash, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id verify.codegen, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id verify.conn, priority 1, derived_at 2026-09-02T10:37:35.415375Z}
     {id verify.entity, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
