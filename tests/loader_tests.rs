@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::alias;
-use pgorm::pgorm_query::Expr;
+use pgorm::pgorm_query::{ConditionType, Expr, IntoCondition};
 use pgorm::{DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*, set};
 
 // [spec:pgorm:req:query.loader+1/test]    `load_one` over a `Vec<M>`, taking a
@@ -56,7 +56,7 @@ async fn loader_load_one() -> Result<(), Error> {
 // [spec:pgorm:req:query.loader+1/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
-// [spec:pgorm:sem:query.loader.regroup+3/test]    a bucket per input key in
+// [spec:pgorm:sem:query.loader.regroup+4/test]    a bucket per input key in
 // result order, an empty `Vec` for an input nothing matched, and a clone of
 // the same model for two inputs sharing a key
 #[pgorm_macros::test]
@@ -377,8 +377,8 @@ impl Related<ledger::Entity> for baker::Entity {
 
 // A second fixture whose key column is blank-padded `char(3)`: a key matches in
 // SQL, because `bpchar` comparison ignores trailing blanks, but reads back
-// padded, so the returned row's key is not equal to the input key it was
-// fetched for.
+// padded, so an input model spelling that key unpadded is not equal to the row
+// it was fetched for.
 mod padded {
     use pgorm::entity::prelude::*;
 
@@ -405,6 +405,82 @@ impl Related<padded::Entity> for bakery::Entity {
             .into();
         def.rel_type = RelationType::HasMany;
         def
+    }
+}
+
+/// The same pairing walked the other way, so the padded column is the one the
+/// input models are keyed by.
+impl Related<bakery::Entity> for padded::Entity {
+    fn to() -> RelationDef {
+        let mut def: RelationDef = padded::Entity::belongs_to(bakery::Entity)
+            .columns(padded::Column::Code, bakery::Column::Name)
+            .into();
+        def.rel_type = RelationType::HasMany;
+        def
+    }
+}
+
+// A fixture whose relations carry a predicate of their own: `visible` is what
+// an authored `on_condition` narrows on, so a load that dropped the relation's
+// predicate would hand back the hidden row.
+mod tagged {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "tagged")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub owner_id: i32,
+        pub visible: bool,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The predicate an authored relation adds to its key equality. It qualifies
+/// from the identifier it is handed, so it survives the loader's aliasing.
+fn only_visible(_left: DynIden, right: DynIden) -> Condition {
+    Expr::col((right, tagged::Column::Visible))
+        .eq(true)
+        .into_condition()
+}
+
+/// `HasMany` narrowed by the relation's own predicate.
+impl Related<tagged::Entity> for bakery::Entity {
+    fn to() -> RelationDef {
+        let mut def: RelationDef = bakery::Entity::belongs_to(tagged::Entity)
+            .columns(bakery::Column::Id, tagged::Column::OwnerId)
+            .into();
+        def.rel_type = RelationType::HasMany;
+        def.on_condition(only_visible)
+    }
+}
+
+/// A self-referencing `HasOne` — target and input are one table — resolving
+/// each row's owner, and only while that owner is visible.
+impl Related<tagged::Entity> for tagged::Entity {
+    fn to() -> RelationDef {
+        let def: RelationDef = tagged::Entity::belongs_to(tagged::Entity)
+            .columns(tagged::Column::OwnerId, tagged::Column::Id)
+            .into();
+        def.on_condition(only_visible)
+    }
+}
+
+/// The same predicate composed with `Any`, so a row satisfying it belongs to
+/// every input rather than only to the one its key names.
+impl Related<tagged::Entity> for customer::Entity {
+    fn to() -> RelationDef {
+        let mut def: RelationDef = customer::Entity::belongs_to(tagged::Entity)
+            .columns(customer::Column::Id, tagged::Column::OwnerId)
+            .condition_type(ConditionType::Any)
+            .into();
+        def.rel_type = RelationType::HasMany;
+        def.on_condition(only_visible)
     }
 }
 
@@ -446,6 +522,37 @@ where
 {
     let stmt = Schema::new().create_table_from_entity(padded::Entity);
     create_table_without_asserts(db, &stmt).await
+}
+
+async fn create_tagged_table<C>(db: &C) -> Result<u64, Error>
+where
+    C: ConnectionTrait,
+{
+    let stmt = Schema::new().create_table_from_entity(tagged::Entity);
+    create_table_without_asserts(db, &stmt).await
+}
+
+async fn insert_tagged(
+    db: &DatabaseConnection,
+    owner_id: i32,
+    visible: bool,
+) -> Result<tagged::Model, Error> {
+    tagged::ActiveModel {
+        owner_id: set(owner_id),
+        visible: set(visible),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+}
+
+async fn insert_customer(db: &DatabaseConnection, name: &str) -> Result<customer::Model, Error> {
+    customer::ActiveModel {
+        name: set(name),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
 }
 
 async fn insert_ledger(
@@ -555,15 +662,15 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+4/test]    keys are collected in input
-// order and become a single IN predicate on the relation's to side: a
-// composite key renders as a tuple `IN` list through `in_tuples` (the unary
-// `col IN (..)` form is what every other loader test here exercises). The
-// predicate is AND-ed onto the caller's `Select`, so a user filter composes
-// with it. The rule's note that duplicate keys are repeated rather than
-// deduplicated concerns the emitted SQL text, which is not observable through
-// this API.
-// [spec:pgorm:sem:query.loader.regroup+3/test]    two inputs sharing a key each
+// [spec:pgorm:sem:query.loader.batching+5/test]    keys are collected in input
+// order and become a single IN predicate on the relation's from side, over a
+// relation that is also self-referencing: a composite key renders as a tuple
+// `IN` list through `in_tuples` (the unary `col IN (..)` form is what every
+// other loader test here exercises). The predicate is AND-ed onto the caller's
+// `Select`, so a user filter composes with it. The rule's note that duplicate
+// keys are repeated rather than deduplicated concerns the emitted SQL text,
+// which is not observable through this API.
+// [spec:pgorm:sem:query.loader.regroup+4/test]    two inputs sharing a key each
 // receive their own clone of that key's bucket
 #[pgorm_macros::test]
 async fn loader_batches_composite_keys_as_tuples() -> Result<(), Error> {
@@ -631,12 +738,12 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+3/test]    `load_one` indexes the returned
-// rows into a map keyed on the relation's to side in result order, so when a relation
-// declared `HasOne` matches several rows for one key the last row wins, an
+// [spec:pgorm:sem:query.loader.regroup+4/test]    `load_one` yields the last
+// element of its key's bucket, so when a relation declared `HasOne` matches
+// several rows for one key the last row of the caller's ordering wins, an
 // unmatched input gets `None`, and inputs sharing a key each get a clone
 // [spec:pgorm:req:query.loader.table-ref-limitation+3/test]    the supported
-// `TableName::SchemaTable` target: its key column is qualified and the load runs
+// `TableName::SchemaTable` target: it names the root and the load runs
 #[pgorm_macros::test]
 async fn loader_load_one_keeps_the_last_row() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_last_row_wins").await;
@@ -703,7 +810,7 @@ async fn loader_errors_on_aliased_from_item() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+4/test]    a relation naming a column
+// [spec:pgorm:sem:query.loader.batching+5/test]    a relation naming a column
 // its source model does not have is reported as an `Err` naming that column and
 // the model's table, not a panic
 #[pgorm_macros::test]
@@ -732,9 +839,42 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+3/test]    a returned row whose key is
-// absent from the seeded map — here because `char(3)` pads it back out — is an
-// `Err` naming the unmatched key, a sample input key and both column lists,
+// [spec:pgorm:sem:query.loader.regroup+4/test]    the key is read back from the
+// input entity's own row rather than re-derived from the target, so a target
+// whose `char(3)` column pads the key back out regroups instead of aborting
+#[pgorm_macros::test]
+async fn loader_regroups_across_a_padded_target() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_padded_target").await;
+    create_tables(&ctx.db).await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
+    create_padded_table(db).await?;
+
+    let bakery_1 = insert_bakery(db, "ab").await?;
+    let stored = padded::ActiveModel {
+        code: set("ab"),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    assert_eq!(stored.code, "ab ");
+
+    let bakeries = vec![bakery_1];
+    assert_eq!(
+        bakeries.load_many(padded::Entity, db).await?,
+        [vec![stored]]
+    );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.regroup+4/test]    a returned row whose key is
+// absent from the seeded buckets — here an input model spelling a `char(3)` key
+// the way the caller wrote it rather than the way the column stores it — is an
+// `Err` naming the unmatched key, a sample input key and the key's column list,
 // rather than a panic
 #[pgorm_macros::test]
 async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
@@ -744,8 +884,8 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
     let db = &conn;
     create_padded_table(db).await?;
 
-    let bakery_1 = insert_bakery(db, "ab").await?;
-    padded::ActiveModel {
+    insert_bakery(db, "ab").await?;
+    let stored = padded::ActiveModel {
         code: set("ab"),
         ..Default::default()
     }
@@ -754,19 +894,150 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
 
     // The row really is reachable through the key predicate; it is only the
     // regrouping that cannot match it back.
-    let bakeries = vec![bakery_1];
+    let inputs = vec![padded::Model {
+        id: stored.id,
+        code: "ab".to_owned(),
+    }];
     let message = internal_message(
-        bakeries.load_many(padded::Entity, db).await,
-        "a padded key must abort the regrouping",
+        inputs.load_many(bakery::Entity, db).await,
+        "an unpadded input key must abort the regrouping",
     );
     assert!(
         message.starts_with(
             "Loader cannot regroup a returned row: the key ValueTuple([String(Some(\"ab \"))]) \
-             read from `code` equals none of the keys read from `name` (an input key reads as \
-             ValueTuple([String(Some(\"ab\"))]))."
+             read back from `code` equals none of the keys read from the input models (an input \
+             key reads as ValueTuple([String(Some(\"ab\"))]))."
         ),
         "{message}"
     );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.batching+5/test]    the relation reaches SQL
+// whole: a `HasMany` narrowed by its own `on_condition` loads exactly what the
+// equivalent graph read returns, the excluded row included in neither, and a
+// caller filter still composes onto the same statement
+#[pgorm_macros::test]
+async fn loader_load_many_applies_relation_predicate() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_load_many_predicate").await;
+    create_tables(&ctx.db).await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
+    create_tagged_table(db).await?;
+
+    let bakery_1 = insert_bakery(db, "SeaSide Bakery").await?;
+    let bakery_2 = insert_bakery(db, "Offshore Bakery").await?;
+    let shown_1 = insert_tagged(db, bakery_1.id, true).await?;
+    let shown_2 = insert_tagged(db, bakery_1.id, true).await?;
+    let hidden = insert_tagged(db, bakery_1.id, false).await?;
+
+    let bakeries = vec![bakery_1.clone(), bakery_2.clone()];
+    let loaded = bakeries.load_many(tagged::Entity, db).await?;
+    let joined = bakery::Entity::graph()
+        .related_maybe::<tagged::Entity>()
+        .all_grouped(db)
+        .await?;
+
+    assert_eq!(loaded, [vec![shown_1.clone(), shown_2.clone()], vec![]]);
+    assert_eq!(
+        joined,
+        [
+            (bakery_1, vec![shown_1, shown_2.clone()]),
+            (bakery_2, vec![])
+        ]
+    );
+    assert!(!loaded.concat().contains(&hidden));
+
+    let filtered = bakeries
+        .load_many(
+            tagged::Entity::find().filter(tagged::Column::Id.eq(shown_2.id)),
+            db,
+        )
+        .await?;
+    assert_eq!(filtered, [vec![shown_2], vec![]]);
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.batching+5/test]    a self-referencing `HasOne`
+// — the input entity joined back under the loader's alias against its own
+// table — resolves to what the equivalent aliased graph read resolves to, the
+// relation's predicate excluding the same rows in both
+#[pgorm_macros::test]
+async fn loader_load_one_applies_relation_predicate() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_load_one_predicate").await;
+    create_tables(&ctx.db).await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
+    create_tagged_table(db).await?;
+
+    let visible_owner = insert_tagged(db, 0, true).await?;
+    let hidden_owner = insert_tagged(db, 0, false).await?;
+    insert_tagged(db, visible_owner.id, true).await?;
+    insert_tagged(db, hidden_owner.id, true).await?;
+
+    let rows = tagged::Entity::find()
+        .order_by_asc(tagged::Column::Id)
+        .all(db)
+        .await?;
+    let owners = rows.load_one(tagged::Entity, db).await?;
+    let joined = tagged::Entity::graph()
+        .join_maybe_as::<tagged::Entity>(
+            <tagged::Entity as Related<tagged::Entity>>::to(),
+            alias("owner"),
+        )
+        .order_by_asc(tagged::Column::Id)
+        .all(db)
+        .await?;
+
+    assert_eq!(owners, [None, None, Some(visible_owner), None]);
+    assert_eq!(
+        owners,
+        joined
+            .into_iter()
+            .map(|(_, owner)| owner)
+            .collect::<Vec<_>>()
+    );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.regroup+4/test]    under an `Any` composition a
+// target satisfying the relation's predicate belongs to every input, not only
+// to the one its key names — which is why the bucket is keyed on the input row
+// the read carries back rather than on the target's own columns
+#[pgorm_macros::test]
+async fn loader_any_composition_shares_a_target() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_any_composition").await;
+    create_tables(&ctx.db).await?;
+    let conn = ctx.db.get().await?;
+    let db = &conn;
+    create_tagged_table(db).await?;
+
+    let customer_1 = insert_customer(db, "Alice").await?;
+    let customer_2 = insert_customer(db, "Bob").await?;
+    let shown = insert_tagged(db, customer_1.id, true).await?;
+    let hidden = insert_tagged(db, customer_2.id, false).await?;
+
+    let customers = vec![customer_1, customer_2];
+    let mut loaded = customers.load_many(tagged::Entity, db).await?;
+    for bucket in &mut loaded {
+        bucket.sort_by_key(|row| row.id);
+    }
+
+    // The visible row matches both inputs; the hidden one only the input its
+    // key names.
+    assert_eq!(loaded, [vec![shown.clone()], vec![shown, hidden]]);
 
     drop(conn);
     ctx.delete().await;

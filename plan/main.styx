@@ -4142,6 +4142,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 2, severity P1. Sources: src/query/loader.rs:145-155 and 194-204. Both load_one and load_many build only membership against relation key columns, omitting on_condition and condition_type. Reproduction (loader_preserves_relation_predicate): parent id 1; children (10,1,'same',true), (11,1,'same',true), (12,1,'hidden',false); Related::to applies on_condition requiring the child's visible column to equal true. Entity::graph().related_maybe::<child::Entity>().all returns two children; vec![parent].load_many(child::Entity, &db) returns all three, including the excluded row. Acceptance: direct loaders evaluate the complete authored relation, including predicates using either side and All/Any composition, while preserving caller filters, positional grouping, duplicate input handling and empty-input behavior; a predicate that cannot be represented must not be silently dropped. Test load_one and load_many against equivalent graph reads with aliased/self-referencing relations as supported. Spec impact: revise query.loader.batching+4's membership-only construction and reconcile query.loader.regroup+3 and query.loader+1; query.loader.many-to-many+3 already provides the graph-based precedent. Depends on completed graph loader work so its existing relation-preserving path can be reused."
                     }
+
+                    {
+                        at 2026-09-07T13:09:39.175938Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

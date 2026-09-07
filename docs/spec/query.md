@@ -510,7 +510,29 @@ what makes it total over partially-set models.
 > `via` junction or if the target relation is not `HasOne`. An empty input
 > slice short-circuits to an empty result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+4]
+> [spec:pgorm:sem:query.loader.batching+5]
+> Every loader operation issues one graph read (`[spec:pgorm:def:query.graph]`),
+> built the same way: the caller's target selector is re-rooted as the graph and
+> the input entity's own table is joined back as the single `Req` slot
+> (`[spec:pgorm:sem:query.graph.slots+1]`) under an internal alias, walking the
+> relation backwards because the root is the target rather than the input. The
+> relation therefore reaches SQL through the graph's one edge walker and the
+> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+3]`), whole: its
+> column pairs, its authored `on_condition` — receiving its two identifiers in
+> the roles it was written with, the loader re-swapping them when it reverses a
+> def — and its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
+> part of a relation as a predicate of its own, which is what makes dropping a
+> part of one unrepresentable rather than merely unintended.
+>
+> An `on_condition` may name either side, so the aliasing hazard of
+> `[spec:pgorm:req:query.graph.aliases]` reaches the input side: a predicate that
+> hard-qualifies the input entity's table instead of using the identifier it is
+> handed names a table the read does not have. The target side keeps its own
+> name, being the root, which is why a relation whose target is anything but an
+> unaliased table cannot be read at all: it is refused up front with the error of
+> [spec:pgorm:req:query.loader.table-ref-limitation+3] rather than rendering SQL
+> that names a table the statement does not select from.
+>
 > Keys are collected in input order: for each input model, `extract_key` walks
 > the from side of the relation's `columns`, projected as an `Identity`
 > (`[spec:pgorm:def:entity.relation.def+6]`), into one `ValueTuple` — one walk
@@ -520,36 +542,54 @@ what makes it total over partially-set models.
 > return `Err(Error::Query)` naming the unresolved column and the model's
 > table rather than panicking, and the load aborts with that error. The
 > batch filter built by `prepare_condition` is a single IN predicate against
-> the to side of the relation's `columns` on `to_tbl`: a unary key becomes
+> the from side of the relation's `columns`, qualified against the alias the
+> input entity is joined back under: a unary key becomes
 > `col IN (v1, v2, ...)` over the flattened values; composite keys become a
 > tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`;
-> `prepare_condition` is likewise fallible, propagating the qualification
-> error of [spec:pgorm:req:query.loader.table-ref-limitation+3].
+> `prepare_condition` is likewise fallible, propagating the same qualification
+> error.
 >
 > Keys are not deduplicated: duplicate key values across input models are
 > repeated verbatim in the IN list (the dedup is an acknowledged TODO in
 > `prepare_condition`; current behaviour sends the duplicates). The condition
-> is AND-ed onto the caller-supplied `Select` via `QueryFilter::filter`, so
-> user filters and the key predicate compose.
-
-> [spec:pgorm:sem:query.loader.regroup+3]
-> Results are regrouped to input order by hashing on the to-side key extracted
-> from each returned row. `load_one` builds a `HashMap<ValueTuple, Model>`
-> — if several returned rows share a key, the last row wins — and yields, per
-> input key, `Some(model.clone())` or `None`; inputs sharing a key each
-> receive a clone of the same model. `load_many` seeds the map with an empty
-> `Vec` per input key, pushes each returned row onto its key's bucket in
-> result order, and yields a clone of the bucket per input key — so inputs
-> sharing a key receive duplicated vectors, and unmatched inputs receive an
-> empty `Vec`.
+> is AND-ed onto the re-rooted selector via `QueryFilter::filter`, so
+> user filters and the key predicate compose, and everything else the caller put
+> on the statement — its FROM, its ordering, its limit — survives the re-rooting
+> unchanged.
 >
-> A returned row whose key is absent from the seeded map means the relation's
-> two sides matched in SQL but not as Rust values — differing integer widths,
-> `char(n)` blank padding, a case-insensitive collation. `load_many` MUST
-> report that as `Err(Error::Query)` rather than panicking, and the message
-> MUST carry the unmatched key and a sample input key in `Debug` form (so both
-> value types are named) together with both sides' column lists, making the
-> asymmetry diagnosable from the error alone.
+> The price of reading the relation instead of approximating it is the join's
+> multiplicity: a target is returned once per input-entity row whose key matches
+> it, so a relation whose from side is not unique in the input entity's table
+> repeats that target within the key's bucket. It is the price
+> `[spec:pgorm:sem:query.loader.many-to-many+3]` already pays, for the same
+> reason.
+
+> [spec:pgorm:sem:query.loader.regroup+4]
+> Results are regrouped to input order by hashing on the from-side key extracted
+> from the input model each returned row carries back beside its target, not on
+> a key re-derived from the target. Reading the key off the side the input came
+> from is what lets the loader honour a relation that files one target under
+> several keys — an `Any` composition, an `on_condition` that is not an equality
+> — since under such a relation the target's own columns no longer say which
+> input it belongs to. Every operation seeds a bucket per input key, pushes each
+> returned target onto its key's bucket in result order, and yields a clone of
+> the bucket per input key, so inputs sharing a key each receive the same list
+> and unmatched inputs receive an empty `Vec`. `load_many` and `load_many_via`
+> yield the bucket; `load_one` yields its last element, so where several rows
+> land under one key the last row wins, and `None` where the bucket is empty.
+>
+> Because the targets are read by one query rather than reassembled from a key
+> map, an `order_by` on the caller's `Select` orders every bucket. Without one
+> the order within a bucket is the join's, hence unspecified — and so, therefore,
+> is which row `load_one` calls the last.
+>
+> A returned row whose key is absent from the seeded buckets means the stored
+> input row and the input model matched in SQL but not as Rust values —
+> differing integer widths, `char(n)` blank padding, a case-insensitive
+> collation. Every loader operation MUST report that as `Err(Error::Query)`
+> rather than panicking, and the message MUST carry the unmatched key and a
+> sample input key in `Debug` form (so both value types are named) together with
+> the key's column list, making the asymmetry diagnosable from the error alone.
 
 > [spec:pgorm:sem:query.loader.many-to-many+3]
 > `load_many_via` issues one query, and that query is a graph read
@@ -593,7 +633,7 @@ what makes it total over partially-set models.
 > absent from the join and so is dropped from the list, and a shared target is
 > cloned into every referencing input. A returned key absent from the seeded
 > buckets is reported as `Err(Error::Query)` on the same terms as
-> `[spec:pgorm:sem:query.loader.regroup+3]`.
+> `[spec:pgorm:sem:query.loader.regroup+4]`.
 >
 > Because the targets are read by one query rather than reassembled from a
 > key map, an `order_by` on the caller's `Select` orders every bucket. Without

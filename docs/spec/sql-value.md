@@ -67,7 +67,7 @@ including panic semantics and quirks inherited from sea-query.
 >
 > The divergence is observable where a `Value` is a map key over live column
 > data — `LoaderTrait`'s `HashMap<ValueTuple, _>`
-> (`[spec:pgorm:sem:query.loader.regroup+3]`) — because the server and the map
+> (`[spec:pgorm:sem:query.loader.regroup+4]`) — because the server and the map
 > then disagree about `-0.0`: a row PostgreSQL matched on `a.k = b.k` can fail
 > to find its bucket, surfacing as the unmatched-key error rather than as a
 > wrong answer. A float is a poor relation key for that reason, and this rule
@@ -185,7 +185,7 @@ including panic semantics and quirks inherited from sea-query.
 > spelling, which is what makes the derived `PartialEq`, `Eq` and `Hash` lawful
 > by construction: a key built from a Rust pair and one gathered from an
 > iterator of the same two values ARE equal and hash alike, so a
-> `HashMap<ValueTuple, _>` (`[spec:pgorm:sem:query.loader.regroup+3]`) cannot
+> `HashMap<ValueTuple, _>` (`[spec:pgorm:sem:query.loader.regroup+4]`) cannot
 > split one logical key across two buckets. Under an arity-tagged
 > representation that agreement rested on every producer picking the same tag;
 > here the divergent spelling cannot be constructed.

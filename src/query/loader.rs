@@ -120,7 +120,8 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.regroup+3]
+    // [spec:pgorm:sem:query.loader.batching+5]
+    // [spec:pgorm:sem:query.loader.regroup+4]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -142,33 +143,15 @@ where
             return Ok(Vec::new());
         }
 
-        let from_col = rel_def.columns.from_identity();
-        let to_col = rel_def.columns.to_identity();
-
-        let keys: Vec<ValueTuple> = self
-            .iter()
-            .map(|model: &M| extract_key(&from_col, model))
-            .collect::<Result<_, Error>>()?;
-
-        let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
-
-        let stmt = <Select<R> as QueryFilter>::filter(stmt.into_select(), condition);
-
-        let data = stmt.all(db).await?;
-
-        let mut hashmap: HashMap<ValueTuple, <R as EntityTrait>::Model> = HashMap::new();
-        for value in data {
-            let key = extract_key(&to_col, &value)?;
-            hashmap.insert(key, value);
-        }
-
-        let result: Vec<Option<<R as EntityTrait>::Model>> =
-            keys.iter().map(|key| hashmap.get(key).cloned()).collect();
-
-        Ok(result)
+        Ok(load_related(self, stmt.into_select(), rel_def, db)
+            .await?
+            .into_iter()
+            .map(|bucket| bucket.into_iter().next_back())
+            .collect())
     }
 
-    // [spec:pgorm:sem:query.loader.regroup+3]
+    // [spec:pgorm:sem:query.loader.batching+5]
+    // [spec:pgorm:sem:query.loader.regroup+4]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -191,43 +174,7 @@ where
             return Ok(Vec::new());
         }
 
-        let from_col = rel_def.columns.from_identity();
-        let to_col = rel_def.columns.to_identity();
-
-        let keys: Vec<ValueTuple> = self
-            .iter()
-            .map(|model: &M| extract_key(&from_col, model))
-            .collect::<Result<_, Error>>()?;
-
-        let condition = prepare_condition(&rel_def.to_tbl, &to_col, &keys)?;
-
-        let stmt = <Select<R> as QueryFilter>::filter(stmt.into_select(), condition);
-
-        let data = stmt.all(db).await?;
-
-        let mut hashmap: HashMap<ValueTuple, Vec<<R as EntityTrait>::Model>> =
-            keys.iter()
-                .fold(HashMap::new(), |mut acc, key: &ValueTuple| {
-                    acc.insert(key.clone(), Vec::new());
-                    acc
-                });
-
-        for value in data {
-            let key = extract_key(&to_col, &value)?;
-
-            let vec = hashmap
-                .get_mut(&key)
-                .ok_or_else(|| unmatched_key_err(&key, &keys, &from_col, &to_col))?;
-
-            vec.push(value);
-        }
-
-        let result: Vec<Vec<R::Model>> = keys
-            .iter()
-            .map(|key: &ValueTuple| hashmap.get(key).cloned().unwrap_or_default())
-            .collect();
-
-        Ok(result)
+        load_related(self, stmt.into_select(), rel_def, db).await
     }
 
     // [spec:pgorm:sem:query.loader.many-to-many+3]
@@ -263,70 +210,120 @@ where
             .map(|model: &M| extract_key(&via_from_col, model))
             .collect::<Result<_, Error>>()?;
 
-        // The source table is joined back in under an alias, so a
-        // self-referencing many-to-many does not name one table twice, and the
-        // key predicate qualifies against the alias rather than the table.
-        let src_alias: DynIden = SharedIden::new(LOADER_SOURCE_ALIAS);
-        let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
-        let condition = prepare_condition(&src_tbl, &via_from_col, &keys)?;
-
         // One graph read: the caller's target selector is the root, the
         // junction is a hop nobody decodes, and the input entity is the one
         // required slot, which is what carries the key back out of the join.
         // The hop joins LEFT and the slot INNER, which is INNER end to end:
         // the slot's ON references the junction's columns, and NULLs do not
         // satisfy it.
-        let graph = many_to_many_graph::<R, <M as ModelTrait>::Entity>(
-            stmt.into_select(),
-            rel_def,
+        let graph = join_source::<R, <M as ModelTrait>::Entity>(
+            root_graph::<R>(stmt.into_select()).via(rev(rel_def)),
             via_rel,
-            SharedIden::clone(&src_alias),
         );
-        let graph = QueryFilter::filter(graph, condition);
 
-        let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
-            .iter()
-            .map(|key: &ValueTuple| (key.clone(), Vec::new()))
-            .collect();
-
-        for (target, source) in graph.all(db).await? {
-            let key = extract_key(&via_from_col, &source)?;
-            let bucket = buckets
-                .get_mut(&key)
-                .ok_or_else(|| unmatched_key_err(&key, &keys, &via_from_col, &via_from_col))?;
-            bucket.push(target);
-        }
-
-        Ok(keys
-            .iter()
-            .map(|key: &ValueTuple| buckets.get(key).cloned().unwrap_or_default())
-            .collect())
+        collect_buckets(graph, keys, &via_from_col, db).await
     }
 }
 
-/// The alias the input entity's table is joined back under by
-/// [`LoaderTrait::load_many_via`]. Internal: it is never handed to a caller,
-/// who filters against the target entity by its own name.
+/// The alias the input entity's table is joined back under by every loader
+/// operation. Internal: it is never handed to a caller, who filters against
+/// the target entity by its own name.
 const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
 
-/// The one graph read [`LoaderTrait::load_many_via`] issues: the caller's
-/// target selector rooted as the graph, the junction joined as a `via` hop
-/// nobody decodes, and the input entity `F` joined back under `src_alias` as
-/// the single required slot the key is read from.
-// [spec:pgorm:sem:query.loader.many-to-many+3]
-fn many_to_many_graph<R, F>(
-    select: Select<R>,
-    rel_def: RelationDef,
-    via_rel: RelationDef,
-    src_alias: DynIden,
-) -> SelectGraph<R, (Req<F>,)>
+/// The identifier the input entity's table is bound to inside a loader read.
+// [spec:pgorm:sem:query.loader.batching+5]
+fn source_alias() -> DynIden {
+    SharedIden::new(LOADER_SOURCE_ALIAS)
+}
+
+/// The read every loader operation issues, minus its terminal: the caller's
+/// target selector re-rooted as a graph, and the input entity `F` joined back
+/// under [`LOADER_SOURCE_ALIAS`] as the single required slot the key is read
+/// from.
+///
+/// The join is written by the graph's one edge walker, so the relation arrives
+/// whole — its column pairs, its `on_condition` and its `condition_type`
+/// composed by the same `join_condition` every other join goes through. The
+/// loader reconstructs no part of a relation and so can drop no part of one.
+// [spec:pgorm:sem:query.loader.batching+5]
+fn join_source<R, F>(graph: SelectGraph<R, ()>, rel: RelationDef) -> SelectGraph<R, (Req<F>,)>
 where
     R: EntityTrait,
     F: EntityTrait,
 {
-    root_graph::<R>(select)
-        .via(rev(rel_def))
-        .join_one_as::<F>(rev(via_rel), src_alias)
+    graph.join_one_as::<F>(rev(rel), source_alias())
+}
+
+/// Run a loader's graph read under the batch key predicate and hand back, per
+/// input key in input order, the target models the read attributed to it.
+///
+/// Each row carries the input entity's own row beside its target, so the key a
+/// target is filed under is read back from the source side rather than
+/// re-derived from the target — which is what lets a relation whose
+/// `condition_type` is `Any` file one target under several keys.
+// [spec:pgorm:sem:query.loader.regroup+4]
+async fn collect_buckets<R, F, C>(
+    graph: SelectGraph<R, (Req<F>,)>,
+    keys: Vec<ValueTuple>,
+    from_col: &Identity,
+    db: &C,
+) -> Result<Vec<Vec<R::Model>>, Error>
+where
+    C: ConnectionTrait,
+    R: EntityTrait,
+    R::Model: Send + Sync,
+    F: EntityTrait,
+{
+    let src_tbl = FromItem::from(TableName::Table(source_alias()));
+    let condition = prepare_condition(&src_tbl, from_col, &keys)?;
+    let graph = QueryFilter::filter(graph, condition);
+
+    let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
+        .iter()
+        .map(|key: &ValueTuple| (key.clone(), Vec::new()))
+        .collect();
+
+    for (target, source) in graph.all(db).await? {
+        let key = extract_key(from_col, &source)?;
+        let bucket = buckets
+            .get_mut(&key)
+            .ok_or_else(|| unmatched_key_err(&key, &keys, from_col))?;
+        bucket.push(target);
+    }
+
+    Ok(keys
+        .iter()
+        .map(|key: &ValueTuple| buckets.get(key).cloned().unwrap_or_default())
+        .collect())
+}
+
+/// The whole of a direct load: the relation's target checked against what the
+/// graph can qualify, the keys read off the input models in input order, and
+/// the one graph read regrouped into a bucket per input.
+// [spec:pgorm:sem:query.loader.batching+5]
+async fn load_related<M, R, C>(
+    models: &[M],
+    select: Select<R>,
+    rel_def: RelationDef,
+    db: &C,
+) -> Result<Vec<Vec<R::Model>>, Error>
+where
+    C: ConnectionTrait,
+    M: ModelTrait,
+    R: EntityTrait,
+    R::Model: Send + Sync,
+{
+    check_target_ref(&rel_def)?;
+
+    let from_col = rel_def.columns.from_identity();
+    let keys: Vec<ValueTuple> = models
+        .iter()
+        .map(|model: &M| extract_key(&from_col, model))
+        .collect::<Result<_, Error>>()?;
+
+    let graph = join_source::<R, <M as ModelTrait>::Entity>(root_graph::<R>(select), rel_def);
+
+    collect_buckets(graph, keys, &from_col, db).await
 }
 
 /// Re-root the caller's target selector as a graph.
@@ -338,6 +335,7 @@ where
 /// from its declaration, never inherited from a builder a caller may have
 /// edited, and clearing before projecting is what makes the two statements
 /// the same one.
+// [spec:pgorm:sem:query.loader.batching+5]
 // [spec:pgorm:sem:query.loader.many-to-many+3]
 fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
     let mut query = select.into_query();
@@ -355,10 +353,11 @@ fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
 /// reversing what an authored `on_condition` is told.
 ///
 /// [`RelationDef::rev`] hands the closure the swapped identifiers, so a
-/// predicate written for `(junction, target)` would silently start receiving
-/// `(target, junction)`. The loader walks both hops backwards purely because
+/// predicate written for `(source, target)` would silently start receiving
+/// `(target, source)`. The loader walks its hops backwards purely because
 /// the caller's selector is the root, which is no reason for a caller's
 /// predicate to change meaning.
+// [spec:pgorm:sem:query.loader.batching+5]
 // [spec:pgorm:sem:query.loader.many-to-many+3]
 fn rev(mut rel: RelationDef) -> RelationDef {
     let on_condition = rel.on_condition.take();
@@ -379,28 +378,38 @@ fn identity_columns(identity: &Identity) -> String {
         .join(", ")
 }
 
-// [spec:pgorm:sem:query.loader.regroup+3]
-fn unmatched_key_err(
-    key: &ValueTuple,
-    input_keys: &[ValueTuple],
-    from_col: &Identity,
-    to_col: &Identity,
-) -> Error {
+// [spec:pgorm:sem:query.loader.regroup+4]
+fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Identity) -> Error {
     let sample = match input_keys.first() {
         Some(sample) => format!("{sample:?}"),
         None => "none".to_owned(),
     };
     query_err(format!(
-        "Loader cannot regroup a returned row: the key {key:?} read from `{to}` equals none of \
-         the keys read from `{from}` (an input key reads as {sample}). The two sides of the \
-         relation match in SQL but not as Rust values; check for a width, padding or collation \
-         difference between the columns.",
-        to = identity_columns(to_col),
+        "Loader cannot regroup a returned row: the key {key:?} read back from `{from}` equals \
+         none of the keys read from the input models (an input key reads as {sample}). The \
+         stored row and the input model match in SQL but not as Rust values; check for a width, \
+         padding or collation difference between them.",
         from = identity_columns(from_col),
     ))
 }
 
-// [spec:pgorm:sem:query.loader.batching+4]
+/// Refuse a relation whose target is not the from item the caller's selector
+/// selects from.
+///
+/// The graph roots at the caller's `Select<R>` — `FROM` the entity's own
+/// table — while the join condition qualifies the target side by whatever
+/// identifier the relation's `to_tbl` carries. An aliased or value-producing
+/// target would name a table the statement does not have, so it is reported
+/// on the terms [`table_column`] states rather than rendered.
+// [spec:pgorm:req:query.loader.table-ref-limitation+3]
+fn check_target_ref(rel: &RelationDef) -> Result<(), Error> {
+    for col in rel.columns.to_identity().iter() {
+        table_column(&rel.to_tbl, col)?;
+    }
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.loader.batching+5]
 fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
@@ -415,7 +424,7 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+4]
+// [spec:pgorm:sem:query.loader.batching+5]
 fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
@@ -427,7 +436,7 @@ where
     Ok(ValueTuple::from(values))
 }
 
-// [spec:pgorm:sem:query.loader.batching+4]
+// [spec:pgorm:sem:query.loader.batching+5]
 fn prepare_condition(
     table: &FromItem,
     col: &Identity,
@@ -467,6 +476,10 @@ fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
     }
 }
 
+// [spec:pgorm:sem:query.loader.batching+5/test]    the one read a direct load
+// issues: the caller's selector rooted, the input entity joined back under the
+// alias the key predicate qualifies against, and the authored relation carried
+// into the `ON` whole — its predicate under either composition
 // [spec:pgorm:sem:query.loader.many-to-many+3/test]    the one read the
 // junction-mediated load issues: the caller's selector rooted and reprojected
 // under the graph's prefixes, the junction joined but never projected, and the
@@ -474,9 +487,34 @@ fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests_cfg::{cake, filling};
+    use crate::RelationTrait;
+    use crate::tests_cfg::{cake, filling, fruit};
     use pgorm_query::IntoValueTuple;
     use pretty_assertions::assert_eq;
+
+    /// The statement a loader sends for a two-key batch.
+    #[track_caller]
+    fn batch_sql<R: EntityTrait, F: EntityTrait>(
+        graph: SelectGraph<R, (Req<F>,)>,
+        from_col: &Identity,
+    ) -> String {
+        let src_tbl = FromItem::from(TableName::Table(source_alias()));
+        let keys = vec![1i32.into_value_tuple(), 2i32.into_value_tuple()];
+        let condition = prepare_condition(&src_tbl, from_col, &keys)
+            .expect("a bare table qualifies the key column");
+        QueryFilter::filter(graph, condition).as_query().to_string()
+    }
+
+    /// The read a direct load of `cake -> fruit` issues, under the relation
+    /// named by `rel`.
+    fn direct_sql(rel: RelationDef) -> String {
+        let from_col = rel.columns.from_identity();
+        let graph = join_source::<fruit::Entity, cake::Entity>(
+            root_graph::<fruit::Entity>(fruit::Entity::find()),
+            rel,
+        );
+        batch_sql(graph, &from_col)
+    }
 
     #[test]
     fn many_to_many_reads_one_graph() {
@@ -485,21 +523,13 @@ mod tests {
         let rel_def = <cake::Entity as Related<filling::Entity>>::to();
         let via_from_col = via_rel.columns.from_identity();
 
-        let src_alias: DynIden = SharedIden::new(LOADER_SOURCE_ALIAS);
-        let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
-        let keys = vec![1i32.into_value_tuple(), 2i32.into_value_tuple()];
-        let condition = prepare_condition(&src_tbl, &via_from_col, &keys)
-            .expect("a bare table qualifies the key column");
-
-        let graph = many_to_many_graph::<filling::Entity, cake::Entity>(
-            filling::Entity::find(),
-            rel_def,
+        let graph = join_source::<filling::Entity, cake::Entity>(
+            root_graph::<filling::Entity>(filling::Entity::find()).via(rev(rel_def)),
             via_rel,
-            SharedIden::clone(&src_alias),
         );
 
         assert_eq!(
-            QueryFilter::filter(graph, condition).as_query().to_string(),
+            batch_sql(graph, &via_from_col),
             [
                 r#"SELECT "filling"."id" AS "s0_id", "filling"."name" AS "s0_name","#,
                 r#""filling"."vendor_id" AS "s0_vendor_id","#,
@@ -511,6 +541,47 @@ mod tests {
                 r#"WHERE "pgorm_loader_src"."id" IN (1, 2)"#,
             ]
             .join(" ")
+        );
+    }
+
+    #[test]
+    fn direct_read_joins_the_input_entity_back() {
+        assert_eq!(
+            direct_sql(cake::Relation::Fruit.def()),
+            [
+                r#"SELECT "fruit"."id" AS "s0_id", "fruit"."name" AS "s0_name","#,
+                r#""fruit"."cake_id" AS "s0_cake_id","#,
+                r#""pgorm_loader_src"."id" AS "s1_id", "pgorm_loader_src"."name" AS "s1_name""#,
+                r#"FROM "fruit""#,
+                r#"INNER JOIN "cake" AS "pgorm_loader_src""#,
+                r#"ON "fruit"."cake_id" = "pgorm_loader_src"."id""#,
+                r#"WHERE "pgorm_loader_src"."id" IN (1, 2)"#,
+            ]
+            .join(" ")
+        );
+    }
+
+    #[test]
+    fn direct_read_carries_the_authored_predicate() {
+        let sql = direct_sql(cake::Relation::TropicalFruit.def());
+
+        assert!(
+            sql.contains(
+                r#"ON "fruit"."cake_id" = "pgorm_loader_src"."id" AND "fruit"."name" LIKE '%tropical%'"#
+            ),
+            "{sql}"
+        );
+    }
+
+    #[test]
+    fn direct_read_carries_any_composition() {
+        let sql = direct_sql(cake::Relation::OrTropicalFruit.def());
+
+        assert!(
+            sql.contains(
+                r#"ON "fruit"."cake_id" = "pgorm_loader_src"."id" OR "fruit"."name" LIKE '%tropical%'"#
+            ),
+            "{sql}"
         );
     }
 
