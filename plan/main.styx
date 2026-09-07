@@ -4070,6 +4070,13 @@ children (
                         kind @note
                         text "Evidence: pgorm-codegen's transformer/writer emit enum definitions and DeriveActiveEnum attributes with bare type names even when the described schema qualifies the enum, so generated entities lose the qualifier the moment it matters (deps on enum-schema-surface — there is nowhere to put the schema until pgorm-query grows the surface). SPEC IMPACT (bump rides the fix commit): bump codegen.entity.enums — generated enum definitions MUST carry the source schema qualifier when the described type has one; bump macros.derive.active-enum if the attribute grammar grows a schema key. FIX SKETCH: thread schema through the codegen enum path the same way TableIdent threaded it for tables (option-as-default so unqualified schemas emit unchanged output); golden-test with a schema-qualified enum fixture."
                     }
+
+                    {
+                        at 2026-09-07T12:18:28.406621Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 5, severity P2, folded into this existing defect rather than duplicated. Additional sources: pgorm-codegen/src/sql_schema/objects.rs:15-23 keeps only names.last() for CREATE TYPE; pgorm-codegen/src/sql_schema/types.rs:90-98 discards the schema during lookup and output construction. Reproduction 1 (qualified_enum_preserves_schema): entities_from_sql(\"CREATE TYPE custom.status AS ENUM ('open'); CREATE TABLE custom.task (id integer PRIMARY KEY, status custom.status NOT NULL);\", defaults) emits an active enum with enum_name = \"status\", losing custom. Reproduction 2 (qualified_enum_does_not_resolve_another_schema): declare only a.status, then reference b.status in a table; generation succeeds by silently using a.status's labels rather than rejecting unresolved b.status. Extend this node's acceptance to the DDL bridge: enum definitions and references must be keyed by full schema/type identity; qualified lookups must never fall back to another schema, and qualifiers must survive generated casts and DDL. Cover same-named enums in distinct schemas according to an explicit supported-or-rejected policy and a conflicting type on search_path, plus unqualified controls. Extend the planned spec impact to codegen.ddl.types+2, codegen.ddl.objects+1 and codegen.ddl.unsupported+1 alongside codegen.entity.enums/macros.derive.active-enum. Keep dependency enum-schema-surface; the type-reference representation must exist before it can be threaded through generation."
+                    }
                 )
             }
 
@@ -4097,6 +4104,96 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Evidence: the pipeline's SelectedSources writer (src/pipeline/sources.rs, [spec:pgorm:sem:pipeline.select-sources]) projects source columns under the default discipline — select_as read casts are not applied — diverging from the graph writer's source_read_cast kernel; a save_as/select_as column read through select_sources decodes the stored representation, not the model type. The enum-array text[] cast path is additionally unexercised anywhere in the tree (no enum-array fixture), and is likely the same root cause through this writer. Divergence was documented as-is at finding time; operator boarded it as a defect (2026-09-07). SPEC IMPACT (bump rides the fix commit): bump pipeline.select-sources — the sources projection MUST apply the graph writer's read-cast discipline; the fix adds an enum-array fixture with /test coverage on both the graph and select_sources paths. FIX SKETCH: reuse the graph kernel's source_read_cast at the SelectedSources projection site rather than growing a parallel cast path."
+                    }
+                )
+            }
+
+            {
+                id empty-insert-batch
+                title "Prevent zero-model insert batches from writing a default row"
+                kind @fix
+                deps (nopanic.insert-uniform)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.095987Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 1, severity P1. Sources: src/query/insert.rs:115-121 and src/executor/insert.rs:120-127. Reproduction (empty_batch_writes_no_rows): create review_parent(id serial PRIMARY KEY), then Insert::<parent::ActiveModel>::many(std::iter::empty::<parent::ActiveModel>()).exec(&db). Actual: Ok(1), with Model { id: 1 } persisted. The initializer applies or_default_values before any model is supplied, conflating an empty iterator with an explicitly supplied all-NotSet model. Acceptance: zero models produce no write through exec, exec_returning_pk and exec_returning_model; define the appropriate no-op or existing typed-error result for each terminal. Preserve one default row per explicitly supplied blank model, TryInsert's documented behavior and uniform-column mismatch errors. Prefer an explicit builder-state distinction; no panics. Spec impact: query.build.insert+3 explicitly specifies default insertion even when no model was added, so revise that design contract with the fix and reconcile query.build.insert.empty-failsafe and exec.crud.try-insert. This is a follow-up to the completed blank-model/uniform-column work, not a reopening."
+                    }
+                )
+            }
+
+            {
+                id loader-relation-predicates
+                title "Preserve authored relation predicates in direct eager loaders"
+                kind @fix
+                deps (loader)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.187021Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 2, severity P1. Sources: src/query/loader.rs:145-155 and 194-204. Both load_one and load_many build only membership against relation key columns, omitting on_condition and condition_type. Reproduction (loader_preserves_relation_predicate): parent id 1; children (10,1,'same',true), (11,1,'same',true), (12,1,'hidden',false); Related::to applies on_condition requiring the child's visible column to equal true. Entity::graph().related_maybe::<child::Entity>().all returns two children; vec![parent].load_many(child::Entity, &db) returns all three, including the excluded row. Acceptance: direct loaders evaluate the complete authored relation, including predicates using either side and All/Any composition, while preserving caller filters, positional grouping, duplicate input handling and empty-input behavior; a predicate that cannot be represented must not be silently dropped. Test load_one and load_many against equivalent graph reads with aliased/self-referencing relations as supported. Spec impact: revise query.loader.batching+4's membership-only construction and reconcile query.loader.regroup+3 and query.loader+1; query.loader.many-to-many+3 already provides the graph-based precedent. Depends on completed graph loader work so its existing relation-preserving path can be reused."
+                    }
+                )
+            }
+
+            {
+                id update-noop-filters
+                title "Preserve additional WHERE predicates when an UpdateOne has no changed fields"
+                kind @fix
+                deps (orm.exec)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.273507Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 3, severity P2. Source: src/executor/update.rs:33-34, find_updated_model_by_id. Reproduction (no_change_update_preserves_filters): existing parent id 1, then Update::one(parent::Model { id: 1 }.into_active()).unwrap().filter(parent::Column::Id.eq(99)).exec_returning_model(&db). Actual: Ok(Model { id: 1 }), despite the contradictory WHERE. The no-SET shortcut creates a fresh primary-key SELECT and loses the query's additional predicates; version/tenant guards therefore cease to apply on unchanged models. Acceptance: the no-change read honors the complete original filtering and returns RecordNotFound for a nonmatching guard, without an UPDATE or trigger side effects; changed and unchanged paths agree on row eligibility. Cover matching/nonmatching additional predicates and composite primary keys. Spec impact: revise exec.crud.update+5, whose current no-op contract says to re-fetch by primary key, and preserve query.build.update's primary-key validation."
+                    }
+                )
+            }
+
+            {
+                id cursor-source-key-tiebreaks
+                title "Include the ordered source's primary key in joined cursor tiebreaks"
+                kind @fix
+                deps (cursor cursor-joined-boundary)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.359914Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 4, severity P2. Source: src/executor/cursor.rs:563-564; cursor_by_on omits the selected slot from S::tiebreaks. Reproduction (slot_cursor_resumes_equal_names): parent id 1 has visible children ids 10 and 11, both named 'same'; graph.related_maybe::<child::Entity>().cursor_by_on::<1, _>(child::Column::Name).first(1) returns one child. Continuing with after_with(('same', 1)), the entire installed key (child name, parent id), returns zero rows and skips the other child. Acceptance: when the chosen order columns are nonunique, include the ordered source's missing primary-key columns so every distinguishable decoded join row has a complete continuation key; assess the symmetric root-ordered path. Preserve alias qualification, composite keys, direction/window semantics, boundary arity errors and the separately documented NULL limitation. Test ties across multiple pages with after_with/before_with, asc/desc and repeated execution. Spec impact: revise query.graph.cursor's explicit exclusion of the selected slot and reconcile exec.cursor.keyset+3, exec.cursor.order+3 and full-boundary documentation. Earlier cursor-joined-boundary work correctly compares installed secondary keys; this follow-up fixes the missing keys."
+                    }
+                )
+            }
+
+            {
+                id graph-long-column-aliases
+                title "Keep generated graph and pipeline aliases within PostgreSQL's identifier limit"
+                kind @fix
+                deps (pipeline-sources)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.44752Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 6, severity P2. Source: src/query/graph.rs:238-239 (source_column_alias), also consumed by src/pipeline/sources.rs. Reproduction (graph_preserves_valid_long_column_name): an entity has id plus a text column whose SQL name is 61 ASCII 'a' characters, with one row. Entity::find().all succeeds. Entity::graph().all fails with a missing-column error naming s0_ followed by those 61 characters: the 64-byte alias was truncated by PostgreSQL to 63 bytes, but decoding requests all 64. Acceptance: every valid PostgreSQL column identifier, including multibyte identifiers and names sharing a long prefix, projects and decodes without truncation or collisions through graph and select_sources. Use one consistent bounded alias/decode mapping across required/optional slots and preserve absence detection and normal short-name behavior. Spec impact: revise query.graph.writer+1's unconditional s{i}_{column} spelling and reconcile query.graph.decode+1 and pipeline.select-sources so the generated alias and decode witness stay one contract. Depends on the completed pipeline sources terminal because both consumers share the alias function."
+                    }
+                )
+            }
+
+            {
+                id nullable-projection-absence
+                title "Apply the all-NULL absence witness even when nullable projection decoding succeeds"
+                kind @fix
+                deps (joined-row-decode-errors)
+                log (
+                    {
+                        at 2026-09-07T12:18:08.539783Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 7, severity P2. Source: src/entity/model.rs:114-120, FromQueryResult::from_query_result_optional. Reproduction (all_null_optional_projection_is_absent): derive FromQueryResult for a struct containing only name: Option<String>; decode SELECT NULL::text AS name through from_query_result_optional. Actual: Some(NullableProjection { name: None }); expected by the documented absence witness: None. The function checks nullness only after decoding errors, while an entirely nullable projection decodes successfully. Acceptance: evaluate the absence witness independently of decode success; all witnessed columns NULL means None for nullable projections as well as required-field models. Preserve errors for incomplete/missing columns and present-but-invalid types, enum labels and JSON; keep empty witness sets from being classified absent. Test derived and handwritten reflected/fallback projections, nonempty prefixes, genuinely unmatched joins and matched all-NULL projections. Spec impact: exec.decode.absent already requires this outcome, so this is an implementation defect; clarify entity.traits.from-query-result only if needed. The earlier joined-row-decode-errors fix preserved present-row failures, and this follow-up closes its successful-decode bypass."
                     }
                 )
             }
