@@ -56,7 +56,12 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - `ColumnTrait` carries `eq_col`/`ne_col`/`gt_col`/`gte_col`/`lt_col`/`lte_col`/`eq_expr` for column-to-column and column-to-expression predicates; `eq` and friends stay value-only so their `save_as` enum cast is never dropped
 - `ModelTrait::into_active()` converts a model to its entity's ActiveModel with no destination annotation
 - `select([..])` on the SELECT builders clears the default projection and projects the given list in one call — the pipeline's verb, in the ORM. A single item needs no wrapper, a homogeneous list is an array or `Vec`, a mixed list (two entities' columns, an expression, an alias token) is a tuple; a computed iterator stays `select_only()` + `columns(..)`, which are unchanged
-- Failsafe behavior for empty `insert_many` operations
+- A zero-model insert batch writes nothing: `Insert::many(empty)` reports `Ok(0)` through `exec`, and the returning terminals error (`RecordNotInserted` / `RecordNotFound`); an explicitly supplied all-`NotSet` model still writes one default row, and `TryInsert` reports `Empty` for both states
+- Every value predicate carries `save_as` casts (`between`, `if_null` and the membership forms included), and keyset cursor boundaries bind under the same casts; graph cursors complete the ordered source's continuation key with its own primary key
+- `load_one`/`load_many` evaluate the complete authored relation (`on_condition` and `condition_type` included) by riding the graph machinery, and `load_one` errors on an unmatched key instead of yielding `None` silently
+- `RelationDef::rev()` preserves an attached `on_condition`'s authored argument roles
+- Enum types can be schema-qualified end to end: `ColumnType::Enum` carries `schema`, `DeriveActiveEnum` takes `schema_name = "..."`, and codegen keys enums by full identity with no cross-schema fallback
+- Prefixed result-column names (the graph's `s{i}_` aliases and every prefixed decode) are bounded to PostgreSQL's 63-byte identifier limit through one shared composition
 
 ### Connections
 `pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning an `Error`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is an `Error`, not a panic.
