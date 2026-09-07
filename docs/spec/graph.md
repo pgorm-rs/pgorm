@@ -253,7 +253,7 @@ chapter is stated twice anywhere else.
 > `after_with` at whole-keyset arity, the direction resolution, the
 > arity-mismatch error, and the NULL-tiebreak limitation are
 > `[spec:pgorm:sem:exec.cursor.keyset+3]` and
-> `[spec:pgorm:sem:exec.cursor.order+2]`, unchanged and not restated
+> `[spec:pgorm:sem:exec.cursor.order+3]`, unchanged and not restated
 > here. The NULL limitation is live on a graph: an unmatched `Opt` slot's
 > primary key IS null, so a row whose tiebreak is null is reachable
 > through the order-column boundary, not an extended one — resuming with
@@ -295,7 +295,7 @@ chapter is stated twice anywhere else.
 > shape and ANDs the produced condition into the join's ON clause *in
 > addition to* whatever `on_condition` the relation already carries —
 > where `RelationDef::on_condition` replaces
-> (`[spec:pgorm:def:entity.relation.def+5]`), the sugar composes, so a
+> (`[spec:pgorm:def:entity.relation.def+6]`), the sugar composes, so a
 > call-site narrowing cannot silently drop an authored predicate. ON
 > versus WHERE is the point of its existence: under a LEFT JOIN a
 > predicate in ON narrows which rows *match* (unmatched roots survive,
@@ -306,7 +306,7 @@ chapter is stated twice anywhere else.
 > spells it.
 >
 > The standing hazard is the authored closure that ignores its
-> parameters (`[spec:pgorm:def:entity.relation.def+5]`): a hardcoded
+> parameters (`[spec:pgorm:def:entity.relation.def+6]`): a hardcoded
 > table qualification renders verbatim, so under an `_as` slot the
 > predicate constrains the un-aliased name — a table not in the query,
 > or another join of it — and nothing errors client-side. The graph

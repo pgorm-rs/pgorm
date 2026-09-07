@@ -178,30 +178,37 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Value tuples
 
-> [spec:pgorm:def:sql.value.tuple+2]
-> `ValueTuple` represents an ordered tuple of values for composite keys and
-> VALUES lists: `One(Value)`, `Two(Value, Value)`, `Three(Value, Value,
-> Value)` or `Many(Vec<Value>)`. `IntoValueTuple` is implemented for any
-> single `Into<Value>` (producing `One`), for 2- and 3-tuples (producing
-> `Two`/`Three` in field order), and for 4- through 12-tuples (producing
-> `Many` in field order). `IntoIterator for ValueTuple` yields the values in
-> that same positional order. `ValueTuple::shape` projects a tuple onto its
-> arity alone as a `ValueTupleShape` — `One`, `Two`, `Three`, or `Many(len)` —
-> which displays as `ValueTuple::One` and, for the last, `ValueTuple::Many
-> with length of N`.
+> [spec:pgorm:def:sql.value.tuple+3]
+> `ValueTuple` is a newtype over `Vec<Value>`: one ordered tuple of values for
+> composite keys and VALUES lists, at every arity. It MUST NOT tag its arity in
+> its representation. A tuple of a given width therefore has exactly one
+> spelling, which is what makes the derived `PartialEq`, `Eq` and `Hash` lawful
+> by construction: a key built from a Rust pair and one gathered from an
+> iterator of the same two values ARE equal and hash alike, so a
+> `HashMap<ValueTuple, _>` (`[spec:pgorm:sem:query.loader.regroup+3]`) cannot
+> split one logical key across two buckets. Under an arity-tagged
+> representation that agreement rested on every producer picking the same tag;
+> here the divergent spelling cannot be constructed.
+>
+> `IntoValueTuple` is implemented for any single `Into<Value>` and for 2-
+> through 12-tuples, each producing its values in field order. `IntoIterator
+> for ValueTuple` yields them in that same positional order, `iter()` borrows
+> them, and `arity()` is their count. `From<Vec<Value>>` and
+> `FromIterator<Value>` build a tuple from values already gathered.
 >
 > `TryFromValueTuple` inverts the mapping, is arity-strict, and is fallible:
-> it returns `Result<Self, ValueTupleError>` and never panics. The scalar impl
-> requires `One`, the pair impl `Two`, the triple impl `Three`, and the 4..=12
-> impls `Many` with exactly the expected length; anything else is
-> `ValueTupleError::Arity { expected, actual }`, naming both shapes. Element
-> extraction goes through `ValueType::try_from`, so a type mismatch at any
-> position is `ValueTupleError::Element { position, expected }`, naming the
-> zero-based position and the `ValueType::type_name` required there. The
-> conversion is short-circuiting: the leftmost failing position is the one
-> reported. `ValueTupleError` implements `std::error::Error`; `Arity` displays
-> as `expected {expected}, received {actual}` and `Element` as `value at
-> position {position} is not a valid {expected}`, the type name backquoted.
+> it returns `Result<Self, ValueTupleError>` and never panics. Every impl makes
+> the same single length check — 1 for the scalar impl, 2..=12 for the tuple
+> impls — and any other length is `ValueTupleError::Arity { expected, actual }`,
+> both fields plain lengths rather than named shapes. Element extraction goes
+> through `ValueType::try_from`, so a type mismatch at any position is
+> `ValueTupleError::Element { position, expected }`, naming the zero-based
+> position and the `ValueType::type_name` required there. The conversion is
+> short-circuiting: the leftmost failing position is the one reported.
+> `ValueTupleError` implements `std::error::Error`; `Arity` displays as
+> `expected a tuple of arity {expected}, received {actual}` and `Element` as
+> `value at position {position} is not a valid {expected}`, the type name
+> backquoted.
 >
 > `Values` is a `Vec<Value>` newtype with `iter()` and `IntoIterator`, used to
 > carry a statement's collected parameters.

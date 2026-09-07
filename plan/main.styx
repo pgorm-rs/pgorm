@@ -2553,12 +2553,20 @@ children (
             {
                 id identity-arity-collapse
                 title "Collapse the enumerated arities of Identity and ValueTuple"
+                sealed true
                 log (
                     {
                         at 2026-09-07T10:48:52.613919Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Operator-approved (2026-09-07) from the post-graph \"Two-pattern\" sweep. Identity::{Unary,Binary,Ternary,Many} (src/entity/identity.rs) and ValueTuple::{One,Two,Three,Many} + ValueTupleShape (pgorm-query/src/value.rs) hand-enumerate arities 1-3 beside a total Many(Vec): no capability ceiling, but (a) every consumer pays four match arms — loader.rs carries the quadruple twice, identity.rs twice, cursor/find-by-id paths more; (b) ValueTuple derives PartialEq/Eq/Hash and keys loader HashMaps, and Two(a,b) != Many(vec![a,b]) under derived equality — two unequal spellings of one logical key, latent-only because all producers currently agree at arities 1-3, i.e. an invalid state enforced by convention rather than construction. Fix: collapse each to a single-variant carrier (newtype over Vec), keep the IntoValueTuple tuple-sugar impls as constructors so find_by_id((a,b)) and cursor after((a,b)) spellings are unchanged, delete ValueTupleShape or reduce it to a length. Breaking for public pattern matches on the short variants. Both enums move together — the loader's Identity→ValueTuple mapping is where the arms multiply. Spec: bumps sql.value.tuple+2 and whichever entity/identity rules name the variants (rg the ids); arity-mismatch error text (the cursor boundary's) must keep saying lengths, not variant names."
+                    }
+
+                    {
+                        at 2026-09-07T11:24:33.746636Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

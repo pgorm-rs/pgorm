@@ -8,8 +8,8 @@ use pgorm::{
     Schema, Select, Value, entity::prelude::*,
 };
 use pgorm_query::{
-    Alias, Expr, IntoIden, QueryBuilder, TableName, TryFromValueTuple, ValueTuple, ValueTupleError,
-    ValueTupleShape,
+    Alias, Expr, IntoIden, IntoValueTuple, QueryBuilder, TableName, TryFromValueTuple,
+    ValueTupleError,
 };
 use pretty_assertions::assert_eq;
 
@@ -65,6 +65,31 @@ mod pair {
         pub left_id: i32,
         #[pgorm(primary_key, auto_increment = false)]
         pub right_id: i32,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// Composite four-column primary key: the arity past every hand-written tuple
+/// impl, so it exercises the one representation a wide key reaches.
+mod quad {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "quad")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub a: i32,
+        #[pgorm(primary_key, auto_increment = false)]
+        pub b: i32,
+        #[pgorm(primary_key, auto_increment = false)]
+        pub c: i32,
+        #[pgorm(primary_key, auto_increment = false)]
+        pub d: i32,
         pub label: String,
     }
 
@@ -430,6 +455,22 @@ fn entity_crud_surface() {
         ]
         .join(" ")
     );
+    // A four-column key walks the same one filter per column, with no arity
+    // past which the key changes representation.
+    assert_eq!(
+        quad::Entity::find_by_id((2, 3, 4, 5)).build().0,
+        [
+            r#"SELECT "quad"."a", "quad"."b", "quad"."c", "quad"."d", "quad"."label""#,
+            r#"FROM "quad" WHERE "quad"."a" = $1 AND "quad"."b" = $2"#,
+            r#"AND "quad"."c" = $3 AND "quad"."d" = $4"#,
+        ]
+        .join(" ")
+    );
+    // And the key round-trips back out of the tuple at that arity.
+    assert_eq!(
+        <(i32, i32, i32, i32)>::try_from_value_tuple((2, 3, 4, 5).into_value_tuple()),
+        Ok((2, 3, 4, 5))
+    );
 
     // `insert` is `Insert::one`.
     assert_eq!(
@@ -549,30 +590,30 @@ fn delete_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::delete_by_id(1);
 }
 
-// [spec:pgorm:def:sql.value.tuple+2/test]    the conversion the update-side
-// `find_updated_model_by_id` runs a primary-key tuple through errs on a shape
-// the entity's `ValueType` does not have, naming both shapes
+// [spec:pgorm:def:sql.value.tuple+3/test]    the conversion the update-side
+// `find_updated_model_by_id` runs a primary-key tuple through errs on an arity
+// the entity's `ValueType` does not have, naming both lengths
 #[test]
 fn primary_key_value_type_errs_on_arity() {
     type ItemKey = <item::PrimaryKey as PrimaryKeyTrait>::ValueType;
     type PairKey = <pair::PrimaryKey as PrimaryKeyTrait>::ValueType;
 
     assert_eq!(
-        ItemKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), 2i32.into())),
+        ItemKey::try_from_value_tuple((1i32, 2i32).into_value_tuple()),
         Err(ValueTupleError::Arity {
-            expected: ValueTupleShape::One,
-            actual: ValueTupleShape::Two,
+            expected: 1,
+            actual: 2,
         })
     );
     assert_eq!(
-        PairKey::try_from_value_tuple(ValueTuple::One(1i32.into())),
+        PairKey::try_from_value_tuple(1i32.into_value_tuple()),
         Err(ValueTupleError::Arity {
-            expected: ValueTupleShape::Two,
-            actual: ValueTupleShape::One,
+            expected: 2,
+            actual: 1,
         })
     );
     assert_eq!(
-        PairKey::try_from_value_tuple(ValueTuple::Two(1i32.into(), "b".into())),
+        PairKey::try_from_value_tuple((1i32, "b").into_value_tuple()),
         Err(ValueTupleError::Element {
             position: 1,
             expected: "i32".to_owned(),

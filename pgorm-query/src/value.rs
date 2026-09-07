@@ -142,54 +142,30 @@ impl std::fmt::Display for ValueTypeError {
     }
 }
 
-// [spec:pgorm:def:sql.value.tuple+2]
+// [spec:pgorm:def:sql.value.tuple+3]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Values(pub Vec<Value>);
 
-// [spec:pgorm:def:sql.value.tuple+2]
+/// An ordered tuple of values, for composite keys and VALUES lists.
+///
+/// One arity-agnostic representation, so a tuple of two values has exactly one
+/// spelling: two constructions of the same values — one from a Rust pair, one
+/// gathered from an iterator — are equal and hash alike, which is what makes it
+/// sound as a `HashMap` key.
+// [spec:pgorm:def:sql.value.tuple+3]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ValueTuple {
-    One(Value),
-    Two(Value, Value),
-    Three(Value, Value, Value),
-    Many(Vec<Value>),
-}
-
-/// The shape of a [`ValueTuple`], carrying its arity but none of its values.
-// [spec:pgorm:def:sql.value.tuple+2]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ValueTupleShape {
-    /// A [`ValueTuple::One`].
-    One,
-    /// A [`ValueTuple::Two`].
-    Two,
-    /// A [`ValueTuple::Three`].
-    Three,
-    /// A [`ValueTuple::Many`] holding this many values.
-    Many(usize),
-}
-
-impl std::fmt::Display for ValueTupleShape {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::One => f.write_str("ValueTuple::One"),
-            Self::Two => f.write_str("ValueTuple::Two"),
-            Self::Three => f.write_str("ValueTuple::Three"),
-            Self::Many(len) => write!(f, "ValueTuple::Many with length of {len}"),
-        }
-    }
-}
+pub struct ValueTuple(Vec<Value>);
 
 /// Why a [`ValueTuple`] could not be rebuilt into a typed tuple.
-// [spec:pgorm:def:sql.value.tuple+2]
+// [spec:pgorm:def:sql.value.tuple+3]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueTupleError {
-    /// The tuple's shape is not the one the target type requires.
+    /// The tuple's arity is not the one the target type requires.
     Arity {
-        /// Shape the target type requires.
-        expected: ValueTupleShape,
-        /// Shape actually received.
-        actual: ValueTupleShape,
+        /// Number of values the target type requires.
+        expected: usize,
+        /// Number of values actually received.
+        actual: usize,
     },
     /// A value could not be converted to the type the target holds there.
     Element {
@@ -206,7 +182,7 @@ impl std::fmt::Display for ValueTupleError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Arity { expected, actual } => {
-                write!(f, "expected {expected}, received {actual}")
+                write!(f, "expected a tuple of arity {expected}, received {actual}")
             }
             Self::Element { position, expected } => {
                 write!(
@@ -219,15 +195,30 @@ impl std::fmt::Display for ValueTupleError {
 }
 
 impl ValueTuple {
-    /// The shape of this tuple, without its values.
-    // [spec:pgorm:def:sql.value.tuple+2]
-    pub fn shape(&self) -> ValueTupleShape {
-        match self {
-            Self::One(_) => ValueTupleShape::One,
-            Self::Two(_, _) => ValueTupleShape::Two,
-            Self::Three(_, _, _) => ValueTupleShape::Three,
-            Self::Many(vec) => ValueTupleShape::Many(vec.len()),
-        }
+    /// The number of values in this tuple.
+    // [spec:pgorm:def:sql.value.tuple+3]
+    pub fn arity(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Iterate the values in positional order.
+    // [spec:pgorm:def:sql.value.tuple+3]
+    pub fn iter(&self) -> impl Iterator<Item = &Value> {
+        self.0.iter()
+    }
+}
+
+// [spec:pgorm:def:sql.value.tuple+3]
+impl From<Vec<Value>> for ValueTuple {
+    fn from(values: Vec<Value>) -> Self {
+        Self(values)
+    }
+}
+
+// [spec:pgorm:def:sql.value.tuple+3]
+impl FromIterator<Value> for ValueTuple {
+    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -1051,12 +1042,7 @@ impl IntoIterator for ValueTuple {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            ValueTuple::One(v) => vec![v].into_iter(),
-            ValueTuple::Two(v, w) => vec![v, w].into_iter(),
-            ValueTuple::Three(u, v, w) => vec![u, v, w].into_iter(),
-            ValueTuple::Many(vec) => vec.into_iter(),
-        }
+        self.0.into_iter()
     }
 }
 
@@ -1071,28 +1057,7 @@ where
     V: Into<Value>,
 {
     fn into_value_tuple(self) -> ValueTuple {
-        ValueTuple::One(self.into())
-    }
-}
-
-impl<V, W> IntoValueTuple for (V, W)
-where
-    V: Into<Value>,
-    W: Into<Value>,
-{
-    fn into_value_tuple(self) -> ValueTuple {
-        ValueTuple::Two(self.0.into(), self.1.into())
-    }
-}
-
-impl<U, V, W> IntoValueTuple for (U, V, W)
-where
-    U: Into<Value>,
-    V: Into<Value>,
-    W: Into<Value>,
-{
-    fn into_value_tuple(self) -> ValueTuple {
-        ValueTuple::Three(self.0.into(), self.1.into(), self.2.into())
+        ValueTuple(vec![self.into()])
     }
 }
 
@@ -1103,7 +1068,7 @@ macro_rules! impl_into_value_tuple {
             $($T: Into<Value>),+
         {
             fn into_value_tuple(self) -> ValueTuple {
-                ValueTuple::Many(vec![
+                ValueTuple(vec![
                     $(self.$idx.into()),+
                 ])
             }
@@ -1115,6 +1080,8 @@ macro_rules! impl_into_value_tuple {
 mod impl_into_value_tuple {
     use super::*;
 
+    impl_into_value_tuple!(0:T0, 1:T1);
+    impl_into_value_tuple!(0:T0, 1:T1, 2:T2);
     impl_into_value_tuple!(0:T0, 1:T1, 2:T2, 3:T3);
     impl_into_value_tuple!(0:T0, 1:T1, 2:T2, 3:T3, 4:T4);
     impl_into_value_tuple!(0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5);
@@ -1126,7 +1093,7 @@ mod impl_into_value_tuple {
     impl_into_value_tuple!(0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5, 6:T6, 7:T7, 8:T8, 9:T9, 10:T10, 11:T11);
 }
 
-// [spec:pgorm:def:sql.value.tuple+2]
+// [spec:pgorm:def:sql.value.tuple+3]
 fn tuple_element<T>(value: Value, position: usize) -> Result<T, ValueTupleError>
 where
     T: ValueType,
@@ -1137,7 +1104,7 @@ where
     })
 }
 
-// [spec:pgorm:def:sql.value.tuple+2]
+// [spec:pgorm:def:sql.value.tuple+3]
 fn take_tuple_element<T>(
     iter: &mut std::vec::IntoIter<Value>,
     position: usize,
@@ -1149,9 +1116,24 @@ where
     match iter.next() {
         Some(value) => tuple_element(value, position),
         None => Err(ValueTupleError::Arity {
-            expected: ValueTupleShape::Many(expected),
-            actual: ValueTupleShape::Many(position),
+            expected,
+            actual: position,
         }),
+    }
+}
+
+/// The tuple's values, positionally, once its arity is the one the target type
+/// requires — the single length check every [`TryFromValueTuple`] impl makes.
+// [spec:pgorm:def:sql.value.tuple+3]
+fn tuple_values(
+    tuple: ValueTuple,
+    expected: usize,
+) -> Result<std::vec::IntoIter<Value>, ValueTupleError> {
+    let actual = tuple.arity();
+    if actual == expected {
+        Ok(tuple.into_iter())
+    } else {
+        Err(ValueTupleError::Arity { expected, actual })
     }
 }
 
@@ -1159,63 +1141,13 @@ impl<V> TryFromValueTuple for V
 where
     V: Into<Value> + ValueType,
 {
-    // [spec:pgorm:def:sql.value.tuple+2]
+    // [spec:pgorm:def:sql.value.tuple+3]
     fn try_from_value_tuple<I>(i: I) -> Result<Self, ValueTupleError>
     where
         I: IntoValueTuple,
     {
-        match i.into_value_tuple() {
-            ValueTuple::One(u) => tuple_element(u, 0),
-            other => Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::One,
-                actual: other.shape(),
-            }),
-        }
-    }
-}
-
-impl<V, W> TryFromValueTuple for (V, W)
-where
-    V: Into<Value> + ValueType,
-    W: Into<Value> + ValueType,
-{
-    // [spec:pgorm:def:sql.value.tuple+2]
-    fn try_from_value_tuple<I>(i: I) -> Result<Self, ValueTupleError>
-    where
-        I: IntoValueTuple,
-    {
-        match i.into_value_tuple() {
-            ValueTuple::Two(v, w) => Ok((tuple_element(v, 0)?, tuple_element(w, 1)?)),
-            other => Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Two,
-                actual: other.shape(),
-            }),
-        }
-    }
-}
-
-impl<U, V, W> TryFromValueTuple for (U, V, W)
-where
-    U: Into<Value> + ValueType,
-    V: Into<Value> + ValueType,
-    W: Into<Value> + ValueType,
-{
-    // [spec:pgorm:def:sql.value.tuple+2]
-    fn try_from_value_tuple<I>(i: I) -> Result<Self, ValueTupleError>
-    where
-        I: IntoValueTuple,
-    {
-        match i.into_value_tuple() {
-            ValueTuple::Three(u, v, w) => Ok((
-                tuple_element(u, 0)?,
-                tuple_element(v, 1)?,
-                tuple_element(w, 2)?,
-            )),
-            other => Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Three,
-                actual: other.shape(),
-            }),
-        }
+        let mut values = tuple_values(i.into_value_tuple(), 1)?;
+        take_tuple_element(&mut values, 0, 1)
     }
 }
 
@@ -1225,25 +1157,15 @@ macro_rules! impl_try_from_value_tuple {
         where
             $($T: Into<Value> + ValueType),+
         {
-            // [spec:pgorm:def:sql.value.tuple+2]
+            // [spec:pgorm:def:sql.value.tuple+3]
             fn try_from_value_tuple<Z>(i: Z) -> Result<Self, ValueTupleError>
             where
                 Z: IntoValueTuple,
             {
-                let tuple = i.into_value_tuple();
-                let actual = tuple.shape();
-                match tuple {
-                    ValueTuple::Many(vec) if vec.len() == $len => {
-                        let mut iter = vec.into_iter();
-                        Ok((
-                            $(take_tuple_element::<$T>(&mut iter, $idx, $len)?),+
-                        ))
-                    }
-                    _ => Err(ValueTupleError::Arity {
-                        expected: ValueTupleShape::Many($len),
-                        actual,
-                    }),
-                }
+                let mut values = tuple_values(i.into_value_tuple(), $len)?;
+                Ok((
+                    $(take_tuple_element::<$T>(&mut values, $idx, $len)?),+
+                ))
             }
         }
     };
@@ -1253,6 +1175,8 @@ macro_rules! impl_try_from_value_tuple {
 mod impl_try_from_value_tuple {
     use super::*;
 
+    impl_try_from_value_tuple!( 2, 0:T0, 1:T1);
+    impl_try_from_value_tuple!( 3, 0:T0, 1:T1, 2:T2);
     impl_try_from_value_tuple!( 4, 0:T0, 1:T1, 2:T2, 3:T3);
     impl_try_from_value_tuple!( 5, 0:T0, 1:T1, 2:T2, 3:T3, 4:T4);
     impl_try_from_value_tuple!( 6, 0:T0, 1:T1, 2:T2, 3:T3, 4:T4, 5:T5);
@@ -1353,35 +1277,35 @@ mod tests {
         assert_eq!(out, val);
     }
 
-    // [spec:pgorm:def:sql.value.tuple+2/test]
+    // [spec:pgorm:def:sql.value.tuple+3/test]
     #[test]
     fn test_value_tuple() {
         assert_eq!(
             1i32.into_value_tuple(),
-            ValueTuple::One(Value::Int(Some(1)))
+            ValueTuple::from(vec![Value::Int(Some(1))])
         );
         assert_eq!(
             "b".into_value_tuple(),
-            ValueTuple::One(Value::String(Some(Box::new("b".to_owned()))))
+            ValueTuple::from(vec![Value::String(Some(Box::new("b".to_owned())))])
         );
         assert_eq!(
             (1i32, "b").into_value_tuple(),
-            ValueTuple::Two(
+            ValueTuple::from(vec![
                 Value::Int(Some(1)),
                 Value::String(Some(Box::new("b".to_owned())))
-            )
+            ])
         );
         assert_eq!(
             (1i32, 2.4f64, "b").into_value_tuple(),
-            ValueTuple::Three(
+            ValueTuple::from(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned())))
-            )
+            ])
         );
         assert_eq!(
             (1i32, 2.4f64, "b", 123i8).into_value_tuple(),
-            ValueTuple::Many(vec![
+            ValueTuple::from(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
@@ -1390,7 +1314,7 @@ mod tests {
         );
         assert_eq!(
             (1i32, 2.4f64, "b", 123i8, 456i16).into_value_tuple(),
-            ValueTuple::Many(vec![
+            ValueTuple::from(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
@@ -1400,7 +1324,7 @@ mod tests {
         );
         assert_eq!(
             (1i32, 2.4f64, "b", 123i8, 456i16, 789u32).into_value_tuple(),
-            ValueTuple::Many(vec![
+            ValueTuple::from(vec![
                 Value::Int(Some(1)),
                 Value::Double(Some(2.4)),
                 Value::String(Some(Box::new("b".to_owned()))),
@@ -1411,7 +1335,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.tuple+2/test]
+    // [spec:pgorm:def:sql.value.tuple+3/test]
     #[test]
     #[allow(clippy::clone_on_copy)]
     fn test_try_from_value_tuple() {
@@ -1451,60 +1375,75 @@ mod tests {
         assert_eq!(val, original);
     }
 
-    // [spec:pgorm:def:sql.value.tuple+2/test]
+    // [spec:pgorm:def:sql.value.tuple+3/test]
     #[test]
-    fn value_tuple_shape_names_each_variant() {
-        assert_eq!(ValueTuple::One(1i32.into()).shape(), ValueTupleShape::One);
-        assert_eq!(
-            ValueTuple::Two(1i32.into(), 2i32.into()).shape(),
-            ValueTupleShape::Two
-        );
-        assert_eq!(
-            ValueTuple::Three(1i32.into(), 2i32.into(), 3i32.into()).shape(),
-            ValueTupleShape::Three
-        );
-        assert_eq!(
-            ValueTuple::Many(vec![1i32.into(), 2i32.into()]).shape(),
-            ValueTupleShape::Many(2)
-        );
-        assert_eq!(ValueTupleShape::One.to_string(), "ValueTuple::One");
-        assert_eq!(ValueTupleShape::Two.to_string(), "ValueTuple::Two");
-        assert_eq!(ValueTupleShape::Three.to_string(), "ValueTuple::Three");
-        assert_eq!(
-            ValueTupleShape::Many(5).to_string(),
-            "ValueTuple::Many with length of 5"
-        );
+    fn value_tuple_arity_counts_values() {
+        assert_eq!(1i32.into_value_tuple().arity(), 1);
+        assert_eq!((1i32, 2i32).into_value_tuple().arity(), 2);
+        assert_eq!((1i32, 2i32, 3i32).into_value_tuple().arity(), 3);
+        assert_eq!((1i32, 2i32, 3i32, 4i32).into_value_tuple().arity(), 4);
     }
 
-    // [spec:pgorm:def:sql.value.tuple+2/test]
+    /// The dual spelling of one logical key is gone: a tuple built from a Rust
+    /// pair and one gathered from an iterator of the same values are the same
+    /// value, so a `HashMap` keyed on them cannot split a key in two.
+    // [spec:pgorm:def:sql.value.tuple+3/test]
+    #[test]
+    fn value_tuples_of_equal_values_are_equal() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn hash_of(tuple: &ValueTuple) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            tuple.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let values = vec![Value::from(1i32), Value::from(2i32)];
+        let from_pair = (1i32, 2i32).into_value_tuple();
+        let from_iter: ValueTuple = values.iter().cloned().collect();
+        let from_vec = ValueTuple::from(values);
+
+        assert_eq!(from_pair, from_iter);
+        assert_eq!(from_pair, from_vec);
+        assert_eq!(hash_of(&from_pair), hash_of(&from_iter));
+        assert_eq!(hash_of(&from_pair), hash_of(&from_vec));
+
+        let four = (1i32, 2i32, 3i32, 4i32).into_value_tuple();
+        let four_by_iter: ValueTuple = (1..=4).map(|n: i32| Value::from(n)).collect();
+        assert_eq!(four, four_by_iter);
+        assert_eq!(hash_of(&four), hash_of(&four_by_iter));
+    }
+
+    // [spec:pgorm:def:sql.value.tuple+3/test]
     #[test]
     fn try_from_value_tuple_errs_on_wrong_arity() {
         assert_eq!(
             <i32 as TryFromValueTuple>::try_from_value_tuple((1i32, 2i32)),
             Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::One,
-                actual: ValueTupleShape::Two,
+                expected: 1,
+                actual: 2,
             })
         );
         assert_eq!(
             <(i32, i32) as TryFromValueTuple>::try_from_value_tuple(1i32),
             Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Two,
-                actual: ValueTupleShape::One,
+                expected: 2,
+                actual: 1,
             })
         );
         assert_eq!(
             <(i32, i32, i32) as TryFromValueTuple>::try_from_value_tuple((1i32, 2i32)),
             Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Three,
-                actual: ValueTupleShape::Two,
+                expected: 3,
+                actual: 2,
             })
         );
         assert_eq!(
             <(i32, i32, i32, i32) as TryFromValueTuple>::try_from_value_tuple((1i32, 2i32, 3i32)),
             Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Many(4),
-                actual: ValueTupleShape::Three,
+                expected: 4,
+                actual: 3,
             })
         );
         assert_eq!(
@@ -1512,13 +1451,21 @@ mod tests {
                 1i32, 2i32, 3i32, 4i32, 5i32
             )),
             Err(ValueTupleError::Arity {
-                expected: ValueTupleShape::Many(4),
-                actual: ValueTupleShape::Many(5),
+                expected: 4,
+                actual: 5,
             })
+        );
+        assert_eq!(
+            ValueTupleError::Arity {
+                expected: 4,
+                actual: 5,
+            }
+            .to_string(),
+            "expected a tuple of arity 4, received 5"
         );
     }
 
-    // [spec:pgorm:def:sql.value.tuple+2/test]
+    // [spec:pgorm:def:sql.value.tuple+3/test]
     #[test]
     fn try_from_value_tuple_errs_on_wrong_element() {
         assert_eq!(
@@ -1546,11 +1493,11 @@ mod tests {
         );
         assert_eq!(
             ValueTupleError::Arity {
-                expected: ValueTupleShape::One,
-                actual: ValueTupleShape::Many(3),
+                expected: 1,
+                actual: 3,
             }
             .to_string(),
-            "expected ValueTuple::One, received ValueTuple::Many with length of 3"
+            "expected a tuple of arity 1, received 3"
         );
         assert_eq!(
             ValueTupleError::Element {

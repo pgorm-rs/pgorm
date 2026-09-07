@@ -2,18 +2,59 @@ use crate::{ColumnTrait, EntityTrait, IdenStr};
 use pgorm_query::{Alias, DynIden, Iden, IntoIden, IntoValueTuple, SharedIden, Value, ValueTuple};
 use std::fmt;
 
-/// List of column identifier
-// [spec:pgorm:def:entity.relation.def+5]
+/// The columns a lookup keys on, in declared order.
+///
+/// One arity-agnostic representation, whether the key is a single column or a
+/// composite: every consumer walks the columns rather than dispatching on how
+/// many there are, and a column set of a given width has exactly one spelling.
+// [spec:pgorm:def:entity.relation.def+6]
 #[derive(Debug, Clone)]
-pub enum Identity {
-    /// Column identifier consists of 1 column
-    Unary(DynIden),
-    /// Column identifier consists of 2 columns
-    Binary(DynIden, DynIden),
-    /// Column identifier consists of 3 columns
-    Ternary(DynIden, DynIden, DynIden),
-    /// Column identifier consists of more than 3 columns
-    Many(Vec<DynIden>),
+pub struct Identity(Vec<DynIden>);
+
+impl Identity {
+    /// The number of columns.
+    // [spec:pgorm:def:entity.relation.def+6]
+    pub fn arity(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Iterate the columns in declared order.
+    // [spec:pgorm:def:entity.relation.def+6]
+    pub fn iter(&self) -> impl Iterator<Item = &DynIden> {
+        self.0.iter()
+    }
+
+    /// The one column of a unary set, or `None` when the set is wider: what a
+    /// consumer that can only act on one column asks, instead of dispatching on
+    /// arity.
+    // [spec:pgorm:def:entity.relation.def+6]
+    pub fn single(&self) -> Option<&DynIden> {
+        match self.0.as_slice() {
+            [only] => Some(only),
+            _ => None,
+        }
+    }
+}
+
+// [spec:pgorm:def:entity.relation.def+6]
+impl From<DynIden> for Identity {
+    fn from(iden: DynIden) -> Self {
+        Self(vec![iden])
+    }
+}
+
+// [spec:pgorm:def:entity.relation.def+6]
+impl From<Vec<DynIden>> for Identity {
+    fn from(idens: Vec<DynIden>) -> Self {
+        Self(idens)
+    }
+}
+
+// [spec:pgorm:def:entity.relation.def+6]
+impl FromIterator<DynIden> for Identity {
+    fn from_iter<I: IntoIterator<Item = DynIden>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
 }
 
 impl IntoIterator for Identity {
@@ -21,35 +62,14 @@ impl IntoIterator for Identity {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Identity::Unary(ident1) => vec![ident1].into_iter(),
-            Identity::Binary(ident1, ident2) => vec![ident1, ident2].into_iter(),
-            Identity::Ternary(ident1, ident2, ident3) => vec![ident1, ident2, ident3].into_iter(),
-            Identity::Many(vec) => vec.into_iter(),
-        }
+        self.0.into_iter()
     }
 }
 
 impl Iden for Identity {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
-        match self {
-            Identity::Unary(iden) => {
-                write!(s, "{}", iden.to_string()).expect("write to sql sink");
-            }
-            Identity::Binary(iden1, iden2) => {
-                write!(s, "{}", iden1.to_string()).expect("write to sql sink");
-                write!(s, "{}", iden2.to_string()).expect("write to sql sink");
-            }
-            Identity::Ternary(iden1, iden2, iden3) => {
-                write!(s, "{}", iden1.to_string()).expect("write to sql sink");
-                write!(s, "{}", iden2.to_string()).expect("write to sql sink");
-                write!(s, "{}", iden3.to_string()).expect("write to sql sink");
-            }
-            Identity::Many(vec) => {
-                for iden in vec.iter() {
-                    write!(s, "{}", iden.to_string()).expect("write to sql sink");
-                }
-            }
+        for iden in self.iter() {
+            write!(s, "{}", iden.to_string()).expect("write to sql sink");
         }
     }
 }
@@ -60,7 +80,7 @@ impl Iden for Identity {
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+5]
+// [spec:pgorm:def:entity.relation.def+6]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (DynIden, DynIden),
@@ -138,16 +158,7 @@ impl ColumnPairs {
     where
         F: Fn(&(DynIden, DynIden)) -> DynIden,
     {
-        match self.rest.as_slice() {
-            [] => Identity::Unary(col(&self.first)),
-            [second] => Identity::Binary(col(&self.first), col(second)),
-            [second, third] => Identity::Ternary(col(&self.first), col(second), col(third)),
-            rest => Identity::Many(
-                std::iter::once(col(&self.first))
-                    .chain(rest.iter().map(col))
-                    .collect(),
-            ),
-        }
+        self.iter().map(col).collect()
     }
 }
 
@@ -161,7 +172,7 @@ impl IntoIterator for ColumnPairs {
 }
 
 /// Performs a conversion into an [Identity]
-// [spec:pgorm:def:entity.relation.def+5]
+// [spec:pgorm:def:entity.relation.def+6]
 pub trait IntoIdentity {
     /// The shape a boundary value must have to line up with this identity: a
     /// tuple of [`Value`] of the same length, so the arity of a column set and
@@ -181,7 +192,7 @@ pub trait IntoIdentity {
 /// The exception is `K = ValueTuple`, the shape of a runtime-built
 /// [`Identity`], which accepts any tuple and leaves the arity to be checked
 /// when the query runs.
-// [spec:pgorm:def:entity.relation.def+5]
+// [spec:pgorm:def:entity.relation.def+6]
 pub trait IntoBoundary<K>: IntoValueTuple {}
 
 /// Check the [Identity] of an Entity
@@ -217,7 +228,7 @@ impl IntoIdentity for &str {
     type ValueType = Value;
 
     fn into_identity(self) -> Identity {
-        Identity::Unary(SharedIden::new(Alias::new(self)))
+        Identity::from(SharedIden::new(Alias::new(self)))
     }
 }
 
@@ -228,48 +239,8 @@ where
     type ValueType = Value;
 
     fn into_identity(self) -> Identity {
-        Identity::Unary(self.into_iden())
+        Identity::from(self.into_iden())
     }
-}
-
-impl<T, C> IntoIdentity for (T, C)
-where
-    T: IdenStr,
-    C: IdenStr,
-{
-    type ValueType = (Value, Value);
-
-    fn into_identity(self) -> Identity {
-        Identity::Binary(self.0.into_iden(), self.1.into_iden())
-    }
-}
-
-impl<T, C> IntoBoundary<(Value, Value)> for (T, C)
-where
-    T: Into<Value>,
-    C: Into<Value>,
-{
-}
-
-impl<T, C, R> IntoIdentity for (T, C, R)
-where
-    T: IdenStr,
-    C: IdenStr,
-    R: IdenStr,
-{
-    type ValueType = (Value, Value, Value);
-
-    fn into_identity(self) -> Identity {
-        Identity::Ternary(self.0.into_iden(), self.1.into_iden(), self.2.into_iden())
-    }
-}
-
-impl<T, C, R> IntoBoundary<(Value, Value, Value)> for (T, C, R)
-where
-    T: Into<Value>,
-    C: Into<Value>,
-    R: Into<Value>,
-{
 }
 
 /// Expands to [`Value`] once per type parameter of a tuple impl, so the
@@ -289,7 +260,7 @@ macro_rules! impl_into_identity {
             type ValueType = ( $(boundary_element!($T)),+ );
 
             fn into_identity(self) -> Identity {
-                Identity::Many(vec![
+                Identity::from(vec![
                     $(self.$N.into_iden()),+
                 ])
             }
@@ -307,6 +278,8 @@ macro_rules! impl_into_identity {
 mod impl_into_identity {
     use super::*;
 
+    impl_into_identity!(T0:0, T1:1);
+    impl_into_identity!(T0:0, T1:1, T2:2);
     impl_into_identity!(T0:0, T1:1, T2:2, T3:3);
     impl_into_identity!(T0:0, T1:1, T2:2, T3:3, T4:4);
     impl_into_identity!(T0:0, T1:1, T2:2, T3:3, T4:4, T5:5);

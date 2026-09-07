@@ -568,6 +568,7 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id pair-deletion, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:13:59.32051Z}
     {id linked-fold, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:32:33.531154Z}
+    {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
 )
 
 impl_evidence (
@@ -832,12 +833,10 @@ impl_evidence (
     )}
     {id orm.exec, covered_rules (
         exec.crud
-        exec.crud.consolidate
         exec.crud.delete
         exec.crud.exec-result
         exec.crud.insert
         exec.crud.insert-returning
-        exec.crud.no-stream
         exec.crud.select
         exec.crud.try-insert
         exec.crud.update
@@ -853,12 +852,10 @@ impl_evidence (
         exec.decode.u32-oid
     ), covered_claims (
         {impl_name main, rule exec.crud}
-        {impl_name main, rule exec.crud.consolidate}
         {impl_name main, rule exec.crud.delete}
         {impl_name main, rule exec.crud.exec-result}
         {impl_name main, rule exec.crud.insert}
         {impl_name main, rule exec.crud.insert-returning}
-        {impl_name main, rule exec.crud.no-stream}
         {impl_name main, rule exec.crud.select}
         {impl_name main, rule exec.crud.try-insert}
         {impl_name main, rule exec.crud.update}
@@ -902,7 +899,6 @@ impl_evidence (
     )}
     {id orm.query, covered_rules (
         query.build
-        query.build.combine
         query.build.debug-query
         query.build.delete
         query.build.filter
@@ -921,7 +917,6 @@ impl_evidence (
         query.loader.table-ref-limitation
     ), covered_claims (
         {impl_name main, rule query.build}
-        {impl_name main, rule query.build.combine}
         {impl_name main, rule query.build.debug-query}
         {impl_name main, rule query.build.delete}
         {impl_name main, rule query.build.filter}
@@ -1136,7 +1131,6 @@ impl_evidence (
         sql.value.array
         sql.value.conversions
         sql.value.render
-        sql.value.to-json
         sql.value.tuple
         sql.value.value-type
     ), covered_claims (
@@ -1150,7 +1144,6 @@ impl_evidence (
         {impl_name main, rule sql.value.array}
         {impl_name main, rule sql.value.conversions}
         {impl_name main, rule sql.value.render}
-        {impl_name main, rule sql.value.to-json}
         {impl_name main, rule sql.value.tuple}
         {impl_name main, rule sql.value.value-type}
     )}

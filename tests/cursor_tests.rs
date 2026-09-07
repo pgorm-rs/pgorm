@@ -606,7 +606,7 @@ pub async fn create_baker_cake(db: &DatabaseConnection) -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.cursor+4/test]    `SelectGraph::cursor_by` and
 // `cursor_by_on` on a joined read, decoded through the graph's own selector
-// [spec:pgorm:sem:exec.cursor.order+2/test]    a joined cursor's automatic
+// [spec:pgorm:sem:exec.cursor.order+3/test]    a joined cursor's automatic
 // secondary order on every decoded slot's primary key, giving the
 // deterministic tiebreak the row order below depends on
 pub async fn cursor_related_pagination(db: &DatabaseConnection) -> Result<(), Error> {
@@ -1223,7 +1223,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
         "Query Error: cursor boundary of arity 2 does not match 1 order column(s)"
     );
 
-    // And a five-element tuple against a four-column `Identity::Many`.
+    // And a five-element tuple against a four-column `Identity`.
     let many = Entity::find()
         .cursor_by((Column::A, Column::B, Column::C, Column::D).into_identity())
         .after((1, 2, 3, 4, 5))
@@ -1252,7 +1252,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.order+2/test]    ordering clears any pre-existing
+// [spec:pgorm:sem:exec.cursor.order+3/test]    ordering clears any pre-existing
 // ORDER BY, applies the order columns in declared order, then the unary
 // secondary entries, all in the single resolved direction
 #[pgorm_macros::test]
@@ -1307,7 +1307,7 @@ async fn cursor_order_composition() -> Result<(), Error> {
     let mut bad_unary = Entity::find().cursor_by(Column::A);
     bad_unary.set_secondary_order_by(vec![(
         SharedIden::clone(&table),
-        Identity::Unary(alias("no_such_column").into_iden()),
+        Identity::from(alias("no_such_column").into_iden()),
     )]);
     assert!(matches!(
         bad_unary.first(8).all(&db).await,
@@ -1319,10 +1319,10 @@ async fn cursor_order_composition() -> Result<(), Error> {
     let mut composite_secondary = Entity::find().cursor_by(Column::A);
     composite_secondary.set_secondary_order_by(vec![(
         SharedIden::clone(&table),
-        Identity::Binary(
+        Identity::from(vec![
             alias("no_such_column").into_iden(),
             alias("nor_this_one").into_iden(),
-        ),
+        ]),
     )]);
     assert_eq!(composite_secondary.first(8).all(&db).await?.len(), 8);
 
@@ -1332,7 +1332,7 @@ async fn cursor_order_composition() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.order+2/test]    every execution composes onto a
+// [spec:pgorm:sem:exec.cursor.order+3/test]    every execution composes onto a
 // copy of the query, so a moved boundary or a flipped direction replaces the
 // previous execution's WHERE instead of being ANDed onto it
 #[pgorm_macros::test]

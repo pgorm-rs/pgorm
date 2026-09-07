@@ -200,7 +200,7 @@ explicit limitations.
 
 ## Active model
 
-> [spec:pgorm:req:entity.active-model+2]
+> [spec:pgorm:req:entity.active-model+3]
 > `ActiveModelTrait: Clone + Debug` (`src/entity/active_model.rs`) is the write-side
 > row representation whose fields are `ActiveValue`s. Implementations MUST provide
 > per-column state access: `get` (immutable), `take` (removes and returns, leaving
@@ -209,8 +209,9 @@ explicit limitations.
 > `Error::Type` instead of unwinding), `not_set` (clears to `NotSet`),
 > `is_not_set`, `reset` (per-column `Unchanged` → `Set`), and `default()` (all columns
 > `NotSet`). `reset_all` applies `reset` to every column. `get_primary_key_value`
-> returns the key as a `ValueTuple` (`One`/`Two`/`Three`/`Many` chosen by
-> `PrimaryKeyArity::ARITY`) and MUST return `None` if any key component is `NotSet`.
+> reads `PrimaryKeyArity::ARITY` values, in primary-key iteration order, into one
+> `ValueTuple` (`[spec:pgorm:def:sql.value.tuple+3]`) whatever the arity, and
+> MUST return `None` if any key component is `NotSet`.
 > `is_changed` returns `true` when any attribute is in the `Set` state.
 
 > [spec:pgorm:def:entity.active-model.active-value+1]
@@ -380,7 +381,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+5]
+> [spec:pgorm:def:entity.relation.def+6]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
@@ -404,11 +405,15 @@ explicit limitations.
 > `to_identity()` project one side as an `Identity` for consumers that key on a
 > single side.
 >
-> `Identity` (`src/entity/identity.rs`) encodes column-set arity as
-> `Unary` / `Binary` / `Ternary` / `Many(Vec<DynIden>)`. `IntoIdentity` converts
-> `&str` and `String` (via `Alias`), any `IdenStr`, and tuples of up to 12
-> identifiers; `IdentityOf<E>`, a subtrait of `IntoIdentity`, restricts
-> conversions to columns of entity `E`.
+> `Identity` (`src/entity/identity.rs`) is a newtype over `Vec<DynIden>`: the
+> columns a lookup keys on, in declared order, at every arity. It MUST NOT tag
+> its arity in its representation, so a column set of a given width has one
+> spelling and every consumer walks it rather than dispatching on how many
+> columns it holds — `iter()`, `IntoIterator`, `arity()`, and `single()`, which
+> answers with the one column of a unary set and declines for a wider one. `From<DynIden>`, `From<Vec<DynIden>>` and `FromIterator<DynIden>` build
+> one. `IntoIdentity` converts `&str` and `String` (via `Alias`), any `IdenStr`,
+> and tuples of up to 12 identifiers; `IdentityOf<E>`, a subtrait of
+> `IntoIdentity`, restricts conversions to columns of entity `E`.
 >
 > Each `IntoIdentity` impl also names a `ValueType`: the tuple of `Value` of the
 > same length as the columns it produces, or `ValueTuple` for `Identity` itself,
@@ -476,7 +481,7 @@ explicit limitations.
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+5]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def+6]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a

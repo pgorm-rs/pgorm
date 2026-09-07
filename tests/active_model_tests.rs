@@ -4,7 +4,7 @@ pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
 use pgorm::{Error, Schema, entity::prelude::*};
-use pgorm_query::{QueryBuilder, ValueTuple};
+use pgorm_query::{IntoValueTuple, QueryBuilder, ValueTuple};
 use pretty_assertions::assert_eq;
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ mod serde_renamed {
 // ActiveModelTrait: per-column state access
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model+2/test]    the per-column state surface —
+// [spec:pgorm:req:entity.active-model+3/test]    the per-column state surface —
 // `default()` leaves every column `NotSet`, `set` stores a `Value` as `Set`,
 // `get` reads without consuming, `take` removes and leaves `NotSet` behind,
 // `not_set` clears, `is_not_set` reports, and `reset` / `reset_all` promote
@@ -254,12 +254,12 @@ fn active_model_column_state_access() {
     assert!(all.is_changed());
 }
 
-// [spec:pgorm:req:entity.active-model+2/test]    `get_primary_key_value` picks the
-// `ValueTuple` arm from `PrimaryKeyArity::ARITY` — One / Two / Three / Many — and
+// [spec:pgorm:req:entity.active-model+3/test]    `get_primary_key_value` reads
+// `PrimaryKeyArity::ARITY` values into one `ValueTuple`, whatever the arity, and
 // returns `None` when any key component is `NotSet`
 #[test]
 fn active_model_get_primary_key_value() {
-    // Arity 1 -> ValueTuple::One. `Unchanged` counts as holding a value.
+    // Arity 1. `Unchanged` counts as holding a value.
     let am = row::ActiveModel {
         id: ActiveValue::Unchanged(7),
         name: set("Apple"),
@@ -267,10 +267,10 @@ fn active_model_get_primary_key_value() {
     };
     assert_eq!(
         am.get_primary_key_value(),
-        Some(ValueTuple::One(Value::Int(Some(7))))
+        Some(ValueTuple::from(vec![Value::Int(Some(7))]))
     );
 
-    // Arity 2 -> ValueTuple::Two, in primary-key iteration order.
+    // Arity 2, in primary-key iteration order.
     let am = pk2::ActiveModel {
         id_1: set(1),
         id_2: set("two"),
@@ -278,13 +278,13 @@ fn active_model_get_primary_key_value() {
     };
     assert_eq!(
         am.get_primary_key_value(),
-        Some(ValueTuple::Two(
+        Some(ValueTuple::from(vec![
             Value::Int(Some(1)),
             Value::String(Some(Box::new("two".to_owned())))
-        ))
+        ]))
     );
 
-    // Arity 3 -> ValueTuple::Three.
+    // Arity 3.
     let am = pk3::ActiveModel {
         id_1: set(1),
         id_2: set(2),
@@ -293,14 +293,14 @@ fn active_model_get_primary_key_value() {
     };
     assert_eq!(
         am.get_primary_key_value(),
-        Some(ValueTuple::Three(
+        Some(ValueTuple::from(vec![
             Value::Int(Some(1)),
             Value::Int(Some(2)),
             Value::Int(Some(3))
-        ))
+        ]))
     );
 
-    // Arity 4 falls into the `Many` arm.
+    // Arity 4 reads through the same walk as every other arity.
     let am = pk4::ActiveModel {
         id_1: set(1),
         id_2: set(2),
@@ -310,12 +310,19 @@ fn active_model_get_primary_key_value() {
     };
     assert_eq!(
         am.get_primary_key_value(),
-        Some(ValueTuple::Many(vec![
+        Some(ValueTuple::from(vec![
             Value::Int(Some(1)),
             Value::Int(Some(2)),
             Value::Int(Some(3)),
             Value::Int(Some(4)),
         ]))
+    );
+
+    // A tuple gathered from an iterator is the same value as one a Rust tuple
+    // builds: the collapsed representation has no second spelling for a key.
+    assert_eq!(
+        am.get_primary_key_value(),
+        Some((1i32, 2i32, 3i32, 4i32).into_value_tuple())
     );
 
     // Any `NotSet` key component collapses the whole thing to `None`.

@@ -131,7 +131,7 @@ impl From<&[u8]> for ActiveValue<Vec<u8>> {
 /// [`ActiveModelBehavior`] for what the hooks can and cannot undo.
 ///
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:req:entity.active-model+2]
+// [spec:pgorm:req:entity.active-model+3]
 // [spec:pgorm:req:entity.active-model.save+1]
 // [spec:pgorm:req:entity.active-model.hooks+1]
 #[async_trait]
@@ -172,47 +172,14 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Get the primary key of the ActiveModel
-    #[allow(clippy::question_mark)]
     fn get_primary_key_value(&self) -> Option<ValueTuple> {
+        let arity = <<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY;
         let mut cols = <Self::Entity as EntityTrait>::PrimaryKey::iter();
-        macro_rules! next {
-            () => {
-                if let Some(col) = cols.next() {
-                    if let Some(val) = self.get(col.into_column()).into_value() {
-                        val
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            };
+        let mut values = Vec::with_capacity(arity);
+        for _ in 0..arity {
+            values.push(self.get(cols.next()?.into_column()).into_value()?);
         }
-        match <<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY {
-            1 => {
-                let s1 = next!();
-                Some(ValueTuple::One(s1))
-            }
-            2 => {
-                let s1 = next!();
-                let s2 = next!();
-                Some(ValueTuple::Two(s1, s2))
-            }
-            3 => {
-                let s1 = next!();
-                let s2 = next!();
-                let s3 = next!();
-                Some(ValueTuple::Three(s1, s2, s3))
-            }
-            len => {
-                let mut vec = Vec::with_capacity(len);
-                for _ in 0..len {
-                    let s = next!();
-                    vec.push(s);
-                }
-                Some(ValueTuple::Many(vec))
-            }
-        }
+        Some(ValueTuple::from(values))
     }
 
     /// Perform an `INSERT` operation on the ActiveModel

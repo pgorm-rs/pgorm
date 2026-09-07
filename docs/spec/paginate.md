@@ -15,7 +15,7 @@ bound parameter is held to.
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoIdentity::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+5]` — and defaults to
+> of `[spec:pgorm:def:entity.relation.def+6]` — and defaults to
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
@@ -40,7 +40,7 @@ bound parameter is held to.
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
-> (`[spec:pgorm:sem:exec.cursor.order+2]`). `ORDER BY` and the boundary
+> (`[spec:pgorm:sem:exec.cursor.order+3]`). `ORDER BY` and the boundary
 > comparison MUST both be built from that one list, so the row order and
 > the predicate that resumes it cannot disagree about where a page ends.
 >
@@ -108,7 +108,7 @@ bound parameter is held to.
 > decoding, so `all` always returns rows in the cursor's logical
 > (`asc`/`desc`) order regardless of windowing direction.
 
-> [spec:pgorm:sem:exec.cursor.order+2]
+> [spec:pgorm:sem:exec.cursor.order+3]
 > `Cursor::all` composes each execution onto a *copy* of the stored query:
 > the limit, then the order clause, then the boundary filters are applied
 > to the clone, which is then built and executed via `query_all` and
@@ -127,9 +127,10 @@ bound parameter is held to.
 > theirs — all using the single resolved direction of
 > `exec.cursor.window`. This is the same list the boundary comparison of
 > `[spec:pgorm:sem:exec.cursor.keyset+3]` is built from. Only
-> `Identity::Unary` secondary entries take part; composite secondary
-> identities are silently ignored, in the ordering and in the boundary
-> alike. A joined read installs those entries from its declaration rather
+> unary secondary entries take part — those whose `Identity` has arity 1
+> (`[spec:pgorm:def:entity.relation.def+6]`), a length now read rather than
+> matched on; composite secondary identities are silently ignored, in the
+> ordering and in the boundary alike. A joined read installs those entries from its declaration rather
 > than from a call site (`[spec:pgorm:sem:query.graph.cursor]`), so a joined
 > cursor is totally ordered and can be resumed mid-tie through `after_with`
 > / `before_with`.

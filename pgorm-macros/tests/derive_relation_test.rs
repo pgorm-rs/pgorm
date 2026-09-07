@@ -108,16 +108,7 @@ mod entity_override {
 }
 
 fn cols(id: &Identity) -> Vec<String> {
-    match id {
-        Identity::Unary(a) => vec![Iden::to_string(&**a)],
-        Identity::Binary(a, b) => vec![Iden::to_string(&**a), Iden::to_string(&**b)],
-        Identity::Ternary(a, b, c) => vec![
-            Iden::to_string(&**a),
-            Iden::to_string(&**b),
-            Iden::to_string(&**c),
-        ],
-        Identity::Many(v) => v.iter().map(|i| Iden::to_string(&**i)).collect(),
-    }
+    id.iter().map(|i| Iden::to_string(&**i)).collect()
 }
 
 // [spec:pgorm:syn:macros.derive.relation+1/test]    belongs_to + the mandatory from/to

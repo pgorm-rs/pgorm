@@ -400,7 +400,7 @@ fn unmatched_key_err(
     ))
 }
 
-// [spec:pgorm:sem:query.loader.batching+3]
+// [spec:pgorm:sem:query.loader.batching+4]
 fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
@@ -415,33 +415,19 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+3]
+// [spec:pgorm:sem:query.loader.batching+4]
 fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
 {
-    Ok(match target_col {
-        Identity::Unary(a) => ValueTuple::One(model.get(resolve_column::<Model>(a)?)),
-        Identity::Binary(a, b) => ValueTuple::Two(
-            model.get(resolve_column::<Model>(a)?),
-            model.get(resolve_column::<Model>(b)?),
-        ),
-        Identity::Ternary(a, b, c) => ValueTuple::Three(
-            model.get(resolve_column::<Model>(a)?),
-            model.get(resolve_column::<Model>(b)?),
-            model.get(resolve_column::<Model>(c)?),
-        ),
-        Identity::Many(cols) => {
-            let mut values = Vec::with_capacity(cols.len());
-            for col in cols {
-                values.push(model.get(resolve_column::<Model>(col)?));
-            }
-            ValueTuple::Many(values)
-        }
-    })
+    let mut values = Vec::with_capacity(target_col.arity());
+    for col in target_col.iter() {
+        values.push(model.get(resolve_column::<Model>(col)?));
+    }
+    Ok(ValueTuple::from(values))
 }
 
-// [spec:pgorm:sem:query.loader.batching+3]
+// [spec:pgorm:sem:query.loader.batching+4]
 fn prepare_condition(
     table: &FromItem,
     col: &Identity,
@@ -449,33 +435,16 @@ fn prepare_condition(
 ) -> Result<Condition, Error> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
-    Ok(match col {
-        Identity::Unary(column_a) => {
-            let column_a = table_column(table, column_a)?;
-            Condition::all().add(Expr::col(column_a).is_in(keys.into_iter().flatten()))
+    let mut columns = Vec::with_capacity(col.arity());
+    for col in col.iter() {
+        columns.push(table_column(table, col)?);
+    }
+    Ok(match columns.as_slice() {
+        [column_a] => {
+            Condition::all().add(Expr::col(column_a.clone()).is_in(keys.into_iter().flatten()))
         }
-        Identity::Binary(column_a, column_b) => Condition::all().add(
-            Expr::tuple([
-                SimpleExpr::Column(table_column(table, column_a)?),
-                SimpleExpr::Column(table_column(table, column_b)?),
-            ])
-            .in_tuples(keys),
-        ),
-        Identity::Ternary(column_a, column_b, column_c) => Condition::all().add(
-            Expr::tuple([
-                SimpleExpr::Column(table_column(table, column_a)?),
-                SimpleExpr::Column(table_column(table, column_b)?),
-                SimpleExpr::Column(table_column(table, column_c)?),
-            ])
-            .in_tuples(keys),
-        ),
-        Identity::Many(cols) => {
-            let mut columns = Vec::with_capacity(cols.len());
-            for col in cols {
-                columns.push(SimpleExpr::Column(table_column(table, col)?));
-            }
-            Condition::all().add(Expr::tuple(columns).in_tuples(keys))
-        }
+        _ => Condition::all()
+            .add(Expr::tuple(columns.iter().cloned().map(SimpleExpr::Column)).in_tuples(keys)),
     })
 }
 
@@ -506,6 +475,7 @@ fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
 mod tests {
     use super::*;
     use crate::tests_cfg::{cake, filling};
+    use pgorm_query::IntoValueTuple;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -517,7 +487,7 @@ mod tests {
 
         let src_alias: DynIden = SharedIden::new(LOADER_SOURCE_ALIAS);
         let src_tbl = FromItem::from(TableName::Table(SharedIden::clone(&src_alias)));
-        let keys = vec![ValueTuple::One(1i32.into()), ValueTuple::One(2i32.into())];
+        let keys = vec![1i32.into_value_tuple(), 2i32.into_value_tuple()];
         let condition = prepare_condition(&src_tbl, &via_from_col, &keys)
             .expect("a bare table qualifies the key column");
 

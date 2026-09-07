@@ -230,7 +230,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+5]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+6]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -491,12 +491,12 @@ what makes it total over partially-set models.
 > `via` junction or if the target relation is not `HasOne`. An empty input
 > slice short-circuits to an empty result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+3]
-> Keys are collected in input order: for each input model, `extract_key`
-> builds a `ValueTuple` from the from side of the relation's `columns`,
-> projected as an `Identity` (unary,
-> binary, ternary or many), resolving each column name back to the entity's
-> `Column` enum via `FromStr`. A name that does not map is a caller-authored
+> [spec:pgorm:sem:query.loader.batching+4]
+> Keys are collected in input order: for each input model, `extract_key` walks
+> the from side of the relation's `columns`, projected as an `Identity`
+> (`[spec:pgorm:def:entity.relation.def+6]`), into one `ValueTuple` — one walk
+> at every arity, resolving each column name back to the entity's `Column` enum
+> via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
 > return `Err(Error::Query)` naming the unresolved column and the model's
 > table rather than panicking, and the load aborts with that error. The
@@ -556,7 +556,7 @@ what makes it total over partially-set models.
 > rather than the input entity. That reversal is a direction, not a change of
 > meaning: an authored `on_condition` MUST still receive its two identifiers
 > in the roles the relation was written with
-> (`[spec:pgorm:def:entity.relation.def+5]`), so the loader re-swaps the
+> (`[spec:pgorm:def:entity.relation.def+6]`), so the loader re-swaps the
 > closure's arguments when it reverses a def. The `via()` hop joins LEFT and
 > the slot INNER, which selects the rows two INNER joins did: the slot's ON
 > references the junction's columns and NULLs do not satisfy it.

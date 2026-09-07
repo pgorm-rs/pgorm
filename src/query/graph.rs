@@ -131,7 +131,7 @@ pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &DynIden) -> Tie
         .map(|pk| {
             (
                 SharedIden::clone(qualifier),
-                Identity::Unary(SharedIden::new(pk.into_column())),
+                Identity::from(SharedIden::new(pk.into_column())),
             )
         })
         .collect()

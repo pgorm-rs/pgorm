@@ -555,7 +555,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+3/test]    keys are collected in input
+// [spec:pgorm:sem:query.loader.batching+4/test]    keys are collected in input
 // order and become a single IN predicate on the relation's to side: a
 // composite key renders as a tuple `IN` list through `in_tuples` (the unary
 // `col IN (..)` form is what every other loader test here exercises). The
@@ -703,7 +703,7 @@ async fn loader_errors_on_aliased_from_item() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+3/test]    a relation naming a column
+// [spec:pgorm:sem:query.loader.batching+4/test]    a relation naming a column
 // its source model does not have is reported as an `Err` naming that column and
 // the model's table, not a panic
 #[pgorm_macros::test]
@@ -761,9 +761,9 @@ async fn loader_errors_on_unmatched_returned_key() -> Result<(), Error> {
     );
     assert!(
         message.starts_with(
-            "Loader cannot regroup a returned row: the key One(String(Some(\"ab \"))) read from \
-             `code` equals none of the keys read from `name` (an input key reads as \
-             One(String(Some(\"ab\"))))."
+            "Loader cannot regroup a returned row: the key ValueTuple([String(Some(\"ab \"))]) \
+             read from `code` equals none of the keys read from `name` (an input key reads as \
+             ValueTuple([String(Some(\"ab\"))]))."
         ),
         "{message}"
     );

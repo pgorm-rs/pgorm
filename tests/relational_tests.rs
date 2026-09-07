@@ -1420,7 +1420,7 @@ fn relation_trait_and_ownership_direction() {
     );
 }
 
-// [spec:pgorm:def:entity.relation.def+5/test]    the `RelationDef` record and its
+// [spec:pgorm:def:entity.relation.def+6/test]    the `RelationDef` record and its
 // combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
 // keeps everything else; `from_alias` re-points the source table; `on_condition`
 // replaces any existing custom condition; `condition_type` picks AND vs OR.
@@ -1559,40 +1559,60 @@ fn relation_def_record_and_combinators() {
         r#""baker"."bakery_id" = "bakery"."id" OR "bakery"."id" > 10"#
     );
 
-    // `Identity` encodes column-set arity, and `IntoIdentity` reaches it from
-    // `&str`, `String`, any `IdenStr`, and tuples.
-    assert!(matches!("code".into_identity(), Identity::Unary(_)));
-    assert!(matches!(
-        "code".to_owned().into_identity(),
-        Identity::Unary(_)
-    ));
-    assert!(matches!(
-        bakery::Column::Id.into_identity(),
-        Identity::Unary(_)
-    ));
-    assert!(matches!(
-        (bakery::Column::Id, bakery::Column::Name).into_identity(),
-        Identity::Binary(..)
-    ));
-    assert!(matches!(
+    // `Identity` holds a column set of any width in one representation, and
+    // `IntoIdentity` reaches it from `&str`, `String`, any `IdenStr`, and
+    // tuples: the arity is the length, not a variant.
+    assert_eq!("code".into_identity().arity(), 1);
+    assert_eq!("code".to_owned().into_identity().arity(), 1);
+    assert_eq!(bakery::Column::Id.into_identity().arity(), 1);
+    assert_eq!(
+        (bakery::Column::Id, bakery::Column::Name)
+            .into_identity()
+            .arity(),
+        2
+    );
+    assert_eq!(
         (
             bakery::Column::Id,
             bakery::Column::Name,
             bakery::Column::ProfitMargin
         )
-            .into_identity(),
-        Identity::Ternary(..)
-    ));
-    assert!(matches!(
+            .into_identity()
+            .arity(),
+        3
+    );
+    assert_eq!(
         (
             cake::Column::Id,
             cake::Column::Name,
             cake::Column::Price,
             cake::Column::BakeryId
         )
-            .into_identity(),
-        Identity::Many(v) if v.len() == 4
-    ));
+            .into_identity()
+            .arity(),
+        4
+    );
+
+    // `single` is the length check a consumer that can only act on one column
+    // makes: it answers for a unary set and declines for a wider one.
+    assert!(bakery::Column::Id.into_identity().single().is_some());
+    assert!(
+        (bakery::Column::Id, bakery::Column::Name)
+            .into_identity()
+            .single()
+            .is_none()
+    );
+
+    // A column set gathered from an iterator is the same value as the one a
+    // tuple builds, so there is no second spelling of the same key.
+    let gathered: Identity = (bakery::Column::Id, bakery::Column::Name)
+        .into_identity()
+        .into_iter()
+        .collect();
+    assert_eq!(
+        gathered.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
+        ["id", "name"]
+    );
 
     // An `Identity` iterates its components in order.
     let components: Vec<String> = (bakery::Column::Id, bakery::Column::Name)
@@ -1609,14 +1629,8 @@ fn relation_def_record_and_combinators() {
             .columns(cakes_bakers::Column::CakeId, cakes_bakers::Column::CakeId)
             .and_columns(cakes_bakers::Column::BakerId, cakes_bakers::Column::BakerId),
     );
-    assert!(matches!(
-        composite.columns.from_identity(),
-        Identity::Binary(..)
-    ));
-    assert!(matches!(
-        composite.columns.to_identity(),
-        Identity::Binary(..)
-    ));
+    assert_eq!(composite.columns.from_identity().arity(), 2);
+    assert_eq!(composite.columns.to_identity().arity(), 2);
 }
 
 // [spec:pgorm:req:entity.relation.builder+1/test]    the `belongs_to` path starts
@@ -1633,8 +1647,8 @@ fn relation_builder_accumulates_a_definition() {
         baker::Entity::belongs_to(bakery::Entity)
             .columns(baker::Column::BakeryId, bakery::Column::Id),
     );
-    assert!(matches!(def.columns.from_identity(), Identity::Unary(_)));
-    assert!(matches!(def.columns.to_identity(), Identity::Unary(_)));
+    assert_eq!(def.columns.from_identity().arity(), 1);
+    assert_eq!(def.columns.to_identity().arity(), 1);
     // Nothing optional was set, and `condition_type` defaults to All.
     assert_eq!(action(&def.on_delete), "None");
     assert_eq!(action(&def.on_update), "None");
@@ -1666,7 +1680,7 @@ fn relation_builder_accumulates_a_definition() {
     assert_eq!(full.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:def:entity.relation.def+5/test]    a set of join columns is a
+// [spec:pgorm:def:entity.relation.def+6/test]    a set of join columns is a
 // list of pairs, so both sides always name the same number of columns however
 // the definition is built, reversed or extended
 #[test]

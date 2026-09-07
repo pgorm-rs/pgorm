@@ -62,26 +62,6 @@ pub struct Cursor<S, K = ValueTuple> {
     phantom: PhantomData<(S, K)>,
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3]
-fn identity_arity(columns: &Identity) -> usize {
-    match columns {
-        Identity::Unary(..) => 1,
-        Identity::Binary(..) => 2,
-        Identity::Ternary(..) => 3,
-        Identity::Many(columns) => columns.len(),
-    }
-}
-
-// [spec:pgorm:sem:exec.cursor.keyset+3]
-fn value_tuple_arity(values: &ValueTuple) -> usize {
-    match values {
-        ValueTuple::One(..) => 1,
-        ValueTuple::Two(..) => 2,
-        ValueTuple::Three(..) => 3,
-        ValueTuple::Many(values) => values.len(),
-    }
-}
-
 impl<S, K> Cursor<S, K> {
     /// Create a new cursor
     pub fn new<C>(query: SelectStatement, table: DynIden, order_columns: C) -> Self
@@ -161,19 +141,12 @@ impl<S, K> Cursor<S, K> {
     // [spec:pgorm:sem:exec.cursor.keyset+3]
     fn keyset_columns(&self) -> Vec<(DynIden, DynIden)> {
         self.order_columns
-            .clone()
-            .into_iter()
-            .map(|col| (SharedIden::clone(&self.table), col))
-            .chain(
-                self.secondary_order_by
-                    .iter()
-                    .filter_map(|(tbl, col)| match col {
-                        Identity::Unary(c1) => {
-                            Some((SharedIden::clone(tbl), SharedIden::clone(c1)))
-                        }
-                        _ => None,
-                    }),
-            )
+            .iter()
+            .map(|col| (SharedIden::clone(&self.table), SharedIden::clone(col)))
+            .chain(self.secondary_order_by.iter().filter_map(|(tbl, col)| {
+                col.single()
+                    .map(|c1| (SharedIden::clone(tbl), SharedIden::clone(c1)))
+            }))
             .collect()
     }
 
@@ -201,8 +174,8 @@ impl<S, K> Cursor<S, K> {
         F: Fn(Expr, Value) -> SimpleExpr,
     {
         let keyset = self.keyset_columns();
-        let primary = identity_arity(&self.order_columns);
-        let arity = value_tuple_arity(&values);
+        let primary = self.order_columns.arity();
+        let arity = values.arity();
 
         let columns = if arity == primary {
             &keyset[..primary]
@@ -293,7 +266,7 @@ impl<S, K> Cursor<S, K> {
         }
     }
 
-    // [spec:pgorm:sem:exec.cursor.order+2]
+    // [spec:pgorm:sem:exec.cursor.order+3]
     fn apply_order_by(&mut self, query: &mut SelectStatement) {
         query.clear_order_by();
         let ord = self.resolve_sort_order();
@@ -307,7 +280,7 @@ impl<S, K> Cursor<S, K> {
     /// window, order and boundary applied to a copy of it, so the cursor can be
     /// re-executed with a moved boundary or a flipped direction without the
     /// previous execution's clauses still on it.
-    // [spec:pgorm:sem:exec.cursor.order+2]
+    // [spec:pgorm:sem:exec.cursor.order+3]
     fn compose(&mut self) -> Result<SelectStatement, Error> {
         let mut query = self.query.clone();
         self.apply_limit(&mut query);
@@ -359,7 +332,7 @@ where
     S: SelectorTrait,
 {
     /// Fetch the paginated result
-    // [spec:pgorm:sem:exec.cursor.order+2]
+    // [spec:pgorm:sem:exec.cursor.order+3]
     pub async fn all<C>(&mut self, db: &C) -> Result<Vec<S::Item>, Error>
     where
         C: ConnectionTrait,
