@@ -1517,6 +1517,34 @@ children (
                     }
                 )
             }
+
+            {
+                id query-error-from
+                title "impl From&lt;pgorm_query::Error&gt; for pgorm::Error"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-07T11:39:30.398557Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: pgorm::Error has no From&lt;pgorm_query::Error&gt;, so every ORM-level call into the template/expr constructors (CustomExpr and friends) hand-rolls map_err. SPEC IMPACT (bump rides the fix commit): bump error.model — the error type MUST absorb the query-builder's error via From so ? works across the crate boundary; decide the variant (likely a dedicated Query variant rather than stringly folding). FIX SKETCH: From impl plus a sweep replacing the manual map_err call sites."
+                    }
+                )
+            }
+
+            {
+                id relation-def-rev
+                title "Promote RelationDef reversal to the public surface, consolidating both private copies"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-07T11:39:37.517597Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: two private reversal helpers exist — src/entity/relation.rs:166 (left by the linked-fold, single caller) and src/query/loader.rs:363 (the loader's own copy) — the same from/to + ownership flip written twice. Deferred during linked-fold as single-caller; the duplicate makes promotion worth it. SPEC IMPACT (bump rides the fix commit): bump entity.relation.def — define reversal (from/to swap, FK-ownership flip, condition side preservation) as public RelationDef surface. FIX SKETCH: one public RelationDef::rev, both private copies deleted, loader and link.rs call it; test asserting rev(rev(r)) round-trips the def."
+                    }
+                )
+            }
         )
     }
 
@@ -3998,6 +4026,77 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id save-as-predicate-casts
+                title "save_as casts never reach eq_any/ne_all or cursor keyset predicates"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-07T11:38:52.607452Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence (from the wire-types campaign, repro on d778f24b lineage): ColumnTrait::eq and the other value-only comparators apply the column's save_as cast, but the multi-value forms (eq_any/ne_all, i.e. the is_in/is_not_in family) and the keyset cursor's boundary predicates build bare column comparisons — a save_as enum column filtered by set membership or paginated by cursor sends the uncast representation. Since the ValueHolder wire-type matrix landed, this fails loudly client-side instead of sending garbage; still broken, and there is no test exercising either path. SPEC IMPACT (bump rides the fix commit per bump-once-re-pin-everywhere): bump entity.traits.column.enum-cast — every value-predicate form, including multi-value set membership, MUST carry the column's save_as cast; bump exec.cursor.keyset — boundary predicates apply the same cast discipline as ordinary value predicates. FIX SKETCH: thread cast application through the multi-value predicate constructors on ColumnTrait and through the cursor's boundary-predicate builder; tests: save_as enum column through is_in/is_not_in, and cursor_by over an ordering keyed on such a column."
+                    }
+                )
+            }
+
+            {
+                id enum-schema-surface
+                title "pgorm-query: enum type references carry no schema qualifier"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-07T11:39:00.766389Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: ColumnType::Enum and the enum DDL/cast renderers have no schema surface — CREATE TYPE, DROP TYPE, ALTER TYPE and ::type casts always render the bare type name, so a schema-qualified enum cannot round-trip through pgorm-query. Surfaced during the codegen-schema-qualifiers fix: TableIdent{table, schema} gave tables a qualifier, enum types got nothing. SPEC IMPACT (bump rides the fix commit): bump sql.ddl.type-enum and sql.render.ddl.enum-type — an enum type reference declares an optional schema and every rendering, DDL and cast alike, MUST qualify when one is present; check whether sql.render.cast-param-type renders the cast site and bump it too if so. FIX SKETCH: give the enum type reference a schema-bearing shape mirroring TableIdent (schema None preserves today's rendering everywhere); this is the pgorm-query half — the codegen/macros threading is enum-schema-codegen, which deps on this node."
+                    }
+                )
+            }
+
+            {
+                id enum-schema-codegen
+                title "Codegen and macros drop schema qualifiers on generated enum types"
+                kind @fix
+                deps (enum-schema-surface)
+                log (
+                    {
+                        at 2026-09-07T11:39:07.944984Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: pgorm-codegen's transformer/writer emit enum definitions and DeriveActiveEnum attributes with bare type names even when the described schema qualifies the enum, so generated entities lose the qualifier the moment it matters (deps on enum-schema-surface — there is nowhere to put the schema until pgorm-query grows the surface). SPEC IMPACT (bump rides the fix commit): bump codegen.entity.enums — generated enum definitions MUST carry the source schema qualifier when the described type has one; bump macros.derive.active-enum if the attribute grammar grows a schema key. FIX SKETCH: thread schema through the codegen enum path the same way TableIdent threaded it for tables (option-as-default so unqualified schemas emit unchanged output); golden-test with a schema-qualified enum fixture."
+                    }
+                )
+            }
+
+            {
+                id datetime-array-tags
+                title "sql_type_match collapses the three datetime array flavors to one ArrayType tag"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-07T11:39:15.78767Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: sql_type_match (pgorm-macros/src/derives/sql_type_match.rs, annotated [spec:pgorm:sem:macros.derive.entity-model.column-def]) maps the three datetime array flavors — timestamp, timestamptz, and the third date-time variant — onto a single ArrayType tag, so the inferred array identity is wrong for two of the three. Latent: no current caller observes the collapsed tag, but any future consumer of ArrayType for these columns inherits the wrong answer silently. SPEC IMPACT (bump rides the fix commit): bump macros.derive.entity-model.column-def — each datetime column flavor MUST map to its own distinct array tag; implementing agent verifies the exact variant set at the site before writing the rule text. FIX SKETCH: split the match arms so each flavor yields its own ArrayType; add a compile-side test asserting the three tags are pairwise distinct."
+                    }
+                )
+            }
+
+            {
+                id select-sources-read-casts
+                title "select_sources projects select_as columns under the default read discipline"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-07T11:39:24.245489Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Evidence: the pipeline's SelectedSources writer (src/pipeline/sources.rs, [spec:pgorm:sem:pipeline.select-sources]) projects source columns under the default discipline — select_as read casts are not applied — diverging from the graph writer's source_read_cast kernel; a save_as/select_as column read through select_sources decodes the stored representation, not the model type. The enum-array text[] cast path is additionally unexercised anywhere in the tree (no enum-array fixture), and is likely the same root cause through this writer. Divergence was documented as-is at finding time; operator boarded it as a defect (2026-09-07). SPEC IMPACT (bump rides the fix commit): bump pipeline.select-sources — the sources projection MUST apply the graph writer's read-cast discipline; the fix adds an enum-array fixture with /test coverage on both the graph and select_sources paths. FIX SKETCH: reuse the graph kernel's source_read_cast at the SelectedSources projection site rather than growing a parallel cast path."
                     }
                 )
             }
