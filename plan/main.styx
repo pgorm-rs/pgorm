@@ -4305,6 +4305,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-09-07T16:17:48.939563Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "Verification on bc45e47b (2026-09-07): the original long-column failure is fixed and all eight review probes pass (cursor probe uses the newly complete boundary). Full workspace run: 1,347 passed, including those eight probes. Closure is nevertheless incomplete: result_column_name in src/executor/result_name.rs:19-29 maps a long column to a head plus hash but leaves short names untouched, allowing a valid short column to equal that generated spelling. No hash search is needed. With columns A = 'a' repeated 61 times and B = 'a' repeated 44 times followed by '08003a0bcb7eb8e2', both under source prefix s0_, both aliases are identical. A database row {left: 'left', right: 'right'} decodes through the graph as {left: 'left', right: 'left'} and through Pipeline::select_sources as {left: 'right', right: 'right'}. New probe bounded_alias_does_not_collide_with_short_column failed live. Follow-up graph-alias-collisions tracks the remaining acceptance gap; this append does not erase the completed original truncation fix. Reproduction patch: /tmp/pgorm-defect-verification-repros.patch; failing output: /tmp/pgorm-alias-collision-verification.log."
+                        after_done true
+                    }
                 )
             }
 
@@ -4326,6 +4334,21 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id graph-alias-collisions
+                title "Prevent bounded result aliases from colliding with valid short column names"
+                kind @fix
+                deps (graph-long-column-aliases)
+                log (
+                    {
+                        at 2026-09-07T16:17:49.097013Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Defect verification 2026-09-07 on bc45e47b. Review severity P1 (silent incorrect model values, not a planning-pass pin). Sources: src/executor/result_name.rs:19-29, consumed by src/query/graph.rs:241 and src/pipeline/sources.rs, with prefixed decoding through src/executor/query.rs. Reproduction: create a model/table with id and two text columns whose SQL names are A = 61 ASCII 'a' characters and B = 44 ASCII 'a' characters followed by '08003a0bcb7eb8e2'. Their ordinary values are 'left' and 'right'. Prefixing A with s0_ invokes the bounded hash spelling; prefixing B stays within 63 bytes and passes through unchanged, yielding the identical alias s0_ plus B. Entity::find().all returns both values correctly. Entity::graph().all returns left='left', right='left'; Pipeline::from(Entity).select_sources(Entity).all returns left='right', right='right'. This deterministic collision requires no FNV collision search. Acceptance: generated result aliases must be unique across each complete projection, including long-versus-short collisions, identical long heads, multibyte identifiers and multiple source slots; graph and pipeline decoding and optional-row absence witnesses must use the same unambiguous mapping. Prefer a construction that makes alias collisions unrepresentable rather than silently relying on hashed names being distinct; if arbitrary input cannot be supported, reject the conflict through a typed error before returning incorrect data. Preserve the fixed 63-byte limit and the successful original long-name probes. Spec impact: revise query.graph.writer+2's explicit short-name passthrough/hash concatenation contract and reconcile query.graph.decode and pipeline.select-sources with the chosen shared alias/decode mapping. Depends on completed graph-long-column-aliases; the original truncation bug is fixed, but its no-collision acceptance criterion is not. Evidence: /tmp/pgorm-defect-verification-repros.patch, test bounded_alias_does_not_collide_with_short_column; /tmp/pgorm-alias-collision-verification.log. The full prior suite including all eight original review probes passed (1,347 tests); this additional live probe fails."
                     }
                 )
             }
