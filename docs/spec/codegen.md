@@ -407,7 +407,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `timestamp` is; mapping it to `DateTimeUtc` claimed a time zone the column
 > does not carry, and disagreed with the inference table's
 > `NaiveDateTime`→`Timestamp` direction
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+4]`).
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+5]`).
 >
 > Limitation: only `Chrono` is usable in practice. The `TimeDate`-family
 > aliases in `pgorm::entity::prelude` are gated behind a `with-time` cargo

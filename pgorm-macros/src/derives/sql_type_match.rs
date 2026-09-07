@@ -65,7 +65,7 @@ fn is_byte_vec(ty: &Type) -> bool {
             .is_some_and(|name| name == "u8")
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
 pub fn col_type_match(
     col_type: Option<TokenStream>,
     field_type: &Type,
@@ -100,7 +100,7 @@ pub fn col_type_match(
 /// Inferring one would generate DDL no `SELECT` could ever fill, so the inference
 /// refuses instead — the same posture as `u8` and `u16`, which have no `ValueType` at
 /// all and so fail on the fallback path.
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
 fn refused_col_type(name: &str) -> Option<&'static str> {
     Some(match name {
         "i8" => "`i8` decodes only from the Postgres `\"char\"` type, never from `smallint`",
@@ -139,7 +139,7 @@ fn inferred_col_type(field_type: &Type) -> Option<TokenStream> {
     })
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
 pub fn arr_type_match(
     arr_type: Option<TokenStream>,
     field_type: &Type,
@@ -174,9 +174,9 @@ fn inferred_arr_type(field_type: &Type) -> Option<TokenStream> {
         "Date" | "NaiveDate" => quote! { ChronoDate },
         "Time" | "NaiveTime" => quote! { ChronoTime },
         "DateTime" | "NaiveDateTime" => quote! { ChronoDateTime },
-        "DateTimeUtc" | "DateTimeLocal" | "DateTimeWithTimeZone" => {
-            quote! { ChronoDateTimeWithTimeZone }
-        }
+        "DateTimeUtc" => quote! { ChronoDateTimeUtc },
+        "DateTimeLocal" => quote! { ChronoDateTimeLocal },
+        "DateTimeWithTimeZone" => quote! { ChronoDateTimeWithTimeZone },
         "Uuid" => quote! { Uuid },
         "Json" => quote! { Json },
         "Decimal" => quote! { Decimal },
@@ -208,7 +208,7 @@ mod tests {
         arr_type_match(None, &ty, Span::call_site()).to_string()
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    types whose decode
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    types whose decode
     // cannot read back what their `Value` binds are refused rather than inferred
     #[test]
     fn undecodable_integer_widths_are_refused() {
@@ -228,7 +228,7 @@ mod tests {
         assert!(col("i64").contains("BigInteger"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    only bare `&str` is in the table
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    only bare `&str` is in the table
     #[test]
     fn shared_str_matches_without_a_lifetime() {
         assert!(col("&str").contains("ColumnType :: string"));
@@ -238,7 +238,7 @@ mod tests {
         assert!(col("&mut str").contains("ValueType"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    the fallback keeps the written type
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    the fallback keeps the written type
     #[test]
     fn fallback_reproduces_the_type_verbatim() {
         assert!(col("&'a str").contains("& 'a str"));
@@ -246,7 +246,7 @@ mod tests {
         assert!(col("<T as Trait>::Assoc").contains("< T as Trait > :: Assoc"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    `Vec<u8>` is the only byte row
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    `Vec<u8>` is the only byte row
     #[test]
     fn byte_vec_matches_only_vec_of_u8() {
         assert!(col("Vec<u8>").contains("Bytea"));
@@ -255,7 +255,23 @@ mod tests {
         assert!(arr("Vec<u8>").contains("ValueType"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    `Option<T>` unwrapping is structural
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    each datetime
+    // flavor keeps its own array tag, agreeing with its `ValueType::array_type()`,
+    // while the column side stays merged on the shared wire type
+    #[test]
+    fn datetime_array_flavors_stay_distinct() {
+        assert!(arr("DateTime").ends_with("ChronoDateTime"));
+        assert!(arr("NaiveDateTime").ends_with("ChronoDateTime"));
+        assert!(arr("DateTimeUtc").ends_with("ChronoDateTimeUtc"));
+        assert!(arr("DateTimeLocal").ends_with("ChronoDateTimeLocal"));
+        assert!(arr("DateTimeWithTimeZone").ends_with("ChronoDateTimeWithTimeZone"));
+
+        for flavor in ["DateTimeUtc", "DateTimeLocal", "DateTimeWithTimeZone"] {
+            assert!(col(flavor).contains("TimestampWithTimeZone"));
+        }
+    }
+
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    `Option<T>` unwrapping is structural
     #[test]
     fn option_unwraps_only_when_bare() {
         let bare = parse_str::<Type>("Option<i64>").expect("test type parses");

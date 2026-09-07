@@ -448,7 +448,7 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
@@ -483,7 +483,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+4/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.

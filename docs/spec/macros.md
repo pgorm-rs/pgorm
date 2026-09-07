@@ -135,7 +135,7 @@ known limitations.
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def+4]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
 > parsed `column_type` attribute if present; otherwise it is inferred by matching the
 > field's Rust type structurally — against the `syn::Type`, never against a
@@ -180,8 +180,14 @@ known limitations.
 >
 > The parallel `ArrayType` table that `DeriveValueType` reads
 > (`[spec:pgorm:sem:macros.derive.value-type+2]`) is matched the same way and carries the
-> same rows mapped to their `ArrayType` counterparts, except `Vec<u8>`, which it does not
-> carry at all. The refusal above is on the `ColumnType` path only, so it reaches
+> same rows mapped to their `ArrayType` counterparts, with two divergences. `Vec<u8>`
+> it does not carry at all. And the timezone-aware datetime row splits:
+> `DateTimeUtc`→`ChronoDateTimeUtc`, `DateTimeLocal`→`ChronoDateTimeLocal`,
+> `DateTimeWithTimeZone`→`ChronoDateTimeWithTimeZone`. The array tag is the element's
+> Rust-side decode identity, not its wire type — all three are `timestamptz` on the
+> wire, which is why the `ColumnType` row stays merged, but each type's own
+> `ValueType::array_type()` names a distinct tag and the inferred tag MUST agree
+> with it. The refusal above is on the `ColumnType` path only, so it reaches
 > `DeriveValueType` too: a newtype over one of the four refused types is the same
 > compile error.
 
@@ -401,7 +407,7 @@ known limitations.
 > attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+4]`, falling back to
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+5]`, falling back to
 > `<T as ValueType>::column_type()`/`array_type()` — and inheriting that rule's refusal
 > of `i8`, `u32`, `u64` and `char` on the `ColumnType` side. Attribute errors propagate: a
 > non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a

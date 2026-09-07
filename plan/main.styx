@@ -4091,6 +4091,13 @@ children (
                         kind @note
                         text "Evidence: sql_type_match (pgorm-macros/src/derives/sql_type_match.rs, annotated [spec:pgorm:sem:macros.derive.entity-model.column-def]) maps the three datetime array flavors — timestamp, timestamptz, and the third date-time variant — onto a single ArrayType tag, so the inferred array identity is wrong for two of the three. Latent: no current caller observes the collapsed tag, but any future consumer of ArrayType for these columns inherits the wrong answer silently. SPEC IMPACT (bump rides the fix commit): bump macros.derive.entity-model.column-def — each datetime column flavor MUST map to its own distinct array tag; implementing agent verifies the exact variant set at the site before writing the rule text. FIX SKETCH: split the match arms so each flavor yields its own ArrayType; add a compile-side test asserting the three tags are pairwise distinct."
                     }
+
+                    {
+                        at 2026-09-07T13:20:35.253984Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
