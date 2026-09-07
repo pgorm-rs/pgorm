@@ -4143,12 +4143,20 @@ children (
                 title "Preserve additional WHERE predicates when an UpdateOne has no changed fields"
                 kind @fix
                 deps (orm.exec)
+                sealed true
                 log (
                     {
                         at 2026-09-07T12:18:08.273507Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 3, severity P2. Source: src/executor/update.rs:33-34, find_updated_model_by_id. Reproduction (no_change_update_preserves_filters): existing parent id 1, then Update::one(parent::Model { id: 1 }.into_active()).unwrap().filter(parent::Column::Id.eq(99)).exec_returning_model(&db). Actual: Ok(Model { id: 1 }), despite the contradictory WHERE. The no-SET shortcut creates a fresh primary-key SELECT and loses the query's additional predicates; version/tenant guards therefore cease to apply on unchanged models. Acceptance: the no-change read honors the complete original filtering and returns RecordNotFound for a nonmatching guard, without an UPDATE or trigger side effects; changed and unchanged paths agree on row eligibility. Cover matching/nonmatching additional predicates and composite primary keys. Spec impact: revise exec.crud.update+5, whose current no-op contract says to re-fetch by primary key, and preserve query.build.update's primary-key validation."
+                    }
+
+                    {
+                        at 2026-09-07T12:47:17.383924Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

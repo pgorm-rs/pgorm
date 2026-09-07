@@ -417,7 +417,7 @@ These rules capture what the code does today, including known gaps.
 > on `UpdateMany`); the old `Insert::exec`, which returned a primary key
 > under a name that promised nothing, is `exec_returning_pk`.
 
-> [spec:pgorm:sem:exec.crud.insert+4]
+> [spec:pgorm:sem:exec.crud.insert+5]
 > `Insert::exec_returning_pk` appends a `RETURNING` clause of the entity's
 > primary-key columns and resolves the key (typed as the entity's
 > `PrimaryKey::ValueType`) from that clause and from nothing else. There is
@@ -438,9 +438,9 @@ These rules capture what the code does today, including known gaps.
 > `RETURNING` reports the conflict row's own key. With the cache gone, a
 > mistyped `PrimaryKey::ValueType` on an insert surfaces as the
 > `Error::UnpackInsertId` of a failed column decode rather than as the
-> `Error::Type` the tuple reconstruction raised; `sql.value.tuple` still
-> guards `exec.crud.update`'s no-op re-fetch, which does rebuild a key from a
-> tuple.
+> `Error::Type` the tuple reconstruction raised. No CRUD path rebuilds a
+> key from a cached tuple any more: `exec.crud.update`'s no-op read reuses
+> its statement's `WHERE` rather than reconstructing one.
 >
 > The key is returned bare. There is no `InsertResult` wrapper and no
 > `last_insert_id` field: a one-field struct whose field repeated the
@@ -476,7 +476,7 @@ These rules capture what the code does today, including known gaps.
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update+5]
+> [spec:pgorm:sem:exec.crud.update+6]
 > `UpdateMany::exec` short-circuits when the update statement carries no SET
 > values, returning `0` without a database round-trip; otherwise it
 > executes and returns the rows-affected count as `u64`.
@@ -491,14 +491,20 @@ These rules capture what the code does today, including known gaps.
 > `RETURNING` clause of all entity columns and decodes through
 > `SelectorRaw::one`, so an update matching zero rows surfaces the
 > `Error::RecordNotFound` of `exec.crud.select`. On the no-op path (nothing
-> to set) it instead re-fetches the current model by primary key. That
-> re-fetch keeps a `Error::PrimaryKeyNotSet` guard for an active model with
-> no primary-key value, but the guard is defensive only: `query.build.update`
-> rejects an unset primary key when the `UpdateOne` is built, so no caller
-> can reach the terminal with one. Rebuilding the typed key from that tuple
-> goes through `sql.value.tuple`, so a shape or element-type disagreement
-> with the entity's declared `ValueType` fails with `Error::Type` naming the
-> table and the mismatch, rather than panicking.
+> to set) it instead re-reads the current model with a plain `SELECT` under
+> the update statement's complete `WHERE` — the primary-key predicates
+> `query.build.update` installed plus every filter the caller added — so a
+> guard predicate (a version or tenant check) excludes an unchanged model
+> exactly as it would exclude a changed one, and a non-matching guard
+> surfaces the same `Error::RecordNotFound`. The changed and unchanged
+> paths thereby agree on row eligibility, and since no `UPDATE` is issued
+> on the no-op path, it can fire no triggers. A statement carrying no
+> `WHERE` at all is refused with `Error::PrimaryKeyNotSet`, but the guard
+> is defensive only: `query.build.update` rejects an unset primary key when
+> the `UpdateOne` is built, so no caller can reach the terminal with one.
+> There is no typed-key rebuild: the read reuses the statement's own
+> predicates rather than reconstructing a key through `sql.value.tuple`, so
+> a mistyped `PrimaryKey::ValueType` is never consulted here.
 > `UpdateMany::exec_returning_models` appends the
 > same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
 > no-op path returns an empty `Vec`.

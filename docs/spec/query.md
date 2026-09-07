@@ -378,7 +378,7 @@ what makes it total over partially-set models.
 > asked to write is not the key of the row the database wrote, and an
 > `ON CONFLICT DO UPDATE` landing on some other row made the difference
 > observable as a primary key that names no row. The key is now resolved from
-> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+4]`), so the builder has
+> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+5]`), so the builder has
 > nothing to remember.
 
 > [spec:pgorm:req:query.build.insert.uniform-columns+3]

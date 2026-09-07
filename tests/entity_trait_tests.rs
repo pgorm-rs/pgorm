@@ -229,7 +229,7 @@ mod too_few_values {
 
 /// One key column of type `i32`, but a `ValueType` declaring `String`. The
 /// arities agree, so `get_primary_key_value` builds a well-shaped tuple and the
-/// element type is what disagrees on the insert and update hot paths.
+/// element type is what disagrees wherever the declared key type is consulted.
 mod mistyped_key {
     use pgorm::entity::prelude::*;
     use pgorm::{RelationDef, RelationTrait};
@@ -621,14 +621,15 @@ fn primary_key_value_type_errs_on_arity() {
     );
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    an insert whose `ValueType`
+// [spec:pgorm:sem:exec.crud.insert+5/test]    an insert whose `ValueType`
 // disagrees with the key column fails decoding the `RETURNING` row, with
 // `Error::UnpackInsertId` rather than a panic. There is no cached tuple to
 // reconstruct from, so the `Error::Type` the reconstruction used to raise is not
 // reachable here. Only `exec_returning_pk` decodes the key, so only it can fail
 // this way; plain `exec` asks for no key and reports the row it wrote.
-// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op re-fetch still rebuilds
-// the typed key from a tuple, and still fails with `Error::Type`
+// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op read reuses the
+// statement's own `WHERE` and never consults `ValueType`, so even a mistyped
+// key declaration re-reads the model successfully
 // [spec:pgorm:req:exec.crud.exec-vocabulary/test]    the two insert terminals
 // differ exactly as their names say: a count needs no key and cannot fail on one
 #[pgorm_macros::test]
@@ -637,12 +638,6 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity);
     db.execute(&stmt.to_string(), &[]).await?;
-
-    let expected = Error::Type(
-        "primary key of `mistyped_key` does not match its declared `ValueType`: \
-         value at position 0 is not a valid `String`"
-            .to_owned(),
-    );
 
     let inserted = Insert::one(mistyped_key::ActiveModel { id: set(1) })
         .exec_returning_pk(&db)
@@ -662,8 +657,48 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
         id: ActiveValue::Unchanged(1),
     })?
     .exec_returning_model(&db)
-    .await;
-    assert_eq!(updated.unwrap_err(), expected);
+    .await?;
+    assert_eq!(updated, mistyped_key::Model { id: 1 });
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.crud.update+6/test]    a composite key's no-op read
+// carries every key predicate and the caller's guard together
+#[pgorm_macros::test]
+async fn composite_key_noop_update_keeps_filters() -> Result<(), Error> {
+    let ctx = TestContext::new("composite_noop_filters").await;
+    let db = ctx.db.get().await?;
+    let stmt = Schema::new().create_table_from_entity(pair::Entity);
+    db.execute(&stmt.to_string(), &[]).await?;
+
+    let row = Insert::one(pair::ActiveModel {
+        left_id: set(1),
+        right_id: set(2),
+        label: set("kept"),
+    })
+    .exec_returning_model(&db)
+    .await?;
+
+    let unchanged = || pair::ActiveModel {
+        left_id: ActiveValue::Unchanged(1),
+        right_id: ActiveValue::Unchanged(2),
+        label: ActiveValue::Unchanged("kept".to_owned()),
+    };
+
+    let matched = Update::one(unchanged())?
+        .filter(pair::Column::Label.eq("kept"))
+        .exec_returning_model(&db)
+        .await?;
+    assert_eq!(matched, row);
+
+    let missed = Update::one(unchanged())?
+        .filter(pair::Column::Label.eq("other"))
+        .exec_returning_model(&db)
+        .await;
+    assert_eq!(missed.unwrap_err(), Error::RecordNotFound);
 
     drop(db);
     ctx.delete().await;

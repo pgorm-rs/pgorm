@@ -65,7 +65,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateMany::exec_returning_models`
+// [spec:pgorm:sem:exec.crud.update+6/test]    `UpdateMany::exec_returning_models`
 // returns every updated model, and an empty `Vec` on the no-op path
 #[pgorm_macros::test]
 async fn update_many() {
@@ -393,7 +393,7 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+5/test]    the no-op short-circuit of
+// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op short-circuit of
 // `UpdateMany::exec` and `UpdateOne::exec_returning_model`
 #[pgorm_macros::test]
 async fn update_noop_and_record_check() -> Result<(), Error> {
@@ -435,7 +435,7 @@ async fn update_noop_and_record_check() -> Result<(), Error> {
     assert_eq!(missed, 0);
 
     // On `UpdateOne`'s no-op path nothing is written; the current model is
-    // re-fetched by primary key instead.
+    // re-read under the statement's own `WHERE` instead.
     let refetched = Update::one(bakery::ActiveModel {
         id: Unchanged(seaside.id),
         name: Unchanged(seaside.name.clone()),
@@ -451,6 +451,48 @@ async fn update_noop_and_record_check() -> Result<(), Error> {
             profit_margin: 12.5,
         }
     );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op read runs under the
+// statement's complete `WHERE`, so a caller-added guard predicate excludes an
+// unchanged row exactly as it would a changed one
+#[pgorm_macros::test]
+async fn no_change_update_honors_added_filters() -> Result<(), Error> {
+    use pgorm::ActiveValue::Unchanged;
+
+    let ctx = TestContext::new("returning_tests_noop_filters").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let seaside = Insert::one(bakery_model("SeaSide Bakery", 10.4))
+        .exec_returning_model(&db)
+        .await?;
+
+    let unchanged = || bakery::ActiveModel {
+        id: Unchanged(seaside.id),
+        name: Unchanged(seaside.name.clone()),
+        profit_margin: Unchanged(seaside.profit_margin),
+    };
+
+    // A guard the row satisfies: the no-op read returns the model.
+    let guarded = Update::one(unchanged())?
+        .filter(bakery::Column::ProfitMargin.eq(seaside.profit_margin))
+        .exec_returning_model(&db)
+        .await?;
+    assert_eq!(guarded, seaside);
+
+    // A guard the row fails: `Error::RecordNotFound`, exactly as a real
+    // `UPDATE` matching zero rows would report.
+    let missed = Update::one(unchanged())?
+        .filter(bakery::Column::Name.eq("Someone Else's Bakery"))
+        .exec_returning_model(&db)
+        .await;
+    assert_eq!(missed.unwrap_err(), Error::RecordNotFound);
 
     drop(db);
     ctx.delete().await;

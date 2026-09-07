@@ -38,7 +38,7 @@ where
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    the primary key comes from the
+// [spec:pgorm:sem:exec.crud.insert+5/test]    the primary key comes from the
 // RETURNING row in every case, including the client-supplied-key one that used
 // to be answered from a cached tuple
 // [spec:pgorm:sem:query.build.insert+3/test]    which is why the builder caches
@@ -71,7 +71,7 @@ async fn manual_key_comes_from_returning() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    an `ON CONFLICT DO UPDATE` that
+// [spec:pgorm:sem:exec.crud.insert+5/test]    an `ON CONFLICT DO UPDATE` that
 // lands on an existing row reports *that* row's primary key, not the one the
 // insert asked for: answering `42` here would name a row that does not exist
 // [spec:pgorm:sem:exec.crud.try-insert+3/test]    and the `TryInsert` wrapper
@@ -135,7 +135,7 @@ async fn upsert_reports_the_conflict_row_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    an empty RETURNING is
+// [spec:pgorm:sem:exec.crud.insert+5/test]    an empty RETURNING is
 // `RecordNotInserted` for a client-supplied key too, which is what an
 // `ON CONFLICT DO NOTHING` that skipped the row yields
 // [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsert` reads that as

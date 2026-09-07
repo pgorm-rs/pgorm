@@ -127,7 +127,7 @@ where
     }
 
     /// Execute the insert and return the inserted row's primary key.
-    // [spec:pgorm:sem:exec.crud.insert+4]
+    // [spec:pgorm:sem:exec.crud.insert+5]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
@@ -167,7 +167,7 @@ where
 /// The key comes from the row the database wrote, never from the model that
 /// asked for it: a manually assigned key that an `ON CONFLICT DO UPDATE` did not
 /// land on names a row that does not exist.
-// [spec:pgorm:sem:exec.crud.insert+4]
+// [spec:pgorm:sem:exec.crud.insert+5]
 async fn exec_insert_returning_pk<A, C>(
     statement: InsertStatement,
     db: &C,

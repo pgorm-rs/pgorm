@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    an empty `RETURNING` fails with
+// [spec:pgorm:sem:exec.crud.insert+5/test]    an empty `RETURNING` fails with
 // RecordNotInserted, for a client-supplied key exactly as for a generated one
 pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
@@ -116,11 +116,11 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+4/test]    a client-supplied primary key is
+// [spec:pgorm:sem:exec.crud.insert+5/test]    a client-supplied primary key is
 // answered from the RETURNING row like any other, not echoed back from the model
 // [spec:pgorm:sem:query.build.insert+3/test]    which is why `Insert::add` keeps
 // no primary-key value tuple to echo
-// [spec:pgorm:sem:exec.crud.update+5/test]    `UpdateOne::exec_returning_model`
+// [spec:pgorm:sem:exec.crud.update+6/test]    `UpdateOne::exec_returning_model`
 // returns the model
 // built from the full-column RETURNING, including a column set back to NULL
 pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(), Error> {
@@ -152,7 +152,7 @@ pub async fn create_and_update_repository(db: &DatabaseConnection) -> Result<(),
         .exec_returning_model(db)
         .await;
 
-    // [spec:pgorm:sem:exec.crud.update+5] UpdateOne decodes through `one`, so a
+    // [spec:pgorm:sem:exec.crud.update+6] UpdateOne decodes through `one`, so a
     // filter matching zero rows surfaces RecordNotFound.
     assert_eq!(update_res, Err(Error::RecordNotFound));
 

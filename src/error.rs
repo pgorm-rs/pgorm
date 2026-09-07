@@ -168,13 +168,6 @@ where
     Error::Json(s.to_string())
 }
 
-#[allow(dead_code)]
-pub(crate) fn primary_key_type_err(table: &str, err: pgorm_query::ValueTupleError) -> Error {
-    Error::Type(format!(
-        "primary key of `{table}` does not match its declared `ValueType`: {err}"
-    ))
-}
-
 /// An error from unsuccessful SQL query
 // [spec:pgorm:sem:error.model.sql-class+3]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]

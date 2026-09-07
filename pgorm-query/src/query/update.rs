@@ -294,6 +294,16 @@ impl UpdateStatement {
     pub fn get_values(&self) -> &[(DynIden, Box<SimpleExpr>)] {
         &self.values
     }
+
+    /// The accumulated `WHERE` condition, when at least one predicate was
+    /// added.
+    // [spec:pgorm:sem:exec.crud.update+6]
+    pub fn where_condition(&self) -> Option<&Condition> {
+        self.r#where
+            .contents
+            .as_ref()
+            .filter(|cond| !cond.conditions.is_empty())
+    }
 }
 
 #[inherent]
