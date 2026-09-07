@@ -1522,12 +1522,27 @@ children (
                 id query-error-from
                 title "impl From&lt;pgorm_query::Error&gt; for pgorm::Error"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-07T11:39:30.398557Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Evidence: pgorm::Error has no From&lt;pgorm_query::Error&gt;, so every ORM-level call into the template/expr constructors (CustomExpr and friends) hand-rolls map_err. SPEC IMPACT (bump rides the fix commit): bump error.model — the error type MUST absorb the query-builder's error via From so ? works across the crate boundary; decide the variant (likely a dedicated Query variant rather than stringly folding). FIX SKETCH: From impl plus a sweep replacing the manual map_err call sites."
+                    }
+
+                    {
+                        at 2026-09-07T13:57:11.152164Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T14:06:34.991306Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

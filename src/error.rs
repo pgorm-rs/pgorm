@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+6]
+// [spec:pgorm:def:error.model+7]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -52,6 +52,9 @@ pub enum Error {
     /// A decode target does not match the statement it would decode
     #[error("Verification Error: {0}")]
     Verify(#[from] VerifyError),
+    /// The statement builder rejected its input
+    #[error("Query Builder Error: {0}")]
+    QueryBuilder(#[from] pgorm_query::error::Error),
     /// A custom error
     #[error("Custom Error: {0}")]
     Custom(String),
@@ -118,7 +121,7 @@ pub enum VerifyError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+6]    crate-root Result alias
+// [spec:pgorm:def:error.model+7]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -130,7 +133,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+6]    Display-string equality
+// [spec:pgorm:def:error.model+7]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

@@ -21,7 +21,7 @@ impl fmt::Display for Boom {
 
 impl StdError for Boom {}
 
-// [spec:pgorm:def:error.model+6/test]    the variants pgorm constructs itself, and how each renders
+// [spec:pgorm:def:error.model+7/test]    the variants pgorm constructs itself, and how each renders
 #[test]
 fn error_variants_render_expected_messages() {
     let cases: Vec<(Error, &str)> = vec![
@@ -71,7 +71,7 @@ fn error_variants_render_expected_messages() {
     }
 }
 
-// [spec:pgorm:def:error.model+6/test]    PartialEq/Eq compare rendered messages, not payloads
+// [spec:pgorm:def:error.model+7/test]    PartialEq/Eq compare rendered messages, not payloads
 #[test]
 fn error_eq_compares_rendered_messages() {
     fn assert_is_eq<T: Eq>() {}
@@ -97,7 +97,7 @@ fn error_eq_compares_rendered_messages() {
     assert_eq!(Error::RecordNotFound, Error::RecordNotFound);
 }
 
-// [spec:pgorm:def:error.model+6/test]    ColumnFromStrError covers FromStr failures on entity columns
+// [spec:pgorm:def:error.model+7/test]    ColumnFromStrError covers FromStr failures on entity columns
 #[test]
 fn column_from_str_error_reports_bad_input() {
     assert!(matches!(
@@ -114,7 +114,7 @@ fn column_from_str_error_reports_bad_input() {
     );
 }
 
-// [spec:pgorm:def:error.model+6/test]    Result defaults to Error but still takes a foreign one
+// [spec:pgorm:def:error.model+7/test]    Result defaults to Error but still takes a foreign one
 #[test]
 fn result_alias_defaults_to_error() {
     fn defaulted() -> pgorm::Result<u8> {
@@ -182,7 +182,7 @@ async fn query_err_surfaces_through_loader_misuse() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+6/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
+// [spec:pgorm:def:error.model+7/test]    ConnectionTrait failures arrive as Postgres, rendering the server detail
 #[pgorm_macros::test]
 async fn error_postgres_carries_server_detail() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_postgres_errmodel").await;
@@ -233,7 +233,7 @@ async fn error_postgres_carries_server_detail() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:error.model+6/test]    DatabasePool::get surfaces pool exhaustion as Error::Pool
+// [spec:pgorm:def:error.model+7/test]    DatabasePool::get surfaces pool exhaustion as Error::Pool
 #[pgorm_macros::test]
 async fn error_pool_from_acquisition_timeout() -> Result<(), Error> {
     let ctx = TestContext::new("error_model_pool_errmodel").await;
@@ -265,4 +265,20 @@ async fn error_pool_from_acquisition_timeout() -> Result<(), Error> {
     ctx.delete().await;
 
     Ok(())
+}
+
+// [spec:pgorm:def:error.model+7/test]    the builder layer's refusals convert
+// in via `From`, so `?` crosses the crate boundary without a `map_err`
+#[test]
+fn query_builder_errors_convert_via_from() {
+    fn build() -> Result<pgorm::pgorm_query::CustomExpr, Error> {
+        Ok(pgorm::pgorm_query::CustomExpr::new("$1 <-> $3", [])?)
+    }
+
+    let err = build().expect_err("a placeholder past the supplied values");
+    assert!(matches!(err, Error::QueryBuilder(_)), "got {err:?}");
+    assert!(
+        err.to_string().starts_with("Query Builder Error: "),
+        "got: {err}"
+    );
 }

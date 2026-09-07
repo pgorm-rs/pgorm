@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+6]
+> [spec:pgorm:def:error.model+7]
 > `Error` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -14,7 +14,11 @@ it.
 > `Pool(pgorm_pool::PoolError)` (produced by `DatabasePool::get`; pool
 > exhaustion and acquisition timeouts surface here). `Verify(VerifyError)`
 > converts in the same way from the statement-verification failures of
-> `exec.verify.errors`. The remaining variants
+> `exec.verify.errors`, and `QueryBuilder(pgorm_query::Error)` from the
+> builder layer's own refusals — the template constructors and
+> `inject_parameters` — so `?` carries them across the crate boundary
+> without a hand-written `map_err` at every ORM-level call site. The
+> `From` impl is that variant's construction site. The remaining variants
 > are constructed by pgorm itself: `Conversion { from, into, source }`,
 > `Query(RuntimeError)`, `ConvertFromU64(&'static str)`, `UnpackInsertId`,
 > `PrimaryKeyNotSet`, `AttrNotSet(String)`, `Type(String)`,
