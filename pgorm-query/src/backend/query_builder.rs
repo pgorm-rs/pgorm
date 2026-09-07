@@ -1521,7 +1521,10 @@ impl QueryBuilder {
                     None => "vector".into(),
                 },
                 ColumnType::Custom(iden) => iden.to_string(),
-                ColumnType::Enum { name, .. } => name.to_string(),
+                ColumnType::Enum { name, schema, .. } => match schema {
+                    Some(schema) => format!("{}.{}", schema.to_string(), name.to_string()),
+                    None => name.to_string(),
+                },
                 ColumnType::Cidr => "cidr".into(),
                 ColumnType::Inet => "inet".into(),
                 ColumnType::MacAddr => "macaddr".into(),
@@ -2169,7 +2172,7 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
-    // [spec:pgorm:req:sql.ddl.type-enum+2]
+    // [spec:pgorm:req:sql.ddl.type-enum+3]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
         match as_type {
             TypeAs::Enum(values) => {
@@ -2197,7 +2200,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.render.ddl.enum-type+1] (ALTER TYPE label operands parameterized)
+    // [spec:pgorm:req:sql.render.ddl.enum-type+2] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2231,8 +2234,8 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+2]
-    // [spec:pgorm:req:sql.render.ddl.enum-type+1]
+    // [spec:pgorm:req:sql.ddl.type-enum+3]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+2]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,

@@ -47,6 +47,24 @@ fn enum_name(col_type: &ColumnType) -> Option<&DynIden> {
     }
 }
 
+/// The enum type's cast spelling: `schema.name` when the type declares a
+/// schema, the bare name otherwise — raw text either way, matching the
+/// unquoted convention every enum cast renders under.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+pub(crate) fn enum_cast_iden(col_type: &ColumnType) -> Option<DynIden> {
+    match col_type {
+        ColumnType::Enum { name, schema, .. } => Some(match schema {
+            Some(schema) => {
+                let qualified = format!("{}.{}", schema.to_string(), name.to_string());
+                SharedIden::new(pgorm_query::Alias::new(qualified)) as DynIden
+            }
+            None => SharedIden::clone(name),
+        }),
+        ColumnType::Array(col_type) => enum_cast_iden(col_type),
+        _ => None,
+    }
+}
+
 impl ColumnDef {
     /// Marks the column as `UNIQUE`
     pub fn unique(mut self) -> Self {
@@ -143,9 +161,128 @@ where
                 _ => expr,
             }
         }
-        _ => match col_type.get_enum_name() {
-            Some(enum_name) => f(expr, SharedIden::clone(enum_name), col_type),
+        _ => match enum_cast_iden(col_type) {
+            Some(enum_name) => f(expr, enum_name, col_type),
             None => expr.into(),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{ColumnTrait, EntityTrait};
+
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3/test]    every
+    // value-position operand passes through `save_as` — between, if_null and
+    // the array membership forms included — for the derive-generated override
+    // and the enum default alike
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3/test]    a
+    // schema-qualified enum type reaches every rendering qualified: the value
+    // cast, the array cast, the CREATE TABLE column type and CREATE TYPE
+    #[test]
+    #[cfg(feature = "macros")]
+    fn schema_qualified_enum_renders_qualified_everywhere() {
+        use crate::{QueryFilter, QueryTrait, Schema};
+
+        mod housed {
+            use crate as pgorm;
+            use crate::entity::prelude::*;
+            use crate::pgorm_query::{Alias, SharedIden};
+
+            #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+            pub struct Entity;
+
+            impl EntityName for Entity {
+                fn table_name(&self) -> &str {
+                    "housed"
+                }
+            }
+
+            #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+            pub struct Model {
+                pub id: i32,
+                pub status: String,
+            }
+
+            #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+            pub enum Column {
+                Id,
+                Status,
+            }
+
+            #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+            pub enum PrimaryKey {
+                Id,
+            }
+
+            impl PrimaryKeyTrait for PrimaryKey {
+                type ValueType = i32;
+
+                fn auto_increment() -> bool {
+                    false
+                }
+            }
+
+            #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+            pub enum Relation {}
+
+            impl ColumnTrait for Column {
+                type EntityName = Entity;
+
+                fn def(&self) -> ColumnDef {
+                    match self {
+                        Self::Id => ColumnType::Integer.def(),
+                        Self::Status => ColumnType::Enum {
+                            name: SharedIden::new(Alias::new("status")),
+                            schema: Some(SharedIden::new(Alias::new("custom"))),
+                            variants: vec![SharedIden::new(Alias::new("open"))],
+                        }
+                        .def(),
+                    }
+                }
+            }
+
+            impl ActiveModelBehavior for ActiveModel {}
+        }
+
+        assert_eq!(
+            housed::Entity::find()
+                .filter(housed::Column::Status.eq("open"))
+                .as_query()
+                .to_string(),
+            [
+                r#"SELECT "housed"."id", CAST("housed"."status" AS text)"#,
+                r#"FROM "housed" WHERE "housed"."status" = (CAST('open' AS custom.status))"#,
+            ]
+            .join(" ")
+        );
+        assert_eq!(
+            housed::Entity::find()
+                .filter(housed::Column::Status.eq_any(["open".to_owned()]))
+                .as_query()
+                .to_string()
+                .split_once("WHERE ")
+                .expect("a WHERE clause")
+                .1,
+            r#""housed"."status" = ANY(CAST(ARRAY ['open'] AS custom.status[]))"#
+        );
+
+        let schema = Schema::new();
+        assert_eq!(
+            schema
+                .create_enum_from_entity(housed::Entity)
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            [r#"CREATE TYPE "custom"."status" AS ENUM ('open')"#]
+        );
+        assert!(
+            schema
+                .create_table_from_entity(housed::Entity)
+                .to_string()
+                .contains(r#""status" custom.status NOT NULL"#),
+            "the column type renders qualified: {}",
+            schema.create_table_from_entity(housed::Entity)
+        );
     }
 }

@@ -207,6 +207,7 @@ fn db_type_enum_expands_to_enum_column_type() {
     assert_eq!(
         col.get_column_type(),
         &ColumnType::Enum {
+            schema: None,
             name: <TestEnum as ActiveEnum>::name(),
             variants: TestEnum::iden_values(),
         }

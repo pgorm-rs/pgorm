@@ -2280,6 +2280,7 @@ mod tests {
                     Column {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
+                            schema: None,
                             name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
                                 SharedIden::new(Alias::new("everyday_tea")),
@@ -2293,6 +2294,7 @@ mod tests {
                     Column {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
+                            schema: None,
                             name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
                                 SharedIden::new(Alias::new("everyday_tea")),
@@ -2324,6 +2326,7 @@ mod tests {
                     Column {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
+                            schema: None,
                             name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
                                 SharedIden::new(Alias::new("everyday_tea")),
@@ -2337,6 +2340,7 @@ mod tests {
                     Column {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
+                            schema: None,
                             name: SharedIden::new(Alias::new("tea_enum")),
                             variants: vec![
                                 SharedIden::new(Alias::new("everyday_tea")),
@@ -2350,6 +2354,7 @@ mod tests {
                     Column {
                         name: "size".to_owned(),
                         col_type: ColumnType::Enum {
+                            schema: None,
                             name: SharedIden::new(Alias::new("tea_size")),
                             variants: vec![
                                 SharedIden::new(Alias::new("small")),

@@ -233,7 +233,7 @@ fn alter_type_rename_emits_identifier() {
 // second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:def:sql.render.ddl.types+3/test]
-// [spec:pgorm:def:sql.types.column-type+3/test]
+// [spec:pgorm:def:sql.types.column-type+4/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
     let hour = Table::create(Glyph::Table)
@@ -521,7 +521,7 @@ fn foreign_keys_name_two_tables_and_a_pair() {
 // and the option-less `ALTER TYPE` PostgreSQL rejects have nowhere to come
 // from. The `compile_fail` doctests on each statement type prove it.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+2/test]
+// [spec:pgorm:req:sql.ddl.type-enum+3/test]
 // [spec:pgorm:req:sql.ddl.type-alter-drop+3/test]
 // [spec:pgorm:req:sql.ddl.extension+3/test]
 #[test]
@@ -555,7 +555,7 @@ fn type_and_extension_names_are_taken() {
 // missing values, that PostgreSQL rejected, so the list is always parenthesised
 // once the type is an enum and both accepted shapes stay buildable.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+2/test]
+// [spec:pgorm:req:sql.ddl.type-enum+3/test]
 #[test]
 fn empty_enum_and_shell_type_are_valid() {
     let shell = Type::create(Alias::new("font_family")).to_string();

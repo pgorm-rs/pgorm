@@ -55,7 +55,9 @@ impl EntityTransformer {
                     || unique_column_sets
                         .iter()
                         .any(|columns| columns.len() == 1 && columns.contains(&col.name));
-                if let pgorm_query::ColumnType::Enum { name, variants } = col.get_inner_col_type() {
+                if let pgorm_query::ColumnType::Enum { name, variants, .. } =
+                    col.get_inner_col_type()
+                {
                     enums.insert(
                         name.to_string(),
                         ActiveEnum {

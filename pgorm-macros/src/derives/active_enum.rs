@@ -61,6 +61,7 @@ impl ActiveEnum {
                                 db_type = Ok(quote! {
                                     Enum {
                                         name: Self::name(),
+                                        schema: None,
                                         variants: Self::iden_values(),
                                     }
                                 })

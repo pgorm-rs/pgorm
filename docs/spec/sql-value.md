@@ -357,7 +357,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.column-type+3]
+> [spec:pgorm:def:sql.types.column-type+4]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -365,7 +365,10 @@ including panic semantics and quirks inherited from sea-query.
 > `BigInteger`, `Float`, `Double`, `Decimal(Option<(u32, u32)>)`, `Timestamp`,
 > `TimestampWithTimeZone`, `Time`, `Date`, `Interval(IntervalSpec)`,
 > `Bit(Option<u32>)`, `VarBit(u32)`, `Boolean`, `Money`,
-> `Json`, `JsonBinary`, `Uuid`, `Custom(DynIden)`, `Enum { name, variants }`,
+> `Json`, `JsonBinary`, `Uuid`, `Custom(DynIden)`,
+> `Enum { name, schema, variants }` (`schema: Option<DynIden>` — a qualified
+> enum type carries its schema in the type itself, so every rendering that
+> names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
 > and `LTree`. `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else

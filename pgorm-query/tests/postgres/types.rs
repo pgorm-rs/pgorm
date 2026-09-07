@@ -2,9 +2,9 @@ use super::*;
 use crate::oracle::assert_eq;
 use pgorm_query::extension::Type;
 
-// [spec:pgorm:req:sql.ddl.type-enum+2/test]
+// [spec:pgorm:req:sql.ddl.type-enum+3/test]
 #[test]
-// [spec:pgorm:req:sql.render.ddl.enum-type+1/test]
+// [spec:pgorm:req:sql.render.ddl.enum-type+2/test]
 fn create_1() {
     assert_eq!(
         Type::create(Font::Table)

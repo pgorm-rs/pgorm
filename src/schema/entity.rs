@@ -3,9 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, SharedIden,
-    TableCreateStatement,
-    extension::{Type, TypeCreateStatement},
+    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, TableCreateStatement,
+    extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
 
@@ -172,14 +171,19 @@ fn enum_element_type(col_type: &ColumnType) -> &ColumnType {
 }
 
 pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<TypeCreateStatement> {
-    let ColumnType::Enum { name, variants } = enum_element_type(col_type) else {
+    let ColumnType::Enum {
+        name,
+        schema,
+        variants,
+    } = enum_element_type(col_type)
+    else {
         return None;
     };
-    Some(
-        Type::create(name.clone())
-            .values(variants.clone())
-            .to_owned(),
-    )
+    let type_ref = match schema {
+        Some(schema) => (schema.clone(), name.clone()).into_type_ref(),
+        None => name.clone().into_type_ref(),
+    };
+    Some(Type::create(type_ref).values(variants.clone()).to_owned())
 }
 
 // [spec:pgorm:sem:schema.from-entity.enum+3]
@@ -192,10 +196,14 @@ where
     for col in E::Column::iter() {
         let col_def = col.def();
         let col_type = enum_element_type(col_def.get_column_type());
-        let ColumnType::Enum { name, .. } = col_type else {
+        let ColumnType::Enum { name, schema, .. } = col_type else {
             continue;
         };
-        if seen.insert(name.to_string()) {
+        let seen_key = match schema {
+            Some(schema) => format!("{}.{}", schema.to_string(), name.to_string()),
+            None => name.to_string(),
+        };
+        if seen.insert(seen_key) {
             vec.extend(create_enum_from_column_type(col_type));
         }
     }
@@ -285,8 +293,10 @@ where
     E: EntityTrait,
 {
     let orm_column_def = column.def();
-    let types = match orm_column_def.col_type {
-        ColumnType::Enum { ref name, .. } => ColumnType::Custom(SharedIden::clone(name)),
+    let types = match crate::entity::column_def::enum_cast_iden(&orm_column_def.col_type) {
+        Some(name) if !matches!(orm_column_def.col_type, ColumnType::Array(_)) => {
+            ColumnType::Custom(name)
+        }
         _ => orm_column_def.col_type,
     };
     let mut column_def = ColumnDef::new_with_type(column, types);

@@ -4085,12 +4085,20 @@ children (
                 id enum-schema-surface
                 title "pgorm-query: enum type references carry no schema qualifier"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-07T11:39:00.766389Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Evidence: ColumnType::Enum and the enum DDL/cast renderers have no schema surface — CREATE TYPE, DROP TYPE, ALTER TYPE and ::type casts always render the bare type name, so a schema-qualified enum cannot round-trip through pgorm-query. Surfaced during the codegen-schema-qualifiers fix: TableIdent{table, schema} gave tables a qualifier, enum types got nothing. SPEC IMPACT (bump rides the fix commit): bump sql.ddl.type-enum and sql.render.ddl.enum-type — an enum type reference declares an optional schema and every rendering, DDL and cast alike, MUST qualify when one is present; check whether sql.render.cast-param-type renders the cast site and bump it too if so. FIX SKETCH: give the enum type reference a schema-bearing shape mirroring TableIdent (schema None preserves today's rendering everywhere); this is the pgorm-query half — the codegen/macros threading is enum-schema-codegen, which deps on this node."
+                    }
+
+                    {
+                        at 2026-09-07T15:12:53.594408Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

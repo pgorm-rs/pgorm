@@ -95,6 +95,7 @@ fn named_type(
     };
     if !catalog && let Some(variants) = enums.get(name.as_str()) {
         return Ok(plain(ColumnType::Enum {
+            schema: None,
             name: SharedIden::new(Alias::new(name.as_str())),
             variants: variants
                 .iter()

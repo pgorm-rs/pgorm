@@ -567,8 +567,10 @@ an ideal Postgres renderer would emit.
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered
 > by the same builder with identifiers quoted per `sql.render.ident-quoting`.
 
-> [spec:pgorm:req:sql.render.ddl.enum-type+1]
-> `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` where each enum label
+> [spec:pgorm:req:sql.render.ddl.enum-type+2]
+> `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` — the name via
+> `TypeRef`'s quoted, dot-joined parts, so a schema-qualified type renders
+> `"schema"."name"` — where each enum label
 > is emitted through `prepare_value` — i.e. as a `$N` parameter in the
 > `build()` path and as a quoted string inline in the `to_string()` path.
 > `ALTER TYPE name` supports ` ADD VALUE v [BEFORE w | AFTER w]`,

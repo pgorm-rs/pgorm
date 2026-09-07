@@ -9,7 +9,7 @@ use std::str::FromStr;
 // It was replaced by `pgorm_query::ColumnType`, we reexport it here to keep the `ColumnType` symbol
 pub use pgorm_query::ColumnType;
 #[path = "column_def.rs"]
-mod column_def;
+pub(crate) mod column_def;
 pub use column_def::*;
 
 /// Defines a Column for an Entity
@@ -439,7 +439,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         cast_enum_as(expr, self, |col, _, col_type| {
             let type_name = match col_type {
@@ -463,7 +463,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// A column that overrides `save_as` with a cast of its own — what
     /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
         self.save_enum_array_as(val)
     }
@@ -473,10 +473,10 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
     /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
     /// columns without a `save_as` attribute.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
     fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
-        match col_def.get_enum_name() {
+        match enum_cast_iden(col_def.get_column_type()) {
             Some(enum_name) => {
                 val.as_enum(Alias::new(format!("{}[]", enum_name.to_string())).into_iden())
             }
@@ -486,7 +486,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
 
     /// Cast value of an enum column as enum type; do nothing if `self` is not an enum.
     /// Will also transform `Array(Vec<Json>)` into `Json(Vec<Json>)` if the column type is `Json`.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         cast_enum_as(val, self, |col, enum_name, col_type| {
             let type_name = match col_type {
@@ -1294,10 +1294,6 @@ mod tests {
         });
     }
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+2/test]    every
-    // value-position operand passes through `save_as` — between, if_null and
-    // the array membership forms included — for the derive-generated override
-    // and the enum default alike
     #[test]
     #[cfg(feature = "macros")]
     fn save_as_covers_every_value_predicate() {

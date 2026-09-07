@@ -270,7 +270,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {
@@ -466,7 +466,7 @@ where
 /// rendered once it is one, because `CREATE TYPE "t" AS ENUM ()` is an accepted
 /// spelling of the empty enum while `CREATE TYPE "t" AS ENUM` is not a
 /// statement at all.
-// [spec:pgorm:req:sql.ddl.type-enum+2]
+// [spec:pgorm:req:sql.ddl.type-enum+3]
 #[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
     pub(crate) name: TypeRef,
@@ -474,7 +474,7 @@ pub struct TypeCreateStatement {
 }
 
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
-// [spec:pgorm:req:sql.ddl.type-enum+2]
+// [spec:pgorm:req:sql.ddl.type-enum+3]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
     // Composite,

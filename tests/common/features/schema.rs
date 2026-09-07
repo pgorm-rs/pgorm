@@ -444,6 +444,7 @@ where
         .col(
             ColumnDef::new(collection::Column::Teas)
                 .array(pgorm_query::ColumnType::Enum {
+                    schema: None,
                     name: TeaEnum.into_iden(),
                     variants: vec![
                         TeaVariant::EverydayTea.into_iden(),
@@ -454,6 +455,7 @@ where
         )
         .col(
             ColumnDef::new(collection::Column::TeasOpt).array(pgorm_query::ColumnType::Enum {
+                schema: None,
                 name: TeaEnum.into_iden(),
                 variants: vec![
                     TeaVariant::EverydayTea.into_iden(),

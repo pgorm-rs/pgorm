@@ -48,7 +48,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -77,6 +77,7 @@ pub enum ColumnType {
     Custom(DynIden),
     Enum {
         name: DynIden,
+        schema: Option<DynIden>,
         variants: Vec<DynIden>,
     },
     Array(Arc<ColumnType>),
@@ -97,7 +98,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -111,14 +112,18 @@ impl PartialEq for ColumnType {
             (
                 Self::Enum {
                     name: l_name,
+                    schema: l_schema,
                     variants: l_variants,
                 },
                 Self::Enum {
                     name: r_name,
+                    schema: r_schema,
                     variants: r_variants,
                 },
             ) => {
                 l_name.to_string() == r_name.to_string()
+                    && l_schema.as_ref().map(|s| s.to_string())
+                        == r_schema.as_ref().map(|s| s.to_string())
                     && l_variants
                         .iter()
                         .map(|v| v.to_string())
@@ -179,7 +184,7 @@ pub enum ColumnSpec {
 /// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
 /// the precision sits on the second-bearing field spellings and on the
 /// unqualified form, and `interval HOUR(3)` has no spelling here.
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IntervalSpec {
     /// `interval`, or `interval(p)` — every field, with a fractional-seconds
@@ -192,7 +197,7 @@ pub enum IntervalSpec {
 /// Fractional-seconds precision of an interval type.
 ///
 /// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum IntervalPrecision {
     P0,
@@ -241,7 +246,7 @@ impl std::fmt::Display for IntervalPrecision {
 
 /// All interval field qualifiers; the second-bearing ones carry the precision
 /// PostgreSQL allows only there.
-// [spec:pgorm:def:sql.types.column-type+3]
+// [spec:pgorm:def:sql.types.column-type+4]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,
@@ -462,7 +467,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+3]
+    // [spec:pgorm:def:sql.types.column-type+4]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self
@@ -563,6 +568,7 @@ impl ColumnDef {
     {
         self.types = Some(ColumnType::Enum {
             name: name.into_iden(),
+            schema: None,
             variants: variants.into_iter().map(IntoIden::into_iden).collect(),
         });
         self

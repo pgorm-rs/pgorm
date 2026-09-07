@@ -486,6 +486,7 @@ fn import_block_matches_the_with_serde_variant() {
 #[test]
 fn entity_imports_each_enum_once_in_first_use() {
     let alpha = || ColumnType::Enum {
+        schema: None,
         name: Alias::new("alpha").into_iden(),
         variants: vec![Alias::new("one").into_iden()],
     };

@@ -325,6 +325,7 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
 #[test]
 fn transform_registers_enums_once_per_name_across_tables() {
     let tea = || ColumnType::Enum {
+        schema: None,
         name: Alias::new("tea").into_iden(),
         variants: vec![
             Alias::new("EverydayTea").into_iden(),

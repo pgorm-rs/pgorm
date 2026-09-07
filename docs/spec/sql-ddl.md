@@ -332,7 +332,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+2]
+> [spec:pgorm:req:sql.ddl.type-enum+3]
+> An enum type reference declares an optional schema — `Type::create` and its
+> siblings take any `IntoTypeRef`, so `(schema, name)` names a qualified type
+> and a bare name an unqualified one — and every DDL rendering MUST qualify
+> when a schema is present, via `TypeRef`'s quoted, dot-joined parts.
 > `TypeCreateStatement` takes its type name in `Type::create(name)`, because
 > `CREATE TYPE ` is rejected at end of input and a nameless statement
 > therefore MUST NOT construct

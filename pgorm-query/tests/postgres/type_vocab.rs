@@ -391,7 +391,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+3/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+4/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -436,7 +436,7 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+3/test]    equality compares parameters, renders
+// [spec:pgorm:def:sql.types.column-type+4/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -477,6 +477,7 @@ fn column_type_equality_semantics() {
 
     // `Enum` compares name and variant list, both by rendered text.
     let tea = ColumnType::Enum {
+        schema: None,
         name: Alias::new("tea").into_iden(),
         variants: vec![
             Alias::new("green").into_iden(),
@@ -484,6 +485,7 @@ fn column_type_equality_semantics() {
         ],
     };
     let same_tea = ColumnType::Enum {
+        schema: None,
         name: Alias::new("tea").into_iden(),
         variants: vec![
             Alias::new("green").into_iden(),
@@ -491,6 +493,7 @@ fn column_type_equality_semantics() {
         ],
     };
     let other_tea = ColumnType::Enum {
+        schema: None,
         name: Alias::new("tea").into_iden(),
         variants: vec![Alias::new("green").into_iden()],
     };
@@ -514,7 +517,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+3/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+4/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -556,7 +559,7 @@ fn pg_interval_display_and_parse_round_trip() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+3/test]    the precision vocabulary is the closed set
+// [spec:pgorm:def:sql.types.column-type+4/test]    the precision vocabulary is the closed set
 // PostgreSQL accepts, and nothing outside it constructs
 #[test]
 fn interval_precision_is_zero_through_six() {
