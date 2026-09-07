@@ -4365,6 +4365,29 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-09-07T18:36:33.010161Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "Re-verification on fa0aa01b (2026-09-07): cc461d96 fixes the original ASCII collision, but closure remains incomplete for multibyte identifiers. src/executor/result_name.rs:32-36 retreats from byte 47 to a UTF-8 boundary, so a bounded alias can be 60-62 bytes, contradicting the claim that all bounded aliases are longer than all plain aliases. Concrete valid column pair under s0_: A = 43 ASCII 'a' characters + 'å' + 16 ASCII 'b' characters (61 bytes); B = 43 ASCII 'a' characters + 'd9004b29644599f8' (59 bytes). A's alias is 62 bytes after trimming, and B's identical 62-byte composition passes through unchanged. find returns left='left', right='right'; graph returns left='left', right='left'; select_sources returns left='right', right='right'. No hash collision search is involved. Workspace verification: 1,350 passed, one failed, zero skipped; all nine previously saved probes passed and only the new unicode_bounded_alias_does_not_collide_with_short_column probe failed. Follow-up graph-unicode-alias-collisions tracks this remaining gap. Evidence: /tmp/pgorm-defect-recheck-fa0aa01b-repros.patch and /tmp/pgorm-defect-recheck-fa0aa01b.log."
+                        after_done true
+                    }
+                )
+            }
+
+            {
+                id graph-unicode-alias-collisions
+                title "Prevent UTF-8 shortening from reintroducing result alias collisions"
+                kind @fix
+                deps (graph-alias-collisions)
+                log (
+                    {
+                        at 2026-09-07T18:36:33.172524Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Verification defect on fa0aa01b, 2026-09-07. Review severity P1: silent incorrect decoded values (not a planning priority pin). Source: src/executor/result_name.rs:28-36. Plain aliases pass through when shorter than 63 bytes, but trimming the bounded alias head to a UTF-8 boundary can produce a 60-, 61-, or 62-byte alias. These namespaces therefore still overlap. Reproduction: A = 'a'.repeat(43) + 'å' + 'b'.repeat(16), B = 'a'.repeat(43) + 'd9004b29644599f8'; both are valid, distinct PostgreSQL column identifiers, respectively 61 and 59 bytes. Under s0_, A's full composition is 64 bytes and its hash spelling retreats to a 46-byte head plus 16 hash digits, for 62 total bytes. B's 62-byte composition is identical and passes through unchanged. Store left='left', right='right': ordinary find decodes correctly, graph yields ('left','left'), and Pipeline::select_sources yields ('right','right'). This is deterministic alias-versus-plain overlap, independent of the accepted theoretical 64-bit hash-collision risk. Acceptance: bounded/plain alias namespaces must remain disjoint for every possible UTF-8 head boundary, including 2-, 3-, and 4-byte characters and multiple source prefixes; preserve the 63-byte maximum, consistent writer/read/absence mapping, and all original regression probes. Add live regression coverage that checks distinct values through graph and pipeline for the concrete pair, plus boundary coverage of every possible UTF-8 retreat length. Spec impact: correct query.graph.writer+3's false claim that every plain spelling is shorter than every bounded spelling, and reconcile its references after revision. Depends on the completed ASCII collision fix; manual follow-up leaf avoids duplicate spec ownership. Command: cargo nextest run --workspace --no-fail-fast, with /tmp/pgorm-defect-recheck-fa0aa01b-repros.patch applied: 1,351 tests run, 1,350 passed, one failed (unicode_bounded_alias_does_not_collide_with_short_column), zero skipped. Output: /tmp/pgorm-defect-recheck-fa0aa01b.log."
+                    }
                 )
             }
         )
