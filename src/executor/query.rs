@@ -2,7 +2,7 @@ use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error as _;
 
 /// Defines the result of a query operation on a Model
-// [spec:pgorm:def:exec.decode+2]
+// [spec:pgorm:def:exec.decode+3]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct QueryResult {
@@ -10,7 +10,7 @@ pub struct QueryResult {
 }
 
 /// An interface to get a value from the query result
-// [spec:pgorm:def:exec.decode+2]
+// [spec:pgorm:def:exec.decode+3]
 pub trait TryGetable: Sized {
     /// Get a value from the query result with an RowIndex
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -24,7 +24,10 @@ pub trait TryGetable: Sized {
         if pre.is_empty() {
             Self::try_get_by(res, col)
         } else {
-            Self::try_get_by(res, format!("{pre}{col}").as_str())
+            Self::try_get_by(
+                res,
+                super::result_name::result_column_name(pre, col).as_str(),
+            )
         }
     }
 
@@ -164,8 +167,9 @@ impl QueryResult {
             let present = if pre.is_empty() {
                 self.row.try_get::<_, Option<AnyValue>>(col)
             } else {
-                self.row
-                    .try_get::<_, Option<AnyValue>>(format!("{pre}{col}").as_str())
+                self.row.try_get::<_, Option<AnyValue>>(
+                    super::result_name::result_column_name(pre, col).as_str(),
+                )
             };
             if !matches!(present, Ok(None)) {
                 return false;

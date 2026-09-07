@@ -4215,6 +4215,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 6, severity P2. Source: src/query/graph.rs:238-239 (source_column_alias), also consumed by src/pipeline/sources.rs. Reproduction (graph_preserves_valid_long_column_name): an entity has id plus a text column whose SQL name is 61 ASCII 'a' characters, with one row. Entity::find().all succeeds. Entity::graph().all fails with a missing-column error naming s0_ followed by those 61 characters: the 64-byte alias was truncated by PostgreSQL to 63 bytes, but decoding requests all 64. Acceptance: every valid PostgreSQL column identifier, including multibyte identifiers and names sharing a long prefix, projects and decodes without truncation or collisions through graph and select_sources. Use one consistent bounded alias/decode mapping across required/optional slots and preserve absence detection and normal short-name behavior. Spec impact: revise query.graph.writer+1's unconditional s{i}_{column} spelling and reconcile query.graph.decode+1 and pipeline.select-sources so the generated alias and decode witness stay one contract. Depends on the completed pipeline sources terminal because both consumers share the alias function."
                     }
+
+                    {
+                        at 2026-09-07T13:53:25.354727Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

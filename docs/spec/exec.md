@@ -9,13 +9,16 @@ These rules capture what the code does today, including known gaps.
 
 ## Decoding (`exec.decode`)
 
-> [spec:pgorm:def:exec.decode+2]
+> [spec:pgorm:def:exec.decode+3]
 > `QueryResult` is a `#[repr(transparent)]` wrapper around a single
 > `tokio_postgres::Row`. Values are extracted through the `TryGetable`
 > trait, which has three entry points: `try_get_by` (any
 > `tokio_postgres::row::RowIndex`, i.e. a column name or ordinal),
-> `try_get` (a prefix plus column name, concatenated as `{pre}{col}` with
-> no separator; an empty prefix uses the bare column name), and
+> `try_get` (a prefix plus column name, composed as `{pre}{col}` with no
+> separator through the bounded spelling of
+> `[spec:pgorm:sem:query.graph.writer+2]`, so a composition past
+> PostgreSQL's 63-byte identifier bound looks up the same bounded name the
+> projection writers mint; an empty prefix uses the bare column name), and
 > `try_get_by_index` (ordinal position in the select list). Its fourth
 > method extracts nothing: `accepts` asks which PostgreSQL types the
 > implementing type can decode, for use before a row exists

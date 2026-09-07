@@ -159,7 +159,7 @@ impl FromQueryResult for EntryPoints {
     }
 }
 
-// [spec:pgorm:def:exec.decode+2/test]    every `QueryResult` entry point, and the
+// [spec:pgorm:def:exec.decode+3/test]    every `QueryResult` entry point, and the
 // `{pre}{col}` concatenation `try_get` performs
 #[pgorm_macros::test]
 async fn decode_entry_points() -> Result<(), Error> {

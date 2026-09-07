@@ -6,6 +6,7 @@ mod graph;
 mod insert;
 mod paginator;
 mod query;
+pub(crate) mod result_name;
 mod select;
 mod update;
 mod verify;

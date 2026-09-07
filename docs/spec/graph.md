@@ -27,7 +27,7 @@ chapter is stated twice anywhere else.
 > construction. Construction initialises the statement with
 > `FROM E::default().table_ref()` and immediately projects `E`'s columns
 > under the `s0_` prefix through the one writer
-> (`[spec:pgorm:sem:query.graph.writer+1]`), so a graph's select list is
+> (`[spec:pgorm:sem:query.graph.writer+2]`), so a graph's select list is
 > non-empty from the moment the value exists and the empty-projection guard
 > of `[spec:pgorm:sem:query.build.modifiers+7]` has nothing to catch. There
 > is no conversion between `Select<E>` and `SelectGraph<E, S>` in either
@@ -110,7 +110,7 @@ chapter is stated twice anywhere else.
 
 ## Projection
 
-> [spec:pgorm:sem:query.graph.writer+1]
+> [spec:pgorm:sem:query.graph.writer+2]
 > One writer projects every decoded source; nothing else writes the select
 > list. At construction (for the root) and at each slot declaration, the
 > writer appends, for every variant of the source entity's `Column` in
@@ -120,6 +120,18 @@ chapter is stated twice anywhere else.
 > enum-typed column is cast to text on selection here exactly as there, and
 > the alias is the plain SQL column name under the prefix, whatever the
 > cast wrapped.
+>
+> The alias MUST respect PostgreSQL's 63-byte identifier bound: the server
+> truncates a longer alias silently, so a projection minting 64 bytes and a
+> decode requesting all of them would never meet. A prefixed name past the
+> bound is spelled as the longest UTF-8-whole head leaving room for the
+> 64-bit FNV-1a hash of the full name as 16 hex digits — deterministic,
+> release-stable, and distinct for names sharing a head. The composition is
+> one function (`result_column_name`) that the writers mint through and
+> every prefixed read (`TryGetable::try_get`, the absence witness's
+> `all_null`) composes through, so the generated alias and the decode
+> witness stay one contract at every length; a name within the bound passes
+> through as the plain concatenation.
 >
 > `i` counts decoded sources: the root is `0`, each slot takes the next
 > index in declaration order, and `via()` hops take none — they are joined,

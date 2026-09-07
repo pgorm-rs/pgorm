@@ -27,6 +27,7 @@ use pgorm_query::{
 };
 
 use super::helper::join_condition;
+use crate::executor::result_name::result_column_name;
 use crate::{
     ColumnTrait, EntityTrait, Error, FromQueryResult, IdenStr, Identity, Iterable,
     PrimaryKeyToColumn, QueryFilter, QueryOrder, QueryResult, QueryTrait, Related, RelationDef,
@@ -227,16 +228,18 @@ slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5);
 slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
 
 /// THE prefix scheme: the alias the writer gives `column` of the `index`-th
-/// decoded source, `s{index}_{column}`.
+/// decoded source, `s{index}_{column}` — bounded to PostgreSQL's 63-byte
+/// identifier limit through [`result_column_name`], the same composition
+/// every prefixed read looks names up by.
 ///
 /// Both projection writers — [`project_source`] into a [`SelectStatement`]
 /// and the pipeline's `select_sources` terminal into prqlc's PL AST — mint
 /// their aliases here, and the per-prefix decode reads exactly these names,
 /// so the scheme is one code path rather than a convention three sites
 /// repeat.
-// [spec:pgorm:sem:query.graph.writer+1]
+// [spec:pgorm:sem:query.graph.writer+2]
 pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
-    format!("s{index}_{column}")
+    result_column_name(&format!("s{index}_"), column)
 }
 
 /// THE read-cast discipline, stated once: the type a projected column is
@@ -249,7 +252,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// PRQL nodes rather than [`SimpleExpr`](pgorm_query::SimpleExpr)) casts by
 /// the same rule. A column that *overrides* `select_as` is honoured only by
 /// the [`SelectStatement`] writer, which still calls the method.
-// [spec:pgorm:sem:query.graph.writer+1]
+// [spec:pgorm:sem:query.graph.writer+2]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> {
     use crate::entity::ColumnTypeTrait;
     let def = col.def();
@@ -273,7 +276,7 @@ pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> 
 /// the source was declared under one, otherwise its bare table — the same
 /// identifier the `ON` clause constrains against, so the projection and the
 /// join cannot name one source two ways.
-// [spec:pgorm:sem:query.graph.writer+1]
+// [spec:pgorm:sem:query.graph.writer+2]
 pub(crate) fn project_source<F: EntityTrait>(
     query: &mut SelectStatement,
     qualifier: DynIden,
@@ -400,7 +403,7 @@ impl<E: EntityTrait> Default for SelectGraph<E, ()> {
 impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// Project one decoded source under the next prefix, and record the
     /// identifier that prefix belongs to.
-    // [spec:pgorm:sem:query.graph.writer+1]
+    // [spec:pgorm:sem:query.graph.writer+2]
     pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
         project_source::<F>(
             &mut self.query,
@@ -669,7 +672,7 @@ impl<E: EntityTrait, S> QueryTrait for SelectGraph<E, S> {
 // and the filter / order / query traits reach the same statement
 // [spec:pgorm:sem:query.graph.slots+1/test]    the slot kind fixes the join
 // type, and the declared tuple grows to the generated ceiling
-// [spec:pgorm:sem:query.graph.writer+1/test]    one prefixed block per decoded
+// [spec:pgorm:sem:query.graph.writer+2/test]    one prefixed block per decoded
 // source, in declaration order, under the source's effective identifier
 // [spec:pgorm:req:query.graph.aliases/test]    an `_as` slot is named by its
 // alias everywhere, and `join_maybe_filtered` composes with the relation's

@@ -349,7 +349,7 @@ of the crate, compiled in every build. Rules are grouped under
 > so the limit belongs to it, in contrast to `SelectorRaw::one`, which
 > executes its text as written.
 
-> [spec:pgorm:sem:pipeline.select-sources]
+> [spec:pgorm:sem:pipeline.select-sources+1]
 > `select_sources(sources)` is the model-decode terminal: where
 > `into_model::<M>` asks the caller for a row type whose projection the
 > caller must have arranged, `select_sources` takes the relations
@@ -366,9 +366,10 @@ of the crate, compiled in every build. Rules are grouped under
 > (`[spec:pgorm:sem:pipeline.self-join]`), so two occurrences of one table
 > are told apart exactly as the join told them apart. Before compilation
 > the terminal appends one final projection stage through the same writer
-> as the graph's (`[spec:pgorm:sem:query.graph.writer+1]`): for the i-th
+> as the graph's (`[spec:pgorm:sem:query.graph.writer+2]`): for the i-th
 > listed source (zero-based), every column of its entity in iteration
-> order, projected `col.select_as(..)` and aliased `s{i}_{col}`,
+> order, projected `col.select_as(..)` and aliased `s{i}_{col}` under the
+> writer's 63-byte-bounded spelling,
 > qualified by the source's name — the `named` token, or the entity's own
 > qualification (`[spec:pgorm:sem:pipeline.qualify+2]`). An explicitly
 > aliased projection is what dissolves prqlc's `_expr_N` renaming: two

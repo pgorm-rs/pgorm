@@ -115,7 +115,7 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 // [spec:pgorm:def:query.graph/test]    a graph declared as a root plus joined
 // sources executes as one statement whose rows carry every declared source
-// [spec:pgorm:sem:query.graph.writer+1/test]    three sources each carrying a
+// [spec:pgorm:sem:query.graph.writer+2/test]    three sources each carrying a
 // `name` and an `id` column decode without collision, because each is
 // projected under its own `s{i}_` prefix
 // [spec:pgorm:sem:query.graph.decode+1/test]    an unmatched LEFT JOIN reads as
@@ -945,6 +945,77 @@ async fn graph_grouped_composite_key() -> Result<(), Error> {
             ),
         ]
     );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+mod long_name {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "review_long_name")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+        pub value: String,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab")]
+        pub sibling: String,
+        #[pgorm(column_name = "åååååååååååååååååååååååååååååå")]
+        pub wide: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:query.graph.writer+2/test]    every valid PostgreSQL column
+// identifier projects and decodes through the graph: a 61-byte name whose
+// prefixed alias passes the 63-byte bound, a sibling sharing its whole head,
+// and a multibyte name — through `find`, the graph, and `select_sources`
+// [spec:pgorm:sem:query.graph.decode+1/test]    the decode witness reads the
+// same bounded spelling the writer minted
+#[pgorm_macros::test]
+async fn long_column_names_survive_graph_reads() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_long_column_names").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(&format!(
+        r#"CREATE TABLE review_long_name (
+               id integer PRIMARY KEY,
+               {a} text NOT NULL,
+               {b} text NOT NULL,
+               "{w}" text NOT NULL
+           );
+           INSERT INTO review_long_name VALUES (1, 'value', 'sibling', 'wide');"#,
+        a = "a".repeat(61),
+        b = "a".repeat(60) + "b",
+        w = "å".repeat(30),
+    ))
+    .await?;
+
+    let ordinary = long_name::Entity::find().all(&db).await?;
+    assert_eq!(
+        ordinary,
+        [long_name::Model {
+            id: 1,
+            value: "value".to_owned(),
+            sibling: "sibling".to_owned(),
+            wide: "wide".to_owned(),
+        }]
+    );
+
+    let graph = long_name::Entity::graph().all(&db).await?;
+    assert_eq!(graph, ordinary);
+
+    let sourced = pgorm::pipeline::Pipeline::from(long_name::Entity)
+        .select_sources(long_name::Entity)
+        .all(&db)
+        .await?;
+    assert_eq!(sourced, [Some(graph[0].clone())]);
 
     drop(db);
     ctx.delete().await;
