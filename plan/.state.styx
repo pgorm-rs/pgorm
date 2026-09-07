@@ -579,6 +579,7 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id query-error-from, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:06:34.991306Z}
     {id relation-def-rev, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:13:12.176232Z}
+    {id select-sources-read-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:35:42.050401Z}
 )
 
 impl_evidence (

@@ -955,3 +955,104 @@ async fn select_sources_one_takes_one() {
 
     ctx.delete().await;
 }
+
+mod cast_probe {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "cast_probe")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        #[pgorm(
+            select_as = "text",
+            save_as = "numeric",
+            column_type = "custom(\"numeric\")"
+        )]
+        pub amount: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    a select_as override and
+// the enum-array default alike reach the sources projection: a numeric column
+// read as text decodes, and a tea[] column reads back under text[]
+#[pgorm_macros::test]
+async fn select_sources_applies_read_casts() -> Result<(), pgorm::Error> {
+    use pgorm::QueryFilter;
+
+    let ctx = TestContext::new("pipeline_select_sources_casts").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(
+        r#"CREATE TABLE cast_probe (id integer PRIMARY KEY, amount numeric NOT NULL);
+           INSERT INTO cast_probe VALUES (1, 12.5);
+           CREATE TYPE tea AS ENUM ('EverydayTea', 'BreakfastTea');
+           CREATE TABLE tea_pot (id integer PRIMARY KEY, teas tea[] NOT NULL);
+           INSERT INTO tea_pot VALUES (1, ARRAY['EverydayTea']::tea[]);"#,
+    )
+    .await?;
+
+    let expected = cast_probe::Model {
+        id: 1,
+        amount: "12.5".to_owned(),
+    };
+    // The graph writer already honours the override; it is the control.
+    assert_eq!(
+        cast_probe::Entity::graph().all(&db).await?,
+        std::slice::from_ref(&expected)
+    );
+    assert_eq!(
+        Pipeline::from(cast_probe::Entity)
+            .select_sources(cast_probe::Entity)
+            .all(&db)
+            .await?,
+        [Some(expected)]
+    );
+
+    let brewed = Pipeline::from(tea_pot::Entity)
+        .select_sources(tea_pot::Entity)
+        .all(&db)
+        .await?;
+    assert_eq!(
+        brewed,
+        [Some(tea_pot::Model {
+            id: 1,
+            teas: vec![Tea::EverydayTea],
+        })]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+mod tea_pot {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy)]
+    #[pgorm(rs_type = "String", db_type = "Enum", enum_name = "tea")]
+    pub enum Tea {
+        #[pgorm(string_value = "EverydayTea")]
+        EverydayTea,
+        #[pgorm(string_value = "BreakfastTea")]
+        BreakfastTea,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "tea_pot")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub teas: Vec<Tea>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+use tea_pot::Tea;

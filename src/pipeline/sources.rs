@@ -99,7 +99,7 @@ fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index:
         let alias = source_column_alias(index, column.as_str());
         let node = adapter::ident_in(vec![qualifier.to_owned()], Iden::to_string(&column));
         let node = match source_read_cast(&column) {
-            Some(cast) => adapter::call("as", vec![adapter::ident(cast), node]),
+            Some(cast) => adapter::call("as", vec![adapter::ident(&cast), node]),
             None => node,
         };
         nodes.push(adapter::aliased(node, alias));

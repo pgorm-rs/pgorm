@@ -4142,12 +4142,27 @@ children (
                 id select-sources-read-casts
                 title "select_sources projects select_as columns under the default read discipline"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-07T11:39:24.245489Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Evidence: the pipeline's SelectedSources writer (src/pipeline/sources.rs, [spec:pgorm:sem:pipeline.select-sources]) projects source columns under the default discipline — select_as read casts are not applied — diverging from the graph writer's source_read_cast kernel; a save_as/select_as column read through select_sources decodes the stored representation, not the model type. The enum-array text[] cast path is additionally unexercised anywhere in the tree (no enum-array fixture), and is likely the same root cause through this writer. Divergence was documented as-is at finding time; operator boarded it as a defect (2026-09-07). SPEC IMPACT (bump rides the fix commit): bump pipeline.select-sources — the sources projection MUST apply the graph writer's read-cast discipline; the fix adds an enum-array fixture with /test coverage on both the graph and select_sources paths. FIX SKETCH: reuse the graph kernel's source_read_cast at the SelectedSources projection site rather than growing a parallel cast path."
+                    }
+
+                    {
+                        at 2026-09-07T14:35:37.933636Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T14:35:42.050401Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

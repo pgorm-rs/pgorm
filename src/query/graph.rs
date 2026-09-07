@@ -242,25 +242,37 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
     result_column_name(&format!("s{index}_"), column)
 }
 
-/// THE read-cast discipline, stated once: the type a projected column is
-/// `CAST` to on selection, or `None` to project it untouched.
+/// THE read-cast discipline, derived from the column's own `select_as`
+/// answer: the type a projected column is `CAST` to on selection, or `None`
+/// to project it untouched.
 ///
-/// This is the decision the default [`ColumnTrait::select_as`] renders on
-/// the SQL side — an enum column reads back as `text`, an array of enums as
-/// `text[]`, everything else as itself — restated as data so the writer
-/// that cannot dispatch through `select_as` (the pipeline's, which emits
-/// PRQL nodes rather than [`SimpleExpr`](pgorm_query::SimpleExpr)) casts by
-/// the same rule. A column that *overrides* `select_as` is honoured only by
-/// the [`SelectStatement`] writer, which still calls the method.
+/// The pipeline's writer emits PRQL nodes rather than
+/// [`SimpleExpr`](pgorm_query::SimpleExpr), so it cannot splice the method's
+/// answer in directly. Instead the answer is probed with the bare column and
+/// the cast target read back off its shape — the `AsEnum` of the enum
+/// default (`text` / `text[]`) and the `CAST(_ AS T)` a
+/// `#[pgorm(select_as = "…")]` override generates alike, so the two writers
+/// cannot disagree about a column's read cast. A shape the probe does not
+/// recognise — a hand-written override that is not a cast — projects
+/// untouched, exactly as it stands outside the `SelectStatement` writer's
+/// guarantees too.
 // [spec:pgorm:sem:query.graph.writer+2]
-pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<&'static str> {
-    use crate::entity::ColumnTypeTrait;
-    let def = col.def();
-    def.get_enum_name()?;
-    Some(match def.get_column_type() {
-        pgorm_query::ColumnType::Array(_) => "text[]",
-        _ => "text",
-    })
+// [spec:pgorm:sem:pipeline.select-sources+2]
+pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
+    use pgorm_query::{BinOper, Function, SimpleExpr};
+    match col.select_as(Expr::col(SharedIden::new(*col))) {
+        SimpleExpr::AsEnum(name, _) => Some(name.to_string()),
+        SimpleExpr::FunctionCall(func) if matches!(func.get_func(), Function::Cast) => {
+            match func.get_args() {
+                [SimpleExpr::Binary(_, BinOper::As, target)] => match target.as_ref() {
+                    SimpleExpr::Custom(name) => Some(name.clone()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 /// THE one projection writer: every decoded source of a graph — and of the
