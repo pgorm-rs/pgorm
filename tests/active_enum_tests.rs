@@ -732,3 +732,49 @@ mod tests {
         assert_eq!(format!("{}", DisplayTea::EverydayTea), "Everyday");
     }
 }
+
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    a cursor keyed on an enum
+// column pages across boundaries — the boundary value binds under the same
+// `save_as` cast every value predicate applies
+// [spec:pgorm:sem:entity.traits.column.enum-cast+2/test]    enum set membership
+// through `is_in` returns rows against the live database
+#[pgorm_macros::test]
+async fn enum_keyed_cursor_pages_across_boundaries() -> Result<(), Error> {
+    use active_enum::*;
+
+    let ctx = TestContext::new("active_enum_cursor").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    for (id, tea) in [(1, Tea::BreakfastTea), (2, Tea::EverydayTea)] {
+        ActiveModel {
+            id: set(id),
+            tea: set(Some(tea)),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await?;
+    }
+
+    // Enum comparison order is label-declaration order, where 'EverydayTea'
+    // precedes 'BreakfastTea'.
+    let mut cursor = Entity::find().cursor_by(Column::Tea);
+    let first = cursor.first(1).all(&db).await?;
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].tea, Some(Tea::EverydayTea));
+
+    let second = cursor.after(Tea::EverydayTea).all(&db).await?;
+    assert_eq!(second.len(), 1);
+    assert_eq!(second[0].tea, Some(Tea::BreakfastTea));
+
+    let sipped = Entity::find()
+        .filter(Column::Tea.is_in([Tea::BreakfastTea]))
+        .all(&db)
+        .await?;
+    assert_eq!(sipped.len(), 1);
+    assert_eq!(sipped[0].id, 1);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}

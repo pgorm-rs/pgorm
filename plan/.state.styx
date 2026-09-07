@@ -535,6 +535,7 @@ assertions (
     {id repair.tests-cfg, kind @complete, author "brendan@necessary.nu", at 2026-09-01T19:40:21.226441Z}
     {id repair.tests-crates, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:00:52.916149Z}
     {id repair.tests-root, kind @complete, author "brendan@necessary.nu", at 2026-09-01T20:52:56.738375Z}
+    {id save-as-predicate-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:39:08.287478Z}
     {id schema-enum-arrays, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:27.938472Z}
     {id schema-enum-dedup, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:30.128281Z}
     {id sea-config-residue, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:40:06.389769Z}

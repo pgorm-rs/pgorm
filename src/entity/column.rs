@@ -230,6 +230,8 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     where
         V: Into<Value>,
     {
+        let a = self.save_as(Expr::val(a));
+        let b = self.save_as(Expr::val(b));
         Expr::col((self.entity_name(), *self)).between(a, b)
     }
 
@@ -248,6 +250,8 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     where
         V: Into<Value>,
     {
+        let a = self.save_as(Expr::val(a));
+        let b = self.save_as(Expr::val(b));
         Expr::col((self.entity_name(), *self)).not_between(a, b)
     }
 
@@ -356,6 +360,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     where
         V: Into<Value>,
     {
+        let v = self.save_as(Expr::val(v));
         Expr::col((self.entity_name(), *self)).if_null(v)
     }
 
@@ -434,7 +439,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         cast_enum_as(expr, self, |col, _, col_type| {
             let type_name = match col_type {
@@ -456,10 +461,20 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// column takes `{enum_name}[]`, and every other column is left untouched.
     ///
     /// A column that overrides `save_as` with a cast of its own — what
-    /// `#[pgorm(save_as = "…")]` generates — should override this too, with the
+    /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
+        self.save_enum_array_as(val)
+    }
+
+    /// Cast an array of values as the column's enum array type; do nothing if
+    /// `self` is not an enum. The array counterpart of
+    /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
+    /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
+    /// columns without a `save_as` attribute.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
+    fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
         match col_def.get_enum_name() {
             Some(enum_name) => {
@@ -471,7 +486,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
 
     /// Cast value of an enum column as enum type; do nothing if `self` is not an enum.
     /// Will also transform `Array(Vec<Json>)` into `Json(Vec<Json>)` if the column type is `Json`.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+1]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+2]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         cast_enum_as(val, self, |col, enum_name, col_type| {
             let type_name = match col_type {
@@ -1277,6 +1292,82 @@ mod tests {
             two: ActiveValue::set(2),
             three: ActiveValue::set(3),
         });
+    }
+
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+2/test]    every
+    // value-position operand passes through `save_as` — between, if_null and
+    // the array membership forms included — for the derive-generated override
+    // and the enum default alike
+    #[test]
+    #[cfg(feature = "macros")]
+    fn save_as_covers_every_value_predicate() {
+        use crate::pgorm_query::SimpleExpr;
+        use crate::tests_cfg::{active_enums::Tea, lunch_set};
+        use crate::{QueryFilter, QueryTrait};
+
+        mod guarded {
+            use crate as pgorm;
+            use crate::entity::prelude::*;
+
+            #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+            #[pgorm(table_name = "guarded")]
+            pub struct Model {
+                #[pgorm(primary_key)]
+                pub id: i32,
+                #[pgorm(save_as = "text")]
+                pub two: i32,
+            }
+
+            #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+            pub enum Relation {}
+
+            impl ActiveModelBehavior for ActiveModel {}
+        }
+
+        let clause = |expr: SimpleExpr| {
+            let sql = guarded::Entity::find().filter(expr).as_query().to_string();
+            sql.split_once("WHERE ")
+                .expect("a WHERE clause")
+                .1
+                .to_owned()
+        };
+
+        assert_eq!(
+            clause(guarded::Column::Two.between(1, 2)),
+            r#""guarded"."two" BETWEEN CAST(1 AS text) AND CAST(2 AS text)"#
+        );
+        assert_eq!(
+            clause(guarded::Column::Two.not_between(1, 2)),
+            r#""guarded"."two" NOT BETWEEN CAST(1 AS text) AND CAST(2 AS text)"#
+        );
+        assert_eq!(
+            clause(guarded::Column::Two.eq_any([1, 2])),
+            r#""guarded"."two" = ANY(CAST(ARRAY [1,2] AS text[]))"#
+        );
+        assert_eq!(
+            clause(guarded::Column::Two.ne_all([1, 2])),
+            r#""guarded"."two" <> ALL(CAST(ARRAY [1,2] AS text[]))"#
+        );
+        assert_eq!(
+            clause(guarded::Column::Two.is_in([1, 2])),
+            r#""guarded"."two" IN (CAST(1 AS text), CAST(2 AS text))"#
+        );
+
+        let tea_clause = |expr: SimpleExpr| {
+            let sql = lunch_set::Entity::find()
+                .filter(expr)
+                .as_query()
+                .to_string();
+            sql.split_once("WHERE ")
+                .expect("a WHERE clause")
+                .1
+                .to_owned()
+        };
+
+        assert_eq!(
+            tea_clause(lunch_set::Column::Tea.between(Tea::BreakfastTea, Tea::EverydayTea)),
+            r#""lunch_set"."tea" BETWEEN (CAST('BreakfastTea' AS tea)) AND (CAST('EverydayTea' AS tea))"#
+        );
     }
 
     #[test]

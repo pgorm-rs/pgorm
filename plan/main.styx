@@ -4041,6 +4041,13 @@ children (
                         kind @note
                         text "Evidence (from the wire-types campaign, repro on d778f24b lineage): ColumnTrait::eq and the other value-only comparators apply the column's save_as cast, but the multi-value forms (eq_any/ne_all, i.e. the is_in/is_not_in family) and the keyset cursor's boundary predicates build bare column comparisons — a save_as enum column filtered by set membership or paginated by cursor sends the uncast representation. Since the ValueHolder wire-type matrix landed, this fails loudly client-side instead of sending garbage; still broken, and there is no test exercising either path. SPEC IMPACT (bump rides the fix commit per bump-once-re-pin-everywhere): bump entity.traits.column.enum-cast — every value-predicate form, including multi-value set membership, MUST carry the column's save_as cast; bump exec.cursor.keyset — boundary predicates apply the same cast discipline as ordinary value predicates. FIX SKETCH: thread cast application through the multi-value predicate constructors on ColumnTrait and through the cursor's boundary-predicate builder; tests: save_as enum column through is_in/is_not_in, and cursor_by over an ordering keyed on such a column."
                     }
+
+                    {
+                        at 2026-09-07T13:39:08.287478Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 

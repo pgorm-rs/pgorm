@@ -48,16 +48,18 @@ known limitations.
 
 ## DeriveEntityModel
 
-> [spec:pgorm:sem:macros.derive.entity-model+1]
+> [spec:pgorm:sem:macros.derive.entity-model+2]
 > `DeriveEntityModel` is the composite derive: applied to a `Model` struct, it expands
 > the entity-model generation and then re-runs `DeriveModel` and `DeriveActiveModel` on
 > the same input, so one derive yields the full entity module. The entity-model portion
 > generates: (1) a `Column` enum deriving `Copy, Clone, Debug, EnumIter, DeriveColumn`
 > with one variant per non-ignored field; (2) an `impl ColumnTrait for Column` with
 > `type EntityName = Entity`, a `def()` match arm per column, a `json_key()` match arm
-> per column, and `select_as`/`save_as`
+> per column, and `select_as`/`save_as`/`save_array_as`
 > overrides that `cast_as` an alias for columns carrying `select_as`/`save_as` attributes
-> and otherwise fall back to `ColumnTrait::select_enum_as`/`save_enum_as`; (3) only when
+> — a `save_as = "T"` column's `save_array_as` casts to `T[]`, so scalar and array
+> comparisons carry the same cast — and otherwise fall back to
+> `ColumnTrait::select_enum_as`/`save_enum_as`/`save_enum_array_as`; (3) only when
 > `table_name` is given, a `pub struct Entity;` deriving
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and

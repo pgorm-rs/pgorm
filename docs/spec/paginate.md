@@ -19,7 +19,7 @@ bound parameter is held to.
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
-> `K` (`[spec:pgorm:sem:exec.cursor.keyset+3]`). Cursors are created via
+> `K` (`[spec:pgorm:sem:exec.cursor.keyset+4]`). Cursors are created via
 > `Select::cursor_by` (order columns on the entity's table) and, for joined
 > reads, `SelectGraph::cursor_by` / `cursor_by_on`
 > (`[spec:pgorm:sem:query.graph.cursor]`: order columns on the root or on a
@@ -36,7 +36,7 @@ bound parameter is held to.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+3]
+> [spec:pgorm:sem:exec.cursor.keyset+4]
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
@@ -53,6 +53,13 @@ bound parameter is held to.
 > where `⋈` is the direction comparison — one generic fold over the keyset,
 > at every arity. Conditions are added to the composed query's `WHERE` via
 > `cond_where`; both `before` and `after` may be set simultaneously.
+>
+> Each boundary value binds under its order column's `save_as` cast
+> (`entity.traits.column.enum-cast`), captured from the typed column set at
+> `cursor_by` time — the keyset itself is type-erased identifiers, so the
+> cast cannot be recovered later. An identifier no column of the capture
+> set claims, and every secondary tiebreak (another table's primary key),
+> binds bare, as a plain column's value always did.
 >
 > A boundary may be given at either of two arities, and its arity selects
 > how much of the keyset it compares. At the arity of the order columns it
@@ -126,7 +133,7 @@ bound parameter is held to.
 > table, in declared order, then its secondary order entries qualified with
 > theirs — all using the single resolved direction of
 > `exec.cursor.window`. This is the same list the boundary comparison of
-> `[spec:pgorm:sem:exec.cursor.keyset+3]` is built from. Only
+> `[spec:pgorm:sem:exec.cursor.keyset+4]` is built from. Only
 > unary secondary entries take part — those whose `Identity` has arity 1
 > (`[spec:pgorm:def:entity.relation.def+6]`), a length now read rather than
 > matched on; composite secondary identities are silently ignored, in the

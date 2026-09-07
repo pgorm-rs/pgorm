@@ -216,7 +216,7 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 }
 
 /// Method to derive an Model
-// [spec:pgorm:sem:macros.derive.entity-model+1]
+// [spec:pgorm:sem:macros.derive.entity-model+2]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
@@ -288,6 +288,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     let mut columns_json_key: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_select_as: Punctuated<_, Comma> = Punctuated::new();
     let mut columns_save_as: Punctuated<_, Comma> = Punctuated::new();
+    let mut columns_save_array_as: Punctuated<_, Comma> = Punctuated::new();
     let mut primary_keys: Punctuated<_, Comma> = Punctuated::new();
     let mut primary_key_types: Punctuated<Type, Comma> = Punctuated::new();
     let mut auto_increment = true;
@@ -388,8 +389,12 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                         });
                 }
                 if let Some(save_as) = save_as {
+                    let save_as_array = format!("{save_as}[]");
                     columns_save_as.push(quote! {
                         Self::#field_name => val.cast_as(pgorm::pgorm_query::Alias::new(#save_as))
+                    });
+                    columns_save_array_as.push(quote! {
+                        Self::#field_name => val.cast_as(pgorm::pgorm_query::Alias::new(#save_as_array))
                     });
                 }
 
@@ -440,6 +445,9 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     }
     if !columns_save_as.is_empty() {
         columns_save_as.push_punct(Comma::default());
+    }
+    if !columns_save_array_as.is_empty() {
+        columns_save_array_as.push_punct(Comma::default());
     }
 
     let primary_key = {
@@ -502,6 +510,13 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                 match self {
                     #columns_save_as
                     _ => pgorm::prelude::ColumnTrait::save_enum_as(self, val),
+                }
+            }
+
+            fn save_array_as(&self, val: pgorm::pgorm_query::Expr) -> pgorm::pgorm_query::SimpleExpr {
+                match self {
+                    #columns_save_array_as
+                    _ => pgorm::prelude::ColumnTrait::save_enum_array_as(self, val),
                 }
             }
         }

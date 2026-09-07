@@ -252,7 +252,7 @@ chapter is stated twice anywhere else.
 > disjuncts, `before` / `after` at order-column arity and `before_with` /
 > `after_with` at whole-keyset arity, the direction resolution, the
 > arity-mismatch error, and the NULL-tiebreak limitation are
-> `[spec:pgorm:sem:exec.cursor.keyset+3]` and
+> `[spec:pgorm:sem:exec.cursor.keyset+4]` and
 > `[spec:pgorm:sem:exec.cursor.order+3]`, unchanged and not restated
 > here. The NULL limitation is live on a graph: an unmatched `Opt` slot's
 > primary key IS null, so a row whose tiebreak is null is reachable

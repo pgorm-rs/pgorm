@@ -113,7 +113,7 @@ explicit limitations.
 > (the latter accepting arbitrary expressions). `get_column_type()` and `is_null()`
 > expose the type and nullability for introspection.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+1]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+2]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -123,13 +123,23 @@ explicit limitations.
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.
 >
-> `save_array_as` is the array counterpart of `save_as`, for the operands that are one
-> array value rather than one value per element: it casts to `{enum_name}[]` when the
-> column's type is an enum or an array of one, and leaves every other column untouched.
-> It does not take the JSON-flattening path — flattening an array into a scalar would
-> destroy the operand `= ANY` needs. A column that overrides `save_as` with a cast of
-> its own, as `#[pgorm(save_as = "…")]` generates, MUST override this too if its array
-> comparisons are to carry the matching cast; the default knows only the enum case.
+> Every value-position operand a `ColumnTrait` predicate takes passes through
+> `save_as`: the scalar comparators, `between` / `not_between`, `if_null`, and
+> `is_in` / `is_not_in` per element. A value predicate that binds an operand bare
+> is a defect — the column-taking (`eq_col`) and expression-taking (`eq_expr`)
+> forms are the deliberate exceptions, since their operands are not values. The
+> keyset cursor's boundary values follow the same discipline
+> (`exec.cursor.keyset`).
+>
+> `save_array_as` / `save_enum_array_as` are the array counterpart of `save_as` /
+> `save_enum_as`, for the operands that are one array value rather than one value
+> per element (`eq_any`, `ne_all`): the default casts to `{enum_name}[]` when the
+> column's type is an enum or an array of one, and leaves every other column
+> untouched. It does not take the JSON-flattening path — flattening an array into
+> a scalar would destroy the operand `= ANY` needs. A column that overrides
+> `save_as` with a cast of its own also overrides `save_array_as` with the array
+> spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
+> scalar and array comparisons of one column cannot disagree about its cast.
 
 > [spec:pgorm:def:entity.traits.primary-key+2]
 > `PrimaryKeyTrait: IdenStr + Iterable` (`src/entity/primary_key.rs`) defines an
@@ -420,7 +430,7 @@ explicit limitations.
 > whose arity is only known at runtime. `IntoBoundary<K>` is the matching
 > relation on the value side, implemented exactly for the tuples whose length `K`
 > describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
-> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+3]`)
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+4]`)
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Identity` case is the only one left to check.
 >

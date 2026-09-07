@@ -56,7 +56,7 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
 
 // [spec:pgorm:def:exec.cursor+4/test]    `Select::cursor_by`, `asc`/`desc`, and
 // the `into_model` / `into_partial_model` re-targeting
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    `before` / `after` comparison
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    `before` / `after` comparison
 // direction under both sort orders, and both boundaries at once
 // [spec:pgorm:sem:exec.cursor.window+1/test]    `first` and `last` replacing
 // each other, and `last` reversing the fetched buffer back into logical order
@@ -1106,7 +1106,7 @@ fn ids(rows: &[cursor_composite::Model]) -> Vec<i32> {
     rows.iter().map(|row| row.id).collect()
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the row-value emulation of a
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    the row-value emulation of a
 // composite boundary, in each arity, in both sort directions
 #[pgorm_macros::test]
 async fn cursor_composite_keyset() -> Result<(), Error> {
@@ -1198,7 +1198,7 @@ async fn cursor_composite_keyset() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    a boundary whose arity does not
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    a boundary whose arity does not
 // match a runtime-built `Identity` is an `Error`, not a panic; the typed
 // counterpart of the same mismatch does not compile at all, which the
 // `compile_fail` doctests on `Select::cursor_by` prove
@@ -1385,7 +1385,7 @@ async fn cursor_reuse_replaces_boundary() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    a secondary order column is a
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    a secondary order column is a
 // trailing keyset column, so `after_with` resumes from inside a run of rows
 // sharing an order-column value where `after` alone skips its remainder
 #[pgorm_macros::test]
@@ -1457,7 +1457,7 @@ async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+3/test]    the tiebreak
+// [spec:pgorm:sem:exec.cursor.keyset+4/test]    the tiebreak
 // `SelectGraph::cursor_by` installs on the decoded slot's primary key is part
 // of the boundary, so a page ending inside a joined row's repeats resumes
 // without skipping or repeating
