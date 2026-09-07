@@ -244,20 +244,25 @@ chapter is stated twice anywhere else.
 > root twice; adjacency is a property of primary-key ordering, not a
 > precondition of correctness.
 
-> [spec:pgorm:sem:query.graph.cursor]
+> [spec:pgorm:sem:query.graph.cursor+1]
 > `cursor_by<C: IdentityOf<E>>(cols)` re-homes the joined keyset cursor
-> onto the graph: order columns on the root's table, and the primary-key
-> columns of every decoded slot installed as unary secondary order
-> entries — qualified with each slot's *effective* identifier (its alias
-> when the slot was declared `_as`, per
+> onto the graph: order columns on the root's table, then the root's own
+> primary key, then the primary-key columns of every decoded slot
+> installed as unary secondary order entries — qualified with each slot's
+> *effective* identifier (its alias when the slot was declared `_as`, per
 > `[spec:pgorm:req:query.graph.aliases]`), in slot declaration order.
 > `cursor_by_on::<Si>(cols)` is the generalization of the retired
 > `cursor_by_other`: the slot is selected by its position at compile time,
 > the order columns are typed `IdentityOf` that slot's entity and
-> qualified with its effective identifier, and the tiebreaks are the
-> root's primary key first, then the remaining decoded slots' in
-> declaration order. Both return `Cursor<GraphRow<E, S>, C::ValueType>`,
-> so the boundary arity is typed by the order columns exactly as
+> qualified with its effective identifier, and the tiebreaks are that
+> slot's own primary key first — completing the ordered source's
+> continuation key, so two decoded rows sharing an order-column value
+> under one root remain distinguishable and a mid-run resume cannot skip
+> the sibling — then the root's primary key, then the remaining decoded
+> slots' in declaration order. On both paths a tiebreak entry that
+> restates one of the order columns is dropped rather than installed
+> twice. Both return `Cursor<GraphRow<E, S>, C::ValueType>`, so the
+> boundary arity is typed by the order columns exactly as
 > `[spec:pgorm:def:exec.cursor+4]` states.
 >
 > The machinery MUST NOT move: the keyset construction, the boundary

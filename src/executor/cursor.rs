@@ -378,6 +378,25 @@ impl<S, K> Cursor<S, K> {
         self.secondary_order_by = tbl_col;
         self
     }
+
+    /// [`set_secondary_order_by`](Self::set_secondary_order_by), dropping any
+    /// entry that restates one of the order columns: ordering a source by its
+    /// own primary key would otherwise install that key twice.
+    // [spec:pgorm:sem:query.graph.cursor+1]
+    fn set_graph_tiebreaks(&mut self, tiebreaks: Vec<(DynIden, Identity)>) -> &mut Self {
+        let table = self.table.to_string();
+        let order: Vec<String> = self.order_columns.iter().map(|c| c.to_string()).collect();
+        self.secondary_order_by = tiebreaks
+            .into_iter()
+            .filter(|(tbl, cols)| {
+                !(tbl.to_string() == table
+                    && cols
+                        .single()
+                        .is_some_and(|c| order.contains(&c.to_string())))
+            })
+            .collect();
+        self
+    }
 }
 
 impl<S, K> Cursor<S, K>
@@ -557,14 +576,15 @@ where
     where
         C: IdentityOf<E>,
     {
-        let tiebreaks = S::tiebreaks(self.slot_qualifiers(), 0);
         let table = self
             .qualifier(0)
             .unwrap_or_else(|| SharedIden::new(E::default()));
+        let mut tiebreaks = qualified_pk_tiebreaks::<E>(&table);
+        tiebreaks.extend(S::tiebreaks(self.slot_qualifiers(), 0));
 
         let mut cursor =
             Cursor::new(self.query, table, order_columns).with_boundary_casts::<E::Column>();
-        cursor.set_secondary_order_by(tiebreaks);
+        cursor.set_graph_tiebreaks(tiebreaks);
         cursor
     }
 
@@ -584,8 +604,9 @@ where
     ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
     ///     .cursor_by_on::<1, _>(fruit::Column::Name);
     ///
-    /// // The whole key is the slot's order column then the root's primary key.
-    /// cursor.after_with(("Cherry", 1)).first(2);
+    /// // The whole key is the slot's order column, its remaining primary
+    /// // key, then the root's.
+    /// cursor.after_with(("Cherry", 10, 1)).first(2);
     /// ```
     ///
     /// A position no slot occupies has no implementation, so it is a compile
@@ -615,15 +636,17 @@ where
         S: SlotAt<I>,
         C: IdentityOf<<<S as SlotAt<I>>::Slot as Slot>::Entity>,
     {
-        let mut tiebreaks = pk_tiebreaks::<E>();
-        tiebreaks.extend(S::tiebreaks(self.slot_qualifiers(), I));
         let table = self.qualifier(I).unwrap_or_else(|| {
             SharedIden::new(<<S as SlotAt<I>>::Slot as Slot>::Entity::default())
         });
+        let mut tiebreaks =
+            qualified_pk_tiebreaks::<<<S as SlotAt<I>>::Slot as Slot>::Entity>(&table);
+        tiebreaks.extend(pk_tiebreaks::<E>());
+        tiebreaks.extend(S::tiebreaks(self.slot_qualifiers(), I));
 
         let mut cursor = Cursor::new(self.query, table, order_columns)
             .with_boundary_casts::<<<<S as SlotAt<I>>::Slot as Slot>::Entity as EntityTrait>::Column>();
-        cursor.set_secondary_order_by(tiebreaks);
+        cursor.set_graph_tiebreaks(tiebreaks);
         cursor
     }
 }
@@ -746,12 +769,14 @@ mod tests {
             .related_maybe::<filling::Entity>()
             .cursor_by_on::<1, _>(fruit::Column::Name);
 
-        // The root's primary key first, then the slots that are not the one
-        // being ordered on, in declaration order.
+        // The ordered slot's own remaining primary key first — completing its
+        // continuation key — then the root's, then the slots that are not the
+        // one being ordered on, in declaration order.
         assert_eq!(
             order_by(&mut first),
             [
                 r#""fruit"."name" ASC"#,
+                r#""fruit"."id" ASC"#,
                 r#""cake"."id" ASC"#,
                 r#""filling"."id" ASC"#,
             ]
@@ -769,6 +794,7 @@ mod tests {
             order_by(&mut second),
             [
                 r#""tropical"."name" ASC"#,
+                r#""tropical"."id" ASC"#,
                 r#""cake"."id" ASC"#,
                 r#""fruit"."id" ASC"#,
             ]

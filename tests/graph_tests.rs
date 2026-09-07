@@ -414,9 +414,9 @@ async fn graph_cursor_tie_straddles_a_page_boundary() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor/test]    `cursor_by_on` orders on the slot
-// its position names, typed against that slot's entity, and tiebreaks on the
-// root's primary key first
+// [spec:pgorm:sem:query.graph.cursor+1/test]    `cursor_by_on` orders on the
+// slot its position names, typed against that slot's entity, completes that
+// slot's own key, and then tiebreaks on the root's primary key
 #[pgorm_macros::test]
 async fn graph_cursor_on_a_slot() -> Result<(), Error> {
     let ctx = TestContext::new("graph_cursor_on_slot").await;
@@ -440,9 +440,14 @@ async fn graph_cursor_on_a_slot() -> Result<(), Error> {
         ]
     );
 
-    // The whole key is the slot's order column then the root's primary key.
+    // The whole key is the slot's order column, its remaining primary key,
+    // then the root's.
     assert_eq!(
-        cursor().after_with(("Cherry", 1)).first(1).all(&db).await?,
+        cursor()
+            .after_with(("Cherry", 10, 1))
+            .first(1)
+            .all(&db)
+            .await?,
         [(cheesecake(), Some(peach()))]
     );
 
@@ -542,7 +547,7 @@ async fn graph_cursor_null_tiebreaks() -> Result<(), Error> {
     assert_eq!(by_name().first(4).all(&db).await?.len(), 4);
     assert_eq!(
         by_name()
-            .after_with((Option::<String>::None, 2))
+            .after_with((Option::<String>::None, Option::<i32>::None, 2))
             .first(1)
             .all(&db)
             .await?,
@@ -945,6 +950,36 @@ async fn graph_grouped_composite_key() -> Result<(), Error> {
             ),
         ]
     );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.cursor+1/test]    equal order-column values
+// under one root stay reachable: the ordered slot's own key completes the
+// boundary, so resuming mid-run yields the sibling instead of skipping it
+#[pgorm_macros::test]
+async fn slot_cursor_resumes_through_equal_names() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_cursor_equal_names").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+    db.batch_execute(r#"INSERT INTO "fruit" VALUES (12, 'Same', 1), (13, 'Same', 1);"#)
+        .await?;
+
+    let cursor = || {
+        cake::Entity::graph()
+            .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
+            .cursor_by_on::<1, _>(fruit::Column::Name)
+    };
+
+    let resumed = cursor()
+        .after_with(("Same", 12, 1))
+        .first(1)
+        .all(&db)
+        .await?;
+    assert_eq!(resumed.len(), 1, "the equal-named sibling is reachable");
+    assert_eq!(resumed[0].1.as_ref().map(|f| f.id), Some(13));
 
     drop(db);
     ctx.delete().await;

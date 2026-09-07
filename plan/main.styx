@@ -4238,12 +4238,27 @@ children (
                 title "Include the ordered source's primary key in joined cursor tiebreaks"
                 kind @fix
                 deps (cursor cursor-joined-boundary)
+                sealed true
                 log (
                     {
                         at 2026-09-07T12:18:08.359914Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 4, severity P2. Source: src/executor/cursor.rs:563-564; cursor_by_on omits the selected slot from S::tiebreaks. Reproduction (slot_cursor_resumes_equal_names): parent id 1 has visible children ids 10 and 11, both named 'same'; graph.related_maybe::<child::Entity>().cursor_by_on::<1, _>(child::Column::Name).first(1) returns one child. Continuing with after_with(('same', 1)), the entire installed key (child name, parent id), returns zero rows and skips the other child. Acceptance: when the chosen order columns are nonunique, include the ordered source's missing primary-key columns so every distinguishable decoded join row has a complete continuation key; assess the symmetric root-ordered path. Preserve alias qualification, composite keys, direction/window semantics, boundary arity errors and the separately documented NULL limitation. Test ties across multiple pages with after_with/before_with, asc/desc and repeated execution. Spec impact: revise query.graph.cursor's explicit exclusion of the selected slot and reconcile exec.cursor.keyset+3, exec.cursor.order+3 and full-boundary documentation. Earlier cursor-joined-boundary work correctly compares installed secondary keys; this follow-up fixes the missing keys."
+                    }
+
+                    {
+                        at 2026-09-07T14:47:02.603604Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T14:47:06.955598Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
