@@ -363,3 +363,111 @@ async fn enum_payload_decode_errors() -> Result<(), Error> {
     ctx.delete().await;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// The witness is judged before decoding succeeds
+// ---------------------------------------------------------------------------
+
+/// Nothing but nullable fields: an all-`NULL` row decodes successfully, so
+/// only the witness can tell it apart from an absent one.
+#[derive(Debug, PartialEq, FromQueryResult)]
+struct NullableName {
+    name: Option<String>,
+}
+
+/// A hand-written mirror that reports no columns, so it is judged against the
+/// result set under its prefix instead.
+#[derive(Debug, PartialEq)]
+struct UnreflectedName {
+    name: Option<String>,
+}
+
+impl FromQueryResult for UnreflectedName {
+    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error> {
+        Ok(Self {
+            name: res.try_get(pre, "name")?,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct MaybeNullable(Option<NullableName>, Option<UnreflectedName>);
+
+impl FromQueryResult for MaybeNullable {
+    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, Error> {
+        Ok(MaybeNullable(
+            NullableName::from_query_result_optional(res, &format!("{pre}s0_"))?,
+            UnreflectedName::from_query_result_optional(res, &format!("{pre}s1_"))?,
+        ))
+    }
+}
+
+// [spec:pgorm:req:exec.decode.absent/test]    an all-`NULL` row is absent even
+// when every field is nullable and the decode would have succeeded, through
+// both the reported-columns witness and the prefix fallback
+#[pgorm_macros::test]
+async fn all_null_nullable_projection_is_absent() -> Result<(), Error> {
+    let ctx = TestContext::new("joined_decode_nullable_witness").await;
+    let db = ctx.db.get().await?;
+
+    let row = |name_a: &str, name_b: &str| {
+        MaybeNullable::find_by_statement(
+            format!(r#"SELECT {name_a}::text AS "s0_name", {name_b}::text AS "s1_name""#),
+            vec![],
+        )
+    };
+
+    // All witness columns NULL: absent on both paths, not Some(None-fields).
+    assert_eq!(
+        row("NULL", "NULL").one(&db).await?,
+        MaybeNullable(None, None)
+    );
+
+    // A present value decodes as usual on both paths.
+    assert_eq!(
+        row("'a'", "'b'").one(&db).await?,
+        MaybeNullable(
+            Some(NullableName {
+                name: Some("a".to_owned())
+            }),
+            Some(UnreflectedName {
+                name: Some("b".to_owned())
+            })
+        )
+    );
+
+    // Present on one side, absent on the other: the witnesses are independent.
+    assert_eq!(
+        row("'a'", "NULL").one(&db).await?,
+        MaybeNullable(
+            Some(NullableName {
+                name: Some("a".to_owned())
+            }),
+            None
+        )
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:exec.decode.absent/test]    a present-but-invalid column
+// still errors: judging the witness first must not swallow decode failures
+#[pgorm_macros::test]
+async fn present_invalid_column_still_errors() -> Result<(), Error> {
+    let ctx = TestContext::new("joined_decode_nullable_invalid").await;
+    let db = ctx.db.get().await?;
+
+    let result = MaybeNullable::find_by_statement(
+        r#"SELECT 123::int AS "s0_name", NULL::text AS "s1_name""#,
+        vec![],
+    )
+    .one(&db)
+    .await;
+    assert_wrong_type(result);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}

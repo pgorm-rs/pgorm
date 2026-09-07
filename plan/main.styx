@@ -4209,6 +4209,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 7, severity P2. Source: src/entity/model.rs:114-120, FromQueryResult::from_query_result_optional. Reproduction (all_null_optional_projection_is_absent): derive FromQueryResult for a struct containing only name: Option<String>; decode SELECT NULL::text AS name through from_query_result_optional. Actual: Some(NullableProjection { name: None }); expected by the documented absence witness: None. The function checks nullness only after decoding errors, while an entirely nullable projection decodes successfully. Acceptance: evaluate the absence witness independently of decode success; all witnessed columns NULL means None for nullable projections as well as required-field models. Preserve errors for incomplete/missing columns and present-but-invalid types, enum labels and JSON; keep empty witness sets from being classified absent. Test derived and handwritten reflected/fallback projections, nonempty prefixes, genuinely unmatched joins and matched all-NULL projections. Spec impact: exec.decode.absent already requires this outcome, so this is an implementation defect; clarify entity.traits.from-query-result only if needed. The earlier joined-row-decode-errors fix preserved present-row failures, and this follow-up closes its successful-decode bypass."
                     }
+
+                    {
+                        at 2026-09-07T13:08:20.541646Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
         )

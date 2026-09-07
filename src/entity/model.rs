@@ -112,14 +112,17 @@ pub trait FromQueryResult: Sized {
     /// arises for a projection that leaves the key out.
     // [spec:pgorm:req:exec.decode.absent]
     fn from_query_result_optional(res: &QueryResult, pre: &str) -> Result<Option<Self>, Error> {
-        match Self::from_query_result(res, pre) {
-            Ok(model) => Ok(Some(model)),
-            Err(err) => match Self::expected_columns() {
-                Some(cols) if res.all_null(pre, cols.iter().map(ExpectedColumn::name)) => Ok(None),
-                None if res.all_null_under(pre) => Ok(None),
-                _ => Err(err),
-            },
+        // The witness is judged before decoding: a projection of nothing but
+        // nullable fields decodes an all-`NULL` row successfully, and that
+        // shape is still an absent row, not a value.
+        let absent = match Self::expected_columns() {
+            Some(cols) => res.all_null(pre, cols.iter().map(ExpectedColumn::name)),
+            None => res.all_null_under(pre),
+        };
+        if absent {
+            return Ok(None);
         }
+        Self::from_query_result(res, pre).map(Some)
     }
 
     /// The columns [`from_query_result`](FromQueryResult::from_query_result)
