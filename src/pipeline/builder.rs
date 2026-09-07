@@ -64,7 +64,7 @@ pub struct Pipeline {
     /// embedded pipeline that reshaped itself is a table-like relation whose
     /// resulting columns the CTE boundary re-exposes, so embedding does not
     /// propagate it.
-    // [spec:pgorm:sem:pipeline.select-sources]
+    // [spec:pgorm:sem:pipeline.select-sources+2]
     pub(super) reshaped: Option<&'static str>,
 }
 
@@ -134,7 +134,7 @@ pub trait IntoSource {
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
     // [spec:pgorm:sem:pipeline.self-join]
-    // [spec:pgorm:sem:pipeline.select-sources]
+    // [spec:pgorm:sem:pipeline.select-sources+2]
     fn named(self, name: impl Into<AliasName>) -> Named<Self>
     where
         Self: Sized,
@@ -455,7 +455,7 @@ impl Pipeline {
 
     /// Record that `stage` replaced this pipeline's source namespaces,
     /// keeping the *first* offender — the one that did the replacing.
-    // [spec:pgorm:sem:pipeline.select-sources]
+    // [spec:pgorm:sem:pipeline.select-sources+2]
     fn reshaping(mut self, stage: &'static str) -> Self {
         self.reshaped.get_or_insert(stage);
         self

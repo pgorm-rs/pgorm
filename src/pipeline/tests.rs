@@ -1105,7 +1105,7 @@ fn nested_embedding_prunes_through_two_levels() {
 
 /// Like [`sql_of`], for the source-select terminal: golden output plus the
 /// grammar oracle.
-// [spec:pgorm:sem:pipeline.select-sources/test]
+// [spec:pgorm:sem:pipeline.select-sources+2/test]
 fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     let (sql, _) = selected.into_sql().expect("select_sources compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -1114,7 +1114,7 @@ fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     sql
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    two sources with a
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    two sources with a
 // colliding column name land under different prefixes by construction, so
 // prqlc never mints an _expr_N the decode could not predict
 #[test]
@@ -1137,7 +1137,7 @@ fn select_sources_prefixes_dissolve_expr_n() {
     assert!(!built.contains("_expr_"), "{built}");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    a single source needs no
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    a single source needs no
 // tuple and projects one block under s0_
 #[test]
 fn select_sources_takes_a_single_source() {
@@ -1145,7 +1145,7 @@ fn select_sources_takes_a_single_source() {
     assert_eq!(built, "SELECT id AS s0_id, name AS s0_name FROM cake");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    a named restatement
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    a named restatement
 // qualifies its block by the name, exactly as the join told the two
 // occurrences apart
 #[test]
@@ -1168,7 +1168,7 @@ fn select_sources_named_self_join_qualifies_by_name() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    the writer's cast
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    the writer's cast
 // discipline reaches the PRQL side: an enum column reads back as text
 // [spec:pgorm:sem:query.graph.writer+2/test]
 #[test]
@@ -1180,7 +1180,7 @@ fn select_sources_casts_enum_columns_to_text() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    reshaping before the
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    reshaping before the
 // terminal is refused by the stage's own name, before prqlc compiles
 #[test]
 fn select_sources_refuses_a_reshaped_pipeline() {
@@ -1214,7 +1214,7 @@ fn select_sources_refuses_a_reshaped_pipeline() {
     assert_eq!(err, PipelineError::ReshapedSources("remove"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    the refusal names the
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    the refusal names the
 // stage that did the replacing: the first offender, not the last
 #[test]
 fn select_sources_refusal_names_the_first_offender() {
@@ -1227,7 +1227,7 @@ fn select_sources_refusal_names_the_first_offender() {
     assert_eq!(err, PipelineError::ReshapedSources("select"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    the whole allowed set
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    the whole allowed set
 // ahead of the terminal: filter, derive, sort, take, join, window, distinct
 // and append leave every source addressable
 #[test]
@@ -1253,7 +1253,7 @@ fn select_sources_composes_after_the_allowed_stages() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    append is in the allowed
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    append is in the allowed
 // set because the left side's naming survives it
 #[test]
 fn select_sources_composes_after_append() {
@@ -1268,7 +1268,7 @@ fn select_sources_composes_after_append() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    an embedded pipeline's
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    an embedded pipeline's
 // reshaping stays its own: the CTE boundary re-exposes its projection as a
 // table-like namespace, and the consumer's sources are untouched
 #[test]
@@ -1291,7 +1291,7 @@ fn select_sources_ignores_an_embedded_reshape() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources/test]    the catalog-less ceiling:
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    the catalog-less ceiling:
 // a listed source the pipeline never read reaches prqlc, which refuses the
 // unresolvable columns as Compile diagnostics
 #[test]

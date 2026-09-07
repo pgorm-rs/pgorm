@@ -179,7 +179,7 @@ pub enum Displayed {
     Large,
 }
 
-// [spec:pgorm:syn:macros.derive.active-enum/test]    rename_all + per-variant rename + string_value
+// [spec:pgorm:syn:macros.derive.active-enum+1/test]    rename_all + per-variant rename + string_value
 #[test]
 fn container_and_variant_string_markers() {
     // Covered exhaustively by `derive_active_enum_value` above; this asserts the
@@ -198,7 +198,7 @@ fn container_and_variant_string_markers() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.active-enum/test]    db_type = "Enum" is a special spelling
+// [spec:pgorm:syn:macros.derive.active-enum+1/test]    db_type = "Enum" is a special spelling
 #[test]
 fn db_type_enum_expands_to_enum_column_type() {
     use pgorm::pgorm_query::ColumnType;
@@ -224,7 +224,7 @@ fn db_type_enum_expands_to_enum_column_type() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.active-enum/test]    num_value
+// [spec:pgorm:syn:macros.derive.active-enum+1/test]    num_value
 #[test]
 fn num_value_variants() {
     assert_eq!(Numbered::One.to_value(), 1);
@@ -233,7 +233,7 @@ fn num_value_variants() {
     assert!(Numbered::try_from_value(&23).is_err());
 }
 
-// [spec:pgorm:syn:macros.derive.active-enum/test]    discriminant fallback, incl. unary minus
+// [spec:pgorm:syn:macros.derive.active-enum+1/test]    discriminant fallback, incl. unary minus
 #[test]
 fn variants_without_attributes_fall_back_to_their_discriminant() {
     assert_eq!(Discriminants::Below.to_value(), -3);
@@ -242,7 +242,7 @@ fn variants_without_attributes_fall_back_to_their_discriminant() {
     assert_eq!(Discriminants::try_from_value(&-3), Ok(Discriminants::Below));
 }
 
-// [spec:pgorm:syn:macros.derive.active-enum/test]    display_value is accepted as a placeholder
+// [spec:pgorm:syn:macros.derive.active-enum+1/test]    display_value is accepted as a placeholder
 #[test]
 fn display_value_is_accepted_as_placeholder() {
     // It plays no part in the stored value...
