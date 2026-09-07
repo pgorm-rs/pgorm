@@ -46,12 +46,12 @@ impl Linked for CheeseCakeToFillingVendor {
         vec![
             super::cake_filling::Relation::Cake
                 .def()
+                .rev()
                 .on_condition(|left, _right| {
                     Expr::col((left, super::cake::Column::Name))
                         .like("%cheese%")
                         .into_condition()
-                })
-                .rev(),
+                }),
             super::cake_filling::Relation::Filling.def(),
             super::filling::Relation::Vendor.def(),
         ]
