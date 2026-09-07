@@ -115,7 +115,7 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 // [spec:pgorm:def:query.graph/test]    a graph declared as a root plus joined
 // sources executes as one statement whose rows carry every declared source
-// [spec:pgorm:sem:query.graph.writer+2/test]    three sources each carrying a
+// [spec:pgorm:sem:query.graph.writer+3/test]    three sources each carrying a
 // `name` and an `id` column decode without collision, because each is
 // projected under its own `s{i}_` prefix
 // [spec:pgorm:sem:query.graph.decode+1/test]    an unmatched LEFT JOIN reads as
@@ -986,6 +986,74 @@ async fn slot_cursor_resumes_through_equal_names() -> Result<(), Error> {
     Ok(())
 }
 
+/// The deterministic collision pair: `mimic`'s SQL name IS `victim`'s
+/// bounded spelling minus the prefix, so under the old contract both aliases
+/// were the identical 63 bytes.
+mod alias_collision {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "review_alias_collision")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+        pub victim: String,
+        #[pgorm(column_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa08003a0bcb7eb8e2")]
+        pub mimic: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:query.graph.writer+3/test]    a column literally named like
+// another column's bounded spelling keeps its own value through the graph and
+// select_sources: the plain and bounded alias namespaces cannot meet
+#[pgorm_macros::test]
+async fn bounded_alias_never_shadows_a_short_column() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_alias_collision").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(&format!(
+        r#"CREATE TABLE review_alias_collision (
+               id integer PRIMARY KEY,
+               {victim} text NOT NULL,
+               {mimic} text NOT NULL
+           );
+           INSERT INTO review_alias_collision VALUES (1, 'left', 'right');"#,
+        victim = "a".repeat(61),
+        mimic = "a".repeat(44) + "08003a0bcb7eb8e2",
+    ))
+    .await?;
+
+    let expected = alias_collision::Model {
+        id: 1,
+        victim: "left".to_owned(),
+        mimic: "right".to_owned(),
+    };
+    assert_eq!(
+        alias_collision::Entity::find().all(&db).await?,
+        std::slice::from_ref(&expected)
+    );
+    assert_eq!(
+        alias_collision::Entity::graph().all(&db).await?,
+        std::slice::from_ref(&expected)
+    );
+    assert_eq!(
+        pgorm::pipeline::Pipeline::from(alias_collision::Entity)
+            .select_sources(alias_collision::Entity)
+            .all(&db)
+            .await?,
+        [Some(expected)]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 mod long_name {
     use pgorm::entity::prelude::*;
 
@@ -1008,7 +1076,7 @@ mod long_name {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:query.graph.writer+2/test]    every valid PostgreSQL column
+// [spec:pgorm:sem:query.graph.writer+3/test]    every valid PostgreSQL column
 // identifier projects and decodes through the graph: a 61-byte name whose
 // prefixed alias passes the 63-byte bound, a sibling sharing its whole head,
 // and a multibyte name — through `find`, the graph, and `select_sources`

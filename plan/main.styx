@@ -4343,12 +4343,27 @@ children (
                 title "Prevent bounded result aliases from colliding with valid short column names"
                 kind @fix
                 deps (graph-long-column-aliases)
+                sealed true
                 log (
                     {
                         at 2026-09-07T16:17:49.097013Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Defect verification 2026-09-07 on bc45e47b. Review severity P1 (silent incorrect model values, not a planning-pass pin). Sources: src/executor/result_name.rs:19-29, consumed by src/query/graph.rs:241 and src/pipeline/sources.rs, with prefixed decoding through src/executor/query.rs. Reproduction: create a model/table with id and two text columns whose SQL names are A = 61 ASCII 'a' characters and B = 44 ASCII 'a' characters followed by '08003a0bcb7eb8e2'. Their ordinary values are 'left' and 'right'. Prefixing A with s0_ invokes the bounded hash spelling; prefixing B stays within 63 bytes and passes through unchanged, yielding the identical alias s0_ plus B. Entity::find().all returns both values correctly. Entity::graph().all returns left='left', right='left'; Pipeline::from(Entity).select_sources(Entity).all returns left='right', right='right'. This deterministic collision requires no FNV collision search. Acceptance: generated result aliases must be unique across each complete projection, including long-versus-short collisions, identical long heads, multibyte identifiers and multiple source slots; graph and pipeline decoding and optional-row absence witnesses must use the same unambiguous mapping. Prefer a construction that makes alias collisions unrepresentable rather than silently relying on hashed names being distinct; if arbitrary input cannot be supported, reject the conflict through a typed error before returning incorrect data. Preserve the fixed 63-byte limit and the successful original long-name probes. Spec impact: revise query.graph.writer+2's explicit short-name passthrough/hash concatenation contract and reconcile query.graph.decode and pipeline.select-sources with the chosen shared alias/decode mapping. Depends on completed graph-long-column-aliases; the original truncation bug is fixed, but its no-collision acceptance criterion is not. Evidence: /tmp/pgorm-defect-verification-repros.patch, test bounded_alias_does_not_collide_with_short_column; /tmp/pgorm-alias-collision-verification.log. The full prior suite including all eight original review probes passed (1,347 tests); this additional live probe fails."
+                    }
+
+                    {
+                        at 2026-09-07T16:33:30.715282Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-07T17:40:27.266491Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

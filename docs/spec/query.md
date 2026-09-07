@@ -204,7 +204,7 @@ is what `EntityTrait::find()` produces.
 > `Alias` is NOT deprecated by this and MUST remain: a name computed at run
 > time cannot be a `&'static str` token, and the ORM builds such names itself
 > — the loader's join-back alias, the source graph's `s{i}_` column prefixes
-> (`[spec:pgorm:sem:query.graph.writer+2]`), an entity's schema qualifier. The
+> (`[spec:pgorm:sem:query.graph.writer+3]`), an entity's schema qualifier. The
 > token is the paved road for the static case, not a replacement for the
 > dynamic one.
 >
@@ -597,7 +597,7 @@ what makes it total over partially-set models.
 > (`[spec:pgorm:def:query.graph]`). The caller's target selector is re-rooted
 > as the graph: the statement keeps its FROM, its filters, its ordering and
 > its limit, and gives up only its projection, which the one writer
-> (`[spec:pgorm:sem:query.graph.writer+2]`) regenerates under `s0_`. Clearing
+> (`[spec:pgorm:sem:query.graph.writer+3]`) regenerates under `s0_`. Clearing
 > the caller's select list before projecting is what keeps a graph's select
 > list generated from its declaration rather than inherited from a builder
 > whose list a caller may have edited. The junction enters as a `via()` hop —

@@ -237,7 +237,7 @@ slots!(S1 @ 1, S2 @ 2, S3 @ 3, S4 @ 4, S5 @ 5, S6 @ 6);
 /// their aliases here, and the per-prefix decode reads exactly these names,
 /// so the scheme is one code path rather than a convention three sites
 /// repeat.
-// [spec:pgorm:sem:query.graph.writer+2]
+// [spec:pgorm:sem:query.graph.writer+3]
 pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
     result_column_name(&format!("s{index}_"), column)
 }
@@ -256,7 +256,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// recognise — a hand-written override that is not a cast — projects
 /// untouched, exactly as it stands outside the `SelectStatement` writer's
 /// guarantees too.
-// [spec:pgorm:sem:query.graph.writer+2]
+// [spec:pgorm:sem:query.graph.writer+3]
 // [spec:pgorm:sem:pipeline.select-sources+2]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
     use pgorm_query::{BinOper, Function, SimpleExpr};
@@ -288,7 +288,7 @@ pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
 /// the source was declared under one, otherwise its bare table — the same
 /// identifier the `ON` clause constrains against, so the projection and the
 /// join cannot name one source two ways.
-// [spec:pgorm:sem:query.graph.writer+2]
+// [spec:pgorm:sem:query.graph.writer+3]
 pub(crate) fn project_source<F: EntityTrait>(
     query: &mut SelectStatement,
     qualifier: DynIden,
@@ -415,7 +415,7 @@ impl<E: EntityTrait> Default for SelectGraph<E, ()> {
 impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// Project one decoded source under the next prefix, and record the
     /// identifier that prefix belongs to.
-    // [spec:pgorm:sem:query.graph.writer+2]
+    // [spec:pgorm:sem:query.graph.writer+3]
     pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
         project_source::<F>(
             &mut self.query,
@@ -684,7 +684,7 @@ impl<E: EntityTrait, S> QueryTrait for SelectGraph<E, S> {
 // and the filter / order / query traits reach the same statement
 // [spec:pgorm:sem:query.graph.slots+1/test]    the slot kind fixes the join
 // type, and the declared tuple grows to the generated ceiling
-// [spec:pgorm:sem:query.graph.writer+2/test]    one prefixed block per decoded
+// [spec:pgorm:sem:query.graph.writer+3/test]    one prefixed block per decoded
 // source, in declaration order, under the source's effective identifier
 // [spec:pgorm:req:query.graph.aliases/test]    an `_as` slot is named by its
 // alias everywhere, and `join_maybe_filtered` composes with the relation's
