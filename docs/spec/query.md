@@ -356,12 +356,26 @@ builder is or what its rows decode into.
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.
 
-> [spec:pgorm:sem:query.build.insert+3]
+> [spec:pgorm:sem:query.build.insert+4]
 > `Insert::<A>::new` targets `A::Entity`'s table and applies
-> `or_default_values()`, so a builder to which no model was ever added still
-> renders a valid default-values INSERT rather than invalid SQL. `Insert::one`
-> and `Insert::many` (and `add`/`add_many`) accept anything implementing
-> `IntoActiveModel<A>`, converting Models to ActiveModels first.
+> `or_default_values()`, so the statement stays renderable: `as_query()` on a
+> builder holding no model is valid SQL rather than a column-less
+> `INSERT INTO "t" ()`. `Insert::one` and `Insert::many` (and `add`/`add_many`)
+> accept anything implementing `IntoActiveModel<A>`, converting Models to
+> ActiveModels first.
+>
+> That rendered default-values row MUST NOT be written. "No model was ever
+> added" is a state the builder records, and all three of `Insert`'s terminals
+> read it and answer without a database round-trip: `exec` reports `Ok(0)` rows
+> affected, `exec_returning_pk` fails with `Error::RecordNotInserted` and
+> `exec_returning_model` with `Error::RecordNotFound` — each terminal's existing
+> answer for a statement that wrote no row, so the empty batch needs no outcome
+> of its own. The distinction MUST be the builder's own state and not a
+> predicate over the statement, which cannot carry it: an empty batch and an
+> explicitly supplied all-`NotSet` model both leave the value list empty, and
+> they are different requests. A caller who wants the empty batch reported
+> rather than inferred converts with `on_empty_do_nothing`
+> (`[spec:pgorm:sem:query.build.insert.empty-failsafe]`).
 >
 > `add` iterates every `A::Entity` column in order: `Set` and `Unchanged`
 > values are included (each value passed through `col.save_as(...)`, applying
@@ -369,8 +383,10 @@ what makes it total over partially-set models.
 > lists entirely. A model that leaves every column `NotSet` therefore
 > contributes no column list and no values row: instead of an arity-zero row
 > it raises the statement's default-values row count, so `n` such models
-> render `VALUES (DEFAULT)` repeated `n` times, one row of database defaults
-> each. `on_conflict` attaches a pgorm-query `OnConflict` clause verbatim.
+> render `VALUES (DEFAULT)` repeated `n` times and write `n` rows of database
+> defaults. Asking for a row of defaults is asking for a row; only asking for
+> nothing is asking for nothing. `on_conflict` attaches a pgorm-query
+> `OnConflict` clause verbatim.
 >
 > `Insert` MUST NOT cache the added model's primary-key value tuple. It carried
 > one — populated for non-auto-increment keys, last row winning, and read back
@@ -403,7 +419,7 @@ what makes it total over partially-set models.
 > fails with that error before any SQL is sent, so a mismatched batch leaves
 > the database untouched.
 
-> [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
+> [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
 > `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:
 > `Insert::on_empty_do_nothing()` converts without
 > altering the statement, while `Insert::on_conflict_do_nothing()` first
@@ -418,13 +434,16 @@ what makes it total over partially-set models.
 >
 > Emptiness is a state the builder records, not a predicate re-derived at each
 > execution. An `Insert` holds either the per-column presence bitmap of the
-> first model added — which always marks at least one column present — or the
-> empty state, reached both by adding no model at all (`Insert::many` over an
-> empty iterator) and by adding only models that leave every column `NotSet`.
-> All three `TryInsert` execution paths (`exec`, `exec_returning_pk`,
-> `exec_returning_model`) read that one state, so an all-`NotSet` model reports
-> `TryInsertResult::Empty` on every path exactly as an empty batch does,
-> without sending any SQL and leaving the database untouched. A
+> first model added — which always marks at least one column present — or one
+> of the two empty states: no model added at all (`Insert::many` over an empty
+> iterator), or only models that leave every column `NotSet`. `Insert`'s own
+> terminals hold those two apart (`[spec:pgorm:sem:query.build.insert]`), since
+> a blank model asks for a row of defaults and an empty batch asks for nothing.
+> `TryInsert` deliberately does not: all three of its execution paths (`exec`,
+> `exec_returning_pk`, `exec_returning_model`) read both as empty, so an
+> all-`NotSet` model reports `TryInsertResult::Empty` on every path exactly as
+> an empty batch does, without sending any SQL and leaving the database
+> untouched — the failsafe answers for the whole of "nothing to write". A
 > `Error::RecordNotInserted` from the underlying insert is mapped to
 > `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.

@@ -116,25 +116,40 @@ where
     ///
     /// No `RETURNING` clause is emitted. See [`Self::exec_returning_pk`] for the
     /// inserted primary key and [`Self::exec_returning_model`] for the row.
+    ///
+    /// An insert to which no model was added writes nothing and reports `0`; a
+    /// model that leaves every column `NotSet` asks for a row of database
+    /// defaults and still writes one.
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:query.build.insert+4]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
     {
         self.ensure_uniform_columns()?;
+        if self.has_no_models() {
+            return Ok(0);
+        }
         exec_insert_without_returning(self.query, db).await
     }
 
     /// Execute the insert and return the inserted row's primary key.
+    ///
+    /// An insert to which no model was added has no row to report a key for and
+    /// fails with [`Error::RecordNotInserted`].
     // [spec:pgorm:sem:exec.crud.insert+5]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:query.build.insert+4]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
     where
         C: ConnectionTrait,
     {
         self.ensure_uniform_columns()?;
+        if self.has_no_models() {
+            return Err(Error::RecordNotInserted);
+        }
         let mut query = self.query;
         let returning =
             Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
@@ -146,8 +161,12 @@ where
     }
 
     /// Execute the insert and return the inserted row as a model.
+    ///
+    /// An insert to which no model was added has no row to return and fails
+    /// with [`Error::RecordNotFound`].
     // [spec:pgorm:sem:exec.crud.insert-returning+2]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:query.build.insert+4]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
     pub async fn exec_returning_model<C>(
         self,
@@ -158,6 +177,9 @@ where
         C: ConnectionTrait,
     {
         self.ensure_uniform_columns()?;
+        if self.has_no_models() {
+            return Err(Error::RecordNotFound);
+        }
         exec_insert_returning_model_opt::<A, _>(self.query, db)
             .await?
             .ok_or(Error::RecordNotFound)

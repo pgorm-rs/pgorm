@@ -20,7 +20,45 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.insert+3/test]    a batch of models that set no
+// [spec:pgorm:sem:query.build.insert+4/test]    a batch to which no model was
+// added writes nothing on any terminal, unlike an all-NotSet model
+#[pgorm_macros::test]
+async fn empty_batch_writes_no_row_anywhere() -> Result<(), Error> {
+    use insert_default::*;
+
+    let ctx = TestContext::new("insert_default_tests_empty_batch").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    let empty = || Insert::many(std::iter::empty::<ActiveModel>());
+
+    assert_eq!(empty().exec(&db).await?, 0);
+    assert!(matches!(
+        empty().exec_returning_pk(&db).await,
+        Err(Error::RecordNotInserted)
+    ));
+    assert!(matches!(
+        empty().exec_returning_model(&db).await,
+        Err(Error::RecordNotFound)
+    ));
+    assert!(Entity::find().all(&db).await?.is_empty());
+
+    let blank = Insert::one(ActiveModel {
+        ..Default::default()
+    })
+    .exec(&db)
+    .await?;
+
+    assert_eq!(blank, 1);
+    assert_eq!(Entity::find().all(&db).await?, [Model { id: 1 }]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.build.insert+4/test]    a batch of models that set no
 // column inserts one default row per model rather than collapsing into one
 #[pgorm_macros::test]
 async fn all_not_set_models_insert_one_row_each() -> Result<(), Error> {

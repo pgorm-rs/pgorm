@@ -4120,6 +4120,13 @@ children (
                         kind @note
                         text "Adversarial review 2026-09-07. Existing workspace suite: 1,312 tests passed; eight temporary probes reproduced seven defects. Review severity is recorded below, not a planning-priority pin. Reproduction patch: /tmp/pgorm-adversarial-repros.patch; the details here are sufficient to recreate the probe after that temporary file expires. Finding 1, severity P1. Sources: src/query/insert.rs:115-121 and src/executor/insert.rs:120-127. Reproduction (empty_batch_writes_no_rows): create review_parent(id serial PRIMARY KEY), then Insert::<parent::ActiveModel>::many(std::iter::empty::<parent::ActiveModel>()).exec(&db). Actual: Ok(1), with Model { id: 1 } persisted. The initializer applies or_default_values before any model is supplied, conflating an empty iterator with an explicitly supplied all-NotSet model. Acceptance: zero models produce no write through exec, exec_returning_pk and exec_returning_model; define the appropriate no-op or existing typed-error result for each terminal. Preserve one default row per explicitly supplied blank model, TryInsert's documented behavior and uniform-column mismatch errors. Prefer an explicit builder-state distinction; no panics. Spec impact: query.build.insert+3 explicitly specifies default insertion even when no model was added, so revise that design contract with the fix and reconcile query.build.insert.empty-failsafe and exec.crud.try-insert. This is a follow-up to the completed blank-model/uniform-column work, not a reopening."
                     }
+
+                    {
+                        at 2026-09-07T12:50:38.839369Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -4143,7 +4150,6 @@ children (
                 title "Preserve additional WHERE predicates when an UpdateOne has no changed fields"
                 kind @fix
                 deps (orm.exec)
-                sealed true
                 log (
                     {
                         at 2026-09-07T12:18:08.273507Z

@@ -910,7 +910,7 @@ fn relation_named_joins_match_the_long_spelling() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+3/test]    `Insert::new` renders a valid
+// [spec:pgorm:sem:query.build.insert+4/test]    `Insert::new` renders a valid
 // DEFAULT VALUES statement before any model is added, and `one`/`many` /
 // `add`/`add_many` take anything `IntoActiveModel`
 #[test]
@@ -952,7 +952,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+3/test]    `add` writes `Set` and
+// [spec:pgorm:sem:query.build.insert+4/test]    `add` writes `Set` and
 // `Unchanged` columns through `col.save_as` and omits `NotSet` ones entirely
 #[test]
 fn insert_add_omits_not_set_columns() {
@@ -989,7 +989,7 @@ fn insert_add_omits_not_set_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+3/test]    `on_conflict` attaches the given
+// [spec:pgorm:sem:query.build.insert+4/test]    `on_conflict` attaches the given
 // pgorm-query clause verbatim
 #[test]
 fn insert_on_conflict_is_attached_verbatim() {
@@ -1060,7 +1060,7 @@ fn insert_many_rejects_mismatched_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+3/test]    a model with nothing set
+// [spec:pgorm:sem:query.build.insert+4/test]    a model with nothing set
 // contributes a default-values row rather than an arity-zero column and value
 // list, and one such row per model
 #[test]
@@ -1110,7 +1110,7 @@ fn insert_many_rejects_a_blank_first_model() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    `on_empty_do_nothing`
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    `on_empty_do_nothing`
 // converts to `TryInsert` without touching the statement, while
 // `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]

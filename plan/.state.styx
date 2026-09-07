@@ -441,6 +441,7 @@ assertions (
     {id decide.schema-comments, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:38:16.477006Z}
     {id decide.statement, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:07.694429Z}
     {id decide.turso, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:54:51.122793Z}
+    {id empty-insert-batch, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:50:38.839369Z}
     {id ergo.eq-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:19:37.671298Z}
     {id ergo.fluent-alias, kind @complete, author "brendan@necessary.nu", at 2026-09-05T12:51:02.500287Z}
     {id ergo.fluent-audit, kind @complete, author "brendan@necessary.nu", at 2026-09-04T15:20:00.520126Z}
@@ -460,6 +461,7 @@ assertions (
     {id ergo.prql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-04T14:41:22.291401Z}
     {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
     {id from-json-serialization, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:10.825951Z}
+    {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}
@@ -474,6 +476,7 @@ assertions (
     {id infra.tx.tests, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:44:19.363915Z}
     {id insert-returning-manual-pk, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:02.163452Z}
     {id joined-row-decode-errors, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:26:15.432338Z}
+    {id linked-fold, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:32:33.531154Z}
     {id loader, kind @complete, author "brendan@necessary.nu", at 2026-09-06T15:14:29.949545Z}
     {id macro-dependency-renames, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:06.458967Z}
     {id macro-from-query-result-skip, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:45:59.257788Z}
@@ -500,6 +503,7 @@ assertions (
     {id nopanic.value-tuple, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:46:15.258382Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
+    {id pair-deletion, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:13:59.32051Z}
     {id parameter-wire-types, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:31:53.446847Z}
     {id pgparse.codegen-ddl, kind @complete, author "brendan@necessary.nu", at 2026-09-02T21:15:51.896227Z}
     {id pgparse.fingerprint, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:06:32.153992Z}
@@ -558,6 +562,7 @@ assertions (
     {id unrep.select-only, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:10:14.926388Z}
     {id unrep.tableref-split, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:47:05.432653Z}
     {id unrep.transaction-mode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:45:38.889783Z}
+    {id update-noop-filters, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:47:17.383924Z}
     {id value-float-eq-hash, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:20.231538Z}
     {id verify.codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:24:36.309541Z}
     {id verify.conn, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:40:21.722896Z}
@@ -567,10 +572,6 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
-    {id pair-deletion, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:13:59.32051Z}
-    {id linked-fold, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:32:33.531154Z}
-    {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
-    {id update-noop-filters, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:47:17.383924Z}
 )
 
 impl_evidence (

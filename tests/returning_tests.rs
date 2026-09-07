@@ -262,7 +262,7 @@ async fn insert_returning_modes() -> Result<(), Error> {
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from a skipped `ON CONFLICT` insert, and any other error
 // propagating
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    the same three
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    the same three
 // entry points reading the one recorded empty state: an insert over an empty
 // iterator and an insert of an all-NotSet model both return Empty with the
 // database left untouched

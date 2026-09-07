@@ -41,7 +41,7 @@ where
 // [spec:pgorm:sem:exec.crud.insert+5/test]    the primary key comes from the
 // RETURNING row in every case, including the client-supplied-key one that used
 // to be answered from a cached tuple
-// [spec:pgorm:sem:query.build.insert+3/test]    which is why the builder caches
+// [spec:pgorm:sem:query.build.insert+4/test]    which is why the builder caches
 // no primary key to answer from
 #[pgorm_macros::test]
 async fn manual_key_comes_from_returning() -> Result<(), Error> {
@@ -141,7 +141,7 @@ async fn upsert_reports_the_conflict_row_key() -> Result<(), Error> {
 // [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsert` reads that as
 // `Conflicted`, and an insert with nothing to write as `Empty` without touching
 // the database
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+3/test]    the empty-insert
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    the empty-insert
 // failsafe is unchanged by the key resolution above
 #[pgorm_macros::test]
 async fn skipped_and_empty_inserts_are_unchanged() -> Result<(), Error> {

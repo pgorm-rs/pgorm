@@ -10,14 +10,20 @@ use pgorm_query::{Expr, InsertStatement, OnConflict};
 /// Emptiness is a variant rather than a predicate over the bitmap: `Present` is
 /// only reachable through [`Insert::add`] for a model that set at least one
 /// column, so an all-`NotSet` model cannot present itself as a row of values.
+/// "No model at all" is a variant of its own for the same reason: a batch that
+/// asks for nothing and a model that asks for a row of database defaults are
+/// different requests, and both leave the statement's value list empty, so only
+/// the builder can tell them apart.
 /// A model that disagrees with the shape already recorded is a variant too:
 /// [`Insert::add`] returns `Self` so calls chain and has nowhere to report the
 /// disagreement, so it holds it until an execution path can fail with it.
 #[derive(Debug)]
 enum InsertColumns {
-    /// No column is set. `rows` counts the models added so far, every one of
-    /// which left every column `NotSet`; zero is the initial state.
-    Empty { rows: u32 },
+    /// No model has been added. The initial state.
+    Unset,
+    /// No column is set. `rows` counts the models added so far, at least one,
+    /// every one of which left every column `NotSet`.
+    Blank { rows: u32 },
     /// Per-column presence recorded from the first model added, which set at
     /// least one column.
     Present(Vec<bool>),
@@ -33,10 +39,18 @@ enum InsertColumns {
 }
 
 impl InsertColumns {
+    /// How many all-`NotSet` models have been added: zero outside `Blank`.
+    fn blank_rows(&self) -> u32 {
+        match self {
+            Self::Blank { rows } => *rows,
+            Self::Unset | Self::Present(_) | Self::Mismatch { .. } => 0,
+        }
+    }
+
     /// Records the disagreement between the presence bitmap already held and
     /// that of the model being added, naming the columns by which they differ.
     /// A `recorded` shorter than `present` reads as "set nothing", which is the
-    /// empty state's shape.
+    /// blank state's shape.
     fn mismatch<A>(recorded: &[bool], present: &[bool]) -> Self
     where
         A: ActiveModelTrait,
@@ -107,7 +121,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.insert+3]
+// [spec:pgorm:sem:query.build.insert+4]
 impl<A> Insert<A>
 where
     A: ActiveModelTrait,
@@ -118,16 +132,26 @@ where
                 .into_table(A::Entity::default().table_ref())
                 .or_default_values()
                 .to_owned(),
-            columns: InsertColumns::Empty { rows: 0 },
+            columns: InsertColumns::Unset,
             model: PhantomData,
         }
     }
 
     /// Whether the statement carries no column at all: either no model was
     /// added, or every model added left every column `NotSet`.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
     pub(crate) fn is_empty(&self) -> bool {
-        matches!(self.columns, InsertColumns::Empty { .. })
+        matches!(
+            self.columns,
+            InsertColumns::Unset | InsertColumns::Blank { .. }
+        )
+    }
+
+    /// Whether no model was ever added, as distinct from models that left every
+    /// column `NotSet`: nothing was asked for, so there is no row to write.
+    // [spec:pgorm:sem:query.build.insert+4]
+    pub(crate) fn has_no_models(&self) -> bool {
+        matches!(self.columns, InsertColumns::Unset)
     }
 
     /// The columns mismatch recorded while models were added, if any.
@@ -144,7 +168,9 @@ where
                 first_only,
                 later_only,
             } => Err(columns_mismatch_err(first_only, later_only)),
-            InsertColumns::Empty { .. } | InsertColumns::Present(_) => Ok(()),
+            InsertColumns::Unset | InsertColumns::Blank { .. } | InsertColumns::Present(_) => {
+                Ok(())
+            }
         }
     }
 
@@ -221,7 +247,7 @@ where
     /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
     /// and by every execution path.
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:query.build.insert+3]
+    // [spec:pgorm:sem:query.build.insert+4]
     #[allow(clippy::should_implement_trait)]
     pub fn add<M>(mut self, m: M) -> Self
     where
@@ -245,14 +271,14 @@ where
 
         match &self.columns {
             InsertColumns::Mismatch { .. } => return self,
-            InsertColumns::Empty { rows } if columns.is_empty() => {
-                let rows = rows.saturating_add(1);
-                self.columns = InsertColumns::Empty { rows };
+            InsertColumns::Unset | InsertColumns::Blank { .. } if columns.is_empty() => {
+                let rows = self.columns.blank_rows().saturating_add(1);
+                self.columns = InsertColumns::Blank { rows };
                 self.query.or_default_values_many(rows);
                 return self;
             }
-            InsertColumns::Empty { rows: 0 } => self.columns = InsertColumns::Present(present),
-            InsertColumns::Empty { .. } => {
+            InsertColumns::Unset => self.columns = InsertColumns::Present(present),
+            InsertColumns::Blank { .. } => {
                 self.columns = InsertColumns::mismatch::<A>(&[], &present);
                 return self;
             }
@@ -332,7 +358,7 @@ where
     /// sending SQL. Distinct from
     /// [`OnConflict::do_nothing`](pgorm_query::OnConflict::do_nothing), which
     /// attaches an `ON CONFLICT` clause to a statement that does run.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
     pub fn on_empty_do_nothing(self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -363,7 +389,7 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
     pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
     where
         A: ActiveModelTrait,
@@ -404,7 +430,7 @@ where
 ///
 /// All functions works the same as if it is `Insert<A>`. Please refer to the
 /// `Insert<A>` page for more information
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+3]
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
 #[derive(Debug)]
 pub struct TryInsert<A>
 where
