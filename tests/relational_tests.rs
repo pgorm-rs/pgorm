@@ -1799,8 +1799,9 @@ fn relation_def_converts_to_foreign_key_forms() {
         .join(" ")
     );
 
-    // Schema information is reduced away: a schema-qualified `FromItem` becomes
-    // a bare table on both sides, and the derived name uses the bare name too.
+    // Schema information survives on both sides — a REFERENCES clause names
+    // the table the relation points at, not what search_path resolves — while
+    // the derived constraint name still uses the bare table.
     let warehouse = alias("warehouse");
     let qualified = RelationDef {
         rel_type: RelationType::HasOne,
@@ -1824,8 +1825,8 @@ fn relation_def_converts_to_foreign_key_forms() {
     assert_eq!(
         stmt.to_string(),
         [
-            r#"ALTER TABLE "child" ADD CONSTRAINT "fk-child-parent_id""#,
-            r#"FOREIGN KEY ("parent_id") REFERENCES "parent" ("id")"#,
+            r#"ALTER TABLE "warehouse"."child" ADD CONSTRAINT "fk-child-parent_id""#,
+            r#"FOREIGN KEY ("parent_id") REFERENCES "warehouse"."parent" ("id")"#,
         ]
         .join(" ")
     );
