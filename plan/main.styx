@@ -276,7 +276,22 @@ children (
                                 kind @note
                                 text "Shape of the work, as spiked and then reverted out of fad22bef so that commit could land green on its own. TypeName gains a `verbatim: bool` plus a `TypeName::custom(text)` constructor, short-circuiting `to_sql_string` to `raw_text()`; `Expr::cast_as_custom` becomes `self.cast_as_type(TypeName::custom(type_expr))`; `Function::Cast` and the `drop_right_as_hack` in `prepare_binary_expr` become dead and are deleted; `source_read_cast` loses the second match arm fad22bef added. Two rule bodies go stale with it and must be swept in the same commit: `sql.render.cast-param-type` v1 currently specifies both shapes explicitly (\"on both cast shapes ... and a `Value` in the left operand of a `BinOper::As`\"), and `sql.ast.func` still lists `cast_as` among the `Func` helpers though `Func::cast_as` was already deleted in fad22bef — that one is stale on main right now. Verified green at 1353/1353 in the spike before revert; the goldens it moves are the ones fad22bef already re-pinned."
                             }
+
+                            {
+                                at 2026-09-08T17:03:33.750159Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Probe: checking whether the note write itself is what fails lint."
+                                after_done true
+                            }
                         )
+                    }
+
+                    {
+                        id doctest-repair
+                        title "Bring the pgorm-query doc examples back in line with what the code renders"
+                        kind @docs
+                        deps (single-cast-node)
                     }
                 )
                 log (
