@@ -317,7 +317,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
         .to_string(),
         [
             r#"INSERT INTO "casts" ("tea", "teas", "name", "payload")"#,
-            r#"VALUES (CAST('BreakfastTea' AS tea), CAST(ARRAY ['EverydayTea'] AS tea[]), 'plain', E'{\"k\":\"v\"}')"#,
+            r#"VALUES (CAST('BreakfastTea' AS tea), CAST(ARRAY ['EverydayTea'] AS tea[]), 'plain', '{"k":"v"}')"#,
         ]
         .join(" ")
     );
@@ -340,7 +340,7 @@ fn json_column_flattens_json_array_without_cast() {
             Value::Json(Some(Box::new(json!({"b": 2})))),
         ])),
     )));
-    assert_eq!(expr_sql(flattened), r#"E'[{\"a\":1},{\"b\":2}]'"#);
+    assert_eq!(expr_sql(flattened), r#"'[{"a":1},{"b":2}]'"#);
 
     // A null array becomes a null Json rather than a null array.
     let flattened = casts::Column::Payload.save_as(Expr::val(Value::Array(ArrayType::Json, None)));
@@ -348,7 +348,7 @@ fn json_column_flattens_json_array_without_cast() {
 
     // Anything else bound for the Json column passes straight through.
     let untouched = casts::Column::Payload.save_as(Expr::val(json!({"k": "v"})));
-    assert_eq!(expr_sql(untouched), r#"E'{\"k\":\"v\"}'"#);
+    assert_eq!(expr_sql(untouched), r#"'{"k":"v"}'"#);
 }
 
 // [spec:pgorm:sem:entity.traits.column.enum-cast+3/test]    the casts survive a
