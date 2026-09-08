@@ -24,7 +24,7 @@ impl Pipeline {
     /// are discarded and the survivors renumber contiguously, keeping
     /// position `N` in the SQL aligned with position `N` in the values.
     // [spec:pgorm:req:pipeline.errors+2]
-    // [spec:pgorm:req:pipeline.params+3]
+    // [spec:pgorm:req:pipeline.params+4]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let mut aliases = Vec::new();
         for stage in self.bindings.iter().flatten().chain(&self.stages) {

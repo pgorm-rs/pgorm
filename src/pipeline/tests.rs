@@ -128,12 +128,63 @@ fn case_renders_case_when() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a string literal is escaped, not
+// [spec:pgorm:req:pipeline.params+4/test]    a string literal is escaped, not
 // interpolated: it cannot close the quote it is written into
 #[test]
 fn string_literals_are_escaped() {
     let built = sql_of(Pipeline::from(INVOICE).filter(col(INVOICE, alias("note")).eq("o'clock")));
     assert_eq!(built, "SELECT * FROM invoice WHERE note = 'o''clock'");
+}
+
+/// The string constant the PostgreSQL parser recovered from `sql`, decoded
+/// by the server's own scanner — so an ordinary literal and an `E''` one are
+/// compared by what they denote rather than by how they were written.
+fn parsed_string(sql: &str) -> Option<String> {
+    let parsed = pg_query::parse(sql).ok()?;
+    parsed.protobuf.nodes().into_iter().find_map(|node| {
+        let pg_query::NodeRef::AConst(constant) = node.0 else {
+            return None;
+        };
+        match constant.val.as_ref()? {
+            pg_query::protobuf::a_const::Val::Sval(text) => Some(text.sval.clone()),
+            _ => None,
+        }
+    })
+}
+
+// [spec:pgorm:req:pipeline.params+4/test]    an inlined literal is data: it
+// parses as one statement and denotes exactly the value it was given
+#[test]
+fn hostile_literals_stay_one_statement() {
+    let payloads = [
+        "o'clock",
+        "\\'; SELECT 1; --",
+        "\\' OR TRUE --",
+        "'; DROP TABLE invoice; --",
+        "a''b",
+        "'",
+        "\\",
+        "a\\\\'b",
+        "back\\slash",
+        "costs $1",
+        "E'x'",
+        "a\nb\tc",
+        "nul\u{1a}end",
+    ];
+    for payload in payloads {
+        let sql = sql_of(Pipeline::from(INVOICE).filter(col(INVOICE, alias("note")).eq(payload)));
+        let parsed = pg_query::parse(&sql).expect("grammar accepts");
+        assert_eq!(
+            parsed.protobuf.stmts.len(),
+            1,
+            "a value became a second statement: {sql}"
+        );
+        assert_eq!(
+            parsed_string(&sql).as_deref(),
+            Some(payload),
+            "the literal does not denote its value: {sql}"
+        );
+    }
 }
 
 // [spec:pgorm:req:pipeline.surface+3/test]
@@ -290,7 +341,7 @@ fn join_takes_an_explicit_condition() {
     );
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]
+// [spec:pgorm:req:pipeline.params+4/test]
 #[test]
 fn placeholders_number_in_bind_order_across_stages() {
     let gross = alias("gross");
@@ -306,7 +357,7 @@ fn placeholders_number_in_bind_order_across_stages() {
     }
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a literal is inlined, a bound
+// [spec:pgorm:req:pipeline.params+4/test]    a literal is inlined, a bound
 // value is not
 #[test]
 fn literals_inline_and_bound_values_do_not() {
@@ -896,7 +947,7 @@ fn a_reserved_source_name_is_refused() {
 
 /// Like [`sql_of`], keeping the values: the emitted SQL must pass the
 /// grammar oracle after any census rewrite too.
-// [spec:pgorm:req:pipeline.params+3/test]
+// [spec:pgorm:req:pipeline.params+4/test]
 fn sql_and_values_of(pipeline: Pipeline) -> (String, Values) {
     let (sql, values) = pipeline.into_sql().expect("pipeline compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -920,7 +971,7 @@ fn three_bound() -> Pipeline {
     })
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a bound derivation nothing
+// [spec:pgorm:req:pipeline.params+4/test]    a bound derivation nothing
 // reads is pruned by the optimizer; its value must not survive it
 #[test]
 fn pruned_binding_drops_its_value() {
@@ -933,7 +984,7 @@ fn pruned_binding_drops_its_value() {
     assert!(values.0.is_empty(), "{values:?}");
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    pruning the first placeholder
+// [spec:pgorm:req:pipeline.params+4/test]    pruning the first placeholder
 // renumbers the survivors down
 #[test]
 fn pruning_the_first_placeholder_renumbers_survivors() {
@@ -942,7 +993,7 @@ fn pruning_the_first_placeholder_renumbers_survivors() {
     assert_eq!(ints(&values), vec![2_i32.into(), 3_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    pruning a middle placeholder
+// [spec:pgorm:req:pipeline.params+4/test]    pruning a middle placeholder
 // leaves a gap the census closes
 #[test]
 fn pruning_a_middle_placeholder_renumbers_survivors() {
@@ -951,7 +1002,7 @@ fn pruning_a_middle_placeholder_renumbers_survivors() {
     assert_eq!(ints(&values), vec![1_i32.into(), 3_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    pruning the last placeholder
+// [spec:pgorm:req:pipeline.params+4/test]    pruning the last placeholder
 // changes no numbering but still drops the value
 #[test]
 fn pruning_the_last_placeholder_compacts_the_values() {
@@ -960,7 +1011,7 @@ fn pruning_the_last_placeholder_compacts_the_values() {
     assert_eq!(ints(&values), vec![1_i32.into(), 2_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    pruning every placeholder
+// [spec:pgorm:req:pipeline.params+4/test]    pruning every placeholder
 // leaves an unparameterized statement and no values at all
 #[test]
 fn pruning_every_placeholder_empties_the_values() {
@@ -969,7 +1020,7 @@ fn pruning_every_placeholder_empties_the_values() {
     assert!(values.0.is_empty(), "{values:?}");
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a placeholder written twice
+// [spec:pgorm:req:pipeline.params+4/test]    a placeholder written twice
 // keeps its value once, both occurrences renumbered alike
 #[test]
 fn repeated_placeholder_keeps_one_value() {
@@ -990,7 +1041,7 @@ fn repeated_placeholder_keeps_one_value() {
     assert_eq!(ints(&values), vec![7_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    an embedded pipeline's pruned
+// [spec:pgorm:req:pipeline.params+4/test]    an embedded pipeline's pruned
 // binding sits below the consumer's surviving one, which renumbers down
 // past it — the rebase offset and the census compose
 #[test]
@@ -1018,7 +1069,7 @@ fn pruned_embedded_binding_renumbers_the_consumer() {
     assert_eq!(ints(&values), vec![3_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    the mirror ordering: the
+// [spec:pgorm:req:pipeline.params+4/test]    the mirror ordering: the
 // consumer's binding survives at $1 and the embedded pipeline's, rebased
 // past it, is the one pruned
 #[test]
@@ -1046,7 +1097,7 @@ fn pruned_embedded_binding_after_a_surviving_one() {
     assert_eq!(ints(&values), vec![3_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a pruned placeholder between
+// [spec:pgorm:req:pipeline.params+4/test]    a pruned placeholder between
 // two survivors, one on each side of an embedding
 #[test]
 fn prune_between_survivors_across_pipelines() {
@@ -1075,7 +1126,7 @@ fn prune_between_survivors_across_pipelines() {
     assert_eq!(ints(&values), vec![3_i32.into(), 100_i32.into()]);
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    nesting rides along: the
+// [spec:pgorm:req:pipeline.params+4/test]    nesting rides along: the
 // innermost pipeline's pruned binding crosses two embeddings before the
 // census discards it
 #[test]

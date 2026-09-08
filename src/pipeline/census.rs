@@ -15,11 +15,14 @@
 //! (`filter(note.eq("costs $1"))` renders as `'costs $1'`) is never
 //! miscounted, and the extents are exactly what the rewrite needs. Reading
 //! the finished SQL is complete here where it has to be defended in `prql!`
-//! ([spec:pgorm:sem:macros.prql.census]): the pipeline has no s-strings
-//! ([spec:pgorm:req:pipeline.surface+3] cuts them), so every placeholder in
-//! the emitted text is a `Param` node the binder minted, and the census can
-//! only ever find a subset of the minted numbers — never a foreign `$N`
-//! with no value behind it.
+//! ([spec:pgorm:sem:macros.prql.census]): the pipeline offers no raw-SQL
+//! hole ([spec:pgorm:req:pipeline.surface+3] cuts s-strings), and the one
+//! text it hands the compiler to pass through untouched is a string literal
+//! it rendered itself ([spec:pgorm:req:pipeline.params+4]), which the lexer
+//! reads as a single constant. So every placeholder in the emitted text is a
+//! `Param` node the binder minted, and the census can only ever find a
+//! subset of the minted numbers — never a foreign `$N` with no value behind
+//! it.
 
 use std::collections::BTreeSet;
 use std::ops::Range;
@@ -36,7 +39,7 @@ use pgorm_query::{Value, Values};
 /// outside what the binder minted; both unreachable from this module's own
 /// output) — the statement passes through unchanged for the server to
 /// judge, so this function never panics and never invents a binding.
-// [spec:pgorm:req:pipeline.params+3]
+// [spec:pgorm:req:pipeline.params+4]
 pub(super) fn prune(sql: String, values: Vec<Value>) -> (String, Values) {
     if values.is_empty() {
         return (sql, Values(values));

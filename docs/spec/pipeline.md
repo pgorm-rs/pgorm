@@ -131,13 +131,24 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Parameters
 
-> [spec:pgorm:req:pipeline.params+3]
+> [spec:pgorm:req:pipeline.params+4]
 > Values reach the SQL by exactly two routes, and the spelling says which.
 > A Rust literal — `1`, `1.5`, `true`, `"text"` — converts into an `Expr` and
 > is inlined into the SQL text, exactly as a literal written in PRQL text
-> would be; it is a constant of the query, and prqlc escapes it when
-> rendering, so a quote inside a string literal cannot close the literal it
-> sits in. A runtime value goes through the `Binder`: the `_with` form of
+> would be; it is a constant of the query, and the pipeline renders it: a
+> string literal is written as PostgreSQL text by the adapter and handed to
+> the compiler as pass-through source, so nothing escapes it a second time.
+> Every `'` in the value is doubled, and a value carrying a backslash is
+> written as an `E''` literal with its backslashes doubled — the same trigger
+> `pgorm-query` renders on (`[spec:pgorm:req:sql.render.string-escape+1]`) —
+> so the literal denotes the value whichever way `standard_conforming_strings`
+> is set. prqlc's own string rendering MUST NOT be used: it delegates to a
+> dialect-agnostic formatter that reads a quote following a backslash, or one
+> already doubled, as pre-escaped and emits it unchanged, and in an ordinary
+> PostgreSQL literal — where a backslash means nothing — that lets `\'` close
+> the string so the rest of the value parses as SQL. The invariant is that an
+> inlined literal parses as exactly one statement and denotes exactly the
+> value it was given. A runtime value goes through the `Binder`: the `_with` form of
 > every expression-taking transform passes one to its closure, and
 > `bind(value)` pushes the `pgorm_query::Value` and mints its `$N`
 > placeholder in a single step, numbering in bind order across the whole
@@ -156,9 +167,11 @@ of the crate, compiled in every build. Rules are grouped under
 > position `N` in the emitted SQL is position `N` in the returned `Values` —
 > is thus enforced at the boundary rather than assumed of the optimizer. The
 > lexer census is complete here where it has to be argued for in `prql!`
-> ([spec:pgorm:sem:macros.prql.census]): the pipeline has no s-strings
-> (deliberately cut, `[spec:pgorm:req:pipeline.surface+3]`), so every
-> placeholder in the emitted text is a
+> ([spec:pgorm:sem:macros.prql.census]): the pipeline offers no raw-SQL hole
+> (s-strings are cut from the surface, `[spec:pgorm:req:pipeline.surface+3]`),
+> and the one text it hands the compiler to pass through untouched is a string
+> literal it rendered itself, which the lexer reads as a single constant token
+> — so every placeholder in the emitted text is a
 > `Param` node the binder minted, and the census can only ever find a subset
 > of the minted numbers — never a foreign `$N` with no value behind it. A
 > census that cannot be trusted (unscannable text, an out-of-range number;

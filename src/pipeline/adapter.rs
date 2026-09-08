@@ -6,8 +6,8 @@
 //! a compiler bump is absorbed by rewriting this file alone.
 
 use prqlc::pr::{
-    BinaryExpr, Expr, ExprKind, FuncCall, Ident, Literal, ModuleDef, Pipeline, Range, Stmt,
-    StmtKind, SwitchCase, UnaryExpr, VarDef, VarDefKind,
+    BinaryExpr, Expr, ExprKind, FuncCall, Ident, InterpolateItem, Literal, ModuleDef, Pipeline,
+    Range, Stmt, StmtKind, SwitchCase, UnaryExpr, VarDef, VarDefKind,
 };
 use prqlc::sql::Dialect;
 use prqlc::{Options, Target};
@@ -77,8 +77,40 @@ pub(super) fn lit_float(value: f64) -> PlExpr {
     Expr::new(ExprKind::Literal(Literal::Float(value)))
 }
 
+/// A string literal, written here rather than by the compiler.
+///
+/// prqlc hands a `Literal::String` to sqlparser, whose formatter is written
+/// to serve every dialect at once: a quote already doubled, or one following
+/// a backslash, is taken for pre-escaped text and emitted unchanged. That
+/// second reading belongs to the backslash-escape regime, and the literal it
+/// is written into is an ordinary one, where PostgreSQL gives a backslash no
+/// meaning at all — so `\'` closes the string and the rest of the value is
+/// read as SQL. Rendering the literal here keeps one regime end to end, and
+/// the text reaches the emitted SQL through the pass-through node so that
+/// nothing downstream escapes it a second time.
+// [spec:pgorm:req:pipeline.params+4]
 pub(super) fn lit_str(value: &str) -> PlExpr {
-    Expr::new(ExprKind::Literal(Literal::String(value.to_owned())))
+    Expr::new(ExprKind::SString(vec![InterpolateItem::String(
+        string_literal(value),
+    )]))
+}
+
+/// `value` as a self-contained PostgreSQL string literal.
+///
+/// A quote is doubled, which closes it under every setting. A backslash is
+/// the one character whose meaning depends on `standard_conforming_strings`,
+/// so a value carrying one is written as an `E''` string with its
+/// backslashes doubled — the trigger `pgorm-query` renders on
+/// ([spec:pgorm:req:sql.render.string-escape+1]) — and the literal then
+/// denotes the value whichever way the server is configured.
+// [spec:pgorm:req:pipeline.params+4]
+fn string_literal(value: &str) -> String {
+    let quoted = value.replace('\'', "''");
+    if value.contains('\\') {
+        format!("E'{}'", quoted.replace('\\', r"\\"))
+    } else {
+        format!("'{quoted}'")
+    }
 }
 
 pub(super) fn lit_bool(value: bool) -> PlExpr {
@@ -93,7 +125,7 @@ pub(super) fn lit_null() -> PlExpr {
 /// so an index minted here that survives is the index the emitted SQL
 /// carries — but the optimizer may prune the expression around it, which is
 /// what the census in `into_sql` accounts for.
-// [spec:pgorm:req:pipeline.params+3]
+// [spec:pgorm:req:pipeline.params+4]
 pub(super) fn param(index: usize) -> PlExpr {
     Expr::new(ExprKind::Param(index.to_string()))
 }

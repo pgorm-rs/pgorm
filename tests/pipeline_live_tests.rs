@@ -611,7 +611,7 @@ async fn embedded_self_join_renames_before_crossing() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a bound derivation the
+// [spec:pgorm:req:pipeline.params+4/test]    a bound derivation the
 // optimizer prunes must not leave its value behind: the statement executes
 // with exactly the parameters it asks for
 #[pgorm_macros::test]
@@ -642,7 +642,7 @@ async fn pruned_binding_executes() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    a surviving placeholder
+// [spec:pgorm:req:pipeline.params+4/test]    a surviving placeholder
 // renumbered past a pruned one binds the right value on the server
 #[pgorm_macros::test]
 async fn renumbered_binding_executes() {
@@ -666,7 +666,7 @@ async fn renumbered_binding_executes() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:pipeline.params+3/test]    an embedded pipeline's pruned
+// [spec:pgorm:req:pipeline.params+4/test]    an embedded pipeline's pruned
 // binding and the consumer's surviving one: the rebase offsets and the
 // census compose, and the joined rows decode
 #[pgorm_macros::test]
