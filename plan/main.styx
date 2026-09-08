@@ -4435,6 +4435,76 @@ children (
                     }
                 )
             }
+
+            {
+                id inline-string-escaping
+                title "Inline string rendering must round-trip every character"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-08T09:14:26.160218Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Security review 2026-09-08 (acceptance file tests/sql_security_tests.rs, currently untracked; probes also preserved in the session scratchpad). Finding: inline string rendering maps U+001A to the letter 'z' — a MySQL-style \\Z escape that corrupts data on the to_string()/inline path (probe inline_control_characters_round_trip). Audit the whole escape table in the pgorm-query string renderer against PostgreSQL rules (standard_conforming_strings; E'' escapes where needed) — every character except NUL must round-trip byte-identically between the bound and inline paths. SPEC IMPACT: bump sql.render.string-escape."
+                    }
+                )
+            }
+
+            {
+                id like-sugar-escaping
+                title "contains and friends treat their search text literally"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-08T09:14:42.709491Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Security review 2026-09-08. contains/starts_with/ends_with pass their input into the LIKE pattern verbatim, so contains(\"%\") matches every row and a literal underscore or backslash in the search text is a wildcard/escape (probe substring_helpers_treat_search_text_literally: '%'→only '100%pure', '_'→only 'under_score', starts_with(\"folder\\\\\")→only the backslash row). Fix: the three sugar helpers escape %, _ and \\\\ in their input before building the pattern; like/not_like stay raw — a pattern is the caller's own. SPEC IMPACT: bump entity.traits.column (the sugar's semantics sentence)."
+                    }
+                )
+            }
+
+            {
+                id inject-parameters-lexing
+                title "inject_parameters substitutes only real placeholder tokens"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-08T09:14:54.013964Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Security review 2026-09-08, severity P1. inject_parameters replaces $N textually wherever it appears — inside block comments and dollar-quoted bodies included — so a value can escape its context: \"SELECT $1::text AS value /* $1 */\" with a payload ending the comment and appending UNION ALL SELECT executed the payload (probe inline_parameters_preserve_block_comments); a $$-quoted source similarly executed part of the value (inline_parameters_preserve_dollar_quoted_bodies). Fix: substitution must be lexer-aware — the pg_query tokenizer (sql.token, already the paginator's and census's oracle) yields PARAM tokens with spans; replace exactly those and nothing else, so $N spellings inside comments, strings and dollar-quotes are inert text. The substituted literal itself renders through the (separately fixed) inline string escaper. SPEC IMPACT: bump sql.render.inject to state token-level substitution and its oracle."
+                    }
+                )
+            }
+
+            {
+                id pipeline-hostile-identifiers
+                title "Pipeline names and inline values stay data under hostile spellings"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-08T09:15:04.550692Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Security review 2026-09-08, severity P1. Two failing probes: pipeline_keeps_hostile_names_and_values_as_data (table sec\"table, column note\" OR TRUE --, value \\\\'; SELECT 1; --) and pipeline_values_keep_sql_payload_as_data (\\\\' OR TRUE -- as an inline-compared value) — both the inline ExprOps::eq(value) path and the binder path must return the stored payload as data, through into_sql on a pipeline whose source/column names carry embedded quotes. Investigate where the pipeline's adapter renders identifiers and string literals into PRQL (src/pipeline/adapter.rs ident/ident_in/literals) and whether prqlc's ident quoting (backticks) and string escaping are applied or bypassed; hostile names must round-trip into correctly quoted SQL identifiers and inline values into correctly escaped SQL strings. SPEC IMPACT: pipeline.qualify and/or the pipeline rule owning literal rendering; bump what the fix touches."
+                    }
+                )
+            }
+
+            {
+                id raw-identifier-casts
+                title "Function and type names render as quoted identifiers, never raw SQL"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-08T09:15:19.922093Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Security review 2026-09-08, severity P1, the widest node. Function names (Func::cust), cast targets (cast_as via Func::cast_as's Expr::cust of the iden text, and as_enum's rewrite through it), and enum type names in DDL (prepare_column_type, enumeration()) are all emitted as RAW text even when passed as Alias identifiers: Func::cust(Alias::new(\"COALESCE(7) + 100 --\")) and cast_as(Alias::new(\"int4) + 100 --\")) both executed injected expressions; enumeration(Alias::new(\"text, injected integer\")) added a column to CREATE TABLE; and the raw convention also case-folds, so as_enum(Alias::new(\"ReviewStatus\")) fails to find \"ReviewStatus\" (probes custom_function_identifier_is_not_sql, cast_type_identifier_is_not_sql, enum_type_identifier_preserves_case, enum_ddl_name_cannot_add_a_column). FIX DIRECTION: type and function names become structured renderings — dot-split parts each quoted per ident-quoting, an optional [] array suffix kept structural — replacing every Expr::cust(iden.to_string()) spelling: Func::cust/cast_as, the AsEnum rewrite, prepare_column_type's Enum arm and the Enum-to-Custom projection, and the schema-qualified compositions from enum-schema-surface (enum_cast_iden's \"schema.name\" string and the \"{name}[]\" Alias hacks become structure). CONSEQUENCES: golden SQL changes everywhere casts render (CAST('x' AS tea) → CAST('x' AS \"tea\"), text[] → \"text\"[], tenant_a.status → \"tenant_a\".\"status\"); grammar-sugar type spellings that are not catalog names (\"double precision\") stop working via cast_as-by-name — spell the catalog name (float8) or use ColumnType. SPEC IMPACT: bump sql.render.cast-param-type, sql.render.ddl.enum-type, sql.render.ddl.types (if it states raw), entity.traits.column.enum-cast (the documented raw/unquoted cast convention REVERSES to quoted), and reconcile query.graph.writer's cast language plus the pipeline's read-cast probe (source_read_cast matches the AsEnum/Cast shapes — its extraction must follow the new structure)."
+                    }
+                )
+            }
         )
     }
 
