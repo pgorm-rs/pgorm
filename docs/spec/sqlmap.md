@@ -8,6 +8,12 @@ The external scanner supplies independent attack generation and detection.
 The direct regressions in `tests/sql_security_tests.rs` establish exact value,
 identifier and affected-row behavior. Both are required evidence.
 
+This campaign varies attack inputs to fixed adapter queries. Generated pgorm
+operation programs are specified separately in [generative.md](generative.md),
+using the public [Python API](python.md). Reusing sqlmap payloads in that
+generator does not run the external scanner or satisfy this chapter's verdict.
+The Python package and generated campaign do not depend on an HTTP scan passing.
+
 ## Scope and fixtures
 
 > [spec:pgorm:def:security.sqlmap]

@@ -1,0 +1,92 @@
+// Register scoped to the Python API and generated campaign; existing Rust
+// foundations are included as a dependency, not an exhaustive architecture map.
+elements (
+    {
+        id [arch:pgorm:rust-orm]
+        name "Rust ORM and query foundation"
+        kind @subsystem
+        lifecycle @active
+        exposes (src/**/*.rs pgorm-query/src/**/*.rs pgorm-macros/src/**/*.rs pgorm-codegen/src/**/*.rs pgorm-pool/src/**/*.rs)
+    }
+    {
+        id [arch:pgorm:python-api]
+        name "Public Python API and native bindings"
+        kind @subsystem
+        lifecycle @provisional
+        exposes (pgorm-python/** docs/spec/python.md)
+        depends_on ([arch:pgorm:rust-orm])
+        decisions ([dec:pgorm:python-api])
+        owns (
+            [spec:pgorm:def:python.api]
+            [spec:pgorm:req:python.optional]
+            [spec:pgorm:req:python.package]
+            [spec:pgorm:req:python.delegation]
+            [spec:pgorm:req:python.capabilities]
+            [spec:pgorm:req:python.values]
+            [spec:pgorm:req:python.value-tags]
+            [spec:pgorm:req:python.input-boundaries]
+            [spec:pgorm:req:python.expressions]
+            [spec:pgorm:req:python.ownership]
+            [spec:pgorm:req:python.statements]
+            [spec:pgorm:req:python.models]
+            [spec:pgorm:req:python.entities]
+            [spec:pgorm:req:python.graph]
+            [spec:pgorm:req:python.pipeline]
+            [spec:pgorm:req:python.raw]
+            [spec:pgorm:req:python.schema]
+            [spec:pgorm:req:python.runtime]
+            [spec:pgorm:req:python.connections]
+            [spec:pgorm:req:python.transactions]
+            [spec:pgorm:req:python.cancellation]
+            [spec:pgorm:req:python.results]
+            [spec:pgorm:req:python.errors]
+            [spec:pgorm:req:python.codegen]
+            [spec:pgorm:req:python.typing]
+            [spec:pgorm:req:python.distribution]
+            [spec:pgorm:req:python.acceptance]
+        )
+        log ({
+            kind @established
+            at "2026-09-08T15:23:36Z"
+            by [dec:pgorm:python-api]
+        })
+    }
+    {
+        id [arch:pgorm:generative-testing]
+        name "Generated ORM programs and independent verification"
+        kind @subsystem
+        lifecycle @provisional
+        exposes (security/generative/** docs/spec/generative.md)
+        depends_on ([arch:pgorm:python-api] [arch:pgorm:rust-orm])
+        decisions ([dec:pgorm:generated-orm-testing])
+        owns (
+            [spec:pgorm:def:generative.program]
+            [spec:pgorm:req:generative.format]
+            [spec:pgorm:req:generative.grammar]
+            [spec:pgorm:req:generative.matrix]
+            [spec:pgorm:req:generative.corpus]
+            [spec:pgorm:req:generative.execution]
+            [spec:pgorm:req:generative.build-amortization]
+            [spec:pgorm:req:generative.fixtures]
+            [spec:pgorm:req:generative.isolation]
+            [spec:pgorm:req:generative.oracles]
+            [spec:pgorm:req:generative.comparison]
+            [spec:pgorm:req:generative.controls]
+            [spec:pgorm:req:generative.attribution]
+            [spec:pgorm:req:generative.shrink]
+            [spec:pgorm:req:generative.replay]
+            [spec:pgorm:req:generative.replay-parity]
+            [spec:pgorm:req:generative.compile-suite]
+            [spec:pgorm:req:generative.profiles]
+            [spec:pgorm:req:generative.verdict]
+            [spec:pgorm:req:generative.artifacts]
+            [spec:pgorm:req:generative.ci]
+            [spec:pgorm:req:generative.acceptance]
+        )
+        log ({
+            kind @established
+            at "2026-09-08T15:23:36Z"
+            by [dec:pgorm:generated-orm-testing]
+        })
+    }
+)

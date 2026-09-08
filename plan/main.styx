@@ -4878,6 +4878,697 @@ children (
                 kind @decision
                 text "Operator approved the proposed external sqlmap integration on 2026-09-08: 'WBS that up and spec the things'. Scope: test-only HTTP adapter over actual pgorm APIs, disposable PostgreSQL fixtures, a pinned external sqlmap runner, vulnerable positive controls, complete scan accounting and reproducible CI evidence. Success means the versioned configured suite completed, every required vulnerable control was detected, and no protected route was injectable; it is not a universal SQLi-proof claim. Existing direct SQL security regressions remain the semantic oracle. Implementation fixes stay with the existing defect nodes and their agent. Harness construction must not wait for those fixes; the final acceptance run must. New requirements live under security.sqlmap in docs/spec/sqlmap.md. Priorities derive from deps; no operator priority pin is inferred."
             }
+
+            {
+                at 2026-09-08T15:32:47.717304Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "The operator's generated-program/PyO3 direction is tracked by new python and generative roots. This branch retains its fixed-route external sqlmap contract; it is complementary evidence, not the generator. docs/spec/sqlmap.md now links the new contracts. Pinned payload data and suitable fixture infrastructure may be reused independently; neither Python package acceptance nor the generated campaign waits for sqlmap.acceptance, and corpus replay must not be reported as an upstream scanner pass."
+            }
+        )
+    }
+
+    {
+        id python
+        title "Public Python API over pgorm through optional PyO3 bindings"
+        kind @feat
+        children (
+            {
+                id python.design
+                title "Record Python API architecture, contracts and dependency breakdown"
+                kind @docs
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:32:14.568106Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator requested AKM, WBS and specifications for an optional public PyO3 API and generated pgorm testing. Added docs/spec/python.md, plan/decisions/python-api.md and scoped architecture elements. The public package supports application schemas, concrete entity registrations, asyncio, exact conversion, lifecycle, typing and reviewable distribution artifacts. Implementation is future work; the planning request does not publish a package."
+                    }
+
+                    {
+                        at 2026-09-08T15:32:14.867381Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id python.package
+                title "Build the opt-in native package and publish its capability contract"
+                kind @build
+                implements {
+                    main (
+                        [spec:pgorm:def:python.api]
+                        [spec:pgorm:req:python.optional]
+                        [spec:pgorm:req:python.package]
+                        [spec:pgorm:req:python.capabilities]
+                    )
+                }
+                deps (python.design)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.162781Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.values
+                title "Preserve Python/Rust value types, nullability and exact conversions"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.values] [spec:pgorm:req:python.value-tags])
+                }
+                deps (python.package sql.value)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.222111Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.expressions
+                title "Expose faithful composable expressions with owned scope-safe wrappers"
+                kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:python.delegation]
+                        [spec:pgorm:req:python.input-boundaries]
+                        [spec:pgorm:req:python.expressions]
+                        [spec:pgorm:req:python.ownership]
+                    )
+                }
+                deps (python.values sql.ast)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.280424Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.statements
+                title "Expose runtime SELECT/CRUD builders and explicit raw-template APIs"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.statements] [spec:pgorm:req:python.raw])
+                }
+                deps (python.expressions orm.query)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.337118Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.runtime
+                title "Integrate asyncio with reusable Tokio pools, TLS and structured exceptions"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.runtime] [spec:pgorm:req:python.connections] [spec:pgorm:req:python.errors])
+                }
+                deps (
+                    python.package
+                    infra.conn
+                    infra.error
+                    connect-tls
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.393767Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.results
+                title "Decode Python records and implement bounded asynchronous streaming"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.results])
+                }
+                deps (
+                    python.values
+                    python.runtime
+                    orm.stream
+                    orm.value-decode
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.451501Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.transactions
+                title "Preserve transactions, cancellation and connection lifecycle"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.transactions] [spec:pgorm:req:python.cancellation])
+                }
+                deps (python.runtime python.results infra.tx)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.508865Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.models
+                title "Support application-defined runtime model descriptors and CRUD records"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.models])
+                }
+                deps (python.statements python.results)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.566172Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.entities
+                title "Register concrete Rust entities, ActiveModels and downstream extension types"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.entities])
+                }
+                deps (python.expressions python.results orm.entity)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.624107Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.graph
+                title "Expose registered typed graphs, optional decoding and cursor bounds"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.graph])
+                }
+                deps (python.entities core cursor)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.681271Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.pipeline
+                title "Expose composable pipelines, scoped binders and typed source terminals"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.pipeline])
+                }
+                deps (
+                    python.expressions
+                    python.models
+                    python.entities
+                    pipeline-sources
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.738899Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.codegen
+                title "Generate downstream Python registrations and stubs for Rust entities and graph shapes"
+                kind @feat
+                implements {
+                    main ([spec:pgorm:req:python.codegen])
+                }
+                deps (
+                    python.entities
+                    python.graph
+                    codegen.generate
+                    codegen.macros
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.796421Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.typing
+                title "Ship typing and runnable application documentation for the public API"
+                kind @docs
+                implements {
+                    main ([spec:pgorm:req:python.typing])
+                }
+                deps (
+                    python.models
+                    python.graph
+                    python.pipeline
+                    python.transactions
+                    python.codegen
+                    python.schema
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.857877Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.distribution
+                title "Build and install tested wheels and source distributions across the support matrix"
+                kind @build
+                implements {
+                    main ([spec:pgorm:req:python.distribution])
+                }
+                deps (python.typing)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.923608Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.acceptance
+                title "Verify installed Python API parity, lifecycle and application-schema behavior"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:python.acceptance])
+                }
+                deps (python.distribution)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:15.981426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id python.schema
+                title "Expose explicit Rust DDL builders and registered-entity schema generation"
+                implements {
+                    main ([spec:pgorm:req:python.schema])
+                }
+                deps (
+                    python.expressions
+                    python.entities
+                    sql.ddl
+                    infra.schema-gen
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.047901Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+        )
+        sealed true
+        log (
+            {
+                at 2026-09-08T15:35:16.852536Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "sealed — decomposition asserted complete (nplan seal)"
+            }
+        )
+    }
+
+    {
+        id generative
+        title "Generate pgorm operation programs with independent checks and Rust reproducers"
+        kind @test
+        children (
+            {
+                id generative.design
+                title "Record generated-program architecture, contracts and dependency breakdown"
+                kind @docs
+                deps (python.design)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:32:47.462193Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator requested generated pgorm compositions through precompiled PyO3 bindings with a useful public Python package. Added docs/spec/generative.md and plan/decisions/generated-orm-testing.md: portable typed programs, dynamic and registered native paths, independent oracles, structure-aware shrinking, standalone Python/Rust replay, a bounded compile suite and separate runtime/build evidence. Existing sqlmap contracts remain external fixed-route scanner verification; corpus import has no dependency on completed HTTP scans."
+                    }
+
+                    {
+                        at 2026-09-08T15:32:47.579599Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id generative.program
+                title "Define the portable typed operation format and Rust API coverage matrix"
+                kind @test
+                implements {
+                    main ([spec:pgorm:def:generative.program] [spec:pgorm:req:generative.format] [spec:pgorm:req:generative.matrix])
+                }
+                deps (generative.design python.expressions)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.10763Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.fixtures
+                title "Provision isolated deterministic fixtures for subject, oracle and replay"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.fixtures] [spec:pgorm:req:generative.isolation])
+                }
+                deps (generative.design orm.exec)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.166038Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.corpus
+                title "Generate hostile inputs and import pinned contextual sqlmap corpus data"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.corpus])
+                }
+                deps (generative.program)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.224291Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.grammar
+                title "Generate typed query compositions and stateful operation sequences"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.grammar])
+                }
+                deps (generative.program generative.corpus generative.fixtures)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.283432Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.execute
+                title "Execute programs through public bindings and compiled fixture registrations without per-case builds"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.execution] [spec:pgorm:req:generative.build-amortization])
+                }
+                deps (
+                    generative.program
+                    generative.fixtures
+                    python.models
+                    python.graph
+                    python.pipeline
+                    python.transactions
+                    python.schema
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.34044Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.oracles
+                title "Implement independent reference semantics and PostgreSQL-aware comparisons"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.oracles] [spec:pgorm:req:generative.comparison])
+                }
+                deps (generative.program generative.fixtures)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.398633Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.controls
+                title "Verify oracle sensitivity and distinguish binding, generator and ORM failures"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.controls] [spec:pgorm:req:generative.attribution])
+                }
+                deps (generative.execute generative.oracles)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.455749Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.shrink
+                title "Shrink program structure, state and inputs while preserving the failure"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.shrink])
+                }
+                deps (generative.execute generative.oracles)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.513007Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.replay
+                title "Emit standalone Python/Rust reproducers and verify cross-language parity"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.replay] [spec:pgorm:req:generative.replay-parity])
+                }
+                deps (generative.shrink codegen.macros)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.570151Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.compile
+                title "Generate bounded Rust derive, ownership and generic-shape compile suites"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.compile-suite])
+                }
+                deps (generative.replay python.codegen)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.627018Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.runner
+                title "Run bounded profiles with complete verdicts and replayable evidence"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.profiles] [spec:pgorm:req:generative.verdict] [spec:pgorm:req:generative.artifacts])
+                }
+                deps (generative.grammar generative.controls generative.replay)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.682865Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.ci
+                title "Run smoke/full runtime and compile campaigns with failure-path runner tests"
+                kind @ci
+                implements {
+                    main ([spec:pgorm:req:generative.ci])
+                }
+                deps (generative.runner generative.compile python.distribution)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.739504Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+
+            {
+                id generative.acceptance
+                title "Demonstrate full coverage, controls, replay and million-program build amortization"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:generative.acceptance])
+                }
+                deps (
+                    generative.ci
+                    inline-string-escaping
+                    like-sugar-escaping
+                    inject-parameters-lexing
+                    pipeline-hostile-identifiers
+                    raw-identifier-casts
+                )
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T15:35:16.795734Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+                )
+            }
+        )
+        sealed true
+        log (
+            {
+                at 2026-09-08T15:35:16.909008Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "sealed — decomposition asserted complete (nplan seal)"
+            }
         )
     }
 )

@@ -16,6 +16,10 @@ specs ({
             pgorm-sql-macro/src/**/*.rs
             security/sqlmap/adapter/src/**/*.rs
             security/sqlmap/harness.py
+            pgorm-python/src/**/*.rs
+            pgorm-python/python/**/*.py
+            security/generative/src/**/*.py
+            security/generative/bridge/src/**/*.rs
         ),
         test_include (
             tests/**/*.rs
@@ -28,6 +32,10 @@ specs ({
             pgorm-query/pgorm-query-derive/tests/**/*.rs
             pgorm-sql-macro/tests/**/*.rs
             security/sqlmap/test_*.py
+            pgorm-python/tests/**/*.rs
+            pgorm-python/tests/**/*.py
+            security/generative/tests/**/*.py
+            security/generative/bridge/tests/**/*.rs
         ),
         exclude (
             target/**

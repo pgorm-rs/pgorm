@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-08T15:20:53.390093Z
+last_sync_at 2026-09-08T15:34:01.846701Z
 
 rule_versions (
     {id codegen.entity, version 2}
@@ -101,6 +101,28 @@ rule_versions (
     {id exec.paginator.raw, version 3}
     {id exec.stream, version 2}
     {id exec.stream.decode, version 1}
+    {id generative.acceptance, version 0}
+    {id generative.artifacts, version 0}
+    {id generative.attribution, version 0}
+    {id generative.build-amortization, version 0}
+    {id generative.ci, version 0}
+    {id generative.comparison, version 0}
+    {id generative.compile-suite, version 0}
+    {id generative.controls, version 0}
+    {id generative.corpus, version 0}
+    {id generative.execution, version 0}
+    {id generative.fixtures, version 0}
+    {id generative.format, version 0}
+    {id generative.grammar, version 0}
+    {id generative.isolation, version 0}
+    {id generative.matrix, version 0}
+    {id generative.oracles, version 0}
+    {id generative.profiles, version 0}
+    {id generative.program, version 0}
+    {id generative.replay, version 0}
+    {id generative.replay-parity, version 0}
+    {id generative.shrink, version 0}
+    {id generative.verdict, version 0}
     {id macros.derive, version 1}
     {id macros.derive.active-enum, version 1}
     {id macros.derive.active-enum.expansion, version 1}
@@ -132,6 +154,33 @@ rule_versions (
     {id migration.up, version 2}
     {id migration.up-only, version 0}
     {id pipeline.select-sources, version 2}
+    {id python.acceptance, version 0}
+    {id python.api, version 0}
+    {id python.cancellation, version 0}
+    {id python.capabilities, version 0}
+    {id python.codegen, version 0}
+    {id python.connections, version 0}
+    {id python.delegation, version 0}
+    {id python.distribution, version 0}
+    {id python.entities, version 0}
+    {id python.errors, version 0}
+    {id python.expressions, version 0}
+    {id python.graph, version 0}
+    {id python.input-boundaries, version 0}
+    {id python.models, version 0}
+    {id python.optional, version 0}
+    {id python.ownership, version 0}
+    {id python.package, version 0}
+    {id python.pipeline, version 0}
+    {id python.raw, version 0}
+    {id python.results, version 0}
+    {id python.runtime, version 0}
+    {id python.schema, version 0}
+    {id python.statements, version 0}
+    {id python.transactions, version 0}
+    {id python.typing, version 0}
+    {id python.value-tags, version 0}
+    {id python.values, version 0}
     {id query.build, version 1}
     {id query.build.debug-query, version 0}
     {id query.build.delete, version 2}
@@ -321,6 +370,20 @@ derived_priorities (
     {id ergo.prql-macro, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id ergo.with-carry, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id from-json-serialization, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
+    {id generative.acceptance, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.ci, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.compile, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.controls, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.corpus, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.design, priority 1, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.execute, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.fixtures, priority 2, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.grammar, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.oracles, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.program, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.replay, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.runner, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id generative.shrink, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
     {id graph-alias-collisions, priority 3, derived_at 2026-09-07T18:30:59.484863Z}
     {id graph-long-column-aliases, priority 3, derived_at 2026-09-07T15:33:15.757479Z}
     {id graph-unicode-alias-collisions, priority 3, derived_at 2026-09-07T22:03:19.945209Z}
@@ -398,6 +461,23 @@ derived_priorities (
     {id polish.warnings, priority 0, derived_at 2026-09-02T10:37:35.415375Z}
     {id pool-config-forwarding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id pool-config-secret-debug, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
+    {id python.acceptance, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.codegen, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.design, priority 0, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.distribution, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.entities, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.expressions, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.graph, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.models, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.package, priority 1, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.pipeline, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.results, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.runtime, priority 2, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.schema, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.statements, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.transactions, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.typing, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
+    {id python.values, priority 2, derived_at 2026-09-08T15:34:01.846701Z}
     {id query-error-from, priority 0, derived_at 2026-09-07T15:33:15.757479Z}
     {id raw-identifier-casts, priority 0, derived_at 2026-09-08T15:20:53.390093Z}
     {id raw-pagination-placeholder-lexing, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
@@ -636,6 +716,8 @@ assertions (
     {id inject-parameters-lexing, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:44:08.513823Z}
     {id raw-identifier-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-08T13:14:34.249448Z}
     {id sqlmap.spec, kind @complete, author "brendan@necessary.nu", at 2026-09-08T10:06:16.052903Z}
+    {id python.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:14.867381Z}
+    {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
 )
 
 impl_evidence (
@@ -1246,6 +1328,20 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.controls}
         {impl_name main, rule security.sqlmap.matrix}
         {impl_name main, rule security.sqlmap.observability}
+    ), rule_versions_seen (
+        {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.fixtures, covered_rules (
         security.sqlmap
@@ -1255,6 +1351,20 @@ impl_evidence (
         {impl_name main, rule security.sqlmap}
         {impl_name main, rule security.sqlmap.fixtures}
         {impl_name main, rule security.sqlmap.isolation}
+    ), rule_versions_seen (
+        {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.runner, covered_rules (
         security.sqlmap.artifacts
@@ -1266,6 +1376,20 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.execution}
         {impl_name main, rule security.sqlmap.pin}
         {impl_name main, rule security.sqlmap.profiles}
+    ), rule_versions_seen (
+        {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.verdict, covered_rules (
         security.sqlmap.outcomes
@@ -1273,6 +1397,20 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule security.sqlmap.outcomes}
         {impl_name main, rule security.sqlmap.verdict}
+    ), rule_versions_seen (
+        {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
 )
 
