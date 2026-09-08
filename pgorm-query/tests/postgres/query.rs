@@ -1729,10 +1729,11 @@ fn delete_1() {
 }
 
 #[test]
-// [spec:pgorm:req:sql.render.string-escape/test]
+// [spec:pgorm:req:sql.render.string-escape+1/test]    a double quote is a
+// legal string character, not an escape: it passes through raw
 fn escape_1() {
     let test = r#" "abc" "#;
-    assert_eq!(QueryBuilder.escape_string(test), r#" \"abc\" "#.to_owned());
+    assert_eq!(QueryBuilder.escape_string(test), test.to_owned());
     assert_eq!(
         QueryBuilder.unescape_string(QueryBuilder.escape_string(test).as_str()),
         test
@@ -1762,7 +1763,19 @@ fn escape_3() {
 #[test]
 fn escape_4() {
     let test = "a\"b";
-    assert_eq!(QueryBuilder.escape_string(test), "a\\\"b".to_owned());
+    assert_eq!(QueryBuilder.escape_string(test), test.to_owned());
+    assert_eq!(
+        QueryBuilder.unescape_string(QueryBuilder.escape_string(test).as_str()),
+        test
+    )
+}
+
+#[test]
+// [spec:pgorm:req:sql.render.string-escape+1/test]    0x1A is a legal string
+// character; the retired MySQL \z mapping turned it into the letter z
+fn escape_5() {
+    let test = "left\x1aright";
+    assert_eq!(QueryBuilder.escape_string(test), test.to_owned());
     assert_eq!(
         QueryBuilder.unescape_string(QueryBuilder.escape_string(test).as_str()),
         test

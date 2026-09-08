@@ -70,7 +70,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.render.string-escape] (single-quote wrapping; E-string when a backslash is present)
+    // [spec:pgorm:req:sql.render.string-escape+1] (single-quote wrapping; E-string when a backslash is present)
     fn write_string_quoted(&self, string: &str, buffer: &mut String) {
         let escaped = self.escape_string(string);
         let string = if escaped.find('\\').is_some() {
@@ -2103,17 +2103,20 @@ impl QueryBuilder {
 
     // ESCAPE
 
-    /// Escape a SQL string literal
-    // [spec:pgorm:req:sql.render.string-escape]
+    /// Escape a SQL string literal.
+    ///
+    /// Only characters PostgreSQL's `E''` escape language actually defines
+    /// are mapped; every other byte — 0x1A and the double quote included —
+    /// is a legal string character and passes through raw, so it round-trips
+    /// instead of losing its backslash server-side.
+    // [spec:pgorm:req:sql.render.string-escape+1]
     pub fn escape_string(&self, string: &str) -> String {
         string
             .replace('\\', "\\\\")
-            .replace('"', "\\\"")
             .replace('\'', "\\'")
             .replace('\0', "\\0")
             .replace('\x08', "\\b")
             .replace('\x09', "\\t")
-            .replace('\x1a', "\\z")
             .replace('\n', "\\n")
             .replace('\r', "\\r")
     }
@@ -2133,7 +2136,6 @@ impl QueryBuilder {
                         '0' => '\0',
                         'b' => '\x08',
                         't' => '\x09',
-                        'z' => '\x1a',
                         'n' => '\n',
                         'r' => '\r',
                         c => c,

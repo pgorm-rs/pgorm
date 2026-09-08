@@ -179,16 +179,21 @@ an ideal Postgres renderer would emit.
 > `Function::Custom` function names and `Keyword::Custom` keywords are written
 > via `Iden::unquoted`, i.e. raw with no quoting.
 
-> [spec:pgorm:req:sql.render.string-escape]
+> [spec:pgorm:req:sql.render.string-escape+1]
 > `QueryBuilder::escape_string` MUST apply exactly these replacements, in
-> order: `\` → `\\`, `"` → `\"`, `'` → `\'`, NUL (`\0`) → `\0`, backspace
-> (0x08) → `\b`, tab (0x09) → `\t`, 0x1A → `\z`, LF → `\n`, CR → `\r`.
-> When rendering a string literal (`write_string_quoted`), the escaped text is
-> wrapped in single quotes; if the escaped text contains any backslash the
-> literal MUST instead be an E-string, `E'...'`, so Postgres interprets the
-> backslash escapes. `unescape_string` is the inverse mapping (a backslash
-> followed by `0 b t z n r` maps back to the control character; any other
-> escaped character maps to itself).
+> order: `\` → `\\`, `'` → `\'`, NUL (`\0`) → `\0`, backspace
+> (0x08) → `\b`, tab (0x09) → `\t`, LF → `\n`, CR → `\r` — and nothing
+> else. Every mapping is an escape PostgreSQL's `E''` language defines;
+> `\z` and `\"` are NOT in that language (the server drops the backslash,
+> so the old `0x1A → \z` mapping silently turned 0x1A into the letter
+> `z`), and 0x1A and the double quote are legal string characters that
+> MUST pass through raw and round-trip byte-identically with the bound
+> path. When rendering a string literal (`write_string_quoted`), the
+> escaped text is wrapped in single quotes; if the escaped text contains
+> any backslash the literal MUST instead be an E-string, `E'...'`, so
+> Postgres interprets the backslash escapes. `unescape_string` is the
+> inverse mapping (a backslash followed by `0 b t n r` maps back to the
+> control character; any other escaped character maps to itself).
 
 > [spec:pgorm:def:sql.render.value-literals+2]
 > `value_to_string` defines the inline literal syntax per `Value` variant:

@@ -4440,12 +4440,27 @@ children (
                 id inline-string-escaping
                 title "Inline string rendering must round-trip every character"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-08T09:14:26.160218Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Security review 2026-09-08 (acceptance file tests/sql_security_tests.rs, currently untracked; probes also preserved in the session scratchpad). Finding: inline string rendering maps U+001A to the letter 'z' — a MySQL-style \\Z escape that corrupts data on the to_string()/inline path (probe inline_control_characters_round_trip). Audit the whole escape table in the pgorm-query string renderer against PostgreSQL rules (standard_conforming_strings; E'' escapes where needed) — every character except NUL must round-trip byte-identically between the bound and inline paths. SPEC IMPACT: bump sql.render.string-escape."
+                    }
+
+                    {
+                        at 2026-09-08T09:19:43.383678Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-08T09:19:50.3517Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

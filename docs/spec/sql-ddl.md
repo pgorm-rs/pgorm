@@ -224,7 +224,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > string literal: wrapped in single quotes with every embedded single quote
 > doubled and nothing else altered — backslashes are literal, so no `E''`
 > prefix is used and the escaping of
-> `[spec:pgorm:req:sql.render.string-escape]` does not apply here. The text is
+> `[spec:pgorm:req:sql.render.string-escape+1]` does not apply here. The text is
 > never a bind parameter (a DDL statement yields SQL alone), so this
 > quoting is the whole injection boundary for comment text.
 
