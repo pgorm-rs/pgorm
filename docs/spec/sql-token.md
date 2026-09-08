@@ -29,11 +29,14 @@ of keywords, statements, or expressions.
 > rule). Every input character therefore belongs to exactly one token, and
 > iteration yields `None` exactly when the input is exhausted.
 
-> [spec:pgorm:req:sql.token.space]
-> A `Space` token MUST be a maximal run of the whitespace characters space
-> (`' '`), tab (`\t`), carriage return (`\r`), and newline (`\n`). Consecutive
-> whitespace characters of different kinds are grouped into a single token. No
-> other characters (including other Unicode whitespace) count as whitespace.
+> [spec:pgorm:req:sql.token.space+1]
+> A `Space` token is a maximal run of the whitespace characters space
+> (`' '`), tab (`\t`), carriage return (`\r`), and newline (`\n`) — or one
+> whole comment, `--` through the newline it ends at or a nested `/* */`
+> block, which separates tokens exactly as whitespace does
+> (`sql.token.limits`). Consecutive whitespace characters of different kinds
+> are grouped into a single token; a comment is its own token. No other
+> characters (including other Unicode whitespace) count as whitespace.
 
 > [spec:pgorm:req:sql.token.word]
 > An `Unquoted` token MUST start with an alphanumeric character — Unicode
@@ -46,9 +49,11 @@ of keywords, statements, or expressions.
 > exactly what makes `$1` scan as punctuation `$` + word `1` for placeholder
 > detection.
 
-> [spec:pgorm:req:sql.token.quoted]
+> [spec:pgorm:req:sql.token.quoted+1]
 > A `Quoted` token MUST begin with one of the delimiter characters `` ` ``,
-> `[`, `'`, `"` and runs under this state machine: the closing character is
+> `[`, `'`, `"` — or spell one of the two PostgreSQL forms of
+> `sql.token.limits`: a dollar-quoted body `$tag$…$tag$`, or an escape
+> string `E'…'` — and otherwise runs under this state machine: the closing character is
 > the paired delimiter (`[` closes with `]`; the others close with
 > themselves). A backslash escapes the immediately following character
 > (`escape` toggles, so `\\` does not escape the character after it). On
@@ -78,14 +83,20 @@ of keywords, statements, or expressions.
 > stores its source text verbatim; the module's unit tests assert it for each
 > case.
 
-> [spec:pgorm:sem:sql.token.limits]
-> The tokenizer has no comment handling: `--` and `/* */` are not recognized,
-> so comment bodies are tokenized as ordinary words/punctuation (and a quote
-> character inside a comment starts a quoted token). There is no
-> dollar-quoting support (`$$…$$` / `$tag$…$tag$` scan as punctuation and
-> words), and no E-string awareness (`E'…'` scans as the word `E` followed by
-> an ordinary quoted token). Conversely, the accepted delimiter set is wider
-> than PostgreSQL's: backtick and square-bracket strings (MySQL / SQL Server
-> identifier syntax) are treated as quoted tokens too. Consumers relying on
-> the tokenizer to skip quoted regions (see `sql.render.inject`) inherit
-> these limitations.
+> [spec:pgorm:sem:sql.token.limits+1]
+> The tokenizer understands PostgreSQL's non-plain lexical regions: `--`
+> line comments (through the newline they end at) and nested `/* */` block
+> comments each lex as ONE `Space` token — a comment separates tokens
+> exactly as whitespace does — while `$$…$$` / `$tag$…$tag$` dollar-quoted
+> bodies and `E'…'` escape strings (backslash escapes honoured) each lex as
+> ONE `Quoted` token. A `$` followed by a digit is a placeholder spelling,
+> never a dollar-quote tag, and an unclosed dollar body runs to the end of
+> the input verbatim. `Tokenizer::new_without_dollar_quoting` disables only
+> the dollar-quote form, for input whose `$` spellings carry their own
+> grammar — the placeholder template's `$$` escape
+> (`sql.render.custom-expr`). Remaining limitations: the accepted delimiter
+> set is wider than PostgreSQL's — backtick and square-bracket strings
+> (MySQL / SQL Server identifier syntax) are treated as quoted tokens too —
+> and there is no `U&'…'` awareness. Consumers relying on the tokenizer to
+> skip quoted regions (see `sql.render.inject`) inherit exactly this
+> contract.

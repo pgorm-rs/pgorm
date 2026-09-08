@@ -423,7 +423,7 @@ bound parameter is held to.
 > The wrapped statement's text MUST be copied verbatim and MUST NOT be
 > re-lexed or rewritten — not by the `sql.token` tokenizer, which knows
 > neither PostgreSQL comments nor dollar quoting
-> (`[spec:pgorm:sem:sql.token.limits]`), and not by any other walk over
+> (`[spec:pgorm:sem:sql.token.limits+1]`), and not by any other walk over
 > the text. The caller's `$N` markers therefore keep the numbers the
 > caller gave them, which is sound because nothing is bound ahead of
 > them: the page clauses the paginator appends are numbered from `$N+1`

@@ -520,7 +520,7 @@ an ideal Postgres renderer would emit.
 
 ## Parameter injection
 
-> [spec:pgorm:sem:sql.render.inject+2]
+> [spec:pgorm:sem:sql.render.inject+3]
 > `inject_parameters(sql, params)` (`prepare.rs`) converts a parameterized SQL
 > string back into inline SQL and returns `Result`. It tokenizes the input; a
 > `$` punctuation token immediately followed by an unquoted token that parses
@@ -529,9 +529,12 @@ an ideal Postgres renderer would emit.
 > a `$` that is not followed by such an integer included: unlike
 > `sql.render.custom-expr`, `$$` is NOT an escape here, because what arrives is
 > real SQL, where `$$` opens a dollar-quoted body rather than standing in for a
-> literal `$`. Because quoted tokens are opaque to the tokenizer, `$N`
-> sequences inside string literals or quoted identifiers are neither
-> substituted nor counted.
+> literal `$`. Because quoted tokens are opaque to the tokenizer — and the
+> tokenizer reads comments as space and dollar-quoted bodies and `E'…'`
+> strings as quoted (`sql.token.limits`) — a `$N` spelling inside a string
+> literal, a quoted identifier, a comment or a dollar-quoted body is
+> neither substituted nor counted, so a value can never escape such a
+> context by ending it.
 >
 > The census is settled before anything is written, and MUST come out exact:
 > the distinct `N` referenced MUST equal `1..=params.len()`. `$0`, a reference

@@ -4498,12 +4498,27 @@ children (
                 id inject-parameters-lexing
                 title "inject_parameters substitutes only real placeholder tokens"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-08T09:14:54.013964Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Security review 2026-09-08, severity P1. inject_parameters replaces $N textually wherever it appears — inside block comments and dollar-quoted bodies included — so a value can escape its context: \"SELECT $1::text AS value /* $1 */\" with a payload ending the comment and appending UNION ALL SELECT executed the payload (probe inline_parameters_preserve_block_comments); a $$-quoted source similarly executed part of the value (inline_parameters_preserve_dollar_quoted_bodies). Fix: substitution must be lexer-aware — the pg_query tokenizer (sql.token, already the paginator's and census's oracle) yields PARAM tokens with spans; replace exactly those and nothing else, so $N spellings inside comments, strings and dollar-quotes are inert text. The substituted literal itself renders through the (separately fixed) inline string escaper. SPEC IMPACT: bump sql.render.inject to state token-level substitution and its oracle."
+                    }
+
+                    {
+                        at 2026-09-08T09:44:03.125508Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-08T09:44:08.513823Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

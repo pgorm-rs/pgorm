@@ -2182,7 +2182,7 @@ fn containment_and_concat_serve_json_operands() {
                 Expr::expr(Expr::col(Char::UserData).concat(json!({ "b": 2 }))).is_not_null()
             )
             .to_string(),
-        r#"SELECT "id" FROM "character" WHERE ("user_data" || E'{\"b\":2}') IS NOT NULL"#
+        r#"SELECT "id" FROM "character" WHERE ("user_data" || '{"b":2}') IS NOT NULL"#
     );
 }
 

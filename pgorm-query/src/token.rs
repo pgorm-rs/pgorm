@@ -4,9 +4,10 @@ use std::fmt::Write;
 use std::iter::Iterator;
 
 // [spec:pgorm:def:sql.token]
-// [spec:pgorm:sem:sql.token.limits]
+// [spec:pgorm:sem:sql.token.limits+1]
 #[derive(Debug, Default)]
 pub struct Tokenizer {
+    dollar_quotes: bool,
     pub chars: Vec<char>,
     pub p: usize,
 }
@@ -23,8 +24,19 @@ pub enum Token {
 impl Tokenizer {
     pub fn new(string: &str) -> Self {
         Self {
+            dollar_quotes: true,
             chars: string.chars().collect(),
             p: 0,
+        }
+    }
+
+    /// A tokenizer that does not read `$tag$ … $tag$` as a quoted body, for
+    /// input where `$` spellings carry their own grammar — the placeholder
+    /// template's `$$` escape (`sql.render.custom-expr`).
+    pub fn new_without_dollar_quoting(string: &str) -> Self {
+        Self {
+            dollar_quotes: false,
+            ..Self::new(string)
         }
     }
 
@@ -44,7 +56,133 @@ impl Tokenizer {
         self.p == self.chars.len()
     }
 
-    // [spec:pgorm:req:sql.token.space]
+    fn peek(&self, ahead: usize) -> Option<char> {
+        self.chars.get(self.p + ahead).copied()
+    }
+
+    /// A `--` line comment or a nested `/* */` block comment, lexed as one
+    /// [`Token::Space`]: a comment separates tokens exactly as whitespace
+    /// does, and folding it in keeps everything inside it — a `$N` spelling
+    /// included — out of every other token form.
+    // [spec:pgorm:req:sql.token.space+1]
+    fn comment(&mut self) -> Option<Token> {
+        let mut string = String::new();
+        if self.peek(0) == Some('-') && self.peek(1) == Some('-') {
+            while !self.end() {
+                let c = self.get();
+                write!(string, "{c}").unwrap();
+                self.inc();
+                if c == '\n' {
+                    break;
+                }
+            }
+            return Some(Token::Space(string));
+        }
+        if self.peek(0) == Some('/') && self.peek(1) == Some('*') {
+            let mut depth = 0usize;
+            while !self.end() {
+                if self.peek(0) == Some('/') && self.peek(1) == Some('*') {
+                    depth += 1;
+                    string.push_str("/*");
+                    self.inc();
+                    self.inc();
+                } else if self.peek(0) == Some('*') && self.peek(1) == Some('/') {
+                    depth = depth.saturating_sub(1);
+                    string.push_str("*/");
+                    self.inc();
+                    self.inc();
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    write!(string, "{}", self.get()).unwrap();
+                    self.inc();
+                }
+            }
+            return Some(Token::Space(string));
+        }
+        None
+    }
+
+    /// A dollar-quoted string, `$tag$ … $tag$`, lexed whole as one
+    /// [`Token::Quoted`]. A digit after the opening `$` is a placeholder
+    /// spelling, never a tag, so `$1` stays punctuation; an unclosed body
+    /// runs to the end of the input, reproduced verbatim.
+    // [spec:pgorm:req:sql.token.quoted+1]
+    fn dollar_quoted(&mut self) -> Option<Token> {
+        if !self.dollar_quotes || self.peek(0) != Some('$') {
+            return None;
+        }
+        let mut tag_len = 0usize;
+        loop {
+            match self.peek(1 + tag_len) {
+                Some('$') => break,
+                Some(c) if c.is_alphabetic() || c == '_' || (tag_len > 0 && c.is_ascii_digit()) => {
+                    tag_len += 1;
+                }
+                _ => return None,
+            }
+        }
+        let opener: String = self.chars[self.p..=self.p + tag_len + 1].iter().collect();
+        let mut string = opener.clone();
+        for _ in 0..opener.len() {
+            self.inc();
+        }
+        while !self.end() {
+            let closes =
+                (0..opener.len()).all(|ahead| self.peek(ahead) == opener.chars().nth(ahead));
+            if closes {
+                string.push_str(&opener);
+                for _ in 0..opener.len() {
+                    self.inc();
+                }
+                break;
+            }
+            write!(string, "{}", self.get()).unwrap();
+            self.inc();
+        }
+        Some(Token::Quoted(string))
+    }
+
+    /// An escape string, `E'…'`, lexed whole as one [`Token::Quoted`]: inside
+    /// it a backslash escapes the next character — the closing quote included
+    /// — and `''` doubling still continues the body.
+    // [spec:pgorm:req:sql.token.quoted+1]
+    fn e_string(&mut self) -> Option<Token> {
+        if !matches!(self.peek(0), Some('E' | 'e')) || self.peek(1) != Some('\'') {
+            return None;
+        }
+        let mut string = String::new();
+        write!(string, "{}", self.get()).unwrap();
+        self.inc();
+        write!(string, "{}", self.get()).unwrap();
+        self.inc();
+        let mut escape = false;
+        while !self.end() {
+            let c = self.get();
+            write!(string, "{c}").unwrap();
+            self.inc();
+            if escape {
+                escape = false;
+                continue;
+            }
+            if c == '\\' {
+                escape = true;
+                continue;
+            }
+            if c == '\'' {
+                if self.peek(0) == Some('\'') {
+                    write!(string, "'").unwrap();
+                    self.inc();
+                    continue;
+                }
+                break;
+            }
+        }
+        Some(Token::Quoted(string))
+    }
+
+    // [spec:pgorm:req:sql.token.space+1]
     fn space(&mut self) -> Option<Token> {
         let mut string = String::new();
         while !self.end() {
@@ -87,7 +225,7 @@ impl Tokenizer {
         }
     }
 
-    // [spec:pgorm:req:sql.token.quoted]
+    // [spec:pgorm:req:sql.token.quoted+1]
     fn quoted(&mut self) -> Option<Token> {
         let mut string = String::new();
         let mut first = true;
@@ -224,6 +362,15 @@ impl Iterator for Tokenizer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if let Some(comment) = self.comment() {
+            return Some(comment);
+        }
+        if let Some(dollar) = self.dollar_quoted() {
+            return Some(dollar);
+        }
+        if let Some(quoted) = self.e_string() {
+            return Some(quoted);
+        }
         if let Some(space) = self.space() {
             return Some(space);
         }
@@ -294,9 +441,9 @@ impl std::fmt::Display for Token {
 }
 
 // [spec:pgorm:req:sql.token.scan/test]
-// [spec:pgorm:req:sql.token.space/test]
+// [spec:pgorm:req:sql.token.space+1/test]
 // [spec:pgorm:req:sql.token.word/test]
-// [spec:pgorm:req:sql.token.quoted/test]
+// [spec:pgorm:req:sql.token.quoted+1/test]
 // [spec:pgorm:sem:sql.token.unquote/test]
 // [spec:pgorm:thm:sql.token.roundtrip/test]
 #[cfg(test)]
@@ -621,11 +768,15 @@ mod tests {
 
     #[test]
     fn test_17() {
+        // `$abc$` opens a tagged dollar quote; without a closer the body runs
+        // to the end of the input, verbatim.
         let string = "$abc$123";
         let tokenizer = Tokenizer::new(string);
         let tokens: Vec<Token> = tokenizer.iter().collect();
+        assert_eq!(tokens, vec![Token::Quoted("$abc$123".to_string())]);
+        let template = Tokenizer::new_without_dollar_quoting(string);
         assert_eq!(
-            tokens,
+            template.iter().collect::<Vec<_>>(),
             vec![
                 Token::Punctuation("$".to_string()),
                 Token::Unquoted("abc$123".to_string()),
@@ -646,8 +797,7 @@ mod tests {
             tokens,
             vec![
                 Token::Punctuation("_".to_string()),
-                Token::Punctuation("$".to_string()),
-                Token::Unquoted("abc_123$".to_string()),
+                Token::Quoted("$abc_123$".to_string()),
             ]
         );
         assert_eq!(
@@ -695,5 +845,53 @@ mod tests {
             string,
             tokens.iter().map(|x| x.to_string()).collect::<String>()
         );
+    }
+}
+
+#[cfg(test)]
+mod context_tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn tokens(input: &str) -> Vec<Token> {
+        Tokenizer::new(input).iter().collect()
+    }
+
+    fn roundtrip(input: &str) {
+        let joined: String = tokens(input).iter().map(Token::as_str).collect();
+        assert_eq!(joined, input);
+    }
+
+    // [spec:pgorm:req:sql.token.space+1/test]    comments lex as one space
+    // token, so nothing inside them reaches any other token form
+    #[test]
+    fn comments_lex_as_space() {
+        roundtrip("SELECT 1 -- $1 trailing\nFROM t");
+        roundtrip("SELECT 1 /* $1 /* nested $2 */ still */ FROM t");
+        let toks = tokens("a /* $1 */ b");
+        assert!(matches!(&toks[2], Token::Space(s) if s == "/* $1 */"));
+    }
+
+    // [spec:pgorm:req:sql.token.quoted+1/test]    a dollar-quoted body is one
+    // quoted token — tagged, unclosed and placeholder-adjacent forms included
+    // — while `$1` stays punctuation
+    #[test]
+    fn dollar_quotes_lex_as_quoted() {
+        roundtrip("SELECT $$ $1 $$ WHERE $1 IS NOT NULL");
+        roundtrip("SELECT $tag$ body $$ inner $tag$ AND $2");
+        let toks = tokens("$$ $1 $$ $1");
+        assert!(matches!(&toks[0], Token::Quoted(s) if s == "$$ $1 $$"));
+        assert!(matches!(&toks[2], Token::Punctuation(p) if p == "$"));
+        let unclosed = tokens("$$ runs to the end");
+        assert_eq!(unclosed.len(), 1);
+    }
+
+    // [spec:pgorm:req:sql.token.quoted+1/test]    an escape string honours the
+    // backslash, so an escaped quote does not end the body
+    #[test]
+    fn escape_strings_lex_as_quoted() {
+        roundtrip(r"SELECT E'a\'b $1' AND $1");
+        let toks = tokens(r"E'a\'b $1' x");
+        assert!(matches!(&toks[0], Token::Quoted(s) if s == r"E'a\'b $1'"));
     }
 }

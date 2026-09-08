@@ -44,10 +44,15 @@ pub(crate) enum Grammar {
 
 /// Split `input` into literal text and placeholder references.
 // [spec:pgorm:req:sql.render.custom-expr+1] (the `Template` grammar: `$$` escape, `$N` index)
-// [spec:pgorm:sem:sql.render.inject+2] (the `Sql` grammar: only `$N`, everything else verbatim)
+// [spec:pgorm:sem:sql.render.inject+3] (the `Sql` grammar: only `$N`, everything else verbatim)
 pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
     let mark = QueryBuilder.placeholder().0;
-    let tokens: Vec<Token> = Tokenizer::new(input).iter().collect();
+    let tokens: Vec<Token> = match grammar {
+        Grammar::Sql => Tokenizer::new(input).iter().collect(),
+        Grammar::Template => Tokenizer::new_without_dollar_quoting(input)
+            .iter()
+            .collect(),
+    };
 
     let mut offsets = Vec::with_capacity(tokens.len());
     let mut offset = 0usize;
@@ -114,7 +119,7 @@ pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
 /// Check the census of `chunks` against `supplied`: the distinct placeholder
 /// indices referenced must be exactly `1..=supplied`.
 // [spec:pgorm:req:sql.render.custom-expr+1]
-// [spec:pgorm:sem:sql.render.inject+2]
+// [spec:pgorm:sem:sql.render.inject+3]
 fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
     let mut referenced: Vec<usize> = chunks
         .iter()
@@ -150,7 +155,7 @@ fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
 /// Scan `input` and pair every placeholder with the value it names, or refuse
 /// the pairing. The result holds values, not indices.
 // [spec:pgorm:req:sql.render.custom-expr+1]
-// [spec:pgorm:sem:sql.render.inject+2]
+// [spec:pgorm:sem:sql.render.inject+3]
 pub(crate) fn resolve<T>(input: &str, grammar: Grammar, values: &[T]) -> Result<Vec<Segment<T>>>
 where
     T: Clone,
@@ -178,7 +183,7 @@ where
 }
 
 // [spec:pgorm:req:sql.render.custom-expr+1/test]
-// [spec:pgorm:sem:sql.render.inject+2/test]
+// [spec:pgorm:sem:sql.render.inject+3/test]
 #[cfg(test)]
 mod tests {
     use super::*;

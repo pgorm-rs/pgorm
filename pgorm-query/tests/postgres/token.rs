@@ -50,9 +50,10 @@ fn token_classes_carry_their_source_text_verbatim() {
     assert!(tokens[4].is_punctuation());
 }
 
-// [spec:pgorm:sem:sql.token.limits/test]    `--` is not a comment marker
+// [spec:pgorm:sem:sql.token.limits+1/test]    a line comment is one space
+// token, ending at the newline it includes
 #[test]
-fn line_comments_are_not_recognized() {
+fn line_comments_lex_as_one_space_token() {
     let tokens: Vec<Token> = Tokenizer::new("1 -- two").iter().collect();
 
     assert_eq!(
@@ -60,84 +61,48 @@ fn line_comments_are_not_recognized() {
         vec![
             Token::Unquoted("1".to_owned()),
             Token::Space(" ".to_owned()),
-            Token::Punctuation("-".to_owned()),
-            Token::Punctuation("-".to_owned()),
-            Token::Space(" ".to_owned()),
-            Token::Unquoted("two".to_owned()),
+            Token::Space("-- two".to_owned()),
         ]
     );
 }
 
-// [spec:pgorm:sem:sql.token.limits/test]    `/* */` is not a comment marker either, and a
-// quote character inside what a reader would call a comment opens a quoted token
+// [spec:pgorm:sem:sql.token.limits+1/test]    a block comment is one space
+// token, and a quote character inside a comment stays inside it
 #[test]
-fn quotes_inside_unrecognized_block_comments_open_tokens() {
+fn block_comments_lex_as_one_space_token() {
     let tokens: Vec<Token> = Tokenizer::new("/* a */").iter().collect();
-    assert_eq!(
-        tokens,
-        vec![
-            Token::Punctuation("/".to_owned()),
-            Token::Punctuation("*".to_owned()),
-            Token::Space(" ".to_owned()),
-            Token::Unquoted("a".to_owned()),
-            Token::Space(" ".to_owned()),
-            Token::Punctuation("*".to_owned()),
-            Token::Punctuation("/".to_owned()),
-        ]
-    );
+    assert_eq!(tokens, vec![Token::Space("/* a */".to_owned())]);
 
-    // `it's` inside the "comment" starts a quoted token that swallows the rest of
-    // the input, unterminated, without error.
     let tokens: Vec<Token> = Tokenizer::new("-- it's fine\nSELECT").iter().collect();
     assert_eq!(
         tokens,
         vec![
-            Token::Punctuation("-".to_owned()),
-            Token::Punctuation("-".to_owned()),
-            Token::Space(" ".to_owned()),
-            Token::Unquoted("it".to_owned()),
-            Token::Quoted("'s fine\nSELECT".to_owned()),
+            Token::Space("-- it's fine\n".to_owned()),
+            Token::Unquoted("SELECT".to_owned()),
         ]
     );
 }
 
-// [spec:pgorm:sem:sql.token.limits/test]    no dollar-quoting
+// [spec:pgorm:sem:sql.token.limits+1/test]    a dollar-quoted body — bare or
+// tagged — is one quoted token
 #[test]
-fn dollar_quoting_is_not_recognized() {
+fn dollar_quoting_lexes_as_one_quoted_token() {
     let tokens: Vec<Token> = Tokenizer::new("$$body$$").iter().collect();
-    assert_eq!(
-        tokens,
-        vec![
-            Token::Punctuation("$".to_owned()),
-            Token::Punctuation("$".to_owned()),
-            Token::Unquoted("body$$".to_owned()),
-        ]
-    );
+    assert_eq!(tokens, vec![Token::Quoted("$$body$$".to_owned())]);
 
     let tokens: Vec<Token> = Tokenizer::new("$tag$body$tag$").iter().collect();
-    assert_eq!(
-        tokens,
-        vec![
-            Token::Punctuation("$".to_owned()),
-            Token::Unquoted("tag$body$tag$".to_owned()),
-        ]
-    );
+    assert_eq!(tokens, vec![Token::Quoted("$tag$body$tag$".to_owned())]);
 }
 
-// [spec:pgorm:sem:sql.token.limits/test]    no E-string awareness
+// [spec:pgorm:sem:sql.token.limits+1/test]    an E-string is one quoted token,
+// its backslash escapes honoured
 #[test]
-fn e_strings_scan_as_word_then_quoted_token() {
+fn e_strings_lex_as_one_quoted_token() {
     let tokens: Vec<Token> = Tokenizer::new(r#"E'a\nb'"#).iter().collect();
-    assert_eq!(
-        tokens,
-        vec![
-            Token::Unquoted("E".to_owned()),
-            Token::Quoted(r#"'a\nb'"#.to_owned()),
-        ]
-    );
+    assert_eq!(tokens, vec![Token::Quoted(r#"E'a\nb'"#.to_owned())]);
 }
 
-// [spec:pgorm:sem:sql.token.limits/test]    the delimiter set is wider than PostgreSQL's
+// [spec:pgorm:sem:sql.token.limits+1/test]    the delimiter set is wider than PostgreSQL's
 #[test]
 fn backtick_and_bracket_strings_are_quoted_tokens_too() {
     let tokens: Vec<Token> = Tokenizer::new("`a` [b] \"c\" 'd'").iter().collect();

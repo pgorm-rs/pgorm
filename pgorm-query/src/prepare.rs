@@ -117,7 +117,7 @@ impl SqlWriter for SqlWriterValues {
 /// Each reference is paired with its parameter up front, which is why the
 /// writing walk holds no indices at all. A parameter may be referenced any
 /// number of times.
-// [spec:pgorm:sem:sql.render.inject+2]
+// [spec:pgorm:sem:sql.render.inject+3]
 pub fn inject_parameters<I>(sql: &str, params: I) -> Result<String>
 where
     I: IntoIterator<Item = Value>,
@@ -135,7 +135,7 @@ where
     Ok(output)
 }
 
-// [spec:pgorm:sem:sql.render.inject+2/test]
+// [spec:pgorm:sem:sql.render.inject+3/test]
 #[cfg(test)]
 mod tests_postgres {
     use super::*;

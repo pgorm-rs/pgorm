@@ -603,6 +603,7 @@ assertions (
     {id varied-schemas, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:05:31.028259Z}
     {id inline-string-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:19:50.3517Z}
     {id like-sugar-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:25:55.102226Z}
+    {id inject-parameters-lexing, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:44:08.513823Z}
 )
 
 impl_evidence (
