@@ -1,0 +1,950 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "select",
+      "family": "CRUD values",
+      "api": "Entity::find/filter",
+      "method": "GET",
+      "route": "/case/protected/select",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/select"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "insert",
+      "family": "CRUD values",
+      "api": "ActiveModel::insert",
+      "method": "GET",
+      "route": "/case/protected/insert",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/insert"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "update-value",
+      "family": "CRUD values",
+      "api": "Update::many/col_expr",
+      "method": "GET",
+      "route": "/case/protected/update-value",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/update-value"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "update-guard",
+      "family": "CRUD values",
+      "api": "Update::many/filter",
+      "method": "GET",
+      "route": "/case/protected/update-guard",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/update-guard"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "delete",
+      "family": "CRUD values",
+      "api": "Delete::many/filter",
+      "method": "GET",
+      "route": "/case/protected/delete",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/delete"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "tenant-or",
+      "family": "Composed predicates",
+      "api": "Condition::any + tenant guard",
+      "method": "GET",
+      "route": "/case/protected/tenant-or",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "nobody",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/tenant-or"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "empty-in",
+      "family": "Composed predicates",
+      "api": "is_in(empty) + guard",
+      "method": "GET",
+      "route": "/case/protected/empty-in",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/empty-in"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "empty-or",
+      "family": "Composed predicates",
+      "api": "Condition::any(empty) + guard",
+      "method": "GET",
+      "route": "/case/protected/empty-or",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/empty-or"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "graph-root",
+      "family": "Graph",
+      "api": "Entity::graph/filter",
+      "method": "GET",
+      "route": "/case/protected/graph-root",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/graph-root"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "graph-joined",
+      "family": "Graph",
+      "api": "SelectGraph::join_one_as/filter",
+      "method": "GET",
+      "route": "/case/protected/graph-joined",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/graph-joined"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "graph-alias",
+      "family": "Graph",
+      "api": "SelectGraph::join_one_as alias",
+      "method": "GET",
+      "route": "/case/protected/graph-alias",
+      "field": "input",
+      "baseline": "peer",
+      "alternate": "other_peer",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/graph-alias"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "pipeline-literal",
+      "family": "Pipeline",
+      "api": "Pipeline::filter inline",
+      "method": "GET",
+      "route": "/case/protected/pipeline-literal",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/pipeline-literal"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "pipeline-bound",
+      "family": "Pipeline",
+      "api": "Pipeline::filter_with binder",
+      "method": "GET",
+      "route": "/case/protected/pipeline-bound",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/pipeline-bound"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "pipeline-projection",
+      "family": "Pipeline",
+      "api": "Pipeline::select identifier",
+      "method": "GET",
+      "route": "/case/protected/pipeline-projection",
+      "field": "input",
+      "baseline": "name",
+      "alternate": "note",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/pipeline-projection"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "pipeline-sources",
+      "family": "Pipeline",
+      "api": "Pipeline::join/select_sources",
+      "method": "GET",
+      "route": "/case/protected/pipeline-sources",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/pipeline-sources"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "schema",
+      "family": "Object names",
+      "api": "SelectStatement::from schema",
+      "method": "GET",
+      "route": "/case/protected/schema",
+      "field": "input",
+      "baseline": "fixture",
+      "alternate": "other",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/schema"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "table",
+      "family": "Object names",
+      "api": "SelectStatement::from table",
+      "method": "GET",
+      "route": "/case/protected/table",
+      "field": "input",
+      "baseline": "items",
+      "alternate": "other.items",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/table"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "column",
+      "family": "Object names",
+      "api": "SelectStatement::column",
+      "method": "GET",
+      "route": "/case/protected/column",
+      "field": "input",
+      "baseline": "name",
+      "alternate": "note",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/column"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "alias",
+      "family": "Object names",
+      "api": "SelectStatement::expr_as",
+      "method": "GET",
+      "route": "/case/protected/alias",
+      "field": "input",
+      "baseline": "value",
+      "alternate": "other_value",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/alias"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "order",
+      "family": "Object names",
+      "api": "SelectStatement::order_by",
+      "method": "GET",
+      "route": "/case/protected/order",
+      "field": "input",
+      "baseline": "name",
+      "alternate": "note",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/order"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "group",
+      "family": "Object names",
+      "api": "SelectStatement::group_by_col",
+      "method": "GET",
+      "route": "/case/protected/group",
+      "field": "input",
+      "baseline": "name",
+      "alternate": "note",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/group"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "function",
+      "family": "Type/function names",
+      "api": "Func::cust",
+      "method": "GET",
+      "route": "/case/protected/function",
+      "field": "input",
+      "baseline": "upper",
+      "alternate": "lower",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/function"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "cast",
+      "family": "Type/function names",
+      "api": "Expr::cast_as",
+      "method": "GET",
+      "route": "/case/protected/cast",
+      "field": "input",
+      "baseline": "text",
+      "alternate": "QuotedType",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/cast"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "enum",
+      "family": "Type/function names",
+      "api": "Expr::cast_as_type qualified",
+      "method": "GET",
+      "route": "/case/protected/enum",
+      "field": "input",
+      "baseline": "ReviewStatus",
+      "alternate": "ReviewStatus",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/enum"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "enum-ddl",
+      "family": "Type/function names",
+      "api": "ColumnDef::enumeration",
+      "method": "GET",
+      "route": "/case/protected/enum-ddl",
+      "field": "input",
+      "baseline": "ReviewStatus",
+      "alternate": "ReviewStatus",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/enum-ddl"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "parameters",
+      "family": "Parameter substitution",
+      "api": "inject_parameters lexical contexts",
+      "method": "GET",
+      "route": "/case/protected/parameters",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/parameters"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "contains",
+      "family": "Pattern matching",
+      "api": "ColumnTrait::contains",
+      "method": "GET",
+      "route": "/case/protected/contains",
+      "field": "input",
+      "baseline": "ali",
+      "alternate": "bo",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/contains"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "starts-with",
+      "family": "Pattern matching",
+      "api": "ColumnTrait::starts_with",
+      "method": "GET",
+      "route": "/case/protected/starts-with",
+      "field": "input",
+      "baseline": "ali",
+      "alternate": "bo",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/starts-with"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "ends-with",
+      "family": "Pattern matching",
+      "api": "ColumnTrait::ends_with",
+      "method": "GET",
+      "route": "/case/protected/ends-with",
+      "field": "input",
+      "baseline": "ice",
+      "alternate": "ob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/ends-with"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "like",
+      "family": "Pattern matching",
+      "api": "ColumnTrait::like",
+      "method": "GET",
+      "route": "/case/protected/like",
+      "field": "input",
+      "baseline": "ali%",
+      "alternate": "bo%",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/like"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "direction",
+      "family": "Typed structure",
+      "api": "Order enum",
+      "method": "GET",
+      "route": "/case/protected/direction",
+      "field": "input",
+      "baseline": "asc",
+      "alternate": "desc",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/direction"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "limit",
+      "family": "Typed structure",
+      "api": "SelectStatement::limit",
+      "method": "GET",
+      "route": "/case/protected/limit",
+      "field": "input",
+      "baseline": "1",
+      "alternate": "2",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/limit"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "offset",
+      "family": "Typed structure",
+      "api": "SelectStatement::offset",
+      "method": "GET",
+      "route": "/case/protected/offset",
+      "field": "input",
+      "baseline": "1",
+      "alternate": "2",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/offset"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "stored-value",
+      "family": "Stored inputs",
+      "api": "stored value -> Entity filter",
+      "method": "GET",
+      "route": "/case/protected/stored-value",
+      "field": "input",
+      "baseline": "alice",
+      "alternate": "bob",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/stored-value"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    },
+    {
+      "id": "stored-identifier",
+      "family": "Stored inputs",
+      "api": "stored value -> column",
+      "method": "GET",
+      "route": "/case/protected/stored-identifier",
+      "field": "input",
+      "baseline": "name",
+      "alternate": "note",
+      "techniques": [
+        "B",
+        "E",
+        "U",
+        "S",
+        "T",
+        "Q"
+      ],
+      "controls": [
+        "/case/control/stored-identifier"
+      ],
+      "fixed": {
+        "table": "fixture.items",
+        "tenant_guard": 1,
+        "sentinel_id": 3
+      },
+      "inapplicable": {}
+    }
+  ]
+}

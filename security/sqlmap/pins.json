@@ -1,0 +1,11 @@
+{
+  "sqlmap": {
+    "upstream": "https://github.com/sqlmapproject/sqlmap",
+    "revision": "d486742eec47ba96940d35bf2dc176f60868efdd",
+    "archive": "https://codeload.github.com/sqlmapproject/sqlmap/tar.gz/d486742eec47ba96940d35bf2dc176f60868efdd",
+    "sha256": "a7b0b23339e81b19da94f834df2c9c352845f2e6e1752aa51bd0f5634612b45e",
+    "license": "Upstream LICENSE in the verified archive; scanner is invoked externally, not redistributed in pgorm"
+  },
+  "python": "3.14.4",
+  "postgres": "postgres:16.13-bookworm@sha256:472efd9a66f2b2f1a5aeb18b28de74332e6ef88c2b93a1a5d812fb6db67a5f60"
+}

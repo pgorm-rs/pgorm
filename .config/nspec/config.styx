@@ -3,7 +3,7 @@ specs ({
     include (docs/spec/**/*.md),
     impls ({
         name main,
-        languages (@rust),
+        languages (@rust @python),
         include (
             src/**/*.rs
             pgorm-macros/src/**/*.rs
@@ -14,6 +14,8 @@ specs ({
             pgorm-query/pgorm-query-attr/src/**/*.rs
             pgorm-query/pgorm-query-derive/src/**/*.rs
             pgorm-sql-macro/src/**/*.rs
+            security/sqlmap/adapter/src/**/*.rs
+            security/sqlmap/harness.py
         ),
         test_include (
             tests/**/*.rs
@@ -25,6 +27,7 @@ specs ({
             pgorm-query/pgorm-query-attr/tests/**/*.rs
             pgorm-query/pgorm-query-derive/tests/**/*.rs
             pgorm-sql-macro/tests/**/*.rs
+            security/sqlmap/test_*.py
         ),
         exclude (
             target/**

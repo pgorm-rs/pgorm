@@ -1,0 +1,77 @@
+{
+  "smoke": {
+    "cases": [
+      "select",
+      "pipeline-literal",
+      "parameters"
+    ],
+    "techniques": [
+      "B"
+    ],
+    "level": 2,
+    "risk": 1,
+    "case_timeout_seconds": 240,
+    "concurrency": 1,
+    "retries": 0,
+    "time_sec": 1,
+    "http_timeout_seconds": 15,
+    "postgres_statement_timeout_seconds": 10,
+    "timeout_margin": "10s database and 15s HTTP allow 1s control delays; 240s outer scan deadline"
+  },
+  "full": {
+    "cases": [
+      "select",
+      "insert",
+      "update-value",
+      "update-guard",
+      "delete",
+      "tenant-or",
+      "empty-in",
+      "empty-or",
+      "graph-root",
+      "graph-joined",
+      "graph-alias",
+      "pipeline-literal",
+      "pipeline-bound",
+      "pipeline-projection",
+      "pipeline-sources",
+      "schema",
+      "table",
+      "column",
+      "alias",
+      "order",
+      "group",
+      "function",
+      "cast",
+      "enum",
+      "enum-ddl",
+      "parameters",
+      "contains",
+      "starts-with",
+      "ends-with",
+      "like",
+      "direction",
+      "limit",
+      "offset",
+      "stored-value",
+      "stored-identifier"
+    ],
+    "techniques": [
+      "B",
+      "E",
+      "U",
+      "S",
+      "T",
+      "Q"
+    ],
+    "level": 3,
+    "risk": 2,
+    "case_timeout_seconds": 240,
+    "concurrency": 1,
+    "retries": 0,
+    "time_sec": 1,
+    "http_timeout_seconds": 15,
+    "postgres_statement_timeout_seconds": 10,
+    "timeout_margin": "10s database and 15s HTTP allow 1s control delays; 240s outer scan deadline"
+  }
+}

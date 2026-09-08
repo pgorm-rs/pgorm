@@ -1,0 +1,19 @@
+[package]
+name = "pgorm-sqlmap-adapter"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Independent test package: none of these dependencies enter pgorm's runtime.
+[workspace]
+
+[dependencies]
+pgorm = { path = "../../.." }
+axum = "=0.8.9"
+tokio = { version = "=1.53.0", features = ["full"] }
+tokio-postgres = "=0.7.18"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.11.0"
+url = "=2.5.8"
+libc = "=0.2.189"

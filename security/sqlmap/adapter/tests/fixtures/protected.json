@@ -1,0 +1,13 @@
+{
+    "success": true,
+    "data": [],
+    "error": [
+        "all tested parameters do not appear to be injectable. Try to increase values for '--level'/'--risk' options if you wish to perform more tests. Rerun without providing the option '--technique'. If you suspect that there is some kind of protection mechanism involved (e.g. WAF) maybe you could try to use option '--tamper' (e.g. '--tamper=space2comment') and/or switch '--random-agent'"
+    ],
+    "meta": {
+        "api_version": 2,
+        "sqlmap_version": "sqlmap/1.10.9.6#dev",
+        "url": "http://127.0.0.1:56392/case/protected/select",
+        "timestamp": "2026-09-08 15:32:36"
+    }
+}
