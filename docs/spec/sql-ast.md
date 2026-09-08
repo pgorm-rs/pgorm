@@ -579,6 +579,29 @@ today, including panicking edges and deliberate failsafes.
 > expression can be projected (with `expr_as`), compared, or used anywhere an
 > expression is accepted.
 
+## Casts
+
+> [spec:pgorm:req:sql.ast.cast-shape]
+> A cast has exactly ONE node shape: `SimpleExpr::AsEnum(TypeName, operand)`.
+> Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`, the
+> entity layer's enum casts, and the `cast_as_custom` escape hatch — builds
+> that node, and there is no `Function::Cast`. Whether the type renders as a
+> quoted identifier or as the caller's own verbatim text is carried *inside*
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name]`), never by choosing
+> a different node.
+>
+> What this forbids is the second, `FunctionCall`-shaped cast whose type rode
+> as a raw `SimpleExpr::Custom` operand, and it forbids it for two reasons.
+> A consumer reading a cast back off an expression must recognise one shape
+> rather than enumerate them: `source_read_cast` recognising only the
+> structured shape is why a `#[pgorm(select_as = "…")]` column's read cast
+> was silently dropped, so the graph and pipeline decoded the column's stored
+> type instead of its cast one — a defect no test of either shape alone could
+> have found. And raw text in expression position is an injection site by
+> construction; confining verbatim type text to one field of `TypeName`,
+> reachable only through `cast_as_custom`, makes the places that can emit an
+> unescaped type name a finite list that inspection can enumerate.
+
 ## Function calls
 
 > [spec:pgorm:def:sql.ast.func]

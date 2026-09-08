@@ -259,6 +259,26 @@ children (
                         [spec:pgorm:def:sql.ast.func]
                     )
                 }
+                children (
+                    {
+                        id single-cast-node
+                        title "Collapse the two cast node shapes into one"
+                        priority 0
+                        kind @refactor
+                        implements {
+                            main ([spec:pgorm:req:sql.ast.cast-shape])
+                        }
+                        deps (raw-identifier-casts)
+                        log (
+                            {
+                                at 2026-09-08T15:16:26.560524Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Shape of the work, as spiked and then reverted out of fad22bef so that commit could land green on its own. TypeName gains a `verbatim: bool` plus a `TypeName::custom(text)` constructor, short-circuiting `to_sql_string` to `raw_text()`; `Expr::cast_as_custom` becomes `self.cast_as_type(TypeName::custom(type_expr))`; `Function::Cast` and the `drop_right_as_hack` in `prepare_binary_expr` become dead and are deleted; `source_read_cast` loses the second match arm fad22bef added. Two rule bodies go stale with it and must be swept in the same commit: `sql.render.cast-param-type` v1 currently specifies both shapes explicitly (\"on both cast shapes ... and a `Value` in the left operand of a `BinOper::As`\"), and `sql.ast.func` still lists `cast_as` among the `Func` helpers though `Func::cast_as` was already deleted in fad22bef — that one is stale on main right now. Verified green at 1353/1353 in the spike before revert; the goldens it moves are the ones fad22bef already re-pinned."
+                            }
+                        )
+                    }
+                )
                 log (
                     {
                         at 2026-09-02T09:29:27.492549Z
