@@ -1688,6 +1688,36 @@ children (
                     }
                 )
             }
+
+            {
+                id varied-schemas
+                title "Live coverage for schema-qualified entities across the whole query surface"
+                kind @test
+                deps (enum-schema-codegen)
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T08:50:54.222559Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Operator directive (2026-09-08): \"you need to do a full set of tests for varied schemas and queries\" — first-class schema support must be proven live, not just at the render level. Scope: a live suite driving schema-qualified entities through the whole query surface against real non-public schemas — DDL from entities (CREATE SCHEMA + create_table/create_enum/create_index), CRUD round-trips (insert/exec_returning_model, guarded update, TryInsert conflict, delete), find/filter/order/count/paginate, keyset cursors, graph reads (related_maybe within one schema, joins ACROSS schemas, graph cursor, all_grouped), loaders (load_one/load_many, many-to-many via a qualified junction), pipeline (from + cross-schema join + select_sources), streaming, and schema-qualified enums (storage cast, is_in, enum-keyed cursor). Varied shapes: two entities in one non-public schema, a cross-schema relation, mixed qualified/unqualified, and the same table name in two schemas queried side by side (search_path independence). SPEC IMPACT: primarily /test facets on entity.traits.entity-name (the table_ref qualification guarantee) and the surface rules exercised; defects found get fixed in-node when small or boarded when not. Known adjacent gaps deliberately NOT in scope (offered, unboarded): the pgorm_migrations ledger has no schema surface, and codegen writes {table}.rs so same-named tables in two schemas collide on file name."
+                    }
+
+                    {
+                        at 2026-09-08T08:51:04.293325Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-08T09:05:31.028259Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
         )
         log (
             {

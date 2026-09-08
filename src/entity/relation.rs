@@ -1,4 +1,4 @@
-use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_ref};
+use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_name};
 use core::marker::PhantomData;
 use pgorm_query::{
     Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden, JoinType,
@@ -465,8 +465,8 @@ where
 /// what a foreign key is built from, so the conversion is total.
 macro_rules! foreign_key_from_relation {
     ( $relation: ident, $ty: ty ) => {{
-        let from_tbl = unpack_table_ref(&$relation.from_tbl);
-        let to_tbl = unpack_table_ref(&$relation.to_tbl);
+        let from_tbl = unpack_table_name(&$relation.from_tbl);
+        let to_tbl = unpack_table_name(&$relation.to_tbl);
         let (from, to) = $relation.columns.first();
         let mut foreign_key = <$ty>::new(
             from_tbl.clone(),
@@ -491,7 +491,11 @@ macro_rules! foreign_key_from_relation {
                 .iter()
                 .map(|(from, _)| from.to_string())
                 .collect();
-            format!("fk-{}-{}", from_tbl.to_string(), from_cols.join("-"))
+            format!(
+                "fk-{}-{}",
+                from_tbl.table().to_string(),
+                from_cols.join("-")
+            )
         };
         foreign_key.name(name);
         foreign_key

@@ -1120,13 +1120,17 @@ fn join_tbl_on_condition(
     cond
 }
 
-/// The identifier a [`FromItem`] contributes to a foreign key or a join: the
-/// table it names, or the alias the value-producing forms are bound to.
-pub(crate) fn unpack_table_ref(from_item: &FromItem) -> DynIden {
+/// The full table name a [`FromItem`] contributes to a foreign key: schema
+/// qualification included, so a `REFERENCES` clause names the table the
+/// relation actually points at rather than whatever `search_path` resolves.
+// [spec:pgorm:sem:schema.from-entity+3]
+pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName {
     match from_item {
-        FromItem::Table(table) => SharedIden::clone(table.name.table()),
+        FromItem::Table(table) => table.name.clone(),
         FromItem::SubQuery(_, alias)
         | FromItem::ValuesList(_, alias)
-        | FromItem::FunctionCall(_, alias) => SharedIden::clone(alias),
+        | FromItem::FunctionCall(_, alias) => {
+            pgorm_query::TableName::Table(SharedIden::clone(alias))
+        }
     }
 }

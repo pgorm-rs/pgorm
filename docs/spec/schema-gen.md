@@ -8,7 +8,7 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+2]
+> [spec:pgorm:sem:schema.from-entity+3]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
@@ -23,7 +23,11 @@ executes SQL.
 > composite keys (arity > 1) instead emit a table-level primary-key index
 > named `pk-{table}`. Foreign keys are generated from `E::Relation` entries
 > whose `RelationDef` has `is_owner == false` (the belongs-to side); owner-side
-> relations produce no constraint.
+> relations produce no constraint. A foreign key carries the full table name
+> of both sides — schema qualification included, via `unpack_table_name` — so
+> a `REFERENCES` clause names the table the relation points at rather than
+> whatever `search_path` resolves; the derived constraint name still uses the
+> bare table.
 >
 > Comments ride on the create statement (`get_comment()`,
 > `ColumnSpec::Comment`) but are inert there — executing it attaches nothing
