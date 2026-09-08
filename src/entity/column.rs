@@ -1,7 +1,7 @@
 use crate::{EntityName, Iden, IdenStr, IntoSimpleExpr, Iterable};
 use pgorm_query::{
-    Alias, BinOper, DynIden, Expr, Func, IntoColumnRef, IntoIden, SelectStatement, SharedIden,
-    SimpleExpr, Value, ValueType,
+    BinOper, DynIden, Expr, Func, IntoColumnRef, SelectStatement, SharedIden, SimpleExpr, Value,
+    ValueType,
 };
 use std::str::FromStr;
 
@@ -90,7 +90,7 @@ macro_rules! bind_subquery_func {
     };
 }
 
-use column_def::escape_like_text;
+use column_def::{enum_type_name, escape_like_text};
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
@@ -449,14 +449,14 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         cast_enum_as(expr, self, |col, _, col_type| {
-            let type_name = match col_type {
-                ColumnType::Array(_) => TextArray.into_iden(),
-                _ => Text.into_iden(),
-            };
-            col.as_enum(type_name)
+            let text = pgorm_query::TypeName::new(Text);
+            col.cast_as_type(match col_type {
+                ColumnType::Array(_) => text.array(),
+                _ => text,
+            })
         })
     }
 
@@ -473,7 +473,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// A column that overrides `save_as` with a cast of its own — what
     /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
         self.save_enum_array_as(val)
     }
@@ -483,45 +483,30 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
     /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
     /// columns without a `save_as` attribute.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4]
     fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
-        match enum_cast_iden(col_def.get_column_type()) {
-            Some(enum_name) => {
-                val.as_enum(Alias::new(format!("{}[]", enum_name.to_string())).into_iden())
-            }
+        match enum_type_name(col_def.get_column_type()) {
+            Some(type_name) => val.cast_as_type(type_name.array()),
             None => val.into(),
         }
     }
 
     /// Cast value of an enum column as enum type; do nothing if `self` is not an enum.
     /// Will also transform `Array(Vec<Json>)` into `Json(Vec<Json>)` if the column type is `Json`.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
-        cast_enum_as(val, self, |col, enum_name, col_type| {
-            let type_name = match col_type {
-                ColumnType::Array(_) => {
-                    Alias::new(format!("{}[]", enum_name.to_string())).into_iden()
-                }
-                _ => enum_name,
-            };
-            col.as_enum(type_name)
-        })
+        cast_enum_as(val, self, |col, type_name, _| col.cast_as_type(type_name))
     }
 }
 
+/// The `text` read-cast target of [`ColumnTrait::select_enum_as`]; its array
+/// form is the same name under [`pgorm_query::TypeName::array`].
 struct Text;
-struct TextArray;
 
 impl Iden for Text {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "text").expect("write to sql sink");
-    }
-}
-
-impl Iden for TextArray {
-    fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-        write!(s, "text[]").expect("write to sql sink");
     }
 }
 

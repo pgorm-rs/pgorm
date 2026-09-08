@@ -112,7 +112,7 @@ fn sweep_expression_shapes() {
             .into(),
         Func::count(Expr::col(Glyph::Id)).into(),
         Func::coalesce([Expr::col(Glyph::Aspect).into(), Expr::val(0).into()]).into(),
-        Func::cast_as(Expr::val("1"), Alias::new("int4")).into(),
+        Expr::val("1").cast_as(Alias::new("int4")),
     ];
 
     sweep(
@@ -685,7 +685,7 @@ fn sweep_placeholder_builds() {
         .and_where(Expr::col(Glyph::Id).eq(2))
         .build();
     let (cast, _) = Query::select()
-        .expr(Func::cast_as(Expr::val(1), Alias::new("text")))
+        .expr(Expr::val(1).cast_as(Alias::new("text")))
         .build();
 
     sweep([select, insert, update, delete, cast]);

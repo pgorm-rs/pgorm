@@ -299,11 +299,13 @@ fn create_table_from_entity_projects_columns() {
     assert_eq!(origin.comment.as_deref(), Some("supplier of record"));
     assert_eq!(flags(column(&stmt, "code")).comment, None);
 
-    // `ColumnType::Enum` is rewritten to a custom type reference naming the enum.
+    // `ColumnType::Enum` is carried through as itself: the renderer spells the
+    // type from the enum's own identity, so nothing has to pre-flatten it into
+    // a name-carrying `Custom` first.
     for name in ["grade", "spare_grade"] {
         match column(&stmt, name).get_column_type() {
-            Some(ColumnType::Custom(iden)) => assert_eq!(iden.to_string(), "widget_grade"),
-            other => panic!("expected a custom type reference for {name}, got {other:?}"),
+            Some(ColumnType::Enum { name: ty, .. }) => assert_eq!(ty.to_string(), "widget_grade"),
+            other => panic!("expected the enum type for {name}, got {other:?}"),
         }
     }
     assert!(matches!(

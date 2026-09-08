@@ -1940,7 +1940,7 @@ fn union_1() {
 #[test]
 fn sub_query_with_fn() {
     #[derive(Iden)]
-    #[iden = "ARRAY"]
+    #[iden = "jsonb_agg"]
     pub struct ArrayFunc;
 
     let sub_select = Query::select()
@@ -1957,7 +1957,7 @@ fn sub_query_with_fn() {
 
     assert_eq!(
         select.to_string(),
-        r#"SELECT ARRAY((SELECT * FROM "character"))"#
+        r#"SELECT jsonb_agg((SELECT * FROM "character"))"#
     );
 }
 
@@ -2309,12 +2309,12 @@ fn test_pgvector_select() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type/test]
+// [spec:pgorm:req:sql.render.cast-param-type+1/test]
 #[test]
 fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
         Query::select()
-            .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
+            .expr(Expr::val(8i64).cast_as_custom("BIT(8)"))
             .build(),
         (
             r#"SELECT CAST($1::int8 AS BIT(8))"#.to_owned(),
@@ -2322,14 +2322,28 @@ fn cast_param_is_pinned_to_the_source_type() {
         )
     );
 
+    // Array-ness is structural, so the element name stays a bare identifier.
     assert_eq!(
         Query::select()
-            .expr(Expr::val(vec!["a".to_owned()]).cast_as(Alias::new("tea[]")))
+            .expr(
+                Expr::val(vec!["a".to_owned()])
+                    .cast_as_type(TypeName::new(Alias::new("tea")).array())
+            )
             .build(),
         (
             r#"SELECT CAST($1::text[] AS tea[])"#.to_owned(),
             Values(vec![vec!["a".to_owned()].into()])
         )
+    );
+
+    // Brackets written *into* the name are not an array spelling — they make it
+    // an identifier no bare rendering can carry, so it is quoted.
+    assert_eq!(
+        Query::select()
+            .expr(Expr::val(vec!["a".to_owned()]).cast_as(Alias::new("tea[]")))
+            .build()
+            .0,
+        r#"SELECT CAST($1::text[] AS "tea[]")"#.to_owned(),
     );
 
     assert_eq!(
@@ -2343,12 +2357,12 @@ fn cast_param_is_pinned_to_the_source_type() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type/test]
+// [spec:pgorm:req:sql.render.cast-param-type+1/test]
 #[test]
 fn cast_param_is_not_pinned_when_rendered_inline() {
     assert_eq!(
         Query::select()
-            .expr(Expr::val(8i64).cast_as(Alias::new("BIT(8)")))
+            .expr(Expr::val(8i64).cast_as_custom("BIT(8)"))
             .to_string(),
         r#"SELECT CAST(8 AS BIT(8))"#
     );

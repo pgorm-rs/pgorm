@@ -5,7 +5,7 @@
 #![allow(dead_code, non_snake_case)]
 
 use pgorm::entity::prelude::*;
-use pgorm::pgorm_query::{Alias, ColumnType, Expr, StringLen};
+use pgorm::pgorm_query::{ColumnType, Expr, StringLen};
 use pgorm::{Iterable, PrimaryKeyToColumn};
 
 /// The kitchen-sink entity: every struct-level and field-level attribute the
@@ -260,7 +260,7 @@ mod serde_keys {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model+2/test]
+// [spec:pgorm:sem:macros.derive.entity-model+3/test]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    struct-level table_name / schema_name / comment
 #[test]
 fn struct_attributes_drive_entity_and_entity_name() {
@@ -276,7 +276,7 @@ fn struct_attributes_drive_entity_and_entity_name() {
     assert_eq!(format!("{:?}", filling::Entity {}), "Entity");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model+2/test]    one derive yields the whole entity module
+// [spec:pgorm:sem:macros.derive.entity-model+3/test]    one derive yields the whole entity module
 #[test]
 fn one_derive_yields_the_whole_entity_module() {
     // (1) the `Column` enum, with `EnumIter` + `DeriveColumn` behaviour.
@@ -323,17 +323,19 @@ fn one_derive_yields_the_whole_entity_module() {
     assert_eq!(active.id, pgorm::ActiveValue::unchanged(1));
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model+2/test]    select_as / save_as overrides and their fallback
+// [spec:pgorm:sem:macros.derive.entity-model+3/test]    select_as / save_as overrides and their fallback
 #[test]
 fn select_as_and_save_as_cast_columns() {
     let casted = filling::Column::Casted;
+    // The attribute spells a type *expression*, not an identifier, so it rides
+    // the verbatim escape hatch rather than the quoting `TypeName` path.
     assert_eq!(
         casted.select_as(Expr::col(casted)),
-        Expr::col(casted).cast_as(Alias::new("text"))
+        Expr::col(casted).cast_as_custom("text")
     );
     assert_eq!(
         casted.save_as(Expr::val("v")),
-        Expr::val("v").cast_as(Alias::new("citext"))
+        Expr::val("v").cast_as_custom("citext")
     );
 
     // Columns without the attributes fall through to the trait defaults.
@@ -348,7 +350,7 @@ fn select_as_and_save_as_cast_columns() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model+2/test]    the `json_key` arm: the
+// [spec:pgorm:sem:macros.derive.entity-model+3/test]    the `json_key` arm: the
 // field's own name under `serde`'s renames, with the SQL naming attributes kept
 // out of it and the rest of `serde` stepped over
 // [spec:pgorm:def:entity.traits.column+5/test]    the namespace `json_key` names,

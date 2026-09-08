@@ -100,11 +100,13 @@ an ideal Postgres renderer would emit.
 > values in an `Order::Field` ordering (see `sql.render.select-order`) are
 > inlined via `value_to_string` even in parameterized mode.
 
-> [spec:pgorm:req:sql.render.cast-param-type]
-> A `SimpleExpr::Value` in the left operand of a `BinOper::As` — the operand of
-> a cast, since that binary is the shape `Func::cast_as` builds and the shape
-> `SimpleExpr::AsEnum` and `ColumnTrait::save_as` are rewritten into — MUST be
-> rendered through `push_param_source_typed` rather than `push_param`.
+> [spec:pgorm:req:sql.render.cast-param-type+1]
+> A `SimpleExpr::Value` cast operand MUST be rendered through
+> `push_param_source_typed` rather than `push_param`, on both cast shapes:
+> the operand of a `SimpleExpr::AsEnum` (the structured cast every
+> `cast_as` / `as_enum` / `save_as` spelling builds, rendered directly as
+> `CAST(operand AS <TypeName>)`), and a `Value` in the left operand of a
+> `BinOper::As` (the raw `cast_as_custom` escape hatch's shape).
 > Postgres infers a placeholder's type from the cast target, but the driver
 > writes the value in the format of the type it *is*, so an unpinned cast
 > operand binds the wrong bytes: `CAST($1 AS BIT(8))` makes the server expect
@@ -575,10 +577,16 @@ an ideal Postgres renderer would emit.
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered
 > by the same builder with identifiers quoted per `sql.render.ident-quoting`.
 
-> [spec:pgorm:req:sql.render.ddl.enum-type+2]
+> [spec:pgorm:req:sql.render.ddl.enum-type+3]
 > `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` — the name via
 > `TypeRef`'s quoted, dot-joined parts, so a schema-qualified type renders
 > `"schema"."name"` — where each enum label
+> is emitted per the label rules below. In cast and column-type position an
+> enum type renders through `TypeName`'s part policy
+> (`sql.types.type-name`): a safe lowercase part bare, anything else a
+> quoted identifier — so an enum name is a name there, never SQL, and
+> `enumeration(Alias::new("text, injected integer"))` yields a type
+> PostgreSQL refuses rather than an extra column.
 > is emitted through `prepare_value` — i.e. as a `$N` parameter in the
 > `build()` path and as a quoted string inline in the `to_string()` path.
 > `ALTER TYPE name` supports ` ADD VALUE v [BEFORE w | AFTER w]`,

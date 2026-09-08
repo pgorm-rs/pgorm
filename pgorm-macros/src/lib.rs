@@ -154,7 +154,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// `use my_orm as pgorm;` there or at the crate root; otherwise every generated path is
 /// an `E0433`. There is no `#[pgorm(crate = ...)]` override.
 // [spec:pgorm:def:macros.derive+1]
-// [spec:pgorm:sem:macros.derive.entity-model+2]
+// [spec:pgorm:sem:macros.derive.entity-model+3]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveEntityModel, attributes(pgorm))]

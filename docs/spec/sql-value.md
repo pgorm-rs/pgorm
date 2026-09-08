@@ -357,6 +357,24 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
+> [spec:pgorm:def:sql.types.type-name]
+> `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
+> type in cast or column-type position: `schema: Option<DynIden>`,
+> `name: DynIden`, `array: bool`. Rendering (`to_sql_string`) joins the
+> parts with `.` and appends a structural `[]` for arrays; a part that is a
+> safe lowercase identifier (`^[a-z_][a-z0-9_]*$`) renders bare — unquoted
+> names fold to lowercase, so bare and quoted are the same name there, and
+> grammar-sugar spellings (`integer`) only resolve bare — while every other
+> part renders as a quoted identifier, case preserved. A name is therefore
+> a name: text that is not an identifier becomes a quoted identifier
+> PostgreSQL refuses, never SQL it executes. `raw_text` gives the unquoted
+> dotted spelling for consumers that quote downstream (the pipeline
+> adapter). `Function::Custom` names render under the same part policy.
+> Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names and take
+> the explicit `cast_as_custom` escape hatch, rendered verbatim as the
+> caller's own SQL; `Func::cast_as` is deleted, `cast_as` quoting by
+> default instead.
+
 > [spec:pgorm:def:sql.types.column-type+4]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and

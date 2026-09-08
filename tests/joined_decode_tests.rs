@@ -329,7 +329,7 @@ async fn enum_payload_decode_errors() -> Result<(), Error> {
         CREATE TABLE "cake" ("id" int PRIMARY KEY, "name" text NOT NULL);
         CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea');
         CREATE TABLE "brew" (
-            "id" int PRIMARY KEY, "cake_id" int, "tea" "tea" NOT NULL
+            "id" int PRIMARY KEY, "cake_id" int, "tea" tea NOT NULL
         );
         INSERT INTO "cake" VALUES (1, 'Cheesecake'), (2, 'Lonely');
         INSERT INTO "brew" VALUES (10, 1, 'BreakfastTea');

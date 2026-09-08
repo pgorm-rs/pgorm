@@ -261,7 +261,7 @@ bound parameter is held to.
 > `bits_tests` used to be the standing example of the gap, where saving an
 > integer into a `BIT(n)` column made Postgres infer `bit` for a parameter
 > the driver wrote as an `int8` (`22P03`). It is no longer one:
-> `[spec:pgorm:req:sql.render.cast-param-type]` pins a cast operand's
+> `[spec:pgorm:req:sql.render.cast-param-type+1]` pins a cast operand's
 > placeholder to the type the value is actually written as, and the test
 > runs unignored.
 

@@ -261,11 +261,14 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
     use pgorm_query::{BinOper, Function, SimpleExpr};
     match col.select_as(Expr::col(SharedIden::new(*col))) {
-        SimpleExpr::AsEnum(name, _) => Some(name.to_string()),
-        SimpleExpr::FunctionCall(func) if matches!(func.get_func(), Function::Cast) => {
-            match func.get_args() {
-                [SimpleExpr::Binary(_, BinOper::As, target)] => match target.as_ref() {
-                    SimpleExpr::Custom(name) => Some(name.clone()),
+        SimpleExpr::AsEnum(type_name, _) => Some(type_name.raw_text()),
+        // The `cast_as_custom` escape hatch's shape, which a
+        // `#[pgorm(select_as = "…")]` override generates: a type *expression*
+        // carried as text under `Function::Cast`.
+        SimpleExpr::FunctionCall(call) if call.get_func() == &Function::Cast => {
+            match call.get_args() {
+                [SimpleExpr::Binary(_, BinOper::As, right)] => match right.as_ref() {
+                    SimpleExpr::Custom(type_expr) => Some(type_expr.clone()),
                     _ => None,
                 },
                 _ => None,

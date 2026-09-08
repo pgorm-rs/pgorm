@@ -57,20 +57,18 @@ pub(crate) fn escape_like_text(text: &str) -> String {
         .replace('_', "\\_")
 }
 
-/// The enum type's cast spelling: `schema.name` when the type declares a
-/// schema, the bare name otherwise — raw text either way, matching the
-/// unquoted convention every enum cast renders under.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+3]
-pub(crate) fn enum_cast_iden(col_type: &ColumnType) -> Option<DynIden> {
+/// The enum type a column stores, as the structured [`TypeName`] every cast
+/// renders — schema qualification carried, the array flag set for a column
+/// holding an array of the enum.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+4]
+pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     match col_type {
-        ColumnType::Enum { name, schema, .. } => Some(match schema {
-            Some(schema) => {
-                let qualified = format!("{}.{}", schema.to_string(), name.to_string());
-                SharedIden::new(pgorm_query::Alias::new(qualified)) as DynIden
-            }
-            None => SharedIden::clone(name),
+        ColumnType::Enum { name, schema, .. } => Some(pgorm_query::TypeName {
+            schema: schema.clone(),
+            name: SharedIden::clone(name),
+            array: false,
         }),
-        ColumnType::Array(col_type) => enum_cast_iden(col_type),
+        ColumnType::Array(col_type) => Some(enum_type_name(col_type)?.array()),
         _ => None,
     }
 }
@@ -136,7 +134,7 @@ impl ColumnDef {
 pub(crate) fn cast_enum_as<C, F>(expr: Expr, col: &C, f: F) -> SimpleExpr
 where
     C: ColumnTrait,
-    F: Fn(Expr, DynIden, &ColumnType) -> SimpleExpr,
+    F: Fn(Expr, pgorm_query::TypeName, &ColumnType) -> SimpleExpr,
 {
     let col_def = col.def();
     let col_type = col_def.get_column_type();
@@ -171,8 +169,8 @@ where
                 _ => expr,
             }
         }
-        _ => match enum_cast_iden(col_type) {
-            Some(enum_name) => f(expr, enum_name, col_type),
+        _ => match enum_type_name(col_type) {
+            Some(type_name) => f(expr, type_name, col_type),
             None => expr.into(),
         },
     }
@@ -182,11 +180,11 @@ where
 mod tests {
     use crate::{ColumnTrait, EntityTrait};
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3/test]    every
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4/test]    every
     // value-position operand passes through `save_as` — between, if_null and
     // the array membership forms included — for the derive-generated override
     // and the enum default alike
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+3/test]    a
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+4/test]    a
     // schema-qualified enum type reaches every rendering qualified: the value
     // cast, the array cast, the CREATE TABLE column type and CREATE TYPE
     #[test]

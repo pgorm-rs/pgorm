@@ -604,6 +604,9 @@ assertions (
     {id inline-string-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:19:50.3517Z}
     {id like-sugar-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:25:55.102226Z}
     {id inject-parameters-lexing, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:44:08.513823Z}
+    {id raw-identifier-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-08T13:14:34.249448Z}
+    {id sqlmap.spec, kind @complete, author "brendan@necessary.nu", at 2026-09-08T10:06:16.052903Z}
+    {id sqlmap.fixtures, kind @doing, author "brendan@necessary.nu", at 2026-09-08T14:09:29.392326Z}
 )
 
 impl_evidence (

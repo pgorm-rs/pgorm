@@ -4541,12 +4541,34 @@ children (
                 id raw-identifier-casts
                 title "Function and type names render as quoted identifiers, never raw SQL"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-08T09:15:19.922093Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Security review 2026-09-08, severity P1, the widest node. Function names (Func::cust), cast targets (cast_as via Func::cast_as's Expr::cust of the iden text, and as_enum's rewrite through it), and enum type names in DDL (prepare_column_type, enumeration()) are all emitted as RAW text even when passed as Alias identifiers: Func::cust(Alias::new(\"COALESCE(7) + 100 --\")) and cast_as(Alias::new(\"int4) + 100 --\")) both executed injected expressions; enumeration(Alias::new(\"text, injected integer\")) added a column to CREATE TABLE; and the raw convention also case-folds, so as_enum(Alias::new(\"ReviewStatus\")) fails to find \"ReviewStatus\" (probes custom_function_identifier_is_not_sql, cast_type_identifier_is_not_sql, enum_type_identifier_preserves_case, enum_ddl_name_cannot_add_a_column). FIX DIRECTION: type and function names become structured renderings — dot-split parts each quoted per ident-quoting, an optional [] array suffix kept structural — replacing every Expr::cust(iden.to_string()) spelling: Func::cust/cast_as, the AsEnum rewrite, prepare_column_type's Enum arm and the Enum-to-Custom projection, and the schema-qualified compositions from enum-schema-surface (enum_cast_iden's \"schema.name\" string and the \"{name}[]\" Alias hacks become structure). CONSEQUENCES: golden SQL changes everywhere casts render (CAST('x' AS tea) → CAST('x' AS \"tea\"), text[] → \"text\"[], tenant_a.status → \"tenant_a\".\"status\"); grammar-sugar type spellings that are not catalog names (\"double precision\") stop working via cast_as-by-name — spell the catalog name (float8) or use ColumnType. SPEC IMPACT: bump sql.render.cast-param-type, sql.render.ddl.enum-type, sql.render.ddl.types (if it states raw), entity.traits.column.enum-cast (the documented raw/unquoted cast convention REVERSES to quoted), and reconcile query.graph.writer's cast language plus the pipeline's read-cast probe (source_read_cast matches the AsEnum/Cast shapes — its extraction must follow the new structure)."
+                    }
+
+                    {
+                        at 2026-09-08T09:53:08.788034Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Design settled (2026-09-08, lead): ONE structured cast representation. (1) pgorm-query types.rs gains TypeName { schema: Option<DynIden>, name: DynIden, array: bool } with a prepare() that renders quoted dot-joined parts plus a structural [] suffix, and a raw_text() giving the old dotted spelling for the pipeline adapter. (2) SimpleExpr::AsEnum becomes AsEnum(Box<TypeName>, Box<SimpleExpr>); Expr::as_enum<T: IntoIden> wraps TypeName::new, as_enum_type takes it whole; Expr::cast_as and SimpleExpr::cast_as build the SAME AsEnum shape (a cast is a cast); Func::cast_as (the FunctionCall-with-Expr::cust spelling) is DELETED and callers rerouted. (3) The renderer's AsEnum arm stops rewriting through cast_as text and renders CAST(operand AS <TypeName>) directly — it MUST replicate sql.render.cast-param-type's pin: a Value operand goes through push_param_source_typed. (4) prepare_column_type's Enum arm and Function::Custom render quoted (function names via iden.prepare, not unquoted). ColumnType::Custom stays raw as the documented escape hatch. (5) ORM: enum_cast_iden becomes enum_type_name -> Option<TypeName>; save_enum_as / save_enum_array_as / select_enum_as build TypeName (Text / TextArray become TypeName::new(Text) / .array() — the \"{name}[]\" Alias string hacks die); graph source_read_cast matches AsEnum(tn, _) and hands the pipeline adapter tn.raw_text() so PRQL behavior is unchanged (pipeline ident safety is pipeline-hostile-identifiers' scope). (6) Golden sweep: every cast rendering gains quotes (AS tea → AS \"tea\", AS tea[] → AS \"tea\"[], AS tenant_a.status → AS \"tenant_a\".\"status\", derive save_as AS text → AS \"text\"); grammar-sugar type spellings (double precision) stop working by name — catalog names or ColumnType. Spec: bump sql.render.cast-param-type, sql.render.ddl.enum-type, entity.traits.column.enum-cast (raw convention reverses to quoted), sql.ast.func (Func::cast_as deletion) and reconcile query.graph.writer's cast sentence. Acceptance: the four probes custom_function_identifier_is_not_sql, cast_type_identifier_is_not_sql, enum_type_identifier_preserves_case, enum_ddl_name_cannot_add_a_column in tests/sql_security_tests.rs (untracked acceptance file, to be committed when all six remaining security tests pass)."
+                    }
+
+                    {
+                        at 2026-09-08T09:53:15.58423Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-08T13:14:34.249448Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -4666,6 +4688,175 @@ children (
                         text "Doing → Done (nplan complete)"
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id sqlmap
+        title "Independent sqlmap verification of pgorm against PostgreSQL"
+        kind @test
+        children (
+            {
+                id sqlmap.spec
+                title "Specify the external sqlmap harness and its acceptance criteria"
+                kind @docs
+                sealed true
+                log (
+                    {
+                        at 2026-09-08T10:06:15.945643Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Authored docs/spec/sqlmap.md with 16 rules under security.sqlmap, each assigned to exactly one of the six implementation/acceptance leaves. Specifies isolated fixtures, actual API coverage and vulnerable controls, pinned smoke/full execution, strict verdict accounting, runner regression tests, reproducible artifacts, CI and final acceptance. WBS lint and whitespace checks pass; the tree recognizes all 16 new rules as planned and not yet implemented. Repository-wide spec validation currently reports an unrelated orphan source reference sql.types.type-name in pgorm-query/src/types.rs:170, outside this planning change and in the concurrently edited type-name implementation. Specification work is complete; harness implementation remains Todo."
+                    }
+
+                    {
+                        at 2026-09-08T10:06:16.052903Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id sqlmap.fixtures
+                title "Provision isolated PostgreSQL fixtures and test-only harness infrastructure"
+                kind @test
+                implements {
+                    main ([spec:pgorm:def:security.sqlmap] [spec:pgorm:req:security.sqlmap.isolation] [spec:pgorm:req:security.sqlmap.fixtures])
+                }
+                deps (sqlmap.spec orm.exec)
+                log (
+                    {
+                        at 2026-09-08T10:02:45.834322Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Deliver disposable PostgreSQL provisioning, restricted execution role, deterministic tenant/schema/enum fixtures, per-request reset for mutable routes, bounded process lifetime and cleanup. Keep runner/server dependencies test-only. Register the eventual harness source/test paths in nspec as required by the adapter rule; do not move infrastructure into the public library to obtain coverage. Construction can proceed while the SQL defect fixes are pending."
+                    }
+
+                    {
+                        at 2026-09-08T14:09:29.392326Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
+            }
+
+            {
+                id sqlmap.adapter
+                title "Expose actual pgorm APIs through a case manifest and vulnerable controls"
+                kind @test
+                implements {
+                    main (
+                        [spec:pgorm:req:security.sqlmap.matrix]
+                        [spec:pgorm:req:security.sqlmap.adapter]
+                        [spec:pgorm:req:security.sqlmap.controls]
+                        [spec:pgorm:req:security.sqlmap.observability]
+                    )
+                }
+                deps (sqlmap.fixtures core pipeline-sources)
+                log (
+                    {
+                        at 2026-09-08T10:02:45.964503Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Deliver the versioned coverage matrix, test-only HTTP routes over actual CRUD/graph/pipeline/name/substitution APIs, deterministic responses and request-to-API accounting. Inputs must not acquire adapter-side SQL escaping. Implement and verify vulnerable controls for each applicable context/technique, plus baseline checks and explicit typed-input rejection. Cover each minimum family in docs/spec/sqlmap.md; an absent route or inactive API path is not coverage."
+                    }
+                )
+            }
+
+            {
+                id sqlmap.runner
+                title "Run pinned sqlmap profiles and preserve reproducible scan evidence"
+                kind @test
+                implements {
+                    main (
+                        [spec:pgorm:req:security.sqlmap.pin]
+                        [spec:pgorm:req:security.sqlmap.profiles]
+                        [spec:pgorm:req:security.sqlmap.execution]
+                        [spec:pgorm:req:security.sqlmap.artifacts]
+                    )
+                }
+                deps (sqlmap.adapter)
+                log (
+                    {
+                        at 2026-09-08T10:02:46.090569Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Deliver the external sqlmap installation pin, smoke/full profile manifests, isolated per-case sessions, noninteractive execution, bounded retries/timeouts and result-interface adapter. Record source state and scanner/runtime/database identities, expected/executed case inventory, findings and replay artifacts on every run, including failures. Coordinate time-based control delay with DB/HTTP deadlines. An exit code alone never establishes scan completion."
+                    }
+                )
+            }
+
+            {
+                id sqlmap.verdict
+                title "Reject incomplete scans and failed controls in the aggregate verdict"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:security.sqlmap.outcomes] [spec:pgorm:req:security.sqlmap.verdict] [spec:pgorm:req:security.sqlmap.runner-tests])
+                }
+                deps (sqlmap.runner)
+                log (
+                    {
+                        at 2026-09-08T10:02:46.2087Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Deliver explicit pass/vulnerable/invalid-control/incomplete case outcomes and an aggregate exit status requiring complete inventory, detected controls and successful cleanup. Add fast runner tests for missing/malformed output, zero-exit/no-output, skipped and empty discovery, stale sessions, dead/inactive routes, baseline failure, cancellation/timeouts, protected findings and missed positive controls. Keep these separate from the slower real scanner campaign."
+                    }
+                )
+            }
+
+            {
+                id sqlmap.ci
+                title "Run smoke and full sqlmap profiles in dedicated CI jobs"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:security.sqlmap.ci])
+                }
+                deps (sqlmap.verdict)
+                log (
+                    {
+                        at 2026-09-08T10:02:46.325205Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Deliver local reproduction instructions plus PR smoke, scheduled full and manual full CI entrypoints using the same pinned runner and result logic. Always retain reports, separate smoke/full claims, and keep live scans out of pre-commit checks. Explicitly account for external-PR execution restrictions. Add the appropriate coverage configuration and verification for any workflow or runner files outside current nspec Rust source globs."
+                    }
+                )
+            }
+
+            {
+                id sqlmap.acceptance
+                title "Demonstrate a passing full sqlmap run and direct security regressions"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:security.sqlmap.acceptance])
+                }
+                deps (
+                    sqlmap.ci
+                    inline-string-escaping
+                    like-sugar-escaping
+                    inject-parameters-lexing
+                    pipeline-hostile-identifiers
+                    raw-identifier-casts
+                )
+                log (
+                    {
+                        at 2026-09-08T10:02:46.439789Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final evidence gate: run the complete pinned profile and tests/sql_security_tests.rs against the same identified source and PostgreSQL configuration; all configured scans complete, all positive controls detected, no protected injection/invariant failure, cleanup succeeds. Preserve replayable evidence. The five existing security defect leaves own implementation fixes; this leaf validates their combined outcome and must not weaken the harness to obtain a pass. Report only the explicitly versioned suite claim."
+                    }
+                )
+            }
+        )
+        log (
+            {
+                at 2026-09-08T09:59:51.989683Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator approved the proposed external sqlmap integration on 2026-09-08: 'WBS that up and spec the things'. Scope: test-only HTTP adapter over actual pgorm APIs, disposable PostgreSQL fixtures, a pinned external sqlmap runner, vulnerable positive controls, complete scan accounting and reproducible CI evidence. Success means the versioned configured suite completed, every required vulnerable control was detected, and no protected route was injectable; it is not a universal SQLi-proof claim. Existing direct SQL security regressions remain the semantic oracle. Implementation fixes stay with the existing defect nodes and their agent. Harness construction must not wait for those fixes; the final acceptance run must. New requirements live under security.sqlmap in docs/spec/sqlmap.md. Priorities derive from deps; no operator priority pin is inferred."
             }
         )
     }

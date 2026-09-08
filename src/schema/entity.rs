@@ -293,13 +293,7 @@ where
     E: EntityTrait,
 {
     let orm_column_def = column.def();
-    let types = match crate::entity::column_def::enum_cast_iden(&orm_column_def.col_type) {
-        Some(name) if !matches!(orm_column_def.col_type, ColumnType::Array(_)) => {
-            ColumnType::Custom(name)
-        }
-        _ => orm_column_def.col_type,
-    };
-    let mut column_def = ColumnDef::new_with_type(column, types);
+    let mut column_def = ColumnDef::new_with_type(column, orm_column_def.col_type);
     if !orm_column_def.null {
         column_def.not_null();
     }

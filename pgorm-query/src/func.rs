@@ -338,36 +338,6 @@ impl Func {
         FunctionCall::new(Function::IfNull).args([a.into(), b.into()])
     }
 
-    /// Call `CAST` function with a custom type.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, tests_cfg::*};
-    ///
-    /// assert_eq!(
-    ///     Query::select()
-    ///         .expr(Func::cast_as(
-    ///             Expr::col(Character::Id),
-    ///             Alias::new("TEXT")
-    ///         ))
-    ///         .from(Character::Table)
-    ///         .to_string(),
-    ///     r#"SELECT CAST("id" AS TEXT) FROM "character""#
-    /// );
-    /// ```
-    pub fn cast_as<V, I>(expr: V, iden: I) -> FunctionCall
-    where
-        V: Into<SimpleExpr>,
-        I: IntoIden,
-    {
-        let expr: SimpleExpr = expr.into();
-        FunctionCall::new(Function::Cast).arg(expr.binary(
-            BinOper::As,
-            Expr::cust(iden.into_iden().to_string().as_str()),
-        ))
-    }
-
     /// Call `COALESCE` function.
     ///
     /// # Examples

@@ -28,15 +28,8 @@ impl QueryBuilder {
         ("$", true)
     }
 
-    // [spec:pgorm:req:sql.render.custom-expr+1] (top-level AsEnum rewritten to CAST)
     pub(crate) fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
-        match simple_expr {
-            SimpleExpr::AsEnum(type_name, expr) => {
-                let simple_expr = expr.clone().cast_as(SharedIden::clone(type_name));
-                self.prepare_simple_expr_common(&simple_expr, sql);
-            }
-            _ => QueryBuilder::prepare_simple_expr_common(self, simple_expr, sql),
-        }
+        QueryBuilder::prepare_simple_expr_common(self, simple_expr, sql)
     }
 
     fn prepare_select_distinct(&self, select_distinct: &SelectDistinct, sql: &mut dyn SqlWriter) {
@@ -428,8 +421,18 @@ impl QueryBuilder {
             SimpleExpr::Keyword(keyword) => {
                 self.prepare_keyword(keyword, sql);
             }
-            SimpleExpr::AsEnum(_, expr) => {
-                self.prepare_simple_expr(expr, sql);
+            // A cast, `CAST(operand AS "type")` — the type a quoted
+            // `TypeName`, so a name is a name and never SQL; a `Value`
+            // operand keeps the source-typed placeholder pin of
+            // `sql.render.cast-param-type`.
+            // [spec:pgorm:req:sql.render.cast-param-type+1]
+            SimpleExpr::AsEnum(type_name, expr) => {
+                write!(sql, "CAST(").unwrap();
+                match expr.as_ref() {
+                    SimpleExpr::Value(value) => sql.push_param_source_typed(value.clone()),
+                    other => self.prepare_simple_expr(other, sql),
+                }
+                write!(sql, " AS {})", type_name.to_sql_string(self.quote())).unwrap();
             }
             SimpleExpr::Case(case_stmt) => {
                 self.prepare_case_statement(case_stmt, sql);
@@ -698,7 +701,12 @@ impl QueryBuilder {
     /// Translate [`Function`] into SQL statement.
     fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
         if let Function::Custom(iden) = function {
-            iden.unquoted(sql.as_writer());
+            write!(
+                sql,
+                "{}",
+                TypeName::new(SharedIden::clone(iden)).to_sql_string(self.quote())
+            )
+            .unwrap();
         } else {
             write!(
                 sql,
@@ -1320,7 +1328,7 @@ impl QueryBuilder {
             write!(sql, "(").unwrap();
         }
         match (op, left) {
-            // [spec:pgorm:req:sql.render.cast-param-type]
+            // [spec:pgorm:req:sql.render.cast-param-type+1]
             (BinOper::As, SimpleExpr::Value(value)) => sql.push_param_source_typed(value.clone()),
             _ => self.prepare_simple_expr(left, sql),
         }
@@ -1521,10 +1529,11 @@ impl QueryBuilder {
                     None => "vector".into(),
                 },
                 ColumnType::Custom(iden) => iden.to_string(),
-                ColumnType::Enum { name, schema, .. } => match schema {
-                    Some(schema) => format!("{}.{}", schema.to_string(), name.to_string()),
-                    None => name.to_string(),
-                },
+                ColumnType::Enum { name, schema, .. } => {
+                    let mut type_name = TypeName::new(SharedIden::clone(name));
+                    type_name.schema = schema.clone();
+                    type_name.to_sql_string(self.quote())
+                }
                 ColumnType::Cidr => "cidr".into(),
                 ColumnType::Inet => "inet".into(),
                 ColumnType::MacAddr => "macaddr".into(),
@@ -2202,7 +2211,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.render.ddl.enum-type+2] (ALTER TYPE label operands parameterized)
+    // [spec:pgorm:req:sql.render.ddl.enum-type+3] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2237,7 +2246,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:req:sql.ddl.type-enum+3]
-    // [spec:pgorm:req:sql.render.ddl.enum-type+2]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+3]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,

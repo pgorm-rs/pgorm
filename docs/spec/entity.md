@@ -116,14 +116,15 @@ explicit limitations.
 > (the latter accepting arbitrary expressions). `get_column_type()` and `is_null()`
 > expose the type and nullability for introspection.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+3]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+4]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
 > leaves non-enum columns untouched. On write, `save_as` / `save_enum_as` casts the
-> value to the enum's database type name — spelled `schema.name` when the
-> column's type declares a schema, raw text either way per the unquoted cast
-> convention — or the `[]`-suffixed spelling of the same name for arrays. As a special
+> value to the enum's database type name, carried as the structured
+> `TypeName` (`sql.types.type-name`): schema qualification and the array
+> flag ride the structure, and the parts render bare only when they are
+> safe lowercase identifiers — never as raw SQL text. As a special
 > case under the `with-json` + `postgres-array` features, saving into a `Json` /
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.

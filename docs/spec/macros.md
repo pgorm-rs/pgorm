@@ -48,7 +48,7 @@ known limitations.
 
 ## DeriveEntityModel
 
-> [spec:pgorm:sem:macros.derive.entity-model+2]
+> [spec:pgorm:sem:macros.derive.entity-model+3]
 > `DeriveEntityModel` is the composite derive: applied to a `Model` struct, it expands
 > the entity-model generation and then re-runs `DeriveModel` and `DeriveActiveModel` on
 > the same input, so one derive yields the full entity module. The entity-model portion
@@ -56,7 +56,16 @@ known limitations.
 > with one variant per non-ignored field; (2) an `impl ColumnTrait for Column` with
 > `type EntityName = Entity`, a `def()` match arm per column, a `json_key()` match arm
 > per column, and `select_as`/`save_as`/`save_array_as`
-> overrides that `cast_as` an alias for columns carrying `select_as`/`save_as` attributes
+> overrides for columns carrying `select_as`/`save_as` attributes. What those
+> attributes carry is a type *expression* the entity's own author wrote — `BIT(8)`,
+> `numeric(10,2)` — and not an identifier, so the override MUST cast through
+> `cast_as_custom`, which renders the text as written. Routing it through the
+> identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
+> PostgreSQL has no type for. The verbatim rendering is sound exactly because the
+> text is a compile-time literal in the caller's source, unreachable from data;
+> `[spec:pgorm:req:sql.render.cast-param-type+1]` names this the escape hatch's
+> shape, and `[spec:pgorm:def:sql.types.type-name]` keeps every *identifier*-borne
+> type name quoted
 > — a `save_as = "T"` column's `save_array_as` casts to `T[]`, so scalar and array
 > comparisons carry the same cast — and otherwise fall back to
 > `ColumnTrait::select_enum_as`/`save_enum_as`/`save_enum_array_as`; (3) only when

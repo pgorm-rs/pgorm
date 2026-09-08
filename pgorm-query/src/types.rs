@@ -164,6 +164,103 @@ pub trait IntoColumnRef {
 // [spec:pgorm:def:sql.types.table-ref+2]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
+/// A type name in cast or column-type position: optionally
+/// schema-qualified, optionally an array. Every part renders as a QUOTED
+/// identifier — `"tenant_a"."status"[]` — so a name is a name, never SQL.
+// [spec:pgorm:def:sql.types.type-name]
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeName {
+    pub schema: Option<DynIden>,
+    pub name: DynIden,
+    pub array: bool,
+}
+
+impl TypeName {
+    /// A bare, non-array type name.
+    pub fn new<T>(name: T) -> Self
+    where
+        T: IntoIden,
+    {
+        Self {
+            schema: None,
+            name: name.into_iden(),
+            array: false,
+        }
+    }
+
+    /// Qualify with a schema.
+    pub fn schema<S>(mut self, schema: S) -> Self
+    where
+        S: IntoIden,
+    {
+        self.schema = Some(schema.into_iden());
+        self
+    }
+
+    /// Mark as the array of the named type.
+    pub fn array(mut self) -> Self {
+        self.array = true;
+        self
+    }
+
+    /// The SQL spelling: parts dot-joined, a structural `[]` suffix for
+    /// arrays. A part that is a safe lowercase identifier
+    /// (`^[a-z_][a-z0-9_]*$`) renders bare — PostgreSQL folds unquoted names
+    /// to lowercase, so the bare and quoted spellings are the same name
+    /// there, and grammar-sugar type names (`integer`) only resolve bare.
+    /// Every other part renders as a QUOTED identifier, case preserved — so
+    /// a name is a name, and text that is not one (`int4) + 100 --`) becomes
+    /// an identifier PostgreSQL refuses rather than SQL it executes.
+    pub fn to_sql_string(&self, quote: Quote) -> String {
+        let mut out = String::new();
+        if let Some(schema) = &self.schema {
+            Self::prepare_part(schema, &mut out, quote);
+            out.push('.');
+        }
+        Self::prepare_part(&self.name, &mut out, quote);
+        if self.array {
+            out.push_str("[]");
+        }
+        out
+    }
+
+    fn prepare_part(part: &DynIden, out: &mut String, quote: Quote) {
+        let text = part.to_string();
+        let mut chars = text.chars();
+        let safe = matches!(chars.next(), Some('a'..='z' | '_'))
+            && chars.all(|c| matches!(c, 'a'..='z' | '0'..='9' | '_'));
+        if safe {
+            out.push_str(&text);
+        } else {
+            part.prepare(out, quote);
+        }
+    }
+
+    /// The unquoted dotted spelling — `tenant_a.status[]` — for consumers
+    /// that compose their own quoting downstream (the pipeline adapter).
+    pub fn raw_text(&self) -> String {
+        let mut out = String::new();
+        if let Some(schema) = &self.schema {
+            out.push_str(&schema.to_string());
+            out.push('.');
+        }
+        out.push_str(&self.name.to_string());
+        if self.array {
+            out.push_str("[]");
+        }
+        out
+    }
+}
+
+impl<T> From<T> for TypeName
+where
+    T: IntoIden,
+{
+    fn from(name: T) -> Self {
+        Self::new(name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableName {
     /// Table identifier without any schema prefix

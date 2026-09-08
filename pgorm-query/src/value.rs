@@ -245,7 +245,7 @@ impl Value {
     /// `None` means the variant has no single type to pin it to: `Json` binds
     /// as either `json` or `jsonb`, and `Vector` binds as an extension type
     /// whose name is not guaranteed to resolve in the current search path.
-    // [spec:pgorm:req:sql.render.cast-param-type]
+    // [spec:pgorm:req:sql.render.cast-param-type+1]
     pub fn source_type_name(&self) -> Option<Cow<'static, str>> {
         match self {
             Self::Json(_) | Self::Vector(_) => None,
@@ -281,7 +281,7 @@ impl Value {
 impl ArrayType {
     /// Name of the Postgres type an element of this array is bound as. See
     /// [`Value::source_type_name`].
-    // [spec:pgorm:req:sql.render.cast-param-type]
+    // [spec:pgorm:req:sql.render.cast-param-type+1]
     pub fn source_type_name(&self) -> Option<&'static str> {
         match self {
             Self::Json | Self::Vector => None,

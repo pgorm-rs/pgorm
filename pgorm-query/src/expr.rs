@@ -39,7 +39,7 @@ pub enum SimpleExpr {
     Custom(String),
     CustomWithExpr(CustomExpr),
     Keyword(Keyword),
-    AsEnum(DynIden, Box<SimpleExpr>),
+    AsEnum(Box<TypeName>, Box<SimpleExpr>),
     Case(Box<CaseStatement>),
     Constant(Value),
     /// The right operand of a `LIKE` / `ILIKE`: a pattern and the optional
@@ -1316,7 +1316,27 @@ impl Expr {
     where
         T: IntoIden,
     {
-        SimpleExpr::AsEnum(type_name.into_iden(), Box::new(self.into()))
+        self.cast_as_type(TypeName::new(type_name))
+    }
+
+    /// Cast to a structured [`TypeName`] — schema qualification and array
+    /// suffix included. Every cast spelling funnels here.
+    pub fn cast_as_type(self, type_name: TypeName) -> SimpleExpr {
+        SimpleExpr::AsEnum(Box::new(type_name), Box::new(self.into()))
+    }
+
+    /// Cast to a type EXPRESSION rendered verbatim — `BIT(8)`,
+    /// `numeric(12, 2)` — the escape hatch for spellings that are grammar
+    /// rather than a name. The text is the caller's own SQL: nothing is
+    /// quoted or escaped, exactly as [`ColumnType::custom`] renders. A name
+    /// belongs in [`cast_as`](Self::cast_as), which quotes it.
+    pub fn cast_as_custom<T>(self, type_expr: T) -> SimpleExpr
+    where
+        T: Into<String>,
+    {
+        let func = FunctionCall::new(Function::Cast)
+            .arg(SimpleExpr::from(self).binary(BinOper::As, Expr::cust(type_expr.into())));
+        SimpleExpr::FunctionCall(func)
     }
 
     /// Adds new `CASE WHEN` to existing case statement.
@@ -1371,8 +1391,7 @@ impl Expr {
     where
         T: IntoIden,
     {
-        let func = Func::cast_as(self, type_name);
-        SimpleExpr::FunctionCall(func)
+        self.cast_as_type(TypeName::new(type_name))
     }
 
     /// Keyword `CURRENT_TIMESTAMP`.
@@ -1909,8 +1928,13 @@ impl SimpleExpr {
     where
         T: IntoIden,
     {
-        let func = Func::cast_as(self, type_name);
-        Self::FunctionCall(func)
+        Self::AsEnum(Box::new(TypeName::new(type_name)), Box::new(self))
+    }
+
+    /// Cast to a structured [`TypeName`], the [`Expr::cast_as_type`] of an
+    /// already-built expression.
+    pub fn cast_as_type(self, type_name: TypeName) -> Self {
+        Self::AsEnum(Box::new(type_name), Box::new(self))
     }
 
     /// Create any binary operation
