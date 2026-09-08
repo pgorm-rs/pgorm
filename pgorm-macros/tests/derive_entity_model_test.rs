@@ -351,7 +351,7 @@ fn select_as_and_save_as_cast_columns() {
 // [spec:pgorm:sem:macros.derive.entity-model+2/test]    the `json_key` arm: the
 // field's own name under `serde`'s renames, with the SQL naming attributes kept
 // out of it and the rest of `serde` stepped over
-// [spec:pgorm:def:entity.traits.column+4/test]    the namespace `json_key` names,
+// [spec:pgorm:def:entity.traits.column+5/test]    the namespace `json_key` names,
 // beside the SQL one `as_str` names
 #[test]
 fn json_key_reports_the_serde_key() {

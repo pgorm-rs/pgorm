@@ -62,14 +62,17 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column+4]
+> [spec:pgorm:def:entity.traits.column+5]
 > `ColumnTrait: IdenStr + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
 > expression-building surface wrapping `pgorm_query::Expr`: comparison operators `eq`,
 > `ne`, `gt`, `gte`, `lt`, `lte`; range `between` / `not_between`; pattern matching
-> `like`, `not_like`, and the sugar `starts_with` (`s%`), `ends_with` (`%s`),
-> `contains` (`%s%`); aggregates `max`, `min`, `sum`, `count`; null checks `is_null`,
+> `like`, `not_like`, and the sugar `starts_with`, `ends_with` and
+> `contains`, whose search text is LITERAL: `%`, `_` and `\` in it are
+> escaped before the pattern is built (`s%`, `%s`, `%s%`), so
+> `contains("%")` matches a percent sign rather than every row — a pattern
+> is `like`'s job and `like`/`not_like` take theirs verbatim; aggregates `max`, `min`, `sum`, `count`; null checks `is_null`,
 > `is_not_null`, `if_null`; set membership `is_in` / `is_not_in`, its
 > array-parameter counterpart `eq_any` / `ne_all`
 > (`[spec:pgorm:req:sql.ast.expr.eq-any]`), and subqueries
@@ -354,7 +357,7 @@ explicit limitations.
 > Presence detection and deserialization MUST read the same key namespace, and that
 > namespace is `serde`'s: the key a column occupies is the model field's name as
 > `serde` spells it, read from `ColumnTrait::json_key`
-> (`[spec:pgorm:def:entity.traits.column+4]`) — never the SQL column name, which the
+> (`[spec:pgorm:def:entity.traits.column+5]`) — never the SQL column name, which the
 > deserializer never sees. `DeriveEntityModel` computes each column's key from the
 > field it derived that column from, applying `#[serde(rename = "..")]` and
 > `#[serde(rename_all = "..")]` (the deserialize half where the split form is used);

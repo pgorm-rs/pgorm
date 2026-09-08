@@ -715,7 +715,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column+4/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+5/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`
@@ -867,7 +867,7 @@ fn column_trait_expression_surface() {
     let _: ColumnType = pgorm_query::ColumnType::Integer;
 }
 
-// [spec:pgorm:def:entity.traits.column+4/test]    the column-to-column family
+// [spec:pgorm:def:entity.traits.column+5/test]    the column-to-column family
 // `eq_col` / `ne_col` / `gt_col` / `gte_col` / `lt_col` / `lte_col` and the
 // expression form `eq_expr` — each side qualified by its own entity, same SQL as
 // the `Expr::col` escape they replace, and the value-taking `eq` left alone

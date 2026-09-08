@@ -90,9 +90,11 @@ macro_rules! bind_subquery_func {
     };
 }
 
+use column_def::escape_like_text;
+
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column+4]
+// [spec:pgorm:def:entity.traits.column+5]
 pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -291,6 +293,11 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
         Expr::col((self.entity_name(), *self)).not_like(s)
     }
 
+    /// The search text is literal: a `%`, `_` or `\` in it is escaped rather
+    /// than read as a pattern character. A pattern is [`like`]'s job.
+    ///
+    /// [`like`]: ColumnTrait::like
+    ///
     /// ```
     /// use pgorm::{entity::*, query::*, tests_cfg::cake};
     ///
@@ -302,11 +309,12 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese%'"#
     /// );
     /// ```
+    // [spec:pgorm:def:entity.traits.column+5]
     fn starts_with<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,
     {
-        let pattern = format!("{}%", s.into());
+        let pattern = format!("{}%", escape_like_text(&s.into()));
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 
@@ -321,11 +329,12 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese'"#
     /// );
     /// ```
+    // [spec:pgorm:def:entity.traits.column+5]
     fn ends_with<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,
     {
-        let pattern = format!("%{}", s.into());
+        let pattern = format!("%{}", escape_like_text(&s.into()));
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 
@@ -340,11 +349,12 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
+    // [spec:pgorm:def:entity.traits.column+5]
     fn contains<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,
     {
-        let pattern = format!("%{}%", s.into());
+        let pattern = format!("%{}%", escape_like_text(&s.into()));
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 

@@ -602,6 +602,7 @@ assertions (
     {id graph-unicode-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T21:59:36.946216Z}
     {id varied-schemas, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:05:31.028259Z}
     {id inline-string-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:19:50.3517Z}
+    {id like-sugar-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:25:55.102226Z}
 )
 
 impl_evidence (

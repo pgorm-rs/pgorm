@@ -74,7 +74,7 @@ known limitations.
 > parameter is stepped over unread. Column naming does not take part in either
 > direction — `#[pgorm(column_name)]` and `#[pgorm(enum_name)]` move the SQL name and
 > the variant, not the key — which is the point of the two namespaces being separate
-> (`[spec:pgorm:def:entity.traits.column+4]`).
+> (`[spec:pgorm:def:entity.traits.column+5]`).
 
 > [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier

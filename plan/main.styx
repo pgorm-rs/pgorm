@@ -4469,12 +4469,27 @@ children (
                 id like-sugar-escaping
                 title "contains and friends treat their search text literally"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-08T09:14:42.709491Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Security review 2026-09-08. contains/starts_with/ends_with pass their input into the LIKE pattern verbatim, so contains(\"%\") matches every row and a literal underscore or backslash in the search text is a wildcard/escape (probe substring_helpers_treat_search_text_literally: '%'→only '100%pure', '_'→only 'under_score', starts_with(\"folder\\\\\")→only the backslash row). Fix: the three sugar helpers escape %, _ and \\\\ in their input before building the pattern; like/not_like stay raw — a pattern is the caller's own. SPEC IMPACT: bump entity.traits.column (the sugar's semantics sentence)."
+                    }
+
+                    {
+                        at 2026-09-08T09:23:13.729239Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-08T09:25:55.102226Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

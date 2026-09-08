@@ -47,6 +47,16 @@ fn enum_name(col_type: &ColumnType) -> Option<&DynIden> {
     }
 }
 
+/// The `LIKE`-metacharacter escape behind the substring sugar: `%`, `_` and
+/// the escape character itself become literal, so search text matches
+/// itself and nothing else.
+// [spec:pgorm:def:entity.traits.column+5]
+pub(crate) fn escape_like_text(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 /// The enum type's cast spelling: `schema.name` when the type declares a
 /// schema, the bare name otherwise — raw text either way, matching the
 /// unquoted convention every enum cast renders under.
