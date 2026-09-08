@@ -281,7 +281,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
     };
     assert_eq!(
         filter_sql(casts::Column::Tea.eq(Tea::EverydayTea)),
-        r#""casts"."tea" = (CAST('EverydayTea' AS tea))"#
+        r#""casts"."tea" = CAST('EverydayTea' AS tea)"#
     );
     assert_eq!(
         filter_sql(casts::Column::Name.eq("plain")),

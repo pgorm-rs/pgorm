@@ -249,31 +249,20 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// The pipeline's writer emits PRQL nodes rather than
 /// [`SimpleExpr`](pgorm_query::SimpleExpr), so it cannot splice the method's
 /// answer in directly. Instead the answer is probed with the bare column and
-/// the cast target read back off its shape — the `AsEnum` of the enum
-/// default (`text` / `text[]`) and the `CAST(_ AS T)` a
-/// `#[pgorm(select_as = "…")]` override generates alike, so the two writers
-/// cannot disagree about a column's read cast. A shape the probe does not
-/// recognise — a hand-written override that is not a cast — projects
-/// untouched, exactly as it stands outside the `SelectStatement` writer's
-/// guarantees too.
+/// the cast target read back off its shape. A cast has exactly one shape, so
+/// the probe recognises one — the enum default (`text` / `text[]`) and a
+/// `#[pgorm(select_as = "…")]` override's type expression alike, both riding
+/// in the `AsEnum`'s `TypeName` — and the two writers cannot disagree about
+/// a column's read cast. A shape that is not a cast — a hand-written
+/// override projecting something else — projects untouched, exactly as it
+/// stands outside the `SelectStatement` writer's guarantees too.
 // [spec:pgorm:sem:query.graph.writer+4]
 // [spec:pgorm:sem:pipeline.select-sources+2]
+// [spec:pgorm:req:sql.ast.cast-shape]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
-    use pgorm_query::{BinOper, Function, SimpleExpr};
+    use pgorm_query::SimpleExpr;
     match col.select_as(Expr::col(SharedIden::new(*col))) {
         SimpleExpr::AsEnum(type_name, _) => Some(type_name.raw_text()),
-        // The `cast_as_custom` escape hatch's shape, which a
-        // `#[pgorm(select_as = "…")]` override generates: a type *expression*
-        // carried as text under `Function::Cast`.
-        SimpleExpr::FunctionCall(call) if call.get_func() == &Function::Cast => {
-            match call.get_args() {
-                [SimpleExpr::Binary(_, BinOper::As, right)] => match right.as_ref() {
-                    SimpleExpr::Custom(type_expr) => Some(type_expr.clone()),
-                    _ => None,
-                },
-                _ => None,
-            }
-        }
         _ => None,
     }
 }

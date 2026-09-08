@@ -39,6 +39,8 @@ pub enum SimpleExpr {
     Custom(String),
     CustomWithExpr(CustomExpr),
     Keyword(Keyword),
+    /// THE cast: `CAST(operand AS type)`, and the only node shape a cast has.
+    // [spec:pgorm:req:sql.ast.cast-shape]
     AsEnum(Box<TypeName>, Box<SimpleExpr>),
     Case(Box<CaseStatement>),
     Constant(Value),
@@ -1320,7 +1322,9 @@ impl Expr {
     }
 
     /// Cast to a structured [`TypeName`] — schema qualification and array
-    /// suffix included. Every cast spelling funnels here.
+    /// suffix included. Every cast spelling funnels here, and the node it
+    /// builds is the only shape a cast has.
+    // [spec:pgorm:req:sql.ast.cast-shape]
     pub fn cast_as_type(self, type_name: TypeName) -> SimpleExpr {
         SimpleExpr::AsEnum(Box::new(type_name), Box::new(self.into()))
     }
@@ -1330,13 +1334,15 @@ impl Expr {
     /// rather than a name. The text is the caller's own SQL: nothing is
     /// quoted or escaped, exactly as [`ColumnType::custom`] renders. A name
     /// belongs in [`cast_as`](Self::cast_as), which quotes it.
+    ///
+    /// The verbatim text rides in the [`TypeName`], so this builds the same
+    /// node as every other cast.
+    // [spec:pgorm:req:sql.ast.cast-shape]
     pub fn cast_as_custom<T>(self, type_expr: T) -> SimpleExpr
     where
         T: Into<String>,
     {
-        let func = FunctionCall::new(Function::Cast)
-            .arg(SimpleExpr::from(self).binary(BinOper::As, Expr::cust(type_expr.into())));
-        SimpleExpr::FunctionCall(func)
+        self.cast_as_type(TypeName::custom(type_expr))
     }
 
     /// Adds new `CASE WHEN` to existing case statement.

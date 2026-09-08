@@ -587,7 +587,7 @@ today, including panicking edges and deliberate failsafes.
 > entity layer's enum casts, and the `cast_as_custom` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
-> the `TypeName` (`[spec:pgorm:def:sql.types.type-name]`), never by choosing
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+1]`), never by choosing
 > a different node.
 >
 > What this forbids is the second, `FunctionCall`-shaped cast whose type rode
@@ -604,7 +604,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func]
+> [spec:pgorm:def:sql.ast.func+1]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -612,11 +612,16 @@ today, including panicking edges and deliberate failsafes.
 > `min`, `sum`, `avg`, `count`, `count_distinct` (the DISTINCT argument
 > modifier), `bit_and`, `bit_or`; scalar helpers `abs`, `char_length`,
 > `if_null`, `coalesce`, `lower`, `upper`, `round`, `round_with_precision`,
-> `random`, `starts_with`, `gen_random_uuid`, `cast_as`; the PostgreSQL
+> `random`, `starts_with`, `gen_random_uuid`; the PostgreSQL
 > full-text family `to_tsquery`, `to_tsvector`, `phraseto_tsquery`,
 > `plainto_tsquery`, `websearch_to_tsquery` (each with an optional `regconfig`
 > OID prepended as first argument), `ts_rank`, `ts_rank_cd`; and array/subquery
 > comparators `any`, `some`, `all`.
+>
+> A cast is not among them. `CAST` is written by `SimpleExpr::AsEnum`
+> (`[spec:pgorm:req:sql.ast.cast-shape]`), so there is no `Function::Cast`
+> and no `Func` constructor that produces one — a consumer matching on a
+> `FunctionCall` never has to consider a cast.
 >
 > `Func::cust(iden)` calls an arbitrary function by identifier
 > (`Function::Custom`). A `FunctionCall` converts into

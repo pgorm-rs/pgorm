@@ -1936,7 +1936,7 @@ fn union_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.func/test]
+// [spec:pgorm:def:sql.ast.func+1/test]
 #[test]
 fn sub_query_with_fn() {
     #[derive(Iden)]
@@ -2100,7 +2100,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+1/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+2/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2219,7 +2219,7 @@ fn regex_case_insensitive_bin_oper() {
 }
 
 #[test]
-// [spec:pgorm:req:sql.render.parens/test]
+// [spec:pgorm:req:sql.render.parens+1/test]
 fn test_issue_674_nested_logical() {
     let t = SimpleExpr::Value(true.into());
     let f = SimpleExpr::Value(false.into());
@@ -2240,7 +2240,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+1/test]
+// [spec:pgorm:def:sql.render.precedence+2/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
@@ -2309,7 +2309,61 @@ fn test_pgvector_select() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+1/test]
+// [spec:pgorm:req:sql.ast.cast-shape/test]    every cast spelling — the quoted name and the
+// verbatim type expression alike — is one `AsEnum` node differing only in its `TypeName`
+#[test]
+fn every_cast_spelling_builds_one_node_shape() {
+    let operand = Expr::col(Char::SizeW);
+    let casts = [
+        operand.clone().cast_as(Alias::new("citext")),
+        operand.clone().cast_as_custom("numeric(10, 2)"),
+        operand.clone().as_enum(Alias::new("citext")),
+        operand
+            .clone()
+            .cast_as_type(TypeName::new(Alias::new("status")).schema(Alias::new("tenant_a"))),
+    ];
+
+    let type_names: Vec<TypeName> = casts
+        .iter()
+        .map(|cast| match cast {
+            SimpleExpr::AsEnum(type_name, cast_operand) => {
+                assert_eq!(
+                    **cast_operand,
+                    SimpleExpr::from(operand.clone()),
+                    "the operand rides untouched under every spelling"
+                );
+                TypeName::clone(type_name)
+            }
+            other => panic!("a cast that is not an `AsEnum`: {other:?}"),
+        })
+        .collect();
+
+    assert_eq!(
+        type_names,
+        [
+            TypeName::new(Alias::new("citext")),
+            TypeName::custom("numeric(10, 2)"),
+            TypeName::new(Alias::new("citext")),
+            TypeName::new(Alias::new("status")).schema(Alias::new("tenant_a")),
+        ]
+    );
+
+    // Quoted or verbatim is the `TypeName`'s answer, never the node's.
+    assert_eq!(
+        Query::select().expr(casts[0].clone()).to_string(),
+        r#"SELECT CAST("size_w" AS citext)"#
+    );
+    assert_eq!(
+        Query::select().expr(casts[1].clone()).to_string(),
+        r#"SELECT CAST("size_w" AS numeric(10, 2))"#
+    );
+    assert_eq!(
+        Query::select().expr(casts[3].clone()).to_string(),
+        r#"SELECT CAST("size_w" AS tenant_a.status)"#
+    );
+}
+
+// [spec:pgorm:req:sql.render.cast-param-type+2/test]
 #[test]
 fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
@@ -2357,7 +2411,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+1/test]
+// [spec:pgorm:req:sql.render.cast-param-type+2/test]
 #[test]
 fn cast_param_is_not_pinned_when_rendered_inline() {
     assert_eq!(

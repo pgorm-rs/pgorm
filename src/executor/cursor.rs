@@ -829,7 +829,7 @@ mod tests {
         let mut cursor = lunch_set::Entity::find().cursor_by(lunch_set::Column::Tea);
         let sql = composed(cursor.after(crate::tests_cfg::active_enums::Tea::BreakfastTea));
         assert!(
-            sql.contains(r#""lunch_set"."tea" > (CAST('BreakfastTea' AS tea))"#),
+            sql.contains(r#""lunch_set"."tea" > CAST('BreakfastTea' AS tea)"#),
             "the boundary comparison casts the value to the enum type: {sql}"
         );
 

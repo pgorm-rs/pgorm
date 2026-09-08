@@ -337,6 +337,7 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::NotIn, "NOT IN"),
         (BinOper::Between, "BETWEEN"),
         (BinOper::NotBetween, "NOT BETWEEN"),
+        (BinOper::As, "AS"),
         (BinOper::Equal, "="),
         (BinOper::NotEqual, "<>"),
         (BinOper::SmallerThan, "<"),
@@ -381,14 +382,6 @@ fn the_binary_operator_vocabulary_is_complete() {
             "unexpected rendering for {op:?}"
         );
     }
-
-    // `As` is the cast encoding: its right operand is a raw Custom expression.
-    assert_eq!(
-        Query::select()
-            .expr(Expr::col(Glyph::Aspect).binary(BinOper::As, Expr::cust("text")))
-            .to_string(),
-        r#"SELECT "aspect" AS text"#
-    );
 }
 
 // [spec:pgorm:def:sql.types.column-type+4/test]    `StringLen` parameterises varchar and the

@@ -357,10 +357,11 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name]
+> [spec:pgorm:def:sql.types.type-name+1]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<DynIden>`,
-> `name: DynIden`, `array: bool`. Rendering (`to_sql_string`) joins the
+> `name: DynIden`, `array: bool`, `verbatim: bool`. Rendering
+> (`to_sql_string`) joins the
 > parts with `.` and appends a structural `[]` for arrays; a part that is a
 > safe lowercase identifier (`^[a-z_][a-z0-9_]*$`) renders bare — unquoted
 > names fold to lowercase, so bare and quoted are the same name there, and
@@ -370,10 +371,19 @@ including panic semantics and quirks inherited from sea-query.
 > PostgreSQL refuses, never SQL it executes. `raw_text` gives the unquoted
 > dotted spelling for consumers that quote downstream (the pipeline
 > adapter). `Function::Custom` names render under the same part policy.
-> Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names and take
-> the explicit `cast_as_custom` escape hatch, rendered verbatim as the
-> caller's own SQL; `Func::cast_as` is deleted, `cast_as` quoting by
-> default instead.
+>
+> Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names, and they
+> are the one exception: `TypeName::custom` sets `verbatim`, which makes
+> `to_sql_string` short-circuit to `raw_text` and emit the caller's own SQL
+> unquoted and unescaped. `verbatim` is set nowhere else. Its only
+> constructor is reached only from `Expr::cast_as_custom`, whose argument is
+> a literal in the calling source — program text the author already
+> controls, never data — so the set of expressions that can emit an
+> unescaped type name is one a reader can enumerate. `Func::cast_as` is
+> deleted, `cast_as` quoting by default instead.
+>
+> Carrying the answer here rather than in a second node shape is what lets a
+> cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
 > [spec:pgorm:def:sql.types.column-type+4]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is

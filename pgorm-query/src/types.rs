@@ -167,12 +167,19 @@ pub trait IntoColumnRef {
 /// A type name in cast or column-type position: optionally
 /// schema-qualified, optionally an array. Every part renders as a QUOTED
 /// identifier — `"tenant_a"."status"[]` — so a name is a name, never SQL.
-// [spec:pgorm:def:sql.types.type-name]
+///
+/// This is the *only* thing a cast carries as its type: one node shape, the
+/// quoted-or-verbatim question answered inside the type rather than by
+/// picking a different node.
+// [spec:pgorm:def:sql.types.type-name+1]
+// [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
     pub schema: Option<DynIden>,
     pub name: DynIden,
     pub array: bool,
+    /// Render `name` as the caller's own SQL rather than as an identifier.
+    pub verbatim: bool,
 }
 
 impl TypeName {
@@ -185,6 +192,28 @@ impl TypeName {
             schema: None,
             name: name.into_iden(),
             array: false,
+            verbatim: false,
+        }
+    }
+
+    /// A type EXPRESSION — `BIT(8)`, `numeric(12, 2)` — rendered verbatim,
+    /// nothing quoted or escaped.
+    ///
+    /// Reachable only through [`Expr::cast_as_custom`](crate::Expr::cast_as_custom),
+    /// whose argument is a literal written in the calling source: the text is
+    /// program text the author already controls, never data, so rendering it
+    /// as SQL adds no reach that writing the SQL by hand would not have. Any
+    /// type that arrives as a *name* — from a schema, a derive attribute, or
+    /// anything a value could reach — takes [`new`](Self::new) and is quoted.
+    pub fn custom<T>(type_expr: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self {
+            schema: None,
+            name: Alias::new(type_expr.into()).into_iden(),
+            array: false,
+            verbatim: true,
         }
     }
 
@@ -210,8 +239,13 @@ impl TypeName {
     /// there, and grammar-sugar type names (`integer`) only resolve bare.
     /// Every other part renders as a QUOTED identifier, case preserved — so
     /// a name is a name, and text that is not one (`int4) + 100 --`) becomes
-    /// an identifier PostgreSQL refuses rather than SQL it executes.
+    /// an identifier PostgreSQL refuses rather than SQL it executes. A
+    /// [`custom`](Self::custom) type expression is the one exception and
+    /// renders as written.
     pub fn to_sql_string(&self, quote: Quote) -> String {
+        if self.verbatim {
+            return self.raw_text();
+        }
         let mut out = String::new();
         if let Some(schema) = &self.schema {
             Self::prepare_part(schema, &mut out, quote);

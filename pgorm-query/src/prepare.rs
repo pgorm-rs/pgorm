@@ -13,7 +13,7 @@ pub trait SqlWriter: Write + ToString {
     /// type from the surrounding expression rather than from the value being
     /// bound. Sinks that emit placeholders pin the type; sinks that render the
     /// value inline have nothing to pin and fall back to [`Self::push_param`].
-    // [spec:pgorm:req:sql.render.cast-param-type+1]
+    // [spec:pgorm:req:sql.render.cast-param-type+2]
     fn push_param_source_typed(&mut self, value: Value) {
         self.push_param(value)
     }
@@ -86,7 +86,7 @@ impl SqlWriter for SqlWriterValues {
         self.values.push(value)
     }
 
-    // [spec:pgorm:req:sql.render.cast-param-type+1]
+    // [spec:pgorm:req:sql.render.cast-param-type+2]
     fn push_param_source_typed(&mut self, value: Value) {
         let source_type = value.source_type_name();
         self.push_param(value);

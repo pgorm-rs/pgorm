@@ -100,13 +100,14 @@ an ideal Postgres renderer would emit.
 > values in an `Order::Field` ordering (see `sql.render.select-order`) are
 > inlined via `value_to_string` even in parameterized mode.
 
-> [spec:pgorm:req:sql.render.cast-param-type+1]
+> [spec:pgorm:req:sql.render.cast-param-type+2]
 > A `SimpleExpr::Value` cast operand MUST be rendered through
-> `push_param_source_typed` rather than `push_param`, on both cast shapes:
-> the operand of a `SimpleExpr::AsEnum` (the structured cast every
-> `cast_as` / `as_enum` / `save_as` spelling builds, rendered directly as
-> `CAST(operand AS <TypeName>)`), and a `Value` in the left operand of a
-> `BinOper::As` (the raw `cast_as_custom` escape hatch's shape).
+> `push_param_source_typed` rather than `push_param`. There is one place this
+> can arise, because a cast has one shape
+> (`[spec:pgorm:req:sql.ast.cast-shape]`): the operand of a
+> `SimpleExpr::AsEnum`, which every `cast_as` / `as_enum` / `save_as` /
+> `cast_as_custom` spelling builds and which renders as
+> `CAST(operand AS <TypeName>)`.
 > Postgres infers a placeholder's type from the cast target, but the driver
 > writes the value in the format of the type it *is*, so an unpinned cast
 > operand binds the wrong bytes: `CAST($1 AS BIT(8))` makes the server expect
@@ -263,12 +264,16 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+1]
+> [spec:pgorm:def:sql.render.precedence+2]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
-> `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`, or
-> `SubQuery` (the latter four are already self-wrapping); the inner expression
+> `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
+> `LikePattern`, `AsEnum`, or
+> `SubQuery` (all but the first two are already self-wrapping — `AsEnum` is
+> the cast of `[spec:pgorm:req:sql.ast.cast-shape]` and spells its own
+> `CAST(…)` parentheses, which is why folding the second cast shape into it
+> could not cost a `BETWEEN` operand its bare rendering); the inner expression
 > is an arithmetic (`* / % + -`) or shift (`<< >>`) binary and the outer
 > operator is a comparison, BETWEEN, IN, LIKE, or logical operator; or the
 > inner expression is a comparison, IN, LIKE, or IS binary and the outer
@@ -280,22 +285,27 @@ an ideal Postgres renderer would emit.
 > return JSON or text) do not. All other combinations are considered unknown
 > and keep their parentheses.
 
-> [spec:pgorm:req:sql.render.parens]
+> [spec:pgorm:req:sql.render.parens+1]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by
 > default, dropping parentheses only in these cases. Left operand: dropped when
 > `sql.render.precedence` says the left is higher-precedence, or when the left
 > is a binary expression with the *same* operator and that operator is
 > well-known left-associative (`AND`, `OR`, `+`, `-`, `*`, `%`, plus `||` for
 > Postgres) — so `a AND b AND c` and `a || b || c` render flat. Right operand:
-> dropped when higher-precedence, or under one of three structural hacks for
-> ternary constructs encoded as nested binaries: (1) the outer operator is
-> BETWEEN/NOT BETWEEN and the right is an `AND` binary (`x BETWEEN a AND b`);
-> (2) the outer operator is LIKE/NOT LIKE and the right is an `ESCAPE` binary
-> (`x LIKE p ESCAPE e`); (3) the outer operator is `AS` and the right is a
-> `SimpleExpr::Custom` (the `CAST(expr AS type)` encoding, where the type name
-> is a Custom expression written raw). A unary `NOT` likewise wraps its operand
+> dropped when higher-precedence, or under the one structural hack left for a
+> ternary construct encoded as nested binaries: the outer operator is
+> BETWEEN/NOT BETWEEN and the right is an `AND` binary (`x BETWEEN a AND b`).
+> A unary `NOT` likewise wraps its operand
 > in parentheses unless the operand is higher-precedence per
 > `sql.render.precedence`.
+>
+> The other two hacks this once carried are gone with the shapes that needed
+> them. `LIKE`'s `ESCAPE` tail is a `SimpleExpr::LikePattern` rather than a
+> nested binary, and a cast is a `SimpleExpr::AsEnum` rather than an `AS`
+> binary over a raw `SimpleExpr::Custom`
+> (`[spec:pgorm:req:sql.ast.cast-shape]`) — both are atoms in
+> `sql.render.precedence`, so ordinary elision covers them and no operator
+> pair needs a special case.
 
 > [spec:pgorm:sem:sql.render.empty-in+1]
 > A binary `IN` or `NOT IN` whose right side is an empty tuple is rewritten to a

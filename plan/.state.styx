@@ -1130,7 +1130,11 @@ impl_evidence (
         {id pipeline.select-sources, version 2}
         {id query.graph.cursor, version 1}
     )}
-    {id single-cast-node}
+    {id single-cast-node, covered_rules (
+        sql.ast.cast-shape
+    ), covered_claims (
+        {impl_name main, rule sql.ast.cast-shape}
+    )}
     {id sql.ast, covered_rules (
         sql.ast
         sql.ast.build

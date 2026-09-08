@@ -6,7 +6,7 @@ use common::features::*;
 use pgorm::{ActiveValue::Unchanged, entity::prelude::*, entity::*};
 use pretty_assertions::assert_eq;
 
-// [spec:pgorm:req:sql.render.cast-param-type+1/test]
+// [spec:pgorm:req:sql.render.cast-param-type+2/test]
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
     let ctx = common::TestContext::new("bits_tests_bindtypes").await;

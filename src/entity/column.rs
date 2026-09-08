@@ -1357,7 +1357,7 @@ mod tests {
 
         assert_eq!(
             tea_clause(lunch_set::Column::Tea.between(Tea::BreakfastTea, Tea::EverydayTea)),
-            r#""lunch_set"."tea" BETWEEN (CAST('BreakfastTea' AS tea)) AND (CAST('EverydayTea' AS tea))"#
+            r#""lunch_set"."tea" BETWEEN CAST('BreakfastTea' AS tea) AND CAST('EverydayTea' AS tea)"#
         );
     }
 

@@ -67,6 +67,7 @@ pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeN
             schema: schema.clone(),
             name: SharedIden::clone(name),
             array: false,
+            verbatim: false,
         }),
         ColumnType::Array(col_type) => Some(enum_type_name(col_type)?.array()),
         _ => None,
@@ -260,7 +261,7 @@ mod tests {
                 .to_string(),
             [
                 r#"SELECT "housed"."id", CAST("housed"."status" AS text)"#,
-                r#"FROM "housed" WHERE "housed"."status" = (CAST('open' AS custom.status))"#,
+                r#"FROM "housed" WHERE "housed"."status" = CAST('open' AS custom.status)"#,
             ]
             .join(" ")
         );

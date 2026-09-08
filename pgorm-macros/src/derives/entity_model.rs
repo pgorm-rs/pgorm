@@ -216,7 +216,7 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 }
 
 /// Method to derive an Model
-// [spec:pgorm:sem:macros.derive.entity-model+3]
+// [spec:pgorm:sem:macros.derive.entity-model+4]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+5]

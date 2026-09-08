@@ -421,11 +421,12 @@ impl QueryBuilder {
             SimpleExpr::Keyword(keyword) => {
                 self.prepare_keyword(keyword, sql);
             }
-            // A cast, `CAST(operand AS "type")` — the type a quoted
-            // `TypeName`, so a name is a name and never SQL; a `Value`
-            // operand keeps the source-typed placeholder pin of
+            // THE cast, `CAST(operand AS "type")` — one arm because there is
+            // one shape; the type a `TypeName`, so a name is a name and never
+            // SQL; a `Value` operand keeps the source-typed placeholder pin of
             // `sql.render.cast-param-type`.
-            // [spec:pgorm:req:sql.render.cast-param-type+1]
+            // [spec:pgorm:req:sql.render.cast-param-type+2]
+            // [spec:pgorm:req:sql.ast.cast-shape]
             SimpleExpr::AsEnum(type_name, expr) => {
                 write!(sql, "CAST(").unwrap();
                 match expr.as_ref() {
@@ -721,7 +722,6 @@ impl QueryBuilder {
                     Function::Count => "COUNT",
                     Function::IfNull => self.if_null_function(),
                     Function::CharLength => self.char_length_function(),
-                    Function::Cast => "CAST",
                     Function::Lower => "LOWER",
                     Function::Upper => "UPPER",
                     Function::BitAnd => "BIT_AND",
@@ -1306,7 +1306,7 @@ impl QueryBuilder {
 
     #[doc(hidden)]
     /// Translate a binary expr to SQL.
-    // [spec:pgorm:req:sql.render.parens]
+    // [spec:pgorm:req:sql.render.parens+1]
     fn binary_expr(
         &self,
         left: &SimpleExpr,
@@ -1327,11 +1327,7 @@ impl QueryBuilder {
         if left_paren {
             write!(sql, "(").unwrap();
         }
-        match (op, left) {
-            // [spec:pgorm:req:sql.render.cast-param-type+1]
-            (BinOper::As, SimpleExpr::Value(value)) => sql.push_param_source_typed(value.clone()),
-            _ => self.prepare_simple_expr(left, sql),
-        }
+        self.prepare_simple_expr(left, sql);
         if left_paren {
             write!(sql, ")").unwrap();
         }
@@ -1350,11 +1346,7 @@ impl QueryBuilder {
             && right.is_binary()
             && matches!(right.get_bin_oper(), Some(&BinOper::And));
 
-        // Due to custom representation of casting AS datatype
-        let drop_right_as_hack = (op == &BinOper::As) && matches!(right, SimpleExpr::Custom(_));
-
-        let right_paren =
-            !drop_right_higher_precedence && !drop_right_between_hack && !drop_right_as_hack;
+        let right_paren = !drop_right_higher_precedence && !drop_right_between_hack;
         if right_paren {
             write!(sql, "(").unwrap();
         }
@@ -2381,7 +2373,7 @@ impl QueryBuilder {
         Alias::new(ident).prepare(sql.as_writer(), self.quote());
     }
 
-    // [spec:pgorm:def:sql.render.precedence+1]
+    // [spec:pgorm:def:sql.render.precedence+2]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2404,7 +2396,7 @@ impl QueryBuilder {
         common_answer || pg_specific_answer
     }
 
-    // [spec:pgorm:req:sql.render.parens] (left-associative flattening incl. || for Postgres)
+    // [spec:pgorm:req:sql.render.parens+1] (left-associative flattening incl. || for Postgres)
     fn well_known_left_associative(&self, op: &BinOper) -> bool {
         let common_answer = common_well_known_left_associative(op);
         let pg_specific_answer = matches!(op, BinOper::Concatenate);
@@ -2444,7 +2436,7 @@ impl SubQueryStatement {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence+1] (backend-independent portion of the elision table)
+// [spec:pgorm:def:sql.render.precedence+2] (backend-independent portion of the elision table)
 pub(crate) fn common_inner_expr_well_known_greater_precedence(
     inner: &SimpleExpr,
     outer_oper: &Oper,
@@ -2454,7 +2446,8 @@ pub(crate) fn common_inner_expr_well_known_greater_precedence(
         // unary or binary expression (with an outer_oper).
         // We do not need to wrap with parentheses:
         // Columns, tuples (already wrapped), constants, function calls, values,
-        // keywords, subqueries (already wrapped), case (already wrapped)
+        // keywords, subqueries (already wrapped), case (already wrapped),
+        // casts (`CAST(_ AS _)` wraps itself)
         SimpleExpr::Column(_)
         | SimpleExpr::Tuple(_)
         | SimpleExpr::Constant(_)
@@ -2463,6 +2456,7 @@ pub(crate) fn common_inner_expr_well_known_greater_precedence(
         | SimpleExpr::Keyword(_)
         | SimpleExpr::Case(_)
         | SimpleExpr::LikePattern(_)
+        | SimpleExpr::AsEnum(_, _)
         | SimpleExpr::SubQuery(_, _) => true,
         SimpleExpr::Binary(_, inner_oper, _) => {
             let inner_oper: Oper = (*inner_oper).into();

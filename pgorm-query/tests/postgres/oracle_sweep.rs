@@ -66,7 +66,7 @@ fn sweep_select_clause_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    expression rendering, including the parenthesis
 // elision of `sql.render.precedence`
-// [spec:pgorm:req:sql.render.parens/test]
+// [spec:pgorm:req:sql.render.parens+1/test]
 #[test]
 fn sweep_expression_shapes() {
     let exprs: Vec<SimpleExpr> = vec![
