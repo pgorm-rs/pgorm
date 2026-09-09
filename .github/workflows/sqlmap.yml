@@ -1,0 +1,33 @@
+name: sqlmap
+
+on:
+  pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'security/sqlmap/**'
+      - '.github/workflows/sqlmap*.yml'
+      - '.config/nspec/config.styx'
+  schedule:
+    - cron: '23 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sqlmap-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/sqlmap-run.yml
+    with:
+      profile: smoke
+  full:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/sqlmap-run.yml
+    with:
+      profile: full

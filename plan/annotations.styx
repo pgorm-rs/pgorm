@@ -1,0 +1,8 @@
+sites (
+    {path .github/workflows/sqlmap-run.yml, spec (
+        [spec:pgorm:req:security.sqlmap.ci]
+    )}
+    {path .github/workflows/sqlmap.yml, spec (
+        [spec:pgorm:req:security.sqlmap.ci]
+    )}
+)

@@ -4881,6 +4881,20 @@ children (
                         kind @note
                         text "Deliver local reproduction instructions plus PR smoke, scheduled full and manual full CI entrypoints using the same pinned runner and result logic. Always retain reports, separate smoke/full claims, and keep live scans out of pre-commit checks. Explicitly account for external-PR execution restrictions. Add the appropriate coverage configuration and verification for any workflow or runner files outside current nspec Rust source globs."
                     }
+
+                    {
+                        at 2026-09-09T13:57:40.786569Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T14:02:22.91917Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Added PR smoke and scheduled/manual full entrypoints through one reusable hosted-runner workflow. Both use the Rust runner, existing profiles/pins and fast-check entrypoint, preserve artifacts under always(), use contents:read without secrets/persisted checkout credentials, and retain explicit not-run/incomplete statuses. Full also requires direct regressions on the disposable server. Scan/job deadlines leave time for cancellation cleanup. Workflow coverage is registered through nplan sidecars with both inline/sidecar mode. Documented local reproduction and required trusted revision runs when fork policy prevents execution. Validation: actionlint v1.7.7 passes; 24 Python and 17 Rust fast tests pass. Hosted execution has not yet run."
+                    }
                 )
             }
 

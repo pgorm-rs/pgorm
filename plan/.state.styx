@@ -1405,6 +1405,11 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.runner-tests}
         {impl_name main, rule security.sqlmap.verdict}
     )}
+    {id sqlmap.ci, covered_rules (
+        security.sqlmap.ci
+    ), covered_claims (
+        {impl_name main, rule security.sqlmap.ci}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

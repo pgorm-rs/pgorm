@@ -17,6 +17,8 @@ specs ({
             security/sqlmap/adapter/src/**/*.rs
             security/sqlmap/harness.py
             security/sqlmap/check.py
+            security/sqlmap/ci.py
+            .github/workflows/sqlmap*.yml
             pgorm-python/src/**/*.rs
             pgorm-python/python/**/*.py
             security/generative/src/**/*.py

@@ -24,6 +24,11 @@ commit {
     type-prefix "required"
 }
 
+// Workflow coverage lives in the sidecar; code keeps its inline annotations.
+annotations {
+    mode @both
+}
+
 quality {
     // scaffold templates are starting shapes for downstream
     // crates, not code any structural gate can judge
