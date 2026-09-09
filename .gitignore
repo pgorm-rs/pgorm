@@ -2,6 +2,7 @@ target
 firedbg
 Cargo.lock
 !security/sqlmap/adapter/Cargo.lock
+!pgorm-python/Cargo.lock
 __pycache__/
 *.sublime*
 .vscode

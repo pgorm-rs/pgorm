@@ -1,5 +1,21 @@
 platforms (
     {
+        platform "python-native"
+        files (pgorm-python/**/*.rs pgorm-python/Cargo.toml pgorm-python/Cargo.lock)
+        checks {
+            format {
+                cmd "cargo fmt --manifest-path pgorm-python/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path pgorm-python/Cargo.toml --all"
+            }
+            check {
+                cmd "cargo check --manifest-path pgorm-python/Cargo.toml --locked --target-dir target"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path pgorm-python/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "rust"
         files (src/**/*.rs pgorm-macros/**/*.rs pgorm-codegen/**/*.rs pgorm-migration/**/*.rs pgorm-pool/**/*.rs pgorm-query/**/*.rs pgorm-sql-macro/**/*.rs tests/**/*.rs)
         checks {

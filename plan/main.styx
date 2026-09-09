@@ -5031,6 +5031,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T14:50:49.879748Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T15:17:17.02533Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented opt-in pgorm-python workspace, CPython 3.14 PyO3 0.29.2 module imported as pgorm, pinned Maturin 1.15.0 builds, native/package/pgorm identities, capability discovery and explicit unsupported-operation errors. Built both checkout wheel and filtered source distribution, rebuilt the extracted source with --locked, installed both wheels in separate clean environments and passed all 3 installed-package tests with Rust/Maturin absent from PATH. Archive checks verify licenses, typing marker, native library, locked source dependencies and exclusion of harness/fixture/session files. Root Cargo metadata confirms ordinary workspace membership/dependencies exclude Python. The operation inventory is deliberately empty until the builder/runtime leaves implement their APIs; this node establishes packaging, not direct-query acceptance. Full platform/runtime distribution verification remains python.distribution and python.acceptance."
+                    }
                 )
             }
 

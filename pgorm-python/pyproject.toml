@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin==1.15.0"]
+build-backend = "maturin"
+
+[project]
+name = "pgorm"
+dynamic = ["version"]
+description = "Native pgorm builders and asynchronous PostgreSQL access for Python"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = "MIT OR Apache-2.0"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Database",
+]
+
+[project.urls]
+Repository = "https://github.com/pgorm-rs/pgorm"
+
+[tool.maturin]
+bindings = "pyo3"
+python-source = "python"
+module-name = "pgorm._native"
+features = ["extension-module"]
+exclude = [
+    { path = "**/.codex/**", format = "sdist" },
+    { path = "**/.config/**", format = "sdist" },
+    { path = "**/.github/**", format = "sdist" },
+    { path = "**/.nplan/**", format = "sdist" },
+    { path = "**/plan/**", format = "sdist" },
+    { path = "**/security/**", format = "sdist" },
+    { path = "**/tests/**", format = "sdist" },
+    { path = "**/tests_cfg/**", format = "sdist" },
+    { path = "**/2026-*.txt", format = "sdist" },
+    { path = "**/CLAUDE.md", format = "sdist" },
+]
+include = [
+    { path = "support.json", format = "sdist" },
+]
