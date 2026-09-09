@@ -56,7 +56,7 @@ fn value_expr(value: &Bound<'_, PyAny>, literal: bool) -> PyResult<PyExpr> {
     Ok(PyExpr::from_rust(inner))
 }
 
-pub(super) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
+pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     if let Ok(expr) = value.extract::<PyRef<'_, PyExpr>>() {
         Ok(expr.clone())
     } else {
@@ -158,7 +158,7 @@ fn condition(mut inner: Condition, values: &Bound<'_, PyTuple>) -> PyResult<PyCo
     Ok(PyCondition { inner })
 }
 
-pub(super) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
+pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     value
         .extract::<PyRef<'_, PyExpr>>()
         .map(|value| value.clone())

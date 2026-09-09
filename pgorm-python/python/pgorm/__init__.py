@@ -27,12 +27,27 @@ from ._native import (
     literal,
     call,
     tuple_expr,
+    Table,
+    Select,
+    Join,
+    Insert,
+    Update,
+    Delete,
+    Conflict,
+    ConflictTarget,
+    ConflictUpdate,
+    RawSQL,
     __pgorm_version__,
     __version__,
     capabilities,
     require_capability,
 )
 from .runtime import Connection, Pool, PoolStatus, connect
+
+select = Select
+insert = Insert
+update = Update
+delete = Delete
 
 __all__ = [
     "PgOrmError",
@@ -65,6 +80,20 @@ __all__ = [
     "literal",
     "call",
     "tuple_expr",
+    "Table",
+    "Select",
+    "Join",
+    "Insert",
+    "Update",
+    "Delete",
+    "Conflict",
+    "ConflictTarget",
+    "ConflictUpdate",
+    "RawSQL",
+    "select",
+    "insert",
+    "update",
+    "delete",
     "__pgorm_version__",
     "__version__",
     "capabilities",

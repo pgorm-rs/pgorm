@@ -1469,6 +1469,13 @@ impl_evidence (
         {impl_name main, rule python.value-tags}
         {impl_name main, rule python.values}
     )}
+    {id python.statements, covered_rules (
+        python.raw
+        python.statements
+    ), covered_claims (
+        {impl_name main, rule python.raw}
+        {impl_name main, rule python.statements}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

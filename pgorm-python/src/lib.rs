@@ -9,6 +9,7 @@ mod errors;
 pub mod expressions;
 pub mod identifiers;
 mod runtime;
+pub mod statements;
 pub mod values;
 
 use pyo3::prelude::*;
@@ -37,5 +38,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     values::register(module)?;
     expressions::register(module)?;
     identifiers::register(module)?;
+    statements::register(module)?;
     Ok(())
 }

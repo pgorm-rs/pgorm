@@ -75,6 +75,14 @@ print([value.snapshot() for value in compiled.params])
 See [expression construction and Rust API mappings](EXPRESSIONS.md) for
 conditions, functions, literal/bound paths, casts and ownership semantics.
 
+## Statements
+
+`Table`, `select`, `insert`, `update` and `delete` compose the Rust statement
+builders over application names supplied at runtime. `inspect()` returns the
+SQL and parameters produced by that builder state. See [runtime statement
+examples](STATEMENTS.md) for joins, grouping, write guards, conflict actions,
+RETURNING and the explicit `RawSQL` template API.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

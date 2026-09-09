@@ -18,7 +18,8 @@ use crate::{
 pub(crate) use capabilities::operations as capabilities;
 pub use compiled::Compiled;
 pub use construct::PyCondition;
-use construct::{coerce, sequence};
+use construct::sequence;
+pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
 // [spec:pgorm:req:python.expressions]

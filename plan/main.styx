@@ -5135,6 +5135,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T16:40:19.859576Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T16:56:28.82382Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented runtime NamedTable/SELECT/INSERT/UPDATE/DELETE wrappers with typed joins/orderings, Rust-checked insert arity, explicit write intent, conflict typestates, RETURNING and raw SQL templates. All 44 current installed-wheel Python tests pass; native library parity suite passes 10 tests (5 statement families plus 5 expression families). Raw inline inspection delegates to inject_parameters; statements::compile prepares the exact same validated state as inspect. Generic async result/execution terminals remain python.results, so the direct-builders milestone is not yet claimed."
+                    }
                 )
             }
 

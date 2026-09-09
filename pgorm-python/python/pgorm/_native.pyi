@@ -79,3 +79,8 @@ from ._expressions import (
     Expr as Expr, Condition as Condition, col as col, bind as bind,
     literal as literal, call as call, tuple_expr as tuple_expr,
 )
+from ._statements import Table as Table, Select as Select, Join as Join
+from ._writes import (
+    Insert as Insert, Update as Update, Delete as Delete, RawSQL as RawSQL,
+    Conflict as Conflict, ConflictTarget as ConflictTarget, ConflictUpdate as ConflictUpdate,
+)

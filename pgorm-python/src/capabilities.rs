@@ -48,6 +48,7 @@ fn manifest() -> Value {
     });
     if let Some(operations) = manifest["operations"].as_object_mut() {
         operations.extend(crate::expressions::capabilities());
+        operations.extend(crate::statements::capabilities());
     }
     manifest
 }
