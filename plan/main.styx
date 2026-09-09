@@ -5469,6 +5469,34 @@ children (
                         kind @note
                         text "Implements python.direct-builders in docs/spec/python.md. Install the wheel, use runtime application table names, vary builder structure and values in one loaded native build, compare SQL/parameters with Rust builders and check SELECT/CRUD database results. Exercise literal and binder paths without HTTP, scanner services or per-query compilation. Depends on python.statements and python.results (which brings runtime, values and package); full python.acceptance depends on this evidence."
                     }
+
+                    {
+                        at 2026-09-09T17:29:44.659046Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T17:39:11.558924Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Clean-install proof passed: built one cp314 macOS-arm64 wheel, installed it in a fresh temporary environment, ran 28 query cases through public builders with runtime quoted/Unicode application schema/table names, and verified SELECT joins/nested predicates plus INSERT/UPDATE/DELETE records/counts over bound and literal compositions. Independent precompiled Rust builders matched every SQL string and tagged parameter list. Deliberately changed SQL and removed-parameter reports were both rejected. Query-phase Python process launches were denied and PATH contained only the fresh environment. Evidence: target/python-direct-builders/{summary.json,queries.json,pgorm-0.2.0-cp314-cp314-macosx_11_0_arm64.whl}; wheel SHA256 8dd55d8826b6f5effa9ff77f4d40bef8db73acfdf8c18e207b2d3b0ed64a8152. No HTTP/scanner dependency or per-query compilation. Typed Rust LIMIT remains a bound u64 even with literal expression operands."
+                    }
+
+                    {
+                        at 2026-09-09T17:40:52.31262Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final regression: ordinary installed-wheel unittest discovery passed all 70 tests; required native check, Clippy and format gates passed. The clean-install runner and independent Rust verifier passed, including deliberate SQL/parameter mismatch rejection. The direct no-HTTP builder milestone is achieved; broader Python APIs and distribution acceptance remain on their own WBS leaves."
+                    }
+
+                    {
+                        at 2026-09-09T17:42:23.277047Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Coverage mapping correction: placed the executable clean-install harness at pgorm-python/checks/direct_builders.py and added checks/**/*.py to nspec implementation sources. The application testcase and independent Rust comparator remain verification sites under tests/. Reload confirms one implementation plus both verification sites for python.direct-builders; no coverage bypass. Documented runner --help resolves correctly after the move."
+                    }
                 )
             }
         )

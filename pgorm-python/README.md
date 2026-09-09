@@ -88,6 +88,11 @@ and `fetch_optional` return detached records; `stream` opens an async iterator.
 See [execution, result types and stream ownership](RESULTS.md) for examples,
 PostgreSQL decoding limits and cancellation behavior.
 
+The [direct builder integration suite](DIRECT_BUILDERS.md) installs a wheel in
+a fresh Python environment, runs 28 application query programs against
+PostgreSQL, and compares their SQL and tagged parameters with independent Rust
+builders. It provides the focused proof of direct Python access without HTTP.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

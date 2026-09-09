@@ -1137,7 +1137,11 @@ impl_evidence (
         {id query.graph.cursor, version 1}
     )}
     {id python.acceptance}
-    {id python.direct-builders}
+    {id python.direct-builders, covered_rules (
+        python.direct-builders
+    ), covered_claims (
+        {impl_name main, rule python.direct-builders}
+    )}
     {id python.expressions, covered_rules (
         python.delegation
         python.expressions

@@ -21,6 +21,7 @@ specs ({
             .github/workflows/sqlmap*.yml
             pgorm-python/src/**/*.rs
             pgorm-python/python/**/*.py
+            pgorm-python/checks/**/*.py
             security/generative/src/**/*.py
             security/generative/bridge/src/**/*.rs
         ),
