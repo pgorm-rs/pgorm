@@ -4,6 +4,9 @@
 //! concrete Rust API behind each operation. Downstream bindings share this crate.
 
 mod capabilities;
+mod config;
+mod errors;
+mod runtime;
 
 use pyo3::prelude::*;
 
@@ -26,5 +29,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     module.add_function(wrap_pyfunction!(capabilities::capabilities, module)?)?;
     module.add_function(wrap_pyfunction!(capabilities::require_capability, module)?)?;
+    errors::register(module)?;
+    runtime::register(module)?;
     Ok(())
 }

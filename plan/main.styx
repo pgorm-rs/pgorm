@@ -5131,6 +5131,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T15:24:10.992712Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T15:46:05.995181Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented native asyncio pool/connection handles on pyo3-async-runtimes' shared Tokio runtime, event-loop ownership, explicit close/context managers, bounded cancellable acquisition and conservative connection discard on cancelled I/O. Added Rust DatabasePool.close/is_closed and DatabaseConnection.discard as the underlying lifecycle APIs. TLS uses Rustls with verified certificate/hostname checks, configured PEM or WebPKI roots, and explicit plaintext selection. Native exceptions preserve SQLSTATE/diagnostic fields and redact connection credentials. Validation: 13 installed-wheel Python tests passed against both the dedicated fixture and a fresh disposable TLS fixture; the standalone with_postgres.py runner removed its temporary container. Two Rust integration tests passed, proving pool-close behavior and that discard ends the old backend session instead of recycling it. The current public database operation is ping; composable statements, decoding and transaction tests belong to the remaining Python leaves."
+                    }
                 )
             }
 

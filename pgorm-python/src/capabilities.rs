@@ -13,9 +13,16 @@ fn manifest() -> Value {
         "target": env!("PGORM_BINDING_TARGET"),
         "features": ["macros", "with-json", "with-chrono", "with-uuid", "postgres-array", "runtime-tokio"],
         "transport": "in-process",
-        "operations": {},
+        "operations": {
+            "pool": {"rust_api": "pgorm::connect_with", "features": ["runtime-tokio"]},
+            "pool.acquire": {"rust_api": "pgorm::DatabasePool::get", "features": ["runtime-tokio"]},
+            "pool.close": {"rust_api": "pgorm::DatabasePool::close", "features": ["runtime-tokio"]},
+            "connection.ping": {"rust_api": "pgorm::ConnectionTrait::query_one", "features": ["runtime-tokio"]},
+            "connection.close": {"rust_api": "pgorm::DatabaseConnection::drop", "features": ["runtime-tokio"]}
+        },
         "value_types": [],
-        "result_forms": [],
+        "result_forms": ["pool", "connection", "bool"],
+        "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
     })

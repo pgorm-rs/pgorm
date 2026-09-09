@@ -1,5 +1,6 @@
 mod connection;
 mod db_connection;
+mod lifecycle;
 
 pub use connection::*;
 pub use db_connection::*;

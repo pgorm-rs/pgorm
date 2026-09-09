@@ -1443,6 +1443,15 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id python.runtime, covered_rules (
+        python.connections
+        python.errors
+        python.runtime
+    ), covered_claims (
+        {impl_name main, rule python.connections}
+        {impl_name main, rule python.errors}
+        {impl_name main, rule python.runtime}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

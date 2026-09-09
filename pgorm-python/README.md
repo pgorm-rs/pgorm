@@ -19,7 +19,8 @@ uv pip install --python target/python-dev/bin/python 'maturin==1.15.0'
 target/python-dev/bin/maturin build --manifest-path pgorm-python/Cargo.toml \
   --interpreter target/python-dev/bin/python --out target/python-dist
 uv pip install --python target/python-dev/bin/python target/python-dist/*.whl
-target/python-dev/bin/python -m unittest discover -s pgorm-python/tests
+target/python-dev/bin/python pgorm-python/tests/with_postgres.py \
+  target/python-dev/bin/python -m unittest discover -s pgorm-python/tests
 ```
 
 `maturin sdist --manifest-path pgorm-python/Cargo.toml --out target/python-dist`
@@ -39,3 +40,47 @@ import pgorm
 print(pgorm.__version__)
 print(pgorm.capabilities())
 ```
+
+## Connections
+
+Construct and use resources inside one running asyncio loop. Database waiting
+runs on the shared Tokio runtime. Connection checkout supports cancellation and
+an acquisition timeout; one connection rejects concurrent operations.
+
+```python
+import asyncio
+import os
+import pgorm
+
+async def main():
+    async with pgorm.Pool(os.environ["DATABASE_URL"]) as pool:
+        async with pool.connection() as connection:
+            assert await connection.ping()
+
+asyncio.run(main())
+```
+
+TLS verifies certificates and hostnames using WebPKI roots, or the PEM CA file
+passed as `cafile`. Set `tls="disable"` or include `sslmode=disable` in the DSN
+for an explicitly plaintext connection. TLS verification never falls back to
+plaintext. Pool sizing, connect/acquisition deadlines, statement-cache bounds
+and verified/fast recycling are keyword options on `Pool`.
+
+Closing a pool rejects waiters and cancels operations on its checked-out
+connections. Closing a connection releases it. If an operation is cancelled
+while its database state is uncertain, its connection is discarded. Cancellation
+does not promise rollback of an already submitted write. Context managers close
+their resources on normal and exceptional exit; explicit `close()`/`aclose()`
+is also available. Resources cannot migrate to another event loop.
+
+Construction, capability, connection, database, decode, timeout and lifecycle
+failures have distinct exception classes under `PgOrmError`. PostgreSQL server
+errors retain `sqlstate`, message and structured diagnostics with connection
+credentials redacted. Asyncio cancellation remains `asyncio.CancelledError`.
+Internal Rust panics retain PyO3's identifiable panic exception and are not
+classified as invalid application input.
+
+The test wrapper provisions its own PostgreSQL server and CA certificate, runs
+the supplied command with `PGORM_TEST_DSN` and `PGORM_TEST_CA`, and removes the
+server afterward. It requires Docker and OpenSSL only for testing. Existing
+fixtures can instead supply those two environment variables directly.
