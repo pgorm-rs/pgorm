@@ -1,5 +1,14 @@
 platforms (
     {
+        platform "python-models"
+        files (pgorm-python/python/pgorm/**/*.py pgorm-python/python/pgorm/**/*.pyi)
+        checks {
+            typing {
+                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-models-mypy pgorm-python/python/pgorm/models"
+            }
+        }
+    }
+    {
         platform "python-codegen"
         files (pgorm-python/tests/codegen-entities/** pgorm-python/tests/application-binding/src/account.rs pgorm-python/tests/application-binding/src/note.rs)
         checks {

@@ -24,7 +24,14 @@ fn manifest() -> Value {
             "value.json": {"rust_api": "pgorm::pgorm_query::Value::Json", "features": ["with-json"]},
             "value.null": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
             "value.snapshot": {"rust_api": "pgorm_python::values::PyValue", "features": []},
-            "type_name": {"rust_api": "pgorm::pgorm_query::TypeName", "features": []}
+            "type_name": {"rust_api": "pgorm::pgorm_query::TypeName", "features": []},
+            "model.declare": {"rust_api": "pgorm::pgorm_query::{NamedTable, Value}", "features": [], "python_convenience": true},
+            "model.column": {"rust_api": "pgorm::pgorm_query::{Expr, SimpleExpr, Value}", "features": [], "python_convenience": true},
+            "model.select": {"rust_api": "pgorm::pgorm_query::SelectStatement", "features": [], "python_convenience": true},
+            "model.insert": {"rust_api": "pgorm::pgorm_query::InsertStatement", "features": [], "python_convenience": true},
+            "model.update": {"rust_api": "pgorm::pgorm_query::UpdateStatement", "features": [], "python_convenience": true},
+            "model.delete": {"rust_api": "pgorm::pgorm_query::DeleteStatement", "features": [], "python_convenience": true},
+            "model.records": {"rust_api": "pgorm::ConnectionTrait::{query_all, query_one} / pgorm_python::results", "features": ["runtime-tokio"], "python_convenience": true}
         },
         "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(["enum", "array"]).collect::<Vec<_>>(),
         "value_policy": {
@@ -41,7 +48,7 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records"],
         "result_policy": {
             "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
@@ -82,6 +89,17 @@ fn manifest() -> Value {
                 "entity query views": "registered native EntityQuery methods over Select<Entity>",
                 "graph and cursor views": "registered native GraphQuery and GraphCursor methods over SelectGraph; wrap decoded models in concrete Python views"
             }
+        },
+        "model_policy": {
+            "declarations": "Python metadata over native runtime statements; no compiled entity derives or hooks",
+            "field_identity": "declared Python field keys become native projection aliases",
+            "values": "declared native Value tags, exact nullability and qualified enum/array identity",
+            "scalar_kinds": ["bool", "i8", "i16", "i32", "i64", "u32", "f32", "f64", "text", "bytes", "decimal", "uuid", "json", "date", "time", "datetime", "datetime_utc", "ipnetwork", "mac_address", "vector"],
+            "enum": "schema-qualified TypeName required", "array_dimensions": 1,
+            "writes": "missing mapping entry is omitted; None is SQL NULL; Value.json(None) is JSON null",
+            "one": "strict dynamic Record cardinality; explicit limit selects a first row",
+            "unsupported_kinds": ["u64", "char", "datetime_fixed", "datetime_local"],
+            "stream": false, "automatic_ddl": false
         },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},

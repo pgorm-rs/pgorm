@@ -1500,6 +1500,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.codegen}
     )}
+    {id python.models, covered_rules (
+        python.models
+    ), covered_claims (
+        {impl_name main, rule python.models}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

@@ -5270,6 +5270,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T19:48:20.256896Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T19:48:45.162516Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implement immutable Python Model/Column descriptors over the installed native Table, Select, Insert, Update and Delete builders. Descriptor field identities will become native projection aliases; plain writes and column comparisons will be converted through declared native Value tags. Omission remains missing input, None means SQL NULL, and JSON null remains Value.json(None). Returned records must match declared native tags and nullability, including qualified enum/array identities. These runtime descriptors are explicitly separate from registered Rust entity derives and hooks."
+                    }
+
+                    {
+                        at 2026-09-09T20:06:12.971999Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Runtime Model/Column descriptors now lower declarations, exact typed comparisons, SELECT, INSERT, UPDATE and DELETE through the existing native builders. Declared field keys become projection aliases; primary-key conjunctions support composite keys; omitted fields, SQL NULL and JSON null remain distinct. Installed PostgreSQL tests cover CRUD, default rows, aliases/self-joins, strict decoding failures, 19 scalar wire kinds and qualified enum arrays. All 84 standalone Python tests pass. Strict mypy checks the five implementation modules; precise native fetch overloads also remove Any returns from their Connection dependency. Canonical Record tags are explicit in model_policy; Value-only u64/char/local/fixed variants fail at declaration rather than claiming incompatible decoded models."
+                    }
                 )
             }
 

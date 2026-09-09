@@ -56,6 +56,7 @@ from ._native import (
 )
 from .runtime import Connection, Pool, PoolStatus, connect
 from .results import Record, Field, ResultStream, Query
+from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 
 select = Select
 insert = Insert
@@ -80,6 +81,13 @@ __all__ = [
     "Field",
     "ResultStream",
     "Query",
+    "Column",
+    "ModelColumn",
+    "Model",
+    "ModelRecord",
+    "ModelQuery",
+    "ModelRows",
+    "ModelWrite",
     "UnsupportedCapabilityError",
     "TypeName",
     "Value",

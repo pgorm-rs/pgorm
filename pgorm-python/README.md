@@ -93,6 +93,10 @@ a fresh Python environment, runs 28 application query programs against
 PostgreSQL, and compares their SQL and tagged parameters with independent Rust
 builders. It provides the focused proof of direct Python access without HTTP.
 
+[Runtime model descriptors](MODELS.md) declare table names, field mappings,
+types, nullability and primary keys entirely in Python. They validate native
+statement writes and return records using the declared field identities.
+
 Applications with Rust entities can also [compile their entity registrations
 into an application wheel](ENTITIES.md). Python then uses their real typed
 queries, models, ActiveValue states and write hooks through `pgorm.entity`.
