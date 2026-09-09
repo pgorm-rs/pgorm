@@ -111,6 +111,12 @@ pub struct Func;
 impl Func {
     /// Call a custom function.
     ///
+    /// The name is an identifier, not SQL text: it is spelled bare only when
+    /// it is already a safe lowercase name, and quoted otherwise. So a name
+    /// carrying anything else — an upper-case letter, a space, a payload —
+    /// reaches PostgreSQL as a function it can look up and fail to find,
+    /// never as syntax it executes.
+    ///
     /// # Examples
     ///
     /// ```
@@ -120,7 +126,7 @@ impl Func {
     ///
     /// impl Iden for MyFunction {
     ///     fn unquoted(&self, s: &mut dyn Write) {
-    ///         write!(s, "MY_FUNCTION").unwrap();
+    ///         write!(s, "my_function").unwrap();
     ///     }
     /// }
     ///
@@ -130,7 +136,22 @@ impl Func {
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT MY_FUNCTION('hello')"#
+    ///     r#"SELECT my_function('hello')"#
+    /// );
+    /// ```
+    ///
+    /// A name that cannot be spelled bare is quoted, case preserved:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .expr(Func::cust(Alias::new("MyFunction")).arg("hello"))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "MyFunction"('hello')"#
     /// );
     /// ```
     pub fn cust<T>(func: T) -> FunctionCall

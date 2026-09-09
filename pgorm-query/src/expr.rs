@@ -1306,12 +1306,12 @@ impl Expr {
     /// let query = Query::insert()
     ///     .into_table(Char::Table)
     ///     .columns([Char::FontSize])
-    ///     .values_panic([Expr::val("large").as_enum(Alias::new("FontSizeEnum"))])
+    ///     .values_panic([Expr::val("large").as_enum(Alias::new("font_size_enum"))])
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"INSERT INTO "character" ("font_size") VALUES (CAST('large' AS FontSizeEnum))"#
+    ///     r#"INSERT INTO "character" ("font_size") VALUES (CAST('large' AS font_size_enum))"#
     /// );
     /// ```
     pub fn as_enum<T>(self, type_name: T) -> SimpleExpr
@@ -1552,7 +1552,7 @@ impl Expr {
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "id" FROM "character" WHERE "user_data" @> E'{\"a\":1}'"#
+    ///     r#"SELECT "id" FROM "character" WHERE "user_data" @> '{"a":1}'"#
     /// );
     /// ```
     pub fn contains<T>(self, expr: T) -> SimpleExpr
@@ -1578,7 +1578,7 @@ impl Expr {
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "id" FROM "character" WHERE "user_data" <@ E'{\"a\":1,\"b\":2}'"#
+    ///     r#"SELECT "id" FROM "character" WHERE "user_data" <@ '{"a":1,"b":2}'"#
     /// );
     /// ```
     pub fn contained<T>(self, expr: T) -> SimpleExpr
@@ -1981,12 +1981,12 @@ impl SimpleExpr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .and_where(Expr::col((Char::Table, Char::FontId)).cast_as(Alias::new("TEXT")).like("a%"))
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).cast_as(Alias::new("text")).like("a%"))
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE CAST("character"."font_id" AS TEXT) LIKE 'a%'"#
+    ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE CAST("character"."font_id" AS text) LIKE 'a%'"#
     /// );
     /// ```
     pub fn like<L: IntoLikeExpr>(self, like: L) -> Self {

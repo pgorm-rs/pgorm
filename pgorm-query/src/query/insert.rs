@@ -174,14 +174,14 @@ impl InsertStatement {
     ///     .columns([Glyph::Aspect, Glyph::Image])
     ///     .values([
     ///         2.into(),
-    ///         Func::cast_as("2020-02-02 00:00:00", Alias::new("DATE")).into(),
+    ///         Expr::val("2020-02-02 00:00:00").cast_as(Alias::new("date")),
     ///     ])
     ///     .unwrap()
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, CAST('2020-02-02 00:00:00' AS DATE))"#
+    ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, CAST('2020-02-02 00:00:00' AS date))"#
     /// );
     /// ```
     // [spec:pgorm:req:sql.ast.insert.arity]

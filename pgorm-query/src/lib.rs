@@ -416,12 +416,12 @@
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
 //! let query = Query::select()
-//!     .expr(Func::cast_as("hello", Alias::new("MyType")))
+//!     .expr(Expr::val("hello").cast_as(Alias::new("my_type")))
 //!     .to_owned();
 //!
 //! assert_eq!(
 //!     query.to_string(),
-//!     r#"SELECT CAST('hello' AS MyType)"#
+//!     r#"SELECT CAST('hello' AS my_type)"#
 //! );
 //! ```
 //!
@@ -433,7 +433,7 @@
 //!
 //! impl Iden for MyFunction {
 //!     fn unquoted(&self, s: &mut dyn Write) {
-//!         write!(s, "MY_FUNCTION").unwrap();
+//!         write!(s, "my_function").unwrap();
 //!     }
 //! }
 //!
@@ -443,7 +443,7 @@
 //!
 //! assert_eq!(
 //!     query.to_string(),
-//!     r#"SELECT MY_FUNCTION('hello')"#
+//!     r#"SELECT my_function('hello')"#
 //! );
 //! ```
 //!
