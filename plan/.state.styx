@@ -720,6 +720,7 @@ assertions (
     {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
+    {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
 )
 
 impl_evidence (

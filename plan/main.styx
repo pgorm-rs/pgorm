@@ -4935,6 +4935,27 @@ children (
                         kind @note
                         text "Final evidence gate: run the complete pinned profile and tests/sql_security_tests.rs against the same identified source and PostgreSQL configuration; all configured scans complete, all positive controls detected, no protected injection/invariant failure, cleanup succeeds. Preserve replayable evidence. The five existing security defect leaves own implementation fixes; this leaf validates their combined outcome and must not weaken the harness to obtain a pass. Report only the explicitly versioned suite claim."
                     }
+
+                    {
+                        at 2026-09-09T14:03:57.991058Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T14:25:17.511229Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Fresh full-profile run is executing against e942431c with --direct-regressions, writing target/sqlmap/resume-full/. All 420 expected scanner invocations are inventoried. The earlier baseline diagnostic independently passed all 14 direct regressions on the pinned PostgreSQL 16.13 fixture. The full run already has missed positive controls, so acceptance cannot close on this attempt; continue to completion to retain the full case inventory. No scanner pin, manifest, profile, verdict or protected API path has been weakened."
+                    }
+
+                    {
+                        at 2026-09-09T14:29:56.751008Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Full attempt completed against e942431cf2363e16d9db1da6ea956cb6c25da1d0 with unchanged source: 420/420 scans complete, 210/210 case/technique pairs accounted, 105 pass and 105 invalid-control. No protected findings or invariant violations, no incomplete scans or infrastructure failures, cleanup succeeded. All 14 direct SQL security regressions passed on the same pinned PostgreSQL fixture and settings. No Q control was detected across 35 cases; insert, pipeline-projection, schema, column, group, function and stored-identifier missed all six techniques. Acceptance remains open. Reviewable case matrix and report/configuration digests: security/sqlmap/acceptance/2026-09-09.md. Complete local evidence: target/sqlmap/resume-full/; archive /private/tmp/pgorm-sqlmap-2026-09-09-e942431c.tar.gz. The runner correctly exited 1; no controls, profiles or verdict conditions were relaxed to obtain a pass."
+                    }
                 )
             }
         )

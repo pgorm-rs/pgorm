@@ -71,3 +71,8 @@ A pass covers only the named, pinned manifest/profile. All scheduled scans
 must complete, all required vulnerable controls must be detected, every
 protected case must pass, and cleanup must succeed. Scanner silence is not
 proof that every possible ORM query is injection-free.
+
+The [2026-09-09 acceptance attempt](acceptance/2026-09-09.md) completed all
+420 scans and passed the direct regressions, but failed acceptance because
+105 required controls were not detected. Its case matrix records the remaining
+work; it is not a passing acceptance report.
