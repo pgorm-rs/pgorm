@@ -11,7 +11,10 @@ use crate::{
     runtime::{ConnectionState, NativeConnection, Operation},
 };
 
-fn state(py: Python<'_>, connection: &Bound<'_, PyAny>) -> PyResult<Arc<ConnectionState>> {
+pub(crate) fn state(
+    py: Python<'_>,
+    connection: &Bound<'_, PyAny>,
+) -> PyResult<Arc<ConnectionState>> {
     let native = connection
         .getattr("_native")
         .unwrap_or_else(|_| connection.clone());

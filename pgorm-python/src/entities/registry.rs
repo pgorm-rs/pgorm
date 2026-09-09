@@ -1,6 +1,6 @@
 use std::{
     any::TypeId,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap},
     marker::PhantomData,
     sync::Arc,
 };
@@ -16,7 +16,8 @@ use crate::{UnsupportedCapabilityError, errors::ConstructionError};
 #[derive(Debug, Default)]
 pub struct Registry {
     entries: BTreeMap<String, Arc<dyn EntityBackend>>,
-    types: HashSet<TypeId>,
+    types: HashMap<TypeId, String>,
+    pub(crate) graphs: BTreeMap<String, Arc<dyn crate::graphs::backend::Factory>>,
 }
 
 impl Registry {
@@ -29,7 +30,7 @@ impl Registry {
         E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static,
         E::ActiveModel: Send + Sync + 'static,
     {
-        if self.entries.contains_key(name) || self.types.contains(&TypeId::of::<E>()) {
+        if self.entries.contains_key(name) || self.types.contains_key(&TypeId::of::<E>()) {
             return Err(ConstructionError::new_err(
                 "duplicate entity registration name or Rust type",
             ));
@@ -42,12 +43,25 @@ impl Registry {
                 entity: PhantomData,
             }),
         );
-        self.types.insert(TypeId::of::<E>());
+        self.types.insert(TypeId::of::<E>(), name.to_owned());
         Ok(self)
     }
 
     pub(crate) fn describe(&self) -> Vec<serde_json::Value> {
         self.entries.values().map(|e| e.info().describe()).collect()
+    }
+
+    pub(crate) fn registered<E: EntityTrait + 'static>(&self) -> PyResult<Arc<EntityInfo>> {
+        let entry = self
+            .types
+            .get(&TypeId::of::<E>())
+            .and_then(|name| self.entries.get(name));
+        entry.map(|entry| entry.info().clone()).ok_or_else(|| {
+            ConstructionError::new_err(format!(
+                "register entity {} before its graph",
+                std::any::type_name::<E>()
+            ))
+        })
     }
 }
 

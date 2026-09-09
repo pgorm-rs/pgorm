@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[pgorm(primary_key, auto_increment = false)]
     pub id: i32,
+    pub account_id: i32,
     pub body: String,
 }
 

@@ -138,9 +138,9 @@ where
 }
 
 #[derive(Debug)]
-struct ModelAdapter<E: EntityTrait> {
-    value: E::Model,
-    info: Arc<EntityInfo>,
+pub(crate) struct ModelAdapter<E: EntityTrait> {
+    pub(crate) value: E::Model,
+    pub(crate) info: Arc<EntityInfo>,
 }
 
 impl<E> ModelBackend for ModelAdapter<E>

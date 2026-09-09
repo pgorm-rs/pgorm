@@ -41,7 +41,7 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple"],
         "result_policy": {
             "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
@@ -62,6 +62,14 @@ fn manifest() -> Value {
             "execution": "acquired Connection; native asyncio awaitable",
             "stream": false
         },
+        "graph_policy": {
+            "source_arities": [1, 2, 3, 4, 5, 6, 7],
+            "slots": ["Req", "Opt"], "registration_required": true,
+            "decode": "SelectGraph / GraphRow with actual registered models and optional slots",
+            "result": "bare model for one source; tuple in source order for joined shapes",
+            "cursor": "one root column plus Rust's declared primary-key tiebreaks",
+            "unsupported": ["unregistered shapes", "source arity beyond seven", "graph.stream", "graph.grouped", "slot-column cursors", "composite order-column cursors", "cursor SQL inspection"]
+        },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
@@ -71,6 +79,7 @@ fn manifest() -> Value {
         operations.extend(crate::statements::capabilities());
         operations.extend(crate::results::capabilities());
         operations.extend(crate::entities::capabilities());
+        operations.extend(crate::graphs::capabilities());
     }
     manifest
 }
@@ -82,6 +91,13 @@ pub(crate) fn capabilities<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound
     let registry_object = module.getattr("_registry")?;
     let registry = registry_object.extract::<PyRef<'_, crate::entities::NativeRegistry>>()?;
     manifest["registrations"]["entities"] = registry.0.describe().into();
+    manifest["registrations"]["graphs"] = registry
+        .0
+        .graphs
+        .values()
+        .map(|graph| graph.info().describe())
+        .collect::<Vec<_>>()
+        .into();
     module
         .py()
         .import("json")?

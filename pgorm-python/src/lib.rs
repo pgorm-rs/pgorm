@@ -8,6 +8,7 @@ mod config;
 pub mod entities;
 mod errors;
 pub mod expressions;
+pub mod graphs;
 pub mod identifiers;
 pub mod results;
 mod runtime;
@@ -57,5 +58,6 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     statements::register(module)?;
     results::register(module)?;
     entities::install(module, registry)?;
+    graphs::install(module)?;
     Ok(())
 }

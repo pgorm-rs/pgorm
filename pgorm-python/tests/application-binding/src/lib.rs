@@ -1,8 +1,11 @@
 //! Independent application crate: no pgorm repository fixture entities.
 
 pub mod account;
+pub mod graphs;
 pub mod note;
 
+#[cfg(test)]
+mod graph_parity;
 #[cfg(test)]
 mod parity;
 
@@ -14,6 +17,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let mut registry = pgorm_python::entities::Registry::default();
     registry.entity::<account::Entity>("app.Account")?;
     registry.entity::<note::Entity>("app.Note")?;
+    graphs::register(&mut registry)?;
     pgorm_python::install(module, registry)
 }
 

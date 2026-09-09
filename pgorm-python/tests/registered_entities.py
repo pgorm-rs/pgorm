@@ -15,7 +15,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         self.created = True
         await self.pool.execute(p.RawSQL('CREATE TYPE python_entities."Mood" AS ENUM (\'calm\', \'busy\')'))
         await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.accounts (id integer PRIMARY KEY, "display name" text NOT NULL, note text, version integer NOT NULL, mood python_entities."Mood" NOT NULL)'))
-        await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.notes (id integer PRIMARY KEY, body text NOT NULL)'))
+        await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.notes (id integer PRIMARY KEY, account_id integer NOT NULL, body text NOT NULL)'))
         self.account = p.entity("app.Account")
         self.note = p.entity("app.Note")
 

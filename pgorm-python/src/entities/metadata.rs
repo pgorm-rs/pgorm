@@ -159,6 +159,7 @@ pub(crate) struct EntityInfo {
     pub(crate) model_type: &'static str,
     pub(crate) active_type: &'static str,
     pub(crate) columns: Vec<ColumnInfo>,
+    pub(crate) primary_keys: Vec<String>,
 }
 
 impl EntityInfo {
@@ -208,6 +209,7 @@ impl EntityInfo {
             schema,
             table,
             columns,
+            primary_keys: keys,
             entity_type: std::any::type_name::<E>(),
             column_type: std::any::type_name::<E::Column>(),
             model_type: std::any::type_name::<E::Model>(),
@@ -226,6 +228,7 @@ impl EntityInfo {
         json!({"name": self.name, "schema": self.schema, "table": self.table,
             "rust_entity": self.entity_type, "rust_column": self.column_type, "rust_model": self.model_type, "rust_active_model": self.active_type,
             "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Vec<_>>(),
+            "primary_keys": self.primary_keys,
             "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete"],
             "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"})
     }

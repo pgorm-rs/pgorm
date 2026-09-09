@@ -96,6 +96,8 @@ builders. It provides the focused proof of direct Python access without HTTP.
 Applications with Rust entities can also [compile their entity registrations
 into an application wheel](ENTITIES.md). Python then uses their real typed
 queries, models, ActiveValue states and write hooks through `pgorm.entity`.
+Compiled [typed graphs and keyset cursors](GRAPHS.md) retain `SelectGraph`'s
+required/optional join slots and model decoding through `pgorm.graph`.
 
 ## Connections
 

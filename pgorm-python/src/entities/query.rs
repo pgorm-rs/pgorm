@@ -16,7 +16,7 @@ pub struct PyEntityQuery {
     pub(crate) inner: Select,
 }
 
-fn bound(value: Option<&Bound<'_, PyAny>>) -> PyResult<Option<u64>> {
+pub(crate) fn bound(value: Option<&Bound<'_, PyAny>>) -> PyResult<Option<u64>> {
     let Some(value) = value.filter(|v| !v.is_none()) else {
         return Ok(None);
     };

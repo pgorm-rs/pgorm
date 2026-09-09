@@ -1,13 +1,13 @@
 //! Concrete Rust entity registrations, owned by one native extension module.
 
 mod active;
-mod backend;
+pub(crate) mod backend;
 mod column;
-mod generic;
-mod io;
-mod metadata;
+pub(crate) mod generic;
+pub(crate) mod io;
+pub(crate) mod metadata;
 mod model;
-mod query;
+pub(crate) mod query;
 mod registry;
 
 pub use active::{ActiveState, PyActiveModel, PyActiveValue};

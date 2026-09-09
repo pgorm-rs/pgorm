@@ -1,4 +1,4 @@
-"""Build an independent application registration wheel and test its public API."""
+"""Build an application wheel and verify native entity and graph registrations."""
 
 import argparse
 import json
@@ -28,6 +28,7 @@ def materialize(root, destination):
 
 
 # [spec:pgorm:req:python.entities/test]
+# [spec:pgorm:req:python.graph/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-entities"))
@@ -40,6 +41,8 @@ def main():
     (output / "summary.json").write_text('{"passed": false, "status": "running"}\n')
     environment = {**os.environ, "PYO3_PYTHON": sys.executable, "CARGO_TARGET_DIR": str(root / "target"), "PYTHONNOUSERSITE": "1"}
     environment.pop("PYTHONPATH", None)
+    environment["PGORM_GRAPH_REPORT"] = str(output / "cursor-queries.json")
+    (output / "cursor-queries.json").unlink(missing_ok=True)
     with tempfile.TemporaryDirectory(prefix="pgorm-entity-project-") as directory:
         project = Path(directory)
         materialize(root, project)
@@ -55,7 +58,9 @@ def main():
         python = project / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         run(["uv", "pip", "install", "--no-index", "--no-cache", "--python", str(python), str(wheel)], environment)
         run([str(python), "-I", str(root / "pgorm-python/tests/registered_entities.py"), "-v"], environment)
-    (output / "summary.json").write_text(json.dumps({"passed": True, "registered_entities": ["app.Account", "app.Note"], "wheel": wheel.name}, indent=2) + "\n")
+        run([str(python), "-I", "-m", "unittest", "discover", "-s", str(root / "pgorm-python/tests"), "-p", "registered_graphs.py", "-v"], environment)
+        run(["cargo", "run", "--manifest-path", str(project / "Cargo.toml"), "--locked", "--bin", "graph_oracle"], environment)
+    (output / "summary.json").write_text(json.dumps({"passed": True, "registered_entities": ["app.Account", "app.Note"], "graph_source_arities": list(range(1, 8)), "rust_cursor_parity_cases": 8, "wheel": wheel.name}, indent=2) + "\n")
 
 
 if __name__ == "__main__":

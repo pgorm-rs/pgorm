@@ -1490,6 +1490,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.entities}
     )}
+    {id python.graph, covered_rules (
+        python.graph
+    ), covered_claims (
+        {impl_name main, rule python.graph}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}
