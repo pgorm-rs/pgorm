@@ -4571,12 +4571,27 @@ children (
                 id pipeline-hostile-identifiers
                 title "Pipeline names and inline values stay data under hostile spellings"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-08T09:15:04.550692Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Security review 2026-09-08, severity P1. Two failing probes: pipeline_keeps_hostile_names_and_values_as_data (table sec\"table, column note\" OR TRUE --, value \\\\'; SELECT 1; --) and pipeline_values_keep_sql_payload_as_data (\\\\' OR TRUE -- as an inline-compared value) — both the inline ExprOps::eq(value) path and the binder path must return the stored payload as data, through into_sql on a pipeline whose source/column names carry embedded quotes. Investigate where the pipeline's adapter renders identifiers and string literals into PRQL (src/pipeline/adapter.rs ident/ident_in/literals) and whether prqlc's ident quoting (backticks) and string escaping are applied or bypassed; hostile names must round-trip into correctly quoted SQL identifiers and inline values into correctly escaped SQL strings. SPEC IMPACT: pipeline.qualify and/or the pipeline rule owning literal rendering; bump what the fix touches."
+                    }
+
+                    {
+                        at 2026-09-09T14:02:47.284439Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T14:03:56.770605Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
