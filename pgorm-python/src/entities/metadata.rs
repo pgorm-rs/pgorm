@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::{ColumnType, Value};
-use pgorm::{ColumnTrait, EntityTrait, IdenStr, Iterable, PrimaryKeyToColumn};
+use pgorm::{ColumnTrait, EntityTrait, FromQueryResult, IdenStr, Iterable, PrimaryKeyToColumn};
 use pyo3::{prelude::*, types::PyString};
 use serde_json::{Value as Json, json};
 
@@ -137,6 +137,7 @@ pub(crate) struct ColumnInfo {
     pub(crate) name: String,
     pub(crate) json_key: String,
     pub(crate) sql_type: String,
+    pub(crate) rust_decode_type: Option<&'static str>,
     pub(crate) nullable: bool,
     pub(crate) primary_key: bool,
     pub(crate) input: InputKind,
@@ -145,6 +146,7 @@ pub(crate) struct ColumnInfo {
 impl ColumnInfo {
     pub(crate) fn describe(&self) -> Json {
         json!({"name": self.name, "json_key": self.json_key, "sql_type": self.sql_type,
+            "rust_decode_type": self.rust_decode_type,
             "nullable": self.nullable, "primary_key": self.primary_key, "input_hint": self.input.describe()})
     }
 }
@@ -181,6 +183,7 @@ impl EntityInfo {
             .collect();
         let mut names = std::collections::HashSet::new();
         let mut columns = Vec::new();
+        let reflected = E::Model::expected_columns();
         for column in E::Column::iter() {
             let name = column.as_str().to_owned();
             validate_name(&name)?;
@@ -191,6 +194,12 @@ impl EntityInfo {
             }
             let definition = column.def();
             columns.push(ColumnInfo {
+                rust_decode_type: reflected.as_ref().and_then(|fields| {
+                    fields
+                        .iter()
+                        .find(|field| field.name() == name)
+                        .map(|field| field.rust_type())
+                }),
                 primary_key: keys.contains(&name),
                 name,
                 json_key: column.json_key().to_owned(),

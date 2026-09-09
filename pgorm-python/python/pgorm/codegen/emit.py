@@ -1,0 +1,259 @@
+"""Emit concrete wrappers from the installed, compiled application registry."""
+
+import ast
+import json
+import keyword
+from pathlib import Path
+
+from .config import CodegenError, identifier, validate
+from .types import field_type
+
+RESERVED_FIELDS = {
+    "native",
+    "entity_name",
+    "tagged",
+    "with_value",
+    "into_active",
+    "get",
+    "keys",
+    "values",
+    "items",
+    "property",
+}
+
+
+def attributes(entity, entry):
+    columns = {column["name"]: column for column in entity["columns"]}
+    if set(entry["fields"]) - set(columns):
+        raise CodegenError("field aliases name unknown compiled SQL columns")
+    used = set(RESERVED_FIELDS)
+    result = []
+    for column in entity["columns"]:
+        chosen = entry["fields"].get(column["name"])
+        if chosen is None:
+            chosen = column["name"]
+            if not chosen.isidentifier() or keyword.iskeyword(chosen):
+                chosen = column["json_key"]
+        chosen = identifier(
+            chosen, "field attribute; supply an explicit fields alias if needed"
+        )
+        if chosen in used:
+            raise CodegenError(
+                "field attributes collide with each other or a model method; supply fields aliases"
+            )
+        used.add(chosen)
+        result.append((column, chosen, field_type(column)))
+    return result
+
+
+def entity_code(entry, entity):
+    name = entry["python"]
+    model, active = name + "Model", name + "Active"
+    fields = attributes(entity, entry)
+    code = [
+        f'class {model}(ModelView["{active}"]):',
+        f"    _entity_name = {entry['name']!r}",
+    ]
+    stub = [f"class {model}(ModelView[{active}]):"]
+    for column, attribute, type_ in fields:
+        code.extend(
+            [
+                "",
+                "    @property",
+                f"    def {attribute}(self) -> {type_.annotation}:",
+                f"        return cast({type_.annotation}, self[{column['name']!r}])",
+            ]
+        )
+        stub.extend(
+            ["    @property", f"    def {attribute}(self) -> {type_.annotation}: ..."]
+        )
+    code.extend(
+        [
+            "",
+            f"class {active}(ActiveView[{model}]):",
+            f"    _entity_name = {entry['name']!r}",
+            f"    _model_class = {model}",
+        ]
+    )
+    stub.extend(["", f"class {active}(ActiveView[{model}]):"])
+    for column, attribute, type_ in fields:
+        annotation = (
+            f"{type_.annotation} | p.Value" if type_.annotation != "Any" else "Any"
+        )
+        signature = f"    def set_{attribute}(self, value: {annotation}) -> {active}"
+        code.extend(
+            [
+                "",
+                signature + ":",
+                f"        return self.set({column['name']!r}, {type_.binding()})",
+            ]
+        )
+        stub.append(signature + ": ...")
+    code.extend(
+        [
+            "",
+            f"{model}._active_class = {active}",
+            f"{name}: EntityView[{model}, {active}] = EntityView(p.entity({entry['name']!r}), {model}, {active})",
+            "",
+        ]
+    )
+    stub.extend(["", f"{name}: EntityView[{model}, {active}]", ""])
+    return code, stub
+
+
+def graph_code(entry, graph, entities):
+    types, optional = [], []
+    for source in graph["sources"]:
+        if source["entity"] not in entities:
+            raise CodegenError("graph source is missing from generated entity exports")
+        types.append(entities[source["entity"]]["python"] + "Model")
+        optional.append(source["slot"] == "Opt")
+    name = entry["python"]
+    row = name + "Row"
+    shape = (
+        types[0]
+        if len(types) == 1
+        else "tuple["
+        + ", ".join(
+            type_ + (" | None" if may_be_absent else "")
+            for type_, may_be_absent in zip(types, optional)
+        )
+        + "]"
+    )
+    models = "(" + ", ".join(types) + ",)"
+    code = [
+        f"{row}: TypeAlias = {shape}",
+        "",
+        f"def _decode_{name}(row: Any) -> {row}:",
+        f"    return cast({row}, wrap_row(row, {models}, {tuple(optional)!r}))",
+        "",
+        f"{name}: GraphView[{row}] = GraphView(p.graph({entry['name']!r}), _decode_{name})",
+        "",
+    ]
+    stub = [f"{row}: TypeAlias = {shape}", f"{name}: GraphView[{row}]", ""]
+    return code, stub
+
+
+# [spec:pgorm:req:python.codegen]
+def emit(project):
+    from .. import capabilities
+
+    project = Path(project).resolve()
+    try:
+        description = json.loads((project / "application.json").read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise CodegenError(
+            "project must contain a scaffolded application.json"
+        ) from error
+    raw_keys = {"schema_version", "module", "entity_crate", "entities", "graphs"}
+    if not isinstance(description, dict) or set(description) - raw_keys - {
+        "entity_package",
+        "compatibility",
+    }:
+        raise CodegenError("invalid scaffold metadata")
+    compatibility = description.get("compatibility")
+    if not isinstance(compatibility, dict) or set(compatibility) != {
+        "package_version",
+        "pgorm_version",
+        "registry_abi",
+    }:
+        raise CodegenError("invalid scaffold compatibility metadata")
+    description = {
+        **validate(
+            {key: value for key, value in description.items() if key in raw_keys},
+            project,
+        ),
+        "compatibility": compatibility,
+    }
+    actual = capabilities()
+    expected = description["compatibility"]
+    if (
+        any(
+            actual[key] != expected[key] for key in ("package_version", "pgorm_version")
+        )
+        or actual["binding"]["registry_abi"] != expected["registry_abi"]
+    ):
+        raise CodegenError("installed native build is incompatible with this scaffold")
+    expected = {**expected, "features": actual["features"]}
+    registrations = {}
+    for family in ("entities", "graphs"):
+        registrations[family] = {
+            entry["name"]: entry for entry in actual["registrations"][family]
+        }
+        requested = [entry["name"] for entry in description[family]]
+        if set(requested) != set(registrations[family]):
+            raise CodegenError(
+                "install the scaffold's native wheel before emitting its concrete wrappers"
+            )
+        expected[family] = [registrations[family][name] for name in requested]
+    imports = [
+        "from __future__ import annotations",
+        "",
+        "from datetime import date, datetime, time",
+        "from decimal import Decimal",
+        "from uuid import UUID",
+        "from typing import Any, TypeAlias, cast",
+        "import pgorm as p",
+        "from pgorm._registered import ActiveView, EntityView, GraphView, ModelView, wrap_row",
+        "",
+    ]
+    code = [
+        "# Generated by pgorm.codegen; regenerate from the compiled registry.",
+        *imports,
+        "from pgorm._registered.compat import check as _check",
+        f"_COMPATIBILITY = {expected!r}",
+        "_check(_COMPATIBILITY)",
+        "",
+    ]
+    stubs = [
+        "# Generated by pgorm.codegen from the compiled application registry.",
+        *imports,
+    ]
+    names = []
+    entities = {entry["name"]: entry for entry in description["entities"]}
+    for family, generator in (("entities", entity_code), ("graphs", graph_code)):
+        for entry in description[family]:
+            extra = (entities,) if family == "graphs" else ()
+            generated, stub = generator(
+                entry, registrations[family][entry["name"]], *extra
+            )
+            code.extend(generated)
+            stubs.extend(stub)
+            names.extend(
+                [entry["python"], entry["python"] + "Row"]
+                if family == "graphs"
+                else [
+                    entry["python"],
+                    entry["python"] + "Model",
+                    entry["python"] + "Active",
+                ]
+            )
+    code.append(f"__all__ = {names!r}\n")
+    code = "\n".join(code)
+    stubs = "\n".join(stubs)
+    ast.parse(code)
+    ast.parse(stubs)
+    module = identifier(description["module"], "application module")
+    destination = project / "python/pgorm"
+    if not destination.is_dir():
+        raise CodegenError("scaffold's Python package directory is missing")
+    existing = any(
+        (destination / (module + suffix)).exists() for suffix in ("", ".py", ".pyi")
+    )
+    if existing:
+        try:
+            previous = json.loads(
+                (destination / "_application_module.json").read_text()
+            )["module"]
+        except (OSError, KeyError, json.JSONDecodeError) as error:
+            raise CodegenError(
+                "application module would overwrite an existing Python API"
+            ) from error
+        if previous != module:
+            raise CodegenError("application module would overwrite another Python API")
+    (destination / (module + ".py")).write_text(code)
+    (destination / (module + ".pyi")).write_text(stubs)
+    (destination / "_application_module.json").write_text(
+        json.dumps({"module": module}) + "\n"
+    )
+    return destination / (module + ".py")

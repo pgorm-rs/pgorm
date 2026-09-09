@@ -5398,6 +5398,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T19:04:58.147349Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T19:10:54.431337Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The existing FromQueryResult::expected_columns reflection already exposes each derived field's Rust type spelling and SQL identity, so generated typing can use it without changing root traits or derives. The workflow will scaffold a single native application module from validated Rust entity/factory paths, build and inspect its compiled registry, then emit concrete Python wrappers and stubs from that registry. Unknown/custom reflected types must remain explicit Any unless supported; SQL ColumnType remains an input hint rather than a claimed Rust field type. Generated manifests must pin package/pgorm/registry compatibility and verify source identities and optional graph slot shapes."
+                    }
+
+                    {
+                        at 2026-09-09T19:45:02.344032Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The installed codegen workflow now scaffolds a native application crate, builds and installs a probe wheel, emits deterministic concrete model/ActiveModel/graph wrappers and stubs from compiled metadata, then rebuilds and installs the final wheel. PostgreSQL CRUD/optional-graph execution and compatibility failures passed. Pinned mypy 1.18.2 accepts the concrete consumer and rejects four invalid field/optional-shape uses. The checker isolates standalone Cargo artifacts because downstream dependency builds otherwise overwrite the shared cdylib output without its standalone initializer. Documentation records build-time compilation, exact enum identities, unknown custom type Any, and native operation mappings."
+                    }
                 )
             }
 

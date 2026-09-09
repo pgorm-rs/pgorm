@@ -1,5 +1,18 @@
 platforms (
     {
+        platform "python-codegen"
+        files (pgorm-python/tests/codegen-entities/** pgorm-python/tests/application-binding/src/account.rs pgorm-python/tests/application-binding/src/note.rs)
+        checks {
+            format {
+                cmd "cargo fmt --manifest-path pgorm-python/tests/codegen-entities/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path pgorm-python/tests/codegen-entities/Cargo.toml --all"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path pgorm-python/tests/codegen-entities/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "python-application"
         files (pgorm-python/**/*.rs pgorm-python/Cargo.toml pgorm-python/Cargo.lock pgorm-python/tests/application-binding/Cargo.toml pgorm-python/tests/application-binding/Cargo.lock)
         checks {

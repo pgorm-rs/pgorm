@@ -70,6 +70,19 @@ fn manifest() -> Value {
             "cursor": "one root column plus Rust's declared primary-key tiebreaks",
             "unsupported": ["unregistered shapes", "source arity beyond seven", "graph.stream", "graph.grouped", "slot-column cursors", "composite order-column cursors", "cursor SQL inspection"]
         },
+        "codegen_policy": {
+            "workflow": ["pgorm.codegen scaffold", "native application build and install", "pgorm.codegen emit", "final wheel build and install"],
+            "input_schema_version": 1,
+            "typing_source": "FromQueryResult::expected_columns Rust field spellings; unknown custom types remain Any",
+            "compatibility": ["package_version", "pgorm_version", "registry_abi", "features", "compiled entity and graph metadata"],
+            "python_conveniences": {
+                "model properties": "EntityModel lookup over ModelTrait::get with checked Value conversion",
+                "set_<field>": "typed Value construction then ActiveModelTrait::set on a cloned native model",
+                "model and active views": "registered native EntityModel and ActiveModel methods",
+                "entity query views": "registered native EntityQuery methods over Select<Entity>",
+                "graph and cursor views": "registered native GraphQuery and GraphCursor methods over SelectGraph; wrap decoded models in concrete Python views"
+            }
+        },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}

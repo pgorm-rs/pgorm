@@ -1,0 +1,16 @@
+[package]
+name = "pgorm-python-codegen-entities"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+pgorm = { path = "../../.." }
+serde = { version = "=1.0.229", features = ["derive"] }
+async-trait = "=0.1.92"
+tokio = { version = "=1.53.1", features = ["time"] }
+
+[lints.rust]
+unsafe_code = "forbid"
