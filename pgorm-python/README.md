@@ -57,6 +57,24 @@ assert value.snapshot()["type"] == {"kind": "i16"}
 assert Value.json(None) != Value.null("json")
 ```
 
+## Expressions
+
+Compose native expressions with `col`, `bind`, `literal`, `Condition` and
+`call`. Operations return reusable, immutable Rust builder state. Inspection
+returns Rust-built SQL and tagged parameters:
+
+```python
+from pgorm import col, literal
+
+predicate = (col("active") == True) & (col("score") > literal(10))
+compiled = predicate.inspect()
+print(compiled.sql)
+print([value.snapshot() for value in compiled.params])
+```
+
+See [expression construction and Rust API mappings](EXPRESSIONS.md) for
+conditions, functions, literal/bound paths, casts and ownership semantics.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

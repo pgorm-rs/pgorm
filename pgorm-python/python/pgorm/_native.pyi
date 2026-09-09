@@ -69,3 +69,13 @@ class Value:
     def element_type(self) -> str | TypeName | None: ...
     def items(self) -> list[Value] | None: ...
     def snapshot(self) -> dict[str, Any]: ...
+
+from ._query_types import (
+    Identifier as Identifier, Direction as Direction, Nulls as Nulls,
+    Compiled as Compiled, LikePattern as LikePattern,
+    AliasedExpr as AliasedExpr, OrderBy as OrderBy,
+)
+from ._expressions import (
+    Expr as Expr, Condition as Condition, col as col, bind as bind,
+    literal as literal, call as call, tuple_expr as tuple_expr,
+)

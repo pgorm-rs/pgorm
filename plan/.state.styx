@@ -1138,7 +1138,17 @@ impl_evidence (
     )}
     {id python.acceptance}
     {id python.direct-builders}
-    {id python.expressions}
+    {id python.expressions, covered_rules (
+        python.delegation
+        python.expressions
+        python.input-boundaries
+        python.ownership
+    ), covered_claims (
+        {impl_name main, rule python.delegation}
+        {impl_name main, rule python.expressions}
+        {impl_name main, rule python.input-boundaries}
+        {impl_name main, rule python.ownership}
+    )}
     {id python.package, covered_rules (
         python.api
         python.capabilities

@@ -5102,6 +5102,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T16:18:57.562383Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T16:37:44.014445Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented native owned SimpleExpr/Condition composition, identifier/type/pattern/ordering boundaries, separate Constant/Value paths and Rust-built inspection. Installed expression tests (11) pass; Rust AST/SQL/parameter parity tests (5) pass. Literal substring helpers lower through Rust Func string functions, so no duplicate escaping algorithm is introduced. Final artifact rebuild and required checks remain. Execution/result terminals remain with the existing statements/results/direct-builders nodes."
+                    }
                 )
             }
 

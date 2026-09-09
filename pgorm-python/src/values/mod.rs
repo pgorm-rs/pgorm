@@ -38,6 +38,22 @@ impl PyValue {
         &self.inner
     }
 
+    /// The qualified enum cast carried by this scalar or array, if any.
+    pub fn enum_cast(&self) -> Option<pgorm::pgorm_query::TypeName> {
+        match &self.tag {
+            Tag::Enum(name) => Some(name.rust_type()),
+            Tag::Array(element) => match element.as_ref() {
+                Tag::Enum(name) => Some(name.rust_type().array()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Self::new(value, None)
+    }
+
     fn convert(data: &Bound<'_, PyAny>, tag: Tag) -> PyResult<Self> {
         if let Ok(value) = data.extract::<PyRef<'_, Self>>() {
             if value.tag != tag {

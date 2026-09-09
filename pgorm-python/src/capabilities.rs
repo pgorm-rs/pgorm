@@ -5,7 +5,7 @@ use crate::UnsupportedCapabilityError;
 
 // [spec:pgorm:req:python.capabilities]
 fn manifest() -> Value {
-    json!({
+    let mut manifest = json!({
         "schema_version": 1,
         "package_version": env!("CARGO_PKG_VERSION"),
         "pgorm_version": env!("PGORM_VERSION"),
@@ -35,11 +35,21 @@ fn manifest() -> Value {
             "enum_storage": "Rust String value with qualified TypeName metadata",
             "snapshot": "version 1, tagged JSON with integer strings and IEEE float bits"
         },
-        "result_forms": ["pool", "connection", "bool"],
+        "expression_functions": {
+            "lower": [1], "upper": [1], "abs": [1], "char_length": [1],
+            "count": [1], "count_distinct": [1], "sum": [1], "avg": [1],
+            "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
+            "random": [0], "gen_random_uuid": [0]
+        },
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering"],
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
-    })
+    });
+    if let Some(operations) = manifest["operations"].as_object_mut() {
+        operations.extend(crate::expressions::capabilities());
+    }
+    manifest
 }
 
 /// Return a fresh, versioned description of this native build's public surface.
