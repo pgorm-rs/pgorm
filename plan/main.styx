@@ -5064,6 +5064,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T16:01:54.521187Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T16:16:08.140899Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented immutable native Value wrappers for every current Rust scalar variant, typed SQL NULLs, one-dimensional arrays and qualified enum metadata. Installed-wheel conversion tests pass (10); Rust parity and unrepresentable-output tests pass (3). Conversions reject width/precision loss and ambiguous inputs; snapshot v1 retains tags and IEEE bits. Final rebuilt-wheel regressions and required platform checks remain before delivery."
+                    }
                 )
             }
 

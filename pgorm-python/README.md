@@ -41,6 +41,22 @@ print(pgorm.__version__)
 print(pgorm.capabilities())
 ```
 
+## Values
+
+`Value(data, kind)` constructs an immutable native Rust value. Explicit kinds
+retain integer widths, typed NULLs, temporal variants and qualified enum names;
+`Value.array` and `Value.json` preserve array identity and JSON null. See the
+[conversion table and policies](VALUES.md) for exact limits and examples.
+
+```python
+from pgorm import Value
+
+value = Value(42, "i16")
+assert value.value == 42
+assert value.snapshot()["type"] == {"kind": "i16"}
+assert Value.json(None) != Value.null("json")
+```
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

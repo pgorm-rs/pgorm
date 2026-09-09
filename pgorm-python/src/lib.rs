@@ -7,6 +7,7 @@ mod capabilities;
 mod config;
 mod errors;
 mod runtime;
+pub mod values;
 
 use pyo3::prelude::*;
 
@@ -31,5 +32,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(capabilities::require_capability, module)?)?;
     errors::register(module)?;
     runtime::register(module)?;
+    values::register(module)?;
     Ok(())
 }

@@ -18,9 +18,23 @@ fn manifest() -> Value {
             "pool.acquire": {"rust_api": "pgorm::DatabasePool::get", "features": ["runtime-tokio"]},
             "pool.close": {"rust_api": "pgorm::DatabasePool::close", "features": ["runtime-tokio"]},
             "connection.ping": {"rust_api": "pgorm::ConnectionTrait::query_one", "features": ["runtime-tokio"]},
-            "connection.close": {"rust_api": "pgorm::DatabaseConnection::drop", "features": ["runtime-tokio"]}
+            "connection.close": {"rust_api": "pgorm::DatabaseConnection::drop", "features": ["runtime-tokio"]},
+            "value": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
+            "value.array": {"rust_api": "pgorm::pgorm_query::Value::Array", "features": ["postgres-array"]},
+            "value.json": {"rust_api": "pgorm::pgorm_query::Value::Json", "features": ["with-json"]},
+            "value.null": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
+            "value.snapshot": {"rust_api": "pgorm_python::values::PyValue", "features": []},
+            "type_name": {"rust_api": "pgorm::pgorm_query::TypeName", "features": []}
         },
-        "value_types": [],
+        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(["enum", "array"]).collect::<Vec<_>>(),
+        "value_policy": {
+            "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
+            "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",
+            "temporal_precision": "microseconds; leap seconds and subsecond offsets rejected",
+            "aware_datetime": "explicit UTC, machine local, or fixed-offset tag",
+            "enum_storage": "Rust String value with qualified TypeName metadata",
+            "snapshot": "version 1, tagged JSON with integer strings and IEEE float bits"
+        },
         "result_forms": ["pool", "connection", "bool"],
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},

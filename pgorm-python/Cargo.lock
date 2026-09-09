@@ -1331,9 +1331,11 @@ dependencies = [
 name = "pgorm-python"
 version = "0.2.0"
 dependencies = [
+ "chrono",
  "pgorm",
  "pyo3",
  "pyo3-async-runtimes",
+ "rust_decimal",
  "rustls",
  "rustls-pemfile",
  "serde_json",
@@ -1342,6 +1344,7 @@ dependencies = [
  "tokio-postgres-rustls",
  "tokio-util",
  "toml",
+ "uuid",
  "webpki-roots",
 ]
 
@@ -2733,6 +2736,7 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "rustversion",
+ "serde",
  "wasm-bindgen-macro",
  "wasm-bindgen-shared",
 ]
