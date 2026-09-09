@@ -4956,6 +4956,13 @@ children (
                         kind @note
                         text "Full attempt completed against e942431cf2363e16d9db1da6ea956cb6c25da1d0 with unchanged source: 420/420 scans complete, 210/210 case/technique pairs accounted, 105 pass and 105 invalid-control. No protected findings or invariant violations, no incomplete scans or infrastructure failures, cleanup succeeded. All 14 direct SQL security regressions passed on the same pinned PostgreSQL fixture and settings. No Q control was detected across 35 cases; insert, pipeline-projection, schema, column, group, function and stored-identifier missed all six techniques. Acceptance remains open. Reviewable case matrix and report/configuration digests: security/sqlmap/acceptance/2026-09-09.md. Complete local evidence: target/sqlmap/resume-full/; archive /private/tmp/pgorm-sqlmap-2026-09-09-e942431c.tar.gz. The runner correctly exited 1; no controls, profiles or verdict conditions were relaxed to obtain a pass."
                     }
+
+                    {
+                        at 2026-09-09T14:49:15.189554Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope correction, 2026-09-09: the resumed session continued fixed-route HTTP scanning after the operator's intended direction had moved to direct pgorm builder use through a native Python module. The recorded scanner run remains evidence for this separate branch, but did not deliver that objective. Python implementation and generated-program testing do not depend on completing this node; see python.direct-builders for the direct-access milestone."
+                    }
                 )
             }
         )
@@ -5005,7 +5012,7 @@ children (
 
             {
                 id python.package
-                title "Build the opt-in native package and publish its capability contract"
+                title "Build the opt-in PyO3 module and expose its capability contract"
                 kind @build
                 implements {
                     main (
@@ -5308,12 +5315,12 @@ children (
 
             {
                 id python.acceptance
-                title "Verify installed Python API parity, lifecycle and application-schema behavior"
+                title "Verify installed native Python API and direct builder execution without HTTP"
                 kind @test
                 implements {
                     main ([spec:pgorm:req:python.acceptance])
                 }
-                deps (python.distribution)
+                deps (python.distribution python.direct-builders)
                 sealed true
                 log (
                     {
@@ -5347,6 +5354,32 @@ children (
                     }
                 )
             }
+
+            {
+                id python.direct-builders
+                title "Verify installed Python builders against PostgreSQL without HTTP"
+                kind @test
+                implements {
+                    main ([spec:pgorm:req:python.direct-builders])
+                }
+                deps (python.statements python.results)
+                sealed true
+                log (
+                    {
+                        at 2026-09-09T14:48:22.18185Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+
+                    {
+                        at 2026-09-09T14:48:52.326248Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implements python.direct-builders in docs/spec/python.md. Install the wheel, use runtime application table names, vary builder structure and values in one loaded native build, compare SQL/parameters with Rust builders and check SELECT/CRUD database results. Exercise literal and binder paths without HTTP, scanner services or per-query compilation. Depends on python.statements and python.results (which brings runtime, values and package); full python.acceptance depends on this evidence."
+                    }
+                )
+            }
         )
         sealed true
         log (
@@ -5355,6 +5388,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "sealed — decomposition asserted complete (nplan seal)"
+            }
+
+            {
+                at 2026-09-09T14:48:52.254647Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator reaffirmed on 2026-09-09 that the objective is to remove HTTP from Python access to pgorm and compose the real builders through a native Python module. The existing Python implementation leaves carry that work. Added python.direct-builders after python.statements and python.results to demonstrate installed, in-process construction and PostgreSQL execution before full package acceptance. HTTP scanner completion is not a dependency. python.package is ready because python.design is complete; no binding implementation is claimed by these planning changes."
             }
         )
     }

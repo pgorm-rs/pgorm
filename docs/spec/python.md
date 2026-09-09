@@ -9,6 +9,11 @@ The Python surface serves application developers and the generated campaign in
 [generative.md](generative.md). The campaign consumes the public bindings;
 fixture entities, vulnerable controls and scanner dependencies remain separate.
 
+The immediate integration milestone is `python.direct-builders`: an installed
+Python module composes and executes real pgorm builders in process against
+PostgreSQL. Neither this milestone nor full package acceptance depends on an
+HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
+
 ## Package boundary
 
 > [spec:pgorm:def:python.api]
@@ -37,8 +42,12 @@ fixture entities, vulnerable controls and scanner dependencies remain separate.
 
 ## Faithful construction and conversion
 
-> [spec:pgorm:req:python.delegation]
-> Each exposed operation MUST identify and invoke its corresponding Rust API.
+> [spec:pgorm:req:python.delegation+1]
+> Each exposed operation MUST identify and invoke its corresponding Rust API
+> in the Python process through the native extension. Query construction and
+> execution MUST NOT require an HTTP adapter, RPC service or subprocess query
+> dispatcher. Python MUST compose builder operations directly; selecting a
+> fixed query handler and supplying its inputs does not satisfy this contract.
 > Bindings MUST NOT implement a second SQL renderer, escaping algorithm,
 > placeholder substitution engine or query optimizer. Python conveniences MUST
 > lower into documented Rust operations. A dynamic statement path MUST NOT be
@@ -206,6 +215,25 @@ fixture entities, vulnerable controls and scanner dependencies remain separate.
 > Any caught internal Rust panic MUST remain an identifiable implementation
 > failure and MUST NOT be classified as an expected input rejection.
 
+## Direct builder integration
+
+> [spec:pgorm:req:python.direct-builders]
+> An integration suite MUST install a built wheel in a clean Python environment
+> and import its declared public module. Using only public bindings, it MUST
+> compose SELECT with joins and nested predicates, INSERT, UPDATE and DELETE
+> over application tables whose names are supplied at runtime. Within one
+> loaded extension build it MUST vary both builder structure and values, inspect
+> SQL and tagged parameters, execute against PostgreSQL and check returned rows
+> and affected counts against the fixture's expected state. Equivalent Rust
+> builder operations MUST establish SQL/parameter parity for these cases.
+> The installed suite MUST pass without an HTTP adapter, scanner or query
+> dispatcher service and without invoking a compiler or package build per
+> query. It MUST exercise both literal and bound value paths. Fixture creation
+> MAY use separate test setup; the queries under test MUST use the builders.
+> The suite MUST have a documented command and produce failing exit status
+> for construction, parity, execution or result mismatches. Broader package
+> acceptance MUST retain this suite as required evidence.
+
 ## Downstream development and release
 
 > [spec:pgorm:req:python.codegen]
@@ -234,10 +262,11 @@ fixture entities, vulnerable controls and scanner dependencies remain separate.
 > MUST be claimed only for tested combinations. Artifacts MUST be ready for
 > review without uploading to package registries as part of ordinary tests.
 
-> [spec:pgorm:req:python.acceptance]
-> Initial acceptance MUST include public-API tests against PostgreSQL for an
-> application schema outside the harness fixtures, lossless conversion and
-> boundary rejection cases, runtime/lifecycle/cancellation tests, compiled
+> [spec:pgorm:req:python.acceptance+1]
+> Initial acceptance MUST include the direct-builder integration suite and
+> public-API tests against PostgreSQL for an application schema outside the
+> harness fixtures, lossless conversion and boundary rejection cases,
+> runtime/lifecycle/cancellation tests, compiled
 > entity/graph registration tests and install/type-check tests of built
 > artifacts. Rust/Python parity tests MUST cover every claimed API family and
 > execution path. Default Rust builds MUST still work without Python tooling.

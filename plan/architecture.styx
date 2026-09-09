@@ -43,6 +43,7 @@ elements (
             [spec:pgorm:req:python.codegen]
             [spec:pgorm:req:python.typing]
             [spec:pgorm:req:python.distribution]
+            [spec:pgorm:req:python.direct-builders]
             [spec:pgorm:req:python.acceptance]
         )
         log ({
