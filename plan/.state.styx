@@ -1398,24 +1398,12 @@ impl_evidence (
     )}
     {id sqlmap.verdict, covered_rules (
         security.sqlmap.outcomes
+        security.sqlmap.runner-tests
         security.sqlmap.verdict
     ), covered_claims (
         {impl_name main, rule security.sqlmap.outcomes}
+        {impl_name main, rule security.sqlmap.runner-tests}
         {impl_name main, rule security.sqlmap.verdict}
-    ), rule_versions_seen (
-        {id security.sqlmap, version 0}
-        {id security.sqlmap.adapter, version 0}
-        {id security.sqlmap.artifacts, version 0}
-        {id security.sqlmap.controls, version 0}
-        {id security.sqlmap.execution, version 0}
-        {id security.sqlmap.fixtures, version 0}
-        {id security.sqlmap.isolation, version 0}
-        {id security.sqlmap.matrix, version 0}
-        {id security.sqlmap.observability, version 0}
-        {id security.sqlmap.outcomes, version 0}
-        {id security.sqlmap.pin, version 0}
-        {id security.sqlmap.profiles, version 0}
-        {id security.sqlmap.verdict, version 0}
     )}
 )
 

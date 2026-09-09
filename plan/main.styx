@@ -4849,6 +4849,20 @@ children (
                         kind @note
                         text "Deliver explicit pass/vulnerable/invalid-control/incomplete case outcomes and an aggregate exit status requiring complete inventory, detected controls and successful cleanup. Add fast runner tests for missing/malformed output, zero-exit/no-output, skipped and empty discovery, stale sessions, dead/inactive routes, baseline failure, cancellation/timeouts, protected findings and missed positive controls. Keep these separate from the slower real scanner campaign."
                     }
+
+                    {
+                        at 2026-09-09T13:53:40.854945Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T13:57:06.06504Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Verified the Rust runner's 17 fast tests and Python runner's 22 fast tests with python3 security/sqlmap/check.py. Added the shared fast-test entrypoint as the implementation of security.sqlmap.runner-tests and registered Rust integration tests with nspec. Python inventory now rejects duplicated cases/techniques, unknown or empty techniques, and selected cases with no scheduled technique instead of silently omitting work. Existing tests cover controls, baselines, malformed/missing output, cancellation, stale targets, missing/skipped/empty cases, findings and cleanup failure. Live acceptance remains separate."
+                    }
                 )
             }
 

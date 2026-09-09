@@ -235,6 +235,8 @@ def aggregate(expected, results, cleanup):
 # [spec:pgorm:req:security.sqlmap.profiles]
 def inventory(manifest, profile, subset):
     cases = {c["id"]: c for c in manifest["cases"]}
+    if len(cases) != len(manifest["cases"]):
+        raise ValueError("duplicated manifest case")
     selected = profile["cases"]
     if subset:
         if any(c not in selected for c in subset):
@@ -242,7 +244,20 @@ def inventory(manifest, profile, subset):
         selected = subset
     if not selected or len(selected) != len(set(selected)):
         raise ValueError("empty or duplicated case inventory")
-    return [(cases[c], t) for c in selected for t in cases[c]["techniques"] if t in profile["techniques"]]
+    techniques = profile["techniques"]
+    if not techniques or len(techniques) != len(set(techniques)) or any(t not in TECHNIQUES for t in techniques):
+        raise ValueError("empty, duplicated or unknown technique inventory")
+    work = []
+    for case_id in selected:
+        case = cases[case_id]
+        enabled = case["techniques"]
+        if len(enabled) != len(set(enabled)):
+            raise ValueError("duplicated case technique")
+        scheduled = [(case, t) for t in enabled if t in techniques]
+        if not scheduled:
+            raise ValueError(f"no scheduled techniques for {case_id}")
+        work.extend(scheduled)
+    return work
 
 
 def scan(fixture, case, technique, mode, profile, script, artifacts):

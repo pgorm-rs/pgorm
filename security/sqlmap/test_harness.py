@@ -136,5 +136,30 @@ class VerdictTests(unittest.TestCase):
         self.assertTrue(h.aggregate(["a","b"],{"a":{"outcome":"pass"},"b":{"outcome":"pass"}},[]))
 
 
+# [spec:pgorm:req:security.sqlmap.runner-tests/test]
+# [spec:pgorm:req:security.sqlmap.verdict/test]
+class InventoryTests(unittest.TestCase):
+    def test_unscheduled_cases_cannot_disappear(self):
+        manifest = {"cases": [{"id": "a", "techniques": ["B"]}, {"id": "b", "techniques": ["E"]}]}
+        profile = {"cases": ["a", "b"], "techniques": ["B"]}
+        with self.assertRaisesRegex(ValueError, "no scheduled techniques for b"):
+            h.inventory(manifest, profile, [])
+
+    def test_invalid_inventory_cannot_pass(self):
+        manifest = {"cases": [{"id": "a", "techniques": ["B"]}]}
+        for techniques in ([], ["B", "B"], ["unknown"]):
+            with self.subTest(techniques=techniques), self.assertRaises(ValueError):
+                h.inventory(manifest, {"cases": ["a"], "techniques": techniques}, [])
+        duplicate = {"cases": manifest["cases"] * 2}
+        with self.assertRaisesRegex(ValueError, "duplicated manifest case"):
+            h.inventory(duplicate, {"cases": ["a"], "techniques": ["B"]}, [])
+
+    def test_profiles_account_for_every_scheduled_scan(self):
+        manifest = h.read_json(h.HERE / "cases.json")
+        profiles = h.read_json(h.HERE / "profiles.json")
+        self.assertEqual(len(h.inventory(manifest, profiles["full"], [])), 210)
+        self.assertEqual(len(h.inventory(manifest, profiles["smoke"], [])), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
