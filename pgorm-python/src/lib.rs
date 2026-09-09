@@ -8,6 +8,7 @@ mod config;
 mod errors;
 pub mod expressions;
 pub mod identifiers;
+pub mod results;
 mod runtime;
 pub mod statements;
 pub mod values;
@@ -39,5 +40,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     expressions::register(module)?;
     identifiers::register(module)?;
     statements::register(module)?;
+    results::register(module)?;
     Ok(())
 }

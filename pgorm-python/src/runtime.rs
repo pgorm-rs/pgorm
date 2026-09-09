@@ -289,6 +289,31 @@ pub(crate) struct NativeConnection {
 
 #[pymethods]
 impl NativeConnection {
+    fn execute<'py>(
+        &self,
+        py: Python<'py>,
+        query: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        crate::results::execute(py, self.state.clone(), query)
+    }
+
+    fn fetch<'py>(
+        &self,
+        py: Python<'py>,
+        query: &Bound<'_, PyAny>,
+        mode: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        crate::results::fetch(py, self.state.clone(), query, mode)
+    }
+
+    fn stream<'py>(
+        &self,
+        py: Python<'py>,
+        query: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        crate::results::open(py, self.state.clone(), query)
+    }
+
     fn ping<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.state.pool.check_owner(py)?;
         let state = self.state.clone();

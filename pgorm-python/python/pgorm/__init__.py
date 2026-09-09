@@ -43,6 +43,7 @@ from ._native import (
     require_capability,
 )
 from .runtime import Connection, Pool, PoolStatus, connect
+from .results import Record, Field, ResultStream, Query
 
 select = Select
 insert = Insert
@@ -63,6 +64,10 @@ __all__ = [
     "Pool",
     "PoolStatus",
     "connect",
+    "Record",
+    "Field",
+    "ResultStream",
+    "Query",
     "UnsupportedCapabilityError",
     "TypeName",
     "Value",

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from . import _native
+from .results import Query, Record, ResultStream
 
 
 class PoolStatus(NamedTuple):
@@ -85,6 +86,33 @@ class Pool:
         async with self.connection() as connection:
             return await connection.ping()
 
+    async def execute(self, query: Query) -> int:
+        """Execute a native builder or explicit RawSQL and return affected rows."""
+        async with self.connection() as connection:
+            return await connection.execute(query)
+
+    async def fetch_all(self, query: Query) -> list[Record]:
+        async with self.connection() as connection:
+            return await connection.fetch_all(query)
+
+    async def fetch_one(self, query: Query) -> Record:
+        async with self.connection() as connection:
+            return await connection.fetch_one(query)
+
+    async def fetch_optional(self, query: Query) -> Record | None:
+        async with self.connection() as connection:
+            return await connection.fetch_optional(query)
+
+    async def stream(self, query: Query) -> ResultStream:
+        """Open a stream; its iterator keeps the acquired connection alive."""
+        connection = await self.acquire()
+        try:
+            native = await connection._native.stream(query)
+        except BaseException:
+            await connection.close()
+            raise
+        return ResultStream(native, connection, release_connection=True)
+
     async def close(self) -> None:
         """Reject waiters, cancel active operations and release connections."""
         await self._native.close()
@@ -125,6 +153,25 @@ class Connection:
 
     async def ping(self) -> bool:
         return await self._native.ping()
+
+    async def execute(self, query: Query) -> int:
+        return await self._native.execute(query)
+
+    async def fetch_all(self, query: Query) -> list[Record]:
+        """Materialize all rows through Rust decoders, preserving output names."""
+        return await self._native.fetch(query, "all")
+
+    async def fetch_one(self, query: Query) -> Record:
+        """Require exactly one row; zero or multiple rows raise DatabaseError."""
+        return await self._native.fetch(query, "one")
+
+    async def fetch_optional(self, query: Query) -> Record | None:
+        """Require at most one row; only zero rows produce None."""
+        return await self._native.fetch(query, "optional")
+
+    async def stream(self, query: Query) -> ResultStream:
+        native = await self._native.stream(query)
+        return ResultStream(native, self, release_connection=False)
 
     async def close(self) -> None:
         await self._native.close()

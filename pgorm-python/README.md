@@ -83,6 +83,11 @@ SQL and parameters produced by that builder state. See [runtime statement
 examples](STATEMENTS.md) for joins, grouping, write guards, conflict actions,
 RETURNING and the explicit `RawSQL` template API.
 
+`await pool.execute(query)` returns affected rows. `fetch_all`, `fetch_one`
+and `fetch_optional` return detached records; `stream` opens an async iterator.
+See [execution, result types and stream ownership](RESULTS.md) for examples,
+PostgreSQL decoding limits and cancellation behavior.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

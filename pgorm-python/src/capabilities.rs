@@ -41,7 +41,17 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream"],
+        "result_policy": {
+            "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
+            "names": "unique output names required; explicit aliases resolve duplicates",
+            "timestamptz": "UTC; PostgreSQL does not retain the input timezone",
+            "numeric": "exact 96-bit Decimal coefficient and scale 0–28; other values rejected",
+            "json": "serde_json i64/u64/f64; numeric value loss and nesting beyond 64 rejected",
+            "arrays": "one dimension, lower bound 1, nullable elements; other shapes rejected",
+            "unsupported": ["domain", "composite", "range", "multirange", "interval", "timetz", "bit", "money"],
+            "stream": "one pull at a time over bounded driver buffers; owns connection until EOF or close"
+        },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
@@ -49,6 +59,7 @@ fn manifest() -> Value {
     if let Some(operations) = manifest["operations"].as_object_mut() {
         operations.extend(crate::expressions::capabilities());
         operations.extend(crate::statements::capabilities());
+        operations.extend(crate::results::capabilities());
     }
     manifest
 }

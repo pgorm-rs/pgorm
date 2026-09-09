@@ -38,6 +38,24 @@ impl PyValue {
         &self.inner
     }
 
+    /// Retain a PostgreSQL enum's qualified identity alongside its Rust payload.
+    pub(crate) fn from_enum(inner: Value, name: PyTypeName, array: bool) -> Self {
+        let tag = Tag::Enum(name);
+        Self {
+            inner,
+            tag: if array {
+                Tag::Array(Box::new(tag))
+            } else {
+                tag
+            },
+        }
+    }
+
+    /// Convert through the same checked path used by the public Value getter.
+    pub(crate) fn to_python(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        convert::to_python(py, &self.inner)
+    }
+
     /// The qualified enum cast carried by this scalar or array, if any.
     pub fn enum_cast(&self) -> Option<pgorm::pgorm_query::TypeName> {
         match &self.tag {

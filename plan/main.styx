@@ -5211,6 +5211,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T17:00:28.162714Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T17:25:57.99365Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented native execute/fetch_all/fetch_one/fetch_optional/query_raw streaming over the same compiled Rust statement state, with ValueHolder parameters and the ordinary cached pgorm executor. Records preserve unique names, column/type/source metadata and tagged nullable values. Exactness adapters reject upstream Decimal rounding, NaiveTime midnight wrapping, JSON numeric loss and unrepresentable array bounds; dynamic records retain joined NULL fields without claiming compiled optional-model terminals (those remain entities/graph). Stream guards own checked-out connections and discard incomplete operations on cancellation, decode failure, abandonment and shutdown. Validation and commit gates in progress."
+                    }
+
+                    {
+                        at 2026-09-09T17:29:16.080151Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final installed-wheel regression: 69 tests passed against the disposable PostgreSQL/TLS fixture. Native library suite: 15 tests passed, including independent Rust expression/statement parity and Decimal/time/array/JSON codec parity/rejection. Stream cases cover pending-pull cancellation, foreign-loop rejection without consuming the owner, EOF lease reuse, early discard, abandonment, idle shutdown and late SQLSTATE errors. The pending-pull fixture now consumes partial network frames in a task rather than assuming complete-row flushes; acquisition timeout is 0.5s to allow replacement connections under concurrent compiler load, while cancellation/shutdown checks retain 1s operation budgets."
+                    }
                 )
             }
 
