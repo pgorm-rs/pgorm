@@ -10,7 +10,7 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 
 ### Testing
 - `cargo nextest run --workspace` - Run the test suite (the preferred runner; skips doctests)
-- `cargo test --doc --workspace` - Run the doctests, which nextest skips entirely: a SQL golden written inside a doc example is checked here and nowhere else, so run this whenever rendering changes (~17 minutes). `pgorm` and `pgorm-query` pass. The run then fails in `pgorm-macros`, whose 15 examples pass under `cargo test --doc -p pgorm-macros` and fail only under `--workspace` — a feature-unification difference, not a stale example; being chased under the `doctest-repair` node. Note cargo stops at the first crate that fails, so a green-looking run may simply not have reached the later crates
+- `cargo test --doc --workspace` - Run the doctests, which nextest skips entirely: a SQL golden written inside a doc example is checked here and nowhere else, so run this whenever rendering changes (~17 minutes). All nine crates pass — 543 examples, 9 of them `ignore`-fenced and never run. Two things to know when reading a result: cargo stops at the first crate that fails, so a failure count is a lower bound and later crates may simply not have run; and a doctest run shares `target/` with any other cargo invocation, so a concurrent `build`/`check`/`nextest` swaps the rlibs underneath it and manufactures failures that do not reproduce. Let it finish alone
 - Tests require a running PostgreSQL instance. Set `DATABASE_URL` to the *server* URL with no database path, e.g. `DATABASE_URL=postgres://postgres:postgres@localhost:5432`
 - `.env.local` and `.env` are loaded automatically via dotenvy, so `DATABASE_URL` can live in either
 

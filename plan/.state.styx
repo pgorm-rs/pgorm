@@ -718,6 +718,7 @@ assertions (
     {id sqlmap.spec, kind @complete, author "brendan@necessary.nu", at 2026-09-08T10:06:16.052903Z}
     {id python.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:14.867381Z}
     {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
+    {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
 )
 
 impl_evidence (

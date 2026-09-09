@@ -292,6 +292,15 @@ children (
                         title "Bring the pgorm-query doc examples back in line with what the code renders"
                         kind @docs
                         deps (single-cast-node)
+                        sealed true
+                        log (
+                            {
+                                at 2026-09-09T09:44:00.312706Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Done (nplan complete)"
+                            }
+                        )
                     }
                 )
                 log (
