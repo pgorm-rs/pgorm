@@ -58,7 +58,7 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
 
 fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr {
     let Some(db) = error.as_db_error() else {
-        return ConnectionError::new_err("PostgreSQL connection or protocol failure");
+        return client_error(error, secrets);
     };
     let message = secrets.apply(db.message());
     let exception = DatabaseError::new_err(message.clone());
@@ -82,6 +82,25 @@ fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr 
     match decorated {
         Ok(()) => exception,
         Err(_) => InternalError::new_err("could not attach PostgreSQL diagnostics"),
+    }
+}
+
+fn client_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr {
+    // Pinned tokio-postgres 0.7.18 exposes no public error-kind accessor for
+    // FromSql/ToSql failures. Its top-level Display identifies the phase;
+    // inspect that before redaction, never a user-controlled nested cause.
+    // Keep the original Rust error intact until this Python boundary so
+    // application hooks can still match pgorm::Error::Postgres.
+    let phase = error.to_string();
+    if phase.starts_with("error deserializing column ")
+        || phase.starts_with("invalid column `")
+        || phase == "query returned an unexpected number of columns"
+    {
+        DecodeError::new_err(secrets.apply(&phase))
+    } else if phase.starts_with("error serializing parameter ") {
+        ConstructionError::new_err(secrets.apply(&phase))
+    } else {
+        ConnectionError::new_err("PostgreSQL connection or protocol failure")
     }
 }
 

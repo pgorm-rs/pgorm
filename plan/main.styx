@@ -5289,6 +5289,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T17:42:58.950737Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T17:48:45.052474Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implementation direction: concrete registration adapters will own real E::Select, E::Model and E::ActiveModel values behind object-safe wrappers, and call the existing fallible ModelTrait/ActiveModelTrait setters plus explicit insert/update/delete hooks. The standalone wheel keeps an empty compiled-entity registry; downstream builds can install the shared base bindings plus their registrations into one native module, avoiding incompatible duplicate copies of native Python classes across extension DSOs. Generated downstream packaging remains python.codegen. Registration metadata must declare Rust types, qualified table/column/enum identities, supported terminals and native ActiveValue states."
+                    }
+
+                    {
+                        at 2026-09-09T18:27:56.585326Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The independent application crate now registers real Rust Account and Note entities into the shared native module, with downstream defaults disabled to avoid duplicate PyO3 DSOs. Clean wheel installation passed nine PostgreSQL tests covering real selector cardinality, ActiveValue states, model conversion, enum identity, before/after hook outcomes and cancellation. Three Rust tests additionally verify registry collision rejection and exact Python/Rust SELECT SQL, parameters and ActiveValue parity. Native error translation now distinguishes the pinned driver's FromSql/ToSql errors at the Python boundary while preserving the original errors inside Rust hooks."
+                    }
                 )
             }
 

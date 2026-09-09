@@ -93,6 +93,10 @@ a fresh Python environment, runs 28 application query programs against
 PostgreSQL, and compares their SQL and tagged parameters with independent Rust
 builders. It provides the focused proof of direct Python access without HTTP.
 
+Applications with Rust entities can also [compile their entity registrations
+into an application wheel](ENTITIES.md). Python then uses their real typed
+queries, models, ActiveValue states and write hooks through `pgorm.entity`.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

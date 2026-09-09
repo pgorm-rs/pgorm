@@ -41,8 +41,9 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value"],
         "result_policy": {
+            "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
             "names": "unique output names required; explicit aliases resolve duplicates",
             "timestamptz": "UTC; PostgreSQL does not retain the input timezone",
@@ -52,6 +53,15 @@ fn manifest() -> Value {
             "unsupported": ["domain", "composite", "range", "multirange", "interval", "timetz", "bit", "money"],
             "stream": "one pull at a time over bounded driver buffers; owns connection until EOF or close"
         },
+        "entity_policy": {
+            "registration": "concrete Rust types compiled into the same native module",
+            "decode": "registered Model::from_query_result followed by checked Python Value conversion",
+            "input": "SQL ColumnType hints for plain values; explicit Value tags and Rust setters remain authoritative",
+            "one": "Rust Select::one/one_opt use LIMIT 1; all returns every selected model",
+            "writes": "real ActiveModel insert/update/delete and before/after hooks on a clone",
+            "execution": "acquired Connection; native asyncio awaitable",
+            "stream": false
+        },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
         "registrations": {"entities": [], "graphs": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
@@ -60,15 +70,22 @@ fn manifest() -> Value {
         operations.extend(crate::expressions::capabilities());
         operations.extend(crate::statements::capabilities());
         operations.extend(crate::results::capabilities());
+        operations.extend(crate::entities::capabilities());
     }
     manifest
 }
 
 /// Return a fresh, versioned description of this native build's public surface.
-#[pyfunction]
-pub(crate) fn capabilities(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    py.import("json")?
-        .call_method1("loads", (manifest().to_string(),))
+#[pyfunction(pass_module)]
+pub(crate) fn capabilities<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, PyAny>> {
+    let mut manifest = manifest();
+    let registry_object = module.getattr("_registry")?;
+    let registry = registry_object.extract::<PyRef<'_, crate::entities::NativeRegistry>>()?;
+    manifest["registrations"]["entities"] = registry.0.describe().into();
+    module
+        .py()
+        .import("json")?
+        .call_method1("loads", (manifest.to_string(),))
 }
 
 /// Fail explicitly when this build does not expose the requested operation.

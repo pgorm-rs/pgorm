@@ -1,5 +1,18 @@
 platforms (
     {
+        platform "python-application"
+        files (pgorm-python/**/*.rs pgorm-python/Cargo.toml pgorm-python/Cargo.lock pgorm-python/tests/application-binding/Cargo.toml pgorm-python/tests/application-binding/Cargo.lock)
+        checks {
+            format {
+                cmd "cargo fmt --manifest-path pgorm-python/tests/application-binding/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path pgorm-python/tests/application-binding/Cargo.toml --all"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path pgorm-python/tests/application-binding/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "python-native"
         files (pgorm-python/**/*.rs pgorm-python/Cargo.toml pgorm-python/Cargo.lock)
         checks {

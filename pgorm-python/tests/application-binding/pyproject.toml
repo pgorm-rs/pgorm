@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin==1.15.0"]
+build-backend = "maturin"
+
+[project]
+name = "pgorm"
+dynamic = ["version"]
+requires-python = ">=3.14,<3.15"
+description = "Downstream compiled entity fixture for the pgorm binding contract"
+
+[tool.maturin]
+bindings = "pyo3"
+# checks/entities.py materializes the shared facade in this build project.
+python-source = "python"
+module-name = "pgorm._native"
+features = ["extension-module"]

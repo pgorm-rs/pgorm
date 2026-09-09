@@ -17,6 +17,8 @@ name = "pgorm_python"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = ["standalone-module"]
+standalone-module = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]

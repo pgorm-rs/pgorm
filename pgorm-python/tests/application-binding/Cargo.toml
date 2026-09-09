@@ -1,0 +1,25 @@
+[package]
+name = "pgorm-python-application-fixture"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pgorm-python = { path = "../..", default-features = false }
+pgorm = { path = "../../.." }
+pyo3 = "=0.29.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+async-trait = "=0.1.92"
+tokio = { version = "=1.53.1", features = ["time"] }
+
+[lints.rust]
+unsafe_code = "forbid"
