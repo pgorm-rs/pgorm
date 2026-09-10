@@ -5917,6 +5917,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T22:52:31.231432Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T23:11:07.858579Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Implement independent built-in hostile strings and exact typed boundaries plus versioned deterministic random inputs. The optional offline importer verifies the existing pinned sqlmap archive, retains upstream notices and XML hashes, materializes supported request payload/boundary contexts as data, and inventories every unsupported request and unimported scanner vector/response with reasons. Imported combinations are input cases, never executed-test counts; neither loading inputs nor import runs the HTTP scanner. DISTINCT is already fixed and its verified Rust edits remain separately owned."
+                    }
+
+                    {
+                        at 2026-09-10T23:21:17.456224Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered 308 built-in hostile/typed boundary inputs and SHA-256-counter random samples, with closed value/name authoring roles. Pinned offline archive verification at target/generative-corpus/verified-20260911 passes: 365 templates, 329 supported and 36 dynamic UNION requests inventoried unsupported, all 53 boundaries supported, 21070 contextual input cases and 18655 distinct values (zero executed programs). Verification reconstructs every input, checks byte-exact XML/notices, deterministic re-import, corruption rejection and preservation of original artifacts. Manifest SHA-256 8f79df2ed4b6554f9bd7d0e156020dbeb1e6a6c748aa2f512567498aff2e71fd. All 60 fast tests and pinned Ruff checks pass. No native rebuild or HTTP scanner invocation."
+                    }
                 )
             }
 

@@ -99,7 +99,7 @@ and eight-row fetch regressions. A chained set-operation program still loses its
 expected grouping. New native count/window discrepancies are retained under
 [window-semantics](findings/window-semantics/README.md): a nullable-column count
 counts NULL rows, and first/last omit an explicitly authored row frame.
-Full generation, complete oracle coverage, controls, shrinking,
+Full generation, complete oracle coverage, shrinking,
 general Rust emission, compile campaigns and acceptance remain separate WBS work.
 
 ## Independent checks in development
@@ -203,3 +203,57 @@ review before blaming the library. Missing/inconsistent native evidence remains
 unattributed and never removes the original Python failure. This machinery does
 not patch production code or close findings. General Rust emission and full
 Python/Rust execution parity remain the separate replay node's work.
+
+## Input corpus
+
+`corpus_builtin.builtin()` provides 308 repository-owned inputs: hostile text,
+identifier lengths around PostgreSQL's 63-byte boundary, exact numeric limits,
+IEEE float bits, typed NULLs, arrays (including empty/NULL/NULL elements), JSON,
+Decimal, UUID, enum, temporal, network, bytes and vector values.
+`corpus_random.sample(seed, index)` produces deterministic typed values using a
+versioned SHA-256 counter, independent of iteration order or worker partitioning.
+Neither function imports pgorm, starts PostgreSQL, accesses the network or needs
+sqlmap. A valid portable value does not imply support in every PostgreSQL context;
+the grammar must choose compatible contexts or declare a rejection check.
+
+`Input.node(author, role="value")` inserts a value node. The `identifier` role
+inserts that text through a name node. No role can turn corpus text into a raw
+query or an intentional expression. Empty names, NULs and byte lengths are
+reported as traits, without assuming an API-specific acceptance/rejection rule.
+
+The optional sqlmap importer reads a local archive matching the immutable revision
+and SHA-256 in `sqlmap_archive.py`. It does not run the HTTP scanner:
+
+```sh
+PYTHONPATH=security/generative/src python3 -m pgorm_campaign.sqlmap_import \
+  --archive target/sqlmap-cache/sqlmap.tar.gz \
+  --output target/generative-corpus/my-import --seed 20260911 --variants 2
+```
+
+The output must be a new directory. It retains the upstream LICENSE,
+THIRD-PARTY notices, original XML including notices, importer source, content
+hashes, exact substitution contexts, transformation rules and a complete
+template/boundary inventory. Imported upstream data and its license notices stay
+together in this optional artifact; the public pgorm wheel excludes the campaign.
+The importer source and data hashes make the recorded transformations reviewable.
+`sqlmap_import.load(directory)` validates artifact hashes, input types, identities
+and counts before returning data for generation.
+
+At the pinned revision there are 365 request templates and 53 boundaries.
+329 requests are supported; 36 dynamic UNION requests need scanner-selected
+projection topology and are explicitly inventoried as unsupported. Scanner
+vectors and response oracles are also inventoried as omitted. With the seed and
+two variants above, import produces 21,070 contextual inputs containing 18,655
+distinct values. **These are input counts, with zero executed programs.**
+Clause/placement compatibility and boundary metadata are retained; all DBMS
+families supply hostile strings, without claiming valid PostgreSQL attack syntax.
+No URL decoding, tamper processing, inference or scanner request emulation occurs.
+
+Verify the real pinned archive, deterministic re-import, per-input reconstruction,
+complete unsupported inventory, exact notice retention and corruption rejection:
+
+```sh
+PYTHONPATH=security/generative/src python3 security/generative/tests/live_corpus.py \
+  --archive target/sqlmap-cache/sqlmap.tar.gz \
+  --output target/generative-corpus/verified-import
+```
