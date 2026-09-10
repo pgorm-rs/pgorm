@@ -5842,6 +5842,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T14:08:43.769076Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T14:08:43.878813Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The user has authorized completing the full generative campaign. nplan_next selects generative.fixtures in P2. Implement an owned pinned PostgreSQL container, restricted worker connections and independent subject/reference databases with reproducible baseline data and recorded server settings. Controller subprocesses, worker commands and cleanup have explicit deadlines; no arbitrary target URL is accepted. This infrastructure will support actual public Python builders, independent oracles, per-attempt reset and standalone Rust replay. The full grammar/matrix, positive controls, shrink/replay, compile suite and million-program acceptance remain required; the Python module's smaller acceptance suite does not substitute for them."
+                    }
+
+                    {
+                        at 2026-09-10T14:18:24.966341Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented owned pinned PostgreSQL fixtures with separate subject/reference databases per worker, independent bounded portable baseline rendering, row reset that preserves enum OIDs, explicit schema rebuild, restricted campaign role, loopback exposure, resource limits, subprocess timeout/cancellation handling and label-checked container/volume cleanup. Ten fast tests pass, including malformed fixture rejection, subprocess cancellation/output limits, startup failure cleanup and cleanup refusal. The live installed-pgorm check passed with two workers on PostgreSQL 16.13: equivalent baselines, subject/reference and worker independence, native write/reset, forbidden role/database/file operations rejected with SQLSTATE 42501, server deadline rejected with 57014, and complete cleanup. target/generative-fixtures/fixture.json records actual settings, baseline hash and image identity with no credentials. nplan format/lint/unit checks and nspec validation pass."
+                    }
                 )
             }
 

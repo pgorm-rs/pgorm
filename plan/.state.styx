@@ -1511,6 +1511,13 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.distribution}
     )}
+    {id generative.fixtures, covered_rules (
+        generative.fixtures
+        generative.isolation
+    ), covered_claims (
+        {impl_name main, rule generative.fixtures}
+        {impl_name main, rule generative.isolation}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

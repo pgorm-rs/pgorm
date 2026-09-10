@@ -1,5 +1,21 @@
 platforms (
     {
+        platform "generative-python"
+        files (security/generative/src/**/*.py security/generative/tests/**/*.py security/generative/pyproject.toml)
+        checks {
+            format {
+                cmd "uv tool run --from ruff==0.12.12 ruff format --check security/generative"
+                fix "uv tool run --from ruff==0.12.12 ruff format security/generative"
+            }
+            lint {
+                cmd "uv tool run --from ruff==0.12.12 ruff check security/generative"
+            }
+            unit {
+                cmd "env PYTHONPATH=security/generative/src python3 -m unittest discover -s security/generative/tests"
+            }
+        }
+    }
+    {
         platform "python-distribution"
         files (pgorm-python/Cargo.toml pgorm-python/Cargo.lock Cargo.toml pgorm-*/Cargo.toml pgorm-query/pgorm-query-derive/Cargo.toml pgorm-python/checks/notices.py pgorm-python/licenses/** pgorm-python/python/pgorm/DEPENDENCIES.json pgorm-python/python/pgorm/THIRD_PARTY_NOTICES.txt)
         checks {

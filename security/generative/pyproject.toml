@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pgorm-campaign"
+version = "0.1.0"
+description = "Generated pgorm programs and independent PostgreSQL checks"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pgorm_campaign"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
