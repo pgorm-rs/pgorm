@@ -1,0 +1,11 @@
+   Compiling pgorm-window-replay v0.1.0 (/Users/brendan/git/necessary/pgorm/security/generative/findings/window-semantics)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.43s
+     Running `target/debug/pgorm-window-replay`
+count: SELECT *, COUNT(*) OVER () AS present FROM fixture.accounts
+explicit frame: SELECT *, FIRST_VALUE(score) OVER (ORDER BY id) AS head, LAST_VALUE(score) OVER (ORDER BY id) AS tail FROM fixture.accounts ORDER BY id
+count argument preserved: false
+both explicit frames preserved: false
+
+thread 'main' (258397024) panicked at native.rs:31:5:
+count's argument and first/last's explicit frame must be preserved
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

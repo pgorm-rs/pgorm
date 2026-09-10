@@ -5996,6 +5996,34 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T19:50:31.36863Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T20:43:41.339562Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Independent oracle implementation is in progress in the worktree. Psycopg 3.3.5 reference queries/decoding, final fixture state, CRUD/result reuse, registered models and hooks, graph/cursor/source shapes, pipeline stages/sets/windows, schema/enum DDL, read-only inspection probes, exact SQLSTATE checks and stream lifecycle invariants now have live evidence. target/generative-oracles/run-fbfc215f3e40 contains 72 probes: 70 pass, one expected rejection, and the preserved set-precedence program correctly reported as a defect. This validates detection, not a clean full campaign. All fixtures cleaned up; the installed native identity remains d8a41a12da8ea69c53e38e2cde41bdf1ced10711eb51303aa01805875246d9c1 with no per-program builds. Fast Python checks pass (38 tests and Ruff). Original probe setup errors are retained in earlier fresh runs: untyped raw division was ambiguous, and i8's SMALLINT carrier needs an INTEGER intermediate before casting to PostgreSQL internal char. Oracle coverage remains unfinished: broader literal type inference, ordered pipeline propagation, ranked-column windows, invalid conversion/rejection semantics, inspection amid writes/transactions and native-parity policies explicitly remain incomplete. Broader controls and full campaign acceptance are not claimed. Concurrent root pipeline Rust edits were not modified or staged."
+                    }
+
+                    {
+                        at 2026-09-10T22:00:28.868013Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Verified the user-reported distinct/append fix in the current worktree: the unchanged standalone Rust and public Python reproducers pass. Added preserved inspect and live fetch regression programs; both pass the independent PostgreSQL oracle, with ids 1..4 each occurring twice in the fetch on both databases. Fresh run target/generative-oracles/run-82aa10fa71a2 passes all 74 self-check expectations (72 pass, one exact SQLSTATE rejection, one detected open set-precedence defect). Native SHA b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d; source SHA ea8a476f9ada913ef76e9740be56832ec779126763b683a109476a60d6ac827b. Retained original failing logs and added verification.json; production Rust fix remains owned separately and was not changed/staged here."
+                    }
+
+                    {
+                        at 2026-09-10T22:21:21.718878Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Independent-oracle checkpoint: 42 fast tests and all required Python checks pass. Fresh owned-PostgreSQL self-check target/generative-oracles/run-8b6591ea7639 accounts for 111 handwritten programs: 103 pass, one exact SQLSTATE rejection, seven detections across three open finding categories (set grouping, nullable count, explicit first/last frames). Native artifact remains b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d. Added 23 literal families (scalar/NULL/array), hidden sort-key propagation through projection/filter/take/join/embedded sources, group/distinct order reset, ranked windows and empty-frame comparisons. The reference explicitly follows documented whole-second literal temporal conversions while preserving bound precision and exact result types. Count(score) emits COUNT(*) and first/last drop rows(1,1), both reproduced by direct Python and standalone Rust and preserved under findings/window-semantics. Original harness setup/default-frame mistakes are retained separately. No production fix applied. The node remains Doing for remaining invalid-conversion/oracle hardening; general native parity belongs to replay. No generated full campaign or million-program acceptance is claimed."
+                    }
                 )
             }
 

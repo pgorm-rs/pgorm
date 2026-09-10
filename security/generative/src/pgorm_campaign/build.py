@@ -10,7 +10,7 @@ import shutil
 import sys
 import time
 
-from . import process
+from . import dependencies, process
 
 ROOT = Path(__file__).resolve().parents[4]
 PROBE = """
@@ -111,11 +111,14 @@ async def prepare(output, *, root=ROOT, python=sys.executable):
         actual = await probe(installed)
         if actual != previous["installed"]:
             raise RuntimeError("installed extension differs from its build evidence")
-        return {
+        report = {
             **previous,
+            "campaign_dependencies": await dependencies.prepare(installed, root),
             "builds_this_invocation": 0,
             "build_seconds_this_invocation": 0,
         }
+        manifest.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        return report
     started = time.monotonic()
     (output / "building.json").write_text(json.dumps(identity, indent=2) + "\n")
     project = output / "project"
@@ -169,11 +172,13 @@ async def prepare(output, *, root=ROOT, python=sys.executable):
         str(wheel_paths[0]),
     )
     actual = await probe(installed)
+    campaign_dependencies = await dependencies.prepare(installed, root)
     if content_identity(root) != source:
         raise RuntimeError("native source changed during compilation")
     report = {
         "identity": identity,
         "installed": actual,
+        "campaign_dependencies": campaign_dependencies,
         "python": str(installed),
         "wheel": str(wheel_paths[0]),
         "wheel_sha256": hashlib.sha256(wheel_paths[0].read_bytes()).hexdigest(),

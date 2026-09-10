@@ -1,0 +1,13 @@
+   Compiling pgorm-window-replay v0.1.0 (/Users/brendan/git/necessary/pgorm/security/generative/findings/window-semantics)
+error[E0599]: no method named `aggregate` found for struct `Pipeline` in the current scope
+ --> native.rs:9:10
+  |
+8 |       let (count, _) = relation()
+  |  ______________________-
+9 | |         .aggregate(pl::count(score()).as_("present"))
+  | |         -^^^^^^^^^ method not found in `Pipeline`
+  | |_________|
+  |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `pgorm-window-replay` (bin "pgorm-window-replay") due to 1 previous error

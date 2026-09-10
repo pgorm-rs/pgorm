@@ -1,0 +1,32 @@
+{
+  "oracle_run": "target/generative-oracles/run-40877b5d7100",
+  "identity": {
+    "features": [
+      "extension-module"
+    ],
+    "interpreter": "3.14.4 cpython-314-darwin",
+    "maturin": "1.15.0",
+    "revision": "7db1d0efaa315e64ffac4d673faa8e1331828896",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "source_sha256": "ea8a476f9ada913ef76e9740be56832ec779126763b683a109476a60d6ac827b"
+  },
+  "installed": {
+    "abi": "cpython-314-darwin",
+    "native_sha256": "b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d",
+    "python": "3.14.4"
+  },
+  "dependencies": {
+    "installed": {
+      "psycopg": {
+        "record_sha256": "21ee5f22cd3ac44dc8ad9c63490f9a5e2355cef9c87ae46785616cde224baef6",
+        "version": "3.3.5"
+      },
+      "psycopg-binary": {
+        "record_sha256": "9196295c758b35d36fee84e15a155acde3086e81474dc0b1dc27f55714ee20ee",
+        "version": "3.3.5"
+      }
+    },
+    "installed_this_invocation": true,
+    "pin": "psycopg[binary]==3.3.5"
+  }
+}

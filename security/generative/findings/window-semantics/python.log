@@ -1,0 +1,7 @@
+count: SELECT *, COUNT(*) OVER () AS present FROM fixture.accounts
+explicit frame: SELECT *, FIRST_VALUE(score) OVER (ORDER BY id) AS head, LAST_VALUE(score) OVER (ORDER BY id) AS tail FROM fixture.accounts ORDER BY id
+Traceback (most recent call last):
+  File "/Users/brendan/git/necessary/pgorm/security/generative/findings/window-semantics/python.py", line 21, in <module>
+    "COUNT(score)" in count
+    and frame.count("ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING") == 2
+AssertionError: count's argument and first/last's explicit frame must be preserved

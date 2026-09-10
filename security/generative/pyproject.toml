@@ -7,7 +7,7 @@ name = "pgorm-campaign"
 version = "0.1.0"
 description = "Generated pgorm programs and independent PostgreSQL checks"
 requires-python = ">=3.14,<3.15"
-dependencies = []
+dependencies = ["psycopg[binary]==3.3.5"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pgorm_campaign"]

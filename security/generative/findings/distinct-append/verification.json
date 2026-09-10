@@ -1,0 +1,105 @@
+{
+  "status": "fix-verified-in-current-worktree",
+  "date": "2026-09-10",
+  "build": {
+    "build_seconds_this_invocation": 7.562697667162865,
+    "builds_this_invocation": 1,
+    "builds_total": 5,
+    "campaign_dependencies": {
+      "installed": {
+        "psycopg": {
+          "record_sha256": "21ee5f22cd3ac44dc8ad9c63490f9a5e2355cef9c87ae46785616cde224baef6",
+          "version": "3.3.5"
+        },
+        "psycopg-binary": {
+          "record_sha256": "9196295c758b35d36fee84e15a155acde3086e81474dc0b1dc27f55714ee20ee",
+          "version": "3.3.5"
+        }
+      },
+      "installed_this_invocation": true,
+      "pin": "psycopg[binary]==3.3.5"
+    },
+    "identity": {
+      "features": [
+        "extension-module"
+      ],
+      "interpreter": "3.14.4 cpython-314-darwin",
+      "maturin": "1.15.0",
+      "revision": "7db1d0efaa315e64ffac4d673faa8e1331828896",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "source_sha256": "ea8a476f9ada913ef76e9740be56832ec779126763b683a109476a60d6ac827b"
+    },
+    "python": "/Users/brendan/git/necessary/pgorm/target/generative-build/venv/bin/python",
+    "wheel": "/Users/brendan/git/necessary/pgorm/target/generative-build/dist/pgorm-0.2.0-cp314-cp314-macosx_11_0_arm64.whl",
+    "wheel_sha256": "b48564adf1e322929353f12aa7e5c315160e1fb7151617d24359e3790fe42635"
+  },
+  "installed": {
+    "abi": "cpython-314-darwin",
+    "native_sha256": "b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d",
+    "python": "3.14.4"
+  },
+  "oracle_run": "target/generative-oracles/run-82aa10fa71a2",
+  "results": {
+    "inspect": {
+      "program_sha256": "fe599b9a134226b04e08574eaec132b9182e56d076a6b0466e5eecc181e00d1b",
+      "status": "pass",
+      "comparisons": [
+        {
+          "step": "s0",
+          "oracle": "reference",
+          "equal": true,
+          "reason": "equal"
+        },
+        {
+          "step": "final",
+          "oracle": "fixture-state",
+          "equal": true,
+          "reason": "equal"
+        }
+      ],
+      "cleanup_errors": []
+    },
+    "fetch": {
+      "program_sha256": "1de43f830f6cb080e0991ce068587d8e35cc56c6a3cb032b84a41d08a9cc87d0",
+      "status": "pass",
+      "comparisons": [
+        {
+          "step": "s0",
+          "oracle": "reference",
+          "equal": true,
+          "reason": "equal"
+        },
+        {
+          "step": "final",
+          "oracle": "fixture-state",
+          "equal": true,
+          "reason": "equal"
+        }
+      ],
+      "cleanup_errors": []
+    }
+  },
+  "fetch_id_multiplicities": {
+    "subject": {
+      "4": 2,
+      "2": 2,
+      "1": 2,
+      "3": 2
+    },
+    "reference": {
+      "4": 2,
+      "2": 2,
+      "1": 2,
+      "3": 2
+    }
+  },
+  "campaign_summary": {
+    "passed": true,
+    "count": 74,
+    "statuses": {
+      "pass": 72,
+      "expected-rejection": 1,
+      "defect": 1
+    }
+  }
+}

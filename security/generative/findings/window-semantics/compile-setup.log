@@ -1,0 +1,76 @@
+     Locking 293 packages to latest Rust 1.97.1 compatible versions
+   Compiling pgorm-window-replay v0.1.0 (/Users/brendan/git/necessary/pgorm/security/generative/findings/window-semantics)
+error[E0599]: no method named `aggregate` found for struct `Pipeline` in the current scope
+ --> native.rs:8:33
+  |
+8 |     let (count, _) = relation().aggregate(pl::count(score()).as_("present"))
+  |                                 ^^^^^^^^^ method not found in `Pipeline`
+
+error[E0599]: no method named `as_` found for struct `pgorm::pipeline::Expr<'brand>` in the current scope
+   --> native.rs:8:62
+    |
+  8 |     let (count, _) = relation().aggregate(pl::count(score()).as_("present"))
+    |                                                              ^^^
+    |
+   ::: /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:292:8
+    |
+292 |     fn as_(self, name: impl Into<AliasName>) -> Expr<'brand> {
+    |        --- the method is available for `pgorm::pipeline::Expr<'_>` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `asc` with a similar name, but with different arguments
+   --> /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:310:5
+    |
+310 |     fn asc(self) -> Expr<'brand> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `ExprOps` which provides `as_` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use pgorm::pipeline::ExprOps;
+    |
+
+error[E0599]: no method named `as_` found for struct `pgorm::pipeline::Expr<'brand>` in the current scope
+   --> native.rs:11:29
+    |
+ 11 |         (pl::first(score()).as_("head"), pl::last(score()).as_("tail")),
+    |                             ^^^
+    |
+   ::: /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:292:8
+    |
+292 |     fn as_(self, name: impl Into<AliasName>) -> Expr<'brand> {
+    |        --- the method is available for `pgorm::pipeline::Expr<'_>` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `asc` with a similar name, but with different arguments
+   --> /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:310:5
+    |
+310 |     fn asc(self) -> Expr<'brand> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `ExprOps` which provides `as_` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use pgorm::pipeline::ExprOps;
+    |
+
+error[E0599]: no method named `as_` found for struct `pgorm::pipeline::Expr<'brand>` in the current scope
+   --> native.rs:11:60
+    |
+ 11 |         (pl::first(score()).as_("head"), pl::last(score()).as_("tail")),
+    |                                                            ^^^
+    |
+   ::: /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:292:8
+    |
+292 |     fn as_(self, name: impl Into<AliasName>) -> Expr<'brand> {
+    |        --- the method is available for `pgorm::pipeline::Expr<'_>` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `asc` with a similar name, but with different arguments
+   --> /Users/brendan/git/necessary/pgorm/src/pipeline/expr.rs:310:5
+    |
+310 |     fn asc(self) -> Expr<'brand> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `ExprOps` which provides `as_` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use pgorm::pipeline::ExprOps;
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `pgorm-window-replay` (bin "pgorm-window-replay") due to 4 previous errors

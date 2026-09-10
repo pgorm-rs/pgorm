@@ -1,0 +1,14 @@
+[package]
+name = "pgorm-window-replay"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "pgorm-window-replay"
+path = "native.rs"
+
+[dependencies]
+pgorm = { path = "../../../.." }
