@@ -724,6 +724,7 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
+    {id python.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-10T13:45:44.365077Z}
 )
 
 impl_evidence (
@@ -824,31 +825,6 @@ impl_evidence (
         {impl_name main, rule macros.derive.relation}
         {impl_name main, rule macros.derive.test-attr}
         {impl_name main, rule macros.derive.value-type}
-    ), rule_versions_seen (
-        {id macros.derive, version 1}
-        {id macros.derive.active-enum, version 1}
-        {id macros.derive.active-enum.expansion, version 1}
-        {id macros.derive.active-model, version 2}
-        {id macros.derive.column, version 2}
-        {id macros.derive.entity, version 1}
-        {id macros.derive.entity-model, version 2}
-        {id macros.derive.entity-model.attrs, version 1}
-        {id macros.derive.entity-model.casing, version 1}
-        {id macros.derive.entity-model.column-def, version 5}
-        {id macros.derive.entity-model.primary-key, version 1}
-        {id macros.derive.entity-model.reject, version 1}
-        {id macros.derive.enum-def, version 0}
-        {id macros.derive.enum-iter, version 0}
-        {id macros.derive.from-query-result, version 2}
-        {id macros.derive.iden, version 1}
-        {id macros.derive.iden.query, version 0}
-        {id macros.derive.model, version 3}
-        {id macros.derive.partial-model, version 3}
-        {id macros.derive.relation, version 1}
-        {id macros.derive.test-attr, version 1}
-        {id macros.derive.value-type, version 2}
-        {id pipeline.select-sources, version 2}
-        {id query.graph.cursor, version 1}
     )}
     {id core, covered_rules (
         query.graph

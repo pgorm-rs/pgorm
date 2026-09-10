@@ -1023,6 +1023,15 @@ children (
                     )
                 }
                 deps (orm.entity)
+                log (
+                    {
+                        at 2026-09-10T13:47:38.327735Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Revalidated as a prerequisite of the authorized full Python API acceptance. macros.derive.entity-model is currently v4; both implementation sites and four direct regression sites already carry +4. Reviewed generated Column/Entity/PrimaryKey/model expansions, separate serde JSON keys, custom select/save type-expression casts, save_array_as(T[]) and enum fallbacks against the v4 contract. cargo nextest run --locked -p pgorm-macros passes all 67 tests, 0 skipped, including the composite-derive regression and compile-fail suite (target/python-macros-revalidation.log). Runtime implementation already satisfies v4; refresh the delivery record that still recorded v2 so dependent Python codegen/typing/distribution review can reconcile."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -5622,6 +5631,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+
+                    {
+                        at 2026-09-10T13:45:44.365077Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T13:47:14.634905Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "python.distribution is delivered in 3d79e8f3, leaving python.acceptance as the sole ready Python node. Consolidate installed artifact/direct-builder/native parity/application registration evidence into a repeatable acceptance command. Audit every exposed execution family against its native Rust path; add missing execution oracles rather than count documentation as evidence. Revalidate the already-implemented macros.derive.entity-model v4 dependency (current source/test annotations are v4; prior node delivery recorded v2) and clear propagated review only after actual verification. Preserve the explicit tested-platform limit from distribution; no CI run or publication is claimed."
                     }
                 )
             }
