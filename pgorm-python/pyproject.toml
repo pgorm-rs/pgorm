@@ -6,9 +6,10 @@ build-backend = "maturin"
 name = "pgorm"
 dynamic = ["version"]
 description = "Native pgorm builders and asynchronous PostgreSQL access for Python"
-readme = "README.md"
+readme = "DESCRIPTION.md"
 requires-python = ">=3.14,<3.15"
 license = "MIT OR Apache-2.0"
+license-files = ["licenses/pgorm/LICENSE-APACHE", "licenses/pgorm/LICENSE-MIT", "python/pgorm/THIRD_PARTY_NOTICES.txt"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3.14",
@@ -25,6 +26,8 @@ python-source = "python"
 module-name = "pgorm._native"
 features = ["extension-module"]
 exclude = [
+    "**/__pycache__/**",
+    "**/*.pyc",
     { path = "**/.codex/**", format = "sdist" },
     { path = "**/.config/**", format = "sdist" },
     { path = "**/.github/**", format = "sdist" },
@@ -38,4 +41,6 @@ exclude = [
 ]
 include = [
     { path = "support.json", format = "sdist" },
+    { path = "licenses/**", format = "sdist" },
+    { path = "examples/**", format = "sdist" },
 ]

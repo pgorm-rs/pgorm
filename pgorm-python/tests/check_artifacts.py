@@ -1,6 +1,7 @@
 """Inspect wheel/source contents: python check_artifacts.py ARTIFACT_DIR."""
 
 from pathlib import Path, PurePosixPath
+import json
 import sys
 import tarfile
 import tomllib
@@ -9,6 +10,7 @@ import zipfile
 
 # [spec:pgorm:req:python.optional/test]
 # [spec:pgorm:req:python.package/test]
+# [spec:pgorm:req:python.distribution/test]
 def check_source(path: Path) -> None:
     with tarfile.open(path) as source:
         names = source.getnames()
@@ -16,6 +18,9 @@ def check_source(path: Path) -> None:
         forbidden = {"security", "tests_cfg", ".nplan", ".codex", "plan"}
         for name in names:
             assert not forbidden.intersection(PurePosixPath(name).parts), name
+            assert "__pycache__" not in PurePosixPath(name).parts and not name.endswith(
+                ".pyc"
+            ), name
             assert "this-session-is-being-continued" not in name, name
         project_file = source.extractfile(f"{root}/pyproject.toml")
         assert project_file is not None
@@ -27,19 +32,45 @@ def check_source(path: Path) -> None:
         assert lock_file is not None
         packages = tomllib.loads(lock_file.read().decode())["package"]
         assert any(p["name"] == "pyo3" and p["version"] == "0.29.2" for p in packages)
+        assert any(name.endswith("/examples/application.py") for name in names)
+        assert any(name.endswith("/licenses/supplemental.json") for name in names)
+        assert any(name.endswith("/pgorm/THIRD_PARTY_NOTICES.txt") for name in names)
 
 
 # [spec:pgorm:req:python.optional/test]
 # [spec:pgorm:req:python.package/test]
+# [spec:pgorm:req:python.distribution/test]
 def check_wheel(path: Path) -> None:
     with zipfile.ZipFile(path) as wheel:
         names = wheel.namelist()
+        assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
         assert "pgorm/__init__.py" in names
         assert "pgorm/py.typed" in names
-        assert any(n.startswith("pgorm/_native.") and n.endswith((".so", ".pyd")) for n in names)
+        assert any(
+            n.startswith("pgorm/_native.") and n.endswith((".so", ".pyd"))
+            for n in names
+        )
         assert any(n.endswith("/LICENSE-MIT") for n in names)
         assert any(n.endswith("/LICENSE-APACHE") for n in names)
-        assert not any("security/" in n or "tests_cfg/" in n or "fixtures/" in n for n in names)
+        assert not any(
+            "security/" in n or "tests_cfg/" in n or "fixtures/" in n for n in names
+        )
+        dependencies = json.loads(wheel.read("pgorm/DEPENDENCIES.json"))
+        assert dependencies["python_runtime_dependencies"] == []
+        notices = wheel.read("pgorm/THIRD_PARTY_NOTICES.txt").decode()
+        assert dependencies["packages"]
+        for package in dependencies["packages"]:
+            assert package["license"] and package["notices"], package["name"]
+            for notice in package["notices"]:
+                assert notice["sha256"] in notices
+        assert {
+            component["name"] for component in dependencies["bundled_native_components"]
+        } >= {"libpg_query", "PostgreSQL parser", "protobuf-c", "xxHash"}
+        metadata = wheel.read(
+            next(name for name in names if name.endswith(".dist-info/METADATA"))
+        ).decode()
+        assert "License-Expression: MIT OR Apache-2.0" in metadata
+        assert "License-File:" in metadata and "THIRD_PARTY_NOTICES.txt" in metadata
 
 
 if __name__ == "__main__":
@@ -52,4 +83,6 @@ if __name__ == "__main__":
         check_source(artifact)
     for artifact in wheels:
         check_wheel(artifact)
-    print(f"Validated {len(sources)} source distribution(s) and {len(wheels)} wheel(s).")
+    print(
+        f"Validated {len(sources)} source distribution(s) and {len(wheels)} wheel(s)."
+    )

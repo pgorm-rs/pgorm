@@ -1,5 +1,14 @@
 platforms (
     {
+        platform "python-distribution"
+        files (pgorm-python/Cargo.toml pgorm-python/Cargo.lock Cargo.toml pgorm-*/Cargo.toml pgorm-query/pgorm-query-derive/Cargo.toml pgorm-python/checks/notices.py pgorm-python/licenses/** pgorm-python/python/pgorm/DEPENDENCIES.json pgorm-python/python/pgorm/THIRD_PARTY_NOTICES.txt)
+        checks {
+            notices {
+                cmd "python3 pgorm-python/checks/notices.py"
+            }
+        }
+    }
+    {
         platform "python-types"
         files (pgorm-python/python/pgorm/**/*.py pgorm-python/python/pgorm/**/*.pyi)
         checks {

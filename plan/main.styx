@@ -5583,6 +5583,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T13:23:51.885164Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T13:23:51.998953Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "python.typing is delivered in 06db1c54; python.distribution is the sole ready Python node in P3, continuing the authorized full Python subtree objective. Build and reinstall wheel plus sdist-derived wheel, exercise TLS/native loading/typing against a standalone PostgreSQL fixture, ship dependency/component notices, and add CI for the candidate matrix. Record support only for combinations with actual passing evidence; configuring a candidate CI job does not establish that platform as tested. Codegen/macro review remains for final acceptance."
+                    }
+
+                    {
+                        at 2026-09-10T13:44:52.773826Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The final isolated PEP 517 distribution run passes on macOS 26.5.1 arm64 / CPython 3.14.4 with the GIL. Direct wheel and sdist-derived wheel each pass all 110 standalone tests (including native PostgreSQL/TLS), signature/export checks, strict whole-package and ordinary-application typing, 13 invalid diagnostics, and the runnable application. Python payloads plus package metadata are identical between builds; bytecode caches are explicitly excluded. target/python-distribution/summary.json, run.log, wheels, source archive, per-install typing reports and otool dependency reports retain evidence. Fixed sdist filename collisions by using distinct Python package metadata and namespaced project license files. Dependency inventory covers 330 locked Cargo packages with hash-linked notices, including libpg_query/PostgreSQL/protobuf-c/xxHash/ring and supplemental upstream texts pinned by revision/hash. CI for macos-15 arm64 and Ubuntu 24.04 x86_64 passes actionlint v1.7.7; those configured runners remain candidates, not claimed as tested by this local run. No registry publication. Required notice check passes."
+                    }
                 )
             }
 

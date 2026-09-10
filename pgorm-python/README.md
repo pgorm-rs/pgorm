@@ -35,6 +35,8 @@ builds the source distribution. Build and install commands do not publish to a
 registry. `support.json` records the ABI and candidate platform matrix; release
 artifacts require the installation checks on each claimed platform. Registry
 name availability must be checked before publication.
+See [distribution verification](DISTRIBUTION.md) for isolated wheel/source
+builds, platform evidence, CI and the shipped dependency notices.
 
 Python support has its own Cargo workspace, lockfile and build command. A normal
 `cargo build --workspace` at the repository root does not load PyO3 or Python

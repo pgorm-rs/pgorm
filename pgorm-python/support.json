@@ -8,6 +8,20 @@
   "python_abi": "CPython version-specific (cp314), with the GIL",
   "python_versions": ["3.14"],
   "release_candidates": ["macos-arm64", "linux-x86_64"],
+  "tested_combinations": [
+    {
+      "platform": "macos-arm64",
+      "os": "macOS 26.5.1",
+      "python": "3.14.4",
+      "abi": "cp314",
+      "gil": true,
+      "verification": "checks/distribution.py: wheel and sdist rebuilt in isolated build environments, installed tests, TLS and typing"
+    }
+  ],
+  "ci_candidates": [
+    {"platform": "macos-arm64", "runner": "macos-15", "python": "3.14.4"},
+    {"platform": "linux-x86_64", "runner": "ubuntu-24.04", "python": "3.14.4"}
+  ],
   "free_threading": false,
   "subinterpreters": false,
   "registry_publication": "not requested; distribution-name availability must be checked before release"
