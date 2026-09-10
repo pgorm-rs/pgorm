@@ -105,6 +105,10 @@ required/optional join slots and model decoding through `pgorm.graph`.
 The [application code generator](CODEGEN.md) creates the registration crate,
 concrete Python model wrappers and matching stubs from compiled Rust metadata.
 
+The [pipeline API](PIPELINE.md) composes native relational stages, including
+grouping, windows, bound callbacks and set operations. Registered source tuples
+decode actual Rust models, including absent sources in right and full joins.
+
 ## Connections
 
 Construct and use resources inside one running asyncio loop. Database waiting

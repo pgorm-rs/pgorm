@@ -18,6 +18,7 @@ pub struct Registry {
     entries: BTreeMap<String, Arc<dyn EntityBackend>>,
     types: HashMap<TypeId, String>,
     pub(crate) graphs: BTreeMap<String, Arc<dyn crate::graphs::backend::Factory>>,
+    pub(crate) sources: BTreeMap<String, Arc<dyn crate::pipeline::selected_backend::Factory>>,
 }
 
 impl Registry {
@@ -58,7 +59,7 @@ impl Registry {
             .and_then(|name| self.entries.get(name));
         entry.map(|entry| entry.info().clone()).ok_or_else(|| {
             ConstructionError::new_err(format!(
-                "register entity {} before its graph",
+                "register entity {} before its graph or source tuple",
                 std::any::type_name::<E>()
             ))
         })

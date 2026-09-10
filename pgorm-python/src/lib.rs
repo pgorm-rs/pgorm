@@ -10,6 +10,7 @@ mod errors;
 pub mod expressions;
 pub mod graphs;
 pub mod identifiers;
+pub mod pipeline;
 pub mod results;
 mod runtime;
 pub mod statements;
@@ -59,5 +60,6 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     results::register(module)?;
     entities::install(module, registry)?;
     graphs::install(module)?;
+    pipeline::install(module)?;
     Ok(())
 }

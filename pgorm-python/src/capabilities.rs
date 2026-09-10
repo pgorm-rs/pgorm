@@ -48,7 +48,7 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources"],
         "result_policy": {
             "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
@@ -102,7 +102,19 @@ fn manifest() -> Value {
             "stream": false, "automatic_ddl": false
         },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
-        "registrations": {"entities": [], "graphs": []},
+        "pipeline_policy": {
+            "construction": "owned native Pipeline; runtime table/entity/named pipeline sources",
+            "parameters": "synchronous *_with callback; each binding minted once inside its real Rust brand",
+            "literals": ["null", "bool", "i32", "i64", "finite f64", "text"],
+            "bound_list_max": 32, "literal_list_max": null,
+            "qualified_enum_binding": false,
+            "source_arities": [1, 2, 3, 4, 5, 6],
+            "source_result": "tuple of optional registered models; (None,) is distinct from no row",
+            "record_terminals": "all / one / one_opt on acquired Connection; one and one_opt append take(1)",
+            "stream": "dynamic Record through pool.stream or connection.stream",
+            "selected_sources_stream": false
+        },
+        "registrations": {"entities": [], "graphs": [], "sources": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
     });
     if let Some(operations) = manifest["operations"].as_object_mut() {
@@ -111,6 +123,7 @@ fn manifest() -> Value {
         operations.extend(crate::results::capabilities());
         operations.extend(crate::entities::capabilities());
         operations.extend(crate::graphs::capabilities());
+        operations.extend(crate::pipeline::capabilities());
     }
     manifest
 }
@@ -127,6 +140,13 @@ pub(crate) fn capabilities<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound
         .graphs
         .values()
         .map(|graph| graph.info().describe())
+        .collect::<Vec<_>>()
+        .into();
+    manifest["registrations"]["sources"] = registry
+        .0
+        .sources
+        .values()
+        .map(|source| source.info().describe())
         .collect::<Vec<_>>()
         .into();
     module

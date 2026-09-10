@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use pgorm_query::{AliasName, Iden};
+use pgorm_query::{Alias, AliasName, Iden};
 
 use crate::ColumnTrait;
 
@@ -106,6 +106,14 @@ impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
 impl<'brand> From<AliasName> for Expr<'brand> {
     fn from(token: AliasName) -> Self {
         name(token.as_str())
+    }
+}
+
+/// A runtime alias reads an introduced name under the same resolution rules.
+// [spec:pgorm:req:python.pipeline]
+impl<'brand> From<Alias> for Expr<'brand> {
+    fn from(alias: Alias) -> Self {
+        name(&Iden::to_string(&alias))
     }
 }
 
@@ -286,6 +294,13 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
         branded(adapter::aliased(self.into().node, name.as_str().to_owned()))
     }
 
+    /// Name a projection with an owned identifier computed at runtime.
+    /// Reserved-name validation is identical to [`as_`](ExprOps::as_).
+    // [spec:pgorm:req:python.pipeline]
+    fn as_runtime(self, name: Alias) -> Expr<'brand> {
+        branded(adapter::aliased(self.into().node, Iden::to_string(&name)))
+    }
+
     /// Mark a sort key descending.
     fn desc(self) -> Expr<'brand> {
         branded(adapter::unary(UnOp::Neg, self.into().node))
@@ -302,6 +317,8 @@ impl<'brand> ExprOps<'brand> for Expr<'brand> {}
 
 // [spec:pgorm:req:pipeline.surface+3]
 impl<'brand> ExprOps<'brand> for AliasName {}
+
+impl<'brand> ExprOps<'brand> for Alias {}
 
 // [spec:pgorm:req:pipeline.surface+3]
 impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
@@ -336,6 +353,12 @@ impl<'brand> ExprList<'brand> for Expr<'brand> {
 }
 
 impl<'brand> ExprList<'brand> for AliasName {
+    fn into_exprs(self) -> Vec<Expr<'brand>> {
+        vec![self.into()]
+    }
+}
+
+impl<'brand> ExprList<'brand> for Alias {
     fn into_exprs(self) -> Vec<Expr<'brand>> {
         vec![self.into()]
     }

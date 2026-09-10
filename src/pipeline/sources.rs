@@ -11,7 +11,7 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{Iden, Values};
+use pgorm_query::{Alias, Iden, Values};
 
 use crate::query::graph::{source_column_alias, source_read_cast};
 use crate::{
@@ -402,6 +402,17 @@ impl<T: SourceList> SelectedSources<T> {
 pub struct Named<R> {
     pub(super) relation: R,
     pub(super) name: String,
+}
+
+/// Read a relation under an owned identifier computed at runtime.
+/// Like [`IntoSource::named`], this preserves the relation's source type
+/// for [`Pipeline::select_sources`].
+// [spec:pgorm:req:python.pipeline]
+pub fn named_runtime<R: IntoSource>(relation: R, name: Alias) -> Named<R> {
+    Named {
+        relation,
+        name: Iden::to_string(&name),
+    }
 }
 
 /// Naming a relation aliases it on the way in; naming it again replaces the

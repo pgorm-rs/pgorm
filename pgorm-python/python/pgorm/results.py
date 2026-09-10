@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 Query: TypeAlias = (
     _native.Select | _native.Insert | _native.Update | _native.Delete
-    | _native.RawSQL | _native.Compiled
+    | _native.RawSQL | _native.Compiled | _native.Pipeline
 )
 
 Mapping.register(Record)

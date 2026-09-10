@@ -29,6 +29,7 @@ def materialize(root, destination):
 
 # [spec:pgorm:req:python.entities/test]
 # [spec:pgorm:req:python.graph/test]
+# [spec:pgorm:req:python.pipeline/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-entities"))
@@ -60,7 +61,8 @@ def main():
         run([str(python), "-I", str(root / "pgorm-python/tests/registered_entities.py"), "-v"], environment)
         run([str(python), "-I", "-m", "unittest", "discover", "-s", str(root / "pgorm-python/tests"), "-p", "registered_graphs.py", "-v"], environment)
         run(["cargo", "run", "--manifest-path", str(project / "Cargo.toml"), "--locked", "--bin", "graph_oracle"], environment)
-    (output / "summary.json").write_text(json.dumps({"passed": True, "registered_entities": ["app.Account", "app.Note"], "graph_source_arities": list(range(1, 8)), "rust_cursor_parity_cases": 8, "wheel": wheel.name}, indent=2) + "\n")
+        run([str(python), "-I", "-m", "unittest", "discover", "-s", str(root / "pgorm-python/tests"), "-p", "registered_sources.py", "-v"], environment)
+    (output / "summary.json").write_text(json.dumps({"passed": True, "registered_entities": ["app.Account", "app.Note"], "graph_source_arities": list(range(1, 8)), "pipeline_source_arities": list(range(1, 7)), "rust_cursor_parity_cases": 8, "wheel": wheel.name}, indent=2) + "\n")
 
 
 if __name__ == "__main__":

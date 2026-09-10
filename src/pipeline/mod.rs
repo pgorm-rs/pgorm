@@ -183,7 +183,7 @@ pub use funcs::{
     null, rank, rank_dense, row_number, stddev, sum,
 };
 pub use pgorm_query::{AliasName, alias};
-pub use sources::Named;
+pub use sources::{Named, named_runtime};
 pub use sources::{SelectableSource, SelectedSources, SourceList};
 
 #[cfg(test)]

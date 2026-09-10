@@ -5395,6 +5395,62 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-09T20:10:16.02731Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-09T20:16:52.495564Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The existing Rust Pipeline, Grouped, Over and SelectedSources already implement Clone, so immutable Python builders can own and clone the actual Rust pipeline without root API changes. Branded expressions cannot be stored in Python: a short-lived native Binder callback will collect owned expression recipes and native Values, reject foreign/expired scopes, then lower those recipes inside the real Rust *_with closure. Each bind is minted once in original order so Rust's existing parameter pruning/rebasing remains authoritative. Static literal/name expressions lower through the same Rust ExprOps/functions. Runtime qualified table embedding uses Pipeline::from_schema and IntoSource::named. Registered source selections will compile concrete entity tuples and call actual select_sources, returning Python tuples even for one source so an absent source (None,) remains distinguishable from no row at one_opt."
+                    }
+
+                    {
+                        at 2026-09-10T11:14:22.32364Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Runtime Python aliases cannot use AliasName, which deliberately owns only a static Rust string. Add separate native IntoSource::named_runtime(Alias), ExprOps::as_runtime(Alias), and Alias expression conversions. Preserve the existing static token signatures and lower both paths through the same native PL nodes and reserved-alias checks; no leaked strings or erased lifetimes."
+                    }
+
+                    {
+                        at 2026-09-10T11:34:20.356139Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Final runtime source alias API is the free pgorm::pipeline::named_runtime(relation, Alias), colocated with Named<R>. Static IntoSource::named remains unchanged. Runtime projected aliases use ExprOps::as_runtime(Alias) and owned Alias expression conversion; all retain native compiler validation and branded expression lifetimes."
+                    }
+
+                    {
+                        at 2026-09-10T11:43:08.07279Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Validation: 21 Python programs match independent Rust pipeline SQL and exact Values; 75 root pipeline nextest cases pass. Final standalone wheel passes all 92 Python regressions. Fresh application wheel passes 7 native registration/parity tests, 9 entity tests, 7 graph tests, 8 independent Rust cursor cases and 5 source-selection PostgreSQL tests covering arities 1–6, right/full optional rows, aliases, malformed present rows and cancellation. Lint identified an Option::expect in function lowering; replaced it with arity-specific recipe variants, rebuilt/reinstalled and all 8 affected pipeline tests pass. Required check rerun pending; no gate bypass."
+                    }
+
+                    {
+                        at 2026-09-10T11:45:53.027995Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final function-arity representation passes the independent 21-program SQL/Values parity test and affected installed Python tests. All nplan staged checks now pass or are witnessed: Python typing, native/application format and clippy, native cargo check, root workspace check/clippy/format. Pipeline implementation and documentation are ready for delivery."
+                    }
+
+                    {
+                        at 2026-09-10T11:52:25.119615Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Commit quality review required reducing lower() cyclomatic complexity (53 > 50), removing duplicated terminal result handling and three trivial forwarding functions. Split binary-operation lowering into its own exhaustive dispatcher (main lower now 39), map source models directly in each terminal, let the public source factory own validation, normalize models directly in from_, and export Over as over. Exact 21-program parity and all 8 installed pipeline tests pass after these corrections; no violations/bypasses used."
+                    }
+
+                    {
+                        at 2026-09-10T11:56:54.316241Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Separated the concrete async source read from QueryBackend's small BoxFuture adapter so the implementation logic is explicit outside the shared boxing idiom. Compiler checks preserve the same borrowed lifetimes and Send requirements. All previous semantic checks remain passing; preparing the final quality-gated delivery."
+                    }
                 )
             }
 

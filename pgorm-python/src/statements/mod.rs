@@ -34,6 +34,8 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
         query.inspect()
     } else if let Ok(query) = value.extract::<PyRef<'_, crate::expressions::Compiled>>() {
         Ok(query.clone())
+    } else if let Ok(query) = value.extract::<PyRef<'_, crate::pipeline::PyPipeline>>() {
+        query.compile("all")
     } else {
         Err(crate::errors::ConstructionError::new_err(
             "execution requires a native statement, Compiled object or explicit RawSQL",

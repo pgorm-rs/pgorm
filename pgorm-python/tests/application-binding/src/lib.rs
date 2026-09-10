@@ -3,6 +3,7 @@
 pub mod account;
 pub mod graphs;
 pub mod note;
+pub mod sources;
 
 #[cfg(test)]
 mod graph_parity;
@@ -18,6 +19,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     registry.entity::<account::Entity>("app.Account")?;
     registry.entity::<note::Entity>("app.Note")?;
     graphs::register(&mut registry)?;
+    sources::register(&mut registry)?;
     pgorm_python::install(module, registry)
 }
 
