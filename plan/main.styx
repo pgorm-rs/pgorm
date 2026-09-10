@@ -4640,6 +4640,27 @@ children (
                     }
                 )
             }
+
+            {
+                id pipeline-append-distinct
+                title "Deduplicating an appended pipeline compiles instead of failing on column counts"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-10T19:42:17.160554Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Reported 2026-09-10 from the generative campaign. Appending a projected pipeline to itself compiles; adding distinct() to the same program makes prqlc report mismatched column counts. Reporter has the failing program preserved and was narrowing whether the fault sits in the executor or in pgorm. The composition is DOCUMENTED AS SUPPORTED, which makes this a spec finding and not only a defect: Pipeline::append's doc (src/pipeline/builder.rs:675) says \"Follow with distinct for UNION DISTINCT\", Pipeline::distinct's (line 714) says it is \"folded into UNION DISTINCT when it directly follows append\", both carry [spec:pgorm:req:pipeline.compose], and [spec:pgorm:sem:pipeline.select-sources+2] lists distinct and append among the transforms that compose freely. Likely mechanism: distinct is not a primitive here but lowers to PRQL group this (take 1) (builder.rs:719), so \"this\" must resolve to the combined column set of the set operation; on a self-append of a PROJECTED pipeline both arms are derived and renamed by prqlc, and an arity diagnostic is consistent with group this expanding against one arm and being checked against the union. Isolate by testing whether an UNPROJECTED self-append plus distinct compiles: if it does, projection is the trigger and the bug is in the lowering rather than in prqlc. The compiler's diagnostic usually names the arity it expected, which points at which arm was expanded. Fixing it will need pipeline.compose revised or its claim made true."
+                    }
+
+                    {
+                        at 2026-09-10T19:45:08.306967Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "CORRECTION to the preceding note, against the reproduction preserved at security/generative/findings/distinct-append/. The order is the reverse of what that note assumed. It is not append-then-distinct: with p a pipeline carrying the explicit projection accounts.id, p.append(p) compiles AND p.distinct() compiles, and what fails is p.distinct().append(p.distinct()) — \"cannot combine relations with different numbers of columns\", both sides one column. So the append doc's claim (follow with distinct for UNION DISTINCT) describes a DIFFERENT composition and may still hold; the rule this contradicts is [spec:pgorm:sem:pipeline.select-sources+2], which says distinct and append compose freely, and that covers either order. The executor-versus-pgorm question is settled: native.rs drives Pipeline, col, select, distinct, append and into_sql directly with no Python and no database, and fails the same way, so the fault is in pgorm. The hypothesis to test is therefore what group this (take 1) does to a projected relation's arity as prqlc models it — a grouped relation may carry its key columns distinctly from the projection, so two such relations disagree when unioned even though each projects one column. minimal.program.json isolates the operation graph; the reporter notes the original pipeline-stages artifacts also carry an unrelated invalid take_range(0, 2) probe (PRQL ranges start at one) which is not part of this failure, which persists with no take stage at all. A second, separate finding sits alongside it at findings/set-precedence/ and is not yet boarded."
+                    }
+                )
+            }
         )
     }
 
@@ -5941,6 +5962,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+
+                    {
+                        at 2026-09-10T14:50:11.487766Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T19:37:26.118699Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Executor probes now observe all 89 instructions and 8 effects through one installed native build, including real entities, graphs through arity seven and SourceList through arity six. Two open composition findings are retained under security/generative/findings: distinct->append fails compilation in both direct Python and an independent Rust crate; chained append->intersect->remove observes [8,8,4] rows instead of the independently expected [8,4,0], with native execution attribution still outstanding. Neither is treated as an expected rejection, fixed automatically, or excluded from the eventual campaign acceptance report. Executor dispatch validation is distinct from all grammar/control/parity/compile and million-program acceptance obligations."
                     }
                 )
             }
