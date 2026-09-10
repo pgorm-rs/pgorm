@@ -3,6 +3,7 @@
 import json
 from functools import partial
 from pathlib import Path
+from os import PathLike
 import shutil
 import tomllib
 
@@ -10,7 +11,13 @@ from .config import CodegenError, identifier, rust_string, validate
 
 
 # [spec:pgorm:req:python.codegen]
-def scaffold(config, destination, *, pgorm_source, base="."):
+def scaffold(
+    config: object,
+    destination: str | PathLike[str],
+    *,
+    pgorm_source: str | PathLike[str],
+    base: str | PathLike[str] = ".",
+) -> Path:
     from .. import capabilities
 
     description = validate(config, base)
@@ -59,7 +66,7 @@ def scaffold(config, destination, *, pgorm_source, base="."):
     destination.mkdir(parents=True)
     (destination / "src").mkdir()
 
-    def ignore(directory, names):
+    def ignore(directory: str, names: list[str]) -> set[str]:
         skipped = set(
             shutil.ignore_patterns("__pycache__", "*.pyc", "*.so", "*.pyd", "*.dylib")(
                 directory, names

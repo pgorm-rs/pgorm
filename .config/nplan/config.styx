@@ -1,5 +1,14 @@
 platforms (
     {
+        platform "python-types"
+        files (pgorm-python/python/pgorm/**/*.py pgorm-python/python/pgorm/**/*.pyi)
+        checks {
+            typing {
+                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-types-mypy pgorm-python/python/pgorm"
+            }
+        }
+    }
+    {
         platform "python-transactions"
         files (pgorm-python/python/pgorm/transactions.py pgorm-python/python/pgorm/runtime.py pgorm-python/python/pgorm/_native.pyi)
         checks {

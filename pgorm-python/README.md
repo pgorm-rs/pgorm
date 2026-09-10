@@ -13,6 +13,8 @@ Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
 or to generate schema statements from a registered Rust entity.
 Use [native transactions and savepoints](TRANSACTIONS.md) for explicit or
 context-managed commit and rollback across builders and registered models.
+The [typed application example](TYPING.md) combines schema, CRUD, a join,
+transactions, a pipeline and streaming in one runnable Python program.
 
 ## Build and install
 

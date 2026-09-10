@@ -1,5 +1,6 @@
 """Compose native pgorm builders and execute them directly against PostgreSQL."""
 
+# [spec:pgorm:req:python.typing]
 from ._native import (
     PgOrmError,
     CancelledError,

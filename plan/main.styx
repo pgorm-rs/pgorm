@@ -5543,6 +5543,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T12:58:02.32524Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The current P3 ready frontier contains python.typing as the sole remaining ready Python node after transaction delivery. Proceed within the explicit full Python subtree goal. All direct Python prerequisites are implemented; python.codegen carries Review from upstream codegen.generate/derive-macro drift (macros.derive.entity-model recorded v2 vs current v4), which nplan treats as a completion state for readiness. This node will audit installed runtime signatures against shipped stubs and supply typed runnable application examples across schema/CRUD/joins/transactions/pipelines/streaming. Keep the upstream review visible for final acceptance rather than claiming it resolved here."
+                    }
+
+                    {
+                        at 2026-09-10T12:58:02.373824Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T13:23:23.678485Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Installed-wheel signature audit corrected native positional-only parameters, two keyword names and opaque constructors across all shipped native stubs; it also found and fixed Python 3.14 annotation evaluation shadowed by the generated ModelView.native property. Whole package passes strict mypy (35 standalone / 36 generated source files). The ordinary schema/CRUD/join/transaction/savepoint/pipeline/stream application executes directly against PostgreSQL. Final standalone wheel passes all 110 tests, runtime signature/export checks, positive typing and all 13 expected invalid diagnostics; target/python-typing/summary.json records installed stub hashes. Compiled workflow rebuilt three clean environments and passed concrete typing, four invalid diagnostics, generated CRUD/graphs, compatibility and signature checks (target/python-typing-codegen/summary.json). DatabaseError diagnostics are consistently optional for client-side cardinality failures and populated for server errors. All ten required staged checks pass. Upstream codegen/macros review remains recorded for final acceptance."
+                    }
                 )
             }
 

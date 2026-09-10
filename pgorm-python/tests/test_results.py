@@ -22,8 +22,12 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         empty = p.Select(p.literal(1).as_("n")).where_(p.literal(False))
         self.assertEqual(await self.pool.fetch_all(empty), [])
         self.assertIsNone(await self.pool.fetch_optional(empty))
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaises(p.DatabaseError) as missing:
             await self.pool.fetch_one(empty)
+        self.assertIsNone(missing.exception.sqlstate)
+        self.assertIsNone(missing.exception.message)
+        self.assertIsNone(missing.exception.constraint)
+        self.assertIn("expected exactly one row", str(missing.exception))
         two = p.RawSQL("SELECT generate_series(1, 2) AS n")
         for terminal in (self.pool.fetch_one, self.pool.fetch_optional):
             with self.assertRaises(p.DatabaseError):

@@ -1,6 +1,8 @@
 """Map reflected standard Rust field spellings to their native Python values."""
 
 from dataclasses import dataclass
+from collections.abc import Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -11,7 +13,7 @@ class FieldType:
     nullable: bool = False
     json: bool = False
 
-    def binding(self, variable="value"):
+    def binding(self, variable: str = "value") -> str:
         if self.kind is None:
             return variable
         if self.array:
@@ -60,7 +62,7 @@ SCALARS = {
 }
 
 
-def wrapped(spelling, names):
+def wrapped(spelling: str, names: Iterable[str]) -> str | None:
     for name in names:
         prefix = name + "<"
         if spelling.startswith(prefix) and spelling.endswith(">"):
@@ -68,14 +70,14 @@ def wrapped(spelling, names):
     return None
 
 
-def field_type(column):
+def field_type(column: dict[str, Any]) -> FieldType:
     spelling = column.get("rust_decode_type")
     if not isinstance(spelling, str):
         return FieldType("Any")
     return resolve(spelling.replace(" ", ""), column["input_hint"])
 
 
-def resolve(spelling, hint):
+def resolve(spelling: str, hint: dict[str, Any]) -> FieldType:
     inner = wrapped(spelling, ("Option", "std::option::Option", "core::option::Option"))
     if inner is not None:
         resolved = resolve(inner, hint)
@@ -103,7 +105,7 @@ def resolve(spelling, hint):
     if spelling in ("Json", "JsonValue", "serde_json::Value"):
         return FieldType("Any", repr("json"), json=True)
     timezone = wrapped(spelling, ("DateTime", "chrono::DateTime"))
-    if timezone in (
+    if timezone is not None and timezone in (
         "Utc",
         "chrono::Utc",
         "Local",

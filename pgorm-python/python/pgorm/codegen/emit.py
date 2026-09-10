@@ -4,9 +4,11 @@ import ast
 import json
 import keyword
 from pathlib import Path
+from os import PathLike
+from typing import Any
 
 from .config import CodegenError, identifier, validate
-from .types import field_type
+from .types import FieldType, field_type
 
 RESERVED_FIELDS = {
     "native",
@@ -22,7 +24,9 @@ RESERVED_FIELDS = {
 }
 
 
-def attributes(entity, entry):
+def attributes(
+    entity: dict[str, Any], entry: dict[str, Any]
+) -> list[tuple[dict[str, Any], str, FieldType]]:
     columns = {column["name"]: column for column in entity["columns"]}
     if set(entry["fields"]) - set(columns):
         raise CodegenError("field aliases name unknown compiled SQL columns")
@@ -46,7 +50,9 @@ def attributes(entity, entry):
     return result
 
 
-def entity_code(entry, entity):
+def entity_code(
+    entry: dict[str, Any], entity: dict[str, Any]
+) -> tuple[list[str], list[str]]:
     name = entry["python"]
     model, active = name + "Model", name + "Active"
     fields = attributes(entity, entry)
@@ -101,7 +107,9 @@ def entity_code(entry, entity):
     return code, stub
 
 
-def graph_code(entry, graph, entities):
+def graph_code(
+    entry: dict[str, Any], graph: dict[str, Any], entities: dict[str, dict[str, Any]]
+) -> tuple[list[str], list[str]]:
     types, optional = [], []
     for source in graph["sources"]:
         if source["entity"] not in entities:
@@ -135,7 +143,7 @@ def graph_code(entry, graph, entities):
 
 
 # [spec:pgorm:req:python.codegen]
-def emit(project):
+def emit(project: str | PathLike[str]) -> Path:
     from .. import capabilities
 
     project = Path(project).resolve()
@@ -211,11 +219,13 @@ def emit(project):
     ]
     names = []
     entities = {entry["name"]: entry for entry in description["entities"]}
-    for family, generator in (("entities", entity_code), ("graphs", graph_code)):
+    for family in ("entities", "graphs"):
         for entry in description[family]:
-            extra = (entities,) if family == "graphs" else ()
-            generated, stub = generator(
-                entry, registrations[family][entry["name"]], *extra
+            registered = registrations[family][entry["name"]]
+            generated, stub = (
+                graph_code(entry, registered, entities)
+                if family == "graphs"
+                else entity_code(entry, registered)
             )
             code.extend(generated)
             stubs.extend(stub)
@@ -229,10 +239,10 @@ def emit(project):
                 ]
             )
     code.append(f"__all__ = {names!r}\n")
-    code = "\n".join(code)
-    stubs = "\n".join(stubs)
-    ast.parse(code)
-    ast.parse(stubs)
+    code_text = "\n".join(code)
+    stub_text = "\n".join(stubs)
+    ast.parse(code_text)
+    ast.parse(stub_text)
     module = identifier(description["module"], "application module")
     destination = project / "python/pgorm"
     if not destination.is_dir():
@@ -251,8 +261,8 @@ def emit(project):
             ) from error
         if previous != module:
             raise CodegenError("application module would overwrite another Python API")
-    (destination / (module + ".py")).write_text(code)
-    (destination / (module + ".pyi")).write_text(stubs)
+    (destination / (module + ".py")).write_text(code_text)
+    (destination / (module + ".pyi")).write_text(stub_text)
     (destination / "_application_module.json").write_text(
         json.dumps({"module": module}) + "\n"
     )

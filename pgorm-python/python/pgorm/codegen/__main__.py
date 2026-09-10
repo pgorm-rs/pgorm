@@ -7,7 +7,7 @@ from pathlib import Path
 from . import CodegenError, emit, scaffold
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser(

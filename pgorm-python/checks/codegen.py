@@ -47,6 +47,7 @@ def install(wheel, destination, environment):
 
 
 # [spec:pgorm:req:python.codegen/test]
+# [spec:pgorm:req:python.typing/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-codegen"))
@@ -126,6 +127,7 @@ def main():
         wheel = output / final_wheel.name
         shutil.copyfile(final_wheel, wheel)
         final = install(wheel, temporary / "final", environment)
+        run([final, "-I", root / "pgorm-python/tests/test_signatures.py", "-v"], environment)
         run(
             [
                 final,
@@ -155,6 +157,7 @@ def main():
             str(temporary / "mypy-cache"),
         ]
         run([*mypy, root / "pgorm-python/tests/codegen_types.py"], environment)
+        run([*mypy, "--package", "pgorm"], environment)
         invalid = subprocess.run(
             [*mypy, str(root / "pgorm-python/tests/codegen_types_invalid.py")],
             env=environment,
@@ -207,6 +210,8 @@ def main():
                 "compatibility_checked": True,
                 "type_checker": "mypy==1.18.2",
                 "invalid_typing_cases": 4,
+                "installed_signatures": True,
+                "package_typing": True,
             },
             indent=2,
         )

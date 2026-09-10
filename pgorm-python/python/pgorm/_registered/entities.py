@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
-from .. import _native as native
+from .. import _native as native_types
 
 M = TypeVar("M", bound="ModelView")
 A = TypeVar("A", bound="ActiveView")
@@ -14,11 +14,11 @@ class ModelView(Mapping[str, Any], Generic[A]):
     _entity_name: str
     _active_class: type[A]
 
-    def __init__(self, model: native.EntityModel):
-        if not isinstance(model, native.EntityModel):
-            raise native.ConstructionError("model view requires a native EntityModel")
+    def __init__(self, model: native_types.EntityModel):
+        if not isinstance(model, native_types.EntityModel):
+            raise native_types.ConstructionError("model view requires a native EntityModel")
         if model.entity_name != self._entity_name:
-            raise native.LifecycleError("model belongs to another entity registration")
+            raise native_types.LifecycleError("model belongs to another entity registration")
         self._model = model
 
     @property
@@ -38,7 +38,7 @@ class ModelView(Mapping[str, Any], Generic[A]):
     def __len__(self) -> int:
         return len(self._model)
 
-    def tagged(self, key: str) -> native.Value:
+    def tagged(self, key: str) -> native_types.Value:
         return self._model.tagged(key)
 
     def with_value(self: M, column, value) -> M:
@@ -53,11 +53,11 @@ class ActiveView(Generic[M]):
     _entity_name: str
     _model_class: type[M]
 
-    def __init__(self, active: native.ActiveModel):
-        if not isinstance(active, native.ActiveModel):
-            raise native.ConstructionError("active view requires a native ActiveModel")
+    def __init__(self, active: native_types.ActiveModel):
+        if not isinstance(active, native_types.ActiveModel):
+            raise native_types.ConstructionError("active view requires a native ActiveModel")
         if active.entity_name != self._entity_name:
-            raise native.LifecycleError(
+            raise native_types.LifecycleError(
                 "ActiveModel belongs to another entity registration"
             )
         self._active = active
@@ -95,9 +95,9 @@ class ActiveView(Generic[M]):
 class EntityView(Generic[M, A]):
     __slots__ = ("_entity", "_model_class", "_active_class")
 
-    def __init__(self, entity: native.Entity, model: type[M], active: type[A]):
+    def __init__(self, entity: native_types.Entity, model: type[M], active: type[A]):
         if entity.name != model._entity_name or entity.name != active._entity_name:
-            raise native.LifecycleError(
+            raise native_types.LifecycleError(
                 "generated wrapper types belong to another registration"
             )
         self._entity, self._model_class, self._active_class = entity, model, active
@@ -122,9 +122,9 @@ class EntityView(Generic[M, A]):
 class QueryView(Generic[M]):
     __slots__ = ("_query", "_model_class")
 
-    def __init__(self, query: native.EntityQuery, model: type[M]):
+    def __init__(self, query: native_types.EntityQuery, model: type[M]):
         if query.entity_name != model._entity_name:
-            raise native.LifecycleError("query belongs to another entity registration")
+            raise native_types.LifecycleError("query belongs to another entity registration")
         self._query, self._model_class = query, model
 
     def filter(self, predicate) -> "QueryView[M]":

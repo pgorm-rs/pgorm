@@ -1,9 +1,10 @@
 """Check generated declarations against the extension loaded into this process."""
 
 from .. import _native as native
+from typing import Any
 
 
-def check(expected):
+def check(expected: dict[str, Any]) -> None:
     actual = native.capabilities()
     for key in ("package_version", "pgorm_version"):
         if actual[key] != expected[key]:

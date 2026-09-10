@@ -86,6 +86,12 @@ deploy your application wheel whenever that code changes too.
 
 ## Use the concrete API
 
+The build commands also have typed Python entry points:
+`scaffold(config, destination, *, pgorm_source, base=".") -> pathlib.Path`
+and `emit(project) -> pathlib.Path` in `pgorm.codegen`. Path arguments accept
+strings or `os.PathLike[str]`. The configuration is validated at runtime;
+invalid build descriptions raise `CodegenError` (a `ValueError` subclass).
+
 ```python
 from pgorm.app import Account, AccountNotes
 

@@ -106,9 +106,25 @@ fn client_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr {
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = module.py();
+    // Client-side cardinality errors have no server diagnostics. Keep the
+    // documented optional fields present for every DatabaseError instance.
+    let database_error = py.get_type::<DatabaseError>();
+    for field in [
+        "sqlstate",
+        "message",
+        "severity",
+        "detail",
+        "hint",
+        "schema",
+        "table",
+        "column",
+        "constraint",
+    ] {
+        database_error.setattr(field, py.None())?;
+    }
     module.add("ConstructionError", py.get_type::<ConstructionError>())?;
     module.add("ConnectionError", py.get_type::<ConnectionError>())?;
-    module.add("DatabaseError", py.get_type::<DatabaseError>())?;
+    module.add("DatabaseError", database_error)?;
     module.add("DecodeError", py.get_type::<DecodeError>())?;
     module.add("TimeoutError", py.get_type::<TimeoutError>())?;
     module.add("LifecycleError", py.get_type::<LifecycleError>())?;

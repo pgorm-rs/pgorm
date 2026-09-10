@@ -4,8 +4,10 @@ from copy import deepcopy
 import builtins
 import keyword
 from pathlib import Path
+from os import PathLike
 import re
 import tomllib
+from typing import Any
 import unicodedata
 
 
@@ -13,7 +15,7 @@ class CodegenError(ValueError):
     """The application build description is invalid or incompatible."""
 
 
-def identifier(value, what):
+def identifier(value: object, what: str) -> str:
     if isinstance(value, str):
         value = unicodedata.normalize("NFKC", value)
     if (
@@ -26,7 +28,7 @@ def identifier(value, what):
     return value
 
 
-def rust_path(value):
+def rust_path(value: object) -> str:
     if not isinstance(value, str) or not re.fullmatch(
         r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*(?:::(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*", value
     ):
@@ -80,7 +82,7 @@ def rust_path(value):
     return value
 
 
-def registration(value):
+def registration(value: object) -> str:
     if (
         not isinstance(value, str)
         or not value
@@ -91,7 +93,7 @@ def registration(value):
     return value
 
 
-def validate(data, base):
+def validate(data: object, base: str | PathLike[str]) -> dict[str, Any]:
     if not isinstance(data, dict) or set(data) - {
         "schema_version",
         "module",
@@ -102,22 +104,22 @@ def validate(data, base):
         raise CodegenError("unknown or invalid application configuration")
     if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
         raise CodegenError("application configuration requires schema_version 1")
-    result = deepcopy(data)
+    result: dict[str, Any] = deepcopy(data)
     result["module"] = identifier(data.get("module", "app"), "application module")
     crate = data.get("entity_crate")
     if not isinstance(crate, str):
         raise CodegenError(
             "entity_crate must name the directory of an existing Rust package"
         )
-    crate = (Path(base) / crate).resolve()
+    crate_path = (Path(base) / crate).resolve()
     try:
-        manifest = tomllib.loads((crate / "Cargo.toml").read_text())
+        manifest = tomllib.loads((crate_path / "Cargo.toml").read_text())
         package = manifest["package"]["name"]
     except (OSError, KeyError, tomllib.TOMLDecodeError) as error:
         raise CodegenError("entity_crate must contain a Cargo.toml package") from error
     if not isinstance(package, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", package):
         raise CodegenError("invalid application Rust package name")
-    result["entity_crate"] = str(crate)
+    result["entity_crate"] = str(crate_path)
     result["entity_package"] = package
     exports = set(vars(builtins)) | {
         "p",
@@ -169,7 +171,7 @@ def validate(data, base):
             names.add(name)
             types.add(path)
             exports.update(symbols)
-            current = {"name": name, "rust": path, "python": export}
+            current: dict[str, Any] = {"name": name, "rust": path, "python": export}
             if family == "entities":
                 fields = entry.get("fields", {})
                 if not isinstance(fields, dict) or not all(
@@ -189,7 +191,7 @@ def validate(data, base):
     return result
 
 
-def rust_string(value):
+def rust_string(value: str) -> str:
     escapes = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
     return (
         '"'

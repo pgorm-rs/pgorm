@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Never
 from ._native import Value
 from ._expressions import Expr
 
@@ -8,14 +8,17 @@ class Identifier:
     def name(self) -> str: ...
 
 class Direction:
+    def __init__(self, _native_only: Never, /) -> None: ...
     Asc: ClassVar[Direction]
     Desc: ClassVar[Direction]
 
 class Nulls:
+    def __init__(self, _native_only: Never, /) -> None: ...
     First: ClassVar[Nulls]
     Last: ClassVar[Nulls]
 
 class Compiled:
+    def __init__(self, _native_only: Never, /) -> None: ...
     @property
     def sql(self) -> str: ...
     @property
@@ -25,6 +28,7 @@ class LikePattern:
     def __init__(self, pattern: str, *, escape: str | None = ...) -> None: ...
 
 class AliasedExpr:
+    def __init__(self, _native_only: Never, /) -> None: ...
     @property
     def expr(self) -> Expr: ...
     @property
