@@ -11,9 +11,11 @@ import pgorm as p
 import pgorm._native as native
 
 from pgorm_campaign import wire
+from pgorm_campaign.native_values import materialize
 
 
 # [spec:pgorm:req:generative.format/test]
+# [spec:pgorm:req:generative.execution/test]
 def main():
     cases = {
         "bool": True,
@@ -63,6 +65,7 @@ def main():
         for value in values:
             snapshot = value.snapshot()
             assert wire.validate(json.loads(json.dumps(snapshot))) == snapshot
+            assert materialize(snapshot, p).snapshot() == snapshot
             observed.append(snapshot)
     expected = set(p.capabilities()["value_types"]) - {"array"}
     seen = {snapshot["type"]["kind"] for snapshot in observed} - {"array"}

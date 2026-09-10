@@ -70,6 +70,13 @@ configuration is a format error.
 
 Transaction effects maintain a checked stack. `begin` reserves its parent;
 effects run only in the active child until `commit` or `rollback` closes it.
+Savepoints inherit mode and isolation from their parent. `entity.result` can
+reference a fetched registered model (including a selected tuple source), then
+`entity.into_active` preserves its `Unchanged` fields. `active.set` dispatches
+`set`, `not_set` or `reset`; reset changes an existing value to `Set` and does
+not manufacture an `Unchanged` state. Deleted active models produce counts and
+cannot be used as row-result references. Pipeline take ranges are inclusive and
+start at one; a zero start is an invalid-input case, not a zero-based slice.
 Nested scopes require unique identities and depth at most eight. Every normal
 program closes its transactions. Transaction streaming is rejected because the
 public binding provides streams on pools and connections.

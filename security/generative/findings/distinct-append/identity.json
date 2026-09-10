@@ -1,0 +1,16 @@
+{
+  "source": {
+    "features": [
+      "extension-module"
+    ],
+    "interpreter": "3.14.4 cpython-314-darwin",
+    "maturin": "1.15.0",
+    "revision": "58bf33338b388b021f08d0acac5131141679a7cd",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "source_sha256": "83311db3c86f65fa0c91343b9c02cd15d6ca8157105a4a1f7e2affc93f4ffc9b"
+  },
+  "native_sha256": "2d048b67417daead4b7b8db86a9fd24c7631c805faa2ec033b6e42892de50521",
+  "status": "reproduced-in-native-rust",
+  "native_replay_source_sha256": "d72906da00f5b05b5c7dfdc39f0fcdee7ebcc0de4d25c7437d5e06eb44512d71",
+  "native_replay_lock_sha256": "7354492e6484cc3cc7d73c6d1fbacf3c0784a0818093d3f0ec12c5a4b7e07238"
+}

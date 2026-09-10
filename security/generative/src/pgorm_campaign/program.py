@@ -114,7 +114,7 @@ def _nodes(program, binders):
                 "operation graph exceeds its dependency-depth budget"
             )
         results[identity] = set().union(*(results[ref] for ref in references))
-        if node["op"] == "result.value":
+        if node["op"] in ("result.value", "entity.result"):
             results[identity].add(node["data"]["step"])
         output = operation.output
         types[identity] = types[node["inputs"]["query"]] if output == "same" else output
@@ -151,11 +151,22 @@ def _steps(program, nodes, types, results):
                     "effect depends on an unavailable earlier result"
                 )
             for result in results[reference]:
-                if catalog.EFFECTS[steps[result]["op"]].output not in ("rows", "model"):
+                producer = steps[result]
+                if catalog.EFFECTS[producer["op"]].output not in ("rows", "model") or (
+                    producer["op"] == "active.write"
+                    and producer["data"]["method"] == "delete"
+                ):
                     raise wire.FormatError(
                         "result field reference does not name a row result"
                     )
         if step["op"] == "begin":
+            if len(stack) > 1 and (
+                step["data"]["mode"] != "default"
+                or step["data"]["isolation"] != "default"
+            ):
+                raise wire.FormatError(
+                    "savepoints inherit transaction mode and isolation"
+                )
             child = step["data"]["child"]
             if child in scopes or len(stack) >= 8:
                 raise wire.FormatError(

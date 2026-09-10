@@ -1,0 +1,420 @@
+{
+  "program_sha256": "10cae4ba3ec8e4df2caa59cbf35e837d6ef3a9d3a6dc2bd6c938ae662ffb3fdd",
+  "native_sha256": "2d048b67417daead4b7b8db86a9fd24c7631c805faa2ec033b6e42892de50521",
+  "status": "error",
+  "trace": [
+    {
+      "id": "n24",
+      "operation": "pipeline.distinct",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::distinct"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n23",
+      "operation": "pipeline.take",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::take_range"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n22",
+      "operation": "pipeline.sort",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::sort"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n19",
+      "operation": "pipeline.select",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::select"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n15",
+      "operation": "pipeline.derive",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::derive_with"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n9",
+      "operation": "pipeline.filter",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::filter"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n2",
+      "operation": "pipeline.from",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::from"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n1",
+      "operation": "pipeline.source",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::IntoSource",
+        "pgorm::pipeline::Source::named"
+      ],
+      "observation": {
+        "python_type": "PipelineSource"
+      }
+    },
+    {
+      "id": "n0",
+      "operation": "table",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm_query::TableRef"
+      ],
+      "observation": {
+        "python_type": "Table"
+      }
+    },
+    {
+      "id": "n8",
+      "operation": "pipeline.membership",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps::in_array"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n5",
+      "operation": "pipeline.value",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::literal"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n4",
+      "operation": "value",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm_query::Value"
+      ],
+      "observation": {
+        "python_type": "Value",
+        "value": {
+          "data": "1",
+          "sql_null": false,
+          "type": {
+            "kind": "i32"
+          },
+          "version": 1
+        }
+      }
+    },
+    {
+      "id": "n7",
+      "operation": "pipeline.value",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::literal"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n6",
+      "operation": "value",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm_query::Value"
+      ],
+      "observation": {
+        "python_type": "Value",
+        "value": {
+          "data": "2",
+          "sql_null": false,
+          "type": {
+            "kind": "i32"
+          },
+          "version": 1
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "operation": "pipeline.column",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::col"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n14",
+      "operation": "pipeline.named",
+      "scope": "b",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps::as_"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n13",
+      "operation": "pipeline.cast",
+      "scope": "b",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps::cast"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n12",
+      "operation": "pipeline.binary",
+      "scope": "b",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n11",
+      "operation": "pipeline.bind",
+      "scope": "b",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Binder::bind"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n10",
+      "operation": "value",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm_query::Value"
+      ],
+      "observation": {
+        "python_type": "Value",
+        "value": {
+          "data": "1",
+          "sql_null": false,
+          "type": {
+            "kind": "i32"
+          },
+          "version": 1
+        }
+      }
+    },
+    {
+      "id": "n18",
+      "operation": "pipeline.named",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps::as_"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n17",
+      "operation": "pipeline.unary",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n16",
+      "operation": "pipeline.alias",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::alias"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n21",
+      "operation": "pipeline.unary",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::ExprOps"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n20",
+      "operation": "pipeline.alias",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::alias"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n25",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::append"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n26",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::intersect"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n27",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::remove"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s0",
+      "operation": "fetch",
+      "status": "error",
+      "observation": {
+        "kind": "error",
+        "class": "ConstructionError",
+        "cause": "PRQL compilation failed: Error: take expected a positive int range, but found 0..2\n",
+        "sqlstate": null
+      }
+    },
+    {
+      "id": "s1",
+      "operation": "fetch",
+      "status": "error",
+      "observation": {
+        "kind": "error",
+        "class": "ConstructionError",
+        "cause": "PRQL compilation failed: Error: cannot combine relations with different numbers of columns\n\u21b3 Hint: `append` requires both tables to have matching columns\n",
+        "sqlstate": null
+      }
+    },
+    {
+      "id": "s2",
+      "operation": "fetch",
+      "status": "error",
+      "observation": {
+        "kind": "error",
+        "class": "ConstructionError",
+        "cause": "PRQL compilation failed: Error: cannot combine relations with different numbers of columns\n\u21b3 Hint: `append` requires both tables to have matching columns\n",
+        "sqlstate": null
+      }
+    },
+    {
+      "id": "s3",
+      "operation": "fetch",
+      "status": "error",
+      "observation": {
+        "kind": "error",
+        "class": "ConstructionError",
+        "cause": "PRQL compilation failed: Error: cannot combine relations with different numbers of columns\n\u21b3 Hint: `append` requires both tables to have matching columns\n",
+        "sqlstate": null
+      }
+    }
+  ],
+  "cleanup_errors": [],
+  "builds": 0,
+  "subprocess_attempts": [],
+  "unconstructed": [],
+  "seconds": 0.3223167909309268,
+  "ordinal": 15
+}

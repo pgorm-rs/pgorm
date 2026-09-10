@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin==1.15.0"]
+build-backend = "maturin"
+
+[project]
+name = "pgorm"
+dynamic = ["version"]
+requires-python = ">=3.14,<3.15"
+description = "Private registered entity and graph types for the pgorm campaign"
+
+[tool.maturin]
+bindings = "pyo3"
+python-source = "python"
+module-name = "pgorm._native"
+features = ["extension-module"]

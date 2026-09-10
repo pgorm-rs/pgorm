@@ -1,0 +1,611 @@
+{
+  "program_sha256": "c2f32bce377f0dcb24d0694ac3032c5bd7b844238bdaadef84857fc6a73fe385",
+  "native_sha256": "2d048b67417daead4b7b8db86a9fd24c7631c805faa2ec033b6e42892de50521",
+  "status": "executed",
+  "trace": [
+    {
+      "id": "n5",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::append"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n4",
+      "operation": "pipeline.select",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::select"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n2",
+      "operation": "pipeline.from",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::from"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n1",
+      "operation": "pipeline.source",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::IntoSource",
+        "pgorm::pipeline::Source::named"
+      ],
+      "observation": {
+        "python_type": "PipelineSource"
+      }
+    },
+    {
+      "id": "n0",
+      "operation": "table",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm_query::TableRef"
+      ],
+      "observation": {
+        "python_type": "Table"
+      }
+    },
+    {
+      "id": "n3",
+      "operation": "pipeline.column",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::col"
+      ],
+      "observation": {
+        "python_type": "PipelineExpr"
+      }
+    },
+    {
+      "id": "n6",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::intersect"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    },
+    {
+      "id": "n7",
+      "operation": "pipeline.set",
+      "scope": "root",
+      "status": "constructed",
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::remove"
+      ],
+      "observation": {
+        "python_type": "Pipeline"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s0",
+      "operation": "fetch",
+      "status": "observed",
+      "observation": {
+        "kind": "rows",
+        "rows": [
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "1",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "2",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "3",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "4",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "1",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "2",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "3",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "4",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          }
+        ]
+      },
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::all"
+      ]
+    },
+    {
+      "id": "s1",
+      "operation": "fetch",
+      "status": "observed",
+      "observation": {
+        "kind": "rows",
+        "rows": [
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "1",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "2",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "3",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "4",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "4",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "2",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "1",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "3",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          }
+        ]
+      },
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::all"
+      ]
+    },
+    {
+      "id": "s2",
+      "operation": "fetch",
+      "status": "observed",
+      "observation": {
+        "kind": "rows",
+        "rows": [
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "4",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "2",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "3",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          },
+          {
+            "kind": "record",
+            "fields": [
+              {
+                "name": "id",
+                "value": {
+                  "data": "1",
+                  "sql_null": false,
+                  "type": {
+                    "kind": "i32"
+                  },
+                  "version": 1
+                }
+              }
+            ],
+            "postgres": [
+              {
+                "name": "id",
+                "type": "int4",
+                "schema": "pg_catalog"
+              }
+            ]
+          }
+        ]
+      },
+      "native_paths": [
+        "pgorm::pipeline::Pipeline::all"
+      ]
+    }
+  ],
+  "cleanup_errors": [],
+  "builds": 0,
+  "subprocess_attempts": [],
+  "unconstructed": [],
+  "seconds": 0.17956750001758337,
+  "ordinal": 16
+}

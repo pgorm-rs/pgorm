@@ -1,0 +1,23 @@
+     Locking 293 packages to latest Rust 1.97.1 compatible versions
+   Compiling uuid v1.26.1
+   Compiling prost-build v0.13.5
+   Compiling tokio-util v0.7.19
+   Compiling postgres-types v0.2.14
+   Compiling pg_query v6.2.0
+   Compiling rust_decimal v1.43.0
+   Compiling pgvector v0.4.2
+   Compiling tokio-postgres v0.7.18
+   Compiling pgorm-query v0.2.0 (/Users/brendan/git/necessary/pgorm/pgorm-query)
+   Compiling pgorm-pool v0.2.0 (/Users/brendan/git/necessary/pgorm/pgorm-pool)
+   Compiling pgorm-sql-macro v0.2.0 (/Users/brendan/git/necessary/pgorm/pgorm-sql-macro)
+   Compiling pgorm v0.2.0 (/Users/brendan/git/necessary/pgorm)
+   Compiling pgorm-distinct-replay v0.1.0 (/Users/brendan/git/necessary/pgorm/target/generative-distinct-replay)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 17s
+     Running `target/debug/pgorm-distinct-replay`
+baseline: Ok(("SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts", Values([])))
+distinct: Ok(("SELECT DISTINCT id FROM fixture.accounts", Values([])))
+distinct then append: Err(Compile("Error: cannot combine relations with different numbers of columns\n↳ Hint: `append` requires both tables to have matching columns\n"))
+
+thread 'main' (257744678) panicked at src/main.rs:12:5:
+matching explicit projections should remain composable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

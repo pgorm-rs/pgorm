@@ -116,6 +116,40 @@ class ProgramTests(unittest.TestCase):
         with self.assertRaises(wire.FormatError):
             program.Program('{"unvalidated":true}')
 
+    def test_deleted_models_cannot_supply_result_references(self):
+        from execution_cases import Case
+
+        case = Case()
+        entity = case.node("entity", data={"name": "campaign.Note"})
+        active = case.node("entity.active", {"entity": entity})
+        deleted = case.step("active.write", {"model": active}, {"method": "delete"})
+        model = case.node("entity.result", data={"step": deleted, "row": 0})
+        converted = case.node("entity.into_active", {"model": model})
+        case.step("active.write", {"model": converted}, {"method": "update"})
+        with self.assertRaisesRegex(wire.FormatError, "row result"):
+            case.program()
+
+    def test_savepoints_inherit_transaction_options(self):
+        value = sample()
+        value["steps"] = [
+            node(
+                "start",
+                "begin",
+                data={"child": "tx", "mode": "default", "isolation": "default"},
+            ),
+            node(
+                "savepoint",
+                "begin",
+                data={"child": "nested", "mode": "read_only", "isolation": "default"},
+                scope="tx",
+            ),
+            node("nested_end", "rollback", scope="nested"),
+            node("end", "rollback", scope="tx"),
+            value["steps"][0],
+        ]
+        with self.assertRaisesRegex(wire.FormatError, "savepoints inherit"):
+            program.Program.from_dict(observe(value))
+
     def test_write_type_is_independent_of_key_order(self):
         value = sample()
         value["nodes"] = [

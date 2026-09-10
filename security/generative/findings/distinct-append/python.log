@@ -1,0 +1,8 @@
+baseline: SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts
+distinct: SELECT DISTINCT id FROM fixture.accounts
+Traceback (most recent call last):
+  File "/Users/brendan/git/necessary/pgorm/security/generative/findings/distinct-append/python.py", line 12, in <module>
+    print("distinct then append:", distinct.append(distinct).inspect().sql)
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+pgorm.ConstructionError: PRQL compilation failed: Error: cannot combine relations with different numbers of columns
+↳ Hint: `append` requires both tables to have matching columns

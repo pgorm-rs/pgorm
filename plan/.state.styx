@@ -724,7 +724,6 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
-    {id generative.execute, kind @doing, author "brendan@necessary.nu", at 2026-09-10T14:50:11.487766Z}
 )
 
 impl_evidence (
@@ -1527,6 +1526,13 @@ impl_evidence (
         {impl_name main, rule generative.format}
         {impl_name main, rule generative.matrix}
         {impl_name main, rule generative.program}
+    )}
+    {id generative.execute, covered_rules (
+        generative.build-amortization
+        generative.execution
+    ), covered_claims (
+        {impl_name main, rule generative.build-amortization}
+        {impl_name main, rule generative.execution}
     )}
 )
 

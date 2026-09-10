@@ -3,6 +3,8 @@ firedbg
 Cargo.lock
 !security/sqlmap/adapter/Cargo.lock
 !pgorm-python/Cargo.lock
+!security/generative/bridge/Cargo.lock
+!security/generative/findings/*/Cargo.lock
 __pycache__/
 *.sublime*
 .vscode

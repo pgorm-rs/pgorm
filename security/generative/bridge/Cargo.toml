@@ -1,0 +1,25 @@
+[package]
+name = "pgorm-generative-bridge"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pgorm-python = { path = "../../../pgorm-python", default-features = false }
+pgorm = { path = "../../.." }
+pyo3 = "=0.29.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+async-trait = "=0.1.92"
+
+[lints.rust]
+unsafe_code = "forbid"
