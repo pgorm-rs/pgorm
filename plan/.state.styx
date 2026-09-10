@@ -724,7 +724,6 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
-    {id python.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-10T13:45:44.365077Z}
 )
 
 impl_evidence (
@@ -1112,7 +1111,11 @@ impl_evidence (
         {id pipeline.select-sources, version 2}
         {id query.graph.cursor, version 1}
     )}
-    {id python.acceptance}
+    {id python.acceptance, covered_rules (
+        python.acceptance
+    ), covered_claims (
+        {impl_name main, rule python.acceptance}
+    )}
     {id python.direct-builders, covered_rules (
         python.direct-builders
     ), covered_claims (

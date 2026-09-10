@@ -72,8 +72,9 @@ def main():
     # This is the only compiler/build phase. Its output is reused by every query.
     oracle = rust_oracle(root, environment)
     with tempfile.TemporaryDirectory(prefix="build-", dir=output) as build_dir:
+        wheel_environment = {**environment, "CARGO_TARGET_DIR": str(root / "target/python-codegen-seed")}
         run([sys.executable, "-m", "maturin", "build", "--manifest-path", str(root / "pgorm-python/Cargo.toml"),
-             "--interpreter", sys.executable, "--out", build_dir, "--locked"], environment=environment)
+             "--interpreter", sys.executable, "--out", build_dir, "--locked"], environment=wheel_environment)
         wheels = list(Path(build_dir).glob("pgorm-*.whl"))
         if len(wheels) != 1:
             raise RuntimeError("expected one wheel for the selected interpreter")

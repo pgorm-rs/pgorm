@@ -4,10 +4,12 @@ The `pgorm` Python package loads an optional PyO3 extension over pgorm's Rust
 builders. Calls run in the Python process. PostgreSQL uses its native protocol;
 there is no HTTP adapter or query dispatcher.
 
-The package is under implementation. `pgorm.capabilities()` reports only the
-operations present in the installed build. The full contract is in
-`docs/spec/python.md` in the repository; unimplemented operations are not
-claimed by the capability manifest.
+The package provides runtime SELECT/CRUD and schema builders, asyncio database
+access, transactions, models, pipelines and compiled entity/graph registrations.
+`pgorm.capabilities()` reports the operations and registrations present in the
+installed build. The [specification](../docs/spec/python.md) defines the contract;
+the [acceptance guide](ACCEPTANCE.md) maps it to installed-package tests and
+independent Rust comparisons.
 
 Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
 or to generate schema statements from a registered Rust entity.
@@ -23,8 +25,9 @@ From the repository root, using CPython 3.14:
 ```sh
 uv venv target/python-dev
 uv pip install --python target/python-dev/bin/python 'maturin==1.15.0'
-target/python-dev/bin/maturin build --manifest-path pgorm-python/Cargo.toml \
-  --interpreter target/python-dev/bin/python --out target/python-dist
+CARGO_TARGET_DIR=target/python-codegen-seed \
+  target/python-dev/bin/maturin build --manifest-path pgorm-python/Cargo.toml \
+  --interpreter target/python-dev/bin/python --out target/python-dist --locked
 uv pip install --python target/python-dev/bin/python target/python-dist/*.whl
 target/python-dev/bin/python pgorm-python/tests/with_postgres.py \
   target/python-dev/bin/python -m unittest discover -s pgorm-python/tests

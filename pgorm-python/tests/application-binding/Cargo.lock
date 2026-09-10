@@ -1357,6 +1357,7 @@ name = "pgorm-python-application-fixture"
 version = "0.2.0"
 dependencies = [
  "async-trait",
+ "futures-util",
  "pgorm",
  "pgorm-python",
  "pyo3",

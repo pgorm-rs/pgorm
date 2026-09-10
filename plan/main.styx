@@ -5646,6 +5646,13 @@ children (
                         kind @decision
                         text "python.distribution is delivered in 3d79e8f3, leaving python.acceptance as the sole ready Python node. Consolidate installed artifact/direct-builder/native parity/application registration evidence into a repeatable acceptance command. Audit every exposed execution family against its native Rust path; add missing execution oracles rather than count documentation as evidence. Revalidate the already-implemented macros.derive.entity-model v4 dependency (current source/test annotations are v4; prior node delivery recorded v2) and clear propagated review only after actual verification. Preserve the explicit tested-platform limit from distribution; no CI run or publication is claimed."
                     }
+
+                    {
+                        at 2026-09-10T14:04:25.993991Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Complete acceptance passed on 2026-09-10 using the owned local PostgreSQL 16 fixture: target/python-acceptance/summary.json records all four installed-artifact phases passed, 28 direct-builder programs with SQL/parameter mismatch rejection, 23 native binding tests, 8 application Rust tests, registered entity/graph/source/schema/transaction tests and an independent Rust execution oracle through connections and native transactions (including savepoint, rollback, read-only and streaming outcomes). The deliberately altered execution report was rejected. Codegen passed three fresh installs, runtime signatures, strict package typing and four negative cases. Isolated wheel and sdist-derived wheel each passed all 110 standalone Python tests, installed signature checks, strict package/example typing and 13 negative cases, TLS and native-link checks. The default Rust workspace built with Python tools blocked and no PyO3 dependencies in its resolved graph; nspec validation passed. ACCEPTANCE.md records repeatable commands, evidence mapping and actual platform limits (macOS 26.5.1 arm64, CPython 3.14.4 with GIL). No CI run or registry publication is claimed. Upstream macro v4 was revalidated in 6e726cdd with all 67 macro tests passing, clearing propagated Review."
+                    }
                 )
             }
 
