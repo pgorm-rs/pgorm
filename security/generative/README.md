@@ -7,6 +7,9 @@ reproducible Python/Rust failures and a separate bounded Rust compile suite.
 The Python module is supplied by `pgorm-python`; this package is test
 infrastructure and is excluded from its distributions.
 
+The [portable program format](PROGRAMS.md) defines typed operation references,
+exact value tags, binder/transaction scopes and the versioned coverage matrix.
+
 ## Fixture checks
 
 From the repository root:

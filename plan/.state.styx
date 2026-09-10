@@ -1518,6 +1518,15 @@ impl_evidence (
         {impl_name main, rule generative.fixtures}
         {impl_name main, rule generative.isolation}
     )}
+    {id generative.program, covered_rules (
+        generative.format
+        generative.matrix
+        generative.program
+    ), covered_claims (
+        {impl_name main, rule generative.format}
+        {impl_name main, rule generative.matrix}
+        {impl_name main, rule generative.program}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

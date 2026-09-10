@@ -5823,6 +5823,20 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T14:20:47.273224Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T14:48:49.705093Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented the canonical immutable JSON program format with 87 typed builder instructions, 8 ordered effect kinds, exact tagged values and a versioned matrix containing 444 coverage obligations. The closed catalog maps runtime statements, descriptor models, compiled entities/ActiveModels, typed graphs/cursors, pipelines, schema and execution to distinct native Rust paths. Loading enforces size/depth budgets, versions, typed references, topological order, effect-result dependencies, live binder ownership, transaction parent reservation/closure, no unreachable nodes and an oracle for every effect plus final state. Stored values can become explicitly typed identifier nodes; raw templates remain a separate API. Matrix enumerates every scalar/enum kind across literal/bound/NULL/decode contexts and array contexts, compiled registrations, required structural/hostile variations and compile-only/unsupported paths with reasons. All 22 fast tests pass. The installed native snapshot check passed 125 records covering all 25 scalar/enum kinds plus NULL/nullable/empty arrays, retaining IEEE bits, JSON-vs-SQL NULL and Chrono temporal spellings; target/generative-program/values.json records the native hash. Generation, execution, oracles and full campaign acceptance remain subsequent required nodes."
+                    }
                 )
             }
 
