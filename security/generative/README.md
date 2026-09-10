@@ -153,7 +153,7 @@ that function, and drops it before final state comparison. It does not require
 temporary-table privileges or change the restricted execution role. Helper
 cleanup failure makes the check incomplete.
 
-Oracle development is still tracked as Doing. Non-finite inline floats, an
+The independent oracle kernel is implemented. Non-finite inline floats, an
 uninstalled vector type, some invalid conversion cases and native-parity
 policies report incomplete. Ordered pipeline observations require a surviving
 explicit sort. Unsupported semantics cannot establish a pass.

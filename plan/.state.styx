@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-09T14:49:42.349875Z
+last_sync_at 2026-09-10T22:25:12.233544Z
 
 rule_versions (
     {id codegen.entity, version 2}
@@ -445,6 +445,7 @@ derived_priorities (
     {id pgparse.fingerprint, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
     {id pgparse.oracle, priority 0, derived_at 2026-09-04T14:19:01.307427Z}
     {id pgparse.sql-macro, priority 1, derived_at 2026-09-04T14:19:01.307427Z}
+    {id pipeline-append-distinct, priority 0, derived_at 2026-09-10T22:25:12.233544Z}
     {id pipeline-hostile-identifiers, priority 0, derived_at 2026-09-08T15:20:53.390093Z}
     {id pipeline-sources, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id pipeline-unused-parameters, priority 3, derived_at 2026-09-06T16:36:02.710141Z}
@@ -724,7 +725,6 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
-    {id generative.oracles, kind @doing, author "brendan@necessary.nu", at 2026-09-10T19:50:31.36863Z}
 )
 
 impl_evidence (
@@ -859,6 +859,49 @@ impl_evidence (
         {impl_name main, rule migration.runner}
         {impl_name main, rule migration.up}
         {impl_name main, rule migration.up-only}
+    )}
+    {id generative.execute, covered_rules (
+        generative.build-amortization
+        generative.execution
+    ), covered_claims (
+        {impl_name main, rule generative.build-amortization}
+        {impl_name main, rule generative.execution}
+    ), rule_versions_seen (
+        {id generative.build-amortization, version 0}
+        {id generative.execution, version 0}
+    )}
+    {id generative.fixtures, covered_rules (
+        generative.fixtures
+        generative.isolation
+    ), covered_claims (
+        {impl_name main, rule generative.fixtures}
+        {impl_name main, rule generative.isolation}
+    ), rule_versions_seen (
+        {id generative.fixtures, version 0}
+        {id generative.isolation, version 0}
+    )}
+    {id generative.oracles, covered_rules (
+        generative.comparison
+        generative.oracles
+    ), covered_claims (
+        {impl_name main, rule generative.comparison}
+        {impl_name main, rule generative.oracles}
+    ), rule_versions_seen (
+        {id generative.comparison, version 0}
+        {id generative.oracles, version 0}
+    )}
+    {id generative.program, covered_rules (
+        generative.format
+        generative.matrix
+        generative.program
+    ), covered_claims (
+        {impl_name main, rule generative.format}
+        {impl_name main, rule generative.matrix}
+        {impl_name main, rule generative.program}
+    ), rule_versions_seen (
+        {id generative.format, version 0}
+        {id generative.matrix, version 0}
+        {id generative.program, version 0}
     )}
     {id grouped, covered_rules (
         query.graph.grouped
@@ -1116,11 +1159,36 @@ impl_evidence (
         python.acceptance
     ), covered_claims (
         {impl_name main, rule python.acceptance}
+    ), rule_versions_seen (
+        {id python.acceptance, version 1}
+    )}
+    {id python.codegen, covered_rules (
+        python.codegen
+    ), covered_claims (
+        {impl_name main, rule python.codegen}
+    ), rule_versions_seen (
+        {id python.codegen, version 0}
     )}
     {id python.direct-builders, covered_rules (
         python.direct-builders
     ), covered_claims (
         {impl_name main, rule python.direct-builders}
+    ), rule_versions_seen (
+        {id python.direct-builders, version 0}
+    )}
+    {id python.distribution, covered_rules (
+        python.distribution
+    ), covered_claims (
+        {impl_name main, rule python.distribution}
+    ), rule_versions_seen (
+        {id python.distribution, version 0}
+    )}
+    {id python.entities, covered_rules (
+        python.entities
+    ), covered_claims (
+        {impl_name main, rule python.entities}
+    ), rule_versions_seen (
+        {id python.entities, version 0}
     )}
     {id python.expressions, covered_rules (
         python.delegation
@@ -1132,6 +1200,25 @@ impl_evidence (
         {impl_name main, rule python.expressions}
         {impl_name main, rule python.input-boundaries}
         {impl_name main, rule python.ownership}
+    ), rule_versions_seen (
+        {id python.delegation, version 1}
+        {id python.expressions, version 0}
+        {id python.input-boundaries, version 0}
+        {id python.ownership, version 0}
+    )}
+    {id python.graph, covered_rules (
+        python.graph
+    ), covered_claims (
+        {impl_name main, rule python.graph}
+    ), rule_versions_seen (
+        {id python.graph, version 0}
+    )}
+    {id python.models, covered_rules (
+        python.models
+    ), covered_claims (
+        {impl_name main, rule python.models}
+    ), rule_versions_seen (
+        {id python.models, version 0}
     )}
     {id python.package, covered_rules (
         python.api
@@ -1143,6 +1230,84 @@ impl_evidence (
         {impl_name main, rule python.capabilities}
         {impl_name main, rule python.optional}
         {impl_name main, rule python.package}
+    ), rule_versions_seen (
+        {id python.api, version 0}
+        {id python.capabilities, version 0}
+        {id python.optional, version 0}
+        {id python.package, version 0}
+    )}
+    {id python.pipeline, covered_rules (
+        python.pipeline
+    ), covered_claims (
+        {impl_name main, rule python.pipeline}
+    ), rule_versions_seen (
+        {id python.pipeline, version 0}
+    )}
+    {id python.results, covered_rules (
+        python.results
+    ), covered_claims (
+        {impl_name main, rule python.results}
+    ), rule_versions_seen (
+        {id python.cancellation, version 0}
+        {id python.results, version 0}
+        {id python.value-tags, version 0}
+    )}
+    {id python.runtime, covered_rules (
+        python.connections
+        python.errors
+        python.runtime
+    ), covered_claims (
+        {impl_name main, rule python.connections}
+        {impl_name main, rule python.errors}
+        {impl_name main, rule python.runtime}
+    ), rule_versions_seen (
+        {id python.connections, version 0}
+        {id python.errors, version 0}
+        {id python.runtime, version 0}
+    )}
+    {id python.schema, covered_rules (
+        python.schema
+    ), covered_claims (
+        {impl_name main, rule python.schema}
+    ), rule_versions_seen (
+        {id python.schema, version 0}
+    )}
+    {id python.statements, covered_rules (
+        python.raw
+        python.statements
+    ), covered_claims (
+        {impl_name main, rule python.raw}
+        {impl_name main, rule python.statements}
+    ), rule_versions_seen (
+        {id python.raw, version 0}
+        {id python.statements, version 0}
+    )}
+    {id python.transactions, covered_rules (
+        python.cancellation
+        python.transactions
+    ), covered_claims (
+        {impl_name main, rule python.cancellation}
+        {impl_name main, rule python.transactions}
+    ), rule_versions_seen (
+        {id python.cancellation, version 0}
+        {id python.transactions, version 0}
+    )}
+    {id python.typing, covered_rules (
+        python.typing
+    ), covered_claims (
+        {impl_name main, rule python.typing}
+    ), rule_versions_seen (
+        {id python.typing, version 0}
+    )}
+    {id python.values, covered_rules (
+        python.value-tags
+        python.values
+    ), covered_claims (
+        {impl_name main, rule python.value-tags}
+        {impl_name main, rule python.values}
+    ), rule_versions_seen (
+        {id python.value-tags, version 0}
+        {id python.values, version 0}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape
@@ -1436,104 +1601,6 @@ impl_evidence (
         {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
-    )}
-    {id python.runtime, covered_rules (
-        python.connections
-        python.errors
-        python.runtime
-    ), covered_claims (
-        {impl_name main, rule python.connections}
-        {impl_name main, rule python.errors}
-        {impl_name main, rule python.runtime}
-    )}
-    {id python.values, covered_rules (
-        python.value-tags
-        python.values
-    ), covered_claims (
-        {impl_name main, rule python.value-tags}
-        {impl_name main, rule python.values}
-    )}
-    {id python.statements, covered_rules (
-        python.raw
-        python.statements
-    ), covered_claims (
-        {impl_name main, rule python.raw}
-        {impl_name main, rule python.statements}
-    )}
-    {id python.results, covered_rules (
-        python.results
-    ), covered_claims (
-        {impl_name main, rule python.results}
-    )}
-    {id python.entities, covered_rules (
-        python.entities
-    ), covered_claims (
-        {impl_name main, rule python.entities}
-    )}
-    {id python.graph, covered_rules (
-        python.graph
-    ), covered_claims (
-        {impl_name main, rule python.graph}
-    )}
-    {id python.codegen, covered_rules (
-        python.codegen
-    ), covered_claims (
-        {impl_name main, rule python.codegen}
-    )}
-    {id python.models, covered_rules (
-        python.models
-    ), covered_claims (
-        {impl_name main, rule python.models}
-    )}
-    {id python.pipeline, covered_rules (
-        python.pipeline
-    ), covered_claims (
-        {impl_name main, rule python.pipeline}
-    )}
-    {id python.schema, covered_rules (
-        python.schema
-    ), covered_claims (
-        {impl_name main, rule python.schema}
-    )}
-    {id python.transactions, covered_rules (
-        python.cancellation
-        python.transactions
-    ), covered_claims (
-        {impl_name main, rule python.cancellation}
-        {impl_name main, rule python.transactions}
-    )}
-    {id python.typing, covered_rules (
-        python.typing
-    ), covered_claims (
-        {impl_name main, rule python.typing}
-    )}
-    {id python.distribution, covered_rules (
-        python.distribution
-    ), covered_claims (
-        {impl_name main, rule python.distribution}
-    )}
-    {id generative.fixtures, covered_rules (
-        generative.fixtures
-        generative.isolation
-    ), covered_claims (
-        {impl_name main, rule generative.fixtures}
-        {impl_name main, rule generative.isolation}
-    )}
-    {id generative.program, covered_rules (
-        generative.format
-        generative.matrix
-        generative.program
-    ), covered_claims (
-        {impl_name main, rule generative.format}
-        {impl_name main, rule generative.matrix}
-        {impl_name main, rule generative.program}
-    )}
-    {id generative.execute, covered_rules (
-        generative.build-amortization
-        generative.execution
-    ), covered_claims (
-        {impl_name main, rule generative.build-amortization}
-        {impl_name main, rule generative.execution}
     )}
 )
 

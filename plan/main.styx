@@ -6024,6 +6024,14 @@ children (
                         kind @note
                         text "Independent-oracle checkpoint: 42 fast tests and all required Python checks pass. Fresh owned-PostgreSQL self-check target/generative-oracles/run-8b6591ea7639 accounts for 111 handwritten programs: 103 pass, one exact SQLSTATE rejection, seven detections across three open finding categories (set grouping, nullable count, explicit first/last frames). Native artifact remains b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d. Added 23 literal families (scalar/NULL/array), hidden sort-key propagation through projection/filter/take/join/embedded sources, group/distinct order reset, ranked windows and empty-frame comparisons. The reference explicitly follows documented whole-second literal temporal conversions while preserving bound precision and exact result types. Count(score) emits COUNT(*) and first/last drop rows(1,1), both reproduced by direct Python and standalone Rust and preserved under findings/window-semantics. Original harness setup/default-frame mistakes are retained separately. No production fix applied. The node remains Doing for remaining invalid-conversion/oracle hardening; general native parity belongs to replay. No generated full campaign or million-program acceptance is claimed."
                     }
+
+                    {
+                        at 2026-09-10T22:26:18.210866Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "After checkpoint 5f171d10 was integrated, nplan derived generative.oracles Done from committed implementation/verification coverage despite the explicit chore checkpoint type. The earlier note's statement that the node remains Doing is therefore stale. The delivered kernel checks supported programs independently and fails closed on unsupported semantics, as these two rules require. This component status does not claim full matrix coverage, controls, generic native replay or campaign acceptance; those remain existing downstream WBS obligations. Known invalid-conversion and unsupported-policy paths continue to report incomplete."
+                        after_done true
+                    }
                 )
             }
 
