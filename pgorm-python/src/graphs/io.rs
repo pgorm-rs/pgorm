@@ -1,8 +1,8 @@
 use super::backend::{CursorPlan, Query};
 use crate::{
-    entities,
-    errors::{ConstructionError, LifecycleError, database_error},
-    runtime::Operation,
+    errors::{ConstructionError, InternalError},
+    execution::Target,
+    transactions::work::{Output, Work},
 };
 use pyo3::{
     IntoPyObjectExt,
@@ -24,7 +24,7 @@ pub(crate) fn read<'py>(
     query: Query,
     terminal: Read,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let state = entities::io::state(py, connection)?;
+    let target = Target::extract(py, connection)?;
     let optional = matches!(terminal, Read::Optional);
     if query.compile(optional).1.0.len() > 65535 {
         return Err(ConstructionError::new_err(
@@ -32,19 +32,13 @@ pub(crate) fn read<'py>(
         ));
     }
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = async {
-                match terminal {
-                    Read::Cursor(plan) => query.cursor(operation.connection()?, plan).await.map_err(|error| database_error(error, &state.pool.secrets)),
-                    _ => query.run(operation.connection()?, optional).await.map_err(|error| database_error(error, &state.pool.secrets)),
-                }
-            } => result,
+        let work = match terminal {
+            Read::Cursor(plan) => Work::Cursor(query, plan),
+            _ => Work::Graph(query, optional),
         };
-        operation.restore();
-        let rows = result?;
+        let Output::Graph(rows) = target.run(work).await? else {
+            return Err(InternalError::new_err("unexpected graph result"));
+        };
         Python::attach(|py| {
             let rows = rows
                 .into_iter()

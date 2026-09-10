@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from .. import _native as p
 from ..runtime import Connection, Pool
+from ..transactions import Transaction
 from .record import ModelRecord
 
 if TYPE_CHECKING:
@@ -33,18 +34,18 @@ class ModelRows:
     def inspect(self) -> p.Compiled:
         return self.statement.inspect()
 
-    async def all(self, connection: Connection | Pool) -> list[ModelRecord]:
+    async def all(self, connection: Connection | Pool | Transaction) -> list[ModelRecord]:
         return [
             ModelRecord(self.model, row, self.selected)
             for row in await connection.fetch_all(self.statement)
         ]
 
-    async def one(self, connection: Connection | Pool) -> ModelRecord:
+    async def one(self, connection: Connection | Pool | Transaction) -> ModelRecord:
         return ModelRecord(
             self.model, await connection.fetch_one(self.statement), self.selected
         )
 
-    async def one_opt(self, connection: Connection | Pool) -> ModelRecord | None:
+    async def one_opt(self, connection: Connection | Pool | Transaction) -> ModelRecord | None:
         row = await connection.fetch_optional(self.statement)
         return None if row is None else ModelRecord(self.model, row, self.selected)
 
@@ -119,7 +120,7 @@ class ModelWrite:
     def inspect(self) -> p.Compiled:
         return self.statement.inspect()
 
-    async def execute(self, connection: Connection | Pool) -> int:
+    async def execute(self, connection: Connection | Pool | Transaction) -> int:
         return await connection.execute(self.statement)
 
     def __bool__(self) -> bool:

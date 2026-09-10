@@ -1,37 +1,27 @@
-use std::sync::Arc;
-
-use pgorm::{ConnectionTrait, ValueHolder};
 use pyo3::{prelude::*, types::PyList};
 use pyo3_async_runtimes::tokio::future_into_py;
-use tokio_postgres::types::ToSql;
 
 use super::PyRecord;
 use crate::{
-    errors::{DatabaseError, LifecycleError, database_error},
-    runtime::{ConnectionState, Operation},
+    errors::{DatabaseError, InternalError},
+    execution::Target,
     statements,
+    transactions::work::{Output, Work},
 };
 
 // [spec:pgorm:req:python.results]
 pub(crate) fn execute<'py>(
     py: Python<'py>,
-    state: Arc<ConnectionState>,
+    target: Target,
     query: &Bound<'_, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    state.pool.check_owner(py)?;
-    state.ensure_open()?;
+    target.check(py)?;
     let compiled = statements::compile(query)?;
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let values: Vec<_> = compiled.values.0.into_iter().map(ValueHolder).collect();
-        let params: Vec<_> = values.iter().map(|v| v as &(dyn ToSql + Sync)).collect();
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = operation.connection()?.execute(&compiled.sql, &params) => result,
-        };
-        operation.restore();
-        result.map_err(|error| database_error(error, &state.pool.secrets))
+        match target.run(Work::Execute(compiled)).await? {
+            Output::Count(count) => Ok(count),
+            _ => Err(InternalError::new_err("unexpected execution result")),
+        }
     })
 }
 
@@ -39,12 +29,11 @@ pub(crate) fn execute<'py>(
 /// Cardinality checks never turn database/decode failures into a missing row.
 pub(crate) fn fetch<'py>(
     py: Python<'py>,
-    state: Arc<ConnectionState>,
+    target: Target,
     query: &Bound<'_, PyAny>,
     mode: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    state.pool.check_owner(py)?;
-    state.ensure_open()?;
+    target.check(py)?;
     let compiled = statements::compile(query)?;
     let mode = match mode {
         "all" => 0,
@@ -57,16 +46,9 @@ pub(crate) fn fetch<'py>(
         }
     };
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let values: Vec<_> = compiled.values.0.into_iter().map(ValueHolder).collect();
-        let params: Vec<_> = values.iter().map(|v| v as &(dyn ToSql + Sync)).collect();
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = operation.connection()?.query_all(&compiled.sql, &params) => result,
+        let Output::Rows(rows) = target.run(Work::Fetch(compiled)).await? else {
+            return Err(InternalError::new_err("unexpected query result"));
         };
-        operation.restore();
-        let rows = result.map_err(|error| database_error(error, &state.pool.secrets))?;
         if (mode == 1 && rows.len() != 1) || (mode == 2 && rows.len() > 1) {
             return Err(DatabaseError::new_err(format!(
                 "expected {} row, received {}",

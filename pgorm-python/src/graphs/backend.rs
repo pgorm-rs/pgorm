@@ -1,6 +1,7 @@
+use crate::execution::Database;
 use futures_util::future::BoxFuture;
 use pgorm::{
-    DatabaseConnection, Error,
+    Error,
     pgorm_query::{Condition, NullOrdering, Order, SimpleExpr, Value, Values},
 };
 use std::{fmt::Debug, sync::Arc};
@@ -64,12 +65,12 @@ pub(crate) trait QueryBackend: Debug + Send + Sync {
     fn compile(&self, optional: bool) -> (String, Values);
     fn run<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         optional: bool,
     ) -> BoxFuture<'a, Result<Vec<Row>, Error>>;
     fn cursor<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         plan: CursorPlan,
     ) -> BoxFuture<'a, Result<Vec<Row>, Error>>;
 }

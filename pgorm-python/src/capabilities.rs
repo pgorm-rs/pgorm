@@ -48,7 +48,7 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources", "ddl", "create_table", "create_index", "entity_schema", "ddl_column", "ddl_type"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources", "ddl", "create_table", "create_index", "entity_schema", "ddl_column", "ddl_type", "transaction"],
         "result_policy": {
             "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
@@ -66,7 +66,7 @@ fn manifest() -> Value {
             "input": "SQL ColumnType hints for plain values; explicit Value tags and Rust setters remain authoritative",
             "one": "Rust Select::one/one_opt use LIMIT 1; all returns every selected model",
             "writes": "real ActiveModel insert/update/delete and before/after hooks on a clone",
-            "execution": "acquired Connection; native asyncio awaitable",
+            "execution": "acquired Connection or Transaction; native asyncio awaitable",
             "stream": false
         },
         "graph_policy": {
@@ -110,9 +110,20 @@ fn manifest() -> Value {
             "qualified_enum_binding": false,
             "source_arities": [1, 2, 3, 4, 5, 6],
             "source_result": "tuple of optional registered models; (None,) is distinct from no row",
-            "record_terminals": "all / one / one_opt on acquired Connection; one and one_opt append take(1)",
+            "record_terminals": "all / one / one_opt on acquired Connection or Transaction; one and one_opt append take(1)",
             "stream": "dynamic Record through pool.stream or connection.stream",
             "selected_sources_stream": false
+        },
+        "transaction_policy": {
+            "ownership": "scoped Rust owner task holds borrowed DatabaseTransaction; parent reserved through native completion",
+            "modes": ["default", "read_write", "read_only", "deferrable"],
+            "isolation": ["read_uncommitted", "read_committed", "repeatable_read", "serializable"],
+            "nested": "real native savepoints; each parent reserved until its child completes",
+            "contexts": "commit on normal exit; rollback on exceptional exit; uncertain state discarded",
+            "cancellation": "cancelled in-flight requests discard the entire connection; a cancelled write may have an unknown outcome",
+            "abandoned_idle_rollback_timeout_seconds": 5,
+            "registered": ["entity queries", "ActiveModel writes and hooks", "graphs", "cursors", "pipeline source tuples"],
+            "implicit_retry": false, "stream": false
         },
         "schema_policy": {
             "construction": "owned Rust DDL builders; no database work at construction or import",
@@ -137,6 +148,7 @@ fn manifest() -> Value {
         operations.extend(crate::graphs::capabilities());
         operations.extend(crate::pipeline::capabilities());
         operations.extend(crate::schema::capabilities());
+        operations.extend(crate::transactions::capabilities());
     }
     manifest
 }

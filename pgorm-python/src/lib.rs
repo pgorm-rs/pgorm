@@ -7,6 +7,7 @@ mod capabilities;
 mod config;
 pub mod entities;
 mod errors;
+mod execution;
 pub mod expressions;
 pub mod graphs;
 pub mod identifiers;
@@ -15,6 +16,7 @@ pub mod results;
 mod runtime;
 pub mod schema;
 pub mod statements;
+mod transactions;
 pub mod values;
 
 use pyo3::prelude::*;

@@ -10,7 +10,7 @@ use super::{
     window::{PyOver, expressions},
 };
 use crate::{
-    entities, errors::ConstructionError, expressions::Compiled, results, statements::Join,
+    errors::ConstructionError, execution::Target, expressions::Compiled, results, statements::Join,
 };
 
 // [spec:pgorm:req:python.pipeline]
@@ -59,7 +59,7 @@ impl PyPipeline {
             .into_any();
         results::fetch(
             py,
-            entities::io::state(py, connection)?,
+            Target::extract(py, connection)?,
             &compiled,
             if terminal == "one_opt" {
                 "optional"

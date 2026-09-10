@@ -57,6 +57,7 @@ from ._native import (
 from .runtime import Connection, Pool, PoolStatus, connect
 from .results import Record, Field, ResultStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
+from .transactions import Transaction, TransactionMode, IsolationLevel
 
 select = Select
 insert = Insert
@@ -74,6 +75,9 @@ __all__ = [
     "LifecycleError",
     "TimeoutError",
     "Connection",
+    "Transaction",
+    "TransactionMode",
+    "IsolationLevel",
     "Pool",
     "PoolStatus",
     "connect",

@@ -1,32 +1,15 @@
 use pyo3::{IntoPyObjectExt, prelude::*, types::PyList};
 use pyo3_async_runtimes::tokio::future_into_py;
-use std::sync::Arc;
 
 use super::{
     PyEntityModel,
     backend::{Active, Select, Terminal, Write, Written},
 };
 use crate::{
-    errors::{ConstructionError, LifecycleError, database_error},
-    runtime::{ConnectionState, NativeConnection, Operation},
+    errors::{ConstructionError, InternalError},
+    execution::Target,
+    transactions::work::{Output, Work},
 };
-
-pub(crate) fn state(
-    py: Python<'_>,
-    connection: &Bound<'_, PyAny>,
-) -> PyResult<Arc<ConnectionState>> {
-    let native = connection
-        .getattr("_native")
-        .unwrap_or_else(|_| connection.clone());
-    let native = native
-        .extract::<PyRef<'_, NativeConnection>>()
-        .map_err(|_| {
-            ConstructionError::new_err("entity execution requires an acquired pgorm Connection")
-        })?;
-    native.state.pool.check_owner(py)?;
-    native.state.ensure_open()?;
-    Ok(native.state.clone())
-}
 
 pub(crate) fn select<'py>(
     py: Python<'py>,
@@ -34,21 +17,16 @@ pub(crate) fn select<'py>(
     query: Select,
     terminal: Terminal,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let state = state(py, connection)?;
+    let target = Target::extract(py, connection)?;
     if query.compile(terminal).1.0.len() > 65535 {
         return Err(ConstructionError::new_err(
             "PostgreSQL supports at most 65535 query parameters",
         ));
     }
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = query.run(operation.connection()?, terminal) => result,
+        let Output::Models(models) = target.run(Work::Entity(query, terminal)).await? else {
+            return Err(InternalError::new_err("unexpected entity result"));
         };
-        operation.restore();
-        let models = result.map_err(|error| database_error(error, &state.pool.secrets))?;
         Python::attach(|py| {
             let models: Vec<_> = models
                 .into_iter()
@@ -75,16 +53,11 @@ pub(crate) fn write<'py>(
     active: Active,
     write: Write,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let state = state(py, connection)?;
+    let target = Target::extract(py, connection)?;
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = active.run(operation.connection()?, write) => result,
+        let Output::Written(result) = target.run(Work::Write(active, write)).await? else {
+            return Err(InternalError::new_err("unexpected model write result"));
         };
-        operation.restore();
-        let result = result.map_err(|error| database_error(error, &state.pool.secrets))?;
         Python::attach(|py| match result {
             Written::Count(count) => count.into_py_any(py),
             Written::Model(inner) => {

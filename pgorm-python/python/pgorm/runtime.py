@@ -7,6 +7,7 @@ from typing import Any, NamedTuple
 
 from . import _native
 from .results import Query, Record, ResultStream
+from .transactions import Transaction, TransactionMode, IsolationLevel
 
 
 class PoolStatus(NamedTuple):
@@ -86,6 +87,12 @@ class Pool:
         async with self.connection() as connection:
             return await connection.ping()
 
+    @asynccontextmanager
+    async def transaction(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> AsyncIterator[Transaction]:
+        async with self.connection() as connection:
+            async with await connection.begin(mode=mode, isolation=isolation) as transaction:
+                yield transaction
+
     async def execute(self, query: Query) -> int:
         """Execute a native builder or explicit RawSQL and return affected rows."""
         async with self.connection() as connection:
@@ -150,6 +157,14 @@ class Connection:
     @property
     def closed(self) -> bool:
         return self._native.closed()
+
+    async def begin(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> Transaction:
+        return Transaction(await self._native.begin(mode=mode, isolation=isolation), self)
+
+    @asynccontextmanager
+    async def transaction(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> AsyncIterator[Transaction]:
+        async with await self.begin(mode=mode, isolation=isolation) as transaction:
+            yield transaction
 
     async def ping(self) -> bool:
         return await self._native.ping()

@@ -1,13 +1,13 @@
 //! Each adapter below is monomorphized at downstream module build time.
 
+use crate::execution::Database;
 use std::{marker::PhantomData, sync::Arc};
 
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{Expr, SimpleExpr, Value, Values};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection,
-    EntityTrait, Error, IdenStr, IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait,
+    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error, IdenStr,
+    IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
 };
 
 use super::{backend::*, metadata::EntityInfo};
@@ -144,26 +144,10 @@ where
 
     fn run<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         terminal: Terminal,
     ) -> BoxFuture<'a, Result<Vec<Model>, Error>> {
-        Box::pin(async move {
-            let query = self.query.clone();
-            let models = match terminal {
-                Terminal::All => query.all(db).await?,
-                Terminal::One => vec![query.one(db).await?],
-                Terminal::Optional => query.one_opt(db).await?.into_iter().collect(),
-            };
-            Ok(models
-                .into_iter()
-                .map(|value| {
-                    Arc::new(ModelAdapter::<E> {
-                        value,
-                        info: self.info.clone(),
-                    }) as Model
-                })
-                .collect())
-        })
+        Box::pin(self.read(db, terminal))
     }
 }
 
@@ -251,21 +235,51 @@ where
         }))
     }
 
-    fn run<'a>(
-        &'a self,
-        db: &'a DatabaseConnection,
-        write: Write,
-    ) -> BoxFuture<'a, Result<Written, Error>> {
-        Box::pin(async move {
-            let model = match write {
-                Write::Insert => self.value.clone().insert(db).await?,
-                Write::Update => self.value.clone().update(db).await?,
-                Write::Delete => return self.value.clone().delete(db).await.map(Written::Count),
-            };
-            Ok(Written::Model(Arc::new(ModelAdapter::<E> {
-                value: model,
-                info: self.info.clone(),
-            })))
-        })
+    fn run<'a>(&'a self, db: Database<'a>, write: Write) -> BoxFuture<'a, Result<Written, Error>> {
+        Box::pin(self.write(db, write))
+    }
+}
+
+impl<E> SelectAdapter<E>
+where
+    E: EntityTrait + Send + Sync + 'static,
+    E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static,
+    E::ActiveModel: Send + Sync + 'static,
+{
+    async fn read(&self, db: Database<'_>, terminal: Terminal) -> Result<Vec<Model>, Error> {
+        let query = self.query.clone();
+        let models = match terminal {
+            Terminal::All => query.all(&db).await?,
+            Terminal::One => vec![query.one(&db).await?],
+            Terminal::Optional => query.one_opt(&db).await?.into_iter().collect(),
+        };
+        Ok(models
+            .into_iter()
+            .map(|value| {
+                Arc::new(ModelAdapter::<E> {
+                    value,
+                    info: self.info.clone(),
+                }) as Model
+            })
+            .collect())
+    }
+}
+
+impl<E> ActiveAdapter<E>
+where
+    E: EntityTrait + Send + Sync + 'static,
+    E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static,
+    E::ActiveModel: Send + Sync + 'static,
+{
+    async fn write(&self, db: Database<'_>, write: Write) -> Result<Written, Error> {
+        let model = match write {
+            Write::Insert => self.value.clone().insert(&db).await?,
+            Write::Update => self.value.clone().update(&db).await?,
+            Write::Delete => return self.value.clone().delete(&db).await.map(Written::Count),
+        };
+        Ok(Written::Model(Arc::new(ModelAdapter::<E> {
+            value: model,
+            info: self.info.clone(),
+        })))
     }
 }

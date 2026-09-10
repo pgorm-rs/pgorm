@@ -1,8 +1,8 @@
 use super::selected_backend::{Query, Terminal};
 use crate::{
-    entities,
-    errors::{LifecycleError, database_error},
-    runtime::Operation,
+    errors::InternalError,
+    execution::Target,
+    transactions::work::{Output, Work},
 };
 use pyo3::{
     prelude::*,
@@ -17,17 +17,12 @@ pub(super) fn read<'py>(
     query: Query,
     terminal: Terminal,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let state = entities::io::state(py, connection)?;
+    let target = Target::extract(py, connection)?;
     query.compile(terminal)?;
     future_into_py(py, async move {
-        let operation = Operation::begin(state.clone())?;
-        let result = tokio::select! {
-            _ = state.cancelled.cancelled() => return Err(LifecycleError::new_err("connection is closed")),
-            _ = state.pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-            result = async { query.run(operation.connection()?, terminal).await.map_err(|error| database_error(error, &state.pool.secrets)) } => result,
+        let Output::Graph(rows) = target.run(Work::Sources(query, terminal)).await? else {
+            return Err(InternalError::new_err("unexpected selected source result"));
         };
-        operation.restore();
-        let rows = result?;
         Python::attach(|py| {
             let rows = rows
                 .into_iter()

@@ -1515,6 +1515,13 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.schema}
     )}
+    {id python.transactions, covered_rules (
+        python.cancellation
+        python.transactions
+    ), covered_claims (
+        {impl_name main, rule python.cancellation}
+        {impl_name main, rule python.transactions}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

@@ -5251,6 +5251,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T12:29:51.627699Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "python.schema is delivered. The current P3 ready frontier has python.transactions as the only ready Python node, with python.transactions uncovered and cancellation already covered; its runtime/results/native transaction prerequisites are Done. Continue the explicitly scoped full Python WBS objective, leaving unrelated generative work and priorities unchanged. Preserve real borrowed DatabaseTransaction lifetimes using a scoped Rust owner task, not lifetime extension or SQL-emulated transaction state."
+                    }
+
+                    {
+                        at 2026-09-10T12:29:51.667411Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T12:52:48.240192Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented a scoped Rust owner task retaining real borrowed DatabaseTransaction/savepoint frames, with owned typed commands and a borrowed ConnectionTrait adapter. Parent connection/savepoint reservations persist until completion acknowledgement. Explicit finish/context/abandonment paths await native rollback or discard uncertain leases; cancelled requests abort the entire owner, with no extra retry. Supports ordinary builders, runtime models, registered ActiveModel hooks/entity queries, graphs/cursors and typed pipeline source tuples; transaction streaming is explicitly not exposed. All 107 installed Python tests pass, including 10 transaction tests with bounded cancellation/shutdown. Fresh downstream application checker passed 8 Rust, 9 entity, 7 graph, 5 source, 1 schema and 3 registered-transaction tests plus 8 independent cursor parity cases. Runnable transaction documentation example passed."
+                    }
                 )
             }
 

@@ -265,6 +265,12 @@ impl Operation {
             .ok_or_else(|| InternalError::new_err("operation has no connection"))
     }
 
+    pub(crate) fn connection_mut(&mut self) -> PyResult<&mut pgorm::DatabaseConnection> {
+        self.connection
+            .as_mut()
+            .ok_or_else(|| InternalError::new_err("operation has no connection"))
+    }
+
     pub(crate) fn restore(mut self) {
         if self.state.ensure_open().is_ok() {
             *self.slot = self.connection.take();
@@ -289,12 +295,34 @@ pub(crate) struct NativeConnection {
 
 #[pymethods]
 impl NativeConnection {
+    #[pyo3(signature=(*, mode="default", isolation=None))]
+    fn begin<'py>(
+        &self,
+        py: Python<'py>,
+        mode: &str,
+        isolation: Option<&str>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.state.pool.check_owner(py)?;
+        self.state.ensure_open()?;
+        let mode = crate::transactions::mode(mode, isolation)?;
+        let state = self.state.clone();
+        future_into_py(py, async move {
+            Ok(crate::transactions::NativeTransaction {
+                state: crate::transactions::begin(state, mode).await?,
+            })
+        })
+    }
+
     fn execute<'py>(
         &self,
         py: Python<'py>,
         query: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        crate::results::execute(py, self.state.clone(), query)
+        crate::results::execute(
+            py,
+            crate::execution::Target::Connection(self.state.clone()),
+            query,
+        )
     }
 
     fn fetch<'py>(
@@ -303,7 +331,12 @@ impl NativeConnection {
         query: &Bound<'_, PyAny>,
         mode: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        crate::results::fetch(py, self.state.clone(), query, mode)
+        crate::results::fetch(
+            py,
+            crate::execution::Target::Connection(self.state.clone()),
+            query,
+            mode,
+        )
     }
 
     fn stream<'py>(
@@ -359,5 +392,6 @@ impl Drop for NativeConnection {
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NativePool>()?;
     module.add_class::<NativeConnection>()?;
+    module.add_class::<crate::transactions::NativeTransaction>()?;
     Ok(())
 }

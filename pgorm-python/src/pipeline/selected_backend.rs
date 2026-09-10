@@ -1,8 +1,9 @@
 use super::slots::{SourceBindings, SourceTypes};
+use crate::execution::Database;
 use crate::{entities::PyEntityModel, errors::ConstructionError, expressions::Compiled};
 use futures_util::future::BoxFuture;
 use pgorm::{
-    DatabaseConnection, Error,
+    Error,
     pipeline::{self as pl, SourceList},
 };
 use pyo3::prelude::*;
@@ -52,7 +53,7 @@ pub(crate) trait QueryBackend: Debug + Send + Sync {
     fn compile(&self, terminal: Terminal) -> PyResult<Compiled>;
     fn run<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         terminal: Terminal,
     ) -> BoxFuture<'a, Result<Vec<Row>, Error>>;
 }
@@ -103,13 +104,13 @@ impl<T> Debug for SourceQuery<T> {
 }
 
 impl<T: SourceTypes> SourceQuery<T> {
-    async fn read(&self, db: &DatabaseConnection, terminal: Terminal) -> Result<Vec<Row>, Error> {
+    async fn read(&self, db: Database<'_>, terminal: Terminal) -> Result<Vec<Row>, Error> {
         let query = T::select(self.pipeline.clone(), &self.qualifiers);
         let models = |row| T::models(row, &self.info.bindings);
         match terminal {
-            Terminal::All => Ok(query.all(db).await?.into_iter().map(models).collect()),
-            Terminal::One => Ok(vec![models(query.one(db).await?)]),
-            Terminal::Optional => Ok(query.one_opt(db).await?.map(models).into_iter().collect()),
+            Terminal::All => Ok(query.all(&db).await?.into_iter().map(models).collect()),
+            Terminal::One => Ok(vec![models(query.one(&db).await?)]),
+            Terminal::Optional => Ok(query.one_opt(&db).await?.map(models).into_iter().collect()),
         }
     }
 }
@@ -136,7 +137,7 @@ where
     }
     fn run<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         terminal: Terminal,
     ) -> BoxFuture<'a, Result<Vec<Row>, Error>> {
         Box::pin(self.read(db, terminal))

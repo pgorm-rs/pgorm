@@ -1,8 +1,9 @@
+use crate::execution::Database;
 use std::{fmt::Debug, sync::Arc};
 
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{Condition, NullOrdering, Order, SimpleExpr, Value, Values};
-use pgorm::{ActiveValue, DatabaseConnection, Error};
+use pgorm::{ActiveValue, Error};
 
 use super::metadata::EntityInfo;
 
@@ -62,7 +63,7 @@ pub(crate) trait SelectBackend: Debug + Send + Sync {
     fn compile(&self, terminal: Terminal) -> (String, Values);
     fn run<'a>(
         &'a self,
-        db: &'a DatabaseConnection,
+        db: Database<'a>,
         terminal: Terminal,
     ) -> BoxFuture<'a, Result<Vec<Model>, Error>>;
 }
@@ -85,9 +86,5 @@ pub(crate) trait ActiveBackend: Debug + Send + Sync {
     fn set(&self, column: &str, value: Value) -> Result<Active, Error>;
     fn not_set(&self, column: &str) -> Result<Active, Error>;
     fn reset(&self, column: &str) -> Result<Active, Error>;
-    fn run<'a>(
-        &'a self,
-        db: &'a DatabaseConnection,
-        write: Write,
-    ) -> BoxFuture<'a, Result<Written, Error>>;
+    fn run<'a>(&'a self, db: Database<'a>, write: Write) -> BoxFuture<'a, Result<Written, Error>>;
 }

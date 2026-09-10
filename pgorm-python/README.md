@@ -11,6 +11,8 @@ claimed by the capability manifest.
 
 Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
 or to generate schema statements from a registered Rust entity.
+Use [native transactions and savepoints](TRANSACTIONS.md) for explicit or
+context-managed commit and rollback across builders and registered models.
 
 ## Build and install
 
