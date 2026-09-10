@@ -9,6 +9,9 @@ operations present in the installed build. The full contract is in
 `docs/spec/python.md` in the repository; unimplemented operations are not
 claimed by the capability manifest.
 
+Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
+or to generate schema statements from a registered Rust entity.
+
 ## Build and install
 
 From the repository root, using CPython 3.14:

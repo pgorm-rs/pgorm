@@ -16,11 +16,19 @@ pub enum Mood {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[pgorm(table_name = "accounts", schema_name = "python_entities")]
+#[pgorm(
+    table_name = "accounts",
+    schema_name = "python_entities",
+    comment = "Accounts' native schema"
+)]
 pub struct Model {
     #[pgorm(primary_key, auto_increment = false)]
     pub id: i32,
-    #[pgorm(column_name = "display name")]
+    #[pgorm(
+        column_name = "display name",
+        indexed,
+        comment = "The user's display name"
+    )]
     #[serde(rename = "displayName")]
     pub name: String,
     pub note: Option<String>,

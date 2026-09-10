@@ -1510,6 +1510,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.pipeline}
     )}
+    {id python.schema, covered_rules (
+        python.schema
+    ), covered_claims (
+        {impl_name main, rule python.schema}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

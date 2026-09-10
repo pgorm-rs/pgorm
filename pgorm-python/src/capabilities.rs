@@ -48,7 +48,7 @@ fn manifest() -> Value {
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0]
         },
-        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources"],
+        "result_forms": ["pool", "connection", "bool", "expression", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources", "ddl", "create_table", "create_index", "entity_schema", "ddl_column", "ddl_type"],
         "result_policy": {
             "scope": "dynamic Record results",
             "decode": "Rust Row::try_get / FromSql, Value conversion with exactness checks",
@@ -114,6 +114,18 @@ fn manifest() -> Value {
             "stream": "dynamic Record through pool.stream or connection.stream",
             "selected_sources_stream": false
         },
+        "schema_policy": {
+            "construction": "owned Rust DDL builders; no database work at construction or import",
+            "execution": "explicit Pool.execute or Connection.execute",
+            "values": "Rust DDL literal rendering; inspect.params is empty",
+            "runtime_ddl": true, "automatic_ddl": false,
+            "registered_entity_ddl": "real Schema methods for a compiled entity; registrations.entities lists available types",
+            "index_methods": ["btree", "hash", "gin", "gist", "spgist", "brin"],
+            "column_types": ["char", "varchar", "text", "smallint", "integer", "bigint", "real", "double", "numeric", "boolean", "date", "time", "timestamp", "timestamptz", "interval", "bytea", "bit", "varbit", "money", "json", "jsonb", "uuid", "vector", "cidr", "inet", "macaddr", "ltree"],
+            "named_type": "TypeName retains schema qualification; DataType.array retains element identity",
+            "type_changes": "native driver caches type metadata; close and recreate application pools after altering existing enum labels or type names",
+            "unsupported": ["runtime foreign-key construction", "schema introspection", "automatic migrations", "raw column options", "partial or expression indexes", "concurrent indexes"]
+        },
         "registrations": {"entities": [], "graphs": [], "sources": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}
     });
@@ -124,6 +136,7 @@ fn manifest() -> Value {
         operations.extend(crate::entities::capabilities());
         operations.extend(crate::graphs::capabilities());
         operations.extend(crate::pipeline::capabilities());
+        operations.extend(crate::schema::capabilities());
     }
     manifest
 }

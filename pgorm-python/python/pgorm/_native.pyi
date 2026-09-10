@@ -1,6 +1,15 @@
 from typing import Any, Literal, overload
 from collections.abc import Awaitable
 from asyncio import CancelledError as CancelledError
+from ._schema import (
+    DataType as DataType, ColumnDef as ColumnDef, DDL as DDL,
+    CreateTable as CreateTable, CreateIndex as CreateIndex, EntitySchema as EntitySchema,
+    schema_from_entity as schema_from_entity, drop_table as drop_table,
+    rename_table as rename_table, rename_column as rename_column, truncate as truncate,
+    add_column as add_column, modify_column as modify_column, drop_column as drop_column,
+    drop_index as drop_index, create_enum as create_enum, add_enum_value as add_enum_value,
+    rename_enum as rename_enum, rename_enum_value as rename_enum_value, drop_enum as drop_enum,
+)
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
 from ._pipeline_sources import SourceSelection as SourceSelection, SelectedSources as SelectedSources

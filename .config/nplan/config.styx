@@ -1,5 +1,14 @@
 platforms (
     {
+        platform "python-schema"
+        files (pgorm-python/python/pgorm/schema/**/*.py pgorm-python/python/pgorm/_schema.pyi)
+        checks {
+            typing {
+                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-schema-mypy pgorm-python/python/pgorm/schema"
+            }
+        }
+    }
+    {
         platform "python-pipeline"
         files (pgorm-python/python/pgorm/pipeline/**/*.py pgorm-python/python/pgorm/_pipeline_*.pyi)
         checks {

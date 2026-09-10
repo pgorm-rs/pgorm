@@ -9,6 +9,8 @@ pub mod sources;
 mod graph_parity;
 #[cfg(test)]
 mod parity;
+#[cfg(test)]
+mod schema_parity;
 
 use pyo3::prelude::*;
 

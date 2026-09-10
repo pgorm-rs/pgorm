@@ -5583,6 +5583,34 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T11:57:25.29063Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T11:57:56.266934Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Continue the explicit full-Python objective within the Python subtree. Global nplan_next currently selects unrelated generative.fixtures (P2); it is outside this goal and its priorities/deps are unchanged. P3 ready reports python.schema and python.transactions with one uncovered rule each; schema is the alphabetical tie. Its entity/expression/DDL/schema-generation prerequisites are Done. Expose explicit runtime DDL and real registered-entity Schema methods; declaration/import performs no database work."
+                    }
+
+                    {
+                        at 2026-09-10T12:26:18.835967Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Live DDL tests confirmed native tokio-postgres type metadata remains cached on physical connections after enum label/type renames. Preserve Rust DDL and connection semantics in this binding node: document and test closing/recreating application pools after such migrations, rather than adding implicit pool-wide cache coordination or changing the root driver. Type construction and fresh-pool decode retain fully qualified identities, including a conflicting public type."
+                    }
+
+                    {
+                        at 2026-09-10T12:28:24.395718Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented owned native DataType/ColumnDef/CreateTable/CreateIndex/DDL and registered EntitySchema from actual Rust Schema methods. Verified 19 independent Rust DDL parity cases; all 97 installed standalone Python tests pass, including live quoted table/index/enum alterations, shadowed qualified enum arrays, and declaration/import without DDL. Fresh downstream checker passed 8 Rust tests, 9 entity, 7 graph, 5 pipeline-source and 1 registered-schema live test plus 8 independent cursor parity cases. The runnable SCHEMA.md example passed. Final format/typing/clippy checks in progress."
+                    }
                 )
             }
 
