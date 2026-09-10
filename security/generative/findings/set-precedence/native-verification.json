@@ -1,0 +1,788 @@
+{
+  "passed": true,
+  "output": "target/generative-native-findings/run-fa1808e609e1",
+  "scope": "standalone-rust-renderer-with-independent-postgresql-driver",
+  "results": [
+    {
+      "operation": "append",
+      "native_sql": "SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts",
+      "reference_sql": "(SELECT id FROM fixture.accounts) UNION ALL (SELECT id FROM fixture.accounts)",
+      "native_rows": [
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        }
+      ],
+      "reference_rows": [
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        }
+      ],
+      "equal": true,
+      "reason": "equal"
+    },
+    {
+      "operation": "intersect",
+      "native_sql": "WITH table_1 AS (SELECT id FROM fixture.accounts) SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts INTERSECT ALL SELECT * FROM table_1 AS b",
+      "reference_sql": "((SELECT id FROM fixture.accounts) UNION ALL (SELECT id FROM fixture.accounts)) INTERSECT ALL (SELECT id FROM fixture.accounts)",
+      "native_rows": [
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        }
+      ],
+      "reference_rows": [
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        }
+      ],
+      "equal": false,
+      "reason": "row multisets differ"
+    },
+    {
+      "operation": "remove",
+      "native_sql": "WITH table_1 AS (SELECT id FROM fixture.accounts), table_2 AS (SELECT id FROM fixture.accounts) SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts INTERSECT ALL SELECT * FROM table_1 AS b EXCEPT ALL SELECT * FROM table_2 AS table_1",
+      "reference_sql": "(((SELECT id FROM fixture.accounts) UNION ALL (SELECT id FROM fixture.accounts)) INTERSECT ALL (SELECT id FROM fixture.accounts)) EXCEPT ALL (SELECT id FROM fixture.accounts)",
+      "native_rows": [
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "4"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "2"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "3"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        },
+        {
+          "kind": "record",
+          "fields": [
+            {
+              "name": "id",
+              "value": {
+                "version": 1,
+                "type": {
+                  "kind": "i32"
+                },
+                "sql_null": false,
+                "data": "1"
+              }
+            }
+          ],
+          "postgres": [
+            {
+              "name": "id",
+              "schema": "pg_catalog",
+              "type": "int4"
+            }
+          ]
+        }
+      ],
+      "reference_rows": [],
+      "equal": false,
+      "reason": "row multisets differ"
+    }
+  ],
+  "build_identity": {
+    "features": [
+      "extension-module"
+    ],
+    "interpreter": "3.14.4 cpython-314-darwin",
+    "maturin": "1.15.0",
+    "revision": "7db1d0efaa315e64ffac4d673faa8e1331828896",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "source_sha256": "ea8a476f9ada913ef76e9740be56832ec779126763b683a109476a60d6ac827b"
+  },
+  "native_executable_sha256": "36efd99c3293b3ac3a0199211c5f3ac188da834078f850a70b55ecd069a81e3e",
+  "native_source_sha256": "9ce061c622a52d743aa4fc13939c1653b72e69df6aa1070c06d4311bf8f111d1",
+  "native_lock_sha256": "7bcadb1b4c1347bcbaed6292d567260f05ed2c3a574b0d3a2e5f5c35f0680c18"
+}

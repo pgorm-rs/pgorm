@@ -169,3 +169,37 @@ errors: PostgreSQL needs explicit parameter types for `$1 / $2`, and an i8
 builder value uses a SMALLINT carrier, requiring an intermediate INTEGER cast
 when deliberately decoding PostgreSQL's internal `"char"`. Their original run
 artifacts remain in the earlier fresh directories.
+
+## Sensitivity controls and attribution
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  security/generative/tests/live_controls.py
+```
+
+The versioned catalog contains 22 controls across 21 mandatory comparison
+categories. Each starts with a passing public pgorm execution and independent
+reference. Deliberately incorrect SQL runs through a separate driver in the
+owned subject database, after both databases reset to the program's fixture.
+Other controls corrupt that fresh native run's observations. Control observations
+carry their own dispatch evidence and cannot claim native execution.
+
+Controls cover missing value/name escaping, broadened predicates, swapped binds,
+wrong bound/decoded types, missing/duplicate/reordered rows, optional joins,
+SQL/JSON NULL distinctions, arrays, enum identity, float bits, decimal scale,
+temporal precision, affected counts, omitted writes/schema, committed rollbacks,
+stream closure and exact error causes. A valid control requires exactly its
+declared difference; arbitrary failures, inactive or unchanged mutations, missing
+work and a failed native baseline fail the command. Aggregate validation
+recomputes comparisons from retained evidence instead of trusting status labels.
+The live check also verifies that the public wheel excludes these test modules.
+
+Finding retention writes original programs, fixtures, observations, identities,
+replay arguments and content hashes into a fresh directory. Attribution requires
+completed standalone Rust evidence from the same native source identity and
+rechecks both independent verdicts before comparing observed behavior. Native
+reproduction locates a discrepancy below Python; reference semantics still need
+review before blaming the library. Missing/inconsistent native evidence remains
+unattributed and never removes the original Python failure. This machinery does
+not patch production code or close findings. General Rust emission and full
+Python/Rust execution parity remain the separate replay node's work.

@@ -1602,6 +1602,13 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id generative.controls, covered_rules (
+        generative.attribution
+        generative.controls
+    ), covered_claims (
+        {impl_name main, rule generative.attribution}
+        {impl_name main, rule generative.controls}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

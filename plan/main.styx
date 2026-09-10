@@ -6051,6 +6051,27 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T22:30:07.149071Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The user's persistent objective explicitly directs completing the generative campaign. Within that subtree, nplan_ready P3 ranks generative.controls first, with execute/oracles dependencies Done. The global P0 pipeline-append-distinct production fix remains separately owned and uncommitted; its named campaign regressions have already verified the current worktree behavior. Continue the authorized independent campaign controls without modifying or staging those Rust edits. Controls require a passing actual public/native baseline and deliberate independent PostgreSQL or observation mutations, exact intended oracle differences, per-attempt resets and failure for undetected/malformed/inactive controls."
+                    }
+
+                    {
+                        at 2026-09-10T22:30:07.201646Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T22:50:55.195241Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Implemented 22 test-only sensitivity controls across 21 mandatory comparison families. Fresh live run target/generative-controls/run-cc7c0f4b60d0 validates all 22 controls after passing public/native baselines, independently executes vulnerable SQL in reset owned fixtures, and confirms the public wheel excludes campaign modules. Aggregate validation recomputes baseline/control comparisons and rejects empty, missing, duplicate, unchanged, inactive, malformed or undetected work. Fast suite now has 51 passing tests; required format/lint/unit gates pass. Added immutable finding retention and conservative attribution requiring comparable completed Rust evidence and matching native source identity; native reproduction does not automatically rule out a reference-oracle defect or authorize production edits. The set-precedence finding now has a locked standalone Rust renderer and independent live PostgreSQL validation (run-fa1808e609e1): native row counts 8/8/4 versus expected 8/4/0. Original diagnostic setup error retained separately. Native source digest matches the installed b7017b... extension's recorded ea8a476... source. This diagnostic is renderer attribution, not general Rust execution parity. No production Rust edits were modified/staged; full grammar/corpus/replay/compile/runner/CI/million-program acceptance remain outstanding."
+                    }
                 )
             }
 

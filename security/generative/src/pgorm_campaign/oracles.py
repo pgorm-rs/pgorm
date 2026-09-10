@@ -9,7 +9,14 @@ from .reference_inspection import inspect_reads
 from .reference_state import snapshot
 
 
-def compare(program, subject, reference, subject_state, reference_state):
+def compare(
+    program, subject, reference, subject_state, reference_state, *, control=None
+):
+    if control is not None and subject.get("control") != {
+        "id": control,
+        "dispatched": True,
+    }:
+        raise comparison.InvalidOracle("independent control has no dispatch evidence")
     expected = [step["id"] for step in program["steps"]]
     for name, report in (("subject", subject), ("reference", reference)):
         if report.get("status") not in ("executed", "error") or report.get(
@@ -37,9 +44,13 @@ def compare(program, subject, reference, subject_state, reference_state):
     ):
         policy = policies[step["id"]]
         if actual.get("status") == "observed":
-            if not actual.get("native_paths"):
+            if control is None and not actual.get("native_paths"):
                 raise comparison.InvalidOracle(
                     "subject observation has no native execution evidence"
+                )
+            if control is not None and actual.get("native_paths"):
+                raise comparison.InvalidOracle(
+                    "independent control claims native execution"
                 )
         elif actual.get("status") != "error":
             raise comparison.InvalidOracle(
