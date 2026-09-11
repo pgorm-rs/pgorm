@@ -725,7 +725,6 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
-    {id generative.shrink, kind @doing, author "brendan@necessary.nu", at 2026-09-11T12:00:39.340969Z}
     {id pipeline-append-distinct, kind @doing, author "brendan@necessary.nu", at 2026-09-11T12:59:56.096653Z}
 )
 
@@ -1620,6 +1619,11 @@ impl_evidence (
         generative.grammar
     ), covered_claims (
         {impl_name main, rule generative.grammar}
+    )}
+    {id generative.shrink, covered_rules (
+        generative.shrink
+    ), covered_claims (
+        {impl_name main, rule generative.shrink}
     )}
 )
 

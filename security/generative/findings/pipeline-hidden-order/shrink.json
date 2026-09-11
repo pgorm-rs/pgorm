@@ -1,0 +1,306 @@
+{
+  "accepted": 29,
+  "attempts": [
+    {
+      "description": "bypass pipeline.cast n16 to value",
+      "nodes": 57,
+      "outcome": "accepted",
+      "program_sha256": "42da692cd378c4e469f46909b533f502b919a80fb1a7fef695fabebc11a1cc69",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n20 to value",
+      "nodes": 56,
+      "outcome": "accepted",
+      "program_sha256": "596a245b06d3fd109ec6f3c943c5e73fa3a3d0f96dc395eaaec5186f8a283ff7",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n22 to value",
+      "nodes": 55,
+      "outcome": "accepted",
+      "program_sha256": "8047a634960a537d95b0766e5356700cfa80909da9e1c2aa14c877de9357acd1",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n24 to value",
+      "nodes": 54,
+      "outcome": "accepted",
+      "program_sha256": "a3b0d98cec45ff2d7ecb5df2c4a665a8300f219fe77f46e954065b820a695de4",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n26 to value",
+      "nodes": 53,
+      "outcome": "accepted",
+      "program_sha256": "5e5934c56c7bae2cdbb2ac77ac0a70cada433ae3d56c26843e5105f7c0257e0c",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n28 to value",
+      "nodes": 52,
+      "outcome": "accepted",
+      "program_sha256": "9460e671a36fc3ac18cd36aab0a2089631051260453dad6449d2b94d0a06a599",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.unary n30 to value",
+      "nodes": 51,
+      "outcome": "accepted",
+      "program_sha256": "7f9eced4b615946036c47fc628a7aab5eb4bfbcffadd456be4cf7db708dee18c",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.take n32 to query",
+      "nodes": 50,
+      "outcome": "accepted",
+      "program_sha256": "66d4d6896c2e5f1d840cb02d7d85cf4eb29931312fb4e8a49094e84252bf5c39",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n36 to value",
+      "nodes": 49,
+      "outcome": "accepted",
+      "program_sha256": "e17b4d168eae682dd9b6555fa72129488be8bdce7764d2f793909d710d38f551",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n38 to value",
+      "nodes": 48,
+      "outcome": "accepted",
+      "program_sha256": "e9a404ef3943ea66064ac6d6de194ebdbea01215d5f2eb6faa3ca67c2cbe2542",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n40 to value",
+      "nodes": 47,
+      "outcome": "accepted",
+      "program_sha256": "818226ae49b569b690156393aafe1270921c48dd7eaa16e7bc65c2be368265ad",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n42 to value",
+      "nodes": 46,
+      "outcome": "accepted",
+      "program_sha256": "5b4e4db610d0a3ba8aebc4d8cc922ae2e37851401d546dc0fb97c336d8a776ce",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.cast n47 to value",
+      "nodes": 45,
+      "outcome": "accepted",
+      "program_sha256": "32a9e102a927d05fedb9c9b6f2bf596ca31caa8f037769cb53023415d4aba5f2",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.binary n48 to left",
+      "nodes": 42,
+      "outcome": "accepted",
+      "program_sha256": "21944563f8b7d8a7180a5ac631b4ba4383e2943b5fbc481c59c841fb2dd5a262",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n54 to value",
+      "nodes": 41,
+      "outcome": "accepted",
+      "program_sha256": "d64b8e89cdc46c173aa49516066d1fe032f3149e51c1c4ddead3f90d4e231c51",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.named n56 to value",
+      "nodes": 40,
+      "outcome": "accepted",
+      "program_sha256": "0fc18a4cbc6c4439773e78566c1203a00651d039a50d0b62837aa6d326eec759",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.select n57 to query",
+      "nodes": 37,
+      "outcome": "accepted",
+      "program_sha256": "e858dc63f0b803d83aed8caff0c12a72db76e3610c96dbb318261b29050a147a",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.derive n50 to query",
+      "nodes": 34,
+      "outcome": "accepted",
+      "program_sha256": "25cb4fc0f20ec333a59bb893b39c4e951fbf798fa50c3b321b10ca2339436ddc",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "bypass pipeline.source n51 to source",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "bd83c7037d21e1963274634638a926812f49b9c03eac7d1938282e27ed8dd817",
+      "reduction": "structure",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "simplify i64 value n14",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "0acd3cbdf7c6ac372e922209b5b14429844bfb8228828e833f82a7a182f3b7d4",
+      "reduction": "value",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "keep 0 rows in fixture.accounts",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "06802eb149d93f46264217e60c54560a8a03d531b6106bcfc3d6c4db3014cf75",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "keep 0 rows in fixture.notes",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "953c9297dc6d7fe5750d60a8062350824fbe8899a59ea729e30981784eb8191f",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "keep 0 rows in other.accounts",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "905eb37e176b09963f18705c0bbc08a5a2f186e7f9f5aea2fd8cc5856e48e552",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "keep 0 rows in fixture.odd\" \u96ea",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "6b15ab78285ccd00919fda0cc669d1f9f4f5855c08ef9334991dbceb8fcf3a2f",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "keep 0 rows in fixture.sentinels",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "c60c8b47a81eef44bd52b30e40b983caca46efda262852cd888415c256443a4e",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "drop table fixture.notes",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "72f62fa2944298c8b2aeeec8e7ab2f768a8a9bcca51b006809a961e7e24ec7c9",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "drop table other.accounts",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "1f2d3086d2696a58e05fd5532fb488c814602cb643719a215914e45a15426d4a",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "drop table fixture.odd\" \u96ea",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "6d32242a3bb5ca1c033920962c2e5373652deb7b8c80fc69c3d54181cd5c0cf6",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    },
+    {
+      "description": "drop table fixture.sentinels",
+      "nodes": 33,
+      "outcome": "accepted",
+      "program_sha256": "42f4864204d748e2f19cc763aa1cae83b645dfc24fd1e728b4e118d00df35f7b",
+      "reduction": "fixture",
+      "status": "defect",
+      "steps": 1
+    }
+  ],
+  "best": {
+    "fixture_sha256": "aec4bbf58aca9ffa343f1e273d01c76c722a7d5b8f688bbe8cc917bb23217b28",
+    "nodes": 33,
+    "program_sha256": "42f4864204d748e2f19cc763aa1cae83b645dfc24fd1e728b4e118d00df35f7b",
+    "steps": 1
+  },
+  "budget": {
+    "candidates": 3000,
+    "offered": 20000,
+    "passes": 12,
+    "seconds": 2400.0,
+    "timeout": 10.0
+  },
+  "claim": "a locally reduced reproducer that still satisfies the recorded predicate; no claim of global minimality is made",
+  "executed": 268,
+  "exhausted": "",
+  "globally_minimal": false,
+  "interrupted": false,
+  "invalid": 313,
+  "offered": 581,
+  "original": {
+    "fixture_sha256": "dfd8ef98d4f9b1ea899158ee9668332d04f3ec881dc5c8d5263377c443d1fc94",
+    "nodes": 58,
+    "program_sha256": "4620abf7e8d294494b7cfc1e881ae3909017262935116bc37ae26680b8194b6c",
+    "steps": 1
+  },
+  "predicate": {
+    "kind": "difference",
+    "oracle": "reference",
+    "reason": "observation categories differ",
+    "status": "defect",
+    "witness": [
+      "error",
+      "DatabaseError",
+      "42703"
+    ]
+  },
+  "reduced": true,
+  "seconds": 58.46824304200709,
+  "version": 1
+}

@@ -1,0 +1,1021 @@
+{
+  "program_sha256": "42f4864204d748e2f19cc763aa1cae83b645dfc24fd1e728b4e118d00df35f7b",
+  "status": "defect",
+  "comparisons": [
+    {
+      "step": "s0",
+      "oracle": "reference",
+      "equal": false,
+      "reason": "observation categories differ"
+    },
+    {
+      "step": "final",
+      "oracle": "fixture-state",
+      "equal": true,
+      "reason": "equal"
+    }
+  ],
+  "cleanup_errors": [],
+  "subject": {
+    "program_sha256": "42f4864204d748e2f19cc763aa1cae83b645dfc24fd1e728b4e118d00df35f7b",
+    "native_sha256": "2f99d6e81158a9a7c0ff86bc4bd4652b05dcf00ea6192aaaa72604406c7bc9c7",
+    "status": "error",
+    "trace": [
+      {
+        "id": "n52",
+        "operation": "pipeline.from",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::from"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n43",
+        "operation": "pipeline.select",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::select"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n34",
+        "operation": "pipeline.from",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::from"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n33",
+        "operation": "pipeline.source",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::IntoSource",
+          "pgorm::pipeline::Source::named"
+        ],
+        "observation": {
+          "python_type": "PipelineSource"
+        }
+      },
+      {
+        "id": "n31",
+        "operation": "pipeline.sort",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::sort"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n18",
+        "operation": "pipeline.derive",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::derive"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n13",
+        "operation": "pipeline.select",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::select"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n2",
+        "operation": "pipeline.from",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::from"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n1",
+        "operation": "pipeline.source",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::IntoSource",
+          "pgorm::pipeline::Source::named"
+        ],
+        "observation": {
+          "python_type": "PipelineSource"
+        }
+      },
+      {
+        "id": "n0",
+        "operation": "table",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm_query::TableRef"
+        ],
+        "observation": {
+          "python_type": "Table"
+        }
+      },
+      {
+        "id": "n4",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n3",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n6",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n5",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n8",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n7",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n10",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n9",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n12",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n11",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n17",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n15",
+        "operation": "pipeline.value",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::literal"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n14",
+        "operation": "value",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm_query::Value"
+        ],
+        "observation": {
+          "python_type": "Value",
+          "value": {
+            "data": "0",
+            "sql_null": false,
+            "type": {
+              "kind": "i64"
+            },
+            "version": 1
+          }
+        }
+      },
+      {
+        "id": "n19",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n21",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n23",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n25",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n27",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n29",
+        "operation": "pipeline.alias",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::alias"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n35",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n37",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n39",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n41",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      }
+    ],
+    "steps": [
+      {
+        "id": "s0",
+        "operation": "fetch",
+        "status": "error",
+        "observation": {
+          "kind": "error",
+          "class": "DatabaseError",
+          "cause": "column \"id\" does not exist",
+          "sqlstate": "42703"
+        }
+      }
+    ],
+    "cleanup_errors": [],
+    "builds": 0,
+    "subprocess_attempts": [],
+    "unconstructed": [],
+    "seconds": 0.14495691703632474,
+    "ordinal": 270
+  },
+  "reference": {
+    "program_sha256": "42f4864204d748e2f19cc763aa1cae83b645dfc24fd1e728b4e118d00df35f7b",
+    "status": "executed",
+    "steps": [
+      {
+        "id": "s0",
+        "observation": {
+          "kind": "rows",
+          "rows": []
+        }
+      }
+    ],
+    "cleanup_errors": [],
+    "seconds": 0.0013297502882778645
+  },
+  "reference_state": {
+    "schemas": [
+      [
+        "fixture"
+      ],
+      [
+        "other"
+      ],
+      [
+        "public"
+      ]
+    ],
+    "columns": [
+      [
+        "fixture",
+        "accounts",
+        1,
+        "id",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        2,
+        "tenant",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        3,
+        "name",
+        "pg_catalog",
+        "text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        4,
+        "note",
+        "pg_catalog",
+        "text",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        5,
+        "score",
+        "pg_catalog",
+        "int4",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        6,
+        "rank",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        7,
+        "active",
+        "pg_catalog",
+        "bool",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        8,
+        "balance",
+        "pg_catalog",
+        "numeric",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        9,
+        "tags",
+        "pg_catalog",
+        "_text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        10,
+        "payload",
+        "pg_catalog",
+        "jsonb",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        11,
+        "uuid",
+        "pg_catalog",
+        "uuid",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        12,
+        "created_at",
+        "pg_catalog",
+        "timestamp",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        13,
+        "occurred_at",
+        "pg_catalog",
+        "timestamptz",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        14,
+        "event_date",
+        "pg_catalog",
+        "date",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        15,
+        "event_time",
+        "pg_catalog",
+        "time",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        16,
+        "state",
+        "fixture",
+        "State\" \u96ea",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ]
+    ],
+    "constraints": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "p",
+        "PRIMARY KEY (id)",
+        true
+      ]
+    ],
+    "indexes": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "CREATE UNIQUE INDEX accounts_pkey ON fixture.accounts USING btree (id)",
+        true,
+        true
+      ]
+    ],
+    "enums": [
+      [
+        "fixture",
+        "State\" \u96ea",
+        1.0,
+        "calm"
+      ],
+      [
+        "fixture",
+        "State\" \u96ea",
+        2.0,
+        "O'Brien \u96ea"
+      ]
+    ],
+    "views": [],
+    "triggers": [],
+    "routines": [],
+    "sequences": [],
+    "relations": [
+      [
+        "fixture",
+        "accounts",
+        "r",
+        false,
+        false
+      ]
+    ],
+    "tables": [
+      {
+        "schema": "fixture",
+        "name": "accounts",
+        "rows": []
+      }
+    ]
+  },
+  "subject_state": {
+    "schemas": [
+      [
+        "fixture"
+      ],
+      [
+        "other"
+      ],
+      [
+        "public"
+      ]
+    ],
+    "columns": [
+      [
+        "fixture",
+        "accounts",
+        1,
+        "id",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        2,
+        "tenant",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        3,
+        "name",
+        "pg_catalog",
+        "text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        4,
+        "note",
+        "pg_catalog",
+        "text",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        5,
+        "score",
+        "pg_catalog",
+        "int4",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        6,
+        "rank",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        7,
+        "active",
+        "pg_catalog",
+        "bool",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        8,
+        "balance",
+        "pg_catalog",
+        "numeric",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        9,
+        "tags",
+        "pg_catalog",
+        "_text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        10,
+        "payload",
+        "pg_catalog",
+        "jsonb",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        11,
+        "uuid",
+        "pg_catalog",
+        "uuid",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        12,
+        "created_at",
+        "pg_catalog",
+        "timestamp",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        13,
+        "occurred_at",
+        "pg_catalog",
+        "timestamptz",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        14,
+        "event_date",
+        "pg_catalog",
+        "date",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        15,
+        "event_time",
+        "pg_catalog",
+        "time",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        16,
+        "state",
+        "fixture",
+        "State\" \u96ea",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ]
+    ],
+    "constraints": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "p",
+        "PRIMARY KEY (id)",
+        true
+      ]
+    ],
+    "indexes": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "CREATE UNIQUE INDEX accounts_pkey ON fixture.accounts USING btree (id)",
+        true,
+        true
+      ]
+    ],
+    "enums": [
+      [
+        "fixture",
+        "State\" \u96ea",
+        1.0,
+        "calm"
+      ],
+      [
+        "fixture",
+        "State\" \u96ea",
+        2.0,
+        "O'Brien \u96ea"
+      ]
+    ],
+    "views": [],
+    "triggers": [],
+    "routines": [],
+    "sequences": [],
+    "relations": [
+      [
+        "fixture",
+        "accounts",
+        "r",
+        false,
+        false
+      ]
+    ],
+    "tables": [
+      {
+        "schema": "fixture",
+        "name": "accounts",
+        "rows": []
+      }
+    ]
+  },
+  "seconds": 0.17594429198652506
+}

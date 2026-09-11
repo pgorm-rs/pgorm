@@ -322,5 +322,34 @@ execution while preserving cleanup and cancellation behavior. These findings
 are separate from the fixed DISTINCT regression. The verifier exits unsuccessfully
 for disagreements and incomplete cases; there is no passing allowlist.
 
-Shrinking, general Rust replay, compile profiles, the full matrix runner/CI and
-the million-program acceptance campaign remain separate unfinished WBS work.
+## Shrinking
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  security/generative/tests/live_shrink.py \
+  --program security/generative/findings/pipeline-hidden-order/program.json
+```
+
+`shrink.reduce(checker, program)` searches for a smaller program that still
+fails the same way. It reduces effect sequences, transaction nesting, expression
+and pipeline structure, bound values and the declared fixture, then re-validates
+every candidate against the portable format before running it. Each candidate
+goes through the same `Checker`, which restores its own declared baseline on
+both databases first, so no attempt inherits the previous one's state.
+
+The predicate is frozen from a completed independent baseline run and is more
+than the comparison verdict: it records the subject's own account of the failing
+step — observation category, error class and SQLSTATE. A candidate that stops
+failing, fails somewhere else, or reports incomplete for a malformed,
+unsupported or fixture reason is recorded and discarded, never adopted. On the
+retained hidden-order finding this matters concretely: a coarser predicate
+accepted a reduction whose subject failed in PRQL compilation rather than with
+PostgreSQL's `42703`, which is a different defect.
+
+Budgets bound candidates, offered rewrites, passes, wall time and per-candidate
+timeout, and all of them are recorded with the result. Interruption keeps the
+original program and the best reproducer found so far. No result claims global
+minimality, and the reports say so in as many words.
+
+General Rust replay, compile profiles, the full matrix runner/CI and the
+million-program acceptance campaign remain separate unfinished WBS work.
