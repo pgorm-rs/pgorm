@@ -542,6 +542,78 @@ fn the_copied_entity_keeps_its_hostile_enum() {
     assert_eq!(values.0.len(), 1);
 }
 
+fn sample_account() -> Result<entities::account::Model, Box<dyn Error + Send + Sync>> {
+    Ok(entities::account::Model {
+        id: 1,
+        tenant: 1,
+        name: "Alice".to_owned(),
+        note: None,
+        score: Some(10),
+        rank: 1,
+        active: true,
+        balance: Decimal::new(1_234_500, 4),
+        payload: json!({"owner": "Alice"}),
+        uuid: pgorm::entity::prelude::Uuid::from_u128(1),
+        created_at: moment()?,
+        occurred_at: moment()?.and_utc(),
+        event_date: moment()?.date(),
+        event_time: moment()?.time(),
+        state: entities::account::State::Busy,
+    })
+}
+
+#[test]
+fn a_model_observation_carries_no_output_identity() -> TestResult {
+    let observed =
+        observe::model::<entities::account::Entity>(&sample_account()?, "campaign.Account")?;
+    assert_eq!(observed["kind"], json!("record"));
+    assert_eq!(observed["entity"], json!("campaign.Account"));
+    // `EntityModel` exposes no PostgreSQL fields, so `observations.row` emits
+    // no `postgres` key for one and neither may this.
+    assert_eq!(observed.get("postgres"), None);
+    let names: Vec<_> = observed["fields"]
+        .as_array()
+        .ok_or("fields is not an array")?
+        .iter()
+        .map(|field| field["name"].clone())
+        .collect();
+    // Declaration order, which is what the binding's `keys()` answers with.
+    assert_eq!(names[0], json!("id"));
+    assert_eq!(names[14], json!("state"));
+    assert_eq!(names.len(), 15);
+    Ok(())
+}
+
+#[test]
+fn a_model_enum_keeps_its_qualified_identity() -> TestResult {
+    let observed =
+        observe::model::<entities::account::Entity>(&sample_account()?, "campaign.Account")?;
+    let state = &observed["fields"][14]["value"];
+    assert_eq!(
+        state["type"],
+        json!({"kind": "enum", "name": "State\" 雪", "schema": "fixture"})
+    );
+    assert_eq!(state["data"], json!("O'Brien 雪"));
+    // A text column beside it stays text; only the tag tells the two apart.
+    assert_eq!(observed["fields"][2]["type"], Json::Null);
+    assert_eq!(
+        observed["fields"][2]["value"]["type"],
+        json!({"kind": "text"})
+    );
+    Ok(())
+}
+
+#[test]
+fn an_absent_slot_observes_as_absent() -> TestResult {
+    assert_eq!(
+        observe::maybe::<entities::note::Entity>(None, "campaign.Note"),
+        Ok(observe::absent())
+    );
+    let rows = observe::collected(vec![observe::absent()]);
+    assert_eq!(rows, json!({"kind": "rows", "rows": [{"kind": "absent"}]}));
+    Ok(())
+}
+
 #[test]
 fn the_copied_graphs_quote_their_given_aliases() {
     use pgorm::QueryTrait;

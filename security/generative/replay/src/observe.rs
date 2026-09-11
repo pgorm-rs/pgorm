@@ -8,10 +8,15 @@
 
 use std::collections::HashSet;
 
+use pgorm::pgorm_query::{ArrayType, ColumnType, DynIden, Iden, Value};
+use pgorm::{ColumnTrait, EntityTrait, IdenStr, Iterable, ModelTrait};
 use serde_json::{Value as Json, json};
 use tokio_postgres::Row;
 
-use crate::{FormatError, ObservedError, decode, wire::Tagged};
+use crate::{
+    FormatError, ObservedError, decode,
+    wire::{Tagged, TypeName},
+};
 
 /// A set of rows.
 ///
@@ -20,6 +25,11 @@ use crate::{FormatError, ObservedError, decode, wire::Tagged};
 /// Returns [`FormatError`] when any column cannot be decoded losslessly.
 pub fn rows(rows: &[Row]) -> Result<Json, FormatError> {
     Ok(json!({"kind": "rows", "rows": records(rows)?}))
+}
+
+/// A set of rows already observed one at a time, as decoded models are.
+pub fn collected(rows: Vec<Json>) -> Json {
+    json!({"kind": "rows", "rows": rows})
 }
 
 /// A set of rows drained from a stream, with the stream's terminal state.
@@ -80,6 +90,100 @@ pub fn record(row: &Row, entity: Option<&str>) -> Result<Json, FormatError> {
         object.insert("entity".to_owned(), json!(entity));
     }
     Ok(observation)
+}
+
+/// One decoded model of a compiled entity, naming the registration it belongs to.
+///
+/// Deliberately *unlike* [`record`]: a model is not a PostgreSQL result row and
+/// carries no output identity, so this observation has no `postgres` key. The
+/// binding's `EntityModel` exposes neither `fields` nor `native`, so
+/// `observations.row` omits that key there too, and a subject that invented one
+/// would fail parity against an oracle that cannot produce it.
+///
+/// The field names and their order are `Column::iter()`'s — the same iteration
+/// the binding's `keys()` answers from — and each value is tagged from the
+/// column's *declared* type, so an enum label keeps its qualified identity
+/// rather than arriving as indistinguishable text.
+///
+/// # Errors
+///
+/// Returns [`FormatError`] when a column's declared type and its decoded Rust
+/// value disagree, or when a payload is not a valid portable value.
+pub fn model<E>(value: &E::Model, entity: &str) -> Result<Json, FormatError>
+where
+    E: EntityTrait,
+{
+    let mut fields = Vec::new();
+    for column in E::Column::iter() {
+        let definition = ColumnTrait::def(&column);
+        let tagged = declared(definition.get_column_type(), ModelTrait::get(value, column))?;
+        fields.push(json!({
+            "name": IdenStr::as_str(&column),
+            "value": tagged.encode_checked()?,
+        }));
+    }
+    if fields.is_empty() {
+        return Err(FormatError::new(
+            "a compiled entity projects no columns; its model cannot be observed",
+        ));
+    }
+    Ok(json!({"kind": "record", "entity": entity, "fields": fields}))
+}
+
+/// An optional slot: the model when a join matched it, [`absent`] when not.
+///
+/// # Errors
+///
+/// Returns [`FormatError`] for the same reasons [`model`] does.
+pub fn maybe<E>(value: Option<&E::Model>, entity: &str) -> Result<Json, FormatError>
+where
+    E: EntityTrait,
+{
+    match value {
+        Some(value) => model::<E>(value, entity),
+        None => Ok(absent()),
+    }
+}
+
+/// Tag a model's value by what its column was *declared* as.
+///
+/// Only an enum needs this: `Value::String` is the Rust representation of both
+/// a text column and an enum label, and the campaign's hostile enum names make
+/// the distinction load-bearing. Everything else is tagged by its own variant,
+/// exactly as the binding's `InputKind::tagged` decides.
+fn declared(kind: &ColumnType, value: Value) -> Result<Tagged, FormatError> {
+    match kind {
+        ColumnType::Enum { name, schema, .. } => enumerated(name, schema.as_ref(), value, false),
+        ColumnType::Array(member) => match member.as_ref() {
+            ColumnType::Enum { name, schema, .. } => enumerated(name, schema.as_ref(), value, true),
+            _ => Ok(Tagged::from_value(value)),
+        },
+        _ => Ok(Tagged::from_value(value)),
+    }
+}
+
+fn enumerated(
+    name: &DynIden,
+    schema: Option<&DynIden>,
+    value: Value,
+    array: bool,
+) -> Result<Tagged, FormatError> {
+    let compatible = if array {
+        matches!(value, Value::Array(ArrayType::String, _))
+    } else {
+        matches!(value, Value::String(_))
+    };
+    if !compatible {
+        return Err(FormatError::new(
+            "compiled enum column returned an incompatible Rust value",
+        ));
+    }
+    let identity = TypeName::new(Iden::to_string(&**name));
+    let identity = match schema {
+        Some(schema) => identity.in_schema(Iden::to_string(&**schema)),
+        None => identity,
+    };
+    Ok(Tagged::from_enum(value, identity, array))
 }
 
 /// A terminal that yielded no row at all, as an optional graph slot does.

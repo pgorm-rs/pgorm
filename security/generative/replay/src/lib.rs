@@ -27,6 +27,7 @@ mod decode;
 pub mod entities;
 pub mod observe;
 mod report;
+pub mod stream;
 pub mod wire;
 
 use std::fmt;
@@ -106,6 +107,16 @@ impl From<pgorm::Error> for Error {
 impl From<FormatError> for Error {
     fn from(error: FormatError) -> Self {
         Self::Format(error)
+    }
+}
+
+/// A reproducer reaches `tokio_postgres` directly wherever pgorm hands it a
+/// driver type — `Row::try_get` for a result reference, `RowStream` for a
+/// streamed step — so those failures have to classify as the database failures
+/// they are rather than stall at the crate boundary.
+impl From<tokio_postgres::Error> for Error {
+    fn from(error: tokio_postgres::Error) -> Self {
+        Self::Database(pgorm::Error::Postgres(error))
     }
 }
 

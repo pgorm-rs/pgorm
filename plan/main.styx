@@ -6201,6 +6201,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-11T15:44:11.617367Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "emit_rust.py and replay.py are deliberately not yet committed. emit_rust.py carries 64 functions against the 50-per-file density cap, so it has to be split before it can land — the repo already shows the shape to follow, with dispatch_*, grammar_* and reference_* each split by concern, and emit_python.py sits inside the cap without help. The natural seams are value and literal emission, expression and predicate construction, pipeline stages, the typed model/graph/source families, and effects. replay.py is held with it only because it imports emit_rust. No quality bypass is to be used for this: the operator ruled that gate exemptions belong in the config whitelist, and the density cap is not an edge case but a genuine signal that one module is doing too much. The trivial-function gate's objection to a newtype constructor was the real edge case and is now handled by quality.trivial-function.allow-names rather than a per-commit violation."
+                        after_done true
+                    }
                 )
             }
 
@@ -6329,6 +6337,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Fixing this inside pgorm is not viable, and that is now established rather than assumed. The nondeterministic order comes from prqlc expanding a star projection, so the obvious pgorm-side fix would be to emit an explicit column list instead of `group this (take 1)`. pgorm cannot: the Pipeline struct carries only bindings, stages, values, reshaped and deduped, and no column knowledge whatsoever. Columns are resolved by prqlc from the source schema, so a pipeline over an entity or a runtime-named source is schema-less on pgorm's side until prqlc resolves it. There is nothing to enumerate. The remaining route is a pinned patch plus an upstream report. A candidate one-line fix exists at prqlc-0.13.14 semantic/lowering.rs, where the lowering of LineageColumn::All iterates LoweredTarget::Input(HashMap<RelationColumn, (CId, usize)>) and then calls sort_by_key on the frame-position usize alone; because the sort is stable over a hash-ordered input, any tie in that key keeps hash order. CId already derives Ord, so widening the key to the pair (frame position, CId) makes the order total at no behavioural cost. That site is a plausible rather than proven origin for this particular failure — but the reproducer committed with this node exits non-zero today, so any candidate patch is empirically verifiable in minutes rather than argued about. prqlc 0.13.14 is the latest release, so there is no upgrade that avoids the work."
+            }
+
+            {
+                at 2026-09-11T15:50:28.646883Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "The fix is now proven, and the earlier candidate was wrong. Patching semantic/lowering.rs to widen input_cols.sort_by_key from the frame-position usize to (position, CId) does NOT fix it: built against the retained reproducer, that change still produced two renderings. The actual site is semantic/resolver/expr.rs in construct_tuple_from_module, which is the star expansion itself. It iterates module.names — a HashMap — sorted only by the declaration order field, so any two declarations sharing an order value have their tie broken by hash iteration, and Rust reseeds RandomState per container, which is why the order moves within a single process. Widening that key to (order, name) makes it total, since names are unique within a module: sorted_by_key(|(n, d)| (d.order, (*n).clone())). With that one line the reproducer reports a single rendering across three fresh processes, and nothing else moves — pgorm's 217 lib unit tests, its 76 pipeline tests and pgorm-query's 77 all pass against the patched compiler, so no existing emitted SQL changes. Validation was done through a scratch [patch.crates-io] against a local copy; the workspace manifest was restored unmodified. The remaining work is to carry this as a real fork with the patch applied, wire it in by [patch.crates-io], and send the same one-liner upstream so the fork can be dropped."
+            }
+
+            {
+                at 2026-09-11T16:18:58.294753Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

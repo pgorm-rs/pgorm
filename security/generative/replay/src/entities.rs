@@ -6,6 +6,25 @@
 //! reproduced exactly rather than tidied: a replay whose entities are milder
 //! than the binding's is replaying a different program.
 
+use pgorm::{EntityTrait, IdenStr, Iterable};
+
+use crate::FormatError;
+
+/// The compiled column a portable program named by its SQL identifier.
+///
+/// A generated program addresses columns by name, because that is all a
+/// portable artifact can carry; the binding resolves the same name the same
+/// way, so a name outside the compiled set is refused rather than guessed at.
+///
+/// # Errors
+///
+/// Returns [`FormatError`] when the entity declares no column with this name.
+pub fn column<E: EntityTrait>(name: &str) -> Result<E::Column, FormatError> {
+    E::Column::iter()
+        .find(|column| IdenStr::as_str(column) == name)
+        .ok_or_else(|| FormatError::new("unknown compiled entity column"))
+}
+
 /// The accounts table: every scalar kind the campaign exercises, a
 /// schema-qualified enum whose name carries a quote and a non-ASCII character,
 /// and a save hook that rewrites on insert and on update alike.
@@ -102,6 +121,13 @@ pub mod graphs {
         note::Entity::belongs_to(account::Entity)
             .columns(note::Column::AccountId, account::Column::Id)
             .into()
+    }
+
+    /// The root-only shape, taking the alias slice every other factory takes so
+    /// that a generated call site does not special-case the one arity that
+    /// joins nothing.
+    pub fn account_only(_aliases: &[String]) -> SelectGraph<account::Entity, ()> {
+        account::Entity::graph()
     }
 
     pub fn optional(aliases: &[String]) -> SelectGraph<account::Entity, (Opt<note::Entity>,)> {

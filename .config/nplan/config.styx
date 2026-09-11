@@ -193,6 +193,11 @@ quality {
         // is all it can be: the field is private, so `new` is the only
         // way to build one. The alternative the gate implies — exposing
         // the field — is worse than the indirection it objects to
-        allow-names (new)
+        //
+        // account_only is the root-only graph shape. It takes the alias
+        // slice every other factory takes precisely so a generated call
+        // site need not special-case the one arity that joins nothing;
+        // the uniformity is the logic the gate cannot see
+        allow-names (new account_only)
     }
 }
