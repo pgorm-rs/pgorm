@@ -163,16 +163,22 @@ def render(definition):
         names.add(name)
         schemas.add(table["schema"])
         statements.extend(_table_sql(table, enums))
-    if not schemas <= {"fixture", "other"}:
-        raise ValueError("fixture schemas must be fixture or other")
-    setup = ["SET standard_conforming_strings = on;", "BEGIN;"]
-    for schema in ("fixture", "other"):
-        setup.extend(
-            [
-                "DROP SCHEMA IF EXISTS " + identifier(schema) + " CASCADE;",
-                "CREATE SCHEMA " + identifier(schema) + " AUTHORIZATION campaign;",
-            ]
-        )
+    if any(
+        schema not in ("fixture", "other") and not schema.startswith("campaign_")
+        for schema in schemas
+    ):
+        raise ValueError("fixture schemas must use the owned campaign namespace")
+    setup = [
+        "SET standard_conforming_strings = on;",
+        "BEGIN;",
+        "DO $reset$ DECLARE owned text; BEGIN "
+        "FOR owned IN SELECT nspname FROM pg_catalog.pg_namespace "
+        "WHERE nspowner = 'campaign'::regrole LOOP "
+        "EXECUTE pg_catalog.format('DROP SCHEMA %I CASCADE', owned); "
+        "END LOOP; END $reset$;",
+    ]
+    for schema in sorted(schemas | {"fixture", "other"}):
+        setup.append("CREATE SCHEMA " + identifier(schema) + " AUTHORIZATION campaign;")
     return "\n".join(
         setup + ["SET LOCAL ROLE campaign;"] + enum_sql + statements + ["COMMIT;"]
     )

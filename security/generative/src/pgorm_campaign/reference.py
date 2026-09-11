@@ -214,7 +214,11 @@ class Reference:
             identity = step["inputs"]["query"]
             query = resolution.get(identity)
             statement = read_statement(query, resolution.nodes[identity]["op"])
-            rows, _ = await self.driver.query(statement)
+            async with self.driver.connection.transaction():
+                await self.driver.connection.execute("SET TRANSACTION READ ONLY")
+                if isinstance(query, Raw):
+                    await validate_types(self.driver, query)
+                rows, _ = await self.driver.query(statement)
             return {"kind": "rows", "rows": rows}
         if name not in ("fetch", "execute", "stream", "active.write"):
             raise InvalidOracle("independent effect semantics uncovered: " + name)

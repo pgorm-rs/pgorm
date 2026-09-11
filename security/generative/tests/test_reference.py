@@ -1,20 +1,41 @@
 import copy
+from decimal import Decimal
 import struct
 import unittest
+from unittest.mock import Mock
 
 from pgorm_campaign import comparison, wire
 from pgorm_campaign.oracles import compare
 from pgorm_campaign.reference import Resolution
 from pgorm_campaign.reference_codec import Codec
+from pgorm_campaign.reference_inspection import read_statement
 from pgorm_campaign.reference_literal import literal
 from pgorm_campaign.reference_sql import SQL, bound
-from pgorm_campaign.reference_template import template
+from pgorm_campaign.reference_template import Raw, template
 from pgorm_campaign.reference_values import Float32, qualified
 
 from execution_cases import select_case
 
 
 class ReferenceTests(unittest.TestCase):
+    def test_inspection_accepts_owned_select_templates(self):
+        raw = Raw("SELECT $1::int4, '$2' /* $3 */", [wire.scalar("i32", "7")])
+        text, values = read_statement(raw, "raw.template").command()
+        self.assertEqual(values, ["7"])
+        self.assertIn("'$2' /* $3 */", text)
+        for text in ("DELETE FROM fixture.accounts", "SELECTED 1"):
+            with self.assertRaises(comparison.InvalidOracle):
+                read_statement(Raw(text, []), "raw.template")
+
+    def test_decimal_decoding_preserves_fixed_scale(self):
+        connection = Mock()
+        codec = Codec(connection)
+        codec.types = {1700: ("pg_catalog", "numeric", "b", 0, "N")}
+        loader = connection.adapters.get_loader.return_value.return_value
+        for value in ("0.0000000000000000000000000001", "-0.00", "100.0000"):
+            loader.load.return_value = Decimal(value)
+            self.assertEqual(codec.value(1700, b"decoded-by-driver")["data"], value)
+
     def test_reference_slots_respect_postgresql_quoted_contexts(self):
         source = "SELECT $2, $1, $2, '$3', E'\\'$4', \"$5\", $$ $6 $$, $tag$ $7 $tag$ /* outer $8 /* inner $9 */ */ -- $10\n"
         text, arguments = template(

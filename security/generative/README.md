@@ -257,3 +257,70 @@ PYTHONPATH=security/generative/src python3 security/generative/tests/live_corpus
   --archive target/sqlmap-cache/sqlmap.tar.gz \
   --output target/generative-corpus/verified-import
 ```
+
+## Generated programs
+
+`grammar.generate(seed, index, family=..., mode=...)` composes 15 families:
+SELECT, CRUD/result reuse, pipelines, registered entities, ActiveModel writes,
+graphs, cursors, runtime models, typed values, schema changes, SQL grouping,
+pipeline grouping/windows, set operations, compiled source tuples and owned SQL
+templates. All calls go through the public Python module and its native builders.
+There is no HTTP transport or scanner in this path.
+
+Recursive expressions carry schema types and nullability. Pipeline transitions
+track available projections, source aliases and binder ownership. PRQL grouping
+and partitioned windows remove their keys from the inner expression scope.
+Runtime-model inserts use unaliased tables, as required by that public API.
+Sequences reuse observed results, actually reach both conflict actions and close
+nested commit/rollback scopes. Read-only transactions and ordered stream prefixes
+are generated separately. Recipes label deliberate database rejections with
+exact expected SQLSTATEs; unexpected valid-program failures remain failures.
+
+Recursive text uses NUL-free corpus entries up to 4 KiB and identifiers have a
+smaller byte budget. The type family separately draws exact built-in and random
+numeric, float, Decimal, JSON, array, enum and temporal boundaries, through bound
+and literal paths with explicit PostgreSQL types. It pins the local-time worker
+to UTC. Construction/rejection coverage for unsigned64 and uninstalled pgvector,
+and complete observation-based coverage of every matrix context, remain full
+profile obligations; these samples do not establish those obligations.
+
+Fast tests check structural diversity after removing literal payloads, stable
+generation, all catalog operations/effects across 2,250 generated programs under
+128-node budgets, result dependencies and binder/source ownership. Generation
+counts establish reachable productions, not executed database coverage. The live
+command retains programs and recipes before execution, then native/reference
+results, fixture evidence and the unchanged extension identity:
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  security/generative/tests/live_grammar.py --count 512 --seed 20260911
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  security/generative/tests/live_grammar.py --count 128 \
+  --corpus target/generative-corpus/verified-20260911
+```
+
+`--corpus` verifies an existing offline import and records its manifest hash;
+it neither downloads inputs nor runs sqlmap. `--family` selects a family for
+focused verification, and `--program path/program.json` replays exact retained
+instructions independently of later generator changes.
+
+The seed `20260911` 512-program run `run-39373a66d2c1` completed with 476 passes,
+32 exact expected rejections and four retained discrepancies, with no incomplete
+cases. The 128-program imported-corpus run `run-37eb6fcba3f0` completed with 119
+passes, eight expected rejections and one hidden-order discrepancy. Both use
+the same installed extension and invoke zero builds. They correctly exit 1;
+neither run is full matrix or million-program acceptance evidence.
+
+Generated findings retain the original program, independent observations,
+fixture, native identity and replay arguments with hashes. Open discrepancies
+include [hidden sort columns](findings/pipeline-hidden-order/README.md),
+[quoted output names](findings/pipeline-quoted-output/README.md),
+[set composition](findings/set-precedence/generated-chain/README.md) and
+[window frames](findings/window-semantics/generated-frame/README.md). A retained
+[native panic](findings/pipeline-native-panic/README.md) is accounted as incomplete
+execution while preserving cleanup and cancellation behavior. These findings
+are separate from the fixed DISTINCT regression. The verifier exits unsuccessfully
+for disagreements and incomplete cases; there is no passing allowlist.
+
+Shrinking, general Rust replay, compile profiles, the full matrix runner/CI and
+the million-program acceptance campaign remain separate unfinished WBS work.

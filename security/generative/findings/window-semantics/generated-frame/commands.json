@@ -1,0 +1,1 @@
+{"python":["env","PYTHONPATH=security/generative/src","target/generative-build/venv/bin/python","security/generative/tests/live_grammar.py","--program","security/generative/findings/window-semantics/generated-frame/program.json"]}

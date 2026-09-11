@@ -1,14 +1,18 @@
 """Check inspected read SQL against independent results without changing fixture data."""
 
+import re
+
 from . import wire
 from .comparison import InvalidOracle
 from .reference import Driver, Rejection, Resolution
 from .reference_pipeline import Relation
 from .reference_sql import SQL, Query
-from .reference_template import template
+from .reference_template import Raw, template
 
 
 def read_statement(query, operation):
+    if isinstance(query, Raw) and re.match(r"\s*SELECT\b", query.text, re.I):
+        return query.sql()
     if isinstance(query, Query) and query.kind == "select" and not query.shape:
         return query.sql()
     if isinstance(query, Relation) and not query.shape:

@@ -35,6 +35,25 @@ class BaselineTests(unittest.TestCase):
         self.assertIn("TRUNCATE", sql)
         self.assertEqual(sql.count("INSERT INTO"), 5)
 
+    def test_owned_hostile_schemas_are_quoted_and_reset(self):
+        value = b.default()
+        value["tables"].append(
+            {
+                "schema": 'campaign_";--雪',
+                "name": "values",
+                "columns": [b.column("id", "i32")],
+                "rows": [[1]],
+            }
+        )
+        sql = b.render(value)
+        self.assertIn('CREATE SCHEMA "campaign_"";--雪" AUTHORIZATION campaign;', sql)
+        self.assertIn("nspowner = 'campaign'::regrole", sql)
+        self.assertIn("format('DROP SCHEMA %I CASCADE', owned)", sql)
+        for name in ("public", "pg_catalog", "unowned"):
+            value["tables"][-1]["schema"] = name
+            with self.assertRaises(ValueError):
+                b.render(value)
+
     def test_invalid_definitions_fail_without_execution(self):
         for change in (
             lambda v: v.update(version=True),

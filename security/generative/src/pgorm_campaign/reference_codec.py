@@ -119,6 +119,10 @@ class Codec:
         value = loader(oid, self.connection).load(raw)
         if kind == "bool":
             return value
+        if kind == "decimal":
+            # Decimal.__str__ may choose exponent notation at small scales;
+            # the portable representation preserves the fixed coefficient/scale.
+            return format(value, "f")
         if kind in ("date", "time") or kind.startswith("datetime"):
             return value.isoformat()
         if kind == "ipnetwork":

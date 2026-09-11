@@ -12,6 +12,14 @@ from .resolution import Resolution
 from .runtime_guard import forbid_processes
 
 
+def native_panic(error):
+    """PyO3 uses a BaseException so ordinary exception handlers cannot hide panic."""
+    return (
+        type(error).__module__ == "pyo3_runtime"
+        and type(error).__name__ == "PanicException"
+    )
+
+
 # [spec:pgorm:req:generative.execution]
 # [spec:pgorm:req:generative.build-amortization]
 class Executor:
@@ -107,6 +115,15 @@ class Executor:
             except Exception as error:
                 report["status"] = "incomplete"
                 report["error"] = observations.error(error)
+            except BaseException as error:
+                if not native_panic(error):
+                    raise
+                report["status"] = "incomplete"
+                report["error"] = {
+                    "kind": "error",
+                    "class": "UnexpectedNativePanic",
+                    "cause": str(error),
+                }
             finally:
                 self.programs += 1
                 report["seconds"] = time.monotonic() - started

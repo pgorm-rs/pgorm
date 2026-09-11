@@ -5957,6 +5957,41 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-10T23:22:48.585615Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-10T23:24:17.753808Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The ready generative frontier selects grammar after corpus. Generate portable programs from recursive typed expressions and stateful builder transitions, with explicit source/nullability metadata, bounded choices, owned binder scopes and nested transaction scopes. Corpus strings enter only value/name nodes; no imported payload becomes authored SQL syntax. Valid and intentional-rejection modes carry separate metadata and exact expected errors. Verify structural diversity after removing literal payloads/seed metadata and execute generated programs through the existing unchanged native build and independent oracle."
+                    }
+
+                    {
+                        at 2026-09-11T10:12:25.020705Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Concrete grammar work now includes recursive typed SELECT predicates/projections/joins, stateful full-schema INSERT/read/result-reuse/update/delete sequences with nested commit/rollback, and pipeline projections/derive/filter/join/nested sources/sort/take/distinct with owned binder scopes. 65 fast tests pass, including structure diversity and 128-node budgets. Initial invalid generator INSERTs omitted required columns and were corrected; a 30-program native sample then passed. Expanded 80-program run target/generative-grammar/run-a120a9b2aeca yielded 59 passes, 20 exact expected rejections, and one preserved discrepancy (seed 20260911/index66): renamed hidden sort columns across nested pipeline sources emit id/name where input only exposes p_id/p_name, PostgreSQL 42703 vs reference rows. Original evidence retained security/generative/findings/pipeline-hidden-order; Rust attribution/shrink still required. DISTINCT remains verified fixed. Grammar remains Doing: broaden generated API/type/context coverage, integrate recipe replay/retention and validate further before delivery."
+                    }
+
+                    {
+                        at 2026-09-11T11:20:39.939336Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Generated 256-program run run-8907525dd7db completed with 228 passes, 16 exact expected rejections, 3 mismatches and 9 incomplete oracle/generator cases. Corrected public rank/rank_dense argument arity, Decimal fixed-scale decoding and read-only owned-template inspection; exact rerun run-64dbd32b11a9 resolves all nine incomplete cases. PRQL 0.13.14 semantic/resolver/transforms.rs group partition explicitly excludes grouping keys from the aggregate input relation, identifying indices 11/155 as generator source-scope errors; valid generation now respects that scope. Index 66 hidden-order discrepancy remains retained separately. DISTINCT remains fixed and the two separately owned Rust files are untouched."
+                    }
+
+                    {
+                        at 2026-09-11T11:58:54.002172Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Grammar delivery now covers 15 compositional families including registered entities/ActiveModels, graph and cursor arities, mapped runtime CRUD, typed scalar/array bound/literal paths, owned namespaces/DDL, grouping/windows, compiled sources and sets. 73 fast tests pass; 2,250 generated programs reach every catalog operation/effect under 128-node budgets, separately labelled generation evidence. Runtime run-39373a66d2c1 completed 512 programs: 476 pass, 32 exact expected rejection, 4 retained discrepancies, zero incomplete. run-37eb6fcba3f0 actually executed 128 generated programs with the verified offline sqlmap corpus: 119 pass, 8 expected rejection, 1 hidden-order discrepancy. Both correctly exit 1 and reuse native SHA b7017b207b2885d98949c8067a952ab027a3dd404181080808809cc2ab7bcc7d with zero per-program builds. Model CRUD focused run-dce5a6304e45 passed 100/100. Preserved exact originals include hidden-order, quote-loss, generated window/set cases and accounted native panic; general Rust replay/shrinking remain required. Full observed matrix coverage, unsigned64/vector construction/rejection profiles and million-program acceptance remain runner/acceptance obligations. DISTINCT stays fixed and both user-owned Rust files remain unchanged."
+                    }
                 )
             }
 

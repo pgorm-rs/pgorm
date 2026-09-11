@@ -1,0 +1,14 @@
+{
+  "kind": "compiled",
+  "sql": "WITH table_0 AS (SELECT * FROM fixture.accounts), table_1 AS (SELECT id AS p_id, tenant AS p_tenant, name AS p_name, score AS p_score, rank AS p_rank, CAST(66 AS bigint) AS nonce FROM table_0 AS \"origin\u00e9\" ORDER BY p_id DESC, p_tenant, p_name, p_score, p_rank, nonce LIMIT 2 OFFSET 1), table_2 AS (SELECT p_tenant, p_score, p_rank, nonce, p_score - CAST($1 AS integer) AS \"derived49a%b_c\", id AS p_id, name AS p_name FROM table_1 AS \"nested33'\") SELECT nonce, \"derived49a%b_c\" FROM table_2 AS \"nested51\u96ea\" ORDER BY p_id DESC, p_tenant, p_name, p_score, p_rank, nonce",
+  "parameters": [
+    {
+      "data": "0",
+      "sql_null": false,
+      "type": {
+        "kind": "i32"
+      },
+      "version": 1
+    }
+  ]
+}

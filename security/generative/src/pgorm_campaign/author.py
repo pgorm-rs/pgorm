@@ -1,5 +1,7 @@
 """Author portable programs without importing or invoking the subject library."""
 
+from copy import deepcopy
+
 from . import baseline, wire
 from .program import Program
 
@@ -15,8 +17,8 @@ class Author:
             {
                 "id": identity,
                 "op": operation,
-                "inputs": inputs or {},
-                "data": data or {},
+                "inputs": deepcopy(inputs or {}),
+                "data": deepcopy(data or {}),
                 "scope": scope,
             }
         )
@@ -35,15 +37,15 @@ class Author:
             {
                 "id": identity,
                 "op": operation,
-                "inputs": inputs or {},
-                "data": data or {},
+                "inputs": deepcopy(inputs or {}),
+                "data": deepcopy(data or {}),
                 "scope": scope,
             }
         )
         self.observations.append(
             {"step": identity, "oracle": "reference"}
             if error is None
-            else {"step": identity, "oracle": "exact-error", "error": error}
+            else {"step": identity, "oracle": "exact-error", "error": deepcopy(error)}
         )
         return identity
 

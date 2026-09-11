@@ -1614,6 +1614,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule generative.corpus}
     )}
+    {id generative.grammar, covered_rules (
+        generative.grammar
+    ), covered_claims (
+        {impl_name main, rule generative.grammar}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

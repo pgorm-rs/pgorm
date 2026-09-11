@@ -32,7 +32,7 @@ def cursor_node(name, i, d):
     query = i["cursor"]
     cursor = query.shape["cursor"]
     if name == "cursor.bound":
-        if len(i["values"]) not in (1, len(cursor["keys"])):
+        if len(i["values"]) != len(cursor["keys"]):
             raise InvalidOracle("cursor oracle needs every declared key component")
         cursor = {**cursor, "bounds": {**cursor["bounds"], d["side"]: i["values"]}}
     elif name == "cursor.page":
