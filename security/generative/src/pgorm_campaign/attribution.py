@@ -36,6 +36,20 @@ def checked(program, report):
         raise InvalidOracle("replay nested observations belong to another program")
 
 
+# [spec:pgorm:req:generative.replay-parity]
+def selected(step):
+    """The pgorm APIs a run actually reached at one step.
+
+    Agreeing rows are not enough to call two runs equivalent: an emitter that
+    reached `Pipeline::filter` where the binding reached `Pipeline::filter_with`
+    has drifted, and the rows can still match. Recorded paths make that visible.
+    """
+    paths = step.get("native_paths")
+    if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+        raise InvalidOracle("replay step has no recorded native execution evidence")
+    return paths
+
+
 def parity(program, first, second):
     expected = [step["id"] for step in program.data()["steps"]]
     for report in (first, second):
@@ -70,8 +84,19 @@ def parity(program, first, second):
             result = observation(
                 actual, expected, ordered=step["data"].get("ordered", False)
             )
+        reached, against = selected(first_step), selected(second_step)
+        same = reached == against
         results.append(
-            {"step": step["id"], "equal": result.equal, "reason": result.reason}
+            {
+                "step": step["id"],
+                "equal": result.equal and same,
+                "reason": result.reason
+                if not result.equal
+                else "equal"
+                if same
+                else "selected API paths differ",
+                "paths": {"first": reached, "second": against},
+            }
         )
     if any(report.get("subject_state") is None for report in (first, second)):
         raise InvalidOracle("replay is missing final fixture state")

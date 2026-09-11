@@ -188,4 +188,11 @@ quality {
         // modules shouldn't consume the per-file budget
         exempt-test-scope true
     }
+    trivial-function {
+        // a newtype's constructor reads as a pass-through because that
+        // is all it can be: the field is private, so `new` is the only
+        // way to build one. The alternative the gate implies — exposing
+        // the field — is worse than the indirection it objects to
+        allow-names (new)
+    }
 }

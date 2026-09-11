@@ -95,6 +95,43 @@ class AttributionTests(unittest.TestCase):
                 "unattributed",
             )
 
+
+# [spec:pgorm:req:generative.replay-parity/test]
+class ParityTests(unittest.TestCase):
+    def test_agreeing_rows_excuse_no_api_drift(self):
+        program = control_programs.read()
+        python = report(program)
+        native = report(program)
+        self.assertTrue(
+            all(c["equal"] for c in attribution.parity(program, python, native))
+        )
+        drifted = copy.deepcopy(native)
+        drifted["subject"]["steps"][0]["native_paths"] = ["pgorm::Selector"]
+        checks = attribution.parity(program, python, drifted)
+        self.assertFalse(all(check["equal"] for check in checks))
+        self.assertIn("selected API paths differ", [c["reason"] for c in checks])
+
+    def test_emitter_drift_makes_a_finding_unattributed(self):
+        program = control_programs.read()
+        python = report(program)
+        drifted = report(program)
+        drifted["subject"]["steps"][0]["native_paths"] = ["pgorm::pipeline::Pipeline"]
+        result = attribution.classify(
+            program, python, {"source_sha256": "a" * 64}, drifted
+        )
+        self.assertNotEqual(result["classification"], "native-reproduced")
+
+    def test_a_step_without_recorded_paths_is_refused(self):
+        program = control_programs.read()
+        python = report(program)
+        native = report(program)
+        del native["subject"]["steps"][0]["native_paths"]
+        with self.assertRaises(attribution.InvalidOracle):
+            attribution.parity(program, python, native)
+
+
+# [spec:pgorm:req:generative.attribution/test]
+class RetentionTests(unittest.TestCase):
     def test_retention_never_overwrites_original_python_failure(self):
         program = control_programs.read()
         python = report(program)
