@@ -66,6 +66,17 @@ pub struct Pipeline {
     /// propagate it.
     // [spec:pgorm:sem:pipeline.select-sources+2]
     pub(super) reshaped: Option<&'static str>,
+    /// Whether the stages accumulated so far end in a deduplicating `group`
+    /// ([`distinct`](Pipeline::distinct)) that no binding has absorbed yet.
+    ///
+    /// prqlc cannot take a set operation directly off a grouped relation —
+    /// it reads the group's arity as the tuple it keys on rather than the
+    /// columns the relation projects, and refuses the combination for a
+    /// column-count mismatch that is not there. Hoisting the grouped stages
+    /// into their own binding first settles the arity at the CTE boundary,
+    /// so the flag records only whether that hoist is still owed.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) deduped: bool,
 }
 
 /// Which rows a [`join`](Pipeline::join) keeps.
@@ -382,6 +393,7 @@ impl Pipeline {
             stages: Vec::new(),
             values: Vec::new(),
             reshaped: None,
+            deduped: false,
         };
         let reference = pipeline.embed(source.into_source());
         pipeline.stages.push(adapter::call("from", vec![reference]));
@@ -397,6 +409,7 @@ impl Pipeline {
             stages: vec![adapter::call("from", vec![source])],
             values: Vec::new(),
             reshaped: None,
+            deduped: false,
         }
     }
 
@@ -707,6 +720,16 @@ impl Pipeline {
     }
 
     fn set_op(mut self, op: &str, other: impl IntoSource) -> Self {
+        // A deduplicating `group` the set operation would otherwise be taken
+        // off directly moves into its own binding first, leaving this pipeline
+        // reading from it, so the arity settles at the CTE boundary.
+        if self.deduped {
+            let stages = std::mem::take(&mut self.stages);
+            let name = adapter::binding_name(self.bindings.len());
+            self.bindings.push(stages);
+            self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
+            self.deduped = false;
+        }
         let reference = self.embed(other.into_source());
         self.stage(adapter::call(op, vec![reference]))
     }
@@ -715,7 +738,8 @@ impl Pipeline {
     /// rendered `SELECT DISTINCT` — or folded into `UNION DISTINCT` when it
     /// directly follows [`append`](Pipeline::append).
     // [spec:pgorm:req:pipeline.compose]
-    pub fn distinct(self) -> Self {
+    pub fn distinct(mut self) -> Self {
+        self.deduped = true;
         self.stage(adapter::call(
             "group",
             vec![

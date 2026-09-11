@@ -4659,6 +4659,13 @@ children (
                         kind @note
                         text "CORRECTION to the preceding note, against the reproduction preserved at security/generative/findings/distinct-append/. The order is the reverse of what that note assumed. It is not append-then-distinct: with p a pipeline carrying the explicit projection accounts.id, p.append(p) compiles AND p.distinct() compiles, and what fails is p.distinct().append(p.distinct()) — \"cannot combine relations with different numbers of columns\", both sides one column. So the append doc's claim (follow with distinct for UNION DISTINCT) describes a DIFFERENT composition and may still hold; the rule this contradicts is [spec:pgorm:sem:pipeline.select-sources+2], which says distinct and append compose freely, and that covers either order. The executor-versus-pgorm question is settled: native.rs drives Pipeline, col, select, distinct, append and into_sql directly with no Python and no database, and fails the same way, so the fault is in pgorm. The hypothesis to test is therefore what group this (take 1) does to a projected relation's arity as prqlc models it — a grouped relation may carry its key columns distinctly from the projection, so two such relations disagree when unioned even though each projects one column. minimal.program.json isolates the operation graph; the reporter notes the original pipeline-stages artifacts also carry an unrelated invalid take_range(0, 2) probe (PRQL ranges start at one) which is not part of this failure, which persists with no take stage at all. A second, separate finding sits alongside it at findings/set-precedence/ and is not yet boarded."
                     }
+
+                    {
+                        at 2026-09-11T12:59:56.096653Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
         )
@@ -6146,6 +6153,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
+                    }
+
+                    {
+                        at 2026-09-11T12:00:39.340969Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-11T12:00:39.456047Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Continue the user's explicitly directed generative campaign: after grammar delivery, the P3 ready frontier selects shrink with execute/oracles Done. Global P0 DISTINCT remains separately owned; its fix is verified and its Rust edits stay untouched. Reduce portable graph/steps, fixture rows and exact typed inputs with format/scope/dependency validation before each run. Replay every accepted candidate through Checker from reset paired fixtures. Freeze a structured failure predicate from a completed independent baseline; reject syntax/capability/fixture errors and changed error classes as replacements. Preserve original and best programs plus every attempted reduction, budget, predicate and interruption status; claim only the achieved local reduction, never global minimality."
                     }
                 )
             }

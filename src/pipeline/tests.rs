@@ -1353,3 +1353,58 @@ fn select_sources_unread_source_fails_in_prqlc() {
         .expect_err("fruit was never read");
     assert!(matches!(err, PipelineError::Compile(_)), "{err:?}");
 }
+
+// [spec:pgorm:req:pipeline.compose/test]    a deduplicated relation stays
+// combinable: prqlc cannot take a set operation off a grouped relation, so the
+// grouped stages are hoisted into their own binding first
+#[test]
+fn deduplicated_relations_still_combine() {
+    let projected = || {
+        Pipeline::from_schema(alias("fixture"), alias("accounts"))
+            .select(col(alias("accounts"), alias("id")))
+    };
+
+    let (sql, _) = projected()
+        .distinct()
+        .append(projected().distinct())
+        .into_sql()
+        .expect("matching projections stay composable");
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+SELECT id FROM table_0 UNION ALL SELECT DISTINCT id FROM fixture.accounts"
+    );
+
+    // The right side alone needs no hoist, and the left one still gets it.
+    let (sql, _) = projected()
+        .distinct()
+        .append(projected())
+        .into_sql()
+        .expect("a plain right side combines too");
+    assert_eq!(
+        sql,
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+SELECT id FROM table_0 UNION ALL SELECT id FROM fixture.accounts"
+    );
+
+    // Undeduplicated set operations are untouched: no binding is minted.
+    let (sql, _) = projected()
+        .append(projected())
+        .into_sql()
+        .expect("the baseline append is unchanged");
+    assert_eq!(
+        sql,
+        "SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts"
+    );
+
+    // Deduplicating *after* the append is the UNION DISTINCT fold, and keeps it.
+    let (sql, _) = projected()
+        .append(projected())
+        .distinct()
+        .into_sql()
+        .expect("append then distinct still folds");
+    assert_eq!(
+        sql,
+        "SELECT id FROM fixture.accounts UNION DISTINCT SELECT id FROM fixture.accounts"
+    );
+}
