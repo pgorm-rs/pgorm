@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-09-10T22:25:12.233544Z
+last_sync_at 2026-09-11T13:35:06.075366Z
 
 rule_versions (
     {id codegen.entity, version 2}
@@ -726,6 +726,7 @@ assertions (
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
     {id pipeline-append-distinct, kind @doing, author "brendan@necessary.nu", at 2026-09-11T12:59:56.096653Z}
+    {id generative.replay, kind @doing, author "brendan@necessary.nu", at 2026-09-11T13:35:21.360566Z}
 )
 
 impl_evidence (
@@ -861,6 +862,23 @@ impl_evidence (
         {impl_name main, rule migration.up}
         {impl_name main, rule migration.up-only}
     )}
+    {id generative.controls, covered_rules (
+        generative.attribution
+        generative.controls
+    ), covered_claims (
+        {impl_name main, rule generative.attribution}
+        {impl_name main, rule generative.controls}
+    ), rule_versions_seen (
+        {id generative.attribution, version 0}
+        {id generative.controls, version 0}
+    )}
+    {id generative.corpus, covered_rules (
+        generative.corpus
+    ), covered_claims (
+        {impl_name main, rule generative.corpus}
+    ), rule_versions_seen (
+        {id generative.corpus, version 0}
+    )}
     {id generative.execute, covered_rules (
         generative.build-amortization
         generative.execution
@@ -880,6 +898,13 @@ impl_evidence (
     ), rule_versions_seen (
         {id generative.fixtures, version 0}
         {id generative.isolation, version 0}
+    )}
+    {id generative.grammar, covered_rules (
+        generative.grammar
+    ), covered_claims (
+        {impl_name main, rule generative.grammar}
+    ), rule_versions_seen (
+        {id generative.grammar, version 0}
     )}
     {id generative.oracles, covered_rules (
         generative.comparison
@@ -903,6 +928,13 @@ impl_evidence (
         {id generative.format, version 0}
         {id generative.matrix, version 0}
         {id generative.program, version 0}
+    )}
+    {id generative.shrink, covered_rules (
+        generative.shrink
+    ), covered_claims (
+        {impl_name main, rule generative.shrink}
+    ), rule_versions_seen (
+        {id generative.shrink, version 0}
     )}
     {id grouped, covered_rules (
         query.graph.grouped
@@ -1602,28 +1634,6 @@ impl_evidence (
         {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
-    )}
-    {id generative.controls, covered_rules (
-        generative.attribution
-        generative.controls
-    ), covered_claims (
-        {impl_name main, rule generative.attribution}
-        {impl_name main, rule generative.controls}
-    )}
-    {id generative.corpus, covered_rules (
-        generative.corpus
-    ), covered_claims (
-        {impl_name main, rule generative.corpus}
-    )}
-    {id generative.grammar, covered_rules (
-        generative.grammar
-    ), covered_claims (
-        {impl_name main, rule generative.grammar}
-    )}
-    {id generative.shrink, covered_rules (
-        generative.shrink
-    ), covered_claims (
-        {impl_name main, rule generative.shrink}
     )}
 )
 

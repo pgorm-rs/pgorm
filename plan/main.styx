@@ -5000,6 +5000,13 @@ children (
                         kind @note
                         text "Scope correction, 2026-09-09: the resumed session continued fixed-route HTTP scanning after the operator's intended direction had moved to direct pgorm builder use through a native Python module. The recorded scanner run remains evidence for this separate branch, but did not deliver that objective. Python implementation and generated-program testing do not depend on completing this node; see python.direct-builders for the direct-access milestone."
                     }
+
+                    {
+                        at 2026-09-11T14:05:27.371302Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator chose to rework the vulnerable control routes rather than declare inapplicability. The 2026-09-09 attempt recorded 0 protected findings and 0 invariant violations but 105 of 210 case-technique pairs came back invalid-control: the control route was not observable to that technique. Q (inline query) was missed in all 35 cases; insert, pipeline-projection, schema, column, group, function and stored-identifier missed all six. Acceptance therefore requires giving each declared technique a genuinely injectable context in the control routes in security/sqlmap/adapter/src/main.rs — notably a subquery-injectable context for Q, and escapable contexts for the identifier-quoted controls — so every pair reaches outcome pass on its own merits. The unused `inapplicable` field in cases.json stays unread; no exemption path is to be implemented, and no case is to be removed from the scheduled inventory. Harness weakening to conceal defects is excluded by the rule itself."
+                    }
                 )
             }
         )
@@ -6187,6 +6194,13 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-11T13:35:21.360566Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 
@@ -6280,6 +6294,27 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "sealed — decomposition asserted complete (nplan seal)"
+            }
+
+            {
+                at 2026-09-11T14:05:32.078315Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator directed continuous execution of the remaining campaign nodes in computed order (replay, compile, runner, ci, acceptance), landing and pushing each node as it completes so progress stays durable and reviewable across sessions. Replay architecture decided and recorded in security/generative/REPLAY.md: the emitted Rust binary is the subject only, printing an executor-shaped report; the independent psycopg reference and the comparison stay in Python, so there is one independent semantics rather than two oracles that can agree with each other and both be wrong. Parity additionally compares recorded native_paths per step, which attribution.parity does not do today."
+            }
+        )
+    }
+
+    {
+        id pipeline-join-distinct-order
+        title "A joined, deduplicated pipeline compiles to one projection order"
+        kind @fix
+        log (
+            {
+                at 2026-09-11T14:55:36.854441Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The same Pipeline value, compiled repeatedly without rebuilding, emits its projection columns in one of two orders chosen at random per compilation. Shape is a join against a nested-pipeline source followed by distinct; neither stage alone is unstable. CTE names are byte-identical between renderings, so only the deduplicated projection order moves: the left relation's columns and the joined relation's columns swap group position. Reproduced through the Rust API with no Python in the process, so this is not the binding — src/pipeline/ holds no HashSet or HashMap, and the projection expansion happens inside prqlc, pinned at =0.13.14, following its container iteration order. Retained with both reproducers and their logs under security/generative/findings/pipeline-join-distinct-order/. It matters beyond text churn because the randomised list is the output projection, hence the tuple layout a positional decode reads; in the variant with a trailing select the same instability lands in DISTINCT ON, where argument order must prefix-match ORDER BY and decides which row of each group survives. Row-level divergence against a live database is not yet confirmed. Found while verifying the emitted Python reproducer against the interpreter, in generate(20260911, 9, family=\"pipeline\") and index 12."
             }
         )
     }

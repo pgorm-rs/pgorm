@@ -1,0 +1,9 @@
+distinct renderings: 2
+  SELECT DISTINCT n.j_id, n.j_account_id, table_1.p_id, table_1.p_rank FROM table_1 LEFT OUTER JOIN table_0 AS n
+  SELECT DISTINCT table_1.p_id, n.j_id, n.j_account_id, table_1.p_rank FROM table_1 LEFT OUTER JOIN table_0 AS n
+
+thread 'main' (262187083) panicked at native.rs:37:5:
+assertion `left == right` failed: the same pipeline must compile to one projection order
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
