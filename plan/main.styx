@@ -6220,6 +6220,13 @@ children (
                         kind @note
                         text "sealed — decomposition asserted complete (nplan seal)"
                     }
+
+                    {
+                        at 2026-09-11T15:10:15.624642Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Survey findings that should shape this node. The obligations are already declared: matrix.json's outside_runtime block holds exactly three compile-only entries — new-rust-entities (DeriveEntityModel, EntityWriter), rust-ownership (DatabaseTransaction, pipeline::Binder) and fresh-graph-generics (SelectGraph, SourceList). Nothing consumes that block yet, and matrix.obligations() deliberately ignores it, so compile coverage is already structurally separate from runtime counts as the rule requires. Infrastructure exists and should be reused rather than reinvented: trybuild 1.0.120 is wired into four crates with 37 fixtures, and roughly 34 compile_fail doctests assert an error code and nothing else. Prefer the doctest form for generated negatives: pgorm-macros/tests/compile_fail_test.rs states the policy in the repo's own words — only refusals the derives word themselves belong in a .stderr snapshot, because a downstream E0277 snapshot re-renders whenever rustc or trybuild changes its diagnostic layout. plan/main.styx records the cost of ignoring that, with value_type_lifetime_field.stderr re-blessed three times in one campaign and causing false pre-existing-failure reports. Three surfaces have no compile test of any kind and are the highest-value targets: pgorm-codegen's generated output is never fed to a compiler anywhere in the tree (its golden tests compare token text and the fixture files are in no module), DatabaseTransaction borrow and ownership rejection is only covered by runtime tests, and cross-pipeline brand mixing is untested while single-pipeline smuggling is pinned. Arity ceilings to exceed by one for the negative cases: SelectGraph grows to six slots, SourceList tuples to six, ExprList to twelve. On cost, the only two measurements in the tree are 1m17s cold against 10.43s warm for a one-file reproducer linking pgorm, so batching per temporary crate matters far less than sharing --target-dir target with --locked --offline; replay.py was corrected to do exactly that."
+                    }
                 )
             }
 

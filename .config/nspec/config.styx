@@ -24,6 +24,8 @@ specs ({
             pgorm-python/checks/**/*.py
             security/generative/src/**/*.py
             security/generative/bridge/src/**/*.rs
+            security/generative/replay/src/**/*.rs
+            .github/workflows/generative*.yml
         ),
         test_include (
             tests/**/*.rs

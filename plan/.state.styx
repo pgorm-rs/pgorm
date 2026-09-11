@@ -726,7 +726,6 @@ assertions (
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
     {id pipeline-append-distinct, kind @doing, author "brendan@necessary.nu", at 2026-09-11T12:59:56.096653Z}
-    {id generative.replay, kind @doing, author "brendan@necessary.nu", at 2026-09-11T13:35:21.360566Z}
 )
 
 impl_evidence (
@@ -1634,6 +1633,13 @@ impl_evidence (
         {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
+    )}
+    {id generative.replay, covered_rules (
+        generative.replay
+        generative.replay-parity
+    ), covered_claims (
+        {impl_name main, rule generative.replay}
+        {impl_name main, rule generative.replay-parity}
     )}
 )
 

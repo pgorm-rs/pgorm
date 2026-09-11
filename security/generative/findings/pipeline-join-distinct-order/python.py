@@ -9,11 +9,14 @@ inner = pl.Pipeline(notes).select(
 query = (
     pl.Pipeline(accounts)
     .select(pl.col("a", "id").as_("p_id"), pl.col("a", "rank").as_("p_rank"))
-    .join(pl.source(inner).named("n"),
-          pl.alias("p_rank").eq(pl.col("n", "j_account_id")), kind=p.Join.Left)
+    .join(
+        pl.source(inner).named("n"),
+        pl.alias("p_rank").eq(pl.col("n", "j_account_id")),
+        kind=p.Join.Left,
+    )
     .distinct()
 )
 seen = {query.inspect().sql for _ in range(40)}
 print("distinct renderings:", len(seen))
 for s in sorted(seen):
-    print("  ", s[s.index("SELECT DISTINCT"):][:120])
+    print("  ", s[s.index("SELECT DISTINCT") :][:120])
