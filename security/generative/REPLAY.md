@@ -69,6 +69,27 @@ Builder operations are emitted as builder calls. Captured SQL is never
 substituted for them; a program that cannot be expressed through the named API
 is reported as unsupported rather than quietly lowered to a string.
 
+## Limits
+
+Four shapes are refused, and each refusal is a fact about the pgorm API rather
+than a limit on what standalone Rust can observe:
+
+- **one cursor cannot feed two instructions.** `Cursor<S, K>` derives `Clone`,
+  which puts the bound on `S = GraphRow<E, S>` — a marker that carries no data
+  and does not implement it. A cursor is moved along its chain, never shared.
+- **a cursor cannot be inspected.** `Cursor` carries no statement builder, so
+  there is nothing for `inspect` to compile. The binding's `GraphCursor` says
+  the same of itself, reporting `"cursor": {"inspect": false}`.
+- **a graph read has no `one`.** `SelectGraph` offers `all` and `one_opt` only,
+  so `fetch` mode `one` against a graph is refused, exactly as the interpreter
+  refuses it.
+- **`result.value` cannot read a graph or sources row.** Those rows are tuples
+  and `result.value` carries no source index to address a slot with. Against an
+  entity read or an active write it is supported, through `ModelTrait::get`.
+
+The grammar generates none of these, so they cost the campaign no coverage; they
+are recorded because a refusal should name the API that caused it.
+
 ## Parity
 
 `replay.parity(program, python, native)` compares the two runs step by step
