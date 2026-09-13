@@ -1,0 +1,297 @@
+"""Fresh entity derives and the type boundaries they mint.
+
+An installed binding registers its entities once; every runtime program then
+draws from that fixed set. The shapes a derive *could* produce — a composite
+key, a schema-qualified enum, a column whose Rust name is not its SQL name —
+are settled at compile time and are invisible to any number of runtime
+programs. They are varied here instead.
+"""
+
+from .compile_case import CompileCase, rejects
+
+OBLIGATION = "new-rust-entities"
+
+PRELUDE = "    use pgorm::entity::prelude::*;"
+
+# Column shapes worth minting a derive for: each one lands in a different arm
+# of the derive's type mapping, and a `set()` against it is a different
+# `TryFrom`.
+COLUMNS = (
+    ("small", "i16", ""),
+    ("count", "i32", ""),
+    ("big", "i64", ""),
+    ("flag", "bool", ""),
+    ("ratio", "f64", ""),
+    ("label", "String", ""),
+    ("note", "Option<String>", ""),
+    ("blob", "Vec<u8>", ""),
+    ("maybe", "Option<i32>", ""),
+)
+
+
+def _field(name, rust, attrs):
+    lines = []
+    if attrs:
+        lines.append("        #[pgorm(" + attrs + ")]")
+    lines.append(f"        pub {name}: {rust},")
+    return lines
+
+
+def entity_module(*, table, columns, schema=None, keys=(("id", "i32"),), relation=""):
+    """Render one `DeriveEntityModel` entity as module body text.
+
+    The relation enum is always emitted, empty when the entity has no edges:
+    the derive requires it, and an entity generated without one would fail for
+    a reason that says nothing about the shape under test.
+    """
+    header = f'table_name = "{table}"'
+    if schema:
+        header = f'schema_name = "{schema}", ' + header
+    lines = [
+        PRELUDE,
+        "",
+        # `Eq` is left off deliberately: the column set varies across `f64`,
+        # and a derive that only compiles for some of the shapes under test
+        # would fail for a reason that says nothing about the entity.
+        "    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]",
+        f"    #[pgorm({header})]",
+        "    pub struct Model {",
+    ]
+    composite = len(keys) > 1
+    for name, rust in keys:
+        key = "primary_key, auto_increment = false" if composite else "primary_key"
+        lines.extend(_field(name, rust, key))
+    for name, rust, attrs in columns:
+        lines.extend(_field(name, rust, attrs))
+    lines.append("    }")
+    lines.append("")
+    lines.append("    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]")
+    lines.append("    pub enum Relation {" + ("" if relation else "}"))
+    if relation:
+        lines.append(relation)
+        lines.append("    }")
+    lines.append("")
+    lines.append("    impl ActiveModelBehavior for ActiveModel {}")
+    return "\n".join(lines)
+
+
+def _nested(name, body):
+    """Wrap an entity as a child module so one case can hold several."""
+    return f"    pub mod {name} {{\n" + _shift(body) + "\n    }"
+
+
+def _shift(text):
+    return "\n".join(("    " + line) if line else line for line in text.splitlines())
+
+
+def _accept(identity, body, note):
+    return CompileCase(
+        id=identity,
+        obligation=OBLIGATION,
+        verdict="accept",
+        phase="typeck",
+        source=body,
+        note=note,
+    )
+
+
+def column_cases():
+    """One derive per column shape, then one carrying all of them at once."""
+    cases = []
+    for index, column in enumerate(COLUMNS):
+        body = entity_module(table=f"col_{column[0]}", columns=(column,))
+        cases.append(
+            _accept(
+                f"entity-column-{column[0]}",
+                body,
+                f"column {index} maps {column[1]} through the derive",
+            )
+        )
+    cases.append(
+        _accept(
+            "entity-columns-all",
+            entity_module(table="col_all", columns=COLUMNS),
+            "every column shape in one derive",
+        )
+    )
+    return cases
+
+
+def naming_cases():
+    """Table, schema and per-column renaming, which only a derive can vary."""
+    renamed = (
+        ("value", "String", 'column_name = "sql_value"'),
+        ("kind", "i32", 'enum_name = "Kind"'),
+        ("r#type", "i32", ""),
+    )
+    return [
+        _accept(
+            "entity-schema-qualified",
+            entity_module(table="qualified", schema="fixture", columns=COLUMNS[:2]),
+            "schema_name rides the derive into the entity's identity",
+        ),
+        _accept(
+            "entity-renamed-columns",
+            entity_module(table="renamed", columns=renamed),
+            "column_name, enum_name and a raw identifier together",
+        ),
+    ]
+
+
+def key_cases():
+    """Key shapes change `PrimaryKey::ValueType`, and so change every lookup."""
+    composite = entity_module(
+        table="composite",
+        columns=(("payload", "String", ""),),
+        keys=(("left", "i32"), ("right", "i64")),
+    )
+    text_key = entity_module(
+        table="text_key",
+        columns=(("payload", "i32", ""),),
+        keys=(("code", "String"),),
+    )
+    return [
+        _accept("entity-key-composite", composite, "a two-column primary key"),
+        _accept("entity-key-text", text_key, "a non-integer primary key"),
+        _accept(
+            "entity-key-lookup",
+            composite + "\n\n    pub fn lookup() -> Select<Entity> {\n"
+            "        Entity::find_by_id((1_i32, 2_i64))\n    }",
+            "the composite ValueType is a tuple at the call site",
+        ),
+    ]
+
+
+def enum_cases():
+    """`DeriveActiveEnum`, including the schema-qualified identity."""
+    body = (
+        PRELUDE
+        + "\n\n"
+        + "    #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]\n"
+        '    #[pgorm(rs_type = "String", db_type = "Enum", '
+        'schema_name = "fixture", enum_name = "state")]\n'
+        "    pub enum State {\n"
+        '        #[pgorm(string_value = "open")]\n'
+        "        Open,\n"
+        '        #[pgorm(string_value = "closed")]\n'
+        "        Closed,\n"
+        "    }\n\n"
+        "    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]\n"
+        '    #[pgorm(table_name = "with_enum")]\n'
+        "    pub struct Model {\n"
+        "        #[pgorm(primary_key)]\n"
+        "        pub id: i32,\n"
+        "        pub state: State,\n"
+        "    }\n\n"
+        "    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]\n"
+        "    pub enum Relation {}\n\n"
+        "    impl ActiveModelBehavior for ActiveModel {}"
+    )
+    return [
+        _accept(
+            "entity-enum-qualified",
+            body,
+            "a schema-qualified active enum used as a column type",
+        )
+    ]
+
+
+def relation_cases():
+    """A derived relation, and the `Related` impl a graph later walks."""
+    child = entity_module(
+        table="rel_child",
+        columns=(("parent_id", "i32", ""),),
+        relation=(
+            '        #[pgorm(belongs_to = "super::parent::Entity", '
+            'from = "Column::ParentId", to = "super::parent::Column::Id")]\n'
+            "        Parent,"
+        ),
+    )
+    body = "\n\n".join(
+        [
+            _nested("parent", entity_module(table="rel_parent", columns=())),
+            _nested(
+                "child",
+                child + "\n\n    impl Related<super::parent::Entity> for Entity {\n"
+                "        fn to() -> RelationDef {\n"
+                "            Relation::Parent.def()\n        }\n    }",
+            ),
+        ]
+    )
+    return [_accept("entity-relation-pair", body, "belongs_to plus a Related impl")]
+
+
+def negative_cases():
+    """Boundaries a fresh derive erects, each rejected by a named code."""
+    entity = entity_module(table="neg_target", columns=(("label", "String", ""),))
+    composite = entity_module(
+        table="neg_composite",
+        columns=(("payload", "i32", ""),),
+        keys=(("left", "i32"), ("right", "i64")),
+    )
+    variants = (
+        (
+            "entity-active-value-type",
+            "    pub fn build() -> ActiveModel {\n"
+            "        ActiveModel {\n"
+            "            label: pgorm::set(7_i32),\n"
+            "            ..Default::default()\n"
+            "        }\n    }",
+            entity,
+            rejects("E0277"),
+            "a column's Rust type refuses a value it has no conversion from",
+        ),
+        (
+            "entity-missing-field",
+            "    pub fn read(model: Model) -> i32 {\n        model.absent\n    }",
+            entity,
+            rejects("E0609"),
+            "the derive mints exactly the declared fields and no others",
+        ),
+        (
+            "entity-key-arity",
+            "    pub fn lookup() -> Select<Entity> {\n"
+            "        Entity::find_by_id(1_i32)\n    }",
+            composite,
+            # `find_by_id` is bounded by `Into<ValueType>`, so a key of the
+            # wrong shape is an unsatisfied conversion rather than a type
+            # mismatch at the argument.
+            rejects("E0277"),
+            "a composite key's ValueType is a tuple, not its first column",
+        ),
+        (
+            "entity-key-value-type",
+            "    pub fn lookup() -> Select<Entity> {\n"
+            '        Entity::find_by_id("1")\n    }',
+            entity,
+            rejects("E0277"),
+            "a key lookup is typed by the declared primary key",
+        ),
+    )
+    return [
+        CompileCase(
+            id=identity,
+            obligation=OBLIGATION,
+            verdict="reject",
+            phase="typeck",
+            source=base + "\n\n" + tail,
+            expects=expectation,
+            note=note,
+        )
+        for identity, tail, base, expectation, note in variants
+    ]
+
+
+# [spec:pgorm:req:generative.compile-suite]
+def cases():
+    return (
+        column_cases()
+        + naming_cases()
+        + key_cases()
+        + enum_cases()
+        + relation_cases()
+        + negative_cases()
+    )
+
+
+__all__ = ["OBLIGATION", "cases", "entity_module"]

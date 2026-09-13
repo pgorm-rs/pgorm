@@ -1,0 +1,31 @@
+[package]
+name = "pgorm-generative-codegen"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+description = "Runs pgorm-codegen over generated DDL so the compile suite can build its output"
+
+# A detached workspace, on the terms the replay harness is detached: the driver
+# depends on the checkout under test by path and never pulls campaign tooling
+# into an ordinary pgorm build.
+[workspace]
+
+[[bin]]
+name = "pgorm-generative-codegen"
+path = "src/main.rs"
+
+[dependencies]
+pgorm-codegen = { path = "../../../pgorm-codegen" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+missing_panics_doc = "deny"
+# The driver's report is written to stdout by contract, at exactly one site.
+print_stderr = "deny"

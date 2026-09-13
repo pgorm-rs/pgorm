@@ -351,5 +351,46 @@ timeout, and all of them are recorded with the result. Interruption keeps the
 original program and the best reproducer found so far. No result claims global
 minimality, and the reports say so in as many words.
 
+## Compile suite
+
+```sh
+PYTHONPATH=security/generative/src python3 -m pgorm_campaign.compile_main
+```
+
+A bounded Rust source-generation suite, separate from the runtime campaign and
+reported separately from it. It covers the three `outside_runtime` entries in
+`matrix.json` marked `compile-only` — entity derives and codegen output, Rust
+borrow and brand rejection, fresh graph and source-tuple instantiations. An
+installed binding fixes those shapes at build time, so no number of runtime
+programs varies them.
+
+Every case predicts its own outcome and is scored only against what the
+compiler said about its own source. A positive must build. A negative must be
+rejected by a named rustc error code inside its own line range — silence is
+never a pass, and a diagnostic that lands on another case does not count for
+this one. A `cargo` failure that produced no attributable diagnostic is a
+toolchain failure, not a rejection, and marks every case in that batch untested
+rather than passed.
+
+Codegen cases visit `pgorm-codegen` first, through the detached driver in
+`compile/`. A generation refusal — an extra-derive string that does not lex, DDL
+the bridge does not carry — is the library holding its own boundary and is
+counted apart from anything a compiler said; only what the generator emitted
+reaches rustc.
+
+Cases share a temporary crate when they are compatible: same verdict, phase,
+kind and dependency set. Verdict is the hard constraint, since one exit status
+cannot mean both "built" and "did not build". Crates are named by content
+digest, because cargo keys freshness on package name and a fixed name sharing a
+target directory reports a stale success.
+
+The run writes `target/generative-compile/compile-report.json`, whose counts are
+all labelled `compile_*` and which carries no runtime totals.
+
+`date_time_crate = "time"` is threaded over a schema with no temporal column.
+pgorm has no `with-time` feature, so generated `TimeDate` and its siblings name
+types the prelude cannot supply; the option is covered, the type mapping behind
+it has no compilable target in this checkout.
+
 General Rust replay, compile profiles, the full matrix runner/CI and the
 million-program acceptance campaign remain separate unfinished WBS work.

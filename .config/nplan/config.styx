@@ -16,6 +16,22 @@ platforms (
         }
     }
     {
+        platform "generative-compile"
+        files (security/generative/compile/**/*.rs security/generative/compile/Cargo.toml security/generative/compile/Cargo.lock)
+        checks {
+            unit {
+                cmd "cargo test --manifest-path security/generative/compile/Cargo.toml --locked --target-dir target"
+            }
+            format {
+                cmd "cargo fmt --manifest-path security/generative/compile/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path security/generative/compile/Cargo.toml --all"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path security/generative/compile/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "generative-replay"
         files (security/generative/replay/**/*.rs security/generative/replay/Cargo.toml security/generative/replay/Cargo.lock)
         checks {
