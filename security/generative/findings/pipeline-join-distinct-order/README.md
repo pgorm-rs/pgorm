@@ -1,8 +1,13 @@
 # A joined, deduplicated pipeline compiles to two projection orders
 
-Open discrepancy. The same `Pipeline` value, compiled repeatedly without being
-rebuilt, emits its projection columns in one of two orders, chosen at random per
-compilation:
+**Fixed.** pgorm now pins a patched prqlc, and
+`pipeline::tests::a_joined_deduplicated_relation_compiles_once` asserts the
+compilation is stable. The material below is what the defect looked like; the
+standalone reproducer here still builds against stock prqlc and still fails
+there, which is what makes it evidence.
+
+The same `Pipeline` value, compiled repeatedly without being rebuilt, emitted
+its projection columns in one of two orders, chosen at random per compilation:
 
 ```
 SELECT DISTINCT n.j_id, n.j_account_id, table_1.p_id, table_1.p_rank FROM ...
@@ -54,4 +59,30 @@ PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
 
 Found while verifying the emitted Python reproducer against the interpreter, in
 generated programs `generate(20260911, 9, family="pipeline")` and index `12`.
-No production source was changed for this finding.
+
+## The fix
+
+`construct_tuple_from_module` in prqlc's `semantic/resolver/expr.rs` is the star
+expansion. It iterates `module.names` — a `HashMap` — sorted only by each
+declaration's `order`, so two declarations sharing an `order` keep whatever
+relative position hash iteration gave them. Rust reseeds `RandomState` per
+container, which is why the order moved within a single process rather than
+only between runs. Names are unique within a module, so widening the sort key
+to `(order, name)` makes it total:
+
+```diff
+-        for (name, decl) in module.names.iter().sorted_by_key(|(_, d)| d.order) {
++        for (name, decl) in module.names.iter().sorted_by_key(|(n, d)| (d.order, (*n).clone())) {
+```
+
+An earlier candidate — widening `input_cols.sort_by_key` in `lowering.rs` from
+the frame position to `(position, CId)` — was built and tested against this
+reproducer and did **not** fix it. It is recorded here because the plausible
+site was not the real one.
+
+The patch lives on `pgorm/deterministic-star-expansion` in
+`necessary-nu/prql`, branched from the `0.13.14` tag, and the root manifest
+pins prqlc to that revision. Upstream's own suite passes unchanged on the
+branch (576 tests), as do pgorm's 218 lib tests and pgorm-query's 77, so the
+change removes the randomness without moving any emitted SQL. The pin should be
+dropped once the fix lands upstream.

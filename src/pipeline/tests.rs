@@ -1408,3 +1408,34 @@ SELECT id FROM table_0 UNION ALL SELECT id FROM fixture.accounts"
         "SELECT id FROM fixture.accounts UNION DISTINCT SELECT id FROM fixture.accounts"
     );
 }
+
+// [spec:pgorm:req:pipeline.compose/test]    compilation is deterministic: a
+// star expanded over a join and then deduplicated used to come out in hash
+// order, so the same pipeline emitted two different projections
+#[test]
+fn a_joined_deduplicated_relation_compiles_once() {
+    let compile = || {
+        let inner = Pipeline::from_schema(alias("fixture"), alias("notes")).select((
+            col(alias("notes"), alias("id")).as_(alias("j_id")),
+            col(alias("notes"), alias("account_id")).as_(alias("j_account_id")),
+        ));
+        Pipeline::from_schema(alias("fixture"), alias("accounts"))
+            .select((
+                col(alias("accounts"), alias("id")).as_(alias("p_id")),
+                col(alias("accounts"), alias("rank")).as_(alias("p_rank")),
+            ))
+            .join(
+                JoinSide::Left,
+                named_runtime(inner, pgorm_query::Alias::new("n")),
+                that(alias("j_account_id")).eq(this(alias("p_rank"))),
+            )
+            .distinct()
+            .into_sql()
+            .expect("the joined, deduplicated pipeline compiles")
+            .0
+    };
+    let first = compile();
+    for _ in 0..64 {
+        assert_eq!(compile(), first, "one pipeline, one projection order");
+    }
+}

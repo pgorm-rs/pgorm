@@ -103,3 +103,12 @@ postgres-array = []
 pgorm-internal = []
 runtime-tokio = []
 tests-cfg = []
+
+# prqlc expands a star by iterating a HashMap sorted only on declaration
+# order, so columns sharing an order value come out in hash order and the
+# same pipeline compiles to different projections between calls. That list
+# is the tuple layout a positional decode reads. Pinned to the fork until
+# the one-line fix lands upstream; see the pipeline-join-distinct-order
+# finding for the reproducer.
+[patch.crates-io]
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "b2baa230e4778a0a8485a4f2b2aab8e05d4bd1a6" }
