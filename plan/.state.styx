@@ -728,6 +728,7 @@ assertions (
     {id sqlmap.acceptance, kind @doing, author "brendan@necessary.nu", at 2026-09-09T14:03:57.991058Z}
     {id pipeline-append-distinct, kind @doing, author "brendan@necessary.nu", at 2026-09-11T12:59:56.096653Z}
     {id pipeline-join-distinct-order, kind @doing, author "brendan@necessary.nu", at 2026-09-11T16:18:58.294753Z}
+    {id jiff-temporal, kind @doing, author "brendan@necessary.nu", at 2026-09-13T12:13:42.909744Z}
 )
 
 impl_evidence (

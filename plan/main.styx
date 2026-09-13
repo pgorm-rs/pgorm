@@ -6361,4 +6361,60 @@ children (
             }
         )
     }
+
+    {
+        id jiff-temporal
+        title "Model PostgreSQL temporal types with jiff instead of chrono"
+        kind @feat
+        log (
+            {
+                at 2026-09-13T12:03:21.049088Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator directed replacing chrono with jiff outright, and doing it before generative.runner rather than after the campaign. postgres-types 0.2.13 already ships with-jiff-0_2, so no fork is needed; it maps civil::Date to DATE, civil::Time to TIME, civil::DateTime to TIMESTAMP and Timestamp to TIMESTAMPTZ. The change is a correction rather than a rename. pgorm currently carries six temporal Value variants, and pgorm-query/src/value.rs renders ChronoDateTimeUtc, ChronoDateTimeLocal and ChronoDateTimeWithTimeZone all to timestamptz — three Rust spellings of one database type, two of which reconstruct an offset PostgreSQL never stored. jiff's Timestamp models the single real thing, so six variants collapse to four and the two that disappear are the fictional ones. That is also why postgres-types has no impl for jiff's Zoned: a timestamptz carries nothing to build a zone from. Dropping DateTime<Local> and DateTime<FixedOffset> is a breaking public API change and is accepted as such. Roughly seventy files are involved: pgorm-query Value/ArrayType/ValueType, pgorm ColumnType, DeriveEntityModel's temporal field detection, pgorm-codegen's DateTimeCrate, pgorm-python's wire snapshot and decode, and forty-three campaign files. The campaign's portable wire format names its temporal kinds datetime, datetime_utc, datetime_local and datetime_fixed after chrono's four shapes, so this is a versioned-format change and not only a rename. Sequencing before the runner means the campaign's oracles and wire format are authored once against jiff instead of being migrated afterwards."
+            }
+
+            {
+                at 2026-09-13T12:11:28.019865Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "A behavioural difference the campaign oracle must model, found by reading postgres-types 0.2.13 src/jiff_02.rs before starting. The ToSql impls for civil::DateTime, Timestamp and civil::Time do not reject sub-microsecond precision: they call Span::round with SpanRound::new().largest(Unit::Microsecond), so a value carrying nanoseconds is ROUNDED to microseconds on write, using jiff's default rounding mode rather than truncation. PostgreSQL stores microseconds, so the lost precision is unavoidable, but the shape of the loss matters. The campaign's current wire format rejects temporal precision Python cannot retain, which is a different contract — under jiff a nanosecond value is accepted and silently changed instead. An oracle expecting equality after a round trip would report a false defect on every such value, and one expecting truncation would report a false defect on any value whose sub-microsecond part rounds up. Whichever way the wire format goes, the reference semantics must expect rounding at the microsecond boundary, and the corpus should carry values either side of a half-microsecond to pin it. Also worth noting the PostgreSQL epoch base is 2000-01-01 rather than the Unix epoch, and both decode and transmit failures flatten to the strings \"value too large to decode\" and \"value too large to transmit\", so a range error carries no detail to attribute it with."
+            }
+
+            {
+                at 2026-09-13T12:13:22.321309Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Correction to the earlier rounding claim: jiff truncates sub-microsecond precision on write. Measured by encoding a civil DateTime through ToSql and reading the wire bytes: .123456, .1234561, .1234565 and .1234569 all give 123456 microseconds, and .999999999 gives 999999. The remainder is discarded whatever its magnitude, including the halfway case and the one that would carry into the next second. The oracle must expect truncation at the microsecond boundary. The contract change still stands, since the campaign wire format rejects precision Python cannot retain while jiff accepts and silently truncates. The corpus needs values with a non-zero sub-microsecond remainder, including one at .999999999, rather than values either side of a half microsecond."
+            }
+
+            {
+                at 2026-09-13T12:13:42.909744Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-13T12:21:37.653392Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Binding and codegen survey findings. The two disappearing kinds are construction-only: pgorm-python/src/results/decode.rs is the whole PostgreSQL to Value mapping and its only timestamptz arm produces ChronoDateTimeUtc, so nothing can ever decode a datetime_local or datetime_fixed. MODEL_KINDS and capabilities.rs already fence them off. Removing them therefore breaks construction, binding, snapshot and equality but never a read path, which de-risks the change considerably: twelve Rust sites, one Python site, six doc and test sites. pgorm-codegen has exactly one type-name selection site, four match arms in src/entity/column.rs, with about twelve further pass-through threading sites, and it takes no chrono, time or jiff dependency at all. Zero golden fixtures need regenerating: no .rs golden in any of the thirteen fixture directories contains a temporal type, and every temporal assertion is inline string matching in five test drivers. Codegen may need no change whatsoever, because gen_import emits only a prelude glob, so Date, Time, DateTime and DateTimeWithTimeZone resolve through src/entity/prelude.rs; repointing those aliases upstream leaves codegen emitting identical text. Mappings that are not one-to-one: check_time rejects chrono leap seconds and jiff cannot represent one at all, so that check goes dead and the leap-second fixture in tests/values.rs must be deleted rather than translated; snapshot Display text changes for naive datetime, space becoming T, and for UTC datetime, trailing UTC becoming Z; aware() collapses to a single outcome and its kind parameter goes dead; codegen/types.py's DateTime generic-wrapper machinery has no jiff analogue, and jiff's bare spellings collide with the prelude aliases in a way the Naive prefixes never did. A user who wrote an offset-carrying value has no offset-preserving replacement and must convert to UTC first. Wire kinds are typed as bare str in every stub with no Literal enumeration, so no stub changes are needed but mypy gives no protection against a stale kind string. Swapping the dependency also changes licenses, DEPENDENCIES.json and THIRD_PARTY_NOTICES.txt, so the notices check needs artifact regeneration."
+            }
+        )
+    }
+
+    {
+        id codegen-datetime-crate-option
+        title "Codegen's date-time crate option generates code that compiles"
+        kind @fix
+        log (
+            {
+                at 2026-09-13T12:22:02.211121Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "pgorm-codegen exposes a public DateTimeCrate option whose Time variant emits code that cannot compile. Generated entities under that variant name TimeDate, TimeTime, TimeDateTime and TimeDateTimeWithTimeZone, but no such alias exists in pgorm or pgorm-query, and time is not a workspace dependency at all. The crate's own tests never notice because tests/common/mod.rs only string-matches generated text and never feeds it to a compiler. Two independent surveys found this: the bounded compile suite could not cover the option and reported the missing with-time feature as the reason, and the binding survey then established the aliases do not exist anywhere. The natural resolution is bound up with jiff-temporal: if jiff becomes the single temporal crate then the option has nothing left to select between, so the honest fix is to delete DateTimeCrate rather than add a third dead variant. Doing that also removes the one place a caller can ask codegen for output the workspace cannot build. If the option is instead kept, the Time variant needs either a real with-time feature and the four aliases, or an explicit refusal at EntityWriterContext::new so the failure lands at the generator boundary rather than at a downstream build."
+            }
+        )
+    }
 )
