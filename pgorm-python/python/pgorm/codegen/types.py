@@ -47,12 +47,20 @@ SCALARS = {
     "rust_decimal::Decimal": ("Decimal", "decimal"),
     "Uuid": ("UUID", "uuid"),
     "uuid::Uuid": ("UUID", "uuid"),
-    "NaiveDate": ("date", "date"),
-    "chrono::NaiveDate": ("date", "date"),
-    "NaiveTime": ("time", "time"),
-    "chrono::NaiveTime": ("time", "time"),
-    "NaiveDateTime": ("datetime", "datetime"),
-    "chrono::NaiveDateTime": ("datetime", "datetime"),
+    # Generated entities spell these through the pgorm prelude, so the bare
+    # aliases and the jiff paths behind them both have to resolve.
+    "Date": ("date", "date"),
+    "civil::Date": ("date", "date"),
+    "jiff::civil::Date": ("date", "date"),
+    "Time": ("time", "time"),
+    "civil::Time": ("time", "time"),
+    "jiff::civil::Time": ("time", "time"),
+    "DateTime": ("datetime", "datetime"),
+    "civil::DateTime": ("datetime", "datetime"),
+    "jiff::civil::DateTime": ("datetime", "datetime"),
+    "DateTimeWithTimeZone": ("datetime", "datetime_utc"),
+    "Timestamp": ("datetime", "datetime_utc"),
+    "jiff::Timestamp": ("datetime", "datetime_utc"),
     "IpNetwork": ("str", "ipnetwork"),
     "ipnetwork::IpNetwork": ("str", "ipnetwork"),
     "MacAddress": ("bytes", "mac_address"),
@@ -104,21 +112,6 @@ def resolve(spelling: str, hint: dict[str, Any]) -> FieldType:
         )
     if spelling in ("Json", "JsonValue", "serde_json::Value"):
         return FieldType("Any", repr("json"), json=True)
-    timezone = wrapped(spelling, ("DateTime", "chrono::DateTime"))
-    if timezone is not None and timezone in (
-        "Utc",
-        "chrono::Utc",
-        "Local",
-        "chrono::Local",
-        "FixedOffset",
-        "chrono::FixedOffset",
-    ):
-        kind = {
-            "Utc": "datetime_utc",
-            "Local": "datetime_local",
-            "FixedOffset": "datetime_fixed",
-        }[timezone.rsplit("::", 1)[-1]]
-        return FieldType("datetime", repr(kind))
     if spelling in SCALARS:
         annotation, kind = SCALARS[spelling]
         return FieldType(annotation, repr(kind))

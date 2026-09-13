@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use chrono::{NaiveDate, NaiveTime};
+use jiff::civil::{date, time};
 use pgorm::pgorm_query::{ArrayType, Value};
 use pgorm_python::values::{PyTypeName, PyValue};
 use pyo3::prelude::*;
@@ -56,16 +56,9 @@ fn python_scalars_preserve_rust_variants() -> PyResult<()> {
 fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
-        let submicro = NaiveTime::from_hms_nano_opt(12, 0, 0, 123_456_789)
-            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid fixture"))?;
-        let leap = NaiveTime::from_hms_nano_opt(23, 59, 59, 1_000_000_000)
-            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid fixture"))?;
-        let old = NaiveDate::from_ymd_opt(0, 1, 1)
-            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid fixture"))?;
         for inner in [
-            Value::ChronoTime(Some(Box::new(submicro))),
-            Value::ChronoTime(Some(Box::new(leap))),
-            Value::ChronoDate(Some(Box::new(old))),
+            Value::Time(Some(Box::new(time(12, 0, 0, 123_456_789)))),
+            Value::Date(Some(Box::new(date(0, 1, 1)))),
             Value::Float(Some(f32::from_bits(0x7f800001))),
         ] {
             let value = Py::new(py, PyValue::from_rust(inner))?;

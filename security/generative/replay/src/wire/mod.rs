@@ -17,8 +17,7 @@ mod temporal;
 mod validate;
 
 pub use temporal::{
-    parse_date, parse_datetime_fixed, parse_datetime_utc, parse_naive_datetime, parse_time,
-    temporal_text,
+    parse_date, parse_datetime_utc, parse_naive_datetime, parse_time, temporal_text,
 };
 pub use validate::validate;
 
@@ -147,9 +146,8 @@ scalar_kinds! {
     BigInt => "i64", Unsigned => "u32", BigUnsigned => "u64",
     Float => "f32", Double => "f64", String => "text", Char => "char",
     Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
-    ChronoDate => "date", ChronoTime => "time", ChronoDateTime => "datetime",
-    ChronoDateTimeUtc => "datetime_utc", ChronoDateTimeLocal => "datetime_local",
-    ChronoDateTimeWithTimeZone => "datetime_fixed", IpNetwork => "ipnetwork",
+    Date => "date", Time => "time", DateTime => "datetime",
+    DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
     MacAddress => "mac_address", Vector => "vector",
 }
 
@@ -248,12 +246,10 @@ impl Tagged {
             Value::Json(value) => json!(value),
             Value::Decimal(value) => string!(value),
             Value::Uuid(value) => string!(value),
-            Value::ChronoDate(value) => string!(value),
-            Value::ChronoTime(value) => string!(value),
-            Value::ChronoDateTime(value) => string!(value),
-            Value::ChronoDateTimeUtc(value) => string!(value),
-            Value::ChronoDateTimeLocal(value) => string!(value),
-            Value::ChronoDateTimeWithTimeZone(value) => string!(value),
+            Value::Date(value) => string!(value),
+            Value::Time(value) => string!(value),
+            Value::DateTime(value) => string!(value),
+            Value::DateTimeWithTimeZone(value) => string!(value),
             Value::IpNetwork(value) => string!(value),
             Value::MacAddress(value) => json!(value.as_ref().map(|value| value.bytes())),
             Value::Vector(value) => json!(value.as_ref().map(|value| {

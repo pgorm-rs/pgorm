@@ -67,8 +67,8 @@ fn is_textual(ty: &Type) -> bool {
 /// `timestamp` and `timestamptz` share one representation — microseconds since
 /// 2000-01-01 — and differ only in whether that instant is read as a wall
 /// clock or as UTC. An acceptance check is about representation, so both are
-/// accepted for every chrono variant, exactly as `postgres-types` does for its
-/// own `SystemTime` impl. Which of the two a value *means* is the caller's.
+/// accepted for both datetime variants, exactly as `postgres-types` does for
+/// its own `SystemTime` impl. Which of the two a value *means* is the caller's.
 // [spec:pgorm:req:exec.cursor.binding-accepts]
 fn is_timestamp(ty: &Type) -> bool {
     matches!(*ty, Type::TIMESTAMP | Type::TIMESTAMPTZ)
@@ -245,28 +245,12 @@ impl ToSql for ValueHolder {
                 ty,
                 out,
             ),
-            Value::ChronoDate(x) => {
-                bind_exact(x.as_deref(), "ChronoDate", |ty| *ty == Type::DATE, ty, out)
+            Value::Date(x) => bind_exact(x.as_deref(), "Date", |ty| *ty == Type::DATE, ty, out),
+            Value::Time(x) => bind_exact(x.as_deref(), "Time", |ty| *ty == Type::TIME, ty, out),
+            Value::DateTime(x) => bind_exact(x.as_deref(), "DateTime", is_timestamp, ty, out),
+            Value::DateTimeWithTimeZone(x) => {
+                bind_exact(x.as_deref(), "DateTimeWithTimeZone", is_timestamp, ty, out)
             }
-            Value::ChronoTime(x) => {
-                bind_exact(x.as_deref(), "ChronoTime", |ty| *ty == Type::TIME, ty, out)
-            }
-            Value::ChronoDateTime(x) => {
-                bind_exact(x.as_deref(), "ChronoDateTime", is_timestamp, ty, out)
-            }
-            Value::ChronoDateTimeUtc(x) => {
-                bind_exact(x.as_deref(), "ChronoDateTimeUtc", is_timestamp, ty, out)
-            }
-            Value::ChronoDateTimeLocal(x) => {
-                bind_exact(x.as_deref(), "ChronoDateTimeLocal", is_timestamp, ty, out)
-            }
-            Value::ChronoDateTimeWithTimeZone(x) => bind_exact(
-                x.as_deref(),
-                "ChronoDateTimeWithTimeZone",
-                is_timestamp,
-                ty,
-                out,
-            ),
             Value::Uuid(x) => bind_exact(x.as_deref(), "Uuid", |ty| *ty == Type::UUID, ty, out),
             Value::Decimal(x) => {
                 bind_exact(x.as_deref(), "Decimal", |ty| *ty == Type::NUMERIC, ty, out)
@@ -680,11 +664,9 @@ mod tests {
             (Value::Int(Some(1)), &Type::BOOL, "Int"),
             (Value::Double(Some(1.5)), &Type::TEXT, "Double"),
             (
-                Value::ChronoDate(Some(Box::new(
-                    chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("a real date"),
-                ))),
+                Value::Date(Some(Box::new(jiff::civil::date(2026, 1, 1)))),
                 &Type::TIMESTAMP,
-                "ChronoDate",
+                "Date",
             ),
             (
                 Value::IpNetwork(Some(Box::new(
@@ -710,34 +692,26 @@ mod tests {
         }
     }
 
-    /// `timestamp` and `timestamptz` share a representation, so every chrono
-    /// datetime variant binds against either.
+    /// `timestamp` and `timestamptz` share a representation, so both datetime
+    /// variants bind against either.
     // [spec:pgorm:req:exec.cursor.binding-accepts/test]
     #[test]
     fn binds_datetimes_to_either_timestamp_type() {
-        let naive = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)
-            .expect("a real date")
-            .and_hms_opt(0, 0, 1)
-            .expect("a real time");
+        let naive = jiff::civil::datetime(2000, 1, 1, 0, 0, 1, 0);
+        let instant: jiff::Timestamp = "2000-01-01T00:00:01Z".parse().expect("a real instant");
         let micros = 1_000_000i64.to_be_bytes();
 
         for ty in [&Type::TIMESTAMP, &Type::TIMESTAMPTZ] {
+            assert_eq!(bytes(Value::DateTime(Some(Box::new(naive))), ty), micros);
             assert_eq!(
-                bytes(Value::ChronoDateTime(Some(Box::new(naive))), ty),
-                micros
-            );
-            assert_eq!(
-                bytes(
-                    Value::ChronoDateTimeUtc(Some(Box::new(naive.and_utc()))),
-                    ty
-                ),
+                bytes(Value::DateTimeWithTimeZone(Some(Box::new(instant))), ty),
                 micros
             );
         }
 
         assert_eq!(
-            error(Value::ChronoDateTime(Some(Box::new(naive))), &Type::DATE),
-            "cannot bind a `ChronoDateTime` value to Postgres type `date`"
+            error(Value::DateTime(Some(Box::new(naive))), &Type::DATE),
+            "cannot bind a `DateTime` value to Postgres type `date`"
         );
     }
 

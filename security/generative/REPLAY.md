@@ -57,8 +57,9 @@ where a literal would lose information:
   format is IEEE bits precisely so NaN payloads and signed zero survive
 - bytes and MAC addresses are integer arrays, not string escapes
 - decimals, UUIDs, temporals and IP networks are parsed from canonical text
-- `NaiveDateTime` is parsed with an explicit format: chrono prints a space
-  separator but its `FromStr` demands a `T`, so `"…".parse()` would fail
+- temporals are re-rendered and compared against the text they were read from,
+  because the native parsers are permissive: they accept a basic-format date,
+  and they accept and then silently discard an offset on a civil type
 - enum values carry no `Value` variant; they emit as text plus the matching
   `cast_as_type(TypeName…)`, with `.array()` for enum arrays
 - every string reaching source — identifier or payload — goes through one Rust

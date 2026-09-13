@@ -113,8 +113,8 @@ schema-qualified `TypeName`, also for array elements.
 Declarations require the canonical decoded tags. For example, PostgreSQL
 `integer` produces `i32`; declaring it as `i64` is an error even if its value
 fits. PostgreSQL `timestamptz` produces UTC datetimes. The Value-only variants
-`u64`, Unicode `char`, `datetime_fixed` and `datetime_local` are not model column
-kinds because the Record decoder does not produce those tags. The full value
+`u64` and Unicode `char` are not model column kinds because the Record decoder
+does not produce those tags. The full value
 conversion limits remain in [VALUES.md](VALUES.md). The capability manifest
 records the model kinds and policies explicitly.
 

@@ -1,4 +1,3 @@
-import copy
 import unittest
 
 from pgorm_campaign import comparison as c, wire
@@ -44,13 +43,14 @@ class ComparisonTests(unittest.TestCase):
                 ).equal
             )
 
-    def test_temporal_spelling_preserves_type_and_offset(self):
-        a = row(wire.scalar("datetime_utc", "2024-01-02 03:04:05 UTC"))
-        b = row(wire.scalar("datetime_utc", "2024-01-02T03:04:05+00:00"))
+    def test_temporal_spelling_preserves_the_declared_kind(self):
+        a = row(wire.scalar("datetime_utc", "2024-01-02T03:04:05Z"))
+        b = row(wire.scalar("datetime_utc", "2024-01-02 03:04:05+00:00"))
         self.assertTrue(c.rows([a], [b], ordered=True).equal)
-        changed = copy.deepcopy(b)
-        changed["fields"][0]["value"]["type"]["kind"] = "datetime_fixed"
-        self.assertFalse(c.rows([a], [changed], ordered=True).equal)
+        # The tag is part of the key, so the same wall clock read as a naive
+        # value and as an instant stays two different observations.
+        naive = row(wire.scalar("datetime", "2024-01-02T03:04:05"))
+        self.assertFalse(c.rows([naive], [b], ordered=True).equal)
 
     def test_arbitrary_errors_do_not_satisfy_rejections(self):
         actual = {

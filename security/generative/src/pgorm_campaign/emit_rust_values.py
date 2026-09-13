@@ -25,12 +25,10 @@ VARIANTS = {
     "json": "Json",
     "decimal": "Decimal",
     "uuid": "Uuid",
-    "date": "ChronoDate",
-    "time": "ChronoTime",
-    "datetime": "ChronoDateTime",
-    "datetime_utc": "ChronoDateTimeUtc",
-    "datetime_local": "ChronoDateTimeLocal",
-    "datetime_fixed": "ChronoDateTimeWithTimeZone",
+    "date": "Date",
+    "time": "Time",
+    "datetime": "DateTime",
+    "datetime_utc": "DateTimeWithTimeZone",
     "ipnetwork": "IpNetwork",
     "mac_address": "MacAddress",
     "vector": "Vector",
@@ -48,7 +46,6 @@ TEMPORAL_PARSERS = {
     "time": "parse_time",
     "datetime": "parse_naive_datetime",
     "datetime_utc": "parse_datetime_utc",
-    "datetime_fixed": "parse_datetime_fixed",
 }
 
 
@@ -203,12 +200,6 @@ class ValueEmitter:
         if kind in TEMPORAL_PARSERS:
             text = literal(wire.temporal_text(data))
             return f"Box::new({REPLAY}::wire::{TEMPORAL_PARSERS[kind]}({text})?)"
-        if kind == "datetime_local":
-            text = literal(wire.temporal_text(data))
-            return (
-                f"Box::new({PRELUDE}::DateTimeLocal::from("
-                f"{REPLAY}::wire::parse_datetime_fixed({text})?))"
-            )
         if kind == "vector":
             items = ", ".join(f"f32::from_bits(0x{item}u32)" for item in data)
             return f"Box::new({PRELUDE}::Vector::from(vec![{items}]))"

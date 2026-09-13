@@ -22,8 +22,6 @@ def carrier(tag):
     mapping = {
         "i8": "i16",
         "char": "text",
-        "datetime_fixed": "datetime_utc",
-        "datetime_local": "datetime_utc",
     }
     return {"kind": mapping[tag["kind"]]} if tag["kind"] in mapping else tag
 

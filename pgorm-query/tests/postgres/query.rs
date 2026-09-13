@@ -1156,10 +1156,7 @@ fn insert_4() {
         Query::insert()
             .into_table(Glyph::Table)
             .columns([Glyph::Image])
-            .values_panic([chrono::DateTime::from_timestamp(0, 0)
-                .unwrap()
-                .naive_utc()
-                .into()])
+            .values_panic([jiff::civil::datetime(1970, 1, 1, 0, 0, 0, 0).into()])
             .to_string(),
         "INSERT INTO \"glyph\" (\"image\") VALUES ('1970-01-01 00:00:00')"
     );

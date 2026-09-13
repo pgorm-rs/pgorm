@@ -2,8 +2,8 @@
 
 pub mod common;
 
-use chrono::offset::Utc;
 use common::{TestContext, bakery_chain::*, setup::*};
+use jiff::{Timestamp, tz::Offset};
 use pgorm::{DatabaseConnection, FromQueryResult, entity::*, query::*, set};
 use rust_decimal::prelude::*;
 use uuid::Uuid;
@@ -105,7 +105,7 @@ async fn seed_data(db: &DatabaseConnection) {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(99.95)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -234,7 +234,7 @@ async fn create_order(db: &DatabaseConnection, cake: cake::Model) {
         bakery_id: set(cake.bakery_id.unwrap()),
         customer_id: set(another_customer.id),
         total: set(rust_dec(200.00)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }

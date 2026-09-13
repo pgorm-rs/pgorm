@@ -61,7 +61,7 @@ pub mod account {
         pub payload: Json,
         pub uuid: Uuid,
         pub created_at: DateTime,
-        pub occurred_at: DateTimeUtc,
+        pub occurred_at: DateTimeWithTimeZone,
         pub event_date: Date,
         pub event_time: Time,
         pub state: State,

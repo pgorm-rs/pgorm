@@ -1,4 +1,7 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use jiff::{
+    Timestamp,
+    civil::{Date, DateTime, Time},
+};
 use pgorm::pgorm_query::{ArrayType, Value, Vector};
 use pyo3::prelude::*;
 use tokio_postgres::{
@@ -7,7 +10,7 @@ use tokio_postgres::{
 };
 use uuid::Uuid;
 
-use super::codecs::{CheckedArray, EnumLabel, ExactDecimal, ExactTime, Inet, Mac};
+use super::codecs::{CheckedArray, EnumLabel, ExactDecimal, Inet, Mac};
 use super::json::ExactJson;
 use crate::{
     errors::DecodeError,
@@ -84,12 +87,12 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
             Value::Json(v.map(|v| Box::new(v.0)))
         }),
         Type::UUID => boxed!(Uuid, Uuid),
-        Type::DATE => boxed!(NaiveDate, ChronoDate),
-        Type::TIME => typed::<ExactTime>(row, index, array, ArrayType::ChronoTime, |v| {
-            Value::ChronoTime(v.map(|v| Box::new(v.0)))
-        }),
-        Type::TIMESTAMP => boxed!(NaiveDateTime, ChronoDateTime),
-        Type::TIMESTAMPTZ => boxed!(DateTime<Utc>, ChronoDateTimeUtc),
+        Type::DATE => boxed!(Date, Date),
+        // The driver's civil-time codec already refuses PostgreSQL 24:00:00 and
+        // every other value outside a civil day, so no exactness wrapper is needed.
+        Type::TIME => boxed!(Time, Time),
+        Type::TIMESTAMP => boxed!(DateTime, DateTime),
+        Type::TIMESTAMPTZ => boxed!(Timestamp, DateTimeWithTimeZone),
         Type::NUMERIC => typed::<ExactDecimal>(row, index, array, ArrayType::Decimal, |v| {
             Value::Decimal(v.map(|v| Box::new(v.0)))
         }),

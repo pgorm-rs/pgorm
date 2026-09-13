@@ -42,7 +42,12 @@ A value uses the native inspection layout: `version`, `type`, `sql_null` and
 deserializer to the public Python API. Signed/unsigned integers use exact
 decimal text, floats use IEEE hexadecimal bits, bytes use integer byte arrays,
 and decimals preserve coefficient, sign and scale. Temporal data retains native
-Chrono text or exact ISO text; precision that Python cannot retain is rejected.
+RFC 3339 text or exact ISO text; precision that Python cannot retain is
+rejected. The four temporal kinds are `date`, `time`, `datetime` (naive) and
+`datetime_utc`, which is an instant and therefore requires a zero offset; a
+non-zero offset is rejected rather than converted. No kind carries an offset,
+so the campaign asserts nothing about non-UTC offsets — an accepted gap, since
+PostgreSQL preserves the instant and never stored the offset either.
 Enum tags carry the schema and type name; array elements retain their full
 tags, including SQL NULL and JSON null as distinct values.
 

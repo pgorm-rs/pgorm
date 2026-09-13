@@ -1,6 +1,6 @@
 """Check portable value records against every installed native scalar tag."""
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 import hashlib
 import json
@@ -37,10 +37,6 @@ def main():
         "time": time(3, 4, 5, 123000),
         "datetime": datetime(2024, 1, 2, 3, 4, 5, 123456),
         "datetime_utc": datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
-        "datetime_fixed": datetime(
-            2024, 1, 2, 3, 4, 5, 123000, tzinfo=timezone(timedelta(hours=2))
-        ),
-        "datetime_local": datetime.now().astimezone(),
         "ipnetwork": "192.0.2.129/24",
         "mac_address": b"\x00\x11\x22\x33\x44\xff",
         "vector": [1.5, -0.0],

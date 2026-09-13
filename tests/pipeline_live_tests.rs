@@ -14,9 +14,9 @@
 
 pub mod common;
 
-pub use chrono::offset::Utc;
 use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
+pub use jiff::{Timestamp, tz::Offset};
 use pgorm::pipeline::{
     AliasName, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows, row_number,
     sort_by, sum,
@@ -119,7 +119,7 @@ async fn seed(db: &impl ConnectionTrait) -> Seeded {
                 bakery_id: set(bakery.id),
                 customer_id: set(customer.id),
                 total: set(rust_dec(total)),
-                placed_at: set(Utc::now().naive_utc()),
+                placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
                 ..Default::default()
             }
             .insert(db)

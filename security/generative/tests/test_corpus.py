@@ -14,7 +14,7 @@ from pgorm_campaign.corpus_random import sample
 class CorpusTests(unittest.TestCase):
     def test_required_boundaries_preserve_tags_and_bytes(self):
         cases = builtin()
-        self.assertEqual(len(cases), 308)
+        self.assertEqual(len(cases), 293)
         self.assertEqual(len({case.data()["id"] for case in cases}), len(cases))
         self.assertTrue(set(STRINGS) <= {case.data()["family"] for case in cases})
         values = [wire.validate(case.value()) for case in cases]
@@ -94,7 +94,7 @@ class CorpusTests(unittest.TestCase):
         values = [sample(123, index) for index in range(1000)]
         self.assertEqual(
             sha256(b"".join(encoded(item.data()) for item in values)).hexdigest(),
-            "fe41fe1bdb11f15802f23e59d39f2d906cfa8f748d9cdcd00e2375f546295ac4",
+            "04cb9a03a020329092e7924cc98dd26798cb18ca41d8984a10e39a3f1e22efa7",
         )
         self.assertEqual(
             list(reversed(values)),

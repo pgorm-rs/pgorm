@@ -86,7 +86,7 @@ class ModelConstruction(unittest.TestCase):
         ):
             with self.assertRaises(p.ConstructionError):
                 operation()
-        for kind in ("u64", "char", "datetime_fixed", "datetime_local", "made-up"):
+        for kind in ("u64", "char", "made-up"):
             with (
                 self.subTest(kind=kind),
                 self.assertRaises(p.UnsupportedCapabilityError),

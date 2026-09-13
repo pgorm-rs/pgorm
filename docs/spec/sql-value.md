@@ -16,10 +16,9 @@ including panic semantics and quirks inherited from sea-query.
 > `BigInt(i64)`, `Unsigned(u32)`, `BigUnsigned(u64)`, `Float(f32)`,
 > `Double(f64)`, `String(Box<String>)`,
 > `Char(char)`, `Bytes(Box<Vec<u8>>)`, `Json(Box<serde_json::Value>)`,
-> `ChronoDate(Box<NaiveDate>)`, `ChronoTime(Box<NaiveTime>)`,
-> `ChronoDateTime(Box<NaiveDateTime>)`, `ChronoDateTimeUtc(Box<DateTime<Utc>>)`,
-> `ChronoDateTimeLocal(Box<DateTime<Local>>)`,
-> `ChronoDateTimeWithTimeZone(Box<DateTime<FixedOffset>>)`, `Uuid(Box<Uuid>)`,
+> `Date(Box<civil::Date>)`, `Time(Box<civil::Time>)`,
+> `DateTime(Box<civil::DateTime>)`,
+> `DateTimeWithTimeZone(Box<jiff::Timestamp>)`, `Uuid(Box<Uuid>)`,
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)` and
 > `MacAddress(Box<MacAddress>)`.
@@ -33,14 +32,14 @@ including panic semantics and quirks inherited from sea-query.
 > `BigUnsigned` (u64) is how `LIMIT`/`OFFSET` counts reach the builder.
 >
 > Unlike upstream sea-query, none of these variants are feature-gated in this
-> fork: chrono, serde_json, rust_decimal, uuid, ipnetwork, mac_address and
+> fork: jiff, serde_json, rust_decimal, uuid, ipnetwork, mac_address and
 > pgvector are unconditional dependencies of `pgorm-query`, so every variant is
 > always compiled in.
 >
 > There is no `Value` → `serde_json::Value` conversion. The inherited
 > `sea_value_to_json_value` MUST NOT exist, under that name or any other: it
-> had no in-tree caller, panicked on non-UTF-8 `Bytes`, turned a chrono `None`
-> into the JSON string `"NULL"` rather than JSON null, and rendered a chrono
+> had no in-tree caller, panicked on non-UTF-8 `Bytes`, turned a temporal `None`
+> into the JSON string `"NULL"` rather than JSON null, and rendered a temporal
 > payload as its quoted SQL literal — answers wrong often enough that reviving
 > it would be a defect rather than a restoration.
 >
@@ -84,10 +83,9 @@ including panic semantics and quirks inherited from sea-query.
 > `NaiveDate`, `NaiveTime`, `NaiveDateTime`, `Decimal`, `Uuid`, `IpNetwork`,
 > `MacAddress` and `pgvector::Vector` convert to their same-named variants.
 >
-> `DateTime<Utc>` and `DateTime<Local>` map to `ChronoDateTimeUtc` /
-> `ChronoDateTimeLocal` directly. `DateTime<FixedOffset>` is rebuilt via
-> `DateTime::from_naive_utc_and_offset(x.naive_utc(), x.offset().fix())` before
-> boxing into `ChronoDateTimeWithTimeZone`. The `uuid::fmt` wrapper types
+> `jiff::Timestamp` maps to `DateTimeWithTimeZone`. It carries an absolute
+> instant and no offset, which is what `timestamptz` stores, so there is no
+> offset-bearing spelling to normalize. The `uuid::fmt` wrapper types
 > (`Braced`, `Hyphenated`, `Simple`, `Urn`) convert into the plain `Uuid`
 > variant via `into_uuid()`; converting back out re-applies the corresponding
 > format accessor.
@@ -109,8 +107,7 @@ including panic semantics and quirks inherited from sea-query.
 > generation (e.g. `String`→`String(StringLen::None)`, `Vec<u8>`→`Bytea`,
 > `char`→`Char(None)`, `Decimal`→`Decimal(None)`, `i8`/`i16`→`SmallInteger`,
 > `u32`/`u64`→`BigInteger` — the `int8` those values bind as —
-> `NaiveDateTime`→`Timestamp`,
-> `DateTime<Utc>`/`Local`/`FixedOffset`→`TimestampWithTimeZone`,
+> `civil::DateTime`→`Timestamp`, `jiff::Timestamp`→`TimestampWithTimeZone`,
 > `IpNetwork`→`Inet`, `MacAddress`→`MacAddr`, `Vector`→`Vector(None)`). The
 > `ColumnType` a Rust type maps to MUST be one Postgres actually has: no
 > mapping may name a width or signedness the server will not honour.
@@ -127,7 +124,7 @@ including panic semantics and quirks inherited from sea-query.
 > `not Value::Json` on a variant other than its own.)
 >
 > The `is_*`/`as_ref_*` pairs are `is_json`/`as_ref_json`,
-> `is_chrono_date`/`as_ref_chrono_date` and the other five chrono accessors,
+> `is_date`/`as_ref_date` and the other three temporal accessors,
 > `is_decimal`/`as_ref_decimal`, `is_uuid`/`as_ref_uuid`,
 > `is_array`/`as_ref_array`, `is_ipnetwork`/`as_ref_ipnetwork` and
 > `is_mac_address`/`as_ref_mac_address`. Each `as_ref_*` returns `Option<&T>`
@@ -139,9 +136,9 @@ including panic semantics and quirks inherited from sea-query.
 > `ValueType::try_from` is the typed extraction that reports a mismatch as
 > `ValueTypeError`.
 >
-> `chrono_as_naive_utc_in_string` stringifies any non-NULL chrono variant, in
+> `as_naive_utc_in_string` stringifies any non-NULL temporal variant, in
 > the UTC-naive form for the three zoned ones, and returns `None` for both a
-> NULL chrono variant and a non-chrono one. `as_ipaddr` returns the network
+> NULL temporal variant and a non-temporal one. `as_ipaddr` returns the network
 > address of a non-NULL `IpNetwork` and `None` otherwise. `decimal_to_f64`
 > returns the payload of a non-NULL `Decimal` through `to_f64`, and `None` if
 > the value is not a `Decimal`, is NULL, or has no `f64` representation.
@@ -151,7 +148,7 @@ including panic semantics and quirks inherited from sea-query.
 > [spec:pgorm:def:sql.value.array+4]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
-> chrono tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
+> temporal tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
 > no nested-array tag. `ValueType::array_type()` is total — `pgvector::Vector`
 > answers `ArrayType::Vector` rather than panicking — but `Vector` does not
 > implement `NotU8`, so `Vec<Vector>` has no `From`/`ValueType` impl and the tag
@@ -222,7 +219,7 @@ including panic semantics and quirks inherited from sea-query.
 > `NULL`; booleans as `TRUE`/`FALSE`; numerics and `Decimal` in plain decimal
 > form. Strings and chars are single-quoted after `escape_string`, switching
 > to the `E'...'` form when the escaped text contains a backslash. `Bytes`
-> renders as `'\xHEX...'`. Chrono values render quoted with formats
+> renders as `'\xHEX...'`. Temporal values render quoted with formats
 > `%Y-%m-%d`, `%H:%M:%S`, `%Y-%m-%d %H:%M:%S` and, for the zoned variants,
 > `%Y-%m-%d %H:%M:%S %:z`. `Uuid`, `IpNetwork` and `MacAddress` render as
 > quoted display strings. `Array` renders as `ARRAY [elem,...]` recursively

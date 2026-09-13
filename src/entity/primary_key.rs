@@ -237,9 +237,9 @@ mod tests {
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_8: DateTime,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_9: DateTimeLocal,
+                pub id_9: DateTimeWithTimeZone,
                 #[pgorm(primary_key, auto_increment = false)]
-                pub id_10: DateTimeUtc,
+                pub id_10: DateTimeWithTimeZone,
                 #[pgorm(primary_key, auto_increment = false)]
                 pub id_11: DateTimeWithTimeZone,
                 pub owner: String,

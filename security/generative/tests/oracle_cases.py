@@ -113,8 +113,6 @@ def type_cases(*, finite=False):
         ("time", "03:04:05.123456", "time"),
         ("datetime", "2024-01-02 03:04:05.123456", "timestamp"),
         ("datetime_utc", "2024-01-02 03:04:05.123456+00:00", "timestamptz"),
-        ("datetime_fixed", "2024-01-02 03:04:05.123456+02:30", "timestamptz"),
-        ("datetime_local", "2024-01-02 03:04:05.123456+01:00", "timestamptz"),
         ("ipnetwork", "192.0.2.129/24", "inet"),
         ("mac_address", [0, 17, 34, 51, 68, 255], "macaddr"),
     ]

@@ -3,33 +3,12 @@
 use std::error::Error;
 
 use bytes::BytesMut;
-use chrono::NaiveTime;
 use fallible_iterator::FallibleIterator;
 use pgorm::pgorm_query::{IpNetwork, MacAddress};
 use rust_decimal::Decimal;
 use tokio_postgres::types::{FromSql, Kind, ToSql, Type};
 
 type CodecError = Box<dyn Error + Send + Sync>;
-
-/// NaiveTime's driver codec wraps PostgreSQL 24:00:00 to midnight.
-#[derive(Debug)]
-pub(super) struct ExactTime(pub NaiveTime);
-
-impl<'a> FromSql<'a> for ExactTime {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
-        let time = NaiveTime::from_sql(ty, raw)?;
-        let mut encoded = BytesMut::new();
-        time.to_sql(ty, &mut encoded)?;
-        if raw != encoded.as_ref() {
-            return Err("time cannot be represented exactly by Rust NaiveTime".into());
-        }
-        Ok(Self(time))
-    }
-
-    fn accepts(ty: &Type) -> bool {
-        <NaiveTime as FromSql>::accepts(ty)
-    }
-}
 
 /// The upstream Decimal decoder can round. Accept only exact values and scale.
 // [spec:pgorm:req:python.results]

@@ -1002,12 +1002,10 @@ impl QueryBuilder {
             | Value::Char(None)
             | Value::Bytes(None) => write!(s, "NULL").unwrap(),
             Value::Json(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoDate(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoTime(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoDateTime(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoDateTimeUtc(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoDateTimeLocal(None) => write!(s, "NULL").unwrap(),
-            Value::ChronoDateTimeWithTimeZone(None) => write!(s, "NULL").unwrap(),
+            Value::Date(None) => write!(s, "NULL").unwrap(),
+            Value::Time(None) => write!(s, "NULL").unwrap(),
+            Value::DateTime(None) => write!(s, "NULL").unwrap(),
+            Value::DateTimeWithTimeZone(None) => write!(s, "NULL").unwrap(),
             Value::Decimal(None) => write!(s, "NULL").unwrap(),
             Value::Uuid(None) => write!(s, "NULL").unwrap(),
             Value::IpNetwork(None) => write!(s, "NULL").unwrap(),
@@ -1027,19 +1025,16 @@ impl QueryBuilder {
             Value::Char(Some(v)) => self.write_string_quoted(v.encode_utf8(&mut [0u8; 4]), &mut s),
             Value::Bytes(Some(v)) => self.write_bytes(v, &mut s),
             Value::Json(Some(v)) => self.write_string_quoted(&v.to_string(), &mut s),
-            Value::ChronoDate(Some(v)) => write!(s, "'{}'", v.format("%Y-%m-%d")).unwrap(),
-            Value::ChronoTime(Some(v)) => write!(s, "'{}'", v.format("%H:%M:%S")).unwrap(),
-            Value::ChronoDateTime(Some(v)) => {
-                write!(s, "'{}'", v.format("%Y-%m-%d %H:%M:%S")).unwrap()
-            }
-            Value::ChronoDateTimeUtc(Some(v)) => {
-                write!(s, "'{}'", v.format("%Y-%m-%d %H:%M:%S %:z")).unwrap()
-            }
-            Value::ChronoDateTimeLocal(Some(v)) => {
-                write!(s, "'{}'", v.format("%Y-%m-%d %H:%M:%S %:z")).unwrap()
-            }
-            Value::ChronoDateTimeWithTimeZone(Some(v)) => {
-                write!(s, "'{}'", v.format("%Y-%m-%d %H:%M:%S %:z")).unwrap()
+            // Each format string asks only for fields its own payload holds.
+            // `strftime` formats leniently: a directive the value cannot fill
+            // is copied into the output verbatim, so `%:z` against a civil type
+            // would render the literal `'... %:z'` — well-formed Rust, malformed
+            // SQL, and no error anywhere. Only the instant carries an offset.
+            Value::Date(Some(v)) => write!(s, "'{}'", v.strftime("%Y-%m-%d")).unwrap(),
+            Value::Time(Some(v)) => write!(s, "'{}'", v.strftime("%H:%M:%S")).unwrap(),
+            Value::DateTime(Some(v)) => write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S")).unwrap(),
+            Value::DateTimeWithTimeZone(Some(v)) => {
+                write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S %:z")).unwrap()
             }
             Value::Decimal(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Uuid(Some(v)) => write!(s, "'{v}'").unwrap(),

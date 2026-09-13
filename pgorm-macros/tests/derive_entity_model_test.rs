@@ -68,8 +68,6 @@ mod scalars {
         pub d: Date,
         pub t: Time,
         pub dt: DateTime,
-        pub dtu: DateTimeUtc,
-        pub dtl: DateTimeLocal,
         pub dttz: DateTimeWithTimeZone,
         pub uid: Uuid,
         pub js: Json,
@@ -311,7 +309,7 @@ fn one_derive_yields_the_whole_entity_module() {
         name: "raspberry".to_owned(),
         vendor_id: None,
         weight: 3,
-        baked_on: Date::from_ymd_opt(2024, 1, 1).unwrap(),
+        baked_on: Date::new(2024, 1, 1).unwrap(),
         sku: "RB-1".to_owned(),
         original: 7,
         casted: "x".to_owned(),
@@ -466,8 +464,6 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::D.def(), ColumnType::Date.def());
     assert_eq!(C::T.def(), ColumnType::Time.def());
     assert_eq!(C::Dt.def(), ColumnType::Timestamp.def());
-    assert_eq!(C::Dtu.def(), ColumnType::TimestampWithTimeZone.def());
-    assert_eq!(C::Dtl.def(), ColumnType::TimestampWithTimeZone.def());
     assert_eq!(C::Dttz.def(), ColumnType::TimestampWithTimeZone.def());
     assert_eq!(C::Uid.def(), ColumnType::Uuid.def());
     assert_eq!(C::Js.def(), ColumnType::Json.def());
@@ -581,7 +577,7 @@ fn derive_entity_wires_up_the_entity_trait() {
         name: String::new(),
         vendor_id: None,
         weight: 0,
-        baked_on: Date::from_ymd_opt(2024, 1, 1).unwrap(),
+        baked_on: Date::new(2024, 1, 1).unwrap(),
         sku: String::new(),
         original: 0,
         casted: String::new(),

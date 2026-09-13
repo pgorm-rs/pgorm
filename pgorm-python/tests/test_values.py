@@ -21,7 +21,6 @@ def bits(value):
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
         instant = dt.datetime(2024, 2, 29, 13, 14, 15, 123456)
-        local = instant.astimezone()
         cases = {
             "bool": True, "i8": -128, "i16": -32768, "i32": -(2**31),
             "i64": -(2**63), "u32": 2**32 - 1, "u64": 2**64 - 1,
@@ -31,8 +30,6 @@ class ValueTests(unittest.TestCase):
             "uuid": UUID("f71dc341-54bc-4e7b-ae7b-1a60aa3b37b4"),
             "date": instant.date(), "time": instant.time(), "datetime": instant,
             "datetime_utc": instant.replace(tzinfo=dt.timezone.utc),
-            "datetime_local": local,
-            "datetime_fixed": instant.replace(tzinfo=dt.timezone(dt.timedelta(seconds=3723))),
             "ipnetwork": "192.0.2.7/24", "mac_address": b"\x00\x01\x02\x03\xfe\xff",
             "vector": [1.5, -0.0, float("inf")],
         }
@@ -162,22 +159,31 @@ class ValueTests(unittest.TestCase):
 
     def test_temporal_policies_are_explicit(self):
         naive = dt.datetime(2024, 11, 3, 1, 30, 0, 999999)
+        utc = naive.replace(tzinfo=dt.timezone.utc)
+        aware = Value(utc, "datetime_utc")
+        self.assertEqual(aware.value, utc)
+        self.assertEqual(aware.value.utcoffset(), dt.timedelta(0))
+        self.assertEqual(Value(aware.value, "datetime_utc"), aware)
+        # An offset is validated, never stored, so a caller converts in Python.
+        # This ambiguous local time resolves to two instants; both survive.
+        instants = set()
         for fold in [0, 1]:
             eastern = naive.replace(tzinfo=ZoneInfo("America/New_York"), fold=fold)
-            fixed = Value(eastern, "datetime_fixed")
-            self.assertEqual(fixed.value.isoformat(), eastern.isoformat())
-            self.assertEqual(fixed.value.timestamp(), eastern.timestamp())
-            self.assertEqual(Value(fixed.value, "datetime_fixed"), fixed)
-        utc = naive.replace(tzinfo=dt.timezone.utc)
-        self.assertNotEqual(Value(utc, "datetime_utc"), Value(utc, "datetime_fixed"))
+            converted = Value(eastern.astimezone(dt.timezone.utc), "datetime_utc")
+            self.assertEqual(converted.value.timestamp(), eastern.timestamp())
+            instants.add(converted.value)
+        self.assertEqual(len(instants), 2)
         for data, kind in [(utc, "datetime"), (naive, "datetime_utc"),
                            (naive.replace(fold=1), "datetime"),
                            (eastern, "datetime_utc"), (utc, "date"),
                            (dt.time(tzinfo=dt.timezone.utc), "time"),
-                           (utc.replace(tzinfo=dt.timezone(dt.timedelta(microseconds=1))), "datetime_fixed")]:
+                           (utc.replace(tzinfo=dt.timezone(dt.timedelta(microseconds=1))), "datetime_utc")]:
             with self.subTest(kind=kind, value=data):
                 with self.assertRaises(ConstructionError):
                     Value(data, kind)
+        for retired in ("datetime_fixed", "datetime_local"):
+            with self.subTest(kind=retired), self.assertRaises(ConstructionError):
+                Value(utc, retired)
         with self.assertRaises(ConstructionError):
             Value(utc)
 

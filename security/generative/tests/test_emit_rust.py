@@ -1,7 +1,8 @@
 import re
 import unittest
+from pathlib import Path
 
-from pgorm_campaign import baseline, emit_rust
+from pgorm_campaign import baseline, emit_rust, emit_rust_expr
 from pgorm_campaign.author import Author
 from pgorm_campaign.grammar import FAMILIES, generate
 
@@ -30,6 +31,9 @@ def unescape(literal):
 
 def literals(source):
     return {unescape(match.group(0)) for match in LITERAL.finditer(source)}
+
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def supported(family, limit=8):
@@ -278,6 +282,19 @@ class EmitRustTests(unittest.TestCase):
                 continue
             seen.append((identity, operation))
         self.assertEqual(seen, [(step["id"], step["op"]) for step in steps])
+
+    def test_schema_types_name_real_column_variants(self):
+        # Every entry is emitted as `ColumnType::<name>`, so a name the enum
+        # does not carry compiles to nothing. The suite generates schema
+        # programs rarely enough that a wrong entry can sit latent for a long
+        # time, which is exactly why this is checked against the enum itself.
+        source = (ROOT / "pgorm-query/src/table/column.rs").read_text()
+        body = source.split("pub enum ColumnType {", 1)[1].split("\n}", 1)[0]
+        variants = set(re.findall(r"^ {4}([A-Z]\w*)", body, re.M))
+        self.assertIn("Timestamp", variants)
+        for kind, named in emit_rust_expr.SCHEMA_TYPES.items():
+            with self.subTest(kind=kind):
+                self.assertIn(named.split("(")[0], variants)
 
     def test_render_accepts_program_dict_and_text(self):
         program = supported("types")

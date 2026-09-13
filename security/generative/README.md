@@ -129,8 +129,10 @@ Literal reference values remain bound, with independent PostgreSQL type
 inference for integers, finite floats, decimals, unknown strings/NULLs and
 arrays. Literal temporal values follow the whole-second conversion explicitly
 specified by `sql.render.value-literals+2`; bound temporal values retain their
-fractional seconds. This conversion happens in the reference semantics, never
-in result comparison. Ordinary and pipeline float literals have separate type
+fractional seconds, down to the microsecond the wire format admits and no
+further — finer precision is rejected at the boundary rather than rounded, so a
+library's rounding rule can never be mistaken for a pgorm defect. This
+conversion happens in the reference semantics, never in result comparison. Ordinary and pipeline float literals have separate type
 inference rules (for example, inline SQL `1` versus pipeline `1.0`).
 
 Pipeline sort keys survive filtering, projection, take, joins and embedded

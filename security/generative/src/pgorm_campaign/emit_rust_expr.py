@@ -31,14 +31,14 @@ SCHEMA_TYPES = {
     "f32": "Float",
     "f64": "Double",
     "bool": "Boolean",
-    "bytes": "Binary",
+    "bytes": "Bytea",
     "decimal": "Decimal(None)",
     "json": "JsonBinary",
     "text": "Text",
     "uuid": "Uuid",
     "date": "Date",
     "time": "Time",
-    "timestamp": "DateTime",
+    "timestamp": "Timestamp",
     "timestamptz": "TimestampWithTimeZone",
 }
 JOIN_TYPES = {

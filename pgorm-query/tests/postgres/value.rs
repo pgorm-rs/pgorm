@@ -3,7 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-use chrono::{DateTime, NaiveDate};
+use jiff::Timestamp;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -271,7 +271,7 @@ fn try_from_errors_on_a_null_payload() {
 #[test]
 fn as_ref_accessors_return_none_on_typed_null() {
     assert!(Value::Json(None).as_ref_json().is_none());
-    assert!(Value::ChronoDate(None).as_ref_chrono_date().is_none());
+    assert!(Value::Date(None).as_ref_date().is_none());
     assert!(Value::Decimal(None).as_ref_decimal().is_none());
     assert!(Value::Uuid(None).as_ref_uuid().is_none());
     assert!(Value::Array(ArrayType::Int, None).as_ref_array().is_none());
@@ -302,34 +302,27 @@ fn as_ref_uuid_returns_none_on_another_variant() {
     assert!(!Value::Int(Some(1)).is_uuid());
 }
 
-// [spec:pgorm:sem:sql.value.accessor-panics+2/test]    chrono accessor stringifies the UTC-naive form
+// [spec:pgorm:sem:sql.value.accessor-panics+2/test]    the accessor stringifies the UTC-naive form
 #[test]
 fn as_naive_utc_in_string_uses_naive_form() {
-    let zoned = DateTime::parse_from_rfc3339("2020-01-01T02:02:02+08:00").unwrap();
+    let instant: Timestamp = "2020-01-01T02:02:02+08:00".parse().unwrap();
     assert_eq!(
-        Value::ChronoDateTimeWithTimeZone(Some(Box::new(zoned))).chrono_as_naive_utc_in_string(),
-        Some("2019-12-31 18:02:02".to_owned())
+        Value::DateTimeWithTimeZone(Some(Box::new(instant))).as_naive_utc_in_string(),
+        Some("2019-12-31T18:02:02".to_owned())
     );
 
-    let date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+    let date = jiff::civil::date(2020, 1, 1);
     assert_eq!(
-        Value::ChronoDate(Some(Box::new(date))).chrono_as_naive_utc_in_string(),
+        Value::Date(Some(Box::new(date))).as_naive_utc_in_string(),
         Some("2020-01-01".to_owned())
     );
-    assert_eq!(
-        Value::ChronoDate(None).chrono_as_naive_utc_in_string(),
-        None
-    );
+    assert_eq!(Value::Date(None).as_naive_utc_in_string(), None);
 }
 
 // [spec:pgorm:sem:sql.value.accessor-panics+2/test]
 #[test]
-fn chrono_as_naive_utc_none_on_other_variant() {
-    assert!(
-        Value::Int(Some(1))
-            .chrono_as_naive_utc_in_string()
-            .is_none()
-    );
+fn as_naive_utc_none_on_other_variant() {
+    assert!(Value::Int(Some(1)).as_naive_utc_in_string().is_none());
 }
 
 // [spec:pgorm:sem:sql.value.accessor-panics+2/test]    `as_ipaddr` returns the network address

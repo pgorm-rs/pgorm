@@ -4,7 +4,11 @@ use std::{borrow::Cow, hash::Hash};
 
 use serde_json::Value as Json;
 
-use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use jiff::{
+    Timestamp,
+    civil::{Date, DateTime, Time},
+    tz::Offset,
+};
 
 use rust_decimal::Decimal;
 
@@ -39,17 +43,13 @@ pub enum ArrayType {
 
     Json,
 
-    ChronoDate,
+    Date,
 
-    ChronoTime,
+    Time,
 
-    ChronoDateTime,
+    DateTime,
 
-    ChronoDateTimeUtc,
-
-    ChronoDateTimeLocal,
-
-    ChronoDateTimeWithTimeZone,
+    DateTimeWithTimeZone,
 
     Uuid,
 
@@ -89,17 +89,16 @@ pub enum Value {
 
     Json(Option<Box<Json>>),
 
-    ChronoDate(Option<Box<NaiveDate>>),
+    Date(Option<Box<Date>>),
 
-    ChronoTime(Option<Box<NaiveTime>>),
+    Time(Option<Box<Time>>),
 
-    ChronoDateTime(Option<Box<NaiveDateTime>>),
+    DateTime(Option<Box<DateTime>>),
 
-    ChronoDateTimeUtc(Option<Box<DateTime<Utc>>>),
-
-    ChronoDateTimeLocal(Option<Box<DateTime<Local>>>),
-
-    ChronoDateTimeWithTimeZone(Option<Box<DateTime<FixedOffset>>>),
+    /// An absolute instant, for `timestamptz`. PostgreSQL normalizes to UTC on
+    /// write and never stores the offset it was given, so the value carries
+    /// none either.
+    DateTimeWithTimeZone(Option<Box<Timestamp>>),
 
     Uuid(Option<Box<Uuid>>),
 
@@ -264,12 +263,10 @@ impl Value {
             Self::String(_) => Some(Cow::Borrowed("text")),
             Self::Char(_) => Some(Cow::Borrowed("text")),
             Self::Bytes(_) => Some(Cow::Borrowed("bytea")),
-            Self::ChronoDate(_) => Some(Cow::Borrowed("date")),
-            Self::ChronoTime(_) => Some(Cow::Borrowed("time")),
-            Self::ChronoDateTime(_) => Some(Cow::Borrowed("timestamp")),
-            Self::ChronoDateTimeUtc(_) => Some(Cow::Borrowed("timestamptz")),
-            Self::ChronoDateTimeLocal(_) => Some(Cow::Borrowed("timestamptz")),
-            Self::ChronoDateTimeWithTimeZone(_) => Some(Cow::Borrowed("timestamptz")),
+            Self::Date(_) => Some(Cow::Borrowed("date")),
+            Self::Time(_) => Some(Cow::Borrowed("time")),
+            Self::DateTime(_) => Some(Cow::Borrowed("timestamp")),
+            Self::DateTimeWithTimeZone(_) => Some(Cow::Borrowed("timestamptz")),
             Self::Uuid(_) => Some(Cow::Borrowed("uuid")),
             Self::Decimal(_) => Some(Cow::Borrowed("numeric")),
             Self::IpNetwork(_) => Some(Cow::Borrowed("inet")),
@@ -297,12 +294,10 @@ impl ArrayType {
             Self::String => Some("text"),
             Self::Char => Some("text"),
             Self::Bytes => Some("bytea"),
-            Self::ChronoDate => Some("date"),
-            Self::ChronoTime => Some("time"),
-            Self::ChronoDateTime => Some("timestamp"),
-            Self::ChronoDateTimeUtc => Some("timestamptz"),
-            Self::ChronoDateTimeLocal => Some("timestamptz"),
-            Self::ChronoDateTimeWithTimeZone => Some("timestamptz"),
+            Self::Date => Some("date"),
+            Self::Time => Some("time"),
+            Self::DateTime => Some("timestamp"),
+            Self::DateTimeWithTimeZone => Some("timestamptz"),
             Self::Uuid => Some("uuid"),
             Self::Decimal => Some("numeric"),
             Self::IpNetwork => Some("inet"),
@@ -500,108 +495,41 @@ mod with_json {
     type_to_box_value!(Json, Json, Json);
 }
 
-mod with_chrono {
+mod with_jiff {
     use super::*;
-    use chrono::{Local, Offset, Utc};
 
-    type_to_box_value!(NaiveDate, ChronoDate, Date);
-    type_to_box_value!(NaiveTime, ChronoTime, Time);
-    type_to_box_value!(NaiveDateTime, ChronoDateTime, Timestamp);
+    type_to_box_value!(Date, Date, Date);
+    type_to_box_value!(Time, Time, Time);
+    type_to_box_value!(DateTime, DateTime, Timestamp);
 
-    impl From<DateTime<Utc>> for Value {
-        fn from(v: DateTime<Utc>) -> Value {
-            Value::ChronoDateTimeUtc(Some(Box::new(v)))
+    impl From<Timestamp> for Value {
+        fn from(x: Timestamp) -> Value {
+            Value::DateTimeWithTimeZone(Some(Box::new(x)))
         }
     }
 
-    impl From<DateTime<Local>> for Value {
-        fn from(v: DateTime<Local>) -> Value {
-            Value::ChronoDateTimeLocal(Some(Box::new(v)))
-        }
-    }
-
-    impl From<DateTime<FixedOffset>> for Value {
-        fn from(x: DateTime<FixedOffset>) -> Value {
-            let v =
-                DateTime::<FixedOffset>::from_naive_utc_and_offset(x.naive_utc(), x.offset().fix());
-            Value::ChronoDateTimeWithTimeZone(Some(Box::new(v)))
-        }
-    }
-
-    impl Nullable for DateTime<Utc> {
+    impl Nullable for Timestamp {
         fn null() -> Value {
-            Value::ChronoDateTimeUtc(None)
+            Value::DateTimeWithTimeZone(None)
         }
     }
 
-    impl ValueType for DateTime<Utc> {
+    impl ValueType for Timestamp {
         fn try_from(v: Value) -> Result<Self, ValueTypeError> {
             match v {
-                Value::ChronoDateTimeUtc(Some(x)) => Ok(*x),
+                Value::DateTimeWithTimeZone(Some(x)) => Ok(*x),
                 _ => Err(ValueTypeError),
             }
         }
 
+        /// Spelled qualified: a bare `Timestamp` in an error message reads as
+        /// PostgreSQL's `timestamp`, which is the naive type `DateTime` maps to.
         fn type_name() -> String {
-            stringify!(DateTime<Utc>).to_owned()
+            "jiff::Timestamp".to_owned()
         }
 
         fn array_type() -> ArrayType {
-            ArrayType::ChronoDateTimeUtc
-        }
-
-        fn column_type() -> ColumnType {
-            ColumnType::TimestampWithTimeZone
-        }
-    }
-
-    impl Nullable for DateTime<Local> {
-        fn null() -> Value {
-            Value::ChronoDateTimeLocal(None)
-        }
-    }
-
-    impl ValueType for DateTime<Local> {
-        fn try_from(v: Value) -> Result<Self, ValueTypeError> {
-            match v {
-                Value::ChronoDateTimeLocal(Some(x)) => Ok(*x),
-                _ => Err(ValueTypeError),
-            }
-        }
-
-        fn type_name() -> String {
-            stringify!(DateTime<Local>).to_owned()
-        }
-
-        fn array_type() -> ArrayType {
-            ArrayType::ChronoDateTimeLocal
-        }
-
-        fn column_type() -> ColumnType {
-            ColumnType::TimestampWithTimeZone
-        }
-    }
-
-    impl Nullable for DateTime<FixedOffset> {
-        fn null() -> Value {
-            Value::ChronoDateTimeWithTimeZone(None)
-        }
-    }
-
-    impl ValueType for DateTime<FixedOffset> {
-        fn try_from(v: Value) -> Result<Self, ValueTypeError> {
-            match v {
-                Value::ChronoDateTimeWithTimeZone(Some(x)) => Ok(*x),
-                _ => Err(ValueTypeError),
-            }
-        }
-
-        fn type_name() -> String {
-            stringify!(DateTime<FixedOffset>).to_owned()
-        }
-
-        fn array_type() -> ArrayType {
-            ArrayType::ChronoDateTimeWithTimeZone
+            ArrayType::DateTimeWithTimeZone
         }
 
         fn column_type() -> ColumnType {
@@ -703,13 +631,13 @@ pub mod with_array {
 
     impl NotU8 for Json {}
 
-    impl NotU8 for NaiveDate {}
+    impl NotU8 for Date {}
 
-    impl NotU8 for NaiveTime {}
+    impl NotU8 for Time {}
 
-    impl NotU8 for NaiveDateTime {}
+    impl NotU8 for DateTime {}
 
-    impl<Tz> NotU8 for DateTime<Tz> where Tz: chrono::TimeZone {}
+    impl NotU8 for Timestamp {}
 
     impl NotU8 for Decimal {}
 
@@ -831,85 +759,57 @@ impl Value {
 }
 
 impl Value {
-    pub fn is_chrono_date(&self) -> bool {
-        matches!(self, Self::ChronoDate(_))
+    pub fn is_date(&self) -> bool {
+        matches!(self, Self::Date(_))
     }
 
-    /// The payload of a non-NULL [`Value::ChronoDate`]; `None` otherwise.
-    pub fn as_ref_chrono_date(&self) -> Option<&NaiveDate> {
+    /// The payload of a non-NULL [`Value::Date`]; `None` otherwise.
+    pub fn as_ref_date(&self) -> Option<&Date> {
         match self {
-            Self::ChronoDate(v) => v.as_deref(),
+            Self::Date(v) => v.as_deref(),
             _ => None,
         }
     }
 }
 
 impl Value {
-    pub fn is_chrono_time(&self) -> bool {
-        matches!(self, Self::ChronoTime(_))
+    pub fn is_time(&self) -> bool {
+        matches!(self, Self::Time(_))
     }
 
-    /// The payload of a non-NULL [`Value::ChronoTime`]; `None` otherwise.
-    pub fn as_ref_chrono_time(&self) -> Option<&NaiveTime> {
+    /// The payload of a non-NULL [`Value::Time`]; `None` otherwise.
+    pub fn as_ref_time(&self) -> Option<&Time> {
         match self {
-            Self::ChronoTime(v) => v.as_deref(),
+            Self::Time(v) => v.as_deref(),
             _ => None,
         }
     }
 }
 
 impl Value {
-    pub fn is_chrono_date_time(&self) -> bool {
-        matches!(self, Self::ChronoDateTime(_))
+    pub fn is_date_time(&self) -> bool {
+        matches!(self, Self::DateTime(_))
     }
 
-    /// The payload of a non-NULL [`Value::ChronoDateTime`]; `None` otherwise.
-    pub fn as_ref_chrono_date_time(&self) -> Option<&NaiveDateTime> {
+    /// The payload of a non-NULL [`Value::DateTime`]; `None` otherwise.
+    pub fn as_ref_date_time(&self) -> Option<&DateTime> {
         match self {
-            Self::ChronoDateTime(v) => v.as_deref(),
+            Self::DateTime(v) => v.as_deref(),
             _ => None,
         }
     }
 }
 
 impl Value {
-    pub fn is_chrono_date_time_utc(&self) -> bool {
-        matches!(self, Self::ChronoDateTimeUtc(_))
+    pub fn is_date_time_with_time_zone(&self) -> bool {
+        matches!(self, Self::DateTimeWithTimeZone(_))
     }
 
-    /// The payload of a non-NULL [`Value::ChronoDateTimeUtc`]; `None` otherwise.
-    pub fn as_ref_chrono_date_time_utc(&self) -> Option<&DateTime<Utc>> {
-        match self {
-            Self::ChronoDateTimeUtc(v) => v.as_deref(),
-            _ => None,
-        }
-    }
-}
-
-impl Value {
-    pub fn is_chrono_date_time_local(&self) -> bool {
-        matches!(self, Self::ChronoDateTimeLocal(_))
-    }
-
-    /// The payload of a non-NULL [`Value::ChronoDateTimeLocal`]; `None` otherwise.
-    pub fn as_ref_chrono_date_time_local(&self) -> Option<&DateTime<Local>> {
-        match self {
-            Self::ChronoDateTimeLocal(v) => v.as_deref(),
-            _ => None,
-        }
-    }
-}
-
-impl Value {
-    pub fn is_chrono_date_time_with_time_zone(&self) -> bool {
-        matches!(self, Self::ChronoDateTimeWithTimeZone(_))
-    }
-
-    /// The payload of a non-NULL [`Value::ChronoDateTimeWithTimeZone`]; `None`
+    /// The payload of a non-NULL [`Value::DateTimeWithTimeZone`]; `None`
     /// otherwise.
-    pub fn as_ref_chrono_date_time_with_time_zone(&self) -> Option<&DateTime<FixedOffset>> {
+    pub fn as_ref_date_time_with_time_zone(&self) -> Option<&Timestamp> {
         match self {
-            Self::ChronoDateTimeWithTimeZone(v) => v.as_deref(),
+            Self::DateTimeWithTimeZone(v) => v.as_deref(),
             _ => None,
         }
     }
@@ -917,16 +817,21 @@ impl Value {
 
 // [spec:pgorm:sem:sql.value.accessor-panics+2]
 impl Value {
-    /// The UTC-naive form of any non-NULL chrono variant, stringified; `None`
-    /// for a NULL chrono variant and for every non-chrono variant alike.
-    pub fn chrono_as_naive_utc_in_string(&self) -> Option<String> {
+    /// The UTC-naive form of any non-NULL temporal variant, stringified; `None`
+    /// for a NULL temporal variant and for every non-temporal variant alike.
+    ///
+    /// The strings are the payloads' own ISO 8601 forms, so a date-time reads
+    /// `2020-01-01T02:02:02` — `T`-separated, and never carrying an offset.
+    pub fn as_naive_utc_in_string(&self) -> Option<String> {
         match self {
-            Self::ChronoDate(v) => v.as_ref().map(|v| v.to_string()),
-            Self::ChronoTime(v) => v.as_ref().map(|v| v.to_string()),
-            Self::ChronoDateTime(v) => v.as_ref().map(|v| v.to_string()),
-            Self::ChronoDateTimeUtc(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
-            Self::ChronoDateTimeLocal(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
-            Self::ChronoDateTimeWithTimeZone(v) => v.as_ref().map(|v| v.naive_utc().to_string()),
+            Self::Date(v) => v.as_ref().map(|v| v.to_string()),
+            Self::Time(v) => v.as_ref().map(|v| v.to_string()),
+            Self::DateTime(v) => v.as_ref().map(|v| v.to_string()),
+            // An instant becomes civil only at some offset, and UTC is the one
+            // that leaves the clock reading where PostgreSQL stored it.
+            Self::DateTimeWithTimeZone(v) => v
+                .as_deref()
+                .map(|v| Offset::UTC.to_datetime(*v).to_string()),
             _ => None,
         }
     }
@@ -1579,73 +1484,68 @@ mod tests {
         assert_eq!(out, json);
     }
 
+    // [spec:pgorm:def:sql.value.conversions+1/test]
     #[test]
-
-    fn test_chrono_value() {
-        let timestamp = NaiveDate::from_ymd_opt(2020, 1, 1)
-            .unwrap()
-            .and_hms_opt(2, 2, 2)
-            .unwrap();
+    fn civil_date_time_round_trips_through_value() {
+        let timestamp = jiff::civil::datetime(2020, 1, 1, 2, 2, 2, 0);
         let value: Value = timestamp.into();
-        let out: NaiveDateTime = <NaiveDateTime as ValueType>::try_from(value).unwrap();
+        let out: DateTime = <DateTime as ValueType>::try_from(value).unwrap();
         assert_eq!(out, timestamp);
     }
 
+    // [spec:pgorm:def:sql.value.conversions+1/test]
     #[test]
-
-    fn test_chrono_utc_value() {
-        let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(
-            NaiveDate::from_ymd_opt(2022, 1, 2)
-                .unwrap()
-                .and_hms_opt(3, 4, 5)
-                .unwrap(),
-            Utc,
-        );
-        let value: Value = timestamp.into();
-        let out: DateTime<Utc> = <DateTime<Utc> as ValueType>::try_from(value).unwrap();
-        assert_eq!(out, timestamp);
+    fn instant_round_trips_through_value() {
+        let instant: Timestamp = "2022-01-02T03:04:05Z".parse().unwrap();
+        let value: Value = instant.into();
+        let out: Timestamp = <Timestamp as ValueType>::try_from(value).unwrap();
+        assert_eq!(out, instant);
     }
 
-    #[test]
-
-    fn test_chrono_local_value() {
-        let timestamp_utc = DateTime::<Utc>::from_naive_utc_and_offset(
-            NaiveDate::from_ymd_opt(2022, 1, 2)
-                .unwrap()
-                .and_hms_opt(3, 4, 5)
-                .unwrap(),
-            Utc,
-        );
-        let timestamp_local: DateTime<Local> = timestamp_utc.into();
-        let value: Value = timestamp_local.into();
-        let out: DateTime<Local> = <DateTime<Local> as ValueType>::try_from(value).unwrap();
-        assert_eq!(out, timestamp_local);
-    }
-
-    #[test]
-
-    fn test_chrono_timezone_value() {
-        let timestamp = DateTime::parse_from_rfc3339("2020-01-01T02:02:02+08:00").unwrap();
-        let value: Value = timestamp.into();
-        let out: DateTime<FixedOffset> =
-            <DateTime<FixedOffset> as ValueType>::try_from(value).unwrap();
-        assert_eq!(out, timestamp);
-    }
-
+    /// A `timestamptz` is an absolute instant: PostgreSQL never stored the
+    /// offset the value was written with, so the literal renders in UTC
+    /// whatever offset it was parsed from.
     // [spec:pgorm:sem:sql.value.render/test]
     #[test]
-
-    fn test_chrono_query() {
+    fn timestamptz_literal_renders_at_utc() {
         use crate::*;
 
-        let string = "2020-01-01T02:02:02+08:00";
-        let timestamp = DateTime::parse_from_rfc3339(string).unwrap();
+        let instant: Timestamp = "2020-01-01T02:02:02+08:00".parse().unwrap();
 
-        let query = Query::select().expr(timestamp).to_owned();
+        let query = Query::select().expr(instant).to_owned();
 
-        let formatted = "2020-01-01 02:02:02 +08:00";
+        assert_eq!(query.to_string(), "SELECT '2019-12-31 18:02:02 +00:00'");
+    }
 
-        assert_eq!(query.to_string(), format!("SELECT '{formatted}'"));
+    /// `strftime` is lenient: a directive the payload cannot fill is copied
+    /// into the output instead of failing, so a stray `%` in a rendered literal
+    /// is the only evidence that a format string outran its type.
+    // [spec:pgorm:sem:sql.value.render/test]
+    #[test]
+    fn temporal_literals_render_without_stray_directives() {
+        let rendered = [
+            Value::from(jiff::civil::date(2020, 1, 1)),
+            Value::from(jiff::civil::time(2, 2, 2, 0)),
+            Value::from(jiff::civil::datetime(2020, 1, 1, 2, 2, 2, 0)),
+            Value::from("2020-01-01T02:02:02Z".parse::<Timestamp>().unwrap()),
+        ];
+
+        let literals = rendered.map(|v| QueryBuilder.value_to_string(&v));
+
+        for literal in &literals {
+            assert!(!literal.contains('%'), "unfilled directive in {literal}");
+        }
+
+        assert_eq!(
+            literals,
+            [
+                "'2020-01-01'",
+                "'02:02:02'",
+                "'2020-01-01 02:02:02'",
+                "'2020-01-01 02:02:02 +00:00'",
+            ]
+            .map(str::to_owned)
+        );
     }
 
     // [spec:pgorm:def:sql.value.conversions+1/test]

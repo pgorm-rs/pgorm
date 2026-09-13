@@ -39,12 +39,10 @@ supplying a different kind with that value raises `ConstructionError`.
 | `decimal` | `Decimal` | `decimal.Decimal`, exact 96-bit coefficient and scale 0–28 |
 | `uuid` | `Uuid` | `uuid.UUID` |
 | `json` | `Json` | JSON-compatible values; see below |
-| `date` | `ChronoDate` | `datetime.date`, years 1–9999 |
-| `time` | `ChronoTime` | `datetime.time` with no timezone and `fold=0` |
-| `datetime` | `ChronoDateTime` | naive `datetime.datetime` with `fold=0` |
-| `datetime_utc` | `ChronoDateTimeUtc` | aware `datetime.datetime` with zero UTC offset |
-| `datetime_fixed` | `ChronoDateTimeWithTimeZone` | aware `datetime.datetime`, preserving its offset and instant |
-| `datetime_local` | `ChronoDateTimeLocal` | aware `datetime.datetime` matching the machine's local timezone at that instant |
+| `date` | `Date` | `datetime.date`, years 1–9999 |
+| `time` | `Time` | `datetime.time` with no timezone and `fold=0` |
+| `datetime` | `DateTime` | naive `datetime.datetime` with `fold=0` |
+| `datetime_utc` | `DateTimeWithTimeZone` | aware `datetime.datetime` with zero UTC offset |
 | `ipnetwork` | `IpNetwork` | IP/prefix string; native formatting on output, host bits retained |
 | `mac_address` | `MacAddress` | exactly six bytes |
 | `vector` | `Vector` | list/tuple of exact `f32` values; returns a list |
@@ -85,15 +83,16 @@ objects and nesting deeper than 64 levels are rejected. Decimal, UUID and
 date/time values require application-selected JSON encodings. No implicit
 string conversion or non-finite JSON number is used.
 
-Temporal values preserve microseconds. Chrono leap seconds, finer Rust
-precision and subsecond timezone offsets raise errors. A timezone-aware
-input must select a temporal kind. `datetime_fixed` captures its resolved
-offset, including a `zoneinfo` daylight-saving fold; output uses a fixed-offset
-timezone with `fold=0`, preserving the instant and local clock fields.
-Timezone names and transition rules are not stored in Rust's fixed-offset
-variant. `datetime_utc` requires zero offset. `datetime_local` retains the Rust
-local variant and rejects inputs whose offset/local time disagrees with the
-machine timezone. Local output uses the stored resolved offset.
+Temporal values preserve microseconds. Finer Rust precision and subsecond
+timezone offsets raise errors; the Rust temporal types cannot represent a leap
+second at all. A timezone-aware input must select a temporal kind, and
+`datetime_utc` is the only aware kind. It requires a zero offset, because the
+Rust value is an instant with nowhere to keep a timezone: the offset is
+validated and discarded, and output is an aware `datetime` with
+`datetime.timezone.utc` and `fold=0`. An input at another offset is converted in
+Python first, with `value.astimezone(datetime.timezone.utc)`; a `zoneinfo`
+daylight-saving fold resolves during that conversion, so the two instants an
+ambiguous local time denotes stay distinct.
 
 These are Rust value representation limits. PostgreSQL may impose additional
 limits when binding a value to a particular database type; the execution API

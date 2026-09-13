@@ -51,47 +51,17 @@ pub use async_trait;
 #[cfg(feature = "with-json")]
 pub use serde_json::Value as Json;
 
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveDate as Date;
+#[cfg(feature = "with-jiff")]
+pub use jiff::civil::{Date, DateTime, Time};
 
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveTime as Time;
-
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveDateTime as DateTime;
-
-/// Date time with fixed offset
-#[cfg(feature = "with-chrono")]
-pub type DateTimeWithTimeZone = chrono::DateTime<chrono::FixedOffset>;
-
-/// Date time represented in UTC
-#[cfg(feature = "with-chrono")]
-pub type DateTimeUtc = chrono::DateTime<chrono::Utc>;
-
-/// Date time represented in local time
-#[cfg(feature = "with-chrono")]
-pub type DateTimeLocal = chrono::DateTime<chrono::Local>;
-
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveDate as ChronoDate;
-
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveTime as ChronoTime;
-
-#[cfg(feature = "with-chrono")]
-pub use chrono::NaiveDateTime as ChronoDateTime;
-
-/// Date time with fixed offset
-#[cfg(feature = "with-chrono")]
-pub type ChronoDateTimeWithTimeZone = chrono::DateTime<chrono::FixedOffset>;
-
-/// Date time represented in UTC
-#[cfg(feature = "with-chrono")]
-pub type ChronoDateTimeUtc = chrono::DateTime<chrono::Utc>;
-
-/// Date time represented in local time
-#[cfg(feature = "with-chrono")]
-pub type ChronoDateTimeLocal = chrono::DateTime<chrono::Local>;
+/// An absolute instant, carried by a `timestamptz` column.
+///
+/// Spelled this way rather than re-exporting `jiff::Timestamp` under its own
+/// name: `ColumnType::Timestamp` is PostgreSQL's *naive* `timestamp`, which is
+/// what [`DateTime`] maps to, so a field written `pub at: Timestamp` inferring
+/// `TimestampWithTimeZone` would read backwards at every call site.
+#[cfg(feature = "with-jiff")]
+pub type DateTimeWithTimeZone = jiff::Timestamp;
 
 pub use rust_decimal::Decimal;
 

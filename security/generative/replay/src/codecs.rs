@@ -1,16 +1,19 @@
 //! Checked adapters around the PostgreSQL driver's existing Rust codecs.
 //!
 //! Each one wraps a decoder that is *nearly* lossless and turns the residue
-//! into an error: a rounded `numeric`, a `time` of `24:00:00` that wraps to
-//! midnight, a multidimensional array that flattens, a JSON number that changes
-//! spelling. The subject reports what it decoded, so a silent repair here would
-//! show up as the oracle disagreeing with reality rather than as a decode
-//! failure.
+//! into an error: a rounded `numeric`, a multidimensional array that flattens,
+//! a JSON number that changes spelling. The subject reports what it decoded, so
+//! a silent repair here would show up as the oracle disagreeing with reality
+//! rather than as a decode failure.
+//!
+//! `time` needs no such wrapper. Its driver codec builds through
+//! `Time::midnight().checked_add(..)`, which fails rather than wrapping, so
+//! PostgreSQL's `24:00:00` is refused by the decoder itself and every value it
+//! does accept re-encodes to the bytes it was read from.
 
 use std::{collections::BTreeMap, error::Error};
 
 use bytes::BytesMut;
-use chrono::NaiveTime;
 use fallible_iterator::FallibleIterator;
 use pgorm::pgorm_query::{IpNetwork, MacAddress};
 use rust_decimal::Decimal;
@@ -18,26 +21,6 @@ use serde_json::{Value as Json, value::RawValue};
 use tokio_postgres::types::{FromSql, Kind, ToSql, Type};
 
 type CodecError = Box<dyn Error + Send + Sync>;
-
-/// NaiveTime's driver codec wraps PostgreSQL 24:00:00 to midnight.
-#[derive(Debug)]
-pub(crate) struct ExactTime(pub NaiveTime);
-
-impl<'a> FromSql<'a> for ExactTime {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
-        let time = NaiveTime::from_sql(ty, raw)?;
-        let mut encoded = BytesMut::new();
-        time.to_sql(ty, &mut encoded)?;
-        if raw != encoded.as_ref() {
-            return Err("time cannot be represented exactly by Rust NaiveTime".into());
-        }
-        Ok(Self(time))
-    }
-
-    fn accepts(ty: &Type) -> bool {
-        <NaiveTime as FromSql>::accepts(ty)
-    }
-}
 
 /// The upstream Decimal decoder can round. Accept only exact values and scale.
 #[derive(Debug)]

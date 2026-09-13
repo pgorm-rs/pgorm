@@ -2,8 +2,8 @@
 
 pub mod common;
 
-pub use chrono::offset::Utc;
 pub use common::{TestContext, bakery_chain::*, setup::*};
+pub use jiff::{Timestamp, tz::Offset};
 use pgorm::{DerivePartialModel, Error, FromQueryResult, alias, entity::*, query::*, set};
 use pgorm_query::{Expr, Func, SimpleExpr};
 use pretty_assertions::assert_eq;
@@ -143,7 +143,7 @@ pub async fn right_join() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(15.10)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -216,7 +216,7 @@ pub async fn inner_join() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(15.10)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -228,7 +228,7 @@ pub async fn inner_join() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(100.00)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -295,7 +295,7 @@ pub async fn group_by() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(99.95)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -307,7 +307,7 @@ pub async fn group_by() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(200.00)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -382,7 +382,7 @@ pub async fn having() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(100.00)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -394,7 +394,7 @@ pub async fn having() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_kate.id),
         total: set(rust_dec(12.00)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -414,7 +414,7 @@ pub async fn having() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_bob.id),
         total: set(rust_dec(50.0)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -426,7 +426,7 @@ pub async fn having() {
         bakery_id: set(bakery.id),
         customer_id: set(customer_bob.id),
         total: set(rust_dec(50.0)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
 
         ..Default::default()
     }
@@ -786,7 +786,7 @@ pub async fn linked() -> Result<(), Error> {
         bakery_id: set(seaside_bakery_res),
         customer_id: set(customer_kate_res),
         total: set(rust_dec(15.10)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
         ..Default::default()
     };
     let kate_order_1_res = Insert::one(kate_order_1).exec_returning_pk(&db).await?;
@@ -803,7 +803,7 @@ pub async fn linked() -> Result<(), Error> {
         bakery_id: set(seaside_bakery_res),
         customer_id: set(customer_kate_res),
         total: set(rust_dec(29.7)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
         ..Default::default()
     };
     let kate_order_2_res = Insert::one(kate_order_2).exec_returning_pk(&db).await?;
@@ -828,7 +828,7 @@ pub async fn linked() -> Result<(), Error> {
         bakery_id: set(seaside_bakery_res),
         customer_id: set(customer_kara_res),
         total: set(rust_dec(15.10)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
         ..Default::default()
     };
     let kara_order_1_res = Insert::one(kara_order_1).exec_returning_pk(&db).await?;
@@ -845,7 +845,7 @@ pub async fn linked() -> Result<(), Error> {
         bakery_id: set(seaside_bakery_res),
         customer_id: set(customer_kara_res),
         total: set(rust_dec(29.7)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
         ..Default::default()
     };
     let kara_order_2_res = Insert::one(kara_order_2).exec_returning_pk(&db).await?;

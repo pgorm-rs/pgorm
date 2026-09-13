@@ -26,7 +26,7 @@
 //!
 //! Macro: `derive` `attr`
 //!
-//! Type support is unconditional: `chrono`, `serde_json`, `rust_decimal`, `uuid`,
+//! Type support is unconditional: `jiff`, `serde_json`, `rust_decimal`, `uuid`,
 //! `ipnetwork`, `mac_address`, `pgvector`, Postgres arrays and intervals.
 //!
 //! ## Usage

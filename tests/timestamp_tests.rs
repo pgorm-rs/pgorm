@@ -12,7 +12,6 @@ async fn main() -> Result<(), Error> {
 
     let db = ctx.db.get().await?;
     create_applog(&db).await?;
-    create_satellites_log(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -36,32 +35,7 @@ pub async fn create_applog(db: &DatabaseConnection) -> Result<(), Error> {
 
     let found = Applog::find().one(db).await?;
     assert_eq!(found, log);
-    assert_eq!(found.created_at.to_rfc3339(), "2021-09-17T09:50:20+00:00");
-
-    Ok(())
-}
-
-pub async fn create_satellites_log(db: &DatabaseConnection) -> Result<(), Error> {
-    let archive = satellite::Model {
-        id: 1,
-        satellite_name: "Sea-00001-2022".to_owned(),
-        launch_date: "2022-01-07T12:11:23Z".parse().unwrap(),
-        deployment_date: "2022-01-07T12:11:23Z".parse().unwrap(),
-    };
-
-    let res = Insert::one(archive.clone().into_active_model())
-        .exec_returning_pk(db)
-        .await?;
-
-    assert_eq!(archive.id, res);
-
-    let found = Satellite::find().one(db).await?;
-    assert_eq!(found, archive);
-    assert_eq!(found.launch_date.to_rfc3339(), "2022-01-07T12:11:23+00:00");
-    assert_eq!(
-        found.deployment_date.to_utc().to_rfc3339(),
-        "2022-01-07T12:11:23+00:00"
-    );
+    assert_eq!(found.created_at.to_string(), "2021-09-17T09:50:20Z");
 
     Ok(())
 }

@@ -117,8 +117,7 @@ an ideal Postgres renderer would emit.
 > name from `Value::source_type_name`: `bool`; `int2` for `TinyInt` and
 > `SmallInt`, `int4` for `Int`, `int8` for `BigInt`, `Unsigned` and
 > `BigUnsigned`; `float4` / `float8`; `text` for `String` and `Char`; `bytea`;
-> `date`, `time`, `timestamp`, and `timestamptz` for all three zoned chrono
-> variants; `uuid`; `numeric`; `inet`; `macaddr`; and, for `Array`, the element
+> `date`, `time`, `timestamp`, and `timestamptz`; `uuid`; `numeric`; `inet`; `macaddr`; and, for `Array`, the element
 > name from `ArrayType::source_type_name` suffixed `[]`. `Json` and `Vector`
 > are `None` and stay unpinned — a JSON payload binds as either `json` or
 > `jsonb` depending on which the server asked for, and the pgvector type name
@@ -212,9 +211,12 @@ an ideal Postgres renderer would emit.
 > total, and the rendered text always denotes the char that was given. `Json`
 > renders its compact serialization as a quoted string. `Bytes` renders as a
 > Postgres hex bytea literal `'\xAB01…'` with uppercase two-digit hex per byte.
-> Chrono values render single-quoted with fixed formats: date `%Y-%m-%d`, time
-> `%H:%M:%S`, naive datetime `%Y-%m-%d %H:%M:%S`, and all timezone-aware
-> datetimes `%Y-%m-%d %H:%M:%S %:z` (fractional seconds are truncated). `Uuid`,
+> Temporal values render single-quoted with fixed formats: date `%Y-%m-%d`,
+> time `%H:%M:%S`, naive datetime `%Y-%m-%d %H:%M:%S`, and the zoned datetime
+> `%Y-%m-%d %H:%M:%S %:z`, always at `+00:00` because the value carries an
+> instant rather than an offset (fractional seconds are truncated). A format
+> string MUST NOT name a field its value lacks: an unfillable directive is
+> written through into the rendered text rather than refused. `Uuid`,
 > `IpNetwork`, and `MacAddress` render their `Display` form in single quotes.
 >
 > `Array(_, Some(v))` renders `ARRAY [e1,e2,…]` — the keyword `ARRAY`, a

@@ -5,7 +5,10 @@
 //! different tags, and an array's element type is recovered from `Kind::Array`
 //! instead of guessed from its first element.
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use jiff::{
+    Timestamp,
+    civil::{Date, DateTime, Time},
+};
 use pgorm::pgorm_query::{ArrayType, Value, Vector};
 use tokio_postgres::{
     Row,
@@ -15,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     FormatError,
-    codecs::{CheckedArray, EnumLabel, ExactDecimal, ExactJson, ExactTime, Inet, Mac},
+    codecs::{CheckedArray, EnumLabel, ExactDecimal, ExactJson, Inet, Mac},
     wire::{Tagged, TypeName},
 };
 
@@ -92,12 +95,10 @@ pub(crate) fn value(row: &Row, index: usize) -> Result<Tagged, FormatError> {
             Value::Json(v.map(|v| Box::new(v.0)))
         }),
         Type::UUID => boxed!(Uuid, Uuid),
-        Type::DATE => boxed!(NaiveDate, ChronoDate),
-        Type::TIME => typed::<ExactTime>(row, index, array, ArrayType::ChronoTime, |v| {
-            Value::ChronoTime(v.map(|v| Box::new(v.0)))
-        }),
-        Type::TIMESTAMP => boxed!(NaiveDateTime, ChronoDateTime),
-        Type::TIMESTAMPTZ => boxed!(DateTime<Utc>, ChronoDateTimeUtc),
+        Type::DATE => boxed!(Date, Date),
+        Type::TIME => boxed!(Time, Time),
+        Type::TIMESTAMP => boxed!(DateTime, DateTime),
+        Type::TIMESTAMPTZ => boxed!(Timestamp, DateTimeWithTimeZone),
         Type::NUMERIC => typed::<ExactDecimal>(row, index, array, ArrayType::Decimal, |v| {
             Value::Decimal(v.map(|v| Box::new(v.0)))
         }),

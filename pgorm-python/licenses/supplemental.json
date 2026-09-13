@@ -30,6 +30,18 @@
       "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
     }
   ],
+  "defmt-parser@1.0.0": [
+    {
+      "file": "defmt-MIT.txt",
+      "source": "Cargo registry package defmt 1.1.1 / LICENSE-MIT (shared defmt project license)",
+      "sha256": "2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50"
+    },
+    {
+      "file": "defmt-APACHE.txt",
+      "source": "Cargo registry package defmt 1.1.1 / LICENSE-APACHE (shared defmt project license)",
+      "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90"
+    }
+  ],
   "objc2-core-foundation@0.3.2": [
     {
       "file": "objc2-LICENSE.md",

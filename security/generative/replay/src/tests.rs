@@ -2,19 +2,19 @@
 //!
 //! Every expected document here has been checked against the Python source of
 //! truth by feeding it to `wire.validate`; the assertions below pin the exact
-//! text so a drift in chrono's `Display`, in `Decimal`'s scale handling or in
+//! text so a drift in jiff's `Display`, in `Decimal`'s scale handling or in
 //! the float bit formatting fails here rather than in the oracle.
 
 use std::error::Error;
 
-use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use jiff::{Timestamp, civil::DateTime, tz::TimeZone};
 use pgorm::pgorm_query::{ArrayType, MacAddress, Value, Vector};
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, json};
 
 use crate::{
     ObservedError, Report, entities, observe,
-    wire::{Tag, Tagged, TypeName, parse_datetime_fixed, parse_datetime_utc, parse_naive_datetime},
+    wire::{Tag, Tagged, TypeName, parse_datetime_utc, parse_naive_datetime},
     wire::{parse_date, parse_time, temporal_text, validate},
 };
 
@@ -28,10 +28,12 @@ fn text(value: &str) -> Value {
     Value::String(Some(Box::new(value.to_owned())))
 }
 
-fn moment() -> Result<NaiveDateTime, Box<dyn Error + Send + Sync>> {
-    let date = NaiveDate::from_ymd_opt(2024, 1, 2).ok_or("unrepresentable date")?;
-    let time = NaiveTime::from_hms_micro_opt(3, 4, 5, 123_456).ok_or("unrepresentable time")?;
-    Ok(date.and_time(time))
+fn moment() -> DateTime {
+    jiff::civil::datetime(2024, 1, 2, 3, 4, 5, 123_456_000)
+}
+
+fn instant() -> Result<Timestamp, Box<dyn Error + Send + Sync>> {
+    Ok(TimeZone::UTC.to_timestamp(moment())?)
 }
 
 #[test]
@@ -210,38 +212,27 @@ fn text_and_char_carry_hostile_content_unchanged() -> TestResult {
 
 #[test]
 fn every_temporal_kind_matches_the_python_normalisation() -> TestResult {
-    let naive = moment()?;
-    let offset = FixedOffset::east_opt(5 * 3600 + 30 * 60).ok_or("unrepresentable offset")?;
-    let fixed = naive
-        .and_local_timezone(offset)
-        .single()
-        .ok_or("ambiguous local time")?;
-
+    let naive = moment();
     let cases: Vec<(Value, &str, &str)> = vec![
         (
-            Value::ChronoDate(Some(Box::new(naive.date()))),
+            Value::Date(Some(Box::new(naive.date()))),
             "date",
             "2024-01-02",
         ),
         (
-            Value::ChronoTime(Some(Box::new(naive.time()))),
+            Value::Time(Some(Box::new(naive.time()))),
             "time",
             "03:04:05.123456",
         ),
         (
-            Value::ChronoDateTime(Some(Box::new(naive))),
+            Value::DateTime(Some(Box::new(naive))),
             "datetime",
-            "2024-01-02 03:04:05.123456",
+            "2024-01-02T03:04:05.123456",
         ),
         (
-            Value::ChronoDateTimeUtc(Some(Box::new(naive.and_utc()))),
+            Value::DateTimeWithTimeZone(Some(Box::new(instant()?))),
             "datetime_utc",
-            "2024-01-02 03:04:05.123456 UTC",
-        ),
-        (
-            Value::ChronoDateTimeWithTimeZone(Some(Box::new(fixed))),
-            "datetime_fixed",
-            "2024-01-02 03:04:05.123456 +05:30",
+            "2024-01-02T03:04:05.123456Z",
         ),
     ];
     for (value, kind, rendered) in cases {
@@ -253,37 +244,19 @@ fn every_temporal_kind_matches_the_python_normalisation() -> TestResult {
 }
 
 #[test]
-fn a_local_datetime_keeps_its_kind_anywhere() -> TestResult {
-    let local: DateTime<Local> = moment()?.and_utc().into();
-    let document = encoded(Value::ChronoDateTimeLocal(Some(Box::new(local))))?;
-    assert_eq!(document["type"], json!({"kind": "datetime_local"}));
-    Ok(())
-}
-
-#[test]
-fn temporal_text_reads_what_chrono_prints() -> TestResult {
+fn temporal_text_reads_what_jiff_prints() -> TestResult {
     for (printed, normalized) in [
         ("2024-01-02", "2024-01-02"),
         ("03:04:05.123456", "03:04:05.123456"),
-        // chrono prints three fractional digits when it can; Python needs six.
+        // jiff writes the fewest fractional digits that round-trip; Python
+        // renders exactly six, or none at all.
         ("03:04:05.123", "03:04:05.123000"),
+        ("03:04:05.12", "03:04:05.120000"),
         // An all-zero fraction is dropped, not padded.
         ("03:04:05.000000", "03:04:05"),
         (
-            "2024-01-02 03:04:05.123456 UTC",
-            "2024-01-02 03:04:05.123456+00:00",
-        ),
-        (
             "2024-01-02T03:04:05.123456Z",
             "2024-01-02 03:04:05.123456+00:00",
-        ),
-        (
-            "2024-01-02 03:04:05.123456 +05:30",
-            "2024-01-02 03:04:05.123456+05:30",
-        ),
-        (
-            "2024-01-02 03:04:05.123456 -05:30",
-            "2024-01-02 03:04:05.123456-05:30",
         ),
         ("2024-01-02T03:04:05", "2024-01-02 03:04:05"),
     ] {
@@ -295,31 +268,26 @@ fn temporal_text_reads_what_chrono_prints() -> TestResult {
 
 #[test]
 fn temporal_parsers_read_back_what_the_encoder_wrote() -> TestResult {
-    let naive = moment()?;
-    let offset = FixedOffset::east_opt(-8 * 3600).ok_or("unrepresentable offset")?;
-    let fixed = naive
-        .and_local_timezone(offset)
-        .single()
-        .ok_or("ambiguous local time")?;
+    let naive = moment();
+    let instant = instant()?;
     assert_eq!(parse_date(&naive.date().to_string())?, naive.date());
     assert_eq!(parse_time(&naive.time().to_string())?, naive.time());
     assert_eq!(parse_naive_datetime(&naive.to_string())?, naive);
-    assert_eq!(
-        parse_datetime_utc(&naive.and_utc().to_string())?,
-        naive.and_utc()
-    );
-    assert_eq!(parse_datetime_fixed(&fixed.to_string())?, fixed);
-    // chrono's own FromStr demands the `T` its Display never writes.
-    assert!(naive.to_string().parse::<NaiveDateTime>().is_err());
+    assert_eq!(parse_datetime_utc(&instant.to_string())?, instant);
+    // The payload is native `Display` output, so the parsers only have a
+    // source of truth to read back because jiff reads what it writes.
+    assert_eq!(naive.to_string().parse::<DateTime>()?, naive);
+    assert_eq!(instant.to_string().parse::<Timestamp>()?, instant);
     Ok(())
 }
 
 #[test]
 fn a_datetime_kind_must_agree_with_its_offset() {
     assert!(parse_naive_datetime("2024-01-02 03:04:05+00:00").is_err());
-    assert!(parse_datetime_fixed("2024-01-02 03:04:05").is_err());
+    assert!(parse_datetime_utc("2024-01-02 03:04:05").is_err());
     assert!(parse_datetime_utc("2024-01-02 03:04:05+05:30").is_err());
-    assert!(parse_datetime_utc("2024-01-02 03:04:05 UTC").is_ok());
+    assert!(parse_time("03:04:05+00:00").is_err());
+    assert!(parse_datetime_utc("2024-01-02T03:04:05Z").is_ok());
 }
 
 #[test]
@@ -516,15 +484,14 @@ fn redaction_removes_connection_secrets_from_diagnostics() -> TestResult {
 }
 
 #[test]
-fn utc_and_fixed_offsets_round_trip_normalised() -> TestResult {
-    let instant = moment()?.and_utc();
+fn a_utc_instant_round_trips_through_the_canon() -> TestResult {
+    let instant = instant()?;
     let normalized = temporal_text(&instant.to_string())?;
     assert_eq!(normalized, "2024-01-02 03:04:05.123456+00:00");
     assert_eq!(parse_datetime_utc(&normalized)?, instant);
-    assert_eq!(
-        parse_datetime_fixed(&normalized)?.with_timezone(&Utc),
-        instant
-    );
+    // The canon is what the oracle compares, so normalising it must be a fixed
+    // point: a value re-read from an artifact has to land on the same text.
+    assert_eq!(temporal_text(&normalized)?, normalized);
     Ok(())
 }
 
@@ -554,10 +521,10 @@ fn sample_account() -> Result<entities::account::Model, Box<dyn Error + Send + S
         balance: Decimal::new(1_234_500, 4),
         payload: json!({"owner": "Alice"}),
         uuid: pgorm::entity::prelude::Uuid::from_u128(1),
-        created_at: moment()?,
-        occurred_at: moment()?.and_utc(),
-        event_date: moment()?.date(),
-        event_time: moment()?.time(),
+        created_at: moment(),
+        occurred_at: instant()?,
+        event_date: moment().date(),
+        event_time: moment().time(),
         state: entities::account::State::Busy,
     })
 }

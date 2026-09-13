@@ -14,8 +14,7 @@ use pgorm::pgorm_query::IpNetwork;
 use serde_json::{Map, Value as Json};
 use uuid::Uuid;
 
-use super::{SCALAR_NAMES, parse_date, parse_datetime_fixed, parse_datetime_utc};
-use super::{parse_naive_datetime, parse_time};
+use super::{SCALAR_NAMES, parse_date, parse_datetime_utc, parse_naive_datetime, parse_time};
 use crate::FormatError;
 
 const TEXT_BYTES: usize = 65_536;
@@ -169,8 +168,7 @@ fn scalar(kind: &str, data: &Json) -> Result<(), FormatError> {
         }),
         "json" => json(data, 0),
         "vector" => vector(data),
-        "date" | "time" => temporal(kind, data),
-        _ if kind.starts_with("datetime") => temporal(kind, data),
+        "date" | "time" | "datetime" | "datetime_utc" => temporal(kind, data),
         _ => Err(FormatError::new("unknown portable value kind")),
     }
 }
@@ -299,7 +297,7 @@ fn temporal(kind: &str, data: &Json) -> Result<(), FormatError> {
         "time" => parse_time(value).map(drop),
         "datetime" => parse_naive_datetime(value).map(drop),
         "datetime_utc" => parse_datetime_utc(value).map(drop),
-        _ => parse_datetime_fixed(value).map(drop),
+        _ => Err(FormatError::new("unknown portable value kind")),
     }
 }
 

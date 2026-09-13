@@ -615,7 +615,7 @@ mod tests {
                 #[pgorm(nullable)]
                 pub eight: i64,
                 #[pgorm(default_expr = "Expr::current_timestamp()")]
-                pub ten: DateTimeUtc,
+                pub ten: DateTimeWithTimeZone,
                 #[pgorm(default_value = 7)]
                 pub eleven: i16,
                 #[pgorm(default_value = "twelve_value")]

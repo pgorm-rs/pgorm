@@ -30,8 +30,6 @@ SCALARS = frozenset(INTEGER_BITS) | {
     "time",
     "datetime",
     "datetime_utc",
-    "datetime_fixed",
-    "datetime_local",
     "ipnetwork",
     "mac_address",
     "vector",
@@ -116,12 +114,17 @@ def _decimal(data):
 
 
 def temporal_text(data):
-    """Accept native Chrono display text while retaining the original artifact."""
-    value = data.removesuffix(" UTC") + ("+00:00" if data.endswith(" UTC") else "")
-    value = re.sub(r" ([+-][0-9]{2}:[0-9]{2})$", r"\1", value)
-    value = value.replace("T", " ").removesuffix("Z") + (
-        "+00:00" if value.endswith("Z") else ""
-    )
+    """Accept native display text while retaining the original artifact.
+
+    The native spelling is RFC 3339 — a ``T`` separator, ``Z`` for a zero
+    offset, and a fractional field trimmed to its significant digits — while
+    Python parses a space separator and renders exactly six fractional digits
+    or none. Reconciling the two here is what lets the encoder emit the native
+    spelling verbatim.
+    """
+    value = data.replace("T", " ")
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
     match = re.search(r"\.(\d+)", value)
     if match:
         digits = match[1]
@@ -151,8 +154,6 @@ def _temporal(kind, data):
                 raise FormatError("datetime kind and timezone do not agree")
             if kind == "datetime_utc" and value.utcoffset().total_seconds() != 0:
                 raise FormatError("UTC datetime requires a zero offset")
-            if value.utcoffset() is not None and value.utcoffset().microseconds:
-                raise FormatError("subsecond timezone offsets are unsupported")
             canonical = value.isoformat(sep=" ")
         # ISO parsers accept and truncate extra precision; preserve it or reject it.
         if normalized != canonical:

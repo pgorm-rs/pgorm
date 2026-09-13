@@ -35,8 +35,6 @@
     {"kind": "time", "postgres": "pg_catalog.time", "result_kind": "time", "policy": "live"},
     {"kind": "datetime", "postgres": "pg_catalog.timestamp", "result_kind": "datetime", "policy": "live"},
     {"kind": "datetime_utc", "postgres": "pg_catalog.timestamptz", "result_kind": "datetime_utc", "policy": "live"},
-    {"kind": "datetime_fixed", "postgres": "pg_catalog.timestamptz", "result_kind": "datetime_utc", "policy": "live", "reason": "PostgreSQL preserves the instant, not the input timezone; construction evidence retains the fixed-offset tag and offset."},
-    {"kind": "datetime_local", "postgres": "pg_catalog.timestamptz", "result_kind": "datetime_utc", "policy": "live", "reason": "Record the worker timezone; native local input must match it. PostgreSQL output is UTC."},
     {"kind": "ipnetwork", "postgres": "pg_catalog.inet", "result_kind": "ipnetwork", "policy": "live"},
     {"kind": "mac_address", "postgres": "pg_catalog.macaddr", "result_kind": "mac_address", "policy": "live"},
     {"kind": "vector", "postgres": null, "result_kind": null, "policy": "construction-or-rejection", "reason": "Pinned PostgreSQL has no pgvector extension; verify tagged construction and explicit missing-type rejection."},

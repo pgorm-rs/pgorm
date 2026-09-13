@@ -580,29 +580,21 @@ impl_into_active_value!(Vec<u8>);
 #[cfg_attr(docsrs, doc(cfg(feature = "with-json")))]
 impl_into_active_value!(crate::prelude::Json);
 
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
 impl_into_active_value!(crate::prelude::Date);
 
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
 impl_into_active_value!(crate::prelude::Time);
 
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
 impl_into_active_value!(crate::prelude::DateTime);
 
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
 impl_into_active_value!(crate::prelude::DateTimeWithTimeZone);
-
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
-impl_into_active_value!(crate::prelude::DateTimeUtc);
-
-#[cfg(feature = "with-chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "with-chrono")))]
-impl_into_active_value!(crate::prelude::DateTimeLocal);
 
 impl_into_active_value!(crate::prelude::Decimal);
 

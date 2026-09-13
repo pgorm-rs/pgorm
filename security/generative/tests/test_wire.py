@@ -16,12 +16,14 @@ class WireTests(unittest.TestCase):
             ("decimal", "-0.00100"),
             ("bytes", [0, 255, 39]),
             ("json", None),
-            ("datetime_fixed", "2024-01-02 03:04:05.123456+02:00"),
             ("date", "2024-01-02"),
             ("time", "03:04:05.123456"),
             ("time", "03:04:05.123"),
-            ("datetime_utc", "2024-01-02 03:04:05 UTC"),
-            ("datetime_fixed", "2024-01-02 03:04:05.123 +02:00"),
+            # The native spelling trims a fraction to its significant digits.
+            ("time", "03:04:05.12"),
+            ("datetime", "2024-01-02T03:04:05.123456"),
+            ("datetime_utc", "2024-01-02T03:04:05.123456Z"),
+            ("datetime_utc", "2024-01-02 03:04:05+00:00"),
             ({"kind": "enum", "schema": "fixture", "name": 'State" 雪'}, "O'Brien 雪"),
         ]
         for kind, data in cases:
@@ -55,7 +57,12 @@ class WireTests(unittest.TestCase):
             ("decimal", "1e-29"),
             ("decimal", "79228162514264337593543950336"),
             ("time", "03:04:05.123456789"),
+            ("time", "03:04:05+00:00"),
             ("datetime", "2024-01-02 03:04:05+00:00"),
+            ("datetime_utc", "2024-01-02 03:04:05"),
+            ("datetime_utc", "2024-01-02 03:04:05+05:30"),
+            # A datetime-shaped name outside SCALARS is not a temporal kind.
+            ("datetime_fixed", "2024-01-02 03:04:05+02:00"),
             ("json", 2**64),
             ("json", float("nan")),
             ({"kind": "array", "element": {"kind": "i32"}}, [wire.scalar("i64", "1")]),

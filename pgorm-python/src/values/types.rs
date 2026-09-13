@@ -92,9 +92,8 @@ scalar_kinds! {
     BigInt => "i64", Unsigned => "u32", BigUnsigned => "u64",
     Float => "f32", Double => "f64", String => "text", Char => "char",
     Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
-    ChronoDate => "date", ChronoTime => "time", ChronoDateTime => "datetime",
-    ChronoDateTimeUtc => "datetime_utc", ChronoDateTimeLocal => "datetime_local",
-    ChronoDateTimeWithTimeZone => "datetime_fixed", IpNetwork => "ipnetwork",
+    Date => "date", Time => "time", DateTime => "datetime",
+    DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
     MacAddress => "mac_address", Vector => "vector",
 }
 

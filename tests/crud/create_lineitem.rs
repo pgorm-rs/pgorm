@@ -1,5 +1,5 @@
 pub use super::*;
-use chrono::offset::Utc;
+use jiff::{Timestamp, tz::Offset};
 use pgorm::set;
 use uuid::Uuid;
 
@@ -76,7 +76,7 @@ pub async fn test_create_lineitem(db: &DatabaseConnection) {
         bakery_id: set(bakery_insert_res),
         customer_id: set(customer_insert_res),
         total: set(rust_dec(7.55)),
-        placed_at: set(Utc::now().naive_utc()),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
         ..Default::default()
     };
     let order_insert_res = Insert::one(order_1)

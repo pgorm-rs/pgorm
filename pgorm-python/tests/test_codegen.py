@@ -83,7 +83,9 @@ class CodegenTests(unittest.TestCase):
             ("i32", "int", "i32"),
             ("Option<String>", "str | None", "text"),
             ("Vec<u8>", "bytes", "bytes"),
-            ("chrono::DateTime<chrono::Utc>", "datetime", "datetime_utc"),
+            ("DateTimeWithTimeZone", "datetime", "datetime_utc"),
+            ("jiff::Timestamp", "datetime", "datetime_utc"),
+            ("Option<DateTime>", "datetime | None", "datetime"),
             ("rust_decimal::Decimal", "Decimal", "decimal"),
         ]
         for rust, annotation, kind in cases:

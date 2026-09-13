@@ -73,8 +73,6 @@ def _temporal(kind, raw):
     if kind == "time":
         return time
     value = day + " " + time
-    if kind == "datetime_fixed":
-        return value + f"+{raw[9] % 14:02d}:{(raw[10] % 4) * 15:02d}"
     return value + ("+00:00" if kind != "datetime" else "")
 
 

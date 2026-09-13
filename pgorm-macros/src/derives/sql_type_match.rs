@@ -126,12 +126,10 @@ fn inferred_col_type(field_type: &Type) -> Option<TokenStream> {
         "f32" => quote! { Float },
         "f64" => quote! { Double },
         "bool" => quote! { Boolean },
-        "Date" | "NaiveDate" => quote! { Date },
-        "Time" | "NaiveTime" => quote! { Time },
-        "DateTime" | "NaiveDateTime" => quote! { Timestamp },
-        "DateTimeUtc" | "DateTimeLocal" | "DateTimeWithTimeZone" => {
-            quote! { TimestampWithTimeZone }
-        }
+        "Date" => quote! { Date },
+        "Time" => quote! { Time },
+        "DateTime" => quote! { Timestamp },
+        "DateTimeWithTimeZone" => quote! { TimestampWithTimeZone },
         "Uuid" => quote! { Uuid },
         "Json" => quote! { Json },
         "Decimal" => quote! { Decimal(None) },
@@ -171,12 +169,10 @@ fn inferred_arr_type(field_type: &Type) -> Option<TokenStream> {
         "f32" => quote! { Float },
         "f64" => quote! { Double },
         "bool" => quote! { Bool },
-        "Date" | "NaiveDate" => quote! { ChronoDate },
-        "Time" | "NaiveTime" => quote! { ChronoTime },
-        "DateTime" | "NaiveDateTime" => quote! { ChronoDateTime },
-        "DateTimeUtc" => quote! { ChronoDateTimeUtc },
-        "DateTimeLocal" => quote! { ChronoDateTimeLocal },
-        "DateTimeWithTimeZone" => quote! { ChronoDateTimeWithTimeZone },
+        "Date" => quote! { Date },
+        "Time" => quote! { Time },
+        "DateTime" => quote! { DateTime },
+        "DateTimeWithTimeZone" => quote! { DateTimeWithTimeZone },
         "Uuid" => quote! { Uuid },
         "Json" => quote! { Json },
         "Decimal" => quote! { Decimal },
@@ -255,20 +251,31 @@ mod tests {
         assert!(arr("Vec<u8>").contains("ValueType"));
     }
 
-    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    each datetime
-    // flavor keeps its own array tag, agreeing with its `ValueType::array_type()`,
-    // while the column side stays merged on the shared wire type
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    a wall clock and
+    // an instant are different columns and different array members, so neither table
+    // may merge them; each array tag agrees with its `ValueType::array_type()`
     #[test]
-    fn datetime_array_flavors_stay_distinct() {
-        assert!(arr("DateTime").ends_with("ChronoDateTime"));
-        assert!(arr("NaiveDateTime").ends_with("ChronoDateTime"));
-        assert!(arr("DateTimeUtc").ends_with("ChronoDateTimeUtc"));
-        assert!(arr("DateTimeLocal").ends_with("ChronoDateTimeLocal"));
-        assert!(arr("DateTimeWithTimeZone").ends_with("ChronoDateTimeWithTimeZone"));
+    fn naive_and_zoned_datetimes_stay_distinct() {
+        assert!(col("DateTime").ends_with("Timestamp"));
+        assert!(arr("DateTime").ends_with("DateTime"));
 
-        for flavor in ["DateTimeUtc", "DateTimeLocal", "DateTimeWithTimeZone"] {
-            assert!(col(flavor).contains("TimestampWithTimeZone"));
+        assert!(col("DateTimeWithTimeZone").ends_with("TimestampWithTimeZone"));
+        assert!(arr("DateTimeWithTimeZone").ends_with("DateTimeWithTimeZone"));
+    }
+
+    // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    the tables hold only
+    // bare names, so a qualified spelling or a user alias resolves through `ValueType`
+    // rather than failing — the tables are a fast path, not the mechanism
+    #[test]
+    fn qualified_temporal_paths_reach_the_fallback() {
+        for ty in ["civil::Date", "jiff::civil::DateTime", "jiff::Timestamp"] {
+            assert!(col(ty).contains("ValueType"));
+            assert!(arr(ty).contains("ValueType"));
         }
+
+        // A bare alias is equally outside the tables and takes the same route.
+        assert!(col("Stamp").contains("ValueType"));
+        assert!(arr("Stamp").contains("ValueType"));
     }
 
     // [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    `Option<T>` unwrapping is structural

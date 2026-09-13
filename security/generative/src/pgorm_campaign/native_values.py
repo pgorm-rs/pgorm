@@ -50,9 +50,12 @@ def equivalent_snapshot(expected, actual):
             for a, b in zip(expected["data"], actual["data"], strict=True)
         )
     if name.startswith("datetime") and not expected["sql_null"]:
+        # Equal tags are already established above, and the one offset-aware
+        # kind is pinned to a zero offset, so the instant is the only thing
+        # left that a spelling change could move.
         first = datetime.fromisoformat(wire.temporal_text(expected["data"]))
         second = datetime.fromisoformat(wire.temporal_text(actual["data"]))
-        return first == second and first.utcoffset() == second.utcoffset()
+        return first == second
     return False
 
 

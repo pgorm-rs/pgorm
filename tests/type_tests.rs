@@ -49,12 +49,10 @@ fn main() {
     it_impl_traits!(Vec<u8>);
     it_impl_traits!(String);
     it_impl_traits!(serde_json::Value);
-    it_impl_traits!(chrono::NaiveDate);
-    it_impl_traits!(chrono::NaiveTime);
-    it_impl_traits!(chrono::NaiveDateTime);
-    it_impl_traits!(chrono::DateTime<chrono::FixedOffset>);
-    it_impl_traits!(chrono::DateTime<chrono::Utc>);
-    it_impl_traits!(chrono::DateTime<chrono::Local>);
+    it_impl_traits!(jiff::civil::Date);
+    it_impl_traits!(jiff::civil::Time);
+    it_impl_traits!(jiff::civil::DateTime);
+    it_impl_traits!(jiff::Timestamp);
     it_impl_traits!(rust_decimal::Decimal);
     it_impl_traits!(uuid::Uuid);
 }
@@ -134,27 +132,19 @@ fn try_from_u64_conversions() {
         Err(Error::ConvertFromU64(_))
     ));
     assert!(matches!(
-        chrono::NaiveDate::try_from_u64(1),
+        jiff::civil::Date::try_from_u64(1),
         Err(Error::ConvertFromU64(_))
     ));
     assert!(matches!(
-        chrono::NaiveTime::try_from_u64(1),
+        jiff::civil::Time::try_from_u64(1),
         Err(Error::ConvertFromU64(_))
     ));
     assert!(matches!(
-        chrono::NaiveDateTime::try_from_u64(1),
+        jiff::civil::DateTime::try_from_u64(1),
         Err(Error::ConvertFromU64(_))
     ));
     assert!(matches!(
-        <chrono::DateTime<chrono::FixedOffset>>::try_from_u64(1),
-        Err(Error::ConvertFromU64(_))
-    ));
-    assert!(matches!(
-        <chrono::DateTime<chrono::Utc>>::try_from_u64(1),
-        Err(Error::ConvertFromU64(_))
-    ));
-    assert!(matches!(
-        <chrono::DateTime<chrono::Local>>::try_from_u64(1),
+        jiff::Timestamp::try_from_u64(1),
         Err(Error::ConvertFromU64(_))
     ));
     assert!(matches!(

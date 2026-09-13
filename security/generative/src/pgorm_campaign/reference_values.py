@@ -48,8 +48,6 @@ TYPES = {
     "time": "time without time zone",
     "datetime": "timestamp without time zone",
     "datetime_utc": "timestamp with time zone",
-    "datetime_fixed": "timestamp with time zone",
-    "datetime_local": "timestamp with time zone",
     "ipnetwork": "inet",
     "mac_address": "macaddr",
 }

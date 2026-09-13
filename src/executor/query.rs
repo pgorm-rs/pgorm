@@ -267,27 +267,6 @@ macro_rules! try_getable_all {
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! try_getable_date_time {
-    ( $type: ty ) => {
-        impl TryGetable for $type {
-            #[allow(unused_variables)]
-            fn try_get_by<I: RowIndex + std::fmt::Display>(
-                res: &QueryResult,
-                idx: I,
-            ) -> Result<Self, TryGetError> {
-                let result: $type = res.row.try_get(idx).map_err(TryGetError::postgres)?;
-                Ok(result)
-            }
-
-            // [spec:pgorm:sem:exec.verify.accepts]
-            fn accepts(ty: &Type) -> bool {
-                <$type as FromSql>::accepts(ty)
-            }
-        }
-    };
-}
-
 try_getable_all!(bool);
 try_getable_all!(i8);
 try_getable_all!(i16);
@@ -301,23 +280,17 @@ try_getable_all!(Vec<u8>);
 #[cfg(feature = "with-json")]
 try_getable_all!(serde_json::Value);
 
-#[cfg(feature = "with-chrono")]
-try_getable_all!(chrono::NaiveDate);
+#[cfg(feature = "with-jiff")]
+try_getable_all!(jiff::civil::Date);
 
-#[cfg(feature = "with-chrono")]
-try_getable_all!(chrono::NaiveTime);
+#[cfg(feature = "with-jiff")]
+try_getable_all!(jiff::civil::Time);
 
-#[cfg(feature = "with-chrono")]
-try_getable_all!(chrono::NaiveDateTime);
+#[cfg(feature = "with-jiff")]
+try_getable_all!(jiff::civil::DateTime);
 
-#[cfg(feature = "with-chrono")]
-try_getable_date_time!(chrono::DateTime<chrono::FixedOffset>);
-
-#[cfg(feature = "with-chrono")]
-try_getable_all!(chrono::DateTime<chrono::Utc>);
-
-#[cfg(feature = "with-chrono")]
-try_getable_all!(chrono::DateTime<chrono::Local>);
+#[cfg(feature = "with-jiff")]
+try_getable_all!(jiff::Timestamp);
 
 use rust_decimal::Decimal;
 
@@ -535,23 +508,17 @@ mod postgres_array {
     #[cfg(feature = "with-json")]
     try_getable_postgres_array!(serde_json::Value);
 
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::NaiveDate);
+    #[cfg(feature = "with-jiff")]
+    try_getable_postgres_array!(jiff::civil::Date);
 
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::NaiveTime);
+    #[cfg(feature = "with-jiff")]
+    try_getable_postgres_array!(jiff::civil::Time);
 
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::NaiveDateTime);
+    #[cfg(feature = "with-jiff")]
+    try_getable_postgres_array!(jiff::civil::DateTime);
 
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::DateTime<chrono::FixedOffset>);
-
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::DateTime<chrono::Utc>);
-
-    #[cfg(feature = "with-chrono")]
-    try_getable_postgres_array!(chrono::DateTime<chrono::Local>);
+    #[cfg(feature = "with-jiff")]
+    try_getable_postgres_array!(jiff::Timestamp);
 
     try_getable_postgres_array!(rust_decimal::Decimal);
 
@@ -931,23 +898,17 @@ try_from_u64_err!(Vec<u8>);
 #[cfg(feature = "with-json")]
 try_from_u64_err!(serde_json::Value);
 
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::NaiveDate);
+#[cfg(feature = "with-jiff")]
+try_from_u64_err!(jiff::civil::Date);
 
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::NaiveTime);
+#[cfg(feature = "with-jiff")]
+try_from_u64_err!(jiff::civil::Time);
 
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::NaiveDateTime);
+#[cfg(feature = "with-jiff")]
+try_from_u64_err!(jiff::civil::DateTime);
 
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::DateTime<chrono::FixedOffset>);
-
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::DateTime<chrono::Utc>);
-
-#[cfg(feature = "with-chrono")]
-try_from_u64_err!(chrono::DateTime<chrono::Local>);
+#[cfg(feature = "with-jiff")]
+try_from_u64_err!(jiff::Timestamp);
 
 try_from_u64_err!(rust_decimal::Decimal);
 

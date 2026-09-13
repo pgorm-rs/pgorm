@@ -29,11 +29,11 @@ pub(super) fn infer(data: &Bound<'_, PyAny>) -> PyResult<ArrayType> {
                 "aware datetimes require an explicit temporal kind",
             ));
         }
-        ArrayType::ChronoDateTime
+        ArrayType::DateTime
     } else if data.is_exact_instance_of::<PyDate>() {
-        ArrayType::ChronoDate
+        ArrayType::Date
     } else if data.is_exact_instance_of::<PyTime>() {
-        ArrayType::ChronoTime
+        ArrayType::Time
     } else if instance(data, "decimal", "Decimal")? {
         ArrayType::Decimal
     } else if instance(data, "uuid", "UUID")? {

@@ -1,9 +1,9 @@
 use bytes::BytesMut;
-use chrono::NaiveTime;
+use jiff::civil::{Time, time};
 use rust_decimal::Decimal;
 use tokio_postgres::types::{FromSql, ToSql, Type};
 
-use super::codecs::{CheckedArray, ExactDecimal, ExactTime};
+use super::codecs::{CheckedArray, ExactDecimal};
 
 type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
@@ -61,14 +61,19 @@ fn array_codec_preserves_nullable_rust_elements() -> TestResult {
 
 // [spec:pgorm:req:python.results/test]
 #[test]
-fn time_roundtrip_rejects_midnight_wrap() -> TestResult {
+fn time_decode_rejects_values_outside_a_civil_day() -> TestResult {
     let valid = 45_296_123_456i64.to_be_bytes();
     assert_eq!(
-        ExactTime::from_sql(&Type::TIME, &valid)?.0,
-        NaiveTime::from_sql(&Type::TIME, &valid)?
+        Time::from_sql(&Type::TIME, &valid)?,
+        time(12, 34, 56, 123_456_000)
     );
-    let midnight_next = 86_400_000_000i64.to_be_bytes();
-    assert!(NaiveTime::from_sql(&Type::TIME, &midnight_next).is_ok());
-    assert!(ExactTime::from_sql(&Type::TIME, &midnight_next).is_err());
+    // PostgreSQL admits 24:00:00; a civil time has no such hour.
+    for outside in [86_400_000_000i64, -1, i64::MAX] {
+        assert!(Time::from_sql(&Type::TIME, &outside.to_be_bytes()).is_err());
+    }
+    // Every accepted value re-encodes byte for byte, so decoding cannot round.
+    let mut encoded = BytesMut::new();
+    Time::from_sql(&Type::TIME, &valid)?.to_sql(&Type::TIME, &mut encoded)?;
+    assert_eq!(valid.as_ref(), encoded.as_ref());
     Ok(())
 }

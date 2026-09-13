@@ -11,7 +11,7 @@ fn manifest() -> Value {
         "pgorm_version": env!("PGORM_VERSION"),
         "binding": {"name": "pyo3", "version": "0.29.2", "registry_abi": 1},
         "target": env!("PGORM_BINDING_TARGET"),
-        "features": ["macros", "with-json", "with-chrono", "with-uuid", "postgres-array", "runtime-tokio"],
+        "features": ["macros", "with-json", "with-jiff", "with-uuid", "postgres-array", "runtime-tokio"],
         "transport": "in-process",
         "operations": {
             "pool": {"rust_api": "pgorm::connect_with", "features": ["runtime-tokio"]},
@@ -37,8 +37,8 @@ fn manifest() -> Value {
         "value_policy": {
             "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
             "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",
-            "temporal_precision": "microseconds; leap seconds and subsecond offsets rejected",
-            "aware_datetime": "explicit UTC, machine local, or fixed-offset tag",
+            "temporal_precision": "microseconds; finer precision and subsecond offsets rejected",
+            "aware_datetime": "explicit UTC tag requiring a zero offset",
             "enum_storage": "Rust String value with qualified TypeName metadata",
             "snapshot": "version 1, tagged JSON with integer strings and IEEE float bits"
         },
@@ -98,7 +98,7 @@ fn manifest() -> Value {
             "enum": "schema-qualified TypeName required", "array_dimensions": 1,
             "writes": "missing mapping entry is omitted; None is SQL NULL; Value.json(None) is JSON null",
             "one": "strict dynamic Record cardinality; explicit limit selects a first row",
-            "unsupported_kinds": ["u64", "char", "datetime_fixed", "datetime_local"],
+            "unsupported_kinds": ["u64", "char"],
             "stream": false, "automatic_ddl": false
         },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},

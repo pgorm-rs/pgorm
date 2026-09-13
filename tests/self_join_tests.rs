@@ -24,7 +24,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let model = self_join::Model {
         uuid: Uuid::new_v4(),
         uuid_ref: None,
-        time: Some(Time::from_hms_opt(1, 00, 00).unwrap()),
+        time: Some(Time::new(1, 0, 0, 0).unwrap()),
     };
 
     model.clone().into_active_model().insert(db).await?;
@@ -32,7 +32,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let linked_model = self_join::Model {
         uuid: Uuid::new_v4(),
         uuid_ref: Some(model.clone().uuid),
-        time: Some(Time::from_hms_opt(2, 00, 00).unwrap()),
+        time: Some(Time::new(2, 0, 0, 0).unwrap()),
     };
 
     linked_model.clone().into_active_model().insert(db).await?;
@@ -40,7 +40,7 @@ pub async fn create_metadata(db: &DatabaseConnection) -> Result<(), Error> {
     let not_linked_model = self_join::Model {
         uuid: Uuid::new_v4(),
         uuid_ref: None,
-        time: Some(Time::from_hms_opt(3, 00, 00).unwrap()),
+        time: Some(Time::new(3, 0, 0, 0).unwrap()),
     };
 
     not_linked_model

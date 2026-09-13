@@ -26,7 +26,7 @@
 //! threaded through a result: the panic is the signal.
 #![allow(clippy::print_stdout, clippy::unwrap_used)]
 
-use chrono::{FixedOffset, NaiveDate, NaiveTime};
+use jiff::{civil::time, tz::TimeZone};
 use pgorm::pgorm_query::{ArrayType, MacAddress, Value, Vector};
 use pgorm_generative_replay::wire::{Tagged, TypeName, validate};
 use rust_decimal::Decimal;
@@ -44,11 +44,8 @@ fn emit(label: &str, document: &Json) {
 }
 
 fn main() {
-    let naive = NaiveDate::from_ymd_opt(2024, 1, 2)
-        .unwrap()
-        .and_time(NaiveTime::from_hms_micro_opt(3, 4, 5, 123_456).unwrap());
-    let offset = FixedOffset::east_opt(5 * 3600 + 30 * 60).unwrap();
-    let fixed = naive.and_local_timezone(offset).single().unwrap();
+    let naive = jiff::civil::datetime(2024, 1, 2, 3, 4, 5, 123_456_000);
+    let instant = TimeZone::UTC.to_timestamp(naive).unwrap();
 
     let encoded: Vec<(&str, Tagged)> = vec![
         ("null-i32", Tagged::from_value(Value::Int(None))),
@@ -163,29 +160,27 @@ fn main() {
         ("json-sql-null", Tagged::from_value(Value::Json(None))),
         (
             "date",
-            Tagged::from_value(Value::ChronoDate(Some(Box::new(naive.date())))),
+            Tagged::from_value(Value::Date(Some(Box::new(naive.date())))),
         ),
         (
             "time",
-            Tagged::from_value(Value::ChronoTime(Some(Box::new(naive.time())))),
+            Tagged::from_value(Value::Time(Some(Box::new(naive.time())))),
         ),
         (
             "time-whole-second",
-            Tagged::from_value(Value::ChronoTime(Some(Box::new(
-                NaiveTime::from_hms_opt(3, 4, 5).unwrap(),
-            )))),
+            Tagged::from_value(Value::Time(Some(Box::new(time(3, 4, 5, 0))))),
+        ),
+        (
+            "time-trimmed-fraction",
+            Tagged::from_value(Value::Time(Some(Box::new(time(3, 4, 5, 120_000_000))))),
         ),
         (
             "datetime",
-            Tagged::from_value(Value::ChronoDateTime(Some(Box::new(naive)))),
+            Tagged::from_value(Value::DateTime(Some(Box::new(naive)))),
         ),
         (
             "datetime-utc",
-            Tagged::from_value(Value::ChronoDateTimeUtc(Some(Box::new(naive.and_utc())))),
-        ),
-        (
-            "datetime-fixed",
-            Tagged::from_value(Value::ChronoDateTimeWithTimeZone(Some(Box::new(fixed)))),
+            Tagged::from_value(Value::DateTimeWithTimeZone(Some(Box::new(instant)))),
         ),
         (
             "uuid",
@@ -314,12 +309,22 @@ fn main() {
             json!({"version": 1, "type": {"kind": "datetime"}, "sql_null": false, "data": "2024-01-02 03:04:05+00:00"}),
         ),
         (
-            "naive-on-fixed",
-            json!({"version": 1, "type": {"kind": "datetime_fixed"}, "sql_null": false, "data": "2024-01-02 03:04:05"}),
+            "offset-on-time",
+            json!({"version": 1, "type": {"kind": "time"}, "sql_null": false, "data": "03:04:05+00:00"}),
+        ),
+        (
+            "naive-on-utc",
+            json!({"version": 1, "type": {"kind": "datetime_utc"}, "sql_null": false, "data": "2024-01-02 03:04:05"}),
         ),
         (
             "nonzero-utc",
             json!({"version": 1, "type": {"kind": "datetime_utc"}, "sql_null": false, "data": "2024-01-02 03:04:05+05:30"}),
+        ),
+        (
+            // A datetime-shaped name outside the scalar set: both sides have to
+            // refuse it on the kind, not fall through to a temporal parser.
+            "unknown-datetime-kind",
+            json!({"version": 1, "type": {"kind": "datetime_fixed"}, "sql_null": false, "data": "2024-01-02 03:04:05+05:45"}),
         ),
         (
             "unknown-kind",

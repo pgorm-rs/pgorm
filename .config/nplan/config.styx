@@ -4,7 +4,11 @@ platforms (
         files (security/generative/bridge/**/*.rs security/generative/bridge/Cargo.toml security/generative/bridge/Cargo.lock)
         checks {
             unit {
-                cmd "cargo test --manifest-path security/generative/bridge/Cargo.toml --locked --target-dir target --lib"
+                // The bridge links libpython, so the interpreter has to be the
+                // pinned one: a shim whose LIBDIR no longer exists fails at the
+                // link step with a message about a missing library rather than
+                // about the interpreter.
+                cmd "env PYO3_PYTHON=python3.14 cargo test --manifest-path security/generative/bridge/Cargo.toml --locked --target-dir target --lib"
             }
             format {
                 cmd "cargo fmt --manifest-path security/generative/bridge/Cargo.toml --all -- --check"
@@ -198,6 +202,13 @@ quality {
         // counts toward src/ — the directory scope penalized
         // every crate that keeps tests out-of-tree
         scope "crate"
+    }
+    function-name {
+        // the temporal accessors are named `as_ref_<variant>` over their own
+        // Value variants, and DateTimeWithTimeZone is spelled that way so
+        // generated entity source keeps compiling unchanged. Shortening this
+        // one would break the run of names its siblings establish
+        allow-names (as_ref_date_time_with_time_zone)
     }
     function-density {
         // count production functions only; inline #[cfg(test)]
