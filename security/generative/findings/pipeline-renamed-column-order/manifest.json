@@ -1,0 +1,17 @@
+{
+  "files": {
+    "Cargo.lock": "69f9a3906d79345382e55cca0bb75b84b7a9539fc3337c5c30bf7dbf0a87acde",
+    "Cargo.toml": "6a6c6bf2cb0f96f5ef6154c8f326aabbf7670c67b245e0f4d2dd2bfafaba5414",
+    "README.md": "330e326777923c8bc504a5e37bed6c42106ae332897c4f3597c26a805a0068e7",
+    "minimal.json": "b63d089a07f44cde720151e0cf80827e5886df7a28f19aca04e89c3c6b15fe38",
+    "minimal.program.json": "5c77f11527fe91e24d4bac18ffe17fc7fdf780d54f915078f165894b598d55ba",
+    "native.log": "fca09e6429c40296226a6a603c495db36ce247974c604a7f90b0c23740e546e5",
+    "native.rs": "332c7bcd19a44f16beb46f2ad39806de83b4a2ed5930bfd577c869fcb0f51265",
+    "program.json": "e1b0705ca3f144a55cb967a574d748c7f8ae4f99c52db349ba6a08e13d6a2803",
+    "python.json": "8e16424e2865ebe912bd8b3d8f9cd9c4ca2305bb82fb9b60d8ea7a80c2a6737e",
+    "shrink.json": "bd29a6de4fc7d5108da0c189d7a86e51a94d79ac46f9f6ecab4935334793502b"
+  },
+  "program_sha256": "e1b0705ca3f144a55cb967a574d748c7f8ae4f99c52db349ba6a08e13d6a2803",
+  "reduced_program_sha256": "68c40169cfa87cd14c2caf1ca4bed6599991626ce7ce4fe4b59af5f2c1c13aa6",
+  "version": 1
+}

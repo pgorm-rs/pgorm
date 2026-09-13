@@ -1,0 +1,929 @@
+{
+  "program_sha256": "68c40169cfa87cd14c2caf1ca4bed6599991626ce7ce4fe4b59af5f2c1c13aa6",
+  "status": "defect",
+  "comparisons": [
+    {
+      "step": "s0",
+      "oracle": "reference",
+      "equal": false,
+      "reason": "row multisets differ"
+    },
+    {
+      "step": "final",
+      "oracle": "fixture-state",
+      "equal": true,
+      "reason": "equal"
+    }
+  ],
+  "cleanup_errors": [],
+  "subject": {
+    "program_sha256": "68c40169cfa87cd14c2caf1ca4bed6599991626ce7ce4fe4b59af5f2c1c13aa6",
+    "native_sha256": "dca1de729f3b38efd76b91cfe7923a473011d6037019698f5d5d8cf39853e244",
+    "status": "executed",
+    "trace": [
+      {
+        "id": "n44",
+        "operation": "pipeline.distinct",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::distinct"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n13",
+        "operation": "pipeline.select",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::select"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n2",
+        "operation": "pipeline.from",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::from"
+        ],
+        "observation": {
+          "python_type": "Pipeline"
+        }
+      },
+      {
+        "id": "n1",
+        "operation": "pipeline.source",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::IntoSource",
+          "pgorm::pipeline::Source::named"
+        ],
+        "observation": {
+          "python_type": "PipelineSource"
+        }
+      },
+      {
+        "id": "n0",
+        "operation": "table",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm_query::TableRef"
+        ],
+        "observation": {
+          "python_type": "Table"
+        }
+      },
+      {
+        "id": "n3",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n6",
+        "operation": "pipeline.named",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::ExprOps::as_"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n5",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n7",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n9",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      },
+      {
+        "id": "n11",
+        "operation": "pipeline.column",
+        "scope": "root",
+        "status": "constructed",
+        "native_paths": [
+          "pgorm::pipeline::col"
+        ],
+        "observation": {
+          "python_type": "PipelineExpr"
+        }
+      }
+    ],
+    "steps": [
+      {
+        "id": "s0",
+        "operation": "fetch",
+        "status": "observed",
+        "observation": {
+          "kind": "rows",
+          "rows": [
+            {
+              "kind": "record",
+              "fields": [
+                {
+                  "name": "id",
+                  "value": {
+                    "data": "1",
+                    "sql_null": false,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "version": 1
+                  }
+                },
+                {
+                  "name": "name",
+                  "value": {
+                    "data": "Alice",
+                    "sql_null": false,
+                    "type": {
+                      "kind": "text"
+                    },
+                    "version": 1
+                  }
+                },
+                {
+                  "name": "score",
+                  "value": {
+                    "data": "10",
+                    "sql_null": false,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "version": 1
+                  }
+                },
+                {
+                  "name": "rank",
+                  "value": {
+                    "data": "1",
+                    "sql_null": false,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "version": 1
+                  }
+                },
+                {
+                  "name": "p_tenant",
+                  "value": {
+                    "data": "1",
+                    "sql_null": false,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "version": 1
+                  }
+                }
+              ],
+              "postgres": [
+                {
+                  "name": "id",
+                  "type": "int4",
+                  "schema": "pg_catalog"
+                },
+                {
+                  "name": "name",
+                  "type": "text",
+                  "schema": "pg_catalog"
+                },
+                {
+                  "name": "score",
+                  "type": "int4",
+                  "schema": "pg_catalog"
+                },
+                {
+                  "name": "rank",
+                  "type": "int4",
+                  "schema": "pg_catalog"
+                },
+                {
+                  "name": "p_tenant",
+                  "type": "int4",
+                  "schema": "pg_catalog"
+                }
+              ]
+            }
+          ]
+        },
+        "native_paths": [
+          "pgorm::pipeline::Pipeline::all"
+        ]
+      }
+    ],
+    "cleanup_errors": [],
+    "builds": 0,
+    "subprocess_attempts": [],
+    "unconstructed": [],
+    "seconds": 0.1472914586775005,
+    "ordinal": 203
+  },
+  "reference": {
+    "program_sha256": "68c40169cfa87cd14c2caf1ca4bed6599991626ce7ce4fe4b59af5f2c1c13aa6",
+    "status": "executed",
+    "steps": [
+      {
+        "id": "s0",
+        "observation": {
+          "kind": "rows",
+          "rows": [
+            {
+              "kind": "record",
+              "fields": [
+                {
+                  "name": "id",
+                  "value": {
+                    "version": 1,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "sql_null": false,
+                    "data": "1"
+                  }
+                },
+                {
+                  "name": "p_tenant",
+                  "value": {
+                    "version": 1,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "sql_null": false,
+                    "data": "1"
+                  }
+                },
+                {
+                  "name": "name",
+                  "value": {
+                    "version": 1,
+                    "type": {
+                      "kind": "text"
+                    },
+                    "sql_null": false,
+                    "data": "Alice"
+                  }
+                },
+                {
+                  "name": "score",
+                  "value": {
+                    "version": 1,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "sql_null": false,
+                    "data": "10"
+                  }
+                },
+                {
+                  "name": "rank",
+                  "value": {
+                    "version": 1,
+                    "type": {
+                      "kind": "i32"
+                    },
+                    "sql_null": false,
+                    "data": "1"
+                  }
+                }
+              ],
+              "postgres": [
+                {
+                  "name": "id",
+                  "schema": "pg_catalog",
+                  "type": "int4"
+                },
+                {
+                  "name": "p_tenant",
+                  "schema": "pg_catalog",
+                  "type": "int4"
+                },
+                {
+                  "name": "name",
+                  "schema": "pg_catalog",
+                  "type": "text"
+                },
+                {
+                  "name": "score",
+                  "schema": "pg_catalog",
+                  "type": "int4"
+                },
+                {
+                  "name": "rank",
+                  "schema": "pg_catalog",
+                  "type": "int4"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "cleanup_errors": [],
+    "seconds": 0.0010857079178094864
+  },
+  "reference_state": {
+    "schemas": [
+      [
+        "fixture"
+      ],
+      [
+        "other"
+      ],
+      [
+        "public"
+      ]
+    ],
+    "columns": [
+      [
+        "fixture",
+        "accounts",
+        1,
+        "id",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        2,
+        "tenant",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        3,
+        "name",
+        "pg_catalog",
+        "text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        4,
+        "note",
+        "pg_catalog",
+        "text",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        5,
+        "score",
+        "pg_catalog",
+        "int4",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        6,
+        "rank",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        7,
+        "active",
+        "pg_catalog",
+        "bool",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        8,
+        "balance",
+        "pg_catalog",
+        "numeric",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        9,
+        "tags",
+        "pg_catalog",
+        "_text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        10,
+        "payload",
+        "pg_catalog",
+        "jsonb",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        11,
+        "uuid",
+        "pg_catalog",
+        "uuid",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        12,
+        "created_at",
+        "pg_catalog",
+        "timestamp",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        13,
+        "occurred_at",
+        "pg_catalog",
+        "timestamptz",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        14,
+        "event_date",
+        "pg_catalog",
+        "date",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        15,
+        "event_time",
+        "pg_catalog",
+        "time",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        16,
+        "state",
+        "fixture",
+        "State\" \u96ea",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ]
+    ],
+    "constraints": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "p",
+        "PRIMARY KEY (id)",
+        true
+      ]
+    ],
+    "indexes": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "CREATE UNIQUE INDEX accounts_pkey ON fixture.accounts USING btree (id)",
+        true,
+        true
+      ]
+    ],
+    "enums": [
+      [
+        "fixture",
+        "State\" \u96ea",
+        1.0,
+        "calm"
+      ],
+      [
+        "fixture",
+        "State\" \u96ea",
+        2.0,
+        "O'Brien \u96ea"
+      ]
+    ],
+    "views": [],
+    "triggers": [],
+    "routines": [],
+    "sequences": [],
+    "relations": [
+      [
+        "fixture",
+        "accounts",
+        "r",
+        false,
+        false
+      ]
+    ],
+    "tables": [
+      {
+        "schema": "fixture",
+        "name": "accounts",
+        "rows": [
+          "{\"fields\":[{\"name\":\"id\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"tenant\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"name\",\"value\":{\"data\":\"Alice\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}}},{\"name\":\"note\",\"value\":{\"data\":null,\"sql_null\":true,\"type\":{\"kind\":\"text\"}}},{\"name\":\"score\",\"value\":{\"data\":\"10\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"rank\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"active\",\"value\":{\"data\":true,\"sql_null\":false,\"type\":{\"kind\":\"bool\"}}},{\"name\":\"balance\",\"value\":{\"data\":\"123.4500\",\"sql_null\":false,\"type\":{\"kind\":\"decimal\"}}},{\"name\":\"tags\",\"value\":{\"data\":[{\"data\":\"Alice\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}},{\"data\":null,\"sql_null\":true,\"type\":{\"kind\":\"text\"}},{\"data\":\"%_\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}}],\"sql_null\":false,\"type\":{\"element\":{\"kind\":\"text\"},\"kind\":\"array\"}}},{\"name\":\"payload\",\"value\":{\"data\":{\"null\":null,\"owner\":\"Alice\"},\"sql_null\":false,\"type\":{\"kind\":\"json\"}}},{\"name\":\"uuid\",\"value\":{\"data\":\"00000000-0000-0000-0000-000000000001\",\"sql_null\":false,\"type\":{\"kind\":\"uuid\"}}},{\"name\":\"created_at\",\"value\":{\"data\":\"2024-01-02T03:04:05.123456\",\"sql_null\":false,\"type\":{\"kind\":\"datetime\"}}},{\"name\":\"occurred_at\",\"value\":{\"data\":\"2024-01-02T03:04:05.123456+00:00\",\"sql_null\":false,\"type\":{\"kind\":\"datetime_utc\"}}},{\"name\":\"event_date\",\"value\":{\"data\":\"2024-01-02\",\"sql_null\":false,\"type\":{\"kind\":\"date\"}}},{\"name\":\"event_time\",\"value\":{\"data\":\"03:04:05.123456\",\"sql_null\":false,\"type\":{\"kind\":\"time\"}}},{\"name\":\"state\",\"value\":{\"data\":\"calm\",\"sql_null\":false,\"type\":{\"kind\":\"enum\",\"name\":\"State\\\" \u96ea\",\"schema\":\"fixture\"}}}],\"kind\":\"record\",\"postgres\":[{\"name\":\"id\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"tenant\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"name\",\"schema\":\"pg_catalog\",\"type\":\"text\"},{\"name\":\"note\",\"schema\":\"pg_catalog\",\"type\":\"text\"},{\"name\":\"score\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"rank\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"active\",\"schema\":\"pg_catalog\",\"type\":\"bool\"},{\"name\":\"balance\",\"schema\":\"pg_catalog\",\"type\":\"numeric\"},{\"name\":\"tags\",\"schema\":\"pg_catalog\",\"type\":\"_text\"},{\"name\":\"payload\",\"schema\":\"pg_catalog\",\"type\":\"jsonb\"},{\"name\":\"uuid\",\"schema\":\"pg_catalog\",\"type\":\"uuid\"},{\"name\":\"created_at\",\"schema\":\"pg_catalog\",\"type\":\"timestamp\"},{\"name\":\"occurred_at\",\"schema\":\"pg_catalog\",\"type\":\"timestamptz\"},{\"name\":\"event_date\",\"schema\":\"pg_catalog\",\"type\":\"date\"},{\"name\":\"event_time\",\"schema\":\"pg_catalog\",\"type\":\"time\"},{\"name\":\"state\",\"schema\":\"fixture\",\"type\":\"State\\\" \u96ea\"}]}"
+        ]
+      }
+    ]
+  },
+  "subject_state": {
+    "schemas": [
+      [
+        "fixture"
+      ],
+      [
+        "other"
+      ],
+      [
+        "public"
+      ]
+    ],
+    "columns": [
+      [
+        "fixture",
+        "accounts",
+        1,
+        "id",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        2,
+        "tenant",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        3,
+        "name",
+        "pg_catalog",
+        "text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        4,
+        "note",
+        "pg_catalog",
+        "text",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        5,
+        "score",
+        "pg_catalog",
+        "int4",
+        -1,
+        false,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        6,
+        "rank",
+        "pg_catalog",
+        "int4",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        7,
+        "active",
+        "pg_catalog",
+        "bool",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        8,
+        "balance",
+        "pg_catalog",
+        "numeric",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        9,
+        "tags",
+        "pg_catalog",
+        "_text",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        10,
+        "payload",
+        "pg_catalog",
+        "jsonb",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        11,
+        "uuid",
+        "pg_catalog",
+        "uuid",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        12,
+        "created_at",
+        "pg_catalog",
+        "timestamp",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        13,
+        "occurred_at",
+        "pg_catalog",
+        "timestamptz",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        14,
+        "event_date",
+        "pg_catalog",
+        "date",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        15,
+        "event_time",
+        "pg_catalog",
+        "time",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ],
+      [
+        "fixture",
+        "accounts",
+        16,
+        "state",
+        "fixture",
+        "State\" \u96ea",
+        -1,
+        true,
+        "",
+        "",
+        null
+      ]
+    ],
+    "constraints": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "p",
+        "PRIMARY KEY (id)",
+        true
+      ]
+    ],
+    "indexes": [
+      [
+        "fixture",
+        "accounts",
+        "accounts_pkey",
+        "CREATE UNIQUE INDEX accounts_pkey ON fixture.accounts USING btree (id)",
+        true,
+        true
+      ]
+    ],
+    "enums": [
+      [
+        "fixture",
+        "State\" \u96ea",
+        1.0,
+        "calm"
+      ],
+      [
+        "fixture",
+        "State\" \u96ea",
+        2.0,
+        "O'Brien \u96ea"
+      ]
+    ],
+    "views": [],
+    "triggers": [],
+    "routines": [],
+    "sequences": [],
+    "relations": [
+      [
+        "fixture",
+        "accounts",
+        "r",
+        false,
+        false
+      ]
+    ],
+    "tables": [
+      {
+        "schema": "fixture",
+        "name": "accounts",
+        "rows": [
+          "{\"fields\":[{\"name\":\"id\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"tenant\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"name\",\"value\":{\"data\":\"Alice\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}}},{\"name\":\"note\",\"value\":{\"data\":null,\"sql_null\":true,\"type\":{\"kind\":\"text\"}}},{\"name\":\"score\",\"value\":{\"data\":\"10\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"rank\",\"value\":{\"data\":\"1\",\"sql_null\":false,\"type\":{\"kind\":\"i32\"}}},{\"name\":\"active\",\"value\":{\"data\":true,\"sql_null\":false,\"type\":{\"kind\":\"bool\"}}},{\"name\":\"balance\",\"value\":{\"data\":\"123.4500\",\"sql_null\":false,\"type\":{\"kind\":\"decimal\"}}},{\"name\":\"tags\",\"value\":{\"data\":[{\"data\":\"Alice\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}},{\"data\":null,\"sql_null\":true,\"type\":{\"kind\":\"text\"}},{\"data\":\"%_\",\"sql_null\":false,\"type\":{\"kind\":\"text\"}}],\"sql_null\":false,\"type\":{\"element\":{\"kind\":\"text\"},\"kind\":\"array\"}}},{\"name\":\"payload\",\"value\":{\"data\":{\"null\":null,\"owner\":\"Alice\"},\"sql_null\":false,\"type\":{\"kind\":\"json\"}}},{\"name\":\"uuid\",\"value\":{\"data\":\"00000000-0000-0000-0000-000000000001\",\"sql_null\":false,\"type\":{\"kind\":\"uuid\"}}},{\"name\":\"created_at\",\"value\":{\"data\":\"2024-01-02T03:04:05.123456\",\"sql_null\":false,\"type\":{\"kind\":\"datetime\"}}},{\"name\":\"occurred_at\",\"value\":{\"data\":\"2024-01-02T03:04:05.123456+00:00\",\"sql_null\":false,\"type\":{\"kind\":\"datetime_utc\"}}},{\"name\":\"event_date\",\"value\":{\"data\":\"2024-01-02\",\"sql_null\":false,\"type\":{\"kind\":\"date\"}}},{\"name\":\"event_time\",\"value\":{\"data\":\"03:04:05.123456\",\"sql_null\":false,\"type\":{\"kind\":\"time\"}}},{\"name\":\"state\",\"value\":{\"data\":\"calm\",\"sql_null\":false,\"type\":{\"kind\":\"enum\",\"name\":\"State\\\" \u96ea\",\"schema\":\"fixture\"}}}],\"kind\":\"record\",\"postgres\":[{\"name\":\"id\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"tenant\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"name\",\"schema\":\"pg_catalog\",\"type\":\"text\"},{\"name\":\"note\",\"schema\":\"pg_catalog\",\"type\":\"text\"},{\"name\":\"score\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"rank\",\"schema\":\"pg_catalog\",\"type\":\"int4\"},{\"name\":\"active\",\"schema\":\"pg_catalog\",\"type\":\"bool\"},{\"name\":\"balance\",\"schema\":\"pg_catalog\",\"type\":\"numeric\"},{\"name\":\"tags\",\"schema\":\"pg_catalog\",\"type\":\"_text\"},{\"name\":\"payload\",\"schema\":\"pg_catalog\",\"type\":\"jsonb\"},{\"name\":\"uuid\",\"schema\":\"pg_catalog\",\"type\":\"uuid\"},{\"name\":\"created_at\",\"schema\":\"pg_catalog\",\"type\":\"timestamp\"},{\"name\":\"occurred_at\",\"schema\":\"pg_catalog\",\"type\":\"timestamptz\"},{\"name\":\"event_date\",\"schema\":\"pg_catalog\",\"type\":\"date\"},{\"name\":\"event_time\",\"schema\":\"pg_catalog\",\"type\":\"time\"},{\"name\":\"state\",\"schema\":\"fixture\",\"type\":\"State\\\" \u96ea\"}]}"
+        ]
+      }
+    ]
+  },
+  "seconds": 0.17510537523776293
+}
