@@ -394,5 +394,56 @@ pgorm has no `with-time` feature, so generated `TimeDate` and its siblings name
 types the prelude cannot supply; the option is covered, the type mapping behind
 it has no compilable target in this checkout.
 
-General Rust replay, compile profiles, the full matrix runner/CI and the
-million-program acceptance campaign remain separate unfinished WBS work.
+General Rust replay, compile profiles, dedicated CI and the million-program
+acceptance campaign remain separate unfinished WBS work.
+
+## Campaign profiles and the runner
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  security/generative/tests/live_campaign.py --profile smoke
+```
+
+`profiles.json` declares the versioned `smoke` and `full` profiles: coverage
+obligations, generation and fixture limits, seed policy, worker count,
+execution and shrink budgets, control requirements, and which of five run
+classes each includes. The classes are counted in fields whose names carry the
+distinction — `construction_only_programs_constructed`,
+`live_database_programs_checked`, `invalid_input_programs_checked`,
+`control_programs_checked` and the compile suite's own `compile_*` block. The
+report contains no total across them, so a construction count cannot be read
+as a count of independently checked database programs.
+
+Every scheduled item ends with exactly one of pass, defect, expected-rejection,
+invalid-control or incomplete. The command fails on a missing worker, a crash,
+an unexpected panic, a deadline, an absent or malformed artifact, skipped work,
+empty discovery or a cleanup failure — each a named fault, kept apart from the
+verdicts because "we could not tell" is not a result. Aggregate success is
+conjunctive: declared coverage satisfied, controls successful, and every
+scheduled item accounted for.
+
+Coverage is computed from observations, never from scheduled labels: a
+constructed instruction with a recorded native path, a dispatched effect, a
+value at the context its own instruction declares. The complete matrix is
+evaluated on every run whatever the profile requires, so a smoke report states
+its own gap rather than leaving it to be inferred.
+
+Each run writes a fresh directory under `target/generative-campaign/`
+recording source revision and dirty content identity, interpreter, pgorm, PyO3,
+toolchain and dependency pins, extension hash, every artifact version,
+PostgreSQL identity and settings, seeds, expected against executed work per
+class, native call evidence, oracle decisions, timings and build counts —
+including `extension_builds_during_campaign`, which a per-program build would
+make non-zero. Credentials are scanned for and their presence fails the report.
+A failing item retains its original program, a reduced reproducer within the
+profile's shrink budget, the fixture definition, emitted Python and Rust
+sources and concrete replay argument lists.
+
+Smoke run `smoke-09b05f984b14` at seed 20260913 scheduled and recorded 208
+items: 150 constructions (744 programs/second, zero database contact), 30 live
+programs passing, six invalid-input programs producing their exact expected
+rejections, and all 22 controls detecting their intended defect. 111 distinct
+native API paths, 155 verified artifacts, zero builds, 18.4 seconds of runner
+work inside a 22-second command. It satisfied its 20 declared obligations and
+recorded 307 of 430 full-matrix obligations still outstanding: this is a
+bounded smoke profile, not full coverage and not acceptance.

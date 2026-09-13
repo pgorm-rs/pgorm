@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "run_classes": ["construction", "runtime", "invalid", "control", "compile"],
+  "class_claims": {
+    "construction": "Builder constructor calls that never reach PostgreSQL. A construction count is a count of programs built, never of independently checked database programs.",
+    "runtime": "Valid generated programs executed against paired PostgreSQL databases and decided by the independent oracle.",
+    "invalid": "Deliberately invalid input programs whose declared rejection PostgreSQL must produce; counted apart from valid runtime programs.",
+    "control": "Sensitivity controls that must make the oracle fail exactly as declared; they measure the oracle, not the library.",
+    "compile": "Bounded Rust source-generation cases scored on compiler diagnostics; its counts are compile counts and are never added to runtime counts."
+  },
+  "profiles": {
+    "smoke": {
+      "profile_version": 1,
+      "purpose": "Bounded pull-request run: every scheduled grammar family reaches PostgreSQL and an oracle, and every mandatory control still detects its intended defect.",
+      "seed_policy": {
+        "mode": "pinned",
+        "seed": 20260913,
+        "derivation": "grammar.generate(seed, index) with index the per-class ordinal; the seed and index of every item are recorded",
+        "reseed_on_retry": false
+      },
+      "workers": 1,
+      "coverage": {
+        "obligations": "scheduled-families",
+        "operations": "sampled",
+        "shapes": "sampled",
+        "value_matrix": "sampled",
+        "claim": "Smoke establishes that each scheduled grammar family was constructed, reached PostgreSQL and was decided by an oracle. It does not establish full operation, shape or value-matrix coverage, and the report records the outstanding full-matrix obligations."
+      },
+      "data": {
+        "ordinary": "required",
+        "hostile": "sampled",
+        "corpus": "builtin",
+        "external_corpus": false
+      },
+      "generation_limits": {
+        "depth": 2,
+        "stages": 4,
+        "nodes": 128,
+        "max_programs": 512
+      },
+      "fixture_limits": {
+        "workers": 1,
+        "reset_per_program": true,
+        "rebuild_on_schema_change": true
+      },
+      "budgets": {
+        "program_timeout_seconds": 10,
+        "control_timeout_seconds": 60,
+        "class_seconds": {
+          "construction": 300,
+          "runtime": 1200,
+          "invalid": 600,
+          "control": 2400,
+          "compile": 0
+        },
+        "total_seconds": 4200,
+        "shrink": {
+          "enabled": true,
+          "candidates": 12,
+          "seconds": 180,
+          "passes": 3,
+          "timeout": 10,
+          "offered": 2000
+        }
+      },
+      "controls": {
+        "required": true,
+        "catalog_version": 1,
+        "minimum_controls": 22,
+        "require_declared_families": true
+      },
+      "run_classes": {
+        "construction": {
+          "included": true,
+          "programs": 150,
+          "families": "all",
+          "mode": "valid",
+          "database": false,
+          "oracle": false
+        },
+        "runtime": {
+          "included": true,
+          "programs": 30,
+          "families": "all",
+          "mode": "valid",
+          "database": true,
+          "oracle": true
+        },
+        "invalid": {
+          "included": true,
+          "programs": 6,
+          "families": "rejection",
+          "mode": "invalid",
+          "database": true,
+          "oracle": true
+        },
+        "control": {
+          "included": true,
+          "database": true,
+          "oracle": true
+        },
+        "compile": {
+          "included": false,
+          "database": false,
+          "oracle": false,
+          "reason": "The compile suite builds Cargo crates and is scheduled by the full profile and by its own command; pull-request smoke stays inside the runtime budget."
+        }
+      }
+    },
+    "full": {
+      "profile_version": 1,
+      "purpose": "Scheduled campaign: the complete coverage matrix over ordinary and hostile data, every control, the invalid-input class and the bounded compile suite.",
+      "seed_policy": {
+        "mode": "pinned",
+        "seed": 20260913,
+        "derivation": "grammar.generate(seed, index) with index the per-class ordinal; the seed and index of every item are recorded",
+        "reseed_on_retry": false
+      },
+      "workers": 4,
+      "coverage": {
+        "obligations": "full-matrix",
+        "operations": "complete",
+        "shapes": "complete",
+        "value_matrix": "complete",
+        "claim": "A full run must discharge every obligation matrix.obligations() derives from the versioned coverage matrix, using observed construction and execution evidence rather than scheduled labels."
+      },
+      "data": {
+        "ordinary": "required",
+        "hostile": "required",
+        "corpus": "builtin",
+        "external_corpus": true
+      },
+      "generation_limits": {
+        "depth": 3,
+        "stages": 5,
+        "nodes": 256,
+        "max_programs": 200000
+      },
+      "fixture_limits": {
+        "workers": 4,
+        "reset_per_program": true,
+        "rebuild_on_schema_change": true
+      },
+      "budgets": {
+        "program_timeout_seconds": 20,
+        "control_timeout_seconds": 120,
+        "class_seconds": {
+          "construction": 7200,
+          "runtime": 43200,
+          "invalid": 7200,
+          "control": 7200,
+          "compile": 7200
+        },
+        "total_seconds": 86400,
+        "shrink": {
+          "enabled": true,
+          "candidates": 240,
+          "seconds": 1800,
+          "passes": 12,
+          "timeout": 20,
+          "offered": 20000
+        }
+      },
+      "controls": {
+        "required": true,
+        "catalog_version": 1,
+        "minimum_controls": 22,
+        "require_declared_families": true
+      },
+      "run_classes": {
+        "construction": {
+          "included": true,
+          "programs": 20000,
+          "families": "all",
+          "mode": "valid",
+          "database": false,
+          "oracle": false
+        },
+        "runtime": {
+          "included": true,
+          "programs": 5000,
+          "families": "all",
+          "mode": "valid",
+          "database": true,
+          "oracle": true
+        },
+        "invalid": {
+          "included": true,
+          "programs": 500,
+          "families": "rejection",
+          "mode": "invalid",
+          "database": true,
+          "oracle": true
+        },
+        "control": {
+          "included": true,
+          "database": true,
+          "oracle": true
+        },
+        "compile": {
+          "included": true,
+          "database": false,
+          "oracle": false
+        }
+      }
+    }
+  }
+}
