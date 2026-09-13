@@ -53,7 +53,7 @@ platforms (
     }
     {
         platform "generative-python"
-        files (security/generative/src/**/*.py security/generative/tests/**/*.py security/generative/pyproject.toml)
+        files (security/generative/*.py security/generative/src/**/*.py security/generative/tests/**/*.py security/generative/pyproject.toml)
         checks {
             format {
                 cmd "uv tool run --from ruff==0.12.12 ruff format --check security/generative"

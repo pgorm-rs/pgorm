@@ -1661,6 +1661,11 @@ impl_evidence (
         {impl_name main, rule generative.profiles}
         {impl_name main, rule generative.verdict}
     )}
+    {id generative.ci, covered_rules (
+        generative.ci
+    ), covered_claims (
+        {impl_name main, rule generative.ci}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

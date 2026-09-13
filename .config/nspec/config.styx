@@ -23,6 +23,8 @@ specs ({
             pgorm-python/python/**/*.py
             pgorm-python/checks/**/*.py
             security/generative/src/**/*.py
+            security/generative/check.py
+            security/generative/ci.py
             security/generative/bridge/src/**/*.rs
             security/generative/replay/src/**/*.rs
             security/generative/compile/src/**/*.rs

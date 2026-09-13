@@ -5,4 +5,10 @@ sites (
     {path .github/workflows/sqlmap.yml, spec (
         [spec:pgorm:req:security.sqlmap.ci]
     )}
+    {path .github/workflows/generative-run.yml, spec (
+        [spec:pgorm:req:generative.ci]
+    )}
+    {path .github/workflows/generative.yml, spec (
+        [spec:pgorm:req:generative.ci]
+    )}
 )
