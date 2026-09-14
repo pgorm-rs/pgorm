@@ -5031,21 +5031,7 @@ children (
 
                     {
                         id sqlmap.controls.literal
-                        title "String-literal controls reach all six techniques"
-                        kind @fix
-                        deps (sqlmap.controls.contexts)
-                    }
-
-                    {
-                        id sqlmap.controls.identifier
-                        title "Quoted-identifier controls reach all six techniques"
-                        kind @fix
-                        deps (sqlmap.controls.contexts)
-                    }
-
-                    {
-                        id sqlmap.controls.unquoted
-                        title "Numeric and keyword controls reach all six techniques"
+                        title "Reshape the controls whose cells are genuinely reachable"
                         kind @fix
                         deps (sqlmap.controls.contexts)
                     }
@@ -5054,7 +5040,14 @@ children (
                         id sqlmap.controls.verify
                         title "A full profile detects every scheduled control"
                         kind @test
-                        deps (sqlmap.controls.literal sqlmap.controls.identifier sqlmap.controls.unquoted)
+                        deps (sqlmap.controls.literal sqlmap.controls.inapplicable)
+                    }
+
+                    {
+                        id sqlmap.controls.inapplicable
+                        title "An exempted pair cites the evidence that proves it unreachable"
+                        kind @feat
+                        deps (sqlmap.controls.contexts)
                     }
                 )
                 log (
@@ -5063,6 +5056,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "The breakdown follows injection context rather than case, because context is what decides which techniques can reach a control. Reading the thirty-five control routes in adapter/src/main.rs, they fall into three classes. String literal contexts interpolate into a quoted value, as in WHERE name='{input}' — these cover insert, update-value, update-guard, delete, tenant-or, empty-in, empty-or, parameters, the four LIKE cases, stored-value and the default arm, and they are the ones already detected by most techniques. Quoted identifier contexts interpolate inside double quotes, as in SELECT \"{input}\" FROM items — schema, table, column, group, pipeline-projection, stored-identifier, order, alias, graph-alias, enum and enum-ddl. These are where detection collapses, because escaping a double-quoted identifier leaves you needing the result to remain a valid identifier position. Unquoted contexts interpolate bare text into a keyword or numeric slot — function, cast, direction, limit and offset. The measured failures line up with those classes: inline query was missed in all thirty-five cases, all six techniques were missed for insert, pipeline-projection, schema, column, group, function and stored-identifier, and the remaining misses cluster in the identifier and unquoted groups. Inline query is the one technique that fails everywhere, and it needs a position where a subquery can be planted; limit and offset can host one directly since LIMIT (SELECT 1) is valid, while an identifier position needs the control to close the quote and open a projection. Worth noting that some of this may be about presenting a boundary shape sqlmap already recognises from its own boundaries list rather than an exotic one it has no payload for, so the contexts node should establish per technique what is actually required before any route is rewritten."
+                    }
+
+                    {
+                        at 2026-09-14T13:57:14.945398Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The operator's earlier choice to rework control routes rather than declare inapplicability is reversed, on evidence gathered since. Reworking cannot reach 210 of 210 because most of the 105 invalid-control pairs are structurally unreachable rather than merely badly written. The decisive fact, verified directly rather than taken from the analysis: inline query ships eight payloads and every one is where=3, REPLACE, and exactly one boundary in sqlmap's whole catalogue serves where=3, carrying an empty prefix and an empty suffix. Inline query therefore cannot escape a quote at any level, only replace a value already sitting unquoted, and because it confirms by grepping the response that value must also be reflected back. pgorm binds values and quotes identifiers, so it never emits an unquoted reflected projection, and no faithful control for inline query exists anywhere in this suite. That alone accounts for thirty-five pairs permanently. The same structural argument removes union against INSERT, UPDATE and DELETE, which offer no set-operation position, union after a terminal clause such as LIMIT or ORDER BY, where nothing may syntactically follow, and boolean, error and time against a bare object-name tail such as FROM quoted-name or AS quoted-name, which has no truth slot to hang a predicate on. The only way to make those fire is to give the control a different shape from the protected route it is twinned with, at which point its detection says nothing about pgorm in the real context and the control stops being a control. The chosen path is therefore declared inapplicability, but with a materially higher bar than the unread empty field that exists today: each exemption must cite the specific boundary or payload evidence that proves the cell unreachable, so a reviewer can check the claim rather than accept it. Everything not exempted must then be detected, with no partial credit. Also confirmed while checking: the full profile runs at level 3 and the harness passes extending=N, which declines sqlmap's offer to escalate to levels 4 and 5, so every identifier-escape, pre-WHERE, table-name and dollar-quoted boundary is out of reach by configuration rather than by nature."
                     }
                 )
             }
