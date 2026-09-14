@@ -5019,6 +5019,14 @@ children (
                         id sqlmap.controls.contexts
                         title "Establish what each technique needs from each context"
                         kind @docs
+                        log (
+                            {
+                                at 2026-09-14T13:22:59.323107Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+                        )
                     }
 
                     {
