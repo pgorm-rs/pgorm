@@ -32,23 +32,14 @@ pub enum WithSerde {
     Both,
 }
 
-// [spec:pgorm:sem:codegen.entity.types.datetime+1]
-#[derive(Debug, Default)]
-pub enum DateTimeCrate {
-    #[default]
-    Chrono,
-    Time,
-}
-
 /// Every generation option, named. `Default` is the no-flags shape: compact
-/// format, no serde, chrono, `mod.rs`.
-// [spec:pgorm:sem:codegen.entity.context+2]
+/// format, no serde, `mod.rs`.
+// [spec:pgorm:sem:codegen.entity.context+3]
 #[derive(Debug, Default)]
 pub struct EntityWriterOptions {
     pub expanded_format: bool,
     pub with_serde: WithSerde,
     pub with_copy_enums: bool,
-    pub date_time_crate: DateTimeCrate,
     pub schema_name: Option<String>,
     pub lib: bool,
     pub serde_skip_deserializing_primary_key: bool,
@@ -64,7 +55,6 @@ pub struct EntityWriterContext {
     pub(crate) expanded_format: bool,
     pub(crate) with_serde: WithSerde,
     pub(crate) with_copy_enums: bool,
-    pub(crate) date_time_crate: DateTimeCrate,
     pub(crate) schema_name: Option<String>,
     pub(crate) lib: bool,
     pub(crate) serde_skip_hidden_column: bool,
@@ -107,7 +97,7 @@ impl WithSerde {
 
 /// Converts *_extra_derives argument to token stream. `option` names the
 /// option the strings came from, so a rejection points at the caller's field.
-// [spec:pgorm:sem:codegen.entity.context+2]    extra-derive normalization
+// [spec:pgorm:sem:codegen.entity.context+3]    extra-derive normalization
 pub(crate) fn bonus_derive<T, I>(option: &str, extra_derives: I) -> Result<TokenStream, Error>
 where
     T: Into<String>,
@@ -123,7 +113,7 @@ where
 }
 
 /// convert *_extra_attributes argument to token stream
-// [spec:pgorm:sem:codegen.entity.context+2]    extra-attribute normalization
+// [spec:pgorm:sem:codegen.entity.context+3]    extra-attribute normalization
 pub(crate) fn bonus_attributes<T, I>(option: &str, attributes: I) -> Result<TokenStream, Error>
 where
     T: Into<String>,
@@ -141,7 +131,7 @@ where
     )
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2]
+// [spec:pgorm:sem:codegen.entity.context+3]
 fn parse_bonus(option: &str, source: &str) -> Result<TokenStream, Error> {
     source.parse().map_err(|_| {
         Error::TransformError(format!(
@@ -170,13 +160,12 @@ impl FromStr for WithSerde {
 }
 
 impl EntityWriterContext {
-    // [spec:pgorm:sem:codegen.entity.context+2]
+    // [spec:pgorm:sem:codegen.entity.context+3]
     pub fn new(options: EntityWriterOptions) -> Result<Self, Error> {
         Ok(Self {
             expanded_format: options.expanded_format,
             with_serde: options.with_serde,
             with_copy_enums: options.with_copy_enums,
-            date_time_crate: options.date_time_crate,
             schema_name: options.schema_name,
             lib: options.lib,
             serde_skip_deserializing_primary_key: options.serde_skip_deserializing_primary_key,
@@ -214,7 +203,6 @@ impl EntityWriter {
     }
 
     // [spec:pgorm:sem:codegen.entity.serde.skip]
-    // [spec:pgorm:sem:codegen.entity.context+2]    date_time_crate threading
     pub fn write_entities(&self, context: &EntityWriterContext) -> Vec<OutputFile> {
         self.entities
             .iter()
@@ -223,7 +211,7 @@ impl EntityWriter {
                 let column_info = entity
                     .columns
                     .iter()
-                    .map(|column| column.get_info(&context.date_time_crate))
+                    .map(|column| column.get_info())
                     .collect::<Vec<String>>();
                 // Serde must be enabled to use this
                 let serde_skip_deserializing_primary_key = context
@@ -246,7 +234,6 @@ impl EntityWriter {
                     Self::gen_expanded_code_blocks(
                         entity,
                         &context.with_serde,
-                        &context.date_time_crate,
                         &context.schema_name,
                         serde_skip_deserializing_primary_key,
                         serde_skip_hidden_column,
@@ -257,7 +244,6 @@ impl EntityWriter {
                     Self::gen_compact_code_blocks(
                         entity,
                         &context.with_serde,
-                        &context.date_time_crate,
                         &context.schema_name,
                         serde_skip_deserializing_primary_key,
                         serde_skip_hidden_column,
@@ -373,7 +359,6 @@ impl EntityWriter {
     pub fn gen_expanded_code_blocks(
         entity: &Entity,
         with_serde: &WithSerde,
-        date_time_crate: &DateTimeCrate,
         schema_name: &Option<String>,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
@@ -389,7 +374,6 @@ impl EntityWriter {
             Self::gen_model_struct(
                 entity,
                 with_serde,
-                date_time_crate,
                 serde_skip_deserializing_primary_key,
                 serde_skip_hidden_column,
                 model_extra_derives,
@@ -397,7 +381,7 @@ impl EntityWriter {
             ),
             Self::gen_column_enum(entity),
             Self::gen_primary_key_enum(entity),
-            Self::gen_impl_primary_key(entity, date_time_crate),
+            Self::gen_impl_primary_key(entity),
             Self::gen_relation_enum(entity),
             Self::gen_impl_column_trait(entity),
             Self::gen_impl_relation_trait(entity),
@@ -413,7 +397,6 @@ impl EntityWriter {
     pub fn gen_compact_code_blocks(
         entity: &Entity,
         with_serde: &WithSerde,
-        date_time_crate: &DateTimeCrate,
         schema_name: &Option<String>,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
@@ -427,7 +410,6 @@ impl EntityWriter {
             Self::gen_compact_model_struct(
                 entity,
                 with_serde,
-                date_time_crate,
                 schema_name,
                 serde_skip_deserializing_primary_key,
                 serde_skip_hidden_column,
@@ -529,14 +511,13 @@ impl EntityWriter {
     pub fn gen_model_struct(
         entity: &Entity,
         with_serde: &WithSerde,
-        date_time_crate: &DateTimeCrate,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
         model_extra_derives: &TokenStream,
         model_extra_attributes: &TokenStream,
     ) -> TokenStream {
         let column_names_snake_case = entity.get_column_names_snake_case();
-        let column_rs_types = entity.get_column_rs_types(date_time_crate);
+        let column_rs_types = entity.get_column_rs_types();
         let if_eq_needed = entity.get_eq_needed();
         let serde_attributes = entity.get_column_serde_attributes(
             serde_skip_deserializing_primary_key,
@@ -588,9 +569,9 @@ impl EntityWriter {
     }
 
     // [spec:pgorm:sem:codegen.entity.pk]
-    pub fn gen_impl_primary_key(entity: &Entity, date_time_crate: &DateTimeCrate) -> TokenStream {
+    pub fn gen_impl_primary_key(entity: &Entity) -> TokenStream {
         let primary_key_auto_increment = entity.get_primary_key_auto_increment();
-        let value_type = entity.get_primary_key_rs_type(date_time_crate);
+        let value_type = entity.get_primary_key_rs_type();
         quote! {
             impl PrimaryKeyTrait for PrimaryKey {
                 type ValueType = #value_type;
@@ -734,7 +715,6 @@ impl EntityWriter {
     pub fn gen_compact_model_struct(
         entity: &Entity,
         with_serde: &WithSerde,
-        date_time_crate: &DateTimeCrate,
         schema_name: &Option<String>,
         serde_skip_deserializing_primary_key: bool,
         serde_skip_hidden_column: bool,
@@ -743,7 +723,7 @@ impl EntityWriter {
     ) -> TokenStream {
         let table_name = entity.table_name.as_str();
         let column_names_snake_case = entity.get_column_names_snake_case();
-        let column_rs_types = entity.get_column_rs_types(date_time_crate);
+        let column_rs_types = entity.get_column_rs_types();
         let if_eq_needed = entity.get_eq_needed();
         let primary_keys: Vec<String> = entity
             .primary_keys
@@ -838,7 +818,7 @@ impl EntityWriter {
     /// The schema literal an entity's generated attribute carries: the source
     /// table's own qualifier, and only failing that the configured default. An
     /// option cannot move a table into a schema the DDL says it is not in.
-    // [spec:pgorm:sem:codegen.entity.context+2]
+    // [spec:pgorm:sem:codegen.entity.context+3]
     pub fn gen_schema_name(entity: &Entity, schema_name: &Option<String>) -> Option<TokenStream> {
         entity
             .effective_schema(schema_name)
@@ -849,8 +829,8 @@ impl EntityWriter {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Column, ConjunctRelation, DateTimeCrate, Entity, EntityWriter, PrimaryKey, Relation,
-        RelationType, WithSerde,
+        Column, ConjunctRelation, Entity, EntityWriter, PrimaryKey, Relation, RelationType,
+        WithSerde,
         entity::writer::{bonus_attributes, bonus_derive},
     };
     use pgorm_query::{Alias, ColumnType, ForeignKeyAction, SharedIden, StringLen};
@@ -1598,7 +1578,6 @@ mod tests {
                 EntityWriter::gen_expanded_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &None,
                     false,
                     false,
@@ -1618,7 +1597,6 @@ mod tests {
                 EntityWriter::gen_expanded_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &Some("schema_name".to_owned()),
                     false,
                     false,
@@ -1680,7 +1658,6 @@ mod tests {
                 EntityWriter::gen_compact_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &None,
                     false,
                     false,
@@ -1700,7 +1677,6 @@ mod tests {
                 EntityWriter::gen_compact_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &Some("schema_name".to_owned()),
                     false,
                     false,
@@ -1732,7 +1708,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1747,7 +1722,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::Serialize,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1762,7 +1736,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::Deserialize,
-                &DateTimeCrate::Chrono,
                 &None,
                 true,
                 false,
@@ -1775,7 +1748,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::Both,
-                &DateTimeCrate::Chrono,
                 &None,
                 true,
                 false,
@@ -1790,7 +1762,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1805,7 +1776,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::Serialize,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1820,7 +1790,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::Deserialize,
-                &DateTimeCrate::Chrono,
                 &None,
                 true,
                 false,
@@ -1833,7 +1802,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::Both,
-                &DateTimeCrate::Chrono,
                 &None,
                 true,
                 false,
@@ -1859,7 +1827,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1872,7 +1839,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1887,7 +1853,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1905,7 +1870,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1920,7 +1884,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1935,7 +1898,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -1980,7 +1942,6 @@ mod tests {
             dyn Fn(
                 &Entity,
                 &WithSerde,
-                &DateTimeCrate,
                 &Option<String>,
                 bool,
                 bool,
@@ -2008,7 +1969,6 @@ mod tests {
         let generated = generator(
             cake_entity,
             &entity_serde_variant.1,
-            &DateTimeCrate::Chrono,
             &entity_serde_variant.2,
             serde_skip_deserializing_primary_key,
             serde_skip_hidden_column,
@@ -2039,7 +1999,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2054,7 +2013,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2073,7 +2031,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_compact_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2094,7 +2051,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2109,7 +2065,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2128,7 +2083,6 @@ mod tests {
             generated_to_string(EntityWriter::gen_expanded_code_blocks(
                 &cake_entity,
                 &WithSerde::None,
-                &DateTimeCrate::Chrono,
                 &None,
                 false,
                 false,
@@ -2223,7 +2177,6 @@ mod tests {
                 EntityWriter::gen_compact_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &None,
                     false,
                     false,
@@ -2243,7 +2196,6 @@ mod tests {
                 EntityWriter::gen_expanded_code_blocks(
                     entity,
                     &crate::WithSerde::None,
-                    &crate::DateTimeCrate::Chrono,
                     &Some("schema_name".to_owned()),
                     false,
                     false,

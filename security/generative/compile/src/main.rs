@@ -14,7 +14,7 @@
 use std::io::{Read, Write};
 
 use pgorm_codegen::sql_schema::entities_from_sql;
-use pgorm_codegen::{DateTimeCrate, EntityWriterOptions, WithSerde};
+use pgorm_codegen::{EntityWriterOptions, WithSerde};
 use serde::{Deserialize, Serialize};
 
 /// One generation request: DDL text plus every `EntityWriterOptions` field.
@@ -33,8 +33,6 @@ struct Case {
     with_serde: String,
     #[serde(default)]
     with_copy_enums: bool,
-    #[serde(default)]
-    date_time_crate: String,
     #[serde(default)]
     schema_name: Option<String>,
     #[serde(default)]
@@ -94,20 +92,11 @@ fn serde_mode(text: &str) -> Result<WithSerde, String> {
     })
 }
 
-fn date_time_crate(text: &str) -> Result<DateTimeCrate, String> {
-    Ok(match text {
-        "" | "chrono" => DateTimeCrate::Chrono,
-        "time" => DateTimeCrate::Time,
-        other => return Err(format!("unknown date_time_crate spelling `{other}`")),
-    })
-}
-
 fn options(case: &Case) -> Result<EntityWriterOptions, String> {
     Ok(EntityWriterOptions {
         expanded_format: case.expanded_format,
         with_serde: serde_mode(&case.with_serde)?,
         with_copy_enums: case.with_copy_enums,
-        date_time_crate: date_time_crate(&case.date_time_crate)?,
         schema_name: case.schema_name.clone(),
         lib: case.lib,
         serde_skip_deserializing_primary_key: case.serde_skip_deserializing_primary_key,
@@ -181,8 +170,6 @@ mod tests {
     fn known_option_spellings_map_to_library_values() {
         assert!(matches!(serde_mode(""), Ok(WithSerde::None)));
         assert!(matches!(serde_mode("both"), Ok(WithSerde::Both)));
-        assert!(matches!(date_time_crate(""), Ok(DateTimeCrate::Chrono)));
-        assert!(matches!(date_time_crate("time"), Ok(DateTimeCrate::Time)));
     }
 
     #[test]

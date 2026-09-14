@@ -389,11 +389,6 @@ target directory reports a stale success.
 The run writes `target/generative-compile/compile-report.json`, whose counts are
 all labelled `compile_*` and which carries no runtime totals.
 
-`date_time_crate = "time"` is threaded over a schema with no temporal column.
-pgorm has no `with-time` feature, so generated `TimeDate` and its siblings name
-types the prelude cannot supply; the option is covered, the type mapping behind
-it has no compilable target in this checkout.
-
 General Rust replay and dedicated CI remain separate unfinished WBS work. The
 million-program stress demonstration and the acceptance assembly are built and
 have been run; acceptance itself has not passed.

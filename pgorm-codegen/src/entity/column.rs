@@ -1,5 +1,5 @@
 use crate::{
-    DateTimeCrate, Error,
+    Error,
     util::{escape_rust_keyword, safe_ident},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
@@ -48,10 +48,10 @@ impl Column {
     }
 
     // [spec:pgorm:sem:codegen.entity.types+2]
-    // [spec:pgorm:sem:codegen.entity.types.datetime+1]
+    // [spec:pgorm:sem:codegen.entity.types.datetime+2]
     // [spec:pgorm:req:codegen.entity.types.unsupported+1]
-    pub fn get_rs_type(&self, date_time_crate: &DateTimeCrate) -> TokenStream {
-        fn write_rs_type(col_type: &ColumnType, date_time_crate: &DateTimeCrate) -> String {
+    pub fn get_rs_type(&self) -> TokenStream {
+        fn write_rs_type(col_type: &ColumnType) -> String {
             #[allow(unreachable_patterns)]
             match col_type {
                 ColumnType::Char(_)
@@ -64,29 +64,17 @@ impl Column {
                 ColumnType::Float => "f32".to_owned(),
                 ColumnType::Double => "f64".to_owned(),
                 ColumnType::Json | ColumnType::JsonBinary => "Json".to_owned(),
-                ColumnType::Date => match date_time_crate {
-                    DateTimeCrate::Chrono => "Date".to_owned(),
-                    DateTimeCrate::Time => "TimeDate".to_owned(),
-                },
-                ColumnType::Time => match date_time_crate {
-                    DateTimeCrate::Chrono => "Time".to_owned(),
-                    DateTimeCrate::Time => "TimeTime".to_owned(),
-                },
-                ColumnType::Timestamp => match date_time_crate {
-                    DateTimeCrate::Chrono => "DateTime".to_owned(),
-                    DateTimeCrate::Time => "TimeDateTime".to_owned(),
-                },
-                ColumnType::TimestampWithTimeZone => match date_time_crate {
-                    DateTimeCrate::Chrono => "DateTimeWithTimeZone".to_owned(),
-                    DateTimeCrate::Time => "TimeDateTimeWithTimeZone".to_owned(),
-                },
+                ColumnType::Date => "Date".to_owned(),
+                ColumnType::Time => "Time".to_owned(),
+                ColumnType::Timestamp => "DateTime".to_owned(),
+                ColumnType::TimestampWithTimeZone => "DateTimeWithTimeZone".to_owned(),
                 ColumnType::Decimal(_) | ColumnType::Money => "Decimal".to_owned(),
                 ColumnType::Uuid => "Uuid".to_owned(),
                 ColumnType::Bytea => "Vec<u8>".to_owned(),
                 ColumnType::Boolean => "bool".to_owned(),
                 ColumnType::Enum { name, .. } => name.to_string().to_upper_camel_case(),
                 ColumnType::Array(column_type) => {
-                    format!("Vec<{}>", write_rs_type(column_type, date_time_crate))
+                    format!("Vec<{}>", write_rs_type(column_type))
                 }
                 other => unreachable!(
                     "column type {other:?} reached the writer; \
@@ -94,7 +82,7 @@ impl Column {
                 ),
             }
         }
-        let ident: TokenStream = write_rs_type(&self.col_type, date_time_crate)
+        let ident: TokenStream = write_rs_type(&self.col_type)
             .parse()
             .expect("mapped Rust type names are token text");
         match self.not_null {
@@ -190,12 +178,9 @@ impl Column {
         col_def
     }
 
-    pub fn get_info(&self, date_time_crate: &DateTimeCrate) -> String {
+    pub fn get_info(&self) -> String {
         let mut info = String::new();
-        let type_info = self
-            .get_rs_type(date_time_crate)
-            .to_string()
-            .replace(' ', "");
+        let type_info = self.get_rs_type().to_string().replace(' ', "");
         let col_info = self.col_info();
         write!(
             &mut info,
@@ -329,7 +314,7 @@ impl TryFrom<&ColumnDef> for Column {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Column, DateTimeCrate};
+    use crate::Column;
     use pgorm_query::{Alias, ColumnDef, ColumnType, SharedIden, StringLen};
     use proc_macro2::TokenStream;
     use quote::quote;
@@ -420,9 +405,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_rs_type_with_chrono() {
+    fn test_get_rs_type() {
         let columns = setup();
-        let chrono_crate = DateTimeCrate::Chrono;
         let rs_types = vec![
             "String",
             "String",
@@ -443,51 +427,11 @@ mod tests {
             let rs_type: TokenStream = rs_type.parse().unwrap();
 
             col.not_null = true;
-            assert_eq!(
-                col.get_rs_type(&chrono_crate).to_string(),
-                quote!(#rs_type).to_string()
-            );
+            assert_eq!(col.get_rs_type().to_string(), quote!(#rs_type).to_string());
 
             col.not_null = false;
             assert_eq!(
-                col.get_rs_type(&chrono_crate).to_string(),
-                quote!(Option<#rs_type>).to_string()
-            );
-        }
-    }
-
-    #[test]
-    fn test_get_rs_type_with_time() {
-        let columns = setup();
-        let time_crate = DateTimeCrate::Time;
-        let rs_types = vec![
-            "String",
-            "String",
-            "String",
-            "i16",
-            "i32",
-            "i64",
-            "f32",
-            "f64",
-            "Vec<u8>",
-            "bool",
-            "TimeDate",
-            "TimeTime",
-            "TimeDateTime",
-            "TimeDateTimeWithTimeZone",
-        ];
-        for (mut col, rs_type) in columns.into_iter().zip(rs_types) {
-            let rs_type: TokenStream = rs_type.parse().unwrap();
-
-            col.not_null = true;
-            assert_eq!(
-                col.get_rs_type(&time_crate).to_string(),
-                quote!(#rs_type).to_string()
-            );
-
-            col.not_null = false;
-            assert_eq!(
-                col.get_rs_type(&time_crate).to_string(),
+                col.get_rs_type().to_string(),
                 quote!(Option<#rs_type>).to_string()
             );
         }
@@ -531,10 +475,7 @@ mod tests {
     #[test]
     fn test_get_info() {
         let column = to_column(ColumnDef::new(Alias::new("id")).string().to_owned());
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
-            "Column `id`: Option<String>"
-        );
+        assert_eq!(column.get_info().as_str(), "Column `id`: Option<String>");
 
         let column = to_column(
             ColumnDef::new(Alias::new("id"))
@@ -542,10 +483,7 @@ mod tests {
                 .not_null()
                 .to_owned(),
         );
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
-            "Column `id`: String, not_null"
-        );
+        assert_eq!(column.get_info().as_str(), "Column `id`: String, not_null");
 
         let column = to_column(
             ColumnDef::new(Alias::new("id"))
@@ -555,7 +493,7 @@ mod tests {
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `id`: String, not_null, unique"
         );
 
@@ -568,7 +506,7 @@ mod tests {
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `id`: String, auto_increment, not_null, unique"
         );
 
@@ -579,85 +517,41 @@ mod tests {
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `date_field`: Date, not_null"
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("date_field"))
-                .date()
-                .not_null()
-                .to_owned(),
-        );
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Time).as_str(),
-            "Column `date_field`: TimeDate, not_null"
-        );
-
-        let column = to_column(
             ColumnDef::new(Alias::new("time_field"))
                 .time()
                 .not_null()
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `time_field`: Time, not_null"
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("time_field"))
-                .time()
-                .not_null()
-                .to_owned(),
-        );
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Time).as_str(),
-            "Column `time_field`: TimeTime, not_null"
-        );
-
-        let column = to_column(
             ColumnDef::new(Alias::new("timestamp_field"))
                 .timestamp()
                 .not_null()
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `timestamp_field`: DateTime, not_null"
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("timestamp_field"))
-                .timestamp()
-                .not_null()
-                .to_owned(),
-        );
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Time).as_str(),
-            "Column `timestamp_field`: TimeDateTime, not_null"
-        );
-
-        let column = to_column(
             ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
                 .timestamp_with_time_zone()
                 .not_null()
                 .to_owned(),
         );
         assert_eq!(
-            column.get_info(&DateTimeCrate::Chrono).as_str(),
+            column.get_info().as_str(),
             "Column `timestamp_with_timezone_field`: DateTimeWithTimeZone, not_null"
-        );
-
-        let column = to_column(
-            ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
-                .timestamp_with_time_zone()
-                .not_null()
-                .to_owned(),
-        );
-        assert_eq!(
-            column.get_info(&DateTimeCrate::Time).as_str(),
-            "Column `timestamp_with_timezone_field`: TimeDateTimeWithTimeZone, not_null"
         );
     }
 

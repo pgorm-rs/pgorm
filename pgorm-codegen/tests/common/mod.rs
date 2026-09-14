@@ -13,8 +13,7 @@ use pgorm_query::{
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
 /// The full `EntityWriterContext::new` option set; `Opts::default()` is the
-/// shape a caller gets with no flags: compact format, no serde, chrono,
-/// `mod.rs`.
+/// shape a caller gets with no flags: compact format, no serde, `mod.rs`.
 pub type Opts = EntityWriterOptions;
 
 /// The same set with the expanded format selected.

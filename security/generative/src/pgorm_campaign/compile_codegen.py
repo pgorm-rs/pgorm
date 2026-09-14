@@ -163,16 +163,6 @@ def option_cases():
             enum_extra_derives=["Hash"],
             enum_extra_attributes=["allow(dead_code)"],
         ),
-        # `time` is threaded without a temporal column on purpose: pgorm has no
-        # `with-time` feature, so `TimeDate` and its siblings name types the
-        # prelude cannot supply. The option is still covered; the type mapping
-        # behind it has no compilable target in this checkout.
-        _case(
-            "codegen-time-crate",
-            SIMPLE,
-            "date_time_crate threading, over a schema with no temporal column",
-            date_time_crate="time",
-        ),
     ]
 
 

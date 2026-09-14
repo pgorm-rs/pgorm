@@ -6676,6 +6676,13 @@ children (
                 kind @blocker
                 text "pgorm-codegen exposes a public DateTimeCrate option whose Time variant emits code that cannot compile. Generated entities under that variant name TimeDate, TimeTime, TimeDateTime and TimeDateTimeWithTimeZone, but no such alias exists in pgorm or pgorm-query, and time is not a workspace dependency at all. The crate's own tests never notice because tests/common/mod.rs only string-matches generated text and never feeds it to a compiler. Two independent surveys found this: the bounded compile suite could not cover the option and reported the missing with-time feature as the reason, and the binding survey then established the aliases do not exist anywhere. The natural resolution is bound up with jiff-temporal: if jiff becomes the single temporal crate then the option has nothing left to select between, so the honest fix is to delete DateTimeCrate rather than add a third dead variant. Doing that also removes the one place a caller can ask codegen for output the workspace cannot build. If the option is instead kept, the Time variant needs either a real with-time feature and the four aliases, or an explicit refusal at EntityWriterContext::new so the failure lands at the generator boundary rather than at a downstream build."
             }
+
+            {
+                at 2026-09-14T23:51:19.565715Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 

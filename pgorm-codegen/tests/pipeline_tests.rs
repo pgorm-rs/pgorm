@@ -5,7 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::{DateTimeCrate, EntityTransformer, EntityWriterContext, Error, WithSerde};
+use pgorm_codegen::{EntityTransformer, EntityWriterContext, Error, WithSerde};
 use pgorm_query::{Alias, ColumnDef, ColumnType, Table};
 use std::path::Path;
 
@@ -177,19 +177,6 @@ fn every_context_option_selects_generated_output() {
         "#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Hash)]",
     );
     assert_contains(enums.file("pgorm_active_enums.rs"), "#[non_exhaustive]");
-
-    // date_time_crate
-    assert_contains(
-        generate(
-            schema(),
-            Opts {
-                date_time_crate: DateTimeCrate::Time,
-                ..Default::default()
-            },
-        )
-        .file("task.rs"),
-        "pub due: Option<TimeDateTime>,",
-    );
 
     // schema_name
     assert_contains(
@@ -379,7 +366,7 @@ fn entity_file_blocks_are_joined_with_blank_lines() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    `bonus_derive` folds extra
+// [spec:pgorm:sem:codegen.entity.context+3/test]    `bonus_derive` folds extra
 // derives into one leading-comma fragment appended to the derive list
 #[test]
 fn context_folds_extra_derives_into_comma_fragment() {
@@ -402,7 +389,7 @@ fn context_folds_extra_derives_into_comma_fragment() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    `bonus_attributes` wraps each
+// [spec:pgorm:sem:codegen.entity.context+3/test]    `bonus_attributes` wraps each
 // extra attribute in its own `#[...]` line
 #[test]
 fn context_wraps_each_extra_attribute_in_own_line() {
@@ -428,7 +415,7 @@ fn context_wraps_each_extra_attribute_in_own_line() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    an unparsable extra derive
+// [spec:pgorm:sem:codegen.entity.context+3/test]    an unparsable extra derive
 // comes back from the constructor as an `Error` naming the option and the
 // string, before any file is generated
 #[test]
@@ -442,7 +429,7 @@ fn context_rejects_unparsable_extra_derive() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    the same holds for an
+// [spec:pgorm:sem:codegen.entity.context+3/test]    the same holds for an
 // unparsable extra attribute
 #[test]
 fn context_rejects_unparsable_extra_attribute() {
@@ -464,10 +451,10 @@ fn assert_context_error(opts: Opts, expected: &str) {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    `date_time_crate` is threaded
-// into Model field types and the expanded `PrimaryKeyTrait::ValueType`
+// [spec:pgorm:sem:codegen.entity.types.datetime+2/test]    temporal columns reach
+// both Model field types and the expanded `PrimaryKeyTrait::ValueType`
 #[test]
-fn context_threads_date_time_crate_into_model_pk() {
+fn temporal_columns_reach_model_and_value_type() {
     let schema = || {
         vec![table_with(
             "event",
@@ -483,20 +470,8 @@ fn context_threads_date_time_crate_into_model_pk() {
         )]
     };
 
-    let chrono = generate(schema(), expanded());
-    assert_contains(chrono.file("event.rs"), "pub at: Date,");
-    assert_contains(chrono.file("event.rs"), "pub seen: DateTime,");
-    assert_contains(chrono.file("event.rs"), "type ValueType = Date;");
-
-    let time = generate(
-        schema(),
-        Opts {
-            expanded_format: true,
-            date_time_crate: DateTimeCrate::Time,
-            ..Default::default()
-        },
-    );
-    assert_contains(time.file("event.rs"), "pub at: TimeDate,");
-    assert_contains(time.file("event.rs"), "pub seen: TimeDateTime,");
-    assert_contains(time.file("event.rs"), "type ValueType = TimeDate;");
+    let generated = generate(schema(), expanded());
+    assert_contains(generated.file("event.rs"), "pub at: Date,");
+    assert_contains(generated.file("event.rs"), "pub seen: DateTime,");
+    assert_contains(generated.file("event.rs"), "type ValueType = Date;");
 }

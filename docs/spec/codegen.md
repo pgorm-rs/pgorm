@@ -210,10 +210,10 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > per entity. Entity-file code blocks are joined with blank lines; content
 > is unformatted `TokenStream` text (callers are expected to run rustfmt).
 
-> [spec:pgorm:sem:codegen.entity.context+2]
+> [spec:pgorm:sem:codegen.entity.context+3]
 > `EntityWriterContext::new` takes one `EntityWriterOptions` struct — every
 > generation option is a named field, and its `Default` is the no-flags
-> shape (compact format, no serde, chrono, `mod.rs`) — and returns
+> shape (compact format, no serde, `mod.rs`) — and returns
 > `Result<EntityWriterContext, Error>`.
 >
 > The `schema_name` option is a **default, not an override**: an entity's
@@ -242,15 +242,6 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > ``TransformError("`<option>` entry `<string>` is not valid Rust token
 > text")`` — naming the option field it came from — before any file is
 > generated.
->
-> `date_time_crate` is threaded by reference from the context through
-> `write_entities` into both block generators: it selects Model field types
-> (`get_column_rs_types`) in both formats, the expanded
-> `PrimaryKeyTrait::ValueType` (`get_primary_key_rs_type`), and the
-> per-column `tracing::info!` lines (`Column::get_info`) that
-> `write_entities` logs while generating each file. The type mapping itself
-> is `codegen.entity.types.datetime`; the compact format has no further
-> date-time surface (its `PrimaryKeyTrait` comes from `DeriveEntityModel`).
 
 ## Compact and expanded formats
 
@@ -392,29 +383,33 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > type is `Float` or `Double`, checked recursively through `Array` element
 > types; a single float column suppresses `Eq` for the whole Model.
 
-> [spec:pgorm:sem:codegen.entity.types.datetime+1]
-> `DateTimeCrate` selects the date/time field types:
+> [spec:pgorm:sem:codegen.entity.types.datetime+2]
+> Date/time columns map to one fixed set of field types, the prelude's
+> temporal aliases:
 >
-> | ColumnType | `Chrono` | `Time` |
-> |---|---|---|
-> | `Date` | `Date` | `TimeDate` |
-> | `Time` | `Time` | `TimeTime` |
-> | `Timestamp` | `DateTime` | `TimeDateTime` |
-> | `TimestampWithTimeZone` | `DateTimeWithTimeZone` | `TimeDateTimeWithTimeZone` |
+> | ColumnType | generated type |
+> |---|---|
+> | `Date` | `Date` |
+> | `Time` | `Time` |
+> | `Timestamp` | `DateTime` |
+> | `TimestampWithTimeZone` | `DateTimeWithTimeZone` |
 >
-> `Timestamp` MUST map to the time-zone-naive type (`chrono::NaiveDateTime`,
+> `Timestamp` MUST map to the time-zone-naive type (`jiff::civil::DateTime`,
 > re-exported from the prelude as `DateTime`), because that is what Postgres
-> `timestamp` is; mapping it to `DateTimeUtc` claimed a time zone the column
-> does not carry, and disagreed with the inference table's
-> `NaiveDateTime`→`Timestamp` direction
+> `timestamp` is; mapping it to the instant type would claim a time zone the
+> column does not carry, and would disagree with the inference table's
+> `DateTime`→`Timestamp` direction
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+5]`).
 >
-> Limitation: only `Chrono` is usable in practice. The `TimeDate`-family
-> aliases in `pgorm::entity::prelude` are gated behind a `with-time` cargo
-> feature that pgorm's `Cargo.toml` does not define (only `with-chrono` is a
-> default feature), and pgorm's `tokio-postgres` dependency is built with
-> `with-chrono-0_4` only — so code generated with `DateTimeCrate::Time` does
-> not compile against pgorm as shipped.
+> There is no option selecting between date/time crates, and codegen MUST NOT
+> offer one. jiff is the single temporal crate pgorm models PostgreSQL with,
+> so a selector would have exactly one legal value. The previous `DateTimeCrate`
+> option is the case against reintroducing it: its second variant emitted a
+> `TimeDate` family of aliases that existed in no crate in the workspace, so
+> the one setting a caller could change was the one that produced source that
+> could not compile. Because the generated identifiers come from the prelude
+> glob rather than from any named crate, repointing the aliases is how the
+> temporal backing changes, and generated text does not move when it does.
 
 > [spec:pgorm:req:codegen.entity.types.unsupported+1]
 > Column types outside the mapping table are not supported, and support is

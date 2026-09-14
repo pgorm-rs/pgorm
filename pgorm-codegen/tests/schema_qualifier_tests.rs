@@ -80,7 +80,7 @@ fn an_unqualified_table_carries_no_schema() {
     assert_not_contains(generated.file("item.rs"), "schema_name");
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    the configured schema is a
+// [spec:pgorm:sem:codegen.entity.context+3/test]    the configured schema is a
 // default, not an override: it fills in for tables the DDL left unqualified and
 // never contradicts one that names its own schema
 #[test]
@@ -104,7 +104,7 @@ fn the_configured_schema_is_only_a_default() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.context+2/test]    the same precedence in the
+// [spec:pgorm:sem:codegen.entity.context+3/test]    the same precedence in the
 // expanded format
 #[test]
 fn the_expanded_format_defaults_the_schema_too() {

@@ -1,10 +1,10 @@
-//! Column type mapping, the date/time crate selection, the unsupported-type
-//! policy, and how primary keys surface in each format.
+//! Column type mapping, the unsupported-type policy, and how primary keys
+//! surface in each format.
 
 mod common;
 
 use common::*;
-use pgorm_codegen::{Column, DateTimeCrate, EntityTransformer, Error};
+use pgorm_codegen::{Column, EntityTransformer, Error};
 use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen, Table};
 use std::sync::Arc;
 
@@ -134,11 +134,12 @@ fn float_and_double_columns_suppress_the_eq_derive() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types.datetime+1/test]    `DateTimeCrate` picks
-// the date/time field types
+// [spec:pgorm:sem:codegen.entity.types.datetime+2/test]    date/time columns map
+// to the prelude's temporal aliases, and to nothing else — there is no option
+// selecting a different set, so the mapping is the whole surface
 #[test]
-fn date_time_crate_selects_date_time_field_types() {
-    let schema = || {
+fn date_time_columns_map_to_prelude_aliases() {
+    let generated = generate(
         vec![table_with(
             "moment",
             vec![
@@ -147,39 +148,32 @@ fn date_time_crate_selects_date_time_field_types() {
                 typed("t", ColumnType::Time),
                 typed("ts", ColumnType::Timestamp),
                 typed("tstz", ColumnType::TimestampWithTimeZone),
+                typed("many", ColumnType::Array(Arc::new(ColumnType::Timestamp))),
             ],
-        )]
-    };
-
-    let chrono = generate(schema(), Opts::default());
+        )],
+        Opts::default(),
+    );
+    let moment = generated.file("moment.rs");
     for (field, rust_type) in [
         ("d", "Date"),
         ("t", "Time"),
         ("ts", "DateTime"),
         ("tstz", "DateTimeWithTimeZone"),
+        ("many", "Vec<DateTime>"),
     ] {
-        assert_contains(
-            chrono.file("moment.rs"),
-            &format!("pub {field}: {rust_type},"),
-        );
+        assert_contains(moment, &format!("pub {field}: {rust_type},"));
     }
-
-    let time = generate(
-        schema(),
-        Opts {
-            date_time_crate: DateTimeCrate::Time,
-            ..Default::default()
-        },
-    );
-    for (field, rust_type) in [
-        ("d", "TimeDate"),
-        ("t", "TimeTime"),
-        ("ts", "TimeDateTime"),
-        ("tstz", "TimeDateTimeWithTimeZone"),
+    // No crate in the workspace defines a `TimeDate` family, so generated source
+    // naming one cannot compile against pgorm. Nothing may reach these spellings.
+    for absent in [
+        "TimeDate",
+        "TimeTime",
+        "TimeDateTime",
+        "TimeDateTimeWithTimeZone",
     ] {
-        assert_contains(
-            time.file("moment.rs"),
-            &format!("pub {field}: {rust_type},"),
+        assert!(
+            !moment.contains(absent),
+            "generated source names `{absent}`, which no crate defines:\n{moment}"
         );
     }
 }
