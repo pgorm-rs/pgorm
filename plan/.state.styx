@@ -733,7 +733,7 @@ assertions (
     {id sqlmap.controls.inapplicable, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:59:29.464321Z}
     {id sqlmap.controls.verify, kind @complete, author "brendan@necessary.nu", at 2026-09-14T19:51:44.825902Z}
     {id report, kind @doing, author "brendan@necessary.nu", at 2026-09-14T23:10:20.517261Z}
-    {id rust, kind @doing, author "brendan@necessary.nu", at 2026-09-14T23:11:13.145706Z}
+    {id rust, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:12:39.836152Z}
 )
 
 impl_evidence (

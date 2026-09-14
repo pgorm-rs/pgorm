@@ -64,7 +64,7 @@ jobs:
           if [ ! -x "$verdict" ]; then
             mkdir -p target/sqlmap-ci
             printf 'sqlmap / %s: NOT-RUN\n\nsetup failed before the verdict tool was built\n' "$SQLMAP_PROFILE" \
-              | tee target/sqlmap-ci/ci-summary.txt "$GITHUB_STEP_SUMMARY"
+              | tee target/sqlmap-ci/ci-summary.txt "${GITHUB_STEP_SUMMARY:-/dev/null}"
             printf '{"profile": "%s", "status": "not-run", "reason": "setup failed before the verdict tool was built", "inapplicable": {}}\n' \
               "$SQLMAP_PROFILE" > target/sqlmap-ci/ci-status.json
             exit 1
