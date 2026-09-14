@@ -15,9 +15,6 @@ specs ({
             pgorm-query/pgorm-query-derive/src/**/*.rs
             pgorm-sql-macro/src/**/*.rs
             security/sqlmap/adapter/src/**/*.rs
-            security/sqlmap/harness.py
-            security/sqlmap/check.py
-            security/sqlmap/ci.py
             .github/workflows/sqlmap*.yml
             security/sqlmap/acceptance/*.md
             pgorm-python/src/**/*.rs
@@ -41,7 +38,6 @@ specs ({
             pgorm-query/pgorm-query-attr/tests/**/*.rs
             pgorm-query/pgorm-query-derive/tests/**/*.rs
             pgorm-sql-macro/tests/**/*.rs
-            security/sqlmap/test_*.py
             security/sqlmap/adapter/tests/**/*.rs
             pgorm-python/tests/**/*.rs
             pgorm-python/tests/**/*.py

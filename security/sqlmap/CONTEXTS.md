@@ -11,14 +11,15 @@ Authoritative sources read:
 - `.../lib/core/enums.py` (`PAYLOAD.CLAUSE`, `PAYLOAD.WHERE`, `PAYLOAD.TECHNIQUE`)
 - `.../lib/controller/checks.py` (the boundary↔payload pairing loop, lines ~403–456; the GREP result path, ~683–700)
 - `.../lib/core/agent.py` (`prefixQuery` / `suffixQuery`)
-- `security/sqlmap/{harness.py,profiles.json,cases.json}` and `adapter/src/main.rs` (`control`, line 158)
+- `security/sqlmap/{profiles.json,cases.json}`, `adapter/src/main.rs` (`control`, line 162)
+  and `adapter/src/harness/` (the runner)
 
 ---
 
 ## 1. The matching model (must be understood before any verdict)
 
 Each `(case, technique)` is an **independent** scan. The harness runs
-(`harness.py:285`):
+(`adapter/src/harness/mod.rs`, `scanner_args`):
 
 ```
 sqlmap --url .../case/control/<id>?input=<baseline> -p input \

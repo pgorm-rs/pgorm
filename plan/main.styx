@@ -5199,6 +5199,20 @@ children (
                     }
                 )
             }
+
+            {
+                id rust
+                title "Retire the Python twin so the sqlmap harness is Rust end to end"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-14T23:11:13.145706Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
+            }
         )
         log (
             {

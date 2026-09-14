@@ -1,6 +1,7 @@
 mod fixture;
 pub mod process;
 pub mod result;
+pub mod verdict;
 
 use fixture::Fixture;
 use result::{ScanResult, aggregate, falsified, findings_show_technique, interpret, inventory, verdict};

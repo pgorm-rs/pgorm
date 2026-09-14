@@ -11,7 +11,7 @@ version in `pins.json`. The runner verifies the upstream archive digest and
 uses the pinned PostgreSQL image. It accepts no external scan target.
 
 ```sh
-python3 security/sqlmap/check.py
+cargo test --locked --manifest-path security/sqlmap/adapter/Cargo.toml --tests
 cargo build --locked --manifest-path security/sqlmap/adapter/Cargo.toml --bins
 security/sqlmap/adapter/target/debug/sqlmap-harness --profile smoke
 ```
@@ -29,8 +29,10 @@ security/sqlmap/adapter/target/debug/sqlmap-harness \
 Artifact directories must be new. `--python PATH` selects the pinned Python
 interpreter. `--case ID` runs a named subset; its result cannot stand for a
 complete profile. `--baseline-only` is a diagnostic and always exits nonzero.
-The Python `harness.py` remains available for comparison; CI and acceptance
-use the Rust runner, which also runs and records the direct regressions.
+The runner also runs and records the direct regressions. Python is needed only
+to execute the pinned scanner itself; the harness around it is entirely Rust.
+`sqlmap-verdict <profile> <artifact directory>` turns a finished run's
+`run/report.json` into the `ci-status.json` and `ci-summary.txt` CI publishes.
 
 To reproduce a report, check out its recorded source revision, restore any
 recorded source changes and workspace lockfile, use the accompanying
