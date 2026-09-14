@@ -1,0 +1,38 @@
+[
+  {
+    "profile": "smoke",
+    "run": "target/generative-campaign/smoke-ef81b2af92e5",
+    "completed": true,
+    "reason": "bounded smoke gate, 208 items, 14.6s; run before the compile and stress evidence"
+  },
+  {
+    "profile": "smoke",
+    "run": "target/generative-campaign/smoke-6eaa5633b21c",
+    "completed": true,
+    "reason": "bounded smoke gate re-run including a cold native build, 148.5s"
+  },
+  {
+    "profile": "smoke",
+    "run": "target/generative-campaign/smoke-09b05f984b14",
+    "completed": true,
+    "reason": "bounded smoke gate, 208 items, 20 of 20 declared obligations, 307 of 430 full-matrix obligations outstanding, 18.4s"
+  },
+  {
+    "profile": "smoke",
+    "run": "target/generative-campaign/smoke-2fea14372979",
+    "completed": false,
+    "reason": "no usable verdict: launched while the replay parity run held the container fixtures, so eight items raised FixtureFailure 'requested worker has no active owned fixture' and 30 live programs recorded incomplete. The faults are contention for the PostgreSQL fixture pool, not pgorm behaviour, so this attempt establishes nothing either way and is superseded by smoke-dbf42940335a"
+  },
+  {
+    "profile": "smoke",
+    "run": "target/generative-campaign/smoke-dbf42940335a",
+    "completed": true,
+    "reason": "uncontended re-run of the attempt above once the parity run had released its fixtures, 208 items, 13.7s; this is the smoke result the full profile was launched from"
+  },
+  {
+    "profile": "full",
+    "run": "target/generative-campaign/full-f71b80d27ea8",
+    "completed": true,
+    "reason": "the full profile ran to completion and wrote its report; it did not pass. 25,523 records, 1061.3s, 33 defects, 4 incompletes and 173 of 430 full-matrix obligations outstanding. The result is scored as the runtime component, not as an unfinished attempt"
+  }
+]

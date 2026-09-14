@@ -394,8 +394,9 @@ pgorm has no `with-time` feature, so generated `TimeDate` and its siblings name
 types the prelude cannot supply; the option is covered, the type mapping behind
 it has no compilable target in this checkout.
 
-General Rust replay, compile profiles, dedicated CI and the million-program
-acceptance campaign remain separate unfinished WBS work.
+General Rust replay and dedicated CI remain separate unfinished WBS work. The
+million-program stress demonstration and the acceptance assembly are built and
+have been run; acceptance itself has not passed.
 
 ## Campaign profiles and the runner
 
@@ -447,3 +448,66 @@ native API paths, 155 verified artifacts, zero builds, 18.4 seconds of runner
 work inside a 22-second command. It satisfied its 20 declared obligations and
 recorded 307 of 430 full-matrix obligations still outstanding: this is a
 bounded smoke profile, not full coverage and not acceptance.
+
+## Stress demonstration
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  -m pgorm_campaign.stress_main --target 1000000
+```
+
+Construction at scale through the installed native binding, sharded across
+worker processes, deduplicated by program digest. It exists to show that the
+generator and the constructor hold up over a million distinct programs without
+per-program builds — and the build guard is the point: every shard constructs
+inside an audit hook that refuses subprocesses, so the report can state
+`per_program_builds: 0` and one unchanged native identity at entry and exit as
+observations rather than intentions.
+
+The report says what it is not, in the document itself. Construction is not
+live coverage: no program here opens a database connection and none is decided
+by an oracle, so the run neither replaces the runtime campaign nor proves any
+ORM program safe. Distinctness is digest distinctness at the recorded
+generation limits, not a claim that a million behaviours were covered. A
+program that fails to construct is reported as a construction failure with its
+cause and samples; it is never dropped to make a round number.
+
+## Acceptance assembly
+
+```sh
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
+  -m pgorm_campaign.acceptance_main \
+  --campaign target/generative-campaign/<run>/campaign.json \
+  --attempts security/generative/attempts.json
+```
+
+Five components are gathered and none is folded into another: the runtime
+campaign, replay parity, the compile suite, the named regressions behind
+resolved findings, and the stress demonstration. Each is read from the run that
+produced it, keeping the vocabulary it was produced with, so a reader can tell a
+constructor call from a compile invocation from an oracle decision. A component
+that was never run is recorded as not run rather than defaulting to anything
+that looks like a pass, and the command exits non-zero while acceptance is
+incomplete — including when the only thing incomplete is an outstanding coverage
+obligation.
+
+Acceptance is not the union of things that passed. The retained finding
+directories are checked against the registry in `acceptance.py` in both
+directions: a finding added to the tree without an entry, or an entry whose
+directory has gone, fails acceptance rather than quietly disappearing. Open
+findings are listed by name, a runtime run's retained findings are listed by
+item, diverging parity families are named, and stress construction failures stay
+visible.
+
+`attempts.json` records the profiles attempted, including any that produced no
+usable verdict, so a report cannot read as having declined a profile it tried
+and lost. Regressions are the one component this command can produce itself, at
+the cost of building a second pgorm in a scratch worktree to show each named
+test failing without its fix; `main` retains that evidence as `regressions.json`
+and `--regressions` reads it back, the way every other component is already read
+from a file.
+
+Dated acceptance reports live in `acceptance/`. The current one is
+[`acceptance/2026-09-14.md`](acceptance/2026-09-14.md): **acceptance has not
+passed** — the full profile completed and failed with 33 defects, 4 incompletes
+and 173 of 430 full-matrix obligations outstanding.
