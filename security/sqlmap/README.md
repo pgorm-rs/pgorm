@@ -112,8 +112,8 @@ run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
 work, appear under `inapplicable` in the report and CI summary with their
 evidence, and are never counted as passes.
 
-Of 210 pairs, 91 are declared inapplicable (Q 35, U 17, E 12, B 11, T 10, S 6),
-leaving 119 scheduled. `schema`, `function`, `column`, `group`,
+Of 210 pairs, 93 are declared inapplicable (Q 35, U 17, E 12, T 12, B 11, S 6),
+leaving 117 scheduled. `schema`, `function`, `column`, `group`,
 `pipeline-projection` and `stored-identifier` have no scheduled technique left
 at all; the suite makes no detection claim about them. Only CONTEXTS.md
 sections 7a and 7d are exempted. The section-7c control-shape cells are

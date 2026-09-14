@@ -69,9 +69,9 @@
     "case_timeout_seconds": 240,
     "concurrency": 1,
     "retries": 0,
-    "time_sec": 1,
+    "time_sec": 3,
     "http_timeout_seconds": 15,
     "postgres_statement_timeout_seconds": 10,
-    "timeout_margin": "10s database and 15s HTTP allow 1s control delays; 240s outer scan deadline"
+    "timeout_margin": "10s database and 15s HTTP allow 3s control delays; 240s outer scan deadline"
   }
 }
