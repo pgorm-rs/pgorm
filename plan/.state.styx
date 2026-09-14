@@ -730,7 +730,9 @@ assertions (
     {id pipeline-join-distinct-order, kind @doing, author "brendan@necessary.nu", at 2026-09-11T16:18:58.294753Z}
     {id jiff-temporal, kind @doing, author "brendan@necessary.nu", at 2026-09-13T12:13:42.909744Z}
     {id sqlmap.controls.contexts, kind @complete, author "brendan@necessary.nu", at 2026-09-14T15:54:28.159137Z}
-    {id sqlmap.controls.literal, kind @doing, author "brendan@necessary.nu", at 2026-09-14T15:54:52.670712Z}
+    {id sqlmap.controls.literal, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:58:53.144613Z}
+    {id sqlmap.controls.inapplicable, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:59:29.464321Z}
+    {id sqlmap.controls.verify, kind @doing, author "brendan@necessary.nu", at 2026-09-14T16:59:49.446376Z}
 )
 
 impl_evidence (

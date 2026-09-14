@@ -5042,12 +5042,20 @@ children (
                         title "Reshape the controls whose cells are genuinely reachable"
                         kind @fix
                         deps (sqlmap.controls.contexts)
+                        sealed true
                         log (
                             {
                                 at 2026-09-14T15:54:52.670712Z
                                 author "brendan@necessary.nu"
                                 kind @status
                                 text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-09-14T16:58:53.144613Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }
@@ -5064,6 +5072,13 @@ children (
                                 kind @note
                                 text "Runtime prerequisites established before the verify run, so the node does not lose time discovering them. The pinned scanner is already extracted at target/sqlmap-cache/scanner/sqlmap-d486742eec47ba96940d35bf2dc176f60868efdd with sqlmap.py present, so no download is needed and the run can stay offline. The harness hard-fails when the interpreter's version differs from the pin in pins.json, which is 3.14.4, and this machine's default python3 is 3.11.6, so the runner must be given --python explicitly. Three interpreters on disk satisfy the pin: /opt/homebrew/bin/python3.14, target/generative-build/venv/bin/python and target/python-check/bin/python. Docker is present at server version 29.4. The full profile is 126 scheduled pairs after exemptions, each pair running a control scan and a protected scan, so roughly 252 scanner invocations at a 240 second per-case timeout; the recorded CI deadline for a full run is 300 minutes, so this needs to run unattended rather than inline. The adapter must be built first with cargo build --locked --bins, and the run wants --direct-regressions so the SQL security regressions are exercised against the same disposable database."
                             }
+
+                            {
+                                at 2026-09-14T16:59:49.446376Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
                         )
                     }
 
@@ -5072,12 +5087,20 @@ children (
                         title "An exempted pair cites the evidence that proves it unreachable"
                         kind @feat
                         deps (sqlmap.controls.contexts)
+                        sealed true
                         log (
                             {
                                 at 2026-09-14T15:46:22.448952Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Correction to the first pass: the insert case was over-exempted, and this is the exact failure mode the mechanism exists to prevent. All six techniques were exempted on the grounds of a VALUES arity wall, but the written reason said the control puts the input in the third of four VALUES columns, which is a fact about the control we happen to have rather than about what any faithful control could do. The contexts analysis says as much itself: its remedy section names moving the injected literal to the final VALUES column, or an INSERT SELECT WHERE form, and either remains an honest INSERT control. Exempting a shape problem as though it were structural is how an exemption mechanism quietly erodes coverage. Boolean, error, stacked and time were therefore returned to scheduled work for insert, leaving only union, which genuinely has no set-operation position in a DML statement, and inline query, which is unreachable everywhere. The arithmetic moves from 88 exempt and 122 scheduled to 84 and 126. Two cases still carry no scheduled technique at all, schema and function, and they deserve the same scrutiny before being accepted, because a suite making no detection claim at all about schema-name or function-name handling should say so loudly rather than let a zero pass unnoticed. The pinned invocation counts in the runner tests caught the change immediately, which is what those pins are for."
+                            }
+
+                            {
+                                at 2026-09-14T16:59:29.464321Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Done (nplan complete)"
                             }
                         )
                     }
