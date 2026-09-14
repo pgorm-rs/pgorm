@@ -117,7 +117,10 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
         "group" => strings(&db,Query::select().column(Alias::new(input)).from(a()).group_by_col(Alias::new(input)).build()).await?,
         "function" => strings(&db,Query::select().expr(Func::cust(Alias::new(input)).arg(Expr::val("Alice"))).build()).await?,
         "cast" => strings(&db,Query::select().column(n()).from(a()).and_where(Expr::col(n()).eq(Expr::val("alice").cast_as(Alias::new(input)))).build()).await?,
-        "enum" => strings(&db,Query::select().expr(Expr::val("ready").cast_as_type(q::TypeName::new(Alias::new(input)).schema(Alias::new("fixture"))).cast_as(Alias::new("text"))).build()).await?,
+        "enum" => {
+            let sql = Query::select().column(n()).from(Alias::new("reviews")).and_where(Expr::col(Alias::new("status")).eq(Expr::val("ready").cast_as_type(q::TypeName::new(Alias::new(input)).schema(Alias::new("fixture"))))).to_string();
+            strings(&db,(sql,Values(vec![]))).await?
+        },
         "enum-ddl" => {
             let sql = q::Table::create(Alias::new("enum_probe")).col(q::ColumnDef::new(Alias::new("value")).enumeration(Alias::new(input),["ready","waiting"])).to_string();
             db.batch_execute(&sql).await?;
@@ -175,7 +178,10 @@ async fn control(app: &App, case: &str, input: &str) -> Result<Value> {
         "function" => format!("SELECT {input}('Alice')"),
         // The unquoted CAST type closes with `)` into a WHERE truth slot, reaching B/E/S/T/U.
         "cast" => format!("SELECT name FROM items WHERE name = CAST('alice' AS {input})"),
-        "enum" => format!("SELECT CAST('ready' AS fixture.\"{input}\")::text"),
+        // A projected enum cast leaves the closed type name in front of an enum-typed value,
+        // where AND is a type error and a UNION branch cannot carry a text marker; filtering an
+        // enum column on the same cast puts the closed identifier in a WHERE truth slot instead.
+        "enum" => format!("SELECT name FROM reviews WHERE status = CAST('ready' AS fixture.\"{input}\")"),
         "enum-ddl" => format!("CREATE TABLE enum_probe (value \"{input}\"); SELECT udt_name FROM information_schema.columns WHERE table_schema='fixture' AND table_name='enum_probe'"),
         "direction" => format!("SELECT name FROM items ORDER BY name {input}"),
         "limit" => format!("SELECT name FROM items LIMIT {input}"),

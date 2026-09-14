@@ -383,6 +383,82 @@ These would pass at `--level 4/5` but are refused here by `extending=N`:
   the control a different (still conventional) injection context, which is the
   honest trade-off to surface rather than work around.
 
+### 7d. Double-quoted identifiers — the suffix that decides them
+
+Filtering `boundaries.xml` to `<level> ≤ 3` leaves exactly **five** boundaries
+that close a double quote, and every one appends a comparison between two
+*invented* double-quoted identifiers:
+
+```xml
+<boundary><level>2</level><clause>1</clause><where>1,2</where><ptype>4</ptype>
+  <prefix>"</prefix><suffix> AND "[RANDSTR]"="[RANDSTR]</suffix></boundary>
+<boundary><level>2</level>…<ptype>4</ptype><prefix>")</prefix>  <suffix> AND ("[RANDSTR]"="[RANDSTR]</suffix></boundary>
+<boundary><level>3</level>…<ptype>4</ptype><prefix>"))</prefix> <suffix> AND (("[RANDSTR]"="[RANDSTR]</suffix></boundary>
+<boundary><level>3</level>…<ptype>5</ptype><prefix>"</prefix>   <suffix> AND "[RANDSTR]" LIKE "[RANDSTR]</suffix></boundary>
+<boundary><level>3</level>…<ptype>5</ptype><prefix>")</prefix>  <suffix> AND ("[RANDSTR]" LIKE "[RANDSTR]</suffix></boundary>
+```
+
+The single closer whose suffix is a comment — `<ptype>4</ptype><prefix>"</prefix>
+<suffix>[GENERIC_SQL_COMMENT]</suffix>` — is **level 5**, refused by
+`--answers extending=N`.
+
+`suffixQuery` (`agent.py`) substitutes the payload's own `<comment>` for the
+boundary suffix whenever the test carries one. So escaping a double-quoted
+identifier at this profile reduces to one question: does any qualifying test of
+that technique carry a `<comment>`?
+
+| tech | qualifying tests at L≤3/R≤2 carrying `<comment>` |
+| --- | --- |
+| B | 3 of 13 — two `[GENERIC_SQL_COMMENT]`, one `--` (stacked) |
+| E | **none of 3** |
+| U | 11 of 11 — `[GENERIC_SQL_COMMENT]` |
+| S | 2 of 2 — `--` |
+| T | **none of 4** |
+| Q | none, and `where=3` regardless (§4) |
+
+**E and T therefore cannot escape any double-quoted identifier here**, whatever
+surrounds it: the appended `"[RANDSTR]"="[RANDSTR]"` names columns no relation
+has, so PostgreSQL rejects the statement during name resolution — before the
+error-forcing CAST is evaluated or the timing subquery is reached. That is a
+property of the context class, not of a control's shape, and it is what
+`enum-E`, `enum-ddl-E`, `enum-T` and `enum-ddl-T` run into.
+
+B is not decided by the comment alone. With one it deletes whatever follows the
+injection point; without one it inherits the invented identifiers. Two outcomes
+matter:
+
+- **Leading projected identifier** (`SELECT "{input}" FROM items`): the comment
+  deletes the `FROM items` the projected name resolves against; the suffix
+  leaves `SELECT (text AND bool)`, a type error; the stacked variant loses its
+  `FROM` on the first statement. Only the level-5 clause-8 `"="[ORIGINAL]"`
+  boundary rewrites the slot into `"c"="c" AND <inference>`, which does parse —
+  so B here is refused by the level ceiling, and relocating the identifier to a
+  trailing slot restores U and S but still not B, at the price of turning the
+  case into the `table`/`order` context.
+- **CREATE TABLE column definition** (`enum-ddl`): a column-definition list has
+  no truth slot and no set-operation position, so neither an `AND <inference>`
+  nor a `UNION SELECT` can attach however the quote is closed. Only
+  `;<statement>` attaches, and the statement it appends returns its own result
+  set rather than changing the original one — the difference B measures. This is
+  why the DDL context caps at S.
+
+**What a truth slot changes.** The same closed identifier is reachable once the
+surrounding statement puts it in a WHERE. Filtering an enum-typed column on the
+injected type name —
+
+```sql
+SELECT name FROM reviews WHERE status = CAST('ready' AS fixture."{input}")
+```
+
+— leaves `") AND <inference>-- ` parsing cleanly, and `") UNION ALL SELECT
+<marker>-- ` projecting a text column a marker can ride; B and U both fire, S is
+unaffected, E and T remain blocked for the reason above. A *projected* cast
+(`SELECT CAST('ready' AS fixture."{input}")::text`) reaches neither: the closed
+identifier sits directly in front of an enum-typed value, where `AND` is a type
+error and every UNION marker sqlmap can place — `[CHAR]`, `[RANDNUM]`, a quoted
+literal — is refused against the enum, leaving only `NULL`, which reflects
+nothing. The difference is the truth slot, not the identifier.
+
 ---
 
 ## 8. Confidence

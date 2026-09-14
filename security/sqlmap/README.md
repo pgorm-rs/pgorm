@@ -112,10 +112,18 @@ run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
 work, appear under `inapplicable` in the report and CI summary with their
 evidence, and are never counted as passes.
 
-Of 210 pairs, 83 are declared inapplicable (Q 35, U 16, E 10, T 10, B 6, S 6),
-leaving 127 scheduled. `schema` and `function` have no scheduled technique left
-at all; the suite makes no detection claim about them. Only CONTEXTS.md section
-7a is exempted. The section-7c control-shape cells are reshaped to fire at
-level 3 — `insert` (INSERT … SELECT … WHERE), `update-value` (value in the
-WHERE) and `cast` (CAST target inside a WHERE) now reach every scheduled
-technique; the remaining level-gated (7b) cells stay scheduled and failing.
+Of 210 pairs, 91 are declared inapplicable (Q 35, U 17, E 12, B 11, T 10, S 6),
+leaving 119 scheduled. `schema`, `function`, `column`, `group`,
+`pipeline-projection` and `stored-identifier` have no scheduled technique left
+at all; the suite makes no detection claim about them. Only CONTEXTS.md
+sections 7a and 7d are exempted. The section-7c control-shape cells are
+reshaped to fire at level 3 — `insert` (INSERT … SELECT … WHERE),
+`update-value` (value in the WHERE), `cast` (CAST target inside a WHERE) and
+`enum` (an enum column filtered on the cast) now reach every scheduled
+technique.
+
+Double-quoted identifier contexts are where the exemptions concentrate, because
+every boundary that closes a `"` below level 5 appends a comparison between two
+invented double-quoted identifiers. A technique whose tests carry no `<comment>`
+at level 3 — error-based and time-based — can only use that suffix, so it never
+produces a statement PostgreSQL will resolve, whatever the surrounding SQL.

@@ -161,8 +161,8 @@ class InventoryTests(unittest.TestCase):
         manifest = h.read_json(h.HERE / "cases.json")
         profiles = h.read_json(h.HERE / "profiles.json")
         work, exempt = h.inventory(manifest, profiles["full"], [])
-        self.assertEqual(len(work), 127)
-        self.assertEqual(len(exempt), 83)
+        self.assertEqual(len(work), 117)
+        self.assertEqual(len(exempt), 93)
         self.assertEqual(len(work) + len(exempt), 6 * len(manifest["cases"]))
         self.assertEqual(len(h.inventory(manifest, profiles["smoke"], [])[0]), 3)
 
