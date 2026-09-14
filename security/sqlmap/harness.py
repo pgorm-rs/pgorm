@@ -22,6 +22,14 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 TECHNIQUES = {"B": "boolean-based blind", "E": "error-based", "U": "UNION query", "S": "stacked queries", "T": "time-based blind", "Q": "inline query"}
 CLEAN_MESSAGE = "all tested parameters do not appear to be injectable."
+# The payload definition that supplies each technique's tests. An exemption must cite
+# its own technique's file so a reviewer lands on the <test> entries being claimed about.
+PAYLOADS = {"B": "boolean_blind.xml", "E": "error_based.xml", "U": "union_query.xml", "S": "stacked_queries.xml", "T": "time_blind.xml", "Q": "inline_query.xml"}
+EVIDENCE_FIELDS = ("boundary", "clause", "contexts", "kind", "payload", "where")
+EVIDENCE_KINDS = ("no-attachable-position", "no-boundary")
+# Prose floors that refuse "n/a" without pretending to judge the argument itself.
+REASON_CHARS = 40
+BOUNDARY_CHARS = 20
 
 
 def read_json(path):
@@ -211,6 +219,13 @@ def interpret(report, log, returncode, target, requests):
     return {"complete": not failures, "reason": "; ".join(failures) if failures else "completed", "findings": findings, "errors": errors, "requests": requests, "returncode": returncode}
 
 
+def detected(control, technique):
+    if technique not in TECHNIQUES:
+        return False
+    findings = control.get("findings", []) if isinstance(control, dict) else []
+    return any(isinstance(f, dict) and f.get("parameter") == "input" and f.get("place") == "GET" and any(isinstance(d, dict) and d.get("technique") == TECHNIQUES[technique] for d in f.get("data", [])) for f in findings)
+
+
 # [spec:pgorm:req:security.sqlmap.outcomes]
 def verdict(control, protected, technique, baseline=True, invariant=True):
     if protected.get("findings") or not invariant:
@@ -219,17 +234,69 @@ def verdict(control, protected, technique, baseline=True, invariant=True):
         return "incomplete"
     if not control.get("complete"):
         return "incomplete"
-    detected = any(isinstance(f, dict) and f.get("parameter") == "input" and f.get("place") == "GET" and any(isinstance(d, dict) and d.get("technique") == TECHNIQUES[technique] for d in f.get("data", [])) for f in control.get("findings", []))
-    if not detected:
+    if not detected(control, technique):
         return "invalid-control"
     if not protected.get("complete"):
         return "incomplete"
     return "pass"
 
 
+# [spec:pgorm:req:security.sqlmap.profiles]
+def falsified(results, inapplicable):
+    """A technique any retained control detected was never inapplicable for that case."""
+    hits = []
+    for key in sorted(inapplicable):
+        if "-" not in key:
+            continue
+        case, technique = key.rsplit("-", 1)
+        for scheduled, result in results.items():
+            if scheduled.rsplit("-", 1)[0] == case and detected(result.get("control"), technique):
+                hits.append(key)
+                break
+    return hits
+
+
 # [spec:pgorm:req:security.sqlmap.verdict]
-def aggregate(expected, results, cleanup):
-    return bool(expected) and len(expected) == len(set(expected)) and set(expected) == set(results) and all(r["outcome"] == "pass" for r in results.values()) and not cleanup
+def aggregate(expected, results, cleanup, falsified_exemptions):
+    return bool(expected) and len(expected) == len(set(expected)) and set(expected) == set(results) and all(r["outcome"] == "pass" for r in results.values()) and not cleanup and not falsified_exemptions
+
+
+def section(text):
+    """A CONTEXTS.md section anchor: a decimal number with an optional subsection letter."""
+    body = text[:-1] if isinstance(text, str) and text[-1:].islower() else text
+    return isinstance(body, str) and body.isdigit() and not body.startswith("0")
+
+
+# [spec:pgorm:req:security.sqlmap.profiles]
+def exemptions(case):
+    """Declared inapplicability, refused unless it cites checkable scanner evidence."""
+    declared = case.get("inapplicable", {})
+    if not isinstance(declared, dict):
+        raise ValueError(f"malformed inapplicable block for {case['id']}")
+    for technique, entry in declared.items():
+        pair = f"{case['id']}-{technique}"
+        if technique not in TECHNIQUES:
+            raise ValueError(f"inapplicable {pair} names an unknown technique")
+        if technique not in case["techniques"]:
+            raise ValueError(f"inapplicable {pair} names a technique the case does not declare")
+        if not isinstance(entry, dict) or not isinstance(entry.get("reason"), str) or len(entry["reason"].strip()) < REASON_CHARS:
+            raise ValueError(f"inapplicable {pair} needs a substantive reason")
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, dict) or tuple(sorted(evidence)) != EVIDENCE_FIELDS:
+            raise ValueError(f"inapplicable {pair} needs evidence fields {list(EVIDENCE_FIELDS)}")
+        if evidence["kind"] not in EVIDENCE_KINDS:
+            raise ValueError(f"inapplicable {pair} has an unknown evidence kind")
+        if evidence["payload"] != PAYLOADS[technique]:
+            raise ValueError(f"inapplicable {pair} cites a payload that does not define {technique}")
+        for field, allowed in (("where", (1, 2, 3)), ("clause", tuple(range(10)))):
+            values = evidence[field]
+            if not isinstance(values, list) or not values or any(isinstance(v, bool) or v not in allowed for v in values):
+                raise ValueError(f"inapplicable {pair} has malformed payload {field} values")
+        if not isinstance(evidence["boundary"], str) or len(evidence["boundary"].strip()) < BOUNDARY_CHARS:
+            raise ValueError(f"inapplicable {pair} must name the boundary its context would require")
+        if not section(evidence["contexts"]):
+            raise ValueError(f"inapplicable {pair} must cite a CONTEXTS.md section")
+    return declared
 
 
 # [spec:pgorm:req:security.sqlmap.profiles]
@@ -247,17 +314,21 @@ def inventory(manifest, profile, subset):
     techniques = profile["techniques"]
     if not techniques or len(techniques) != len(set(techniques)) or any(t not in TECHNIQUES for t in techniques):
         raise ValueError("empty, duplicated or unknown technique inventory")
-    work = []
+    work, exempt = [], []
     for case_id in selected:
         case = cases[case_id]
         enabled = case["techniques"]
         if len(enabled) != len(set(enabled)):
             raise ValueError("duplicated case technique")
-        scheduled = [(case, t) for t in enabled if t in techniques]
-        if not scheduled:
+        offered = [t for t in enabled if t in techniques]
+        # A case the profile drops outright is still unexplained work; only an
+        # evidenced exemption may remove a technique the profile does offer.
+        if not offered:
             raise ValueError(f"no scheduled techniques for {case_id}")
-        work.extend(scheduled)
-    return work
+        declared = exemptions(case)
+        work.extend((case, t) for t in offered if t not in declared)
+        exempt.extend((case_id, t, declared[t]) for t in offered if t in declared)
+    return work, exempt
 
 
 def scan(fixture, case, technique, mode, profile, script, artifacts):
@@ -326,7 +397,7 @@ def main():
     args = parser.parse_args()
     args.artifacts = args.artifacts.resolve()
     args.artifacts.mkdir(parents=True, exist_ok=False)
-    report = {"profile": args.profile, "subset": args.case, "results": {}, "cleanup_errors": [], "pass": False}
+    report = {"profile": args.profile, "subset": args.case, "results": {}, "inapplicable": {}, "falsified_exemptions": [], "cleanup_errors": [], "pass": False}
     fixture = None
     def interrupted(signum, frame):
         raise KeyboardInterrupt(f"signal {signum}")
@@ -335,9 +406,16 @@ def main():
         pins = read_json(HERE / "pins.json")
         manifest = read_json(HERE / "cases.json")
         profile = read_json(HERE / "profiles.json")[args.profile]
-        work = inventory(manifest, profile, args.case)
+        work, exempt = inventory(manifest, profile, args.case)
         if args.baseline_only:
-            work = list({c["id"]: (c,t) for c,t in work}.values())
+            # The diagnostic probes routes, not techniques, so it covers every selected
+            # case including those left with no scheduled technique at all.
+            probes = {c["id"]: (c,t) for c,t in work}
+            by_id = {c["id"]: c for c in manifest["cases"]}
+            for case_id, technique, _ in exempt:
+                probes.setdefault(case_id, (by_id[case_id], technique))
+            work, exempt = list(probes.values()), []
+        report["inapplicable"] = {f"{cid}-{t}": {"technique": t, "reason": e["reason"], "evidence": e["evidence"]} for cid, t, e in exempt}
         report.update(pins=pins, source=source_identity(), manifest_sha256=digest(HERE/"cases.json"), profile_sha256=digest(HERE/"profiles.json"), expected=[f"{c['id']}-{t}" for c,t in work])
         report["results"] = {key: {"outcome": "incomplete", "reason": "not started"} for key in report["expected"]}
         write_json(args.artifacts / "report.json", report)
@@ -381,9 +459,12 @@ def main():
     finally:
         if fixture:
             report["cleanup_errors"] = fixture.close()
-        report["pass"] = not args.baseline_only and not report.get("error") and aggregate(report.get("expected",[]),report["results"],report["cleanup_errors"])
+        report["falsified_exemptions"] = falsified(report["results"], report["inapplicable"])
+        report["pass"] = not args.baseline_only and not report.get("error") and aggregate(report.get("expected",[]),report["results"],report["cleanup_errors"],report["falsified_exemptions"])
         write_json(args.artifacts / "report.json",report)
-        summary = f"{args.profile}{' subset' if args.case else ''}: {'PASS' if report['pass'] else 'FAIL'}\n" + "\n".join(f"{k}: {v['outcome']}" for k,v in report["results"].items()) + "\n"
+        # Exemptions ride beside the outcomes so a reader cannot mistake them for passes.
+        exempt_lines = "\n".join(f"{k}: inapplicable ({v['evidence']['kind']}, CONTEXTS.md section {v['evidence']['contexts']}) {v['reason']}" for k,v in sorted(report["inapplicable"].items()))
+        summary = f"{args.profile}{' subset' if args.case else ''}: {'PASS' if report['pass'] else 'FAIL'}\n" + "\n".join(f"{k}: {v['outcome']}" for k,v in report["results"].items()) + f"\nScheduled: {len(report['results'])}; declared inapplicable: {len(report['inapplicable'])}; falsified exemptions: {report['falsified_exemptions']}\n" + exempt_lines + "\n"
         (args.artifacts/"summary.txt").write_text(summary)
         print(summary,flush=True)
     return 0 if report["pass"] else 1

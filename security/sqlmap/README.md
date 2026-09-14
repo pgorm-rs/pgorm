@@ -76,3 +76,44 @@ The [2026-09-09 acceptance attempt](acceptance/2026-09-09.md) completed all
 420 scans and passed the direct regressions, but failed acceptance because
 105 required controls were not detected. Its case matrix records the remaining
 work; it is not a passing acceptance report.
+
+## Declared inapplicability
+
+[CONTEXTS.md](CONTEXTS.md) derives, from the pinned scanner's own payload and
+boundary XML, which case/technique pairs no faithful control can ever reach.
+Each case in `cases.json` carries an `inapplicable` map keyed by technique:
+
+```json
+"Q": {
+  "reason": "<why no faithful control exists at this injection point>",
+  "evidence": {
+    "kind": "no-boundary",          /* or no-attachable-position */
+    "payload": "inline_query.xml",  /* must define the exempted technique */
+    "where": [3],                   /* qualifying <where> at this level/risk */
+    "clause": [1, 2, 3, 8],         /* qualifying <clause> at this level/risk */
+    "boundary": "<the boundary the context would need, and why it is absent>",
+    "contexts": "4"                 /* the CONTEXTS.md section that derives it */
+  }
+}
+```
+
+`kind` names which argument the reviewer is checking. `no-boundary` means the
+catalogue holds no boundary that can pair with those `where` values and still
+escape this context — the inline-query case, where exactly one of the 53
+boundaries serves `where=3` and it carries an empty prefix and suffix.
+`no-attachable-position` means a boundary does pair, but the control's grammar
+offers no slot the technique's vector can attach to.
+
+Both runners refuse a declaration that omits a reason or any evidence field,
+carries a surplus field, cites a payload file that does not define the
+technique, or names a technique the case does not declare. A declared pair the
+scanner nonetheless detects is recorded in `falsified_exemptions` and fails the
+run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
+work, appear under `inapplicable` in the report and CI summary with their
+evidence, and are never counted as passes.
+
+Of 210 pairs, 88 are declared inapplicable (Q 35, U 17, E 11, T 11, B 7, S 7),
+leaving 122 scheduled. `insert`, `schema` and `function` have no scheduled
+technique left at all; the suite makes no detection claim about them. Only
+CONTEXTS.md section 7a is exempted — the level-gated (7b) and control-shape
+(7c) cells stay scheduled and failing.

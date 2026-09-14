@@ -3,7 +3,7 @@ pub mod process;
 pub mod result;
 
 use fixture::Fixture;
-use result::{ScanResult, aggregate, detected, interpret, inventory, verdict};
+use result::{ScanResult, aggregate, falsified, findings_show_technique, interpret, inventory, verdict};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -222,7 +222,7 @@ impl Campaign<'_> {
             "incomplete" => format!("control: {}; protected: {}", control.reason, protected.reason),
             _ => "completed with detected control and clean protected route".into(),
         };
-        Ok(json!({"outcome":outcome,"reason":reason,"api":case["api"],"control_detected":detected(&control,technique),"control":control,"protected":protected,"baselines":baselines,"invariant":invariant}))
+        Ok(json!({"outcome":outcome,"reason":reason,"api":case["api"],"control_detected":findings_show_technique(&control.findings,technique),"control":control,"protected":protected,"baselines":baselines,"invariant":invariant}))
     }
 }
 
@@ -247,20 +247,39 @@ fn summarize(report: &Value) -> String {
             if result["control_detected"] == false { undetected.push(key.clone()); }
         }
     }
-    format!("{}{}: {}\nScans: {completed} complete, {attempted} attempted\nOutcomes: {outcomes:?}\nProtected findings: {}\nUndetected controls: {}\nInfrastructure failures: {}\n{}\nCleanup: {}\nRun error: {}\nDirect regressions: {}\n",
+    // Exemptions ride beside the outcomes so a reader cannot mistake them for passes.
+    let exempt: Vec<String> = report["inapplicable"].as_object().into_iter().flatten()
+        .map(|(key, entry)| format!("{key}: inapplicable ({}, CONTEXTS.md section {}) {}",
+            entry["evidence"]["kind"].as_str().unwrap_or("?"), entry["evidence"]["contexts"].as_str().unwrap_or("?"), entry["reason"].as_str().unwrap_or("")))
+        .collect();
+    format!("{}{}: {}\nScans: {completed} complete, {attempted} attempted\nOutcomes: {outcomes:?}\nProtected findings: {}\nUndetected controls: {}\nInfrastructure failures: {}\n{}\nScheduled: {}; declared inapplicable: {}; falsified exemptions: {}\n{}\nCleanup: {}\nRun error: {}\nDirect regressions: {}\n",
         report["profile"].as_str().unwrap_or("unknown"), if report["subset"].as_array().is_some_and(|s| !s.is_empty()) {" subset"} else {""},
-        if report["pass"] == true {"PASS"} else {"FAIL"}, findings.join(", "), undetected.join(", "), infrastructure.len(), infrastructure.join("\n"), report["cleanup_errors"], report["error"], report["direct_regressions"])
+        if report["pass"] == true {"PASS"} else {"FAIL"}, findings.join(", "), undetected.join(", "), infrastructure.len(), infrastructure.join("\n"),
+        report["results"].as_object().map_or(0, serde_json::Map::len), exempt.len(), report["falsified_exemptions"], exempt.join("\n"),
+        report["cleanup_errors"], report["error"], report["direct_regressions"])
 }
 
 async fn execute(options: &Options, root: &Path, here: &Path, report: &mut Value, fixture: &mut Fixture) -> Result<()> {
     let pins = read_json(&here.join("pins.json"))?;
     let manifest = read_json(&here.join("cases.json"))?;
     let profile = read_json(&here.join("profiles.json"))?[&options.profile].clone();
-    let mut work = inventory(&manifest, &profile, &options.subset)?;
+    let result::Inventory { mut work, mut exempt } = inventory(&manifest, &profile, &options.subset)?;
     if options.baseline_only {
+        // The diagnostic probes routes, not techniques, so it covers every selected
+        // case including those left with no scheduled technique at all.
         let mut seen = BTreeSet::new();
         work.retain(|(c, _)| seen.insert(c["id"].as_str().unwrap_or_default().to_owned()));
+        let by_id: BTreeMap<_, _> = manifest["cases"].as_array().into_iter().flatten()
+            .filter_map(|c| c["id"].as_str().map(|id| (id, c))).collect();
+        for (id, technique, _) in &exempt {
+            if seen.insert(id.clone())
+                && let Some(case) = by_id.get(id.as_str()) { work.push(((*case).clone(), technique.clone())); }
+        }
+        exempt.clear();
     }
+    report["inapplicable"] = json!(exempt.iter().map(|(id, technique, entry)|
+        (format!("{id}-{technique}"), json!({"technique":technique,"reason":entry["reason"],"evidence":entry["evidence"]})))
+        .collect::<BTreeMap<_,_>>());
     let expected: Vec<_> = work.iter().map(|(c,t)| format!("{}-{t}", c["id"].as_str().unwrap_or_default())).collect();
     report["expected"] = json!(expected);
     report["expected_scans"] = json!(expected.iter().flat_map(|key| [format!("{key}-control"),format!("{key}-protected")]).collect::<Vec<_>>());
@@ -311,7 +330,7 @@ pub async fn run(options: Options) -> Result<bool> {
     let root = here.parent().and_then(Path::parent).ok_or("missing repository root")?;
     if let Some(parent) = options.artifacts.parent() { fs::create_dir_all(parent)?; }
     fs::create_dir(&options.artifacts)?;
-    let mut report = json!({"profile":options.profile,"subset":options.subset,"results":{},"cleanup_errors":[],"pass":false});
+    let mut report = json!({"profile":options.profile,"subset":options.subset,"results":{},"inapplicable":{},"falsified_exemptions":[],"cleanup_errors":[],"pass":false});
     write_json(&options.artifacts.join("report.json"), &report)?;
     let mut fixture = Fixture::new(&options.artifacts)?;
     let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
@@ -324,8 +343,11 @@ pub async fn run(options: Options) -> Result<bool> {
     let cleanup = fixture.close().await;
     let expected: Vec<String> = serde_json::from_value(report["expected"].clone()).unwrap_or_default();
     let results: BTreeMap<String, Value> = serde_json::from_value(report["results"].clone()).unwrap_or_default();
+    let inapplicable: BTreeMap<String, Value> = serde_json::from_value(report["inapplicable"].clone()).unwrap_or_default();
+    let falsified_exemptions = falsified(&results, &inapplicable);
     report["cleanup_errors"] = json!(cleanup);
-    report["pass"] = json!(!options.baseline_only && report.get("error").is_none() && aggregate(&expected, &results, &cleanup)
+    report["falsified_exemptions"] = json!(falsified_exemptions);
+    report["pass"] = json!(!options.baseline_only && report.get("error").is_none() && aggregate(&expected, &results, &cleanup, &falsified_exemptions)
         && (!options.direct_regressions || report["direct_regressions"]["pass"] == true));
     write_json(&options.artifacts.join("report.json"), &report)?;
     let summary = summarize(&report);

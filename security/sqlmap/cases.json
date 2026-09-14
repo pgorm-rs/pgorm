@@ -26,7 +26,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "insert",
@@ -53,7 +72,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a non-final VALUES column, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an INSERT statement whose injection point is a single-quoted literal in a non-final VALUES column; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an INSERT control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "update-value",
@@ -80,7 +137,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in an UPDATE SET assignment, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an UPDATE statement whose injection point is a single-quoted literal in an UPDATE SET assignment; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an UPDATE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "update-guard",
@@ -107,7 +202,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in an UPDATE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an UPDATE statement whose injection point is a single-quoted literal in an UPDATE WHERE predicate; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an UPDATE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "delete",
@@ -134,7 +267,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a DELETE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an DELETE statement whose injection point is a single-quoted literal in a DELETE WHERE predicate; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an DELETE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "tenant-or",
@@ -161,7 +332,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a DELETE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an DELETE statement whose injection point is a single-quoted literal in a DELETE WHERE predicate; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an DELETE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "empty-in",
@@ -188,7 +397,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a DELETE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an DELETE statement whose injection point is a single-quoted literal in a DELETE WHERE predicate; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an DELETE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "empty-or",
@@ -215,7 +462,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a DELETE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an DELETE statement whose injection point is a single-quoted literal in a DELETE WHERE predicate; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an DELETE control.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "graph-root",
@@ -242,7 +527,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "graph-joined",
@@ -269,7 +573,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "graph-alias",
@@ -296,7 +619,90 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an `AND <inference>` predicate \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an error-forcing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted table alias after AS, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for a timing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "pipeline-literal",
@@ -323,7 +729,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "pipeline-bound",
@@ -350,7 +775,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "pipeline-projection",
@@ -377,7 +821,107 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "E": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching an error-forcing subquery fails because appending an error subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted leading projected identifier, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `;<statement>` batch continuation fails because the first statement of the batch loses its `FROM items` to the payload's own comment, so the batch errors before the appended statement runs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a timing subquery fails because appending a timing subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `UNION SELECT` set operation fails because commenting forward deletes the `FROM items` the UNION's left statement needs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "pipeline-sources",
@@ -404,7 +948,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "schema",
@@ -431,7 +994,131 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in a double-quoted schema name whose trailing `.items` is bound to it. Attaching an `AND <inference>` predicate needs the boundary to either comment `.items` away, leaving a schema where a relation must be, or to inject between the identifier and `.items`, which is a syntax error.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "Every boundary either comments `.items` away, leaving `FROM \"schema\"`, which is not a relation, or appends between the identifier and `.items`, which is a syntax error; no boundary at any level reconstructs the qualified name.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in a double-quoted schema name whose trailing `.items` is bound to it. Attaching an error-forcing subquery needs the boundary to either comment `.items` away, leaving a schema where a relation must be, or to inject between the identifier and `.items`, which is a syntax error.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every boundary either comments `.items` away, leaving `FROM \"schema\"`, which is not a relation, or appends between the identifier and `.items`, which is a syntax error; no boundary at any level reconstructs the qualified name.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted schema name bound to a trailing `.items`, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in a double-quoted schema name whose trailing `.items` is bound to it. Attaching a `;<statement>` batch continuation needs the boundary to either comment `.items` away, leaving a schema where a relation must be, or to inject between the identifier and `.items`, which is a syntax error.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "Every boundary either comments `.items` away, leaving `FROM \"schema\"`, which is not a relation, or appends between the identifier and `.items`, which is a syntax error; no boundary at any level reconstructs the qualified name.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted schema name whose trailing `.items` is bound to it. Attaching a timing subquery needs the boundary to either comment `.items` away, leaving a schema where a relation must be, or to inject between the identifier and `.items`, which is a syntax error.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every boundary either comments `.items` away, leaving `FROM \"schema\"`, which is not a relation, or appends between the identifier and `.items`, which is a syntax error; no boundary at any level reconstructs the qualified name.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in a double-quoted schema name whose trailing `.items` is bound to it. Attaching a `UNION SELECT` set operation needs the boundary to either comment `.items` away, leaving a schema where a relation must be, or to inject between the identifier and `.items`, which is a syntax error.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "Every boundary either comments `.items` away, leaving `FROM \"schema\"`, which is not a relation, or appends between the identifier and `.items`, which is a syntax error; no boundary at any level reconstructs the qualified name.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "table",
@@ -458,7 +1145,90 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in a double-quoted relation name closing the FROM clause. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an `AND <inference>` predicate \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in a double-quoted relation name closing the FROM clause. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an error-forcing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted relation name closing the FROM clause, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted relation name closing the FROM clause. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for a timing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "column",
@@ -485,7 +1255,107 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "E": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching an error-forcing subquery fails because appending an error subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted leading projected identifier, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `;<statement>` batch continuation fails because the first statement of the batch loses its `FROM items` to the payload's own comment, so the batch errors before the appended statement runs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a timing subquery fails because appending a timing subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `UNION SELECT` set operation fails because commenting forward deletes the `FROM items` the UNION's left statement needs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "alias",
@@ -512,7 +1382,90 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an `AND <inference>` predicate \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an error-forcing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted table alias after AS, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted table alias after AS. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for a timing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "order",
@@ -539,7 +1492,109 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in a double-quoted identifier in the trailing ORDER BY. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an `AND <inference>` predicate \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in a double-quoted identifier in the trailing ORDER BY. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for an error-forcing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted identifier in the trailing ORDER BY, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted identifier in the trailing ORDER BY. Once a boundary closes the app's double quote the injection point is a FROM/alias/ORDER BY position, which has no truth slot for a timing subquery \u2014 the shape every qualifying where=1 test needs. Only a set operation or a statement terminator can attach there.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "The ptype-4 `\"` boundaries reachable at level 3 close the identifier but leave the injection point in a FROM/alias/ORDER BY position, and no boundary at any level relocates that position into a truth context for a where=1 append.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "UNION tests append at where=1 inside clause 1-5. The control puts the input in a double-quoted identifier in the trailing ORDER BY, and nothing may syntactically follow ORDER BY, LIMIT or OFFSET, so no UNION SELECT can attach while the injection point stays in that clause.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "The ptype-1 and ptype-4 boundaries close the token, but a UNION SELECT appended after ORDER BY/LIMIT/OFFSET is a syntax error; no boundary relocates the injection point out of the terminal clause.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "group",
@@ -566,7 +1621,107 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "E": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching an error-forcing subquery fails because appending an error subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted leading projected identifier, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `;<statement>` batch continuation fails because the first statement of the batch loses its `FROM items` to the payload's own comment, so the batch errors before the appended statement runs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a timing subquery fails because appending a timing subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `UNION SELECT` set operation fails because commenting forward deletes the `FROM items` the UNION's left statement needs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "function",
@@ -593,7 +1748,131 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "B": {
+          "reason": "The control puts the input in an unquoted callable name immediately followed by `('Alice')`. Attaching an `AND <inference>` predicate leaves an expression in the callable position, and PostgreSQL rejects calling an expression result as a function before any payload is evaluated.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "boolean_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "boundary": "No boundary in the catalogue closes out of a function-name slot: appending or replacing yields `<expr>('Alice')`, calling an expression result as a function, which PostgreSQL rejects before any payload can be evaluated.",
+            "contexts": "7a"
+          }
+        },
+        "E": {
+          "reason": "The control puts the input in an unquoted callable name immediately followed by `('Alice')`. Attaching an error-forcing subquery leaves an expression in the callable position, and PostgreSQL rejects calling an expression result as a function before any payload is evaluated.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "No boundary in the catalogue closes out of a function-name slot: appending or replacing yields `<expr>('Alice')`, calling an expression result as a function, which PostgreSQL rejects before any payload can be evaluated.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in an unquoted callable name immediately followed by `(`, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in an unquoted callable name immediately followed by `('Alice')`. Attaching a `;<statement>` batch continuation leaves an expression in the callable position, and PostgreSQL rejects calling an expression result as a function before any payload is evaluated.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "No boundary in the catalogue closes out of a function-name slot: appending or replacing yields `<expr>('Alice')`, calling an expression result as a function, which PostgreSQL rejects before any payload can be evaluated.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in an unquoted callable name immediately followed by `('Alice')`. Attaching a timing subquery leaves an expression in the callable position, and PostgreSQL rejects calling an expression result as a function before any payload is evaluated.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "No boundary in the catalogue closes out of a function-name slot: appending or replacing yields `<expr>('Alice')`, calling an expression result as a function, which PostgreSQL rejects before any payload can be evaluated.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in an unquoted callable name immediately followed by `('Alice')`. Attaching a `UNION SELECT` set operation leaves an expression in the callable position, and PostgreSQL rejects calling an expression result as a function before any payload is evaluated.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "No boundary in the catalogue closes out of a function-name slot: appending or replacing yields `<expr>('Alice')`, calling an expression result as a function, which PostgreSQL rejects before any payload can be evaluated.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "cast",
@@ -620,7 +1899,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in an unquoted type name inside CAST(... AS ...), from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "enum",
@@ -647,7 +1945,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted schema-qualified type name inside CAST, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "enum-ddl",
@@ -674,7 +1991,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted type name in a CREATE TABLE column definition, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "parameters",
@@ -701,7 +2037,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal projected through ::text, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "contains",
@@ -728,7 +2083,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted LIKE pattern in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "starts-with",
@@ -755,7 +2129,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted LIKE pattern in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "ends-with",
@@ -782,7 +2175,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted LIKE pattern in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "like",
@@ -809,7 +2221,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted LIKE pattern in a SELECT WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "direction",
@@ -836,7 +2267,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in an unquoted ASC/DESC keyword after ORDER BY, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "UNION tests append at where=1 inside clause 1-5. The control puts the input in an unquoted ASC/DESC keyword after ORDER BY, and nothing may syntactically follow ORDER BY, LIMIT or OFFSET, so no UNION SELECT can attach while the injection point stays in that clause.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "The ptype-1 and ptype-4 boundaries close the token, but a UNION SELECT appended after ORDER BY/LIMIT/OFFSET is a syntax error; no boundary relocates the injection point out of the terminal clause.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "limit",
@@ -863,7 +2332,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in an unquoted integer closing a LIMIT clause, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "UNION tests append at where=1 inside clause 1-5. The control puts the input in an unquoted integer closing a LIMIT clause, and nothing may syntactically follow ORDER BY, LIMIT or OFFSET, so no UNION SELECT can attach while the injection point stays in that clause.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "The ptype-1 and ptype-4 boundaries close the token, but a UNION SELECT appended after ORDER BY/LIMIT/OFFSET is a syntax error; no boundary relocates the injection point out of the terminal clause.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "offset",
@@ -890,7 +2397,45 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in an unquoted integer closing an OFFSET clause, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "U": {
+          "reason": "UNION tests append at where=1 inside clause 1-5. The control puts the input in an unquoted integer closing an OFFSET clause, and nothing may syntactically follow ORDER BY, LIMIT or OFFSET, so no UNION SELECT can attach while the injection point stays in that clause.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "The ptype-1 and ptype-4 boundaries close the token, but a UNION SELECT appended after ORDER BY/LIMIT/OFFSET is a syntax error; no boundary relocates the injection point out of the terminal clause.",
+            "contexts": "7a"
+          }
+        }
+      }
     },
     {
       "id": "stored-value",
@@ -917,7 +2462,26 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a SELECT WHERE predicate reached through stored state, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        }
+      }
     },
     {
       "id": "stored-identifier",
@@ -944,7 +2508,107 @@
         "tenant_guard": 1,
         "sentinel_id": 3
       },
-      "inapplicable": {}
+      "inapplicable": {
+        "E": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching an error-forcing subquery fails because appending an error subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "error_based.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "Q": {
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a double-quoted leading projected identifier, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "evidence": {
+            "kind": "no-boundary",
+            "payload": "inline_query.xml",
+            "where": [
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8
+            ],
+            "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
+            "contexts": "4"
+          }
+        },
+        "S": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `;<statement>` batch continuation fails because the first statement of the batch loses its `FROM items` to the payload's own comment, so the batch errors before the appended statement runs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "stacked_queries.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "T": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a timing subquery fails because appending a timing subquery makes `SELECT (text AND bool)` a type error. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "time_blind.xml",
+            "where": [
+              1,
+              3
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              8,
+              9
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        },
+        "U": {
+          "reason": "The control puts the input in a double-quoted leading projected identifier, a projected column that depends on the trailing `FROM items`. Attaching a `UNION SELECT` set operation fails because commenting forward deletes the `FROM items` the UNION's left statement needs. The only faithful repair moves the identifier to a trailing slot, which changes what the case tests.",
+          "evidence": {
+            "kind": "no-attachable-position",
+            "payload": "union_query.xml",
+            "where": [
+              1
+            ],
+            "clause": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "boundary": "Every level-3 boundary either comments forward, deleting the `FROM items` the projected name resolves against, or appends a predicate, making `SELECT (text AND bool)` a type error; the clause-8 identifier boundaries are level 4-5 and rescue no technique but B.",
+            "contexts": "7a"
+          }
+        }
+      }
     }
   ]
 }

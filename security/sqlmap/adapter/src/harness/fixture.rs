@@ -91,9 +91,8 @@ impl Fixture {
 
     pub async fn close(&mut self) -> Vec<String> {
         let mut errors = Vec::new();
-        if let Some(mut adapter) = self.adapter.take() {
-            if let Err(e) = adapter.stop().await { errors.push(format!("adapter cleanup: {e}")); }
-        }
+        if let Some(mut adapter) = self.adapter.take()
+            && let Err(e) = adapter.stop().await { errors.push(format!("adapter cleanup: {e}")); }
         if self.container_attempted {
             // Keep server diagnostics even when startup or a scan fails.
             if let Ok(log) = process::run("docker", &["logs", &self.name]).await {

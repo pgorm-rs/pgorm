@@ -41,7 +41,7 @@ class ScannerResultTests(unittest.TestCase):
             self.assertIn("exited 1", failed["reason"])
             self.assertEqual(failed["findings"], result["findings"])
 
-    def test_wrong_injection_parameter_preserves_finding_but_is_incomplete(self):
+    def test_wrong_parameter_keeps_finding_but_incompletes(self):
         report = clean_report()
         report["data"] = [{"type_name":"TECHNIQUES", "value":detection(parameter="other")["findings"]}]
         result = h.interpret(report, LOG, 0, TARGET, 25)
@@ -121,19 +121,22 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(h.verdict(detection(),self.clean,"B",invariant=False),"vulnerable")
         self.assertEqual(h.verdict({"complete":False},detection(),"B"),"vulnerable")
 
-    def test_empty_discovery_missing_extra_duplicate_skipped_cases_fail(self):
-        self.assertFalse(h.aggregate([],{},[]))
-        self.assertFalse(h.aggregate(["a"],{},[]))
-        self.assertFalse(h.aggregate(["a"],{"a":{"outcome":"pass"},"b":{"outcome":"pass"}},[]))
-        self.assertFalse(h.aggregate(["a","a"],{"a":{"outcome":"pass"}},[]))
-        for outcome in ("incomplete","invalid-control","vulnerable","skipped"):
-            self.assertFalse(h.aggregate(["a"],{"a":{"outcome":outcome}},[]))
+    def test_empty_extra_or_skipped_discovery_fails(self):
+        self.assertFalse(h.aggregate([],{},[],[]))
+        self.assertFalse(h.aggregate(["a"],{},[],[]))
+        self.assertFalse(h.aggregate(["a"],{"a":{"outcome":"pass"},"b":{"outcome":"pass"}},[],[]))
+        self.assertFalse(h.aggregate(["a","a"],{"a":{"outcome":"pass"}},[],[]))
+        for outcome in ("incomplete","invalid-control","vulnerable","skipped","inapplicable"):
+            self.assertFalse(h.aggregate(["a"],{"a":{"outcome":outcome}},[],[]))
 
     def test_cleanup_failure_fails_complete_scan(self):
-        self.assertFalse(h.aggregate(["a"],{"a":{"outcome":"pass"}},["container removal failed"]))
+        self.assertFalse(h.aggregate(["a"],{"a":{"outcome":"pass"}},["container removal failed"],[]))
+
+    def test_falsified_exemption_fails_complete_scan(self):
+        self.assertFalse(h.aggregate(["a"],{"a":{"outcome":"pass"}},[],["a-Q"]))
 
     def test_fully_accounted_clean_run_passes(self):
-        self.assertTrue(h.aggregate(["a","b"],{"a":{"outcome":"pass"},"b":{"outcome":"pass"}},[]))
+        self.assertTrue(h.aggregate(["a","b"],{"a":{"outcome":"pass"},"b":{"outcome":"pass"}},[],[]))
 
 
 # [spec:pgorm:req:security.sqlmap.runner-tests/test]
@@ -157,8 +160,77 @@ class InventoryTests(unittest.TestCase):
     def test_profiles_account_for_every_scheduled_scan(self):
         manifest = h.read_json(h.HERE / "cases.json")
         profiles = h.read_json(h.HERE / "profiles.json")
-        self.assertEqual(len(h.inventory(manifest, profiles["full"], [])), 210)
-        self.assertEqual(len(h.inventory(manifest, profiles["smoke"], [])), 3)
+        work, exempt = h.inventory(manifest, profiles["full"], [])
+        self.assertEqual(len(work), 122)
+        self.assertEqual(len(exempt), 88)
+        self.assertEqual(len(work) + len(exempt), 6 * len(manifest["cases"]))
+        self.assertEqual(len(h.inventory(manifest, profiles["smoke"], [])[0]), 3)
+
+
+def evidence():
+    return {"kind": "no-boundary", "payload": "inline_query.xml", "where": [3], "clause": [1, 2, 3, 8],
+            "boundary": "the sole where=3 boundary carries an empty prefix and an empty suffix", "contexts": "4"}
+
+
+def exempt_case(inapplicable):
+    return {"id": "a", "techniques": ["B", "Q"], "inapplicable": inapplicable}
+
+
+def exempt_entry(evidence):
+    return {"reason": "REPLACE-only tests cannot escape the app's quoting at this injection point.", "evidence": evidence}
+
+
+# [spec:pgorm:req:security.sqlmap.profiles/test]
+# [spec:pgorm:req:security.sqlmap.verdict/test]
+class ExemptionTests(unittest.TestCase):
+    def test_exemptions_without_reason_or_evidence_are_refused(self):
+        self.assertEqual(list(h.exemptions(exempt_case({"Q": exempt_entry(evidence())}))), ["Q"])
+        for entry in ({}, "structurally impossible", {"reason": "n/a", "evidence": evidence()},
+                      {"reason": "REPLACE-only tests cannot escape the app's quoting here."},
+                      {"evidence": evidence()}):
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                h.exemptions(exempt_case({"Q": entry}))
+        for field, bad in (("kind", "unproven"), ("payload", "boolean_blind.xml"), ("where", []), ("where", [4]),
+                           ("where", "3"), ("where", [True]), ("clause", [10]), ("clause", []),
+                           ("boundary", "none"), ("contexts", "§4"), ("contexts", "0")):
+            broken = evidence() | {field: bad}
+            with self.subTest(field=field, bad=bad), self.assertRaises(ValueError):
+                h.exemptions(exempt_case({"Q": exempt_entry(broken)}))
+
+    def test_missing_or_surplus_evidence_fields_are_refused(self):
+        short = {k: v for k, v in evidence().items() if k != "boundary"}
+        with self.assertRaises(ValueError):
+            h.exemptions(exempt_case({"Q": exempt_entry(short)}))
+        with self.assertRaises(ValueError):
+            h.exemptions(exempt_case({"Q": exempt_entry(evidence() | {"note": "extra"})}))
+
+    def test_exemptions_naming_undeclared_techniques_are_refused(self):
+        for technique in ("U", "Z", "q"):
+            cited = evidence() | {"payload": h.PAYLOADS.get(technique, "union_query.xml")}
+            with self.subTest(technique=technique), self.assertRaises(ValueError):
+                h.exemptions(exempt_case({technique: exempt_entry(cited)}))
+        with self.assertRaises(ValueError):
+            h.exemptions({"id": "a", "techniques": ["Q"], "inapplicable": []})
+
+    def test_exempted_pairs_never_count_as_passes(self):
+        manifest = {"cases": [exempt_case({"Q": exempt_entry(evidence())})]}
+        work, exempt = h.inventory(manifest, {"cases": ["a"], "techniques": ["B", "Q"]}, [])
+        self.assertEqual([t for _, t in work], ["B"])
+        self.assertEqual([(c, t) for c, t, _ in exempt], [("a", "Q")])
+        # The exemption is absent from scheduled work, so it can neither pass nor be counted.
+        self.assertTrue(h.aggregate(["a-B"], {"a-B": {"outcome": "pass"}}, [], []))
+        self.assertFalse(h.aggregate(["a-B"], {"a-B": {"outcome": "pass"}, "a-Q": {"outcome": "pass"}}, [], []))
+
+    def test_a_detected_exemption_fails_the_run(self):
+        inapplicable = {"a-Q": exempt_entry(evidence())}
+        quiet = {"a-B": {"outcome": "pass", "control": detection("B")}}
+        self.assertEqual(h.falsified(quiet, inapplicable), [])
+        fired = {"a-B": {"outcome": "pass", "control": detection("Q")}}
+        self.assertEqual(h.falsified(fired, inapplicable), ["a-Q"])
+        self.assertFalse(h.aggregate(["a-B"], fired, [], h.falsified(fired, inapplicable)))
+        elsewhere = {"b-B": {"outcome": "pass", "control": detection("Q")},
+                     "a-B": {"outcome": "pass", "control": detection("Q", parameter="other")}}
+        self.assertEqual(h.falsified(elsewhere, inapplicable), [])
 
 
 if __name__ == "__main__":

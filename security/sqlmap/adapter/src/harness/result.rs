@@ -12,6 +12,28 @@ pub const TECHNIQUES: [(&str, &str); 6] = [
     ("T", "time-based blind"),
     ("Q", "inline query"),
 ];
+/// The payload definition that supplies each technique's tests. An exemption must cite
+/// its own technique's file so a reviewer lands on the `<test>` entries being claimed about.
+pub const PAYLOADS: [(&str, &str); 6] = [
+    ("B", "boolean_blind.xml"),
+    ("E", "error_based.xml"),
+    ("U", "union_query.xml"),
+    ("S", "stacked_queries.xml"),
+    ("T", "time_blind.xml"),
+    ("Q", "inline_query.xml"),
+];
+const EVIDENCE_FIELDS: [&str; 6] = ["boundary", "clause", "contexts", "kind", "payload", "where"];
+const EVIDENCE_KINDS: [&str; 2] = ["no-attachable-position", "no-boundary"];
+// Prose floors that refuse "n/a" without pretending to judge the argument itself.
+const REASON_CHARS: usize = 40;
+const BOUNDARY_CHARS: usize = 20;
+
+/// Work list plus the pairs an evidenced manifest declaration removed from it.
+#[derive(Debug, Default)]
+pub struct Inventory {
+    pub work: Vec<(Value, String)>,
+    pub exempt: Vec<(String, String, Value)>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanResult {
@@ -112,9 +134,9 @@ pub fn interpret(
     }
 }
 
-pub fn detected(control: &ScanResult, technique: &str) -> bool {
+pub fn findings_show_technique(findings: &[Value], technique: &str) -> bool {
     TECHNIQUES.iter().find(|(id, _)| *id == technique).is_some_and(|(_, name)| {
-        control.findings.iter().any(|f| valid_finding(f) && f["data"].as_array()
+        findings.iter().any(|f| valid_finding(f) && f["data"].as_array()
             .is_some_and(|data| data.iter().any(|d| d["technique"] == *name)))
     })
 }
@@ -123,52 +145,133 @@ pub fn detected(control: &ScanResult, technique: &str) -> bool {
 pub fn verdict(control: &ScanResult, protected: &ScanResult, technique: &str, baseline: bool, invariant: bool) -> &'static str {
     if !protected.findings.is_empty() || !invariant { return "vulnerable"; }
     if !baseline || !control.complete { return "incomplete"; }
-    if !detected(control, technique) { return "invalid-control"; }
+    if !findings_show_technique(&control.findings, technique) { return "invalid-control"; }
     if !protected.complete { return "incomplete"; }
     "pass"
 }
 
+fn case_of(key: &str) -> Option<&str> { key.rsplit_once('-').map(|(case, _)| case) }
+
+/// A technique any retained control detected was never inapplicable for that case.
+// [spec:pgorm:req:security.sqlmap.profiles]
+pub fn falsified(results: &BTreeMap<String, Value>, inapplicable: &BTreeMap<String, Value>) -> Vec<String> {
+    let mut hits = Vec::new();
+    for key in inapplicable.keys() {
+        let Some((case, technique)) = key.rsplit_once('-') else { continue };
+        if results.iter().any(|(scheduled, result)| case_of(scheduled) == Some(case)
+            && findings_show_technique(result["control"]["findings"].as_array().map_or(&[][..], Vec::as_slice), technique)) {
+            hits.push(key.clone());
+        }
+    }
+    hits
+}
+
 // [spec:pgorm:req:security.sqlmap.verdict]
-pub fn aggregate(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String]) -> bool {
+pub fn aggregate(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String], falsified: &[String]) -> bool {
     let unique: BTreeSet<_> = expected.iter().collect();
     !expected.is_empty() && expected.len() == unique.len()
         && unique == results.keys().collect()
-        && results.values().all(|r| r["outcome"] == "pass") && cleanup.is_empty()
+        && results.values().all(|r| r["outcome"] == "pass") && cleanup.is_empty() && falsified.is_empty()
+}
+
+/// A CONTEXTS.md section anchor: a decimal number with an optional subsection letter.
+fn section(text: &str) -> bool {
+    let body = match text.chars().next_back() {
+        Some(last) if last.is_ascii_lowercase() => &text[..text.len() - last.len_utf8()],
+        _ => text,
+    };
+    !body.is_empty() && !body.starts_with('0') && body.chars().all(|c| c.is_ascii_digit())
+}
+
+fn strings(value: &Value) -> Result<Vec<String>, String> {
+    value.as_array().ok_or("missing inventory list")?.iter()
+        .map(|v| v.as_str().map(str::to_owned).ok_or("non-string inventory entry".into())).collect()
+}
+
+/// Declared inapplicability, refused unless it cites checkable scanner evidence.
+// [spec:pgorm:req:security.sqlmap.profiles]
+pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
+    let id = case["id"].as_str().ok_or("missing case id")?;
+    let declared = match &case["inapplicable"] {
+        Value::Null => return Ok(BTreeMap::new()),
+        Value::Object(map) => map,
+        _ => return Err(format!("malformed inapplicable block for {id}")),
+    };
+    let techniques = strings(&case["techniques"])?;
+    let mut out = BTreeMap::new();
+    for (technique, entry) in declared {
+        let pair = format!("{id}-{technique}");
+        let payload = PAYLOADS.iter().find(|(t, _)| t == technique)
+            .ok_or(format!("inapplicable {pair} names an unknown technique"))?.1;
+        if !techniques.contains(technique) {
+            return Err(format!("inapplicable {pair} names a technique the case does not declare"));
+        }
+        if entry["reason"].as_str().map_or(0, |r| r.trim().chars().count()) < REASON_CHARS {
+            return Err(format!("inapplicable {pair} needs a substantive reason"));
+        }
+        let evidence = entry["evidence"].as_object()
+            .ok_or(format!("inapplicable {pair} needs evidence fields {EVIDENCE_FIELDS:?}"))?;
+        if evidence.keys().map(String::as_str).collect::<BTreeSet<_>>() != EVIDENCE_FIELDS.into_iter().collect() {
+            return Err(format!("inapplicable {pair} needs evidence fields {EVIDENCE_FIELDS:?}"));
+        }
+        if !EVIDENCE_KINDS.iter().any(|k| evidence["kind"] == *k) {
+            return Err(format!("inapplicable {pair} has an unknown evidence kind"));
+        }
+        if evidence["payload"] != payload {
+            return Err(format!("inapplicable {pair} cites a payload that does not define {technique}"));
+        }
+        for (field, high) in [("where", 3u64), ("clause", 9)] {
+            let values = evidence[field].as_array().ok_or(format!("inapplicable {pair} has malformed payload {field} values"))?;
+            if values.is_empty() || values.iter().any(|v| v.as_u64().is_none_or(|n| n > high || (field == "where" && n == 0))) {
+                return Err(format!("inapplicable {pair} has malformed payload {field} values"));
+            }
+        }
+        if evidence["boundary"].as_str().map_or(0, |b| b.trim().chars().count()) < BOUNDARY_CHARS {
+            return Err(format!("inapplicable {pair} must name the boundary its context would require"));
+        }
+        if !evidence["contexts"].as_str().is_some_and(section) {
+            return Err(format!("inapplicable {pair} must cite a CONTEXTS.md section"));
+        }
+        out.insert(technique.clone(), entry.clone());
+    }
+    Ok(out)
 }
 
 // [spec:pgorm:req:security.sqlmap.profiles]
-pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result<Vec<(Value, String)>, String> {
-    let list = |v: &Value| -> Result<Vec<String>, String> {
-        v.as_array().ok_or("missing inventory list")?.iter()
-            .map(|v| v.as_str().map(str::to_owned).ok_or("non-string inventory entry".into())).collect()
-    };
+pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result<Inventory, String> {
     let cases = manifest["cases"].as_array().ok_or("missing manifest cases")?;
     let mut by_id = BTreeMap::new();
     for case in cases {
         let id = case["id"].as_str().ok_or("missing case id")?;
         if by_id.insert(id.to_owned(), case).is_some() { return Err("duplicated manifest case".into()); }
     }
-    let selected = list(&profile["cases"])?;
+    let selected = strings(&profile["cases"])?;
     if subset.iter().any(|s| !selected.contains(s)) { return Err("subset contains cases outside the selected profile".into()); }
     let selected = if subset.is_empty() { selected } else { subset.to_vec() };
     if selected.is_empty() || selected.len() != selected.iter().collect::<BTreeSet<_>>().len() {
         return Err("empty or duplicated case inventory".into());
     }
-    let techniques = list(&profile["techniques"])?;
+    let techniques = strings(&profile["techniques"])?;
     if techniques.is_empty() || techniques.len() != techniques.iter().collect::<BTreeSet<_>>().len()
         || techniques.iter().any(|t| !TECHNIQUES.iter().any(|(id, _)| id == t)) {
         return Err("empty, duplicated or unknown technique inventory".into());
     }
-    let mut work = Vec::new();
+    let mut inventory = Inventory::default();
     for id in selected {
         let case = by_id.get(&id).ok_or(format!("unknown case {id}"))?;
-        let enabled = list(&case["techniques"])?;
+        let enabled = strings(&case["techniques"])?;
         if enabled.len() != enabled.iter().collect::<BTreeSet<_>>().len() { return Err("duplicated case technique".into()); }
-        let before = work.len();
-        for technique in enabled {
-            if techniques.contains(&technique) { work.push(((*case).clone(), technique)); }
+        let offered: Vec<_> = enabled.into_iter().filter(|t| techniques.contains(t)).collect();
+        // A case the profile drops outright is still unexplained work; only an
+        // evidenced exemption may remove a technique the profile does offer.
+        if offered.is_empty() { return Err(format!("no scheduled techniques for {id}")); }
+        let declared = exemptions(case)?;
+        for technique in offered {
+            match declared.get(&technique) {
+                Some(entry) => inventory.exempt.push((id.clone(), technique, entry.clone())),
+                None => inventory.work.push(((*case).clone(), technique)),
+            }
         }
-        if before == work.len() { return Err(format!("no scheduled techniques for {id}")); }
     }
-    Ok(work)
+    Ok(inventory)
 }

@@ -137,8 +137,17 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > cached findings from another case or run MUST NOT satisfy a control or
 > protected result. The full profile includes every manifest case and
 > exercises boolean, error, UNION, stacked, time and inline-query techniques
-> where the context supports them. Inapplicability needs an explicit,
-> reviewable reason in the manifest. Smoke is an explicitly smaller claim.
+> where the context supports them. A technique a case cannot exercise MUST be
+> declared inapplicable in the manifest, per case and per technique, carrying
+> a human reason and machine-checkable evidence: the scanner payload
+> definition the claim concerns, its qualifying clause and where values, and
+> the boundary the context would require. A reviewer MUST be able to retrace
+> the claim through the pinned scanner's own data rather than accept it. A
+> declaration missing a reason or that evidence, or naming a technique the
+> case does not declare, MUST fail the run, as MUST a declared-inapplicable
+> pair the scanner detects. Declared-inapplicable pairs are excluded from
+> scheduled work, reported separately with their evidence, and MUST NOT be
+> counted as passes. Smoke is an explicitly smaller claim.
 > Database and HTTP timeouts MUST allow the profile's expected time-control
 > delay, with a documented margin; an outer deadline still bounds the scan.
 

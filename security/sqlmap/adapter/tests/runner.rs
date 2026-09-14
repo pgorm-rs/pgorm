@@ -20,7 +20,7 @@ fn detection() -> ScanResult {
 // [spec:pgorm:req:security.sqlmap.runner-tests/test]
 // [spec:pgorm:req:security.sqlmap.execution/test]
 #[test]
-fn actual_sqlmap_urls_omit_query_but_match_every_endpoint_component() {
+fn sqlmap_urls_omit_query_but_match_endpoints() {
     for (raw, log) in [(include_str!("fixtures/control.json"), include_str!("fixtures/control.log")), (include_str!("fixtures/protected.json"), include_str!("fixtures/protected.log"))] {
         let report: Value = serde_json::from_str(raw).unwrap();
         let target = format!("{}?input=alice", report["meta"]["url"].as_str().unwrap());
@@ -123,29 +123,32 @@ fn protected_findings_and_invariant_violations_always_fail() {
 
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
-fn empty_missing_extra_duplicate_skipped_and_failed_cleanup_cannot_pass() {
+fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
     let pass = BTreeMap::from([("a".into(), json!({"outcome":"pass"}))]);
-    assert!(result::aggregate(&["a".into()], &pass, &[]));
-    assert!(!result::aggregate(&[], &BTreeMap::new(), &[]));
-    assert!(!result::aggregate(&["a".into()], &BTreeMap::new(), &[]));
-    assert!(!result::aggregate(&["a".into(), "b".into()], &pass, &[]));
-    assert!(!result::aggregate(&["a".into(), "a".into()], &pass, &[]));
-    assert!(!result::aggregate(&[], &pass, &[]));
-    assert!(!result::aggregate(&["a".into()], &pass, &["container removal failed".into()]));
-    for outcome in ["incomplete", "invalid-control", "vulnerable", "skipped"] {
-        assert!(!result::aggregate(&["a".into()], &BTreeMap::from([("a".into(),json!({"outcome":outcome}))]), &[]));
+    assert!(result::aggregate(&["a".into()], &pass, &[], &[]));
+    assert!(!result::aggregate(&[], &BTreeMap::new(), &[], &[]));
+    assert!(!result::aggregate(&["a".into()], &BTreeMap::new(), &[], &[]));
+    assert!(!result::aggregate(&["a".into(), "b".into()], &pass, &[], &[]));
+    assert!(!result::aggregate(&["a".into(), "a".into()], &pass, &[], &[]));
+    assert!(!result::aggregate(&[], &pass, &[], &[]));
+    assert!(!result::aggregate(&["a".into()], &pass, &["container removal failed".into()], &[]));
+    assert!(!result::aggregate(&["a".into()], &pass, &[], &["a-Q".into()]));
+    for outcome in ["incomplete", "invalid-control", "vulnerable", "skipped", "inapplicable"] {
+        assert!(!result::aggregate(&["a".into()], &BTreeMap::from([("a".into(),json!({"outcome":outcome}))]), &[], &[]));
     }
 }
 
 // [spec:pgorm:req:security.sqlmap.profiles/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
-fn profiles_keep_all_420_full_and_six_smoke_invocations() {
+fn profiles_keep_252_full_and_six_smoke() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
     assert_eq!(manifest["cases"].as_array().unwrap().len(), 35);
-    assert_eq!(result::inventory(&manifest, &profiles["full"], &[]).unwrap().len() * 2, 420);
-    assert_eq!(result::inventory(&manifest, &profiles["smoke"], &[]).unwrap().len() * 2, 6);
+    let full = result::inventory(&manifest, &profiles["full"], &[]).unwrap();
+    assert_eq!(full.work.len() * 2, 252);
+    assert_eq!(full.exempt.len(), 84);
+    assert_eq!(result::inventory(&manifest, &profiles["smoke"], &[]).unwrap().work.len() * 2, 6);
     assert!(result::inventory(&manifest, &profiles["smoke"], &["insert".into()]).is_err());
     assert!(result::inventory(&manifest, &profiles["full"], &["select".into(),"select".into()]).is_err());
     let mut profile = profiles["full"].clone(); profile["techniques"] = json!([]);
@@ -154,8 +157,90 @@ fn profiles_keep_all_420_full_and_six_smoke_invocations() {
     assert!(result::inventory(&manifest, &profile, &[]).is_err());
 }
 
+fn evidence() -> Value {
+    json!({"kind":"no-boundary","payload":"inline_query.xml","where":[3],"clause":[1,2,3,8],
+           "boundary":"the sole where=3 boundary carries an empty prefix and an empty suffix","contexts":"4"})
+}
+
+fn exempt_case(inapplicable: Value) -> Value {
+    json!({"id":"a","techniques":["B","Q"],"inapplicable":inapplicable})
+}
+
+fn exempt_entry(evidence: Value) -> Value {
+    json!({"reason":"REPLACE-only tests cannot escape the app's quoting at this injection point.","evidence":evidence})
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles/test]
 #[test]
-fn command_options_and_query_encoding_match_the_python_runner() {
+fn exemptions_without_reason_or_evidence_are_refused() {
+    assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(evidence())}))).is_ok());
+    for entry in [json!({}), json!("structurally impossible"), json!({"reason":"n/a","evidence":evidence()}),
+                  json!({"reason":"REPLACE-only tests cannot escape the app's quoting here."}),
+                  json!({"evidence":evidence()})] {
+        assert!(result::exemptions(&exempt_case(json!({"Q": entry}))).is_err(), "{entry}");
+    }
+    for (field, bad) in [("kind", json!("unproven")), ("payload", json!("boolean_blind.xml")),
+                         ("where", json!([])), ("where", json!([4])), ("where", json!("3")),
+                         ("clause", json!([10])), ("clause", json!([])),
+                         ("boundary", json!("none")), ("contexts", json!("§4")), ("contexts", json!("0"))] {
+        let mut broken = evidence(); broken[field] = bad.clone();
+        assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(broken)}))).is_err(), "{field}={bad}");
+    }
+    // A missing or surplus evidence field must not be silently tolerated.
+    let mut short = evidence(); short.as_object_mut().unwrap().remove("boundary");
+    assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(short)}))).is_err());
+    let mut wide = evidence(); wide["note"] = json!("extra");
+    assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(wide)}))).is_err());
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles/test]
+#[test]
+fn exemptions_naming_undeclared_techniques_are_refused() {
+    for technique in ["U", "Z", "q"] {
+        let mut cited = evidence();
+        cited["payload"] = json!(result::PAYLOADS.iter().find(|(t, _)| *t == technique).map_or("union_query.xml", |(_, p)| p));
+        let case = exempt_case(json!({technique: exempt_entry(cited)}));
+        assert!(result::exemptions(&case).is_err(), "{technique}");
+    }
+    assert!(result::exemptions(&json!({"id":"a","techniques":["Q"],"inapplicable":[]})).is_err());
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.verdict/test]
+#[test]
+fn exempted_pairs_leave_scheduled_work_and_never_pass() {
+    let manifest = json!({"cases":[exempt_case(json!({"Q": exempt_entry(evidence())}))]});
+    let profile = json!({"cases":["a"],"techniques":["B","Q"]});
+    let inventory = result::inventory(&manifest, &profile, &[]).unwrap();
+    assert_eq!(inventory.work.iter().map(|(_, t)| t.as_str()).collect::<Vec<_>>(), ["B"]);
+    assert_eq!(inventory.exempt.len(), 1);
+    assert_eq!(inventory.exempt[0].1, "Q");
+    // The exemption is absent from scheduled work, so it can neither pass nor be counted.
+    let expected = ["a-B".to_owned()];
+    let results = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass"}))]);
+    assert!(result::aggregate(&expected, &results, &[], &[]));
+    let inflated = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass"})), ("a-Q".to_owned(), json!({"outcome":"pass"}))]);
+    assert!(!result::aggregate(&expected, &inflated, &[], &[]));
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.verdict/test]
+#[test]
+fn a_detected_but_exempted_pair_fails_the_run() {
+    let inapplicable = BTreeMap::from([("a-Q".to_owned(), exempt_entry(evidence()))]);
+    let quiet = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("boolean-based blind","input","GET")]}}))]);
+    assert!(result::falsified(&quiet, &inapplicable).is_empty());
+    let fired = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","input","GET")]}}))]);
+    assert_eq!(result::falsified(&fired, &inapplicable), ["a-Q"]);
+    assert!(!result::aggregate(&["a-B".into()], &fired, &[], &result::falsified(&fired, &inapplicable)));
+    // A finding on another case, or at another injection point, falsifies nothing.
+    let elsewhere = BTreeMap::from([("b-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","input","GET")]}})),
+                                    ("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","other","GET")]}}))]);
+    assert!(result::falsified(&elsewhere, &inapplicable).is_empty());
+}
+
+#[test]
+fn command_options_and_encoding_match_python() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
     let mut case = manifest["cases"][0].clone(); case["baseline"] = json!("a b'+&%");
@@ -176,15 +261,17 @@ async fn process_timeout_and_cancellation_stop_children() {
 
 // [spec:pgorm:req:security.sqlmap.artifacts/test]
 #[test]
-fn setup_failure_retains_inventory_report_summary_and_nonzero_status() {
+fn setup_failure_retains_inventory_and_status() {
     let artifacts = std::env::temp_dir().join(format!("sqlmap-runner-test-{}", std::process::id()));
     let status = std::process::Command::new(env!("CARGO_BIN_EXE_sqlmap-harness"))
         .args(["--profile", "full", "--python", "/nonexistent/sqlmap-python", "--artifacts"])
         .arg(&artifacts).output().unwrap();
     assert!(!status.status.success());
     let report = harness::read_json(&artifacts.join("report.json")).unwrap();
-    assert_eq!(report["expected_scans"].as_array().unwrap().len(), 420);
-    assert_eq!(report["results"].as_object().unwrap().len(), 210);
+    assert_eq!(report["expected_scans"].as_array().unwrap().len(), 252);
+    assert_eq!(report["results"].as_object().unwrap().len(), 126);
+    // Declared inapplicability is retained as evidence even when setup never reaches the scanner.
+    assert_eq!(report["inapplicable"].as_object().unwrap().len(), 84);
     assert_eq!(report["pass"], false);
     assert!(report["error"].is_string());
     assert!(artifacts.join("summary.txt").is_file());
@@ -223,5 +310,10 @@ fn parity_against_python_campaign() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 420);
+    // The corpus must be a complete full-profile campaign, whose size depends on how
+    // many pairs the manifest declares inapplicable at the revision that produced it.
+    assert_eq!(report["profile"], "full");
+    assert!(report["subset"].as_array().unwrap().is_empty());
+    assert_eq!(checked, report["expected"].as_array().unwrap().len() * 2);
+    assert!(checked >= 252, "{checked}");
 }

@@ -5048,6 +5048,14 @@ children (
                         title "An exempted pair cites the evidence that proves it unreachable"
                         kind @feat
                         deps (sqlmap.controls.contexts)
+                        log (
+                            {
+                                at 2026-09-14T15:46:22.448952Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Correction to the first pass: the insert case was over-exempted, and this is the exact failure mode the mechanism exists to prevent. All six techniques were exempted on the grounds of a VALUES arity wall, but the written reason said the control puts the input in the third of four VALUES columns, which is a fact about the control we happen to have rather than about what any faithful control could do. The contexts analysis says as much itself: its remedy section names moving the injected literal to the final VALUES column, or an INSERT SELECT WHERE form, and either remains an honest INSERT control. Exempting a shape problem as though it were structural is how an exemption mechanism quietly erodes coverage. Boolean, error, stacked and time were therefore returned to scheduled work for insert, leaving only union, which genuinely has no set-operation position in a DML statement, and inline query, which is unreachable everywhere. The arithmetic moves from 88 exempt and 122 scheduled to 84 and 126. Two cases still carry no scheduled technique at all, schema and function, and they deserve the same scrutiny before being accepted, because a suite making no detection claim at all about schema-name or function-name handling should say so loudly rather than let a zero pass unnoticed. The pinned invocation counts in the runner tests caught the change immediately, which is what those pins are for."
+                            }
+                        )
                     }
                 )
                 log (
