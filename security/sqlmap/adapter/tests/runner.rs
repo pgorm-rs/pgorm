@@ -141,13 +141,13 @@ fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
 // [spec:pgorm:req:security.sqlmap.profiles/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
-fn profiles_keep_252_full_and_six_smoke() {
+fn profiles_keep_254_full_and_six_smoke() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
     assert_eq!(manifest["cases"].as_array().unwrap().len(), 35);
     let full = result::inventory(&manifest, &profiles["full"], &[]).unwrap();
-    assert_eq!(full.work.len() * 2, 252);
-    assert_eq!(full.exempt.len(), 84);
+    assert_eq!(full.work.len() * 2, 254);
+    assert_eq!(full.exempt.len(), 83);
     assert_eq!(result::inventory(&manifest, &profiles["smoke"], &[]).unwrap().work.len() * 2, 6);
     assert!(result::inventory(&manifest, &profiles["smoke"], &["insert".into()]).is_err());
     assert!(result::inventory(&manifest, &profiles["full"], &["select".into(),"select".into()]).is_err());
@@ -268,10 +268,10 @@ fn setup_failure_retains_inventory_and_status() {
         .arg(&artifacts).output().unwrap();
     assert!(!status.status.success());
     let report = harness::read_json(&artifacts.join("report.json")).unwrap();
-    assert_eq!(report["expected_scans"].as_array().unwrap().len(), 252);
-    assert_eq!(report["results"].as_object().unwrap().len(), 126);
+    assert_eq!(report["expected_scans"].as_array().unwrap().len(), 254);
+    assert_eq!(report["results"].as_object().unwrap().len(), 127);
     // Declared inapplicability is retained as evidence even when setup never reaches the scanner.
-    assert_eq!(report["inapplicable"].as_object().unwrap().len(), 84);
+    assert_eq!(report["inapplicable"].as_object().unwrap().len(), 83);
     assert_eq!(report["pass"], false);
     assert!(report["error"].is_string());
     assert!(artifacts.join("summary.txt").is_file());

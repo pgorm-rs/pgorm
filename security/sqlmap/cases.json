@@ -50,7 +50,7 @@
     {
       "id": "insert",
       "family": "CRUD values",
-      "api": "ActiveModel::insert",
+      "api": "Insert::select_from",
       "method": "GET",
       "route": "/case/protected/insert",
       "field": "input",
@@ -74,7 +74,7 @@
       },
       "inapplicable": {
         "Q": {
-          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in a non-final VALUES column, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in the WHERE of an INSERT ... SELECT, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
           "evidence": {
             "kind": "no-boundary",
             "payload": "inline_query.xml",
@@ -89,25 +89,6 @@
             ],
             "boundary": "boundaries.xml holds exactly one boundary whose <where> includes 3 (level 1, clause 0, ptype 1) and it carries an empty <prefix> and empty <suffix>; no where=3 boundary exists at any level that closes a ' or a \", so REPLACE can only land on an already-unquoted value.",
             "contexts": "4"
-          }
-        },
-        "U": {
-          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an INSERT statement whose injection point is a single-quoted literal in a non-final VALUES column; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an INSERT control.",
-          "evidence": {
-            "kind": "no-attachable-position",
-            "payload": "union_query.xml",
-            "where": [
-              1
-            ],
-            "clause": [
-              1,
-              2,
-              3,
-              4,
-              5
-            ],
-            "boundary": "A level-3 ptype-2 `'` boundary closes the quote and the UNION payload supplies its own [GENERIC_SQL_COMMENT], but the enclosing INSERT/UPDATE/DELETE offers no set-operation position for the appended SELECT at any boundary level.",
-            "contexts": "7a"
           }
         }
       }
@@ -139,7 +120,7 @@
       },
       "inapplicable": {
         "Q": {
-          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in an UPDATE SET assignment, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
+          "reason": "Inline-query tests are REPLACE-only (where=3), so the vector substitutes the whole parameter value with no prefix or suffix to escape quoting, and the technique confirms only by grepping its own delimiters out of the response body. The control puts the input in a single-quoted literal in an UPDATE WHERE predicate, from which the vector cannot reach an unquoted, reflected projection; pgorm binds values and double-quotes identifiers, so no faithful control anywhere in this suite exposes one.",
           "evidence": {
             "kind": "no-boundary",
             "payload": "inline_query.xml",
@@ -157,7 +138,7 @@
           }
         },
         "U": {
-          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an UPDATE statement whose injection point is a single-quoted literal in an UPDATE SET assignment; RETURNING cannot be unioned onto through the WHERE, so making this reachable would mean making the control a SELECT, which stops it being an UPDATE control.",
+          "reason": "Every qualifying UNION test appends at where=1 and needs a SELECT set-operation slot to attach to. The control is an UPDATE statement whose injection point is a single-quoted literal in an UPDATE WHERE predicate; a UNION SELECT cannot attach to an UPDATE's WHERE, so making this reachable would mean making the control a SELECT, which stops it being an UPDATE control.",
           "evidence": {
             "kind": "no-attachable-position",
             "payload": "union_query.xml",

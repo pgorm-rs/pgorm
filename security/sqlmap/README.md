@@ -112,8 +112,10 @@ run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
 work, appear under `inapplicable` in the report and CI summary with their
 evidence, and are never counted as passes.
 
-Of 210 pairs, 88 are declared inapplicable (Q 35, U 17, E 11, T 11, B 7, S 7),
-leaving 122 scheduled. `insert`, `schema` and `function` have no scheduled
-technique left at all; the suite makes no detection claim about them. Only
-CONTEXTS.md section 7a is exempted — the level-gated (7b) and control-shape
-(7c) cells stay scheduled and failing.
+Of 210 pairs, 83 are declared inapplicable (Q 35, U 16, E 10, T 10, B 6, S 6),
+leaving 127 scheduled. `schema` and `function` have no scheduled technique left
+at all; the suite makes no detection claim about them. Only CONTEXTS.md section
+7a is exempted. The section-7c control-shape cells are reshaped to fire at
+level 3 — `insert` (INSERT … SELECT … WHERE), `update-value` (value in the
+WHERE) and `cast` (CAST target inside a WHERE) now reach every scheduled
+technique; the remaining level-gated (7b) cells stay scheduled and failing.

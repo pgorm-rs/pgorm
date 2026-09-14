@@ -5019,12 +5019,20 @@ children (
                         id sqlmap.controls.contexts
                         title "Establish what each technique needs from each context"
                         kind @docs
+                        sealed true
                         log (
                             {
                                 at 2026-09-14T13:22:59.323107Z
                                 author "brendan@necessary.nu"
                                 kind @status
                                 text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-09-14T15:54:28.159137Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }
@@ -5034,6 +5042,14 @@ children (
                         title "Reshape the controls whose cells are genuinely reachable"
                         kind @fix
                         deps (sqlmap.controls.contexts)
+                        log (
+                            {
+                                at 2026-09-14T15:54:52.670712Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+                        )
                     }
 
                     {
@@ -5041,6 +5057,14 @@ children (
                         title "A full profile detects every scheduled control"
                         kind @test
                         deps (sqlmap.controls.literal sqlmap.controls.inapplicable)
+                        log (
+                            {
+                                at 2026-09-14T15:57:20.922319Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Runtime prerequisites established before the verify run, so the node does not lose time discovering them. The pinned scanner is already extracted at target/sqlmap-cache/scanner/sqlmap-d486742eec47ba96940d35bf2dc176f60868efdd with sqlmap.py present, so no download is needed and the run can stay offline. The harness hard-fails when the interpreter's version differs from the pin in pins.json, which is 3.14.4, and this machine's default python3 is 3.11.6, so the runner must be given --python explicitly. Three interpreters on disk satisfy the pin: /opt/homebrew/bin/python3.14, target/generative-build/venv/bin/python and target/python-check/bin/python. Docker is present at server version 29.4. The full profile is 126 scheduled pairs after exemptions, each pair running a control scan and a protected scan, so roughly 252 scanner invocations at a 240 second per-case timeout; the recorded CI deadline for a full run is 300 minutes, so this needs to run unattended rather than inline. The adapter must be built first with cargo build --locked --bins, and the run wants --direct-regressions so the SQL security regressions are exercised against the same disposable database."
+                            }
+                        )
                     }
 
                     {
@@ -5071,6 +5095,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "The operator's earlier choice to rework control routes rather than declare inapplicability is reversed, on evidence gathered since. Reworking cannot reach 210 of 210 because most of the 105 invalid-control pairs are structurally unreachable rather than merely badly written. The decisive fact, verified directly rather than taken from the analysis: inline query ships eight payloads and every one is where=3, REPLACE, and exactly one boundary in sqlmap's whole catalogue serves where=3, carrying an empty prefix and an empty suffix. Inline query therefore cannot escape a quote at any level, only replace a value already sitting unquoted, and because it confirms by grepping the response that value must also be reflected back. pgorm binds values and quotes identifiers, so it never emits an unquoted reflected projection, and no faithful control for inline query exists anywhere in this suite. That alone accounts for thirty-five pairs permanently. The same structural argument removes union against INSERT, UPDATE and DELETE, which offer no set-operation position, union after a terminal clause such as LIMIT or ORDER BY, where nothing may syntactically follow, and boolean, error and time against a bare object-name tail such as FROM quoted-name or AS quoted-name, which has no truth slot to hang a predicate on. The only way to make those fire is to give the control a different shape from the protected route it is twinned with, at which point its detection says nothing about pgorm in the real context and the control stops being a control. The chosen path is therefore declared inapplicability, but with a materially higher bar than the unread empty field that exists today: each exemption must cite the specific boundary or payload evidence that proves the cell unreachable, so a reviewer can check the claim rather than accept it. Everything not exempted must then be detected, with no partial credit. Also confirmed while checking: the full profile runs at level 3 and the harness passes extending=N, which declines sqlmap's offer to escalate to levels 4 and 5, so every identifier-escape, pre-WHERE, table-name and dollar-quoted boundary is out of reach by configuration rather than by nature."
+                    }
+
+                    {
+                        at 2026-09-14T16:57:26.605842Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Twice now an exemption filed as structurally impossible turned out to depend on the control's shape rather than on SQL grammar, and both were caught, which is worth recording as a pattern rather than two incidents. The first was insert boolean, error, stacked and time, exempted on a VALUES arity wall whose written reason described the third of four columns, a fact about our control and not about what any INSERT could do; returning them to scheduled work was a judgement call made by reading the reason. The second was insert union, exempted on the argument that a DML statement offers no set-operation position. That is true of INSERT VALUES but false of INSERT SELECT WHERE, and once the control was reshaped to the latter the inner SELECT's set-operation position became union-injectable through RETURNING. This one was not caught by judgement but by the mechanism itself: a declared-inapplicable pair that the scanner detects fails the run, so the false exemption could not survive contact with a real scan and had to be removed. The lesson for any future exemption is that the burden of proof is about the context class, not the specific statement we happen to have written, and that a reason mentioning a detail of the current control is a signal the claim is shape-dependent. Exemptions now stand at 83 with 127 scheduled, and the three reshaped controls are update-value moving its literal from the SET assignment into the WHERE, cast embedding the CAST in a WHERE so the unquoted type closes into a truth slot, and insert becoming a guarded INSERT SELECT WHERE. Each protected twin was updated alongside its control so the pair remains a matched twin rather than drifting into testing two different things."
                     }
                 )
             }

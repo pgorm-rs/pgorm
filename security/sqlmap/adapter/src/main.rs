@@ -57,11 +57,12 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
     let values = match case {
         "select" => names(E::find().filter(C::Name.eq(input)).order_by_asc(C::Id).all(&db).await?),
         "insert" => {
-            item::ActiveModel {id: Set(10), tenant: Set(1), name: Set(input.to_owned()), note: Set("inserted".into())}.insert(&db).await?;
-            names(E::find().filter(C::Id.eq(10)).all(&db).await?)
+            let source = Query::select().expr(Expr::val(10)).expr(Expr::val(1)).expr(Expr::val("alice")).expr(Expr::val("inserted")).and_where(Expr::val("alice").eq(input)).to_owned();
+            let insert = Query::insert().into_table(a()).columns([C::Id,C::Tenant,C::Name,C::Note]).select_from(source)?.returning_col(C::Name).to_owned();
+            strings(&db, insert.build()).await?
         },
         "update-value" => {
-            pgorm::Update::many(E).col_expr(C::Name, Expr::val(input).into()).filter(C::Id.eq(1)).exec(&db).await?;
+            pgorm::Update::many(E).col_expr(C::Note, Expr::val("touched").into()).filter(C::Id.eq(1)).filter(C::Name.eq(input)).exec(&db).await?;
             names(E::find().filter(C::Id.eq(1)).all(&db).await?)
         },
         "update-guard" => {
@@ -115,7 +116,7 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
         "order" => strings(&db,select().order_by(Alias::new(input),q::Order::Asc).build()).await?,
         "group" => strings(&db,Query::select().column(Alias::new(input)).from(a()).group_by_col(Alias::new(input)).build()).await?,
         "function" => strings(&db,Query::select().expr(Func::cust(Alias::new(input)).arg(Expr::val("Alice"))).build()).await?,
-        "cast" => strings(&db,Query::select().expr(Expr::val("alice").cast_as(Alias::new(input))).build()).await?,
+        "cast" => strings(&db,Query::select().column(n()).from(a()).and_where(Expr::col(n()).eq(Expr::val("alice").cast_as(Alias::new(input)))).build()).await?,
         "enum" => strings(&db,Query::select().expr(Expr::val("ready").cast_as_type(q::TypeName::new(Alias::new(input)).schema(Alias::new("fixture"))).cast_as(Alias::new("text"))).build()).await?,
         "enum-ddl" => {
             let sql = q::Table::create(Alias::new("enum_probe")).col(q::ColumnDef::new(Alias::new("value")).enumeration(Alias::new(input),["ready","waiting"])).to_string();
@@ -157,8 +158,13 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
 // These concatenations are the independent positive controls. Do not use ORM escaping here.
 async fn control(app: &App, case: &str, input: &str) -> Result<Value> {
     let sql = match case {
-        "insert" => format!("INSERT INTO items VALUES (10,1,'{input}','inserted') RETURNING name"),
-        "update-value" => format!("UPDATE items SET name='{input}' WHERE id=1 RETURNING name"),
+        // A single-row VALUES literal has no truth slot and its tuple arity blocks every
+        // level-3 boundary; guarding an INSERT ... SELECT on the value reaches a WHERE, where
+        // the same '-delimited literal exposes boolean/error/time/stacked, and the inner
+        // SELECT's set-operation position surfaced through RETURNING also exposes UNION.
+        "insert" => format!("INSERT INTO items SELECT 10,1,'alice','inserted' WHERE 'alice'='{input}' RETURNING name"),
+        // A SET assignment is not a truth slot at level 3; the same value in the WHERE is.
+        "update-value" => format!("UPDATE items SET note='touched' WHERE id=1 AND name='{input}' RETURNING name"),
         "update-guard" => format!("UPDATE items SET note='changed' WHERE tenant=1 AND name='{input}' RETURNING name"),
         "delete" | "tenant-or" | "empty-in" | "empty-or" => format!("DELETE FROM items WHERE tenant=1 AND name='{input}' RETURNING name"),
         "schema" => format!("SELECT name FROM \"{input}\".items"),
@@ -167,7 +173,8 @@ async fn control(app: &App, case: &str, input: &str) -> Result<Value> {
         "order" => format!("SELECT name FROM items ORDER BY \"{input}\""),
         "alias" | "graph-alias" => format!("SELECT name FROM items AS \"{input}\""),
         "function" => format!("SELECT {input}('Alice')"),
-        "cast" => format!("SELECT CAST('alice' AS {input})"),
+        // The unquoted CAST type closes with `)` into a WHERE truth slot, reaching B/E/S/T/U.
+        "cast" => format!("SELECT name FROM items WHERE name = CAST('alice' AS {input})"),
         "enum" => format!("SELECT CAST('ready' AS fixture.\"{input}\")::text"),
         "enum-ddl" => format!("CREATE TABLE enum_probe (value \"{input}\"); SELECT udt_name FROM information_schema.columns WHERE table_schema='fixture' AND table_name='enum_probe'"),
         "direction" => format!("SELECT name FROM items ORDER BY name {input}"),
