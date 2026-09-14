@@ -5009,6 +5009,55 @@ children (
                     }
                 )
             }
+
+            {
+                id sqlmap.controls
+                title "Every declared technique reaches a vulnerable control"
+                kind @fix
+                children (
+                    {
+                        id sqlmap.controls.contexts
+                        title "Establish what each technique needs from each context"
+                        kind @docs
+                    }
+
+                    {
+                        id sqlmap.controls.literal
+                        title "String-literal controls reach all six techniques"
+                        kind @fix
+                        deps (sqlmap.controls.contexts)
+                    }
+
+                    {
+                        id sqlmap.controls.identifier
+                        title "Quoted-identifier controls reach all six techniques"
+                        kind @fix
+                        deps (sqlmap.controls.contexts)
+                    }
+
+                    {
+                        id sqlmap.controls.unquoted
+                        title "Numeric and keyword controls reach all six techniques"
+                        kind @fix
+                        deps (sqlmap.controls.contexts)
+                    }
+
+                    {
+                        id sqlmap.controls.verify
+                        title "A full profile detects every scheduled control"
+                        kind @test
+                        deps (sqlmap.controls.literal sqlmap.controls.identifier sqlmap.controls.unquoted)
+                    }
+                )
+                log (
+                    {
+                        at 2026-09-14T12:24:14.205147Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The breakdown follows injection context rather than case, because context is what decides which techniques can reach a control. Reading the thirty-five control routes in adapter/src/main.rs, they fall into three classes. String literal contexts interpolate into a quoted value, as in WHERE name='{input}' — these cover insert, update-value, update-guard, delete, tenant-or, empty-in, empty-or, parameters, the four LIKE cases, stored-value and the default arm, and they are the ones already detected by most techniques. Quoted identifier contexts interpolate inside double quotes, as in SELECT \"{input}\" FROM items — schema, table, column, group, pipeline-projection, stored-identifier, order, alias, graph-alias, enum and enum-ddl. These are where detection collapses, because escaping a double-quoted identifier leaves you needing the result to remain a valid identifier position. Unquoted contexts interpolate bare text into a keyword or numeric slot — function, cast, direction, limit and offset. The measured failures line up with those classes: inline query was missed in all thirty-five cases, all six techniques were missed for insert, pipeline-projection, schema, column, group, function and stored-identifier, and the remaining misses cluster in the identifier and unquoted groups. Inline query is the one technique that fails everywhere, and it needs a position where a subquery can be planted; limit and offset can host one directly since LIMIT (SELECT 1) is valid, while an identifier position needs the control to close the quote and open a projection. Worth noting that some of this may be about presenting a boundary shape sqlmap already recognises from its own boundaries list rather than an exotic one it has no payload for, so the contexts node should establish per technique what is actually required before any route is rewritten."
+                    }
+                )
+            }
         )
         log (
             {
