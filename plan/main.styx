@@ -7085,4 +7085,46 @@ children (
             }
         )
     }
+
+    {
+        id set-op-keeps-deduplication
+        title "A deduplicated set operation returns each row once"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T16:24:53.154609Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Five findings in the sets family, all with the same arithmetic: the subject returns exactly twice the reference's rows, every row appearing once more than it should. runtime-2187, runtime-252, runtime-3267 and runtime-4317 each return eight rows against four; runtime-1857 returns six against three; and in every case the reference-only set is empty, so nothing is missing, only duplicated. The failing step is always an ordinary fetch of everything, so the duplication is already in the relation rather than introduced by the terminal. Pre-existing rather than caused by this session's pipeline work: all five appear in the 2026-09-14 full run as well as the 2026-09-15 one, which rules out the settle and the naming changes. A doubled row count across a set operation points at a union folding to UNION ALL where it should fold to UNION DISTINCT. The pipeline already has machinery for exactly this: set_op hoists a deduplicating group into its own binding so the arity settles at the CTE boundary, and the commit that later generalised that hoist recorded that settling unconditionally would lose the documented UNION DISTINCT fold. Both facts should be read before touching anything, because the fold and the hoist are in tension and the fix has to keep both. Worth establishing first whether the duplication survives when the two branches are deduplicated separately rather than jointly, which would separate a lost fold from a dedup applied on the wrong side of the operation."
+            }
+        )
+    }
+
+    {
+        id window-frame-bounds
+        title "A bounded window frame selects the rows it names"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T16:25:02.058288Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Ten findings in the relational family, every one differing only in a window column's value while the rows themselves and their order match. The clearest is runtime-101: a window over p_score partitioned by p_rank and ordered by p_id with frame start 1 and end 1, which is ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING. The subject answers 10, 10, null, 30 across p_id 2, 1, 4, 3 while the reference answers 10, null, 30, null over the same rows in the same order, so the two disagree about which neighbour each row sees rather than about which rows exist. runtime-1256 shows the same shape with 10 against 30 on a single row, and runtime-2396 with 2 against 1. Pre-existing rather than introduced by this session: all ten appear in the 2026-09-14 run as well. Which side is right is the first thing to settle and is not obvious from the artifacts, because both sides execute SQL against the same PostgreSQL and so the disagreement is between two translations of one program rather than between an implementation and a model. The useful first step is therefore to emit both SQL strings for runtime-101 and compare their OVER clauses directly, rather than reasoning about frame semantics in the abstract. Note the frame vocabulary in the pipeline reads offsets as rows relative to the current row with negative preceding and positive following, and a reference that mapped start and end to a preceding-and-following pair instead would produce exactly this kind of neighbour-by-one disagreement."
+            }
+        )
+    }
+
+    {
+        id quoted-result-name-doubled
+        title "A result column reports the name it was given"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T16:25:29.587324Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Seven findings, four relational and three pipeline, where the rows and their values match exactly and only a column name differs, always by a doubled double-quote. A column aliased window-quote comes back from the subject as window followed by one quote and from the reference as window followed by two; the same holds for derived49 and for aggregate. Pre-existing rather than caused by this session, since all seven appear in the 2026-09-14 run. PostgreSQL reports a column's actual name rather than its quoted spelling, so a name containing one double quote is reported with one, and doubling is a property of how an identifier is written inside quotes rather than of the identifier itself. That makes the subject almost certainly right and the reference the side that is doubling, most likely by taking the text it emitted into SQL as the name rather than the name it meant to emit, which would be the same class of mistake as the literal renderer that was implementing a stale rule. It should nonetheless be checked in both directions before either side is changed, because the prefixed result-column names the graph uses are bounded to PostgreSQL's sixty-three byte identifier limit through one shared composition, and a doubling applied before that bound would truncate differently from one applied after."
+            }
+        )
+    }
 )
