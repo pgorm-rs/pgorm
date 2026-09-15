@@ -111,4 +111,4 @@ tests-cfg = []
 # the one-line fix lands upstream; see the pipeline-join-distinct-order
 # finding for the reproducer.
 [patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "b2baa230e4778a0a8485a4f2b2aab8e05d4bd1a6" }
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "868a7f9c0dff37755c72458cf9b6eb733776d2c5" }

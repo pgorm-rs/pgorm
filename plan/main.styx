@@ -6742,6 +6742,7 @@ children (
         id bound-datetime-max-precision
         title "A maximum-precision datetime binds as a parameter"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-14T11:10:35.610666Z
@@ -6756,6 +6757,13 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-09-15T01:21:21.710443Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -6763,6 +6771,7 @@ children (
         id decimal-scale-returned
         title "A returned decimal keeps the scale PostgreSQL gave it"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-14T11:10:51.517016Z
@@ -6776,6 +6785,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Not a contract question after all, and the oracle was right to be scale-sensitive. The earlier framing rested on reading the difference as pgorm and the reference disagreeing about whether scale is part of a numeric's identity. The campaign artifacts settle it the other way. In runtime-1283 the same row carries both kinds of field: literal0 reads 0.00 on the subject and 0.00 on the reference, while bound0 reads 0 on the subject and 0.00 on the reference. Scale survives the literal path and is lost on the bound-parameter path, which is the identical signature to bound-datetime-max-precision and not a disagreement about semantics at all. PostgreSQL itself is unambiguous that scale is part of the value: scale(0.00::numeric) is 2, scale(0::numeric) is 0, and the two render as different text. Measured the two paths directly against a live PostgreSQL 16.15 through an example rather than reasoning about them. The read path is clean: every value tested decodes with the scale PostgreSQL reported, as a scalar and inside an array, including 0.00 at scale 2 and 0.000000 at scale 6. The write path loses scale for zero and only for zero. Sent as bound parameters, 0.00 comes back scale 0 and 0.000000 comes back scale 0, while 1.50, 1.5, 12.3400, 0.10 and 100.00 all round-trip their scale exactly. The cause is one line upstream in rust_decimal 1.43.0, src/postgres/common.rs line 70, where to_postgres takes an is_zero shortcut that returns a PostgresDecimal with scale hardcoded to 0 and an empty digit vector, discarding self.scale(); every other path through that function reads self.scale() a few lines below. pgorm reaches it through bind_exact in src/executor/cursor_bind.rs, which hands Value::Decimal straight to rust_decimal's ToSql, so nothing of pgorm's own is wrong, and arrays inherit the same fault because each element re-enters ValueHolder. The chosen fix is to encode zero-with-scale in pgorm's own binding layer rather than fork rust_decimal for one line: the PostgreSQL numeric wire form for zero is fully determined and eight bytes long, ndigits 0, weight 0, sign 0x0000 and dscale set to the value's own scale, with no digit words, and cursor_bind.rs already owns type-aware wire encoding for other values. That also fixes the Python binding for free, since it builds the same Value. Worth noting the asymmetry this closes: the read side already refuses to lose scale, because ExactDecimal in pgorm-python re-encodes what it decoded and errors if the scale differs, so the binding was strict in one direction and silently lossy in the other."
+            }
+
+            {
+                at 2026-09-15T01:21:22.880525Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -6847,6 +6863,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Reproduced standalone in Rust with no database, which settles the attribution blocker both this node and pipeline-hidden-order recorded as standalone Rust replay is still required. The reproducer is examples/pipeline_panic_probe.rs, reduced from runtime-3287, and it panics inside into_sql before anything is sent. A backtrace narrows the path considerably and contradicts the natural reading of the panic message: the unset column name is not reached from projection but from ORDER BY generation, translate_select_pipeline at gen_query.rs:196 into translate_column_sort at gen_expr.rs:918 into translate_cid at gen_expr.rs:687. The triggering shape is therefore a relation sorted on a set of columns, a later select that projects some of those columns away, and then an operation forcing a new SELECT scope, a join or a distinct. The retained sort still holds column ids the projection dropped, and at ORDER BY time those ids have no name. PRQL treats sort as a property of a relation that survives a select, so the sort keys become hidden columns that must still be materialised through the CTE boundary for the outer ORDER BY to reference them, and that materialisation is what fails. This makes a single cause plausible for three filed defects rather than one: this panic, pipeline-hidden-order whose emitted SQL carries ORDER BY p_id on a select that never exposed p_id and is rejected 42703, and nested-source-from-entry whose join, sort and take_range shape is rejected 42P01 for a table absent from the FROM clause. All three are the same disagreement between a retained ordering and what an enclosing scope exposes. One caution carried into the fix: the expect must not simply become an error return, because an unset name here is a symptom, and converting the panic would turn the two SQL-rejection defects from loud failures into silently wrong SQL."
+            }
+
+            {
+                at 2026-09-15T12:26:37.562728Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

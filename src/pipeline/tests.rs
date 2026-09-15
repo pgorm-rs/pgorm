@@ -1647,3 +1647,44 @@ fn a_composable_deduplication_mints_no_binding() {
         "SELECT customer_id FROM invoice UNION DISTINCT SELECT customer_id FROM archive"
     );
 }
+
+/// A sort whose keys a later projection drops still has to reach ORDER BY.
+///
+/// prqlc folds `sort | take` into one `Take` carrying the sort, and `Flattener`
+/// then deletes the standalone `Sort` because a later `group` resets the order
+/// — leaving `Take.sort` the only carrier of an ordering that still decides
+/// which rows the take keeps. The SQL backend's anchoring never looked inside
+/// `Take`, so those columns were neither selected nor named, and generating
+/// ORDER BY aborted the process instead of erroring. Reduced from campaign item
+/// runtime-3287, whose own shape reaches this through `distinct`; an aggregate
+/// is used here because `distinct` settles into its own binding first
+/// (`a_deduplicated_sorted_range_keeps_its_rows`) and would mask it.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn a_dropped_sort_key_still_reaches_order_by() {
+    let sql = Pipeline::from_schema(alias("fixture"), alias("accounts"))
+        .sort([
+            Expr::from(alias("p_id")),
+            Expr::from(alias("p_tenant")),
+            Expr::from(alias("p_score")),
+        ])
+        .take_range(2i64..=4i64)
+        // p_id and p_score are ordered by, then projected away.
+        .select([Expr::from(alias("p_tenant")), Expr::from(alias("nonce"))])
+        .group([Expr::from(alias("p_tenant"))])
+        .aggregate([count_rows().as_(alias("n"))])
+        .into_sql()
+        .expect("a sort whose keys are later dropped still compiles")
+        .0;
+
+    // Each ordered column is carried by the relation its ORDER BY reads from.
+    // That is the whole of the fix: the keys survive the projection that
+    // dropped them rather than becoming unnameable at generation time.
+    let (carrier, ordering) = sql
+        .split_once(" ORDER BY ")
+        .expect("the range is selected by an ordering");
+    for key in ["p_id", "p_tenant", "p_score"] {
+        assert!(ordering.contains(key), "{key} is not ordered by:\n{sql}");
+        assert!(carrier.contains(key), "{key} is not projected:\n{sql}");
+    }
+}
