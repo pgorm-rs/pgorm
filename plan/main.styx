@@ -7088,7 +7088,7 @@ children (
 
     {
         id set-op-keeps-deduplication
-        title "A deduplicated set operation returns each row once"
+        title "A tighter set operation brackets the looser chain"
         kind @fix
         log (
             {
@@ -7096,6 +7096,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Five findings in the sets family, all with the same arithmetic: the subject returns exactly twice the reference's rows, every row appearing once more than it should. runtime-2187, runtime-252, runtime-3267 and runtime-4317 each return eight rows against four; runtime-1857 returns six against three; and in every case the reference-only set is empty, so nothing is missing, only duplicated. The failing step is always an ordinary fetch of everything, so the duplication is already in the relation rather than introduced by the terminal. Pre-existing rather than caused by this session's pipeline work: all five appear in the 2026-09-14 full run as well as the 2026-09-15 one, which rules out the settle and the naming changes. A doubled row count across a set operation points at a union folding to UNION ALL where it should fold to UNION DISTINCT. The pipeline already has machinery for exactly this: set_op hoists a deduplicating group into its own binding so the arity settles at the CTE boundary, and the commit that later generalised that hoist recorded that settling unconditionally would lose the documented UNION DISTINCT fold. Both facts should be read before touching anything, because the fold and the hoist are in tension and the fix has to keep both. Worth establishing first whether the duplication survives when the two branches are deduplicated separately rather than jointly, which would separate a lost fold from a dedup applied on the wrong side of the operation."
+            }
+
+            {
+                at 2026-09-15T17:15:59.441328Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Correction to this node's own filing, which named the wrong cause; the title is changed to match what it turned out to be. A doubled row count read like a lost UNION DISTINCT fold and the filing said so. It is not one. All five findings reduce to a single shape and none of them contains a deduplication anywhere, so there was no fold to lose and nothing misplaced. The cause is SQL set-operation precedence: INTERSECT binds tighter than UNION and EXCEPT, and the pipeline emitted its chain flat, so a program meaning the union of A and B intersected with C was read by the server as A unioned with the intersection of B and C. On a one-row fixture the intended answer is one row and the reassociated answer is two, which is the doubling, and on the four- and three-row fixtures it is the eight-against-four and six-against-three seen in the artifacts. PostgreSQL arbitrated directly rather than the disagreement being argued from semantics: the flat rendering returns the same count as the explicitly reassociated form and a different count from the bracketed one, and discriminating values rule out coincidence. UNION and EXCEPT are equal precedence and left-associative, so only an intersect written after an append or a remove reassociates, which is why the fold and the hoist were never in tension here as the filing assumed. One detail worth keeping for anyone reading the fix: an intervening stage does not reliably break the chain, because prqlc folds a select the relation already carries straight back into the set operation's arms, so append then select then intersect was broken too and the rule has to read the whole pending run rather than only the last stage."
+            }
+
+            {
+                at 2026-09-15T17:16:20.323304Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

@@ -172,6 +172,7 @@ mod error;
 mod expr;
 mod funcs;
 mod naming;
+mod sets;
 mod sources;
 mod terminal;
 mod window;

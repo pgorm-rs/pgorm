@@ -11,6 +11,7 @@ use super::adapter::{self, PlExpr, Projected};
 use super::binder::Binder;
 use super::expr::{Expr, ExprList, nodes_of};
 use super::naming;
+use super::sets;
 use super::window::Over;
 
 /// How prqlc will expand `this` — the whole-relation reference
@@ -535,13 +536,13 @@ impl Pipeline {
     /// writes against a source are repointed there (`settled`), and
     /// [`select_sources`](Pipeline::select_sources) — which projects *by*
     /// those names and so has nothing to repoint to — is refused by the same
-    /// `reshaped` gate the other namespace-replacing stages trip. Every
-    /// settle is owed to a [`distinct`](Pipeline::distinct), whether it
-    /// performs the hoist itself or a set operation performs it afterwards,
-    /// so that is the stage the refusal names.
+    /// `reshaped` gate the other namespace-replacing stages trip, naming
+    /// `owed_to`: the stage the hoist was performed for, which is a
+    /// [`distinct`](Pipeline::distinct) that could not compose or a set
+    /// operation that would otherwise have reassociated.
     // [spec:pgorm:req:pipeline.compose]
     // [spec:pgorm:sem:pipeline.select-sources+2]
-    fn settle(&mut self, naming: &naming::Naming) {
+    fn settle(&mut self, naming: &naming::Naming, owed_to: &'static str) {
         if self.stages.len() <= 1 {
             return;
         }
@@ -550,7 +551,7 @@ impl Pipeline {
         self.settled.absorb(&stages, &name, naming);
         self.bindings.push(stages);
         self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
-        self.reshaped.get_or_insert("distinct");
+        self.reshaped.get_or_insert(owed_to);
         self.deduped = false;
         self.ranged = false;
         self.columns = Columns::Sourced { introduced: false };
@@ -821,6 +822,13 @@ impl Pipeline {
     /// SQL's `INTERSECT ALL`.
     ///
     /// The result is a renamed relation, as under [`remove`](Self::remove).
+    ///
+    /// This is the one set operation SQL binds tightly, so written after an
+    /// [`append`](Self::append) or a [`remove`](Self::remove) it takes the
+    /// relation so far as a binding rather than as another operator in the
+    /// same chain — `(a UNION ALL b) INTERSECT ALL c`, which is what the
+    /// pipeline says, and not the `a UNION ALL (b INTERSECT ALL c)` that
+    /// precedence would otherwise make of it.
     // [spec:pgorm:req:pipeline.compose]
     pub fn intersect(self, other: impl IntoSource) -> Self {
         self.set_op("intersect", other).reshaping("intersect")
@@ -839,14 +847,25 @@ impl Pipeline {
         self.set_op("remove", other).reshaping("remove")
     }
 
-    fn set_op(mut self, op: &str, other: impl IntoSource) -> Self {
-        // A deduplicating `group` the set operation would otherwise be taken
-        // off directly moves into its own binding first, leaving this pipeline
-        // reading from it, so the arity settles at the CTE boundary. Nothing
-        // was renamed on the way: the deduplication that owes the hoist made
-        // the projection addressable already.
-        if self.deduped {
-            self.settle(&naming::Naming::default());
+    fn set_op(mut self, op: &'static str, other: impl IntoSource) -> Self {
+        // Two things force the pending stages into a binding of their own. A
+        // deduplicating `group` the set operation would otherwise be taken off
+        // directly has to move, so the arity settles at the CTE boundary; and
+        // a set operation already pending that SQL binds *looser* than this
+        // one has to move too, because a flat chain of the two is reassociated
+        // by precedence into a relation the pipeline never wrote (`sets`).
+        // Either way the binding is the bracket, and nothing was renamed on
+        // the way: a deduplication that owes the hoist made the projection
+        // addressable already, and a set operation renames nothing.
+        let owed_to = if self.deduped {
+            Some("distinct")
+        } else if sets::reassociates(&self.stages, op) {
+            Some(op)
+        } else {
+            None
+        };
+        if let Some(stage) = owed_to {
+            self.settle(&naming::Naming::default(), stage);
         }
         // The combined relation is not the one the ordering described, and
         // for `intersect` and `remove` it does not even answer to the same
@@ -909,7 +928,7 @@ impl Pipeline {
         let ordering = self.ordering.take();
         let settled = naming.renamed || self.ranged || !self.columns.ordered();
         if settled {
-            self.settle(&naming);
+            self.settle(&naming, "distinct");
         }
         self.deduped = true;
         let deduplicated = self.stage(adapter::call(

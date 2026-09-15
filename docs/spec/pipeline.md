@@ -255,6 +255,23 @@ of the crate, compiled in every build. Rules are grouped under
 > relation is renamed, so later stages refer to its columns by bare name —
 > an entity-qualified reference no longer resolves — while after `append`
 > the left side's naming survives.
+>
+> A chain of set operations associates left: each one combines everything
+> written before it with its own operand, so `append(b)` then `intersect(c)`
+> means `(a UNION ALL b) INTERSECT ALL c`. Rendered flat that is not what
+> PostgreSQL reads. `INTERSECT` binds tighter than `UNION` and `EXCEPT`,
+> which share one level and associate left, so the server would evaluate
+> `a UNION ALL (b INTERSECT ALL c)` — a different relation, and under the
+> `ALL` forms every row of a self-combining source twice. An operation whose
+> operator binds tighter than one already pending therefore takes its left
+> operand as a binding: prqlc's rendering offers no parentheses, and a CTE
+> boundary is the same bracket by another spelling. The obligation is read
+> off the whole pending run rather than the stage that happens to be last,
+> because a stage between two set operations need not break the chain —
+> prqlc folds a projection the relation already carries back into the set
+> operation's own arms. Where precedence cannot move the reading — `append`
+> or `remove` after any operation, any operation after `intersect` — nothing
+> is minted.
 
 ## Self-joins
 

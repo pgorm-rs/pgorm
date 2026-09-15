@@ -438,6 +438,35 @@ async fn remove_pipeline_subtracts_matching_rows() {
     ctx.delete().await;
 }
 
+/// A chain of set operations is evaluated the way it was written.
+///
+/// SQL binds `INTERSECT` tighter than `UNION`, so a flat
+/// `A UNION ALL B INTERSECT ALL C` is the server's
+/// `A UNION ALL (B INTERSECT ALL C)`. Here that is every customer twice
+/// instead of once — the doubling five campaign items reported, all of them
+/// shrinking to this shape. The row count is the whole point, so it is
+/// asserted against the server rather than against a rendering.
+// [spec:pgorm:req:pipeline.compose/test]
+#[pgorm_macros::test]
+async fn an_appended_relation_intersects_as_one_whole() {
+    let ctx = TestContext::new("pipeline_set_op_association").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    let seeded = seed(&db).await;
+
+    // Two copies of every id on the left, one on the right: `INTERSECT ALL`
+    // pairs them off and keeps one copy of each.
+    let ids = || Pipeline::from(customer::Entity).select(C::Id);
+    let pipeline = ids().append(ids()).intersect(ids()).sort(ID);
+
+    let rows: Vec<(i32,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
+    let mut expected = vec![(seeded.alice,), (seeded.bob,), (seeded.cleo,)];
+    expected.sort_unstable();
+    assert_eq!(rows, expected);
+
+    ctx.delete().await;
+}
+
 /// A nested source may only read what the relation under it exposes.
 ///
 /// prqlc built a `RelationInstance` for a declared table with an empty

@@ -2023,3 +2023,245 @@ fn a_sort_before_a_deduplication_still_orders() {
          SELECT id, _col_1, name FROM table_1 ORDER BY id DESC"
     );
 }
+
+/// One column of the campaign's fixture table, the operand every set-operation
+/// test below combines with itself.
+fn projected_id() -> Pipeline {
+    accounts().select(col(ACCOUNTS, ID))
+}
+
+/// How PostgreSQL will associate the emitted query's set operations, written
+/// as nested calls over their arms.
+///
+/// This reads the *parse*, not the text, so precedence has already been
+/// applied: a chain the pipeline wrote left to right shows up here as the tree
+/// the server evaluates, whatever the rendering made of it. A relation reached
+/// through a binding is a leaf, because a CTE is exactly the bracket that ends
+/// the chain.
+// [spec:pgorm:req:pipeline.compose/test]
+fn set_association(sql: &str) -> String {
+    fn walk(select: Option<&pg_query::protobuf::SelectStmt>) -> String {
+        let Some(select) = select else {
+            return "()".to_owned();
+        };
+        let verb = match select.op() {
+            pg_query::protobuf::SetOperation::SetopNone => return "select".to_owned(),
+            pg_query::protobuf::SetOperation::SetopUnion => "union",
+            pg_query::protobuf::SetOperation::SetopIntersect => "intersect",
+            pg_query::protobuf::SetOperation::SetopExcept => "except",
+            other => panic!("unexpected set operation {other:?}"),
+        };
+        let arm = |side: &Option<Box<pg_query::protobuf::SelectStmt>>| {
+            walk(side.as_ref().map(std::convert::AsRef::as_ref))
+        };
+        format!("{verb}({}, {})", arm(&select.larg), arm(&select.rarg))
+    }
+    walk(Some(&parsed_select(sql)))
+}
+
+/// A chain of set operations means what it was written as, left to right.
+///
+/// SQL binds `INTERSECT` tighter than `UNION` and `EXCEPT`, which share one
+/// precedence level and associate left. A flat rendering of
+/// `A UNION ALL B INTERSECT ALL C` is therefore the server's
+/// `A UNION ALL (B INTERSECT ALL C)` — a different relation, and for a
+/// self-combining source every row twice. Hoisting the pending stages into
+/// their own binding is the bracket: the looser operation becomes a CTE the
+/// tighter one reads as one whole relation.
+///
+/// Reduced from campaign items runtime-252, runtime-1857, runtime-2187,
+/// runtime-3267 and runtime-4317, which all shrank to the same
+/// `from t | append t | intersect t` and all returned exactly twice the
+/// reference's rows.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn a_tighter_set_operation_brackets_the_looser_chain() {
+    let t = projected_id;
+
+    // The reduced campaign shape, and its `remove` twin: the tighter operation
+    // applies to the whole of the looser one, which a binding holds.
+    let appended = sql_of(t().append(t()).intersect(t()));
+    assert_eq!(set_association(&appended), "intersect(select, select)");
+    assert!(appended.contains("UNION ALL"), "{appended}");
+
+    let removed = sql_of(t().remove(t()).intersect(t()));
+    assert_eq!(set_association(&removed), "intersect(select, select)");
+    assert!(removed.contains("EXCEPT ALL"), "{removed}");
+
+    // And the same shape as the campaign wrote it, reading the source whole
+    // with no projection in front of the operations.
+    let starred = sql_of(accounts().append(accounts()).intersect(accounts()));
+    assert_eq!(set_association(&starred), "intersect(select, select)");
+    assert!(starred.contains("UNION ALL"), "{starred}");
+
+    // A looser operation after a tighter one needs no bracket: SQL's own
+    // left-association already reads it the way the pipeline wrote it.
+    for (association, built) in [
+        ("union(union(select, select), select)", t().append(t())),
+        (
+            "union(intersect(select, select), select)",
+            t().intersect(t()),
+        ),
+        ("union(except(select, select), select)", t().remove(t())),
+    ] {
+        assert_eq!(set_association(&sql_of(built.append(t()))), association);
+    }
+    for (association, built) in [
+        ("except(union(select, select), select)", t().append(t())),
+        (
+            "except(intersect(select, select), select)",
+            t().intersect(t()),
+        ),
+        ("except(except(select, select), select)", t().remove(t())),
+    ] {
+        assert_eq!(set_association(&sql_of(built.remove(t()))), association);
+    }
+    assert_eq!(
+        set_association(&sql_of(t().intersect(t()).intersect(t()))),
+        "intersect(intersect(select, select), select)"
+    );
+
+    // Three deep, where the bracket has to survive a further operation: the
+    // append on the outside reads the bracketed intersect, not a reassociated
+    // chain.
+    assert_eq!(
+        set_association(&sql_of(t().append(t()).intersect(t()).append(t()))),
+        "union(intersect(select, select), select)"
+    );
+    assert_eq!(
+        set_association(&sql_of(t().append(t()).append(t()).intersect(t()))),
+        "intersect(select, select)"
+    );
+    assert_eq!(
+        set_association(&sql_of(t().intersect(t()).append(t()).intersect(t()))),
+        "intersect(select, select)"
+    );
+
+    // A stage between the two operations does not make the bracket optional:
+    // prqlc folds a projection the relation already carries straight back into
+    // the set operation's own arms, leaving the chain as flat as before.
+    assert_eq!(
+        set_association(&sql_of(
+            t().append(t()).select(col(ACCOUNTS, ID)).intersect(t())
+        )),
+        "intersect(select, select)"
+    );
+}
+
+/// Every set operation composes with a deduplicated branch — on the left, on
+/// the right, on both, and on neither.
+///
+/// `distinct` before a set operation and `distinct` after it are different
+/// relations and render differently: before it the deduplicated branch is
+/// hoisted into its own binding (prqlc cannot take a set operation off a
+/// grouped relation), while directly after an `append` it is the
+/// `UNION DISTINCT` fold. Both are held here against every verb.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn deduplicated_branches_compose_with_every_set_operation() {
+    let branch = |deduplicated: bool| match deduplicated {
+        true => projected_id().distinct(),
+        false => projected_id(),
+    };
+    let combined = |left: bool, verb: &str, right: bool| {
+        let (left, right) = (branch(left), branch(right));
+        sql_of(match verb {
+            "append" => left.append(right),
+            "intersect" => left.intersect(right),
+            "remove" => left.remove(right),
+            other => panic!("not a set operation: {other}"),
+        })
+    };
+
+    // Neither branch deduplicated: the plain `ALL` forms.
+    assert_eq!(
+        combined(false, "append", false),
+        "SELECT id FROM fixture.accounts UNION ALL SELECT id FROM fixture.accounts"
+    );
+    assert_eq!(
+        combined(false, "intersect", false),
+        "WITH table_0 AS (SELECT id FROM fixture.accounts) \
+         SELECT id FROM fixture.accounts INTERSECT ALL SELECT * FROM table_0 AS b"
+    );
+    assert_eq!(
+        combined(false, "remove", false),
+        "WITH table_0 AS (SELECT id FROM fixture.accounts) \
+         SELECT id FROM fixture.accounts EXCEPT ALL SELECT * FROM table_0 AS b"
+    );
+
+    // The left branch alone: its deduplicating group is hoisted into a binding
+    // so the set operation reads a settled arity.
+    assert_eq!(
+        combined(true, "append", false),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM table_0 UNION ALL SELECT id FROM fixture.accounts"
+    );
+    assert_eq!(
+        combined(true, "intersect", false),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts), \
+         table_1 AS (SELECT id FROM fixture.accounts) \
+         SELECT id FROM table_0 AS t INTERSECT ALL SELECT * FROM table_1 AS b"
+    );
+    assert_eq!(
+        combined(true, "remove", false),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts), \
+         table_1 AS (SELECT id FROM fixture.accounts) \
+         SELECT id FROM table_0 AS t EXCEPT ALL SELECT * FROM table_1 AS b"
+    );
+
+    // The right branch alone: an embedded pipeline is a binding already, and
+    // deduplicating inside it needs no hoist of its own.
+    assert_eq!(
+        combined(false, "append", true),
+        "SELECT id FROM fixture.accounts UNION ALL SELECT DISTINCT id FROM fixture.accounts"
+    );
+    assert_eq!(
+        combined(false, "intersect", true),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM fixture.accounts INTERSECT ALL SELECT * FROM table_0 AS b"
+    );
+    assert_eq!(
+        combined(false, "remove", true),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM fixture.accounts EXCEPT ALL SELECT * FROM table_0 AS b"
+    );
+
+    // Both branches: the two deduplications are independent, and neither is
+    // the deduplication of the combined relation.
+    assert_eq!(
+        combined(true, "append", true),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM table_0 UNION ALL SELECT DISTINCT id FROM fixture.accounts"
+    );
+    assert_eq!(
+        combined(true, "intersect", true),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts), \
+         table_1 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM table_0 AS t INTERSECT ALL SELECT * FROM table_1 AS b"
+    );
+    assert_eq!(
+        combined(true, "remove", true),
+        "WITH table_0 AS (SELECT DISTINCT id FROM fixture.accounts), \
+         table_1 AS (SELECT DISTINCT id FROM fixture.accounts) \
+         SELECT id FROM table_0 AS t EXCEPT ALL SELECT * FROM table_1 AS b"
+    );
+
+    // And deduplicating the *combined* relation, which is the fold after
+    // `append` and a plain `SELECT DISTINCT` over a binding after the others.
+    assert_eq!(
+        sql_of(projected_id().append(projected_id()).distinct()),
+        "SELECT id FROM fixture.accounts UNION DISTINCT SELECT id FROM fixture.accounts"
+    );
+    assert_eq!(
+        sql_of(projected_id().intersect(projected_id()).distinct()),
+        "WITH table_0 AS (SELECT id FROM fixture.accounts), \
+         table_1 AS (SELECT id FROM fixture.accounts INTERSECT ALL SELECT * FROM table_0 AS b) \
+         SELECT DISTINCT id FROM table_1"
+    );
+    assert_eq!(
+        sql_of(projected_id().remove(projected_id()).distinct()),
+        "WITH table_0 AS (SELECT id FROM fixture.accounts), \
+         table_1 AS (SELECT id FROM fixture.accounts EXCEPT ALL SELECT * FROM table_0 AS b) \
+         SELECT DISTINCT id FROM table_1"
+    );
+}
