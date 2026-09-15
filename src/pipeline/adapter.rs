@@ -166,10 +166,57 @@ fn binding_index(name: &str) -> Option<usize> {
     name.strip_prefix("table_")?.parse().ok()
 }
 
+/// Visit `node` and every expression nested inside it, outermost first.
+///
+/// The one recursion over the PL tree that the rewrites share, so a new AST
+/// shape is taught to all of them at once rather than to whichever walker its
+/// author remembered.
+fn walk_mut(node: &mut PlExpr, visit: &mut impl FnMut(&mut PlExpr)) {
+    visit(node);
+    match &mut node.kind {
+        ExprKind::Tuple(items) | ExprKind::Array(items) => {
+            for item in items {
+                walk_mut(item, visit);
+            }
+        }
+        ExprKind::Pipeline(pipeline) => {
+            for item in &mut pipeline.exprs {
+                walk_mut(item, visit);
+            }
+        }
+        ExprKind::Range(range) => {
+            for bound in [&mut range.start, &mut range.end].into_iter().flatten() {
+                walk_mut(bound, visit);
+            }
+        }
+        ExprKind::Binary(node) => {
+            walk_mut(&mut node.left, visit);
+            walk_mut(&mut node.right, visit);
+        }
+        ExprKind::Unary(node) => walk_mut(&mut node.expr, visit),
+        ExprKind::FuncCall(node) => {
+            for arg in node.args.iter_mut().chain(node.named_args.values_mut()) {
+                walk_mut(arg, visit);
+            }
+        }
+        ExprKind::Case(arms) => {
+            for arm in arms {
+                walk_mut(&mut arm.condition, visit);
+                walk_mut(&mut arm.value, visit);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Shift an embedded pipeline's frame so it keeps meaning inside its
 /// consumer: every `$N` placeholder moves up by `params`, and every
 /// reference to one of the pipeline's own `bindings` (of which it had
 /// `binding_count`) moves up by `binding_offset`.
+///
+/// A binding is named by the *leading* segment of an identifier — bare where
+/// a stage reads from it, qualifying where a column of it is referred to by
+/// name ([`requalify`]) — so both spellings are renumbered.
 // [spec:pgorm:req:pipeline.compose]
 pub(super) fn rebase(
     node: &mut PlExpr,
@@ -177,53 +224,44 @@ pub(super) fn rebase(
     binding_count: usize,
     binding_offset: usize,
 ) {
-    match &mut node.kind {
+    walk_mut(node, &mut |node| match &mut node.kind {
         ExprKind::Param(index) => {
             if let Ok(position) = index.parse::<usize>() {
                 *index = (position + params).to_string();
             }
         }
         ExprKind::Ident(ident) => {
-            if ident.path.is_empty()
-                && let Some(index) = binding_index(&ident.name)
+            let head = match ident.path.first_mut() {
+                Some(head) => head,
+                None => &mut ident.name,
+            };
+            if let Some(index) = binding_index(head)
                 && index < binding_count
             {
-                ident.name = binding_name(index + binding_offset);
-            }
-        }
-        ExprKind::Tuple(items) | ExprKind::Array(items) => {
-            for item in items {
-                rebase(item, params, binding_count, binding_offset);
-            }
-        }
-        ExprKind::Pipeline(pipeline) => {
-            for item in &mut pipeline.exprs {
-                rebase(item, params, binding_count, binding_offset);
-            }
-        }
-        ExprKind::Range(range) => {
-            for bound in [&mut range.start, &mut range.end].into_iter().flatten() {
-                rebase(bound, params, binding_count, binding_offset);
-            }
-        }
-        ExprKind::Binary(node) => {
-            rebase(&mut node.left, params, binding_count, binding_offset);
-            rebase(&mut node.right, params, binding_count, binding_offset);
-        }
-        ExprKind::Unary(node) => rebase(&mut node.expr, params, binding_count, binding_offset),
-        ExprKind::FuncCall(node) => {
-            for arg in node.args.iter_mut().chain(node.named_args.values_mut()) {
-                rebase(arg, params, binding_count, binding_offset);
-            }
-        }
-        ExprKind::Case(arms) => {
-            for arm in arms {
-                rebase(&mut arm.condition, params, binding_count, binding_offset);
-                rebase(&mut arm.value, params, binding_count, binding_offset);
+                *head = binding_name(index + binding_offset);
             }
         }
         _ => {}
-    }
+    });
+}
+
+/// Repoint the column references in `node` that `repoint` answers for, keyed
+/// by the dotted path each reference carries.
+///
+/// A `Some((qualifier, name))` replaces the whole identifier, which is how a
+/// reference written against a source follows its column into the binding
+/// that now exposes it.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn requalify(node: &mut PlExpr, repoint: &dyn Fn(&str) -> Option<(String, String)>) {
+    walk_mut(node, &mut |node| {
+        if let Some(path) = column_path(node)
+            && let Some((qualifier, name)) = repoint(&path)
+            && let ExprKind::Ident(ident) = &mut node.kind
+        {
+            ident.path = vec![qualifier];
+            ident.name = name;
+        }
+    });
 }
 
 /// Where a projected expression's name lands in the namespace prqlc resolves
@@ -273,6 +311,16 @@ pub(super) fn stage_verb(node: &PlExpr) -> Option<&str> {
     ident.path.is_empty().then_some(ident.name.as_str())
 }
 
+/// The name a `from` or `join` stage's relation answers to: the one that
+/// qualifies its columns for every stage behind it.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn stage_source(node: &PlExpr) -> Option<&str> {
+    let ExprKind::FuncCall(call) = &node.kind else {
+        return None;
+    };
+    exposed_name(call.args.first()?)
+}
+
 /// The tuple a single-argument stage carries — a projection's items, a
 /// sort's keys — reachable for replacement in place.
 // [spec:pgorm:req:pipeline.compose]
@@ -286,8 +334,10 @@ pub(super) fn tuple_items_mut(node: &mut PlExpr) -> Option<&mut Vec<PlExpr>> {
     Some(items)
 }
 
-/// The name a projected item exposes to the stages after it: its alias, or
-/// the last segment of the column it names.
+/// The name an expression exposes to the stages after it: its alias, or the
+/// last segment of the identifier it names. A projected column answers with
+/// the name later stages address it by; a relation reference answers with the
+/// name that qualifies its columns.
 ///
 /// `None` is an expression left unnamed — which is precisely what `this`
 /// cannot expand, because there is nothing to file it in the namespace under.

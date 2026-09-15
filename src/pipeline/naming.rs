@@ -10,10 +10,11 @@
 //!
 //! Naming is what makes a column addressable, so this module decides which
 //! items need a name of their own and what to call them — and, because a
-//! settled relation answers to bare names alone, how a sort key follows the
-//! column it names across that boundary.
+//! settled relation answers under the binding's name and no longer under the
+//! sources' own, how a reference written against a source follows the column
+//! it names across that boundary.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use super::adapter::{self, PlExpr};
 
@@ -106,6 +107,95 @@ pub(super) fn disambiguate(stages: &mut [PlExpr]) -> Naming {
     naming
 }
 
+/// The source names a settle took out of scope, and where their columns went.
+///
+/// Settling moves the stages into a `let` binding and leaves the pipeline
+/// reading from it, so prqlc resolves the relation's columns under that
+/// binding's name and under no other. Every reference a *later* stage writes
+/// against a source — `col(source, column)`, an entity column — would name a
+/// namespace that is no longer there, and prqlc refuses the pipeline before
+/// any SQL is emitted. Those references are repointed on the way in, which is
+/// the only direction available: the pipeline is built forward, so at the
+/// moment of settling the stages that will refer to the sources do not exist
+/// yet.
+///
+/// The binding qualifies the repointed reference rather than the reference
+/// being left bare. It costs nothing — prqlc renders a single input's column
+/// unqualified either way — and it stays unambiguous when a later `join`
+/// brings a second relation alongside, where a bare name could mean either.
+// [spec:pgorm:req:pipeline.compose]
+#[derive(Debug, Clone, Default)]
+pub(super) struct Settled {
+    /// The binding the relation reads from, or `None` while nothing has been
+    /// settled and every source still answers for itself.
+    binding: Option<String>,
+    /// Source names that resolved before the settle and do not after.
+    shadowed: BTreeSet<String>,
+    /// Where a column that had to be renamed to stay addressable ended up,
+    /// keyed by the dotted path it had — [`Naming::exposed`], kept past the
+    /// settle that consumed it because a later stage may name it too.
+    exposed: HashMap<String, String>,
+}
+
+impl Settled {
+    /// Record a settle: the sources the moved `stages` read are out of scope
+    /// from here, and the relation answers under `binding`.
+    ///
+    /// A set operation settles with nothing renamed, so `naming` is that
+    /// pipeline's [`Naming::default`]; a deduplication hands over the one it
+    /// made the projection addressable with.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) fn absorb(&mut self, stages: &[PlExpr], binding: &str, naming: &Naming) {
+        for stage in stages {
+            if !matches!(adapter::stage_verb(stage), Some("from" | "join")) {
+                continue;
+            }
+            if let Some(source) = adapter::stage_source(stage) {
+                self.shadowed.insert(source.to_owned());
+            }
+        }
+        for (path, name) in &naming.exposed {
+            self.exposed.insert(path.clone(), name.clone());
+        }
+        self.binding = Some(binding.to_owned());
+    }
+
+    /// A relation read again — the operand of a `join` — answers for itself
+    /// once more, whatever an earlier settle did to a source of that name.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) fn rejoined(&mut self, reference: &PlExpr) {
+        if let Some(source) = adapter::exposed_name(reference) {
+            self.shadowed.remove(source);
+        }
+    }
+
+    /// Repoint every reference in `node` that names a shadowed source at the
+    /// binding that now exposes its column.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) fn requalify(&self, node: &mut PlExpr) {
+        if self.shadowed.is_empty() {
+            return;
+        }
+        adapter::requalify(node, &|path| self.repoint(path));
+    }
+
+    /// Where a reference written against a source points now: the binding,
+    /// and the name the column answers to there — the one it was renamed to
+    /// if it had to be, and otherwise its own.
+    fn repoint(&self, path: &str) -> Option<(String, String)> {
+        let binding = self.binding.as_ref()?;
+        let (source, column) = path.split_once('.')?;
+        if !self.shadowed.contains(source) {
+            return None;
+        }
+        let exposed = match self.exposed.get(path) {
+            Some(renamed) => renamed.clone(),
+            None => column.to_owned(),
+        };
+        Some((binding.clone(), exposed))
+    }
+}
+
 /// A sort stage repointed at the names a settled binding exposes.
 ///
 /// Behind a CTE the relation's columns answer to their own bare names and
@@ -113,7 +203,11 @@ pub(super) fn disambiguate(stages: &mut [PlExpr]) -> Naming {
 /// longer resolves, and a key whose column was renamed has to follow it.
 /// `None` when some key is not a column reference — there is no bare name to
 /// find for an ordering computed from an expression, and leaving the order as
-/// it was beats emitting SQL prqlc refuses.
+/// it was beats emitting SQL prqlc refuses. That judgement is why this is not
+/// [`Settled::requalify`]: the ordering is restated *behind* the deduplicating
+/// group, which has re-exposed the relation under names of its own, and a key
+/// that cannot follow is dropped rather than rewritten. A key this leaves bare
+/// names no source, so the general repointing passes over it untouched.
 // [spec:pgorm:req:pipeline.compose]
 pub(super) fn rebound_sort(mut sort: PlExpr, naming: &Naming) -> Option<PlExpr> {
     let keys = adapter::tuple_items_mut(&mut sort)?;

@@ -7026,6 +7026,13 @@ children (
                 kind @blocker
                 text "A regression this session introduced and shipped, found by re-running the full generative profile against the fixes. Commit c3f77a50, which made distinct settle the pipeline into its own binding when a take is pending, breaks any later stage that refers to a source by name. The emitted PRQL fails to compile with Unknown name and a hint listing only the binding's internal table_N columns, because a settled relation exposes bare names and nothing else. Thirty-one of the ninety-two findings in the 2026-09-15 full run are this, all in the pipeline family, all recorded as ConstructionError before any SQL is emitted. Bisected rather than guessed: a standalone SQL-only reproducer of item runtime-2387's shape compiles at c3f77a50~1 and fails at c3f77a50 and at every commit since, so the naming work in 39ce5335 neither caused it nor made it worse. The shape is a source nested under a name, a projection renaming its columns, a take_range, a distinct, and then a select whose items are qualified by that source name. The hazard was known when the settle landed: its own commit message records that settling breaks select_sources because source names do not resolve through a CTE, and the implementation guards select_sources specifically. What it does not guard is the general case, an ordinary col(name, column) reference in any later stage, which is the same fault reached through a different door. Two directions are worth weighing rather than one. The narrow repair is to rewrite qualified references to the settled binding the way rebound_sort already repoints sort keys, since naming.rs has the exposed-name map that would need. The broader question is whether distinct should settle at all when a named source is still referenced downstream, which trades the range fix's correctness against this one and probably wants the two conditions separated rather than one flag serving both."
             }
+
+            {
+                at 2026-09-15T16:15:17.831066Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -7053,6 +7060,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The generative campaign writes its run artifacts under target/generative-campaign, and filed defect nodes cite those paths as the evidence behind their claims. cargo clean deletes them. On 2026-09-15 a full disk forced a clean and destroyed the 2026-09-14 full run: fifteen thousand runtime items, thirty-seven finding directories, and the per-item reduced reproducers in both languages. The cost was immediate rather than theoretical. When the next full run reported ninety-two findings against the previous thirty-seven, there was no way to tell which were new, because the baseline no longer existed; the count had to be compared against a handful of numbers that happened to be quoted in the acceptance document and in plan log entries. The curated directories under security/generative/findings are in the repository and survived, but they cover only findings someone thought to promote, and the promotion is manual. Two things are worth separating in the fix. Evidence a node cites has to be durable, which argues for promoting a finding's directory out of target at the moment it is filed rather than leaving the citation pointing into a build directory. Bulk run output can stay disposable, since the campaign is seeded and a run is reproducible in principle, but reproducing a full profile costs hours and only works while the source that produced it is still checked out, so a summary sufficient to diff two runs by finding id and signature should outlive the run itself. A third, smaller point: the campaign's build environment lives under target/generative-build and is also destroyed, which is merely slow to rebuild rather than lossy, but it means a clean leaves the campaign unrunnable until someone works out that it needs maturin 1.15.0 under a 3.14 interpreter."
+            }
+        )
+    }
+
+    {
+        id distinct-star-projection
+        title "A deduplicated star relation projects to valid SQL"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T16:15:03.137963Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while drafting a regression test for settled-source-name-resolves, and unrelated to it. A deduplication over a relation whose columns are still a star, followed by any projection, renders SQL PostgreSQL's grammar rejects: Pipeline::from(entity).distinct().select_sources(entity) emits SELECT DISTINCT ON (id, name, *) name, id FROM cake, where the star sits inside the DISTINCT ON key list alongside the named columns. Reproduces through plain PRQL text, so it is prqlc's rendering of a group over an unexpanded star rather than anything pgorm's builder does, and it involves no settle. Worth pairing with the existing knowledge that a star's expansion order is only made total by the pinned fork commit b2baa230, since both are the same underlying awkwardness about a relation whose column list is not yet known. The render oracle cannot catch this one either way: it is a grammar rejection, so a syntax-only oracle would catch it if the emitted text reached the oracle, which suggests checking whether any test path actually renders this shape rather than assuming the absence of a failure means absence of the defect."
             }
         )
     }

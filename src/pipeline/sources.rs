@@ -283,8 +283,15 @@ impl Pipeline {
     /// sources' namespaces (`select`, `group().aggregate()`, `intersect`,
     /// `remove`) is refused at [`into_sql`](SelectedSources::into_sql) with
     /// [`PipelineError::ReshapedSources`] naming the stage. `filter`,
-    /// `derive`, `sort`, `take` / `take_range`, `join`, `window`, `distinct`
-    /// and `append` leave every source addressable and compose freely ahead.
+    /// `derive`, `sort`, `take` / `take_range`, `join`, `window` and `append`
+    /// leave every source addressable and compose freely ahead.
+    ///
+    /// [`distinct`](Pipeline::distinct) composes ahead too, except where it
+    /// has to settle the pipeline into a binding first — behind one, the
+    /// relation answers under the binding's name alone, which is a per-source
+    /// projection's one requirement. That is refused by the same gate, naming
+    /// `distinct`. Listing the sources before the deduplication, or decoding
+    /// with [`into_model`](Pipeline::into_model), reaches the same rows.
     ///
     /// A listed source the pipeline never read compiles up to prqlc, which
     /// refuses the unresolvable columns as [`PipelineError::Compile`] — the

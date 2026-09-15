@@ -34,16 +34,17 @@ pub enum PipelineError {
     /// project entity models out of a pipeline that no longer carries its
     /// sources' column namespaces.
     ///
-    /// The named stage — `select`, `group().aggregate()`, `intersect` or
-    /// `remove` — replaced, collapsed or renamed the sources' own columns,
-    /// so a per-source projection can no longer resolve. Refused before
-    /// prqlc compiles, so the answer names the stage rather than an opaque
+    /// The named stage — `select`, `group().aggregate()`, `intersect`,
+    /// `remove`, or a `distinct` that had to settle the pipeline into its own
+    /// binding — replaced, collapsed or renamed the sources' own columns, so
+    /// a per-source projection can no longer resolve. Refused before prqlc
+    /// compiles, so the answer names the stage rather than an opaque
     /// unresolved-name diagnostic; decode a reshaped pipeline with
     /// [`into_model`](super::Pipeline::into_model) or
     /// [`into_tuple`](super::Pipeline::into_tuple) instead, or move the
     /// reshaping after the terminal cannot-follow boundary by not doing it
-    /// at all — `filter`, `derive`, `sort`, `take`, `join`, `window`,
-    /// `distinct` and `append` all leave the sources addressable.
+    /// at all — `filter`, `derive`, `sort`, `take`, `join`, `window` and
+    /// `append` all leave the sources addressable.
     // [spec:pgorm:sem:pipeline.select-sources+2]
     #[error(
         "select_sources after `{0}`: the stage replaced the sources' own column namespaces, \

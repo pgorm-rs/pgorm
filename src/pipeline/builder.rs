@@ -167,6 +167,14 @@ pub struct Pipeline {
     /// in separate queries, in the order the stages were written.
     // [spec:pgorm:req:pipeline.compose]
     pub(super) ranged: bool,
+    /// The source names a settle took out of scope, and the binding their
+    /// columns answer under now.
+    ///
+    /// Every stage appended from here is repointed through it, which is what
+    /// keeps a `col(source, column)` reference written after a
+    /// [`distinct`](Pipeline::distinct) resolving.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) settled: naming::Settled,
     /// The `sort` stage that still describes the relation's order, or `None`
     /// while nothing has ordered it since the columns were last replaced.
     ///
@@ -369,6 +377,9 @@ impl Grouped {
     }
 
     fn finish(mut self, aggregates: Vec<PlExpr>) -> Pipeline {
+        for key in &mut self.keys {
+            self.pipeline.settled.requalify(key);
+        }
         // The relation is the keys followed by the aggregates, which are
         // introduced names and so trail them either way.
         self.pipeline.columns = Columns::of(&self.keys).with_introduced();
@@ -397,6 +408,7 @@ impl Pipeline {
             deduped: false,
             columns: Columns::Sourced { introduced: false },
             ranged: false,
+            settled: naming::Settled::default(),
             ordering: None,
         };
         let reference = pipeline.embed(source.into_source());
@@ -416,6 +428,7 @@ impl Pipeline {
             deduped: false,
             columns: Columns::Sourced { introduced: false },
             ranged: false,
+            settled: naming::Settled::default(),
             ordering: None,
         }
     }
@@ -468,7 +481,15 @@ impl Pipeline {
         }
     }
 
-    fn stage(mut self, node: PlExpr) -> Self {
+    /// Append one transform, repointed at the binding a settle left the
+    /// relation reading from.
+    ///
+    /// Every stage the caller writes arrives through here, `staged` or
+    /// `ordered_by`, so this is the one place a reference written against a
+    /// source the pipeline no longer exposes has to be caught.
+    // [spec:pgorm:req:pipeline.compose]
+    fn stage(mut self, mut node: PlExpr) -> Self {
+        self.settled.requalify(&mut node);
         self.stages.push(node);
         self
     }
@@ -481,7 +502,10 @@ impl Pipeline {
         self
     }
 
-    fn staged(mut self, nodes: Vec<PlExpr>) -> Self {
+    fn staged(mut self, mut nodes: Vec<PlExpr>) -> Self {
+        for node in &mut nodes {
+            self.settled.requalify(node);
+        }
         self.stages.extend(nodes);
         self
     }
@@ -490,7 +514,8 @@ impl Pipeline {
     /// carries, so a deduplication after it can restate the ordering a
     /// `group` would otherwise reset.
     // [spec:pgorm:req:pipeline.compose]
-    fn ordered_by(mut self, sort: PlExpr) -> Self {
+    fn ordered_by(mut self, mut sort: PlExpr) -> Self {
+        self.settled.requalify(&mut sort);
         self.ordering = Some(sort.clone());
         self.stages.push(sort);
         self
@@ -504,15 +529,28 @@ impl Pipeline {
     /// own projection in its own order, and each stage that had to be
     /// evaluated before whatever comes next now sits in its own query. A
     /// pipeline that is still nothing but its source has nothing to settle.
+    ///
+    /// What the boundary costs is the sources' own names: behind it the
+    /// relation answers under the binding alone. References a later stage
+    /// writes against a source are repointed there (`settled`), and
+    /// [`select_sources`](Pipeline::select_sources) — which projects *by*
+    /// those names and so has nothing to repoint to — is refused by the same
+    /// `reshaped` gate the other namespace-replacing stages trip. Every
+    /// settle is owed to a [`distinct`](Pipeline::distinct), whether it
+    /// performs the hoist itself or a set operation performs it afterwards,
+    /// so that is the stage the refusal names.
     // [spec:pgorm:req:pipeline.compose]
-    fn settle(&mut self) {
+    // [spec:pgorm:sem:pipeline.select-sources+2]
+    fn settle(&mut self, naming: &naming::Naming) {
         if self.stages.len() <= 1 {
             return;
         }
         let stages = std::mem::take(&mut self.stages);
         let name = adapter::binding_name(self.bindings.len());
+        self.settled.absorb(&stages, &name, naming);
         self.bindings.push(stages);
         self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
+        self.reshaped.get_or_insert("distinct");
         self.deduped = false;
         self.ranged = false;
         self.columns = Columns::Sourced { introduced: false };
@@ -584,7 +622,13 @@ impl Pipeline {
         self.select_nodes(nodes)
     }
 
-    fn select_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
+    fn select_nodes(mut self, mut nodes: Vec<PlExpr>) -> Self {
+        // Read the shape off the names the relation actually answers to: a
+        // list written against two sources a settle has since collapsed into
+        // one binding is one source's columns, not two.
+        for node in &mut nodes {
+            self.settled.requalify(node);
+        }
         self.columns = Columns::of(&nodes);
         // A projection may drop the very columns an earlier sort ordered by,
         // so the ordering it described no longer names anything this relation
@@ -749,6 +793,11 @@ impl Pipeline {
             _ => Columns::Regrouped,
         };
         let reference = self.embed(relation.into_source());
+        // The joined relation is in scope from here under its own name, which
+        // a settle may have shadowed earlier — so the condition's references
+        // to it are the caller's, not a settled binding's, and must survive
+        // the repointing the stage is about to go through.
+        self.settled.rejoined(&reference);
         self.stage(adapter::call_named(
             "join",
             vec![reference, condition],
@@ -793,9 +842,11 @@ impl Pipeline {
     fn set_op(mut self, op: &str, other: impl IntoSource) -> Self {
         // A deduplicating `group` the set operation would otherwise be taken
         // off directly moves into its own binding first, leaving this pipeline
-        // reading from it, so the arity settles at the CTE boundary.
+        // reading from it, so the arity settles at the CTE boundary. Nothing
+        // was renamed on the way: the deduplication that owes the hoist made
+        // the projection addressable already.
         if self.deduped {
-            self.settle();
+            self.settle(&naming::Naming::default());
         }
         // The combined relation is not the one the ordering described, and
         // for `intersect` and `remove` it does not even answer to the same
@@ -817,6 +868,13 @@ impl Pipeline {
     /// than before it. Reading from a binding leaves the group a single
     /// freshly exposed relation, whose columns are that binding's projection
     /// in its own order with nothing in front of them.
+    ///
+    /// Settling costs the sources their own names: behind a binding the
+    /// relation answers under that binding alone. A reference a later stage
+    /// writes against a source — `col(source, column)`, an entity column —
+    /// is repointed there as it is appended, so composing on is unaffected;
+    /// [`select_sources`](Pipeline::select_sources), which projects *by* those
+    /// names and so has nothing to repoint to, is refused instead.
     ///
     /// Because the key is a namespace, it reaches only the columns that have
     /// a name of their own: an unnamed expression and the loser of a name
@@ -851,7 +909,7 @@ impl Pipeline {
         let ordering = self.ordering.take();
         let settled = naming.renamed || self.ranged || !self.columns.ordered();
         if settled {
-            self.settle();
+            self.settle(&naming);
         }
         self.deduped = true;
         let deduplicated = self.stage(adapter::call(

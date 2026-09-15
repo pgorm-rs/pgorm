@@ -1792,6 +1792,176 @@ fn a_collided_column_name_survives_deduplication() {
     );
 }
 
+// [spec:pgorm:req:pipeline.compose/test]    a source name written after a
+// deduplication still resolves. Settling moves the stages behind a binding,
+// which exposes their columns under the binding's name alone, so every
+// reference a later stage writes against the source it read — `col(source,
+// column)`, an entity column — stopped resolving and prqlc refused the
+// pipeline before any SQL was emitted. Reduced from campaign item
+// runtime-2387.
+#[test]
+fn a_settled_source_name_still_resolves() {
+    // A table source, settled by the row range standing in front of the
+    // deduplication, then filtered by the name it was read under.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((col(ACCOUNTS, ID), col(ACCOUNTS, alias("name"))))
+                .take_range(2i64..=7i64)
+                .distinct()
+                .filter(col(ACCOUNTS, ID).gt(1))
+        ),
+        "WITH table_0 AS (SELECT id, name FROM fixture.accounts LIMIT 6 OFFSET 1), \
+         table_1 AS (SELECT DISTINCT id, name FROM table_0) \
+         SELECT id, name FROM table_1 WHERE id > 1"
+    );
+
+    // The campaign's own shape: a pipeline read under a name of its own, and
+    // a projection written against that name after the deduplication.
+    let nested = alias("nested");
+    let renamed = accounts()
+        .select((
+            col(ACCOUNTS, ID).as_(alias("p_id")),
+            col(ACCOUNTS, alias("name")).as_(alias("p_name")),
+        ))
+        .derive(Expr::from(0_i64).as_(alias("nonce")));
+    assert_eq!(
+        sql_of(
+            Pipeline::from(renamed.named(nested))
+                .take_range(2i64..=7i64)
+                .distinct()
+                .select((col(nested, alias("p_id")), col(nested, alias("nonce"))))
+        ),
+        "WITH table_0 AS (SELECT id AS p_id, name AS p_name, 0 AS nonce FROM fixture.accounts), \
+         table_1 AS (SELECT p_id, p_name, nonce FROM table_0 AS nested LIMIT 6 OFFSET 1) \
+         SELECT DISTINCT ON (p_id, p_name, nonce) p_id, nonce FROM table_1"
+    );
+}
+
+/// A settled pipeline's own binding references follow it into a consumer.
+///
+/// A repointed reference names the binding in the *qualifying* position of an
+/// identifier rather than the bare one a `from` stage uses, and embedding
+/// renumbers an embedded pipeline's bindings past the consumer's. Both
+/// spellings have to move together, or the reference lands on whichever
+/// relation the consumer happened to bind at that index.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn a_settled_reference_survives_embedding() {
+    let settled = || {
+        accounts()
+            .select((col(ACCOUNTS, ID), col(ACCOUNTS, alias("name"))))
+            .take_range(2i64..=7i64)
+            .distinct()
+            .select((col(ACCOUNTS, ID), col(ACCOUNTS, alias("name"))))
+    };
+    // Alone, the reference is the pipeline's own first binding.
+    assert_eq!(
+        sql_of(settled()),
+        "WITH table_0 AS (SELECT id, name FROM fixture.accounts LIMIT 6 OFFSET 1) \
+         SELECT DISTINCT id, name FROM table_0"
+    );
+    // Embedded behind a binding the consumer already had, it is the second —
+    // in the `from` stage and in the projection alike.
+    let plain = accounts().select((col(ACCOUNTS, ID), col(ACCOUNTS, alias("name"))));
+    assert_eq!(
+        sql_of(
+            Pipeline::from(plain.named(alias("plain")))
+                .join(
+                    JoinSide::Inner,
+                    settled().named(alias("dedup")),
+                    col(alias("plain"), ID).eq(col(alias("dedup"), ID)),
+                )
+                .select((
+                    col(alias("plain"), alias("name")),
+                    col(alias("dedup"), alias("name")),
+                ))
+        ),
+        "WITH table_0 AS (SELECT id, name FROM fixture.accounts), \
+         table_1 AS (SELECT id, name FROM fixture.accounts LIMIT 6 OFFSET 1), \
+         table_2 AS (SELECT DISTINCT id, name FROM table_1) \
+         SELECT plain.name AS _expr_0, dedup.name FROM table_0 AS plain \
+         INNER JOIN table_2 AS dedup ON plain.id = dedup.id"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a relation joined after a settle
+// answers for itself: its own name is in scope again, and the settled side
+// stays qualified by its binding, so the two never compete for a bare name.
+#[test]
+fn a_join_after_a_settle_keeps_both_sides() {
+    let built = sql_of(
+        Pipeline::from(cake::Entity)
+            .select((cake::Column::Id, cake::Column::Name))
+            .take_range(2i64..=7i64)
+            .distinct()
+            .join(
+                JoinSide::Inner,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .select((cake::Column::Name, fruit::Column::Name)),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT id, name FROM cake LIMIT 6 OFFSET 1), \
+         table_1 AS (SELECT DISTINCT ON (id, name) name, id FROM table_0) \
+         SELECT table_1.name, fruit.name FROM table_1 \
+         INNER JOIN fruit ON table_1.id = fruit.cake_id"
+    );
+
+    // The same relation read again after the settle shadowed it: the second
+    // `fruit` is the caller's, not the binding's, so the condition's two sides
+    // land on different relations.
+    let reread = sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Inner,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .select((cake::Column::Id, cake::Column::Name))
+            .take_range(2i64..=7i64)
+            .distinct()
+            .join(
+                JoinSide::Inner,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .select((cake::Column::Name, fruit::Column::Name)),
+    );
+    assert!(
+        reread.contains("INNER JOIN fruit ON table_1.id = fruit.cake_id"),
+        "{reread}"
+    );
+}
+
+// [spec:pgorm:sem:pipeline.select-sources+2/test]    a settle replaces the
+// sources' namespaces exactly as `select` does, so the terminal that projects
+// *by* those names is refused by the same gate rather than reaching prqlc with
+// qualifiers nothing can resolve. The refusal names the deduplication that
+// owed the hoist. A deduplication that needs no hoist leaves every source
+// addressable, which `select_sources_composes_after_the_allowed_stages` holds.
+#[test]
+fn select_sources_refuses_a_settled_pipeline() {
+    let err = Pipeline::from(cake::Entity)
+        .take(10)
+        .distinct()
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("the row range settled the pipeline behind a binding");
+    assert_eq!(err, PipelineError::ReshapedSources("distinct"));
+
+    // A set operation that inherits the hoist settles for the same reason.
+    let err = Pipeline::from(cake::Entity)
+        .distinct()
+        .append(cake::Entity)
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("the append hoisted the deduplicated stages");
+    assert_eq!(err, PipelineError::ReshapedSources("distinct"));
+}
+
 // [spec:pgorm:req:pipeline.compose/test]    a sort standing in front of a
 // deduplication still orders the result. PRQL's `group` resets the order and
 // prqlc's flattener deletes the standalone `sort` a group follows, so the
