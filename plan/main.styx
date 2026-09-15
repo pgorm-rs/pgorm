@@ -6909,6 +6909,7 @@ children (
         id distinct-drops-computed-column
         title "A computed projected column survives deduplication"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T00:44:35.736926Z
@@ -6923,6 +6924,13 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-09-15T13:12:22.724195Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -6930,12 +6938,20 @@ children (
         id distinct-drops-collided-name
         title "A cross-source name collision keeps both columns"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T00:44:48.875681Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found while fixing pipeline-renamed-column-order and left unfixed there as a distinct fault. When a projection draws the same bare column name from two different sources, for example select of cake.id, fruit.name and cake.name, deduplication drops the renamed column rather than keeping both. Same prqlc namespace-tree cause as its siblings: `this` is resolved by walking a tree keyed by name, so two columns competing for one name cannot both survive the walk and one is silently lost. As with distinct-drops-computed-column the behaviour is identical settled and unsettled, so the settle mechanism neither causes nor cures it. The join case matters more than it looks, because drawing a same-named column from both sides of a join is ordinary rather than exotic; id and name collide between almost any pair of tables."
+            }
+
+            {
+                at 2026-09-15T13:12:24.939449Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -6944,12 +6960,20 @@ children (
         id distinct-drops-sort-order
         title "A sort before a deduplication keeps its ORDER BY"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T00:44:50.05218Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found while fixing distinct-sort-range-rows. A sort standing in front of a deduplication loses its ORDER BY: the emitted SQL deduplicates but comes back unordered. Deliberately not fixed there, on evidence rather than by omission. Settling the pipeline into its own binding first, which is what cures the range case, does not cure this one, because prqlc drops the CTE's ORDER BY as well; so making sort trigger a settle would cost a CTE and change nothing observable. Curing it means re-emitting the sort after the group rather than relying on it surviving, which amounts to giving pgorm's pipeline a sticky-sort semantics that PRQL itself does not promise, and that is a design decision well beyond the two defects that were being fixed. Closely related to pipeline-native-panic, where the same retained-ordering-versus-exposed-scope disagreement panics prqlc during ORDER BY generation instead of silently dropping the clause, so the upstream work on that node should be read before deciding this one."
+            }
+
+            {
+                at 2026-09-15T13:12:26.319579Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
