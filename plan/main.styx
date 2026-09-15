@@ -7090,6 +7090,7 @@ children (
         id set-op-keeps-deduplication
         title "A tighter set operation brackets the looser chain"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T16:24:53.154609Z
@@ -7110,6 +7111,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T17:21:00.292691Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
