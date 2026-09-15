@@ -10,7 +10,7 @@ use super::*;
 /// Postgres type inferred for that placeholder — and refusing, before the
 /// statement is sent, when the value has no representation that type could
 /// receive.
-// [spec:pgorm:def:exec.cursor.binding+4]
+// [spec:pgorm:def:exec.cursor.binding+5]
 pub struct ValueHolder(pub Value);
 
 impl std::fmt::Debug for ValueHolder {
@@ -74,6 +74,120 @@ fn is_timestamp(ty: &Type) -> bool {
     matches!(*ty, Type::TIMESTAMP | Type::TIMESTAMPTZ)
 }
 
+/// The epoch a `timestamp` counts microseconds from on the wire. Not the Unix
+/// epoch.
+const PG_EPOCH: jiff::civil::DateTime = jiff::civil::DateTime::constant(2000, 1, 1, 0, 0, 0, 0);
+
+/// Microseconds from [`PG_EPOCH`] to a civil datetime, truncated toward zero —
+/// the wire payload of a `timestamp`.
+///
+/// Computed here rather than delegated to `postgres-types`' `ToSql for
+/// jiff::civil::DateTime`, which reaches the same number by rounding a `Span`
+/// *relative to* a civil datetime. `since` hands back a span whose largest
+/// unit is days, and balancing days down to microseconds obliges jiff to say
+/// how long a day is; given a relative datetime rather than the invariant
+/// marker, it answers by projecting the reference point onto the absolute
+/// `Timestamp` timeline. `jiff::Timestamp` covers a strictly narrower range
+/// than `civil::DateTime` does — it holds back jiff's largest UTC offset at
+/// each end so every instant still has a civil rendering in every zone — so a
+/// civil datetime outside `-009999-01-02T01:59:59 ..= 9999-12-30T22:00:00`
+/// cannot be rounded and is refused as `value too large to transmit`, though
+/// the value is representable, its microsecond count is unremarkable, and
+/// `postgres-types`' own decoder reads those very bytes back. A difference of
+/// two civil datetimes needs no calendar context at all, so taking it as a
+/// `SignedDuration` is exact across the whole civil range and agrees with the
+/// upstream encoding everywhere upstream produces one.
+///
+/// `None` only when the count leaves `i64`, which the bounded civil range
+/// makes unreachable; it is an error rather than a panic all the same.
+// [spec:pgorm:req:exec.cursor.binding-gaps+3]
+fn civil_micros_since_pg_epoch(value: &jiff::civil::DateTime) -> Option<i64> {
+    i64::try_from(value.duration_since(PG_EPOCH).as_micros()).ok()
+}
+
+/// Bind a naive datetime as microseconds since [`PG_EPOCH`], written by pgorm
+/// rather than by `postgres-types` — see [`civil_micros_since_pg_epoch`] for
+/// why the upstream encoder cannot be used at the ends of the civil range.
+// [spec:pgorm:req:exec.cursor.binding-gaps+3]
+fn bind_civil_datetime(
+    value: Option<&jiff::civil::DateTime>,
+    ty: &Type,
+    out: &mut BytesMut,
+) -> BindResult {
+    match value {
+        None => Ok(IsNull::Yes),
+        Some(_) if !is_timestamp(wire_type(ty)) => Err(mismatch("DateTime", ty)),
+        Some(value) => match civil_micros_since_pg_epoch(value) {
+            Some(micros) => {
+                postgres_protocol::types::timestamp_to_sql(micros, out);
+                Ok(IsNull::No)
+            }
+            None => Err(out_of_range(value, ty)),
+        },
+    }
+}
+
+/// The largest display scale PostgreSQL accepts in an external `numeric`
+/// (`NUMERIC_DSCALE_MASK` in `numeric.c`). `rust_decimal` caps its own scale at
+/// 28, so this is a bound the type cannot currently reach — it is checked
+/// rather than assumed because the refusal belongs on this side of the wire.
+const MAX_NUMERIC_DSCALE: u16 = 0x3fff;
+
+/// Write a zero `numeric`.
+///
+/// The binary form is a four-field header — group count, weight, sign, display
+/// scale — followed by one 16-bit word per base-10000 digit group. Zero has no
+/// digit groups, so its whole encoding is the header, and the display scale is
+/// the only field left carrying anything.
+// [spec:pgorm:req:exec.cursor.binding-gaps+3]
+fn zero_numeric_to_sql(scale: u16, out: &mut BytesMut) {
+    use bytes::BufMut;
+
+    out.reserve(8);
+    out.put_u16(0);
+    out.put_i16(0);
+    // Positive. A zero is never negative on the wire: PostgreSQL renders
+    // `-0.00` as `0.00`, and `rust_decimal` reports `neg: false` for zero too.
+    out.put_u16(0x0000);
+    out.put_u16(scale);
+}
+
+/// Write a decimal in PostgreSQL's binary `numeric` format, taking zero away
+/// from `rust_decimal`.
+///
+/// `rust_decimal`'s `ToSql` builds its wire form through `to_postgres`, which
+/// short-circuits on zero and returns a fixed record carrying `scale: 0` —
+/// discarding `self.scale()`, the one field a zero's encoding still has to
+/// say anything with. `0.00` therefore reaches the server as `0`, while the
+/// same value rendered as a literal arrives as `0.00` and keeps its scale,
+/// which PostgreSQL treats as part of a numeric's identity. Every other value
+/// reads `self.scale()` on the ordinary path, so only zero is written here and
+/// everything else still delegates.
+// [spec:pgorm:req:exec.cursor.binding-gaps+3]
+fn numeric_to_sql(value: &Decimal, ty: &Type, out: &mut BytesMut) -> BindResult {
+    if !value.is_zero() {
+        return value.to_sql(wire_type(ty), out);
+    }
+    match u16::try_from(value.scale()) {
+        Ok(scale) if scale <= MAX_NUMERIC_DSCALE => {
+            zero_numeric_to_sql(scale, out);
+            Ok(IsNull::No)
+        }
+        _ => Err(out_of_range(value, ty)),
+    }
+}
+
+/// Bind a decimal, which is written only against `numeric` — see
+/// [`numeric_to_sql`] for why the zero case is not delegated.
+// [spec:pgorm:req:exec.cursor.binding-gaps+3]
+fn bind_decimal(value: Option<&Decimal>, ty: &Type, out: &mut BytesMut) -> BindResult {
+    match value {
+        None => Ok(IsNull::Yes),
+        Some(_) if *wire_type(ty) != Type::NUMERIC => Err(mismatch("Decimal", ty)),
+        Some(value) => numeric_to_sql(value, ty, out),
+    }
+}
+
 /// Bind a payload whose binary encoding is the wire format of the `accepted`
 /// types and of no others.
 ///
@@ -134,7 +248,7 @@ fn integer_to_sql(value: i64, kind: &'static str, ty: &Type, out: &mut BytesMut)
     } else if *target == Type::FLOAT8 {
         (value as f64).to_sql(target, out)
     } else if *target == Type::NUMERIC {
-        Decimal::from(value).to_sql(target, out)
+        numeric_to_sql(&Decimal::from(value), ty, out)
     } else {
         Err(mismatch(kind, ty))
     }
@@ -158,7 +272,7 @@ fn float_to_sql(value: f64, kind: &'static str, ty: &Type, out: &mut BytesMut) -
         value.to_sql(target, out)
     } else if *target == Type::NUMERIC {
         match Decimal::try_from(value) {
-            Ok(value) => value.to_sql(target, out),
+            Ok(value) => numeric_to_sql(&value, ty, out),
             Err(_) => Err(out_of_range(value, ty)),
         }
     } else if *target == Type::INT2 || *target == Type::INT4 || *target == Type::INT8 {
@@ -211,7 +325,7 @@ fn bind_big_unsigned(value: Option<u64>, ty: &Type, out: &mut BytesMut) -> BindR
     }
 }
 
-// [spec:pgorm:def:exec.cursor.binding+4]
+// [spec:pgorm:def:exec.cursor.binding+5]
 impl ToSql for ValueHolder {
     // [spec:pgorm:req:exec.cursor.binding-gaps+3]
     fn to_sql(
@@ -247,14 +361,12 @@ impl ToSql for ValueHolder {
             ),
             Value::Date(x) => bind_exact(x.as_deref(), "Date", |ty| *ty == Type::DATE, ty, out),
             Value::Time(x) => bind_exact(x.as_deref(), "Time", |ty| *ty == Type::TIME, ty, out),
-            Value::DateTime(x) => bind_exact(x.as_deref(), "DateTime", is_timestamp, ty, out),
+            Value::DateTime(x) => bind_civil_datetime(x.as_deref(), ty, out),
             Value::DateTimeWithTimeZone(x) => {
                 bind_exact(x.as_deref(), "DateTimeWithTimeZone", is_timestamp, ty, out)
             }
             Value::Uuid(x) => bind_exact(x.as_deref(), "Uuid", |ty| *ty == Type::UUID, ty, out),
-            Value::Decimal(x) => {
-                bind_exact(x.as_deref(), "Decimal", |ty| *ty == Type::NUMERIC, ty, out)
-            }
+            Value::Decimal(x) => bind_decimal(x.as_deref(), ty, out),
             Value::Array(_, Some(x)) => {
                 // `Vec<T>`'s own impl panics on a non-array type rather than
                 // erroring, so the shape has to be established here first.
@@ -392,6 +504,117 @@ mod tests {
             bytes(Value::Int(Some(2)), &Type::NUMERIC),
             vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 2]
         );
+    }
+
+    /// The reported defect. A zero `numeric` is written as a bare header whose
+    /// only informative field is the display scale, and `rust_decimal`'s
+    /// `to_postgres` short-circuits on zero with that field hardcoded to 0 —
+    /// so `0.00` was sent as `0` while the literal path sent `0.00`. Every
+    /// non-zero value reads its own scale and was never affected.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn binds_zero_decimals_with_the_scale_they_carry() {
+        // ndigits, weight, sign, dscale — no digit groups follow.
+        let header = |scale: u16| {
+            [
+                &0u16.to_be_bytes()[..],
+                &0i16.to_be_bytes()[..],
+                &0u16.to_be_bytes()[..],
+                &scale.to_be_bytes()[..],
+            ]
+            .concat()
+        };
+
+        for scale in [0u32, 1, 2, 6, 28] {
+            let value = Decimal::new(0, scale);
+            assert_eq!(value.scale(), scale, "rust_decimal kept the scale");
+            let expected = u16::try_from(scale).expect("a small scale");
+            assert_eq!(
+                bytes(Value::Decimal(Some(Box::new(value))), &Type::NUMERIC),
+                header(expected),
+                "binding a zero of scale {scale}"
+            );
+        }
+
+        // A negative zero is still written positive, which is both what
+        // PostgreSQL renders and what `rust_decimal` itself reports for zero.
+        let mut negative = Decimal::new(0, 2);
+        negative.set_sign_negative(true);
+        assert_eq!(
+            bytes(Value::Decimal(Some(Box::new(negative))), &Type::NUMERIC),
+            header(2)
+        );
+
+        // Non-zero values keep delegating, byte for byte.
+        for value in [
+            Decimal::new(150, 2),
+            Decimal::new(15, 1),
+            Decimal::new(123_400, 4),
+            Decimal::new(10, 2),
+            Decimal::new(10_000, 2),
+            Decimal::ONE,
+            Decimal::new(-1_005, 3),
+            Decimal::MAX,
+            Decimal::MIN,
+        ] {
+            let mut upstream = BytesMut::new();
+            value
+                .to_sql(&Type::NUMERIC, &mut upstream)
+                .expect("rust_decimal writes every non-zero value");
+            assert_eq!(
+                bytes(Value::Decimal(Some(Box::new(value))), &Type::NUMERIC),
+                upstream.to_vec(),
+                "binding {value}"
+            );
+        }
+
+        // The refusal and the NULL path are untouched by the new arm.
+        assert_eq!(
+            error(Value::Decimal(Some(Box::new(Decimal::ZERO))), &Type::FLOAT8),
+            "cannot bind a `Decimal` value to Postgres type `float8`"
+        );
+        assert_eq!(encode_as(Value::Decimal(None), &Type::NUMERIC), Ok(None));
+
+        // A domain over `numeric` resolves to it and takes the same encoding.
+        let money = named("money_amount", Kind::Domain(Type::NUMERIC));
+        assert_eq!(
+            bytes(Value::Decimal(Some(Box::new(Decimal::new(0, 4)))), &money),
+            header(4)
+        );
+
+        // Zeroes reached through the numeric coercion have no authored scale,
+        // so they keep scale 0 — the coercion is not a place to invent one.
+        assert_eq!(bytes(Value::Int(Some(0)), &Type::NUMERIC), header(0));
+        assert_eq!(bytes(Value::Double(Some(0.0)), &Type::NUMERIC), header(0));
+    }
+
+    /// The array path inherits the fix through `ValueHolder`, which is worth
+    /// pinning rather than assuming: an array of zeroes must carry each
+    /// element's scale too.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn binds_zero_decimals_inside_an_array() {
+        use pgorm_query::ArrayType;
+
+        let encoded = bytes(
+            Value::Array(
+                ArrayType::Decimal,
+                Some(Box::new(vec![
+                    Value::Decimal(Some(Box::new(Decimal::new(0, 2)))),
+                    Value::Decimal(Some(Box::new(Decimal::new(0, 0)))),
+                ])),
+            ),
+            &Type::NUMERIC_ARRAY,
+        );
+
+        // Each element is length-prefixed; the dscale is the last two bytes of
+        // each eight-byte zero header.
+        let scales: Vec<u16> = encoded
+            .windows(12)
+            .filter(|w| w[..4] == 8u32.to_be_bytes())
+            .map(|w| u16::from_be_bytes([w[10], w[11]]))
+            .collect();
+        assert_eq!(scales, vec![2, 0]);
     }
 
     // [spec:pgorm:req:exec.cursor.binding-coerce+2/test]
@@ -713,6 +936,203 @@ mod tests {
             error(Value::DateTime(Some(Box::new(naive))), &Type::DATE),
             "cannot bind a `DateTime` value to Postgres type `date`"
         );
+        assert_eq!(encode_as(Value::DateTime(None), &Type::TIMESTAMP), Ok(None));
+        assert_eq!(
+            encode_as(Value::DateTimeWithTimeZone(None), &Type::TIMESTAMPTZ),
+            Ok(None)
+        );
+    }
+
+    /// The reported defect. `9999-12-31 23:59:59.999999` was refused before
+    /// the bind message was sent, as `error serializing parameter 0` over
+    /// `postgres-types`' bare `value too large to transmit`. Precision was
+    /// incidental: the whole last day and a bit of the civil calendar range
+    /// was unbindable, microseconds or not, because the upstream encoder
+    /// balances its span *relative to* a civil datetime and so drags the value
+    /// onto `jiff::Timestamp`'s narrower timeline.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn binds_datetimes_at_the_civil_range_ends() {
+        let cases = [
+            // The campaign's value, and the whole band around it that shared
+            // the fault.
+            (
+                jiff::civil::date(9999, 12, 31).at(23, 59, 59, 999_999_000),
+                252_455_615_999_999_999i64,
+            ),
+            (
+                jiff::civil::date(9999, 12, 31).at(23, 59, 59, 0),
+                252_455_615_999_000_000,
+            ),
+            (
+                jiff::civil::date(9999, 12, 30).at(22, 0, 1, 0),
+                252_455_522_401_000_000,
+            ),
+            // The largest civil datetime the upstream encoder still managed,
+            // which must not have moved.
+            (
+                jiff::civil::date(9999, 12, 30).at(22, 0, 0, 0),
+                252_455_522_400_000_000,
+            ),
+            // Both extremes of what the type can hold. Sub-microsecond digits
+            // truncate toward zero rather than rounding, which is jiff's
+            // documented behaviour on write.
+            (jiff::civil::DateTime::MAX, 252_455_615_999_999_999),
+            (jiff::civil::DateTime::MIN, -378_651_801_600_000_000),
+            (
+                jiff::civil::date(-9999, 1, 1).at(0, 0, 0, 1_000),
+                -378_651_801_599_999_999,
+            ),
+            (
+                jiff::civil::date(-9999, 1, 2).at(1, 59, 59, 0),
+                -378_651_708_001_000_000,
+            ),
+            // The epoch the wire format counts from, and either side of it.
+            (jiff::civil::date(2000, 1, 1).at(0, 0, 0, 0), 0),
+            (
+                jiff::civil::date(1999, 12, 31).at(23, 59, 59, 999_999_000),
+                -1,
+            ),
+        ];
+
+        for (value, micros) in cases {
+            for ty in [&Type::TIMESTAMP, &Type::TIMESTAMPTZ] {
+                assert_eq!(
+                    bytes(Value::DateTime(Some(Box::new(value))), ty),
+                    micros.to_be_bytes(),
+                    "binding {value} as {ty}"
+                );
+            }
+        }
+
+        // The arm still resolves a domain to the type it is built over, and
+        // still refuses a target with no timestamp representation — the two
+        // behaviours the shared `bind_exact` used to supply.
+        let moment = named("moment", Kind::Domain(Type::TIMESTAMP));
+        assert_eq!(
+            bytes(Value::DateTime(Some(Box::new(campaign_value()))), &moment),
+            252_455_615_999_999_999i64.to_be_bytes()
+        );
+        assert_eq!(
+            error(
+                Value::DateTime(Some(Box::new(campaign_value()))),
+                &Type::DATE
+            ),
+            "cannot bind a `DateTime` value to Postgres type `date`"
+        );
+    }
+
+    /// The value seven defects in one campaign run shared.
+    fn campaign_value() -> jiff::civil::DateTime {
+        jiff::civil::date(9999, 12, 31).at(23, 59, 59, 999_999_000)
+    }
+
+    /// Sub-microsecond digits truncate toward zero on both sides of the epoch,
+    /// matching what `postgres-types` produces for the values it accepts.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn truncates_sub_microsecond_digits_toward_zero() {
+        let base = jiff::civil::date(2000, 1, 1).at(0, 0, 0, 0);
+        for (nanos, micros) in [
+            (-1_500i64, -1i64),
+            (-999, 0),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (999, 0),
+            (1_500, 1),
+        ] {
+            let value = base
+                .checked_add(jiff::SignedDuration::from_nanos(nanos))
+                .expect("inside the civil range");
+            assert_eq!(
+                bytes(Value::DateTime(Some(Box::new(value))), &Type::TIMESTAMP),
+                micros.to_be_bytes(),
+                "binding {value}"
+            );
+        }
+    }
+
+    /// pgorm encodes `timestamp` itself, so the replacement has to agree with
+    /// `postgres-types` everywhere `postgres-types` produces an answer at all —
+    /// the fix widens the accepted range and changes nothing inside it.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn datetime_binding_agrees_with_postgres_types() {
+        let mut value = jiff::civil::DateTime::MIN;
+        let mut agreed = 0u32;
+        loop {
+            let mut upstream = BytesMut::new();
+            if value.to_sql(&Type::TIMESTAMP, &mut upstream).is_ok() {
+                assert_eq!(
+                    bytes(Value::DateTime(Some(Box::new(value))), &Type::TIMESTAMP),
+                    upstream.to_vec(),
+                    "binding {value}"
+                );
+                agreed += 1;
+            }
+            // A stride with no common factor with a day, so the probes do not
+            // all land on the same wall-clock time.
+            let step = jiff::Span::new().days(337).hours(7).minutes(13).seconds(11);
+            match value.checked_add(step) {
+                Ok(next) => value = next,
+                Err(_) => break,
+            }
+        }
+        assert!(agreed > 20_000, "only {agreed} values were comparable");
+    }
+
+    /// The other three temporal variants at their own extremes. None of them
+    /// shared the defect, and a regression in any of them would look exactly
+    /// like the one that was fixed.
+    // [spec:pgorm:req:exec.cursor.binding-gaps+3/test]
+    #[test]
+    fn binds_the_other_temporal_variants_at_their_extremes() {
+        // `date` is a day count from 2000-01-01, in an `i32`.
+        for (value, days) in [
+            (jiff::civil::Date::MAX, 2_921_939i32),
+            (jiff::civil::Date::MIN, -4_382_544),
+            (jiff::civil::date(2000, 1, 1), 0),
+        ] {
+            assert_eq!(
+                bytes(Value::Date(Some(Box::new(value))), &Type::DATE),
+                days.to_be_bytes(),
+                "binding {value}"
+            );
+        }
+
+        // `time` is microseconds since midnight; the ninth fractional digit
+        // truncates away.
+        for (value, micros) in [
+            (jiff::civil::Time::MAX, 86_399_999_999i64),
+            (jiff::civil::Time::MIN, 0),
+            (jiff::civil::time(23, 59, 59, 999_999_000), 86_399_999_999),
+        ] {
+            assert_eq!(
+                bytes(Value::Time(Some(Box::new(value))), &Type::TIME),
+                micros.to_be_bytes(),
+                "binding {value}"
+            );
+        }
+
+        // `timestamptz` counts from the same epoch as `timestamp`. Note that
+        // `jiff::Timestamp` stops well short of the civil calendar's end —
+        // it holds back jiff's largest UTC offset at each end — so
+        // `9999-12-31 23:59:59.999999` has no `Timestamp` to be bound from in
+        // the first place, and the naive variant above is the only route to it.
+        for (value, micros) in [
+            (jiff::Timestamp::MAX, 252_455_522_400_999_999i64),
+            (jiff::Timestamp::MIN, -378_651_708_001_000_000),
+        ] {
+            assert_eq!(
+                bytes(
+                    Value::DateTimeWithTimeZone(Some(Box::new(value))),
+                    &Type::TIMESTAMPTZ
+                ),
+                micros.to_be_bytes(),
+                "binding {value}"
+            );
+        }
     }
 
     /// An array binds only against an array type, and its elements are held

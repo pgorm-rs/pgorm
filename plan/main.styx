@@ -6706,6 +6706,7 @@ children (
         id pipeline-renamed-column-order
         title "A renamed column keeps its declared position through distinct"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-13T17:52:18.311676Z
@@ -6727,6 +6728,13 @@ children (
                 kind @note
                 text "The fix pushed src/pipeline/builder.rs over the fifty-function density cap, so the window-frame builder moved to its own module at src/pipeline/window.rs, taking Over, over, by, sort_by and Over's five methods with it. That is a real separation rather than a way around the gate: a window spec is built and finished on its own and reaches the pipeline only as a finished value, so it shares none of the builder's internals. Over::wrap widens from private to pub(super) because the pipeline calls it, and mod.rs re-exports the four public names from their new home so no caller sees the move."
             }
+
+            {
+                at 2026-09-15T00:59:38.820334Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -6740,6 +6748,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Binding the maximum timestamp at full microsecond precision fails before reaching PostgreSQL. The subject raises ConstructionError, error serializing parameter 0, while the independent reference returns rows. Seven defects in the 2026-09-14 full profile share one failing value, 9999-12-31 23:59:59.999999. The same instant without microseconds travels the literal path in the same programs and succeeds, which locates the failure in parameter serialization rather than in whether the value is representable at all. Temporally adjacent to the forty-two FormatErrors seen in the stress run but not the same defect: that one is a snapshot-equivalence question about trimmed trailing zeros on a bare time, this is a hard refusal to encode a datetime. Found at seed 20260913; the retained finding directories under target/generative-campaign/full-f71b80d27ea8/findings carry the programs and replay commands."
+            }
+
+            {
+                at 2026-09-15T01:11:19.643659Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
@@ -6783,12 +6798,20 @@ children (
         id distinct-sort-range-rows
         title "A deduplicated sorted range selects the ordered rows"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-14T11:10:49.885981Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "A pipeline combining distinct, sort and take_range selects different rows from the independent reference. One defect in the 2026-09-14 full profile, item runtime-947: the subject returns a single row with p_score 10 and p_rank 1, while the reference returns two, p_score 30 and p_score NULL, both with p_rank 2. This is neither a reordering nor a formatting difference but a genuinely different set of rows, so it is the most serious class in that run. The same three-stage shape recurs in the four incompletes of the same run, which are plausibly the filed pipeline-native-panic, so the interaction of deduplication with an ordered range deserves attention beyond this single case."
+            }
+
+            {
+                at 2026-09-15T00:59:40.28601Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

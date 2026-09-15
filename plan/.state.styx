@@ -735,7 +735,9 @@ assertions (
     {id report, kind @doing, author "brendan@necessary.nu", at 2026-09-14T23:10:20.517261Z}
     {id rust, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:12:39.836152Z}
     {id codegen-datetime-crate-option, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:54:18.092258Z}
-    {id pipeline-renamed-column-order, kind @doing, author "brendan@necessary.nu", at 2026-09-15T00:28:37.111918Z}
+    {id pipeline-renamed-column-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:38.820334Z}
+    {id distinct-sort-range-rows, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:40.28601Z}
+    {id bound-datetime-max-precision, kind @doing, author "brendan@necessary.nu", at 2026-09-15T01:11:19.643659Z}
 )
 
 impl_evidence (

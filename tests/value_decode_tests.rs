@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
 }
 
 // [spec:pgorm:def:exec.decode.types+2/test]
-// [spec:pgorm:def:exec.cursor.binding+4/test]    `IpNetwork` and `MacAddress`
+// [spec:pgorm:def:exec.cursor.binding+5/test]    `IpNetwork` and `MacAddress`
 // values, and a `None` payload emitted as SQL NULL, bound through `ValueHolder`
 async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Error> {
     for model in models() {

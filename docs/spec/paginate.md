@@ -142,7 +142,7 @@ bound parameter is held to.
 > cursor is totally ordered and can be resumed mid-tie through `after_with`
 > / `before_with`.
 
-> [spec:pgorm:def:exec.cursor.binding+4]
+> [spec:pgorm:def:exec.cursor.binding+5]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
 > implementing `tokio_postgres::types::ToSql`; every executor path
 > (select, insert, update, delete, cursor, paginator) wraps built
@@ -153,12 +153,36 @@ bound parameter is held to.
 > `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which also covers the
 > `oid` and `"char"` targets the corresponding primitive impls define —
 > `BigUnsigned` (u64) reaching all of them through a checked conversion to
-> `i64`; `Char` is stringified; `String`, `Bytes`, `Json`, the chrono
-> date/time variants, `Uuid`, and `Decimal` bind their payload, with
-> `None` payloads emitted as SQL `NULL` (`IsNull::Yes`); `Array`
-> recursively wraps its elements in `ValueHolder` (a `None` array is
-> `NULL`), so the numeric coercion also applies element-wise against the
-> array's member type.
+> `i64`; `Char` is stringified; `String`, `Bytes`, `Json`, `Date`, `Time`,
+> `DateTimeWithTimeZone` and `Uuid` bind their payload, with `None` payloads
+> emitted as SQL `NULL` (`IsNull::Yes`); `Array` recursively wraps its
+> elements in `ValueHolder` (a `None` array is `NULL`), so the numeric
+> coercion also applies element-wise against the array's member type.
+>
+> Two variants are written by hand rather than delegated, each because the
+> library impl refuses or discards a value PostgreSQL accepts.
+>
+> `DateTime` (the naive `timestamp`) is encoded as the microsecond count of
+> `duration_since` the PostgreSQL epoch, through
+> `postgres_protocol::types::timestamp_to_sql`. `postgres-types` derives the
+> same payload from `since`, whose span's largest unit is *days*; balancing
+> days down to microseconds obliges jiff to say how long a day is, and given
+> a relative civil datetime it answers by projecting onto the absolute
+> `Timestamp` timeline, which is strictly narrower than `civil::DateTime` by
+> its largest UTC offset at each end. So roughly 26 hours at each end of the
+> calendar are refused with `"value too large to transmit"` despite being
+> representable, storable and decodable. A `SignedDuration` difference needs
+> no calendar context and has no such edge. Inside the range both encodings
+> MUST agree byte for byte.
+>
+> `Decimal` binds its payload except when the value is zero and carries a
+> non-zero scale, where the 8-byte header is written directly with the
+> display scale the value holds. A zero `numeric` has no digit groups, so
+> that header is its entire encoding and the display scale its only
+> informative field; `rust_decimal`'s zero shortcut hardcodes the scale to 0,
+> which sends `0.00` as `0`. Scale is a property of the value — PostgreSQL
+> reports `scale(0.00::numeric)` as 2 and renders the two differently — and
+> the decode side already refuses to lose it, so the binding side MUST NOT.
 >
 > `Vector` delegates to `pgvector`'s own `ToSql` impl, which `pgorm-query`
 > enables through pgvector's `postgres` feature. `IpNetwork` and
