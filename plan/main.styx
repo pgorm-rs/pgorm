@@ -6800,12 +6800,20 @@ children (
         id nested-source-from-entry
         title "A nested pipeline source keeps its FROM entry"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-14T11:10:37.087771Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "A program that joins, sorts, takes a range and then nests the pipeline emits SQL PostgreSQL rejects with SQLSTATE 42P01, missing FROM-clause entry for table table_4, while the independent reference returns rows. One defect in the 2026-09-14 full profile, item runtime-887. Kin to the filed pipeline-hidden-order finding in that both are nested pipeline sources referring outward to something the enclosing scope no longer exposes, but distinct from it: that one is 42703 on a column a CTE never exposed, this is 42P01 on a table absent from the FROM clause entirely. The retained finding directory carries the program and replay commands."
+            }
+
+            {
+                at 2026-09-15T12:40:14.356897Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -6836,6 +6844,7 @@ children (
         id pipeline-hidden-order
         title "A nested source reads only columns its CTE exposes"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T00:00:09.252624Z
@@ -6849,6 +6858,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T12:40:05.303529Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -6941,6 +6957,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found while fixing bound-datetime-max-precision. value_to_string in pgorm-query/src/backend/query_builder.rs renders temporal literals through strftime with the formats year-month-day hour:minute:second and hour:minute:second, neither of which carries a fractional part, so every inlined temporal literal silently drops its sub-second digits. A value of 9999-12-31 23:59:59.999999 is written into SQL as 9999-12-31 23:59:59. This affects Time, DateTime and DateTimeWithTimeZone at all magnitudes, not only at the boundary, and it is the real reason the literal path appeared to succeed where binding failed: the literal path was not preserving the value, it was discarding the part that made binding hard. That makes it more serious than the binding defect it was contrasted against, because a bound parameter that refuses is loud while a literal that truncates is silent. Orthogonal to parameter binding and deliberately left for its own node, because the rendering change moves SQL goldens across the tree including doctests, which nextest does not run, so the doctest suite has to be run separately to see the full blast radius. Worth pairing with the jiff lenient-strftime hazard already recorded on jiff-temporal, that a directive jiff cannot fill is written verbatim into the output rather than failing, so whatever format replaces these must be tested to assert the rendered literal never contains a percent sign."
+            }
+
+            {
+                at 2026-09-15T12:47:52.655356Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

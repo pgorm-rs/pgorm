@@ -1505,7 +1505,7 @@ mod tests {
     /// A `timestamptz` is an absolute instant: PostgreSQL never stored the
     /// offset the value was written with, so the literal renders in UTC
     /// whatever offset it was parsed from.
-    // [spec:pgorm:sem:sql.value.render/test]
+    // [spec:pgorm:sem:sql.value.render+1/test]
     #[test]
     fn timestamptz_literal_renders_at_utc() {
         use crate::*;
@@ -1520,7 +1520,7 @@ mod tests {
     /// `strftime` is lenient: a directive the payload cannot fill is copied
     /// into the output instead of failing, so a stray `%` in a rendered literal
     /// is the only evidence that a format string outran its type.
-    // [spec:pgorm:sem:sql.value.render/test]
+    // [spec:pgorm:sem:sql.value.render+1/test]
     #[test]
     fn temporal_literals_render_without_stray_directives() {
         let rendered = [
@@ -1546,6 +1546,38 @@ mod tests {
             ]
             .map(str::to_owned)
         );
+    }
+
+    /// A literal must carry the sub-second digits the value holds. The formats
+    /// asked only for whole seconds, so `23:59:59.999999` was written into SQL
+    /// as `23:59:59` — silently, and at every magnitude rather than only at a
+    /// boundary. `%.f` omits the fraction when it is zero, which is why the
+    /// whole-second literals above are unchanged.
+    // [spec:pgorm:sem:sql.value.render+1/test]
+    #[test]
+    fn temporal_literals_keep_sub_second_digits() {
+        let literals = [
+            Value::from(jiff::civil::time(23, 59, 59, 999_999_000)),
+            Value::from(jiff::civil::datetime(9999, 12, 31, 23, 59, 59, 999_999_000)),
+            Value::from("2020-01-01T02:02:02.123456Z".parse::<Timestamp>().unwrap()),
+        ]
+        .map(|v| QueryBuilder.value_to_string(&v));
+
+        assert_eq!(
+            literals,
+            [
+                "'23:59:59.999999'",
+                "'9999-12-31 23:59:59.999999'",
+                "'2020-01-01 02:02:02.123456 +00:00'",
+            ]
+            .map(str::to_owned)
+        );
+
+        // PostgreSQL stores microseconds and the parameter path discards the
+        // rest, so a literal truncates too rather than leaving the server to
+        // round a digit the bound form would have dropped.
+        let nanos = Value::from(jiff::civil::time(1, 2, 3, 123_456_789));
+        assert_eq!(QueryBuilder.value_to_string(&nanos), "'01:02:03.123456'");
     }
 
     // [spec:pgorm:def:sql.value.conversions+1/test]

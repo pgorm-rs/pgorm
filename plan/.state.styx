@@ -740,7 +740,9 @@ assertions (
     {id bound-datetime-max-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:21.710443Z}
     {id decimal-scale-returned, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:22.880525Z}
     {id pipeline-native-panic, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:28:05.205873Z}
-    {id pipeline-hidden-order, kind @doing, author "brendan@necessary.nu", at 2026-09-15T12:39:29.650023Z}
+    {id pipeline-hidden-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:05.303529Z}
+    {id nested-source-from-entry, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:14.356897Z}
+    {id literal-temporal-precision, kind @doing, author "brendan@necessary.nu", at 2026-09-15T12:47:52.655356Z}
 )
 
 impl_evidence (

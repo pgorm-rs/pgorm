@@ -212,7 +212,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Literal rendering
 
-> [spec:pgorm:sem:sql.value.render]
+> [spec:pgorm:sem:sql.value.render+1]
 > `QueryBuilder.value_to_string` renders a `Value` as an inline Postgres
 > literal (also used by `Display for Value` and by `SqlWriter for String` when
 > a statement is built without parameter binding). `None` payloads render as
@@ -220,8 +220,22 @@ including panic semantics and quirks inherited from sea-query.
 > form. Strings and chars are single-quoted after `escape_string`, switching
 > to the `E'...'` form when the escaped text contains a backslash. `Bytes`
 > renders as `'\xHEX...'`. Temporal values render quoted with formats
-> `%Y-%m-%d`, `%H:%M:%S`, `%Y-%m-%d %H:%M:%S` and, for the zoned variants,
-> `%Y-%m-%d %H:%M:%S %:z`. `Uuid`, `IpNetwork` and `MacAddress` render as
+> `%Y-%m-%d`, `%H:%M:%S%.f`, `%Y-%m-%d %H:%M:%S%.f` and, for the zoned
+> variants, `%Y-%m-%d %H:%M:%S%.f %:z`.
+>
+> A literal MUST carry the sub-second digits its value holds. `%.f` writes the
+> fraction and omits both it and the dot when it is zero, so a whole second
+> renders exactly as it would without the directive — which is why adding it
+> moved no rendered output anywhere in the tree.
+>
+> The value MUST first be truncated to the microsecond, because that is what
+> PostgreSQL stores and what the parameter path does with the same value. Left
+> alone, a ninth digit would be rounded by the server on the literal path and
+> discarded by the encoder on the bound one, so the same value would mean two
+> different things depending on how it travelled
+> (`[spec:pgorm:def:exec.cursor.binding+5]`).
+>
+> `Uuid`, `IpNetwork` and `MacAddress` render as
 > quoted display strings. `Array` renders as `ARRAY [elem,...]` recursively
 > and `Vector` as a quoted bracket literal `'[v1,v2,...]'`.
 

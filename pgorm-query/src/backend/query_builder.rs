@@ -12,6 +12,18 @@ use std::ops::Deref;
 // [spec:pgorm:req:sql.render.ident-quoting] (the double-quote pair; doubling in Iden::quoted)
 const QUOTE: Quote = Quote(b'"', b'"');
 
+/// Discard sub-microsecond digits before a temporal value is rendered as a
+/// literal. PostgreSQL stores microseconds and would round a ninth digit,
+/// while the parameter path discards it — so without this the same value means
+/// two different things depending on how it travelled.
+macro_rules! truncate_to_microsecond {
+    ($rounder:path) => {
+        <$rounder>::new()
+            .smallest(jiff::Unit::Microsecond)
+            .mode(jiff::RoundMode::Trunc)
+    };
+}
+
 // [spec:pgorm:def:sql.render]
 // [spec:pgorm:req:sql.render.oracle] (the renderer whose every output the oracle in
 // pgorm-query/tests/postgres/oracle.rs holds to the libpg_query grammar)
@@ -984,7 +996,7 @@ impl QueryBuilder {
     }
 
     /// Convert a SQL value into syntax-specific string
-    // [spec:pgorm:sem:sql.value.render]
+    // [spec:pgorm:sem:sql.value.render+1]
     // [spec:pgorm:def:sql.render.value-literals+2]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
@@ -1030,11 +1042,32 @@ impl QueryBuilder {
             // is copied into the output verbatim, so `%:z` against a civil type
             // would render the literal `'... %:z'` — well-formed Rust, malformed
             // SQL, and no error anywhere. Only the instant carries an offset.
+            //
+            // `%.f` writes the fractional second and omits both it and the dot
+            // when it is zero, so a whole second renders exactly as it always
+            // has. The value is truncated to microseconds first because that is
+            // what PostgreSQL stores and what the parameter path does with the
+            // same value; left alone, a ninth digit would be rounded by the
+            // server on the literal path and discarded on the bound one, which
+            // is the disagreement this rendering exists to avoid.
             Value::Date(Some(v)) => write!(s, "'{}'", v.strftime("%Y-%m-%d")).unwrap(),
-            Value::Time(Some(v)) => write!(s, "'{}'", v.strftime("%H:%M:%S")).unwrap(),
-            Value::DateTime(Some(v)) => write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S")).unwrap(),
+            Value::Time(Some(v)) => {
+                let v = v
+                    .round(truncate_to_microsecond!(jiff::civil::TimeRound))
+                    .unwrap_or(**v);
+                write!(s, "'{}'", v.strftime("%H:%M:%S%.f")).unwrap()
+            }
+            Value::DateTime(Some(v)) => {
+                let v = v
+                    .round(truncate_to_microsecond!(jiff::civil::DateTimeRound))
+                    .unwrap_or(**v);
+                write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S%.f")).unwrap()
+            }
             Value::DateTimeWithTimeZone(Some(v)) => {
-                write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S %:z")).unwrap()
+                let v = v
+                    .round(truncate_to_microsecond!(jiff::TimestampRound))
+                    .unwrap_or(**v);
+                write!(s, "'{}'", v.strftime("%Y-%m-%d %H:%M:%S%.f %:z")).unwrap()
             }
             Value::Decimal(Some(v)) => write!(s, "{v}").unwrap(),
             Value::Uuid(Some(v)) => write!(s, "'{v}'").unwrap(),
