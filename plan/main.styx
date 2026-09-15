@@ -6815,6 +6815,14 @@ children (
                 kind @status
                 text "Todo → Done (nplan complete)"
             }
+
+            {
+                at 2026-09-15T14:06:43.474707Z
+                author "brendan@necessary.nu"
+                kind @errata
+                text "Closed too early, and reopening. The 2026-09-15 full profile still records runtime-887 as a finding with the original error unchanged, SQLSTATE 42P01 missing FROM-clause entry for table table_4. The prqlc redirect fix in 12d01a77 is real and does repair the reduced shape, which is what the live regression test added alongside it exercises and why that test fails on the prior rev and passes on this one. But the reduced shape is not the whole program: the original still emits an ORDER BY qualified by a relation its final FROM does not carry. So the cid_redirects gap was a cause and not the only one, and the node should not have been marked done on the reduced evidence alone. Worth noting what this does vindicate: runtime-947, runtime-3722, runtime-3737 and runtime-4262 have all cleared, so the distinct-sort-range fix and the Take.sort anchoring both hold on their original programs rather than only on their reductions. The lesson for the remaining work is to re-check a filed item's own id in the next full run before closing it, rather than treating a passing reduction as proof."
+                after_done true
+            }
         )
     }
 
@@ -7003,6 +7011,34 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Doing → Done (nplan complete)"
+            }
+        )
+    }
+
+    {
+        id settled-source-name-resolves
+        title "A qualified source name resolves after a settled deduplication"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T14:06:30.442793Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "A regression this session introduced and shipped, found by re-running the full generative profile against the fixes. Commit c3f77a50, which made distinct settle the pipeline into its own binding when a take is pending, breaks any later stage that refers to a source by name. The emitted PRQL fails to compile with Unknown name and a hint listing only the binding's internal table_N columns, because a settled relation exposes bare names and nothing else. Thirty-one of the ninety-two findings in the 2026-09-15 full run are this, all in the pipeline family, all recorded as ConstructionError before any SQL is emitted. Bisected rather than guessed: a standalone SQL-only reproducer of item runtime-2387's shape compiles at c3f77a50~1 and fails at c3f77a50 and at every commit since, so the naming work in 39ce5335 neither caused it nor made it worse. The shape is a source nested under a name, a projection renaming its columns, a take_range, a distinct, and then a select whose items are qualified by that source name. The hazard was known when the settle landed: its own commit message records that settling breaks select_sources because source names do not resolve through a CTE, and the implementation guards select_sources specifically. What it does not guard is the general case, an ordinary col(name, column) reference in any later stage, which is the same fault reached through a different door. Two directions are worth weighing rather than one. The narrow repair is to rewrite qualified references to the settled binding the way rebound_sort already repoints sort keys, since naming.rs has the exposed-name map that would need. The broader question is whether distinct should settle at all when a named source is still referenced downstream, which trades the range fix's correctness against this one and probably wants the two conditions separated rather than one flag serving both."
+            }
+        )
+    }
+
+    {
+        id outer-ordering-qualifier
+        title "An outer ORDER BY names a relation the FROM carries"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T14:07:16.27692Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The part of nested-source-from-entry that the prqlc cid_redirects fix did not reach. That node was closed on its reduced shape, which the fix in 12d01a77 genuinely repairs and which the live regression test alongside it exercises in both directions. The 2026-09-15 full profile then recorded runtime-887 still failing with its original error unchanged, SQLSTATE 42P01 missing FROM-clause entry for table table_4, so the empty redirect map was one cause and not the only one. nplan will not move a Done node back, hence a separate id; the errata on nested-source-from-entry points here. What is known: the full program joins, sorts, takes a range and nests, and its final ORDER BY is qualified by an interior relation that the enclosing FROM does not list, while the reduced form of the same program now compiles and executes. That difference is the lead. The reduction dropped whatever second path also carries a qualifier outward, so the useful next step is to diff the emitted SQL of the full program against the reduced one rather than to re-read the redirect code, and then to shrink the full program again under a predicate pinned to 42P01 so the reduction cannot escape the defect the way the last one did. Worth checking against prqlc's own postprocess::alias_last_sorting and the last-sorting cid-redirect walk, which the upstream work identified as where the damage showed even though the cause sat a layer earlier."
             }
         )
     }
