@@ -309,6 +309,40 @@ of the crate, compiled in every build. Rules are grouped under
 > `table_N` namespace the module mints its bindings in — reserved for that
 > reason ([spec:pgorm:req:pipeline.compose]).
 
+## Window frames
+
+> [spec:pgorm:sem:pipeline.window-frame]
+> A frame authored with `rows(start, end)` or `range(start, end)` reaches the
+> emitted SQL for every window function, not only the ones the compiler
+> happens to carry it for. The bounds are rows (or values) relative to the
+> current row, and each maps to exactly one SQL bound: `Some(0)` is
+> `CURRENT ROW`, a negative offset is `n PRECEDING`, a positive one is
+> `n FOLLOWING`, and `None` is `UNBOUNDED PRECEDING` as a start and
+> `UNBOUNDED FOLLOWING` as an end. `rows` renders `ROWS BETWEEN start AND
+> end` and `range` renders `RANGE BETWEEN start AND end`; the two bounds are
+> independent, so every direction — both preceding, spanning the current
+> row, both following, and unbounded on either side — is expressible and is
+> rendered as written.
+>
+> prqlc emits a frame only for the calls its own standard library annotates
+> as frame-aware, which is the aggregates: `first`, `last`, `lag`, `lead`,
+> `rank`, `rank_dense` and `row_number` are handed the frame and drop it.
+> For `FIRST_VALUE` and `LAST_VALUE` that is a different query — the frame is
+> what those functions read — so pgorm writes the whole `OVER (...)` clause
+> for these seven itself, as a `derive` of expressions spelling their own
+> partition keys, ordering keys and frame, rather than as prqlc's `window`
+> transform. The ranking and offset functions are written the same way even
+> though PostgreSQL ignores a frame on them: one rule covers the vocabulary,
+> rather than the subset whose answer happens to move.
+>
+> A written clause states what prqlc's would have: the window's own
+> partition and ordering keys, and — for an unpartitioned window that states
+> no ordering of its own — the ordering the relation already carried, which
+> is the ordering prqlc reads into such a window. A window mixing frame-aware
+> and frame-blind columns therefore renders one frame twice, identically, on
+> the two paths. Without an authored frame nothing is rewritten and the
+> stage is prqlc's `window` exactly as before.
+
 ## Failure model
 
 > [spec:pgorm:req:pipeline.errors+2]

@@ -703,8 +703,16 @@ impl Pipeline {
 
     fn window_nodes(mut self, nodes: Vec<PlExpr>, over: Over) -> Self {
         self.columns = self.columns.with_introduced();
-        let derive_call = adapter::call("derive", vec![adapter::tuple(nodes)]);
-        let staged = over.wrap(derive_call);
+        // The ordering the relation already carries is the ordering prqlc
+        // reads into an unpartitioned window that states none of its own, so
+        // a window that writes its own `OVER` clause has to be told it.
+        let mut carried = self.ordering.clone();
+        let inherited = carried
+            .as_mut()
+            .and_then(adapter::tuple_items_mut)
+            .map(std::mem::take)
+            .unwrap_or_default();
+        let staged = over.wrap(nodes, inherited);
         // An unpartitioned window's own ordering is a real pipeline stage, so
         // it orders the output too, and a deduplication after it inherits
         // that order exactly as it inherits a `sort`'s. A partitioned one

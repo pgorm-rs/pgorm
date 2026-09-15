@@ -86,7 +86,7 @@ FINDINGS = {
     "window-semantics": {
         "finding": "window-semantics",
         "state": "open",
-        "summary": "count(expr) emits COUNT(*) and first/last drop an explicit frame",
+        "summary": "count(expr) emits COUNT(*); the dropped explicit frame is fixed",
     },
 }
 

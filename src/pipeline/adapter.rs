@@ -46,6 +46,64 @@ pub(super) fn tuple(items: Vec<PlExpr>) -> PlExpr {
     Expr::new(ExprKind::Tuple(items))
 }
 
+/// One piece of an expression whose SQL pgorm writes itself: either text that
+/// reaches the query verbatim, or a node prqlc renders in place.
+// [spec:pgorm:def:pipeline.adapter+2]
+#[derive(Debug, Clone)]
+pub(super) enum Piece {
+    Text(String),
+    Node(PlExpr),
+}
+
+/// The expression `pieces` spell, projected under `alias`.
+///
+/// prqlc renders each interpolated node and emits the text between them
+/// unchanged, so this is how pgorm writes SQL prqlc has no vocabulary for
+/// while still letting prqlc resolve the column references inside it.
+// [spec:pgorm:def:pipeline.adapter+2]
+pub(super) fn assembled(pieces: Vec<Piece>, alias: Option<String>) -> PlExpr {
+    let mut node = Expr::new(ExprKind::SString(
+        pieces
+            .into_iter()
+            .map(|piece| match piece {
+                Piece::Text(text) => InterpolateItem::String(text),
+                Piece::Node(node) => InterpolateItem::Expr {
+                    expr: Box::new(node),
+                    format: None,
+                },
+            })
+            .collect(),
+    ));
+    node.alias = alias;
+    node
+}
+
+/// The arguments a call node applies its function to, or `None` for a node
+/// that is not a call of a bare name.
+// [spec:pgorm:def:pipeline.adapter+2]
+pub(super) fn call_args(node: &PlExpr) -> Option<&[PlExpr]> {
+    let ExprKind::FuncCall(call) = &node.kind else {
+        return None;
+    };
+    Some(&call.args)
+}
+
+/// A sort key split into the expression it sorts by and whether it descends:
+/// `desc` is a leading `-` and `asc` a leading `+`, both of which are marks on
+/// the key rather than arithmetic, and neither of which belongs in the SQL
+/// text an `ORDER BY` renders them into.
+// [spec:pgorm:def:pipeline.adapter+2]
+pub(super) fn sort_key(node: &PlExpr) -> (PlExpr, bool) {
+    if let ExprKind::Unary(unary) = &node.kind {
+        match unary.op {
+            UnOp::Neg => return ((*unary.expr).clone(), true),
+            UnOp::Add => return ((*unary.expr).clone(), false),
+            _ => {}
+        }
+    }
+    (node.clone(), false)
+}
+
 pub(super) fn array(items: Vec<PlExpr>) -> PlExpr {
     Expr::new(ExprKind::Array(items))
 }
@@ -298,8 +356,9 @@ pub(super) fn projected(node: &PlExpr) -> Projected<'_> {
     }
 }
 
-/// The verb a stage calls — `select`, `derive`, `sort`, `join` — or `None`
-/// for a stage that is not a plain call of a bare name.
+/// The bare name a call node names — a stage's verb (`select`, `derive`,
+/// `sort`, `join`) or, on a projected expression, the function it calls
+/// (`first`, `sum`) — or `None` for a node that is not a call of a bare name.
 // [spec:pgorm:req:pipeline.compose]
 pub(super) fn stage_verb(node: &PlExpr) -> Option<&str> {
     let ExprKind::FuncCall(call) = &node.kind else {

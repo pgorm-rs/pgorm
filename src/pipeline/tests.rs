@@ -301,6 +301,207 @@ fn window_over_the_whole_relation_needs_no_keys() {
     assert_eq!(built, "SELECT *, SUM(total) OVER () AS grand FROM invoice");
 }
 
+/// Both bounds run over their whole range independently: two preceding, one
+/// each side, two following, and unbounded on either side. `LAST_VALUE` is
+/// the reading, not the writing, of a frame — the function whose answer is
+/// the frame — and it is the one prqlc renders without one.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn every_frame_direction_reaches_a_frame_blind_function() {
+    for (start, end, frame) in [
+        (
+            Some(-2),
+            Some(-1),
+            "ROWS BETWEEN 2 PRECEDING AND 1 PRECEDING",
+        ),
+        (
+            Some(-1),
+            Some(0),
+            "ROWS BETWEEN 1 PRECEDING AND CURRENT ROW",
+        ),
+        (
+            Some(-1),
+            Some(1),
+            "ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING",
+        ),
+        (Some(1), Some(1), "ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING"),
+        (Some(1), Some(2), "ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING"),
+        (
+            None,
+            Some(0),
+            "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW",
+        ),
+        (
+            Some(0),
+            None,
+            "ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING",
+        ),
+        (
+            None,
+            None,
+            "ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING",
+        ),
+    ] {
+        let built = sql_of(Pipeline::from(INVOICE).window(
+            last(total()).as_(alias("tail")),
+            sort_by(col(INVOICE, ID)).rows(start, end),
+        ));
+        assert_eq!(
+            built,
+            format!(
+                "SELECT *, LAST_VALUE(total) OVER (ORDER BY id {frame}) \
+                 AS tail FROM invoice ORDER BY id"
+            )
+        );
+    }
+}
+
+/// The filed shape: a partitioned window ordered descending, reading the one
+/// row that follows. The frame is the whole of what it computes.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn the_filed_following_frame_partitions_and_orders_descending() {
+    let built = sql_of(
+        Pipeline::from(INVOICE).window(
+            last(total()).as_(alias("next")),
+            by(col(INVOICE, CUSTOMER_ID))
+                .sort_by(col(INVOICE, ID).desc())
+                .rows(Some(1), Some(1)),
+        ),
+    );
+    assert_eq!(
+        built,
+        "SELECT *, LAST_VALUE(total) OVER (PARTITION BY customer_id ORDER BY id DESC \
+         ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS next FROM invoice"
+    );
+}
+
+/// One window, two rendering paths — prqlc's for the aggregate, pgorm's for
+/// the frame-blind call — spelling one clause.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn both_render_paths_spell_one_frame() {
+    let built = sql_of(
+        Pipeline::from(INVOICE).window(
+            (
+                sum(total()).as_(alias("run")),
+                first(total()).as_(alias("head")),
+            ),
+            by(col(INVOICE, CUSTOMER_ID))
+                .sort_by(col(INVOICE, ID))
+                .rows(Some(-1), Some(1)),
+        ),
+    );
+    let clause =
+        "OVER (PARTITION BY customer_id ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING)";
+    assert_eq!(
+        built,
+        format!(
+            "SELECT *, SUM(total) {clause} AS run, FIRST_VALUE(total) {clause} \
+             AS head FROM invoice"
+        )
+    );
+}
+
+/// `RANGE` is the other unit, and reaches a frame-blind call the same way.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn a_range_frame_reaches_a_frame_blind_function() {
+    let built = sql_of(Pipeline::from(INVOICE).window(
+        first(total()).as_(alias("head")),
+        sort_by(col(INVOICE, ID)).range(Some(-1), Some(1)),
+    ));
+    assert_eq!(
+        built,
+        "SELECT *, FIRST_VALUE(total) OVER (ORDER BY id RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) \
+         AS head FROM invoice ORDER BY id"
+    );
+}
+
+/// The offset functions take their offset first and render it last, and the
+/// ranking ones drop the column PRQL gives them.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn a_written_call_keeps_its_argument_order() {
+    let built = sql_of(Pipeline::from(INVOICE).window(
+        (
+            lag(2, total()).as_(alias("prev")),
+            lead(3, total()).as_(alias("next")),
+            rank(total()).as_(alias("r")),
+            rank_dense(total()).as_(alias("rd")),
+            row_number().as_(alias("n")),
+        ),
+        sort_by(col(INVOICE, ID)).rows(Some(0), None),
+    ));
+    let clause = "OVER (ORDER BY id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)";
+    assert_eq!(
+        built,
+        format!(
+            "SELECT *, LAG(total, 2) {clause} AS prev, LEAD(total, 3) {clause} AS next, \
+             RANK() {clause} AS r, DENSE_RANK() {clause} AS rd, ROW_NUMBER() {clause} AS n \
+             FROM invoice ORDER BY id"
+        )
+    );
+}
+
+/// An unpartitioned window that states no ordering reads the relation's, so
+/// the written clause has to as well — otherwise the frame would run over a
+/// different order than the one prqlc gives the aggregates beside it.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn a_framed_window_reads_the_carried_ordering() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .sort(col(INVOICE, ID).desc())
+            .window(
+                first(total()).as_(alias("head")),
+                over().rows(Some(-1), Some(0)),
+            ),
+    );
+    assert_eq!(
+        built,
+        "SELECT *, FIRST_VALUE(total) OVER (ORDER BY id DESC ROWS BETWEEN 1 PRECEDING \
+         AND CURRENT ROW) AS head FROM invoice ORDER BY id DESC"
+    );
+}
+
+/// Nothing is rewritten without an authored frame: the stage stays prqlc's,
+/// and a partitioned window still nests its ordering inside the `group`.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn an_unframed_window_is_left_to_prqlc() {
+    let built = sql_of(Pipeline::from(INVOICE).window(
+        first(total()).as_(alias("head")),
+        by(col(INVOICE, CUSTOMER_ID)).sort_by(col(INVOICE, ID)),
+    ));
+    assert_eq!(
+        built,
+        "SELECT *, FIRST_VALUE(total) OVER (PARTITION BY customer_id ORDER BY id) \
+         AS head FROM invoice"
+    );
+}
+
+/// A filter after a written window still nests it in a CTE: the rewritten
+/// column is a window function wherever prqlc puts it.
+// [spec:pgorm:sem:pipeline.window-frame/test]
+#[test]
+fn a_filter_after_a_written_window_nests_it() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .window(
+                first(total()).as_(alias("head")),
+                sort_by(col(INVOICE, ID)).rows(Some(1), Some(1)),
+            )
+            .filter(alias("head").gt(5)),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT *, FIRST_VALUE(total) OVER (ORDER BY id \
+         ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS head FROM invoice) \
+         SELECT * FROM table_0 WHERE head > 5 ORDER BY id"
+    );
+}
+
 // [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn lag_lead_first_last_render_window_calls() {

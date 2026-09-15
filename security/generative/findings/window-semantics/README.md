@@ -1,8 +1,9 @@
 # Nullable count and explicit first/last frames
 
 Status: reproduced through the public Python module, an independent live
-PostgreSQL reference and standalone Rust. These are open native behavior/contract
-discrepancies; no production change or weakened comparison has been applied.
+PostgreSQL reference and standalone Rust. The count discrepancy is an open
+native behavior/contract discrepancy; no weakened comparison has been applied
+to it. The dropped-frame discrepancy is **fixed** — see the closing section.
 
 `count(score)` is documented as `COUNT(expr)` in `src/pipeline/funcs.rs`, with
 `count_rows()` separately documented as `COUNT(*)`. Both Python and Rust emit
@@ -38,3 +39,17 @@ are distinct from dropping an explicitly requested frame. Early development
 runs used the wrong aggregate default and remain separate from the preserved
 corrected reports. The self-check expects these known programs to report
 `defect`; this verifies detection and does not make them clean campaign cases.
+
+## The dropped frame is fixed
+
+The frame half was a translation defect on the subject side, not a disputed
+reading of `start`/`end`: the reference's `boundary()` and `Over::rows`'
+documentation agree exactly. prqlc's `std.sql.prql` annotates only the
+aggregates `@{window_frame=true}`, and `sql/gen_expr.rs::translate_windowed`
+emits a frame clause only for an annotated call, so `first`, `last`, `lag`,
+`lead`, `rank`, `rank_dense` and `row_number` were handed the authored frame
+and dropped it. pgorm now writes the whole `OVER (...)` clause for those seven
+itself ([spec:pgorm:sem:pipeline.window-frame]). The retained artifacts here
+record the discrepancy as found; `known-first-last-frame.program.json` no
+longer reproduces the frame half. The `count(score)` → `COUNT(*)` discrepancy
+is untouched and remains open.

@@ -18,8 +18,8 @@ use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use jiff::{Timestamp, tz::Offset};
 use pgorm::pipeline::{
-    AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows,
-    named_runtime, row_number, sort_by, sum,
+    AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows, first,
+    last, named_runtime, row_number, sort_by, sum,
 };
 use pgorm::{ConnectionTrait, Schema, entity::*, set};
 use pretty_assertions::assert_eq;
@@ -32,6 +32,8 @@ const ORDER_COUNT: AliasName = alias("order_count");
 const RN: AliasName = alias("rn");
 const CUSTOMER_ID: AliasName = alias("customer_id");
 const RUNNING: AliasName = alias("running");
+const NEXT: AliasName = alias("next_total");
+const NEIGHBOURS: AliasName = alias("neighbours");
 const MANAGER: AliasName = alias("manager");
 const PARENT: AliasName = alias("parent");
 const ID: AliasName = alias("id");
@@ -277,6 +279,76 @@ async fn rows_frame_computes_running_sum() {
             (seeded.alice, rust_dec(10.00), rust_dec(10.00)),
             (seeded.alice, rust_dec(20.00), rust_dec(30.00)),
             (seeded.alice, rust_dec(30.00), rust_dec(60.00)),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.window-frame/test]    a frame that selects only the
+// following row reaches LAST_VALUE, so each row reads its neighbour and the
+// partition's last row reads nothing
+#[pgorm_macros::test]
+async fn a_following_frame_reads_only_the_next_row() {
+    let ctx = TestContext::new("pipeline_following_frame_next_row").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    let seeded = seed(&db).await;
+
+    let rows: Vec<(Decimal, Option<Decimal>)> = Pipeline::from(order::Entity)
+        .window(
+            last(O::Total).as_(NEXT),
+            by(O::CustomerId).sort_by(O::Total).rows(Some(1), Some(1)),
+        )
+        .filter_with(|binder| O::CustomerId.eq(binder.bind(seeded.alice)))
+        .select((O::Total, NEXT))
+        .sort(O::Total)
+        .into_tuple()
+        .unwrap()
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (rust_dec(10.00), Some(rust_dec(20.00))),
+            (rust_dec(20.00), Some(rust_dec(30.00))),
+            (rust_dec(30.00), None),
+        ]
+    );
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.window-frame/test]    a frame spanning the current
+// row reaches FIRST_VALUE, and the aggregate rendered beside it counts exactly
+// the rows that frame holds
+#[pgorm_macros::test]
+async fn a_spanning_frame_agrees_across_both_paths() {
+    let ctx = TestContext::new("pipeline_spanning_frame_both_paths").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    let seeded = seed(&db).await;
+
+    let rows: Vec<(Decimal, Decimal, i64)> = Pipeline::from(order::Entity)
+        .window(
+            (first(O::Total).as_(RUNNING), count_rows().as_(NEIGHBOURS)),
+            by(O::CustomerId).sort_by(O::Total).rows(Some(-1), Some(1)),
+        )
+        .filter_with(|binder| O::CustomerId.eq(binder.bind(seeded.alice)))
+        .select((O::Total, RUNNING, NEIGHBOURS))
+        .sort(O::Total)
+        .into_tuple()
+        .unwrap()
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (rust_dec(10.00), rust_dec(10.00), 2),
+            (rust_dec(20.00), rust_dec(10.00), 3),
+            (rust_dec(30.00), rust_dec(20.00), 2),
         ]
     );
 

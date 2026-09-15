@@ -8,3 +8,6 @@ The output alias also contains two quotes that become one in the subject.
 This original generated program therefore has two discrepancies. Keep both
 while minimizing and attributing them independently; neither is an expected
 passing result. Exact artifacts, hashes and replay arguments are retained here.
+
+The frame discrepancy is fixed (see the parent directory's closing section);
+the output-alias one belongs to `pipeline-quoted-output` and remains open.

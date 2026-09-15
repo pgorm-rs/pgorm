@@ -7133,6 +7133,13 @@ children (
                 kind @blocker
                 text "Ten findings in the relational family, every one differing only in a window column's value while the rows themselves and their order match. The clearest is runtime-101: a window over p_score partitioned by p_rank and ordered by p_id with frame start 1 and end 1, which is ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING. The subject answers 10, 10, null, 30 across p_id 2, 1, 4, 3 while the reference answers 10, null, 30, null over the same rows in the same order, so the two disagree about which neighbour each row sees rather than about which rows exist. runtime-1256 shows the same shape with 10 against 30 on a single row, and runtime-2396 with 2 against 1. Pre-existing rather than introduced by this session: all ten appear in the 2026-09-14 run as well. Which side is right is the first thing to settle and is not obvious from the artifacts, because both sides execute SQL against the same PostgreSQL and so the disagreement is between two translations of one program rather than between an implementation and a model. The useful first step is therefore to emit both SQL strings for runtime-101 and compare their OVER clauses directly, rather than reasoning about frame semantics in the abstract. Note the frame vocabulary in the pipeline reads offsets as rows relative to the current row with negative preceding and positive following, and a reference that mapped start and end to a preceding-and-following pair instead would produce exactly this kind of neighbour-by-one disagreement."
             }
+
+            {
+                at 2026-09-15T17:27:03.379715Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -7160,6 +7167,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "live_campaign.py runs against whatever native extension happens to be sitting in target/generative-build, without checking that it was built from the source now checked out. On 2026-09-15 a full profile ran against a bridge built at revision 721003fb while HEAD was three commits further on, so a fix landed in f80e61f1 was neither confirmed nor refuted and the run silently reported the defect it was supposed to have cleared. build.json already records the exact identity needed to catch this — source_sha256, revision, interpreter, rustc and the maturin version — and prepare compares that identity to decide whether to rebuild. Nothing calls prepare from the run path, so the evidence exists and is simply never consulted. Two separable behaviours are worth having: a run should refuse outright when the recorded source digest does not match the tree it is about to test, because a campaign that silently tests the wrong code can report fixed or still-broken about something that is not what is checked out, and that is worse than not running at all. Rebuilding automatically is the friendlier option but hides the cost of a thirty-second link behind what the caller thinks is a read-only operation, so refusing with the command to run is probably the better default. Second failure from the same session worth fixing alongside: that run also collided with three agents exercising the same PostgreSQL, and 2947 of its 2972 findings were FixtureFailure with the cause requested worker has no active owned fixture. The runner provisions per-worker fixtures and has no way to notice that another process is using the server, so it reported a catastrophic-looking result that meant nothing. An advisory lock taken on the maintenance database for the duration of a run would make that collision an immediate refusal rather than three thousand phantom findings."
+            }
+        )
+    }
+
+    {
+        id count-of-expression
+        title "Counting an expression skips its nulls"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T17:26:47.262751Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The second half of the window-semantics finding, which bundles two unrelated discrepancies; the frame half is fixed and this one is not. Counting an expression emits COUNT star rather than COUNT of that expression, so a null row is counted where SQL says it should be skipped. The two forms differ exactly when the counted expression is null for some row, which makes this quiet rather than loud: a column with no nulls gives the same answer either way, and the defect only appears once a null reaches the aggregate. That is also why it is worth fixing rather than documenting, since a count that silently includes nulls is the kind of wrong answer a caller has no reason to check. Plausibly accounts for some of the ten findings originally grouped under the window frame heading, a two-against-one difference among them being the obvious candidate, so the count should be re-derived from a clean run rather than assumed once the frame fix is confirmed. The pipeline already distinguishes the two spellings at its own surface, since count_rows and count are separate functions, so the loss is in the translation rather than in what the caller can express. Worth checking count_distinct in the same pass, which has the same shape and the same opportunity to collapse to a star."
             }
         )
     }
