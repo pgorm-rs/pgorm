@@ -6606,6 +6606,7 @@ children (
         id jiff-temporal
         title "Model PostgreSQL temporal types with jiff instead of chrono"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-09-13T12:03:21.049088Z
@@ -6662,6 +6663,13 @@ children (
                 kind @note
                 text "Three findings from the binding port worth keeping. First, the ExactTime guard in the Python binding was deleted rather than retyped, on evidence: jiff's codec builds a time via Time::midnight().checked_add(span), which errors on overflow where chrono's equivalent wrapped, so the driver itself refuses 24:00:00 and the guard could never fire. A dense sweep of 86,402 values plus the boundary cases confirmed every accepted value re-encodes byte-identically. The campaign's replay crate holds its own copy of that guard and the same reasoning is being re-derived there rather than assumed. Second, the jiff pin does not stay free of a timezone database in pgorm-python: pyo3 0.29.2 declares the jiff feature without default-features = false, so unification pulls in jiff-tzdb, jiff-tzdb-platform and jiff-static. Nothing in the binding reads a system zone, but the no-tzdb property cannot be restored without a change in pyo3. That also dragged in defmt-parser, which ships no license file, so its licence texts were taken from its sibling crate and recorded in the supplemental notices. Third, both Python fixture projects had Cargo.lock files with no jiff entry at all, because the earlier phases moved pgorm to jiff without refreshing them, so their --locked gates were already failing before the binding was touched. Regenerating them is part of this change, and it is worth remembering that a detached crate's lock does not follow the workspace."
             }
+
+            {
+                at 2026-09-14T23:54:19.382561Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -6669,6 +6677,7 @@ children (
         id codegen-datetime-crate-option
         title "Codegen's date-time crate option generates code that compiles"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-13T12:22:02.211121Z
@@ -6682,6 +6691,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-14T23:54:18.092258Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -6725,6 +6741,13 @@ children (
                 kind @note
                 text "The subject returns decimal 0 where the independent reference returns 0.00, both as a scalar and inside a decimal array. Two defects in the 2026-09-14 full profile. The values are numerically equal and differ only in scale. Unlike the other three new classes this one is partly a contract question rather than unambiguously a defect: whether the campaign's decimal comparison should be scale-sensitive is a decision the oracle currently answers yes, and PostgreSQL does carry scale as part of a numeric's identity. Recorded rather than normalized away, because silently widening the comparison would remove the campaign's ability to see scale loss at all. Resolving it means deciding whether pgorm should preserve the scale PostgreSQL returned, or whether the oracle should compare numerically; the first is the stronger guarantee."
             }
+
+            {
+                at 2026-09-15T00:03:21.513184Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Not a contract question after all, and the oracle was right to be scale-sensitive. The earlier framing rested on reading the difference as pgorm and the reference disagreeing about whether scale is part of a numeric's identity. The campaign artifacts settle it the other way. In runtime-1283 the same row carries both kinds of field: literal0 reads 0.00 on the subject and 0.00 on the reference, while bound0 reads 0 on the subject and 0.00 on the reference. Scale survives the literal path and is lost on the bound-parameter path, which is the identical signature to bound-datetime-max-precision and not a disagreement about semantics at all. PostgreSQL itself is unambiguous that scale is part of the value: scale(0.00::numeric) is 2, scale(0::numeric) is 0, and the two render as different text. Measured the two paths directly against a live PostgreSQL 16.15 through an example rather than reasoning about them. The read path is clean: every value tested decodes with the scale PostgreSQL reported, as a scalar and inside an array, including 0.00 at scale 2 and 0.000000 at scale 6. The write path loses scale for zero and only for zero. Sent as bound parameters, 0.00 comes back scale 0 and 0.000000 comes back scale 0, while 1.50, 1.5, 12.3400, 0.10 and 100.00 all round-trip their scale exactly. The cause is one line upstream in rust_decimal 1.43.0, src/postgres/common.rs line 70, where to_postgres takes an is_zero shortcut that returns a PostgresDecimal with scale hardcoded to 0 and an empty digit vector, discarding self.scale(); every other path through that function reads self.scale() a few lines below. pgorm reaches it through bind_exact in src/executor/cursor_bind.rs, which hands Value::Decimal straight to rust_decimal's ToSql, so nothing of pgorm's own is wrong, and arrays inherit the same fault because each element re-enters ValueHolder. The chosen fix is to encode zero-with-scale in pgorm's own binding layer rather than fork rust_decimal for one line: the PostgreSQL numeric wire form for zero is fully determined and eight bytes long, ndigits 0, weight 0, sign 0x0000 and dscale set to the value's own scale, with no digit words, and cursor_bind.rs already owns type-aware wire encoding for other values. That also fixes the Python binding for free, since it builds the same Value. Worth noting the asymmetry this closes: the read side already refuses to lose scale, because ExactDecimal in pgorm-python re-encodes what it decoded and errors if the scale differs, so the binding was strict in one direction and silently lossy in the other."
+            }
         )
     }
 
@@ -6752,6 +6775,34 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "A pipeline combining distinct, sort and take_range selects different rows from the independent reference. One defect in the 2026-09-14 full profile, item runtime-947: the subject returns a single row with p_score 10 and p_rank 1, while the reference returns two, p_score 30 and p_score NULL, both with p_rank 2. This is neither a reordering nor a formatting difference but a genuinely different set of rows, so it is the most serious class in that run. The same three-stage shape recurs in the four incompletes of the same run, which are plausibly the filed pipeline-native-panic, so the interaction of deduplication with an ordered range deserves attention beyond this single case."
+            }
+        )
+    }
+
+    {
+        id pipeline-hidden-order
+        title "A nested source reads only columns its CTE exposes"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T00:00:09.252624Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Filed late: referenced as an existing finding by nested-source-from-entry but never given a node of its own. A nested pipeline source reads columns from a CTE that never exposed them, and PostgreSQL rejects the SQL with SQLSTATE 42703, column \"id\" does not exist. Found at seed 20260911 index 66 in a grammar run, so it carries no runtime-NNN campaign id. The emitted SQL is retained in full: table_1 is a CTE projecting id AS p_id, tenant AS p_tenant, name AS p_name, score AS p_score and rank AS p_rank, and table_2 then selects id AS p_id and name AS p_name from table_1, naming the source columns the rename replaced. The trailing ORDER BY on the outer select also keys on p_id and the other renamed names. The reference oracle executed normally. Evidence in security/generative/findings/pipeline-hidden-order/, including compiled.json with the SQL and its single bound i32 parameter, the original 58-node program, and a 33-node reduced reproducer whose fixture has no rows at all, since the rejection happens at plan time rather than on data. The shrink predicate is pinned to the subject's own error rather than to a verdict mismatch, with witness error, DatabaseError, 42703, and that precision earned its place: an earlier reduction reached 13 nodes but failed in PRQL compilation instead, a different defect wearing the same coarse reason, and the witness rejected it. Not regenerated in the 2026-09-14 full profile: there are zero 42703 records across all fifteen thousand runtime items in that run. Related but distinct from nested-source-from-entry, which is 42P01 on a table absent from the FROM clause rather than 42703 on a column a CTE never exposed; both are nested sources referring outward to something the enclosing scope no longer offers, so a single cause is plausible and worth testing before either is treated separately. Attribution is blocked on the same standalone Rust replay both findings record."
+            }
+        )
+    }
+
+    {
+        id pipeline-native-panic
+        title "A generated pipeline compiles to SQL without panicking"
+        kind @fix
+        log (
+            {
+                at 2026-09-14T23:59:57.611286Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Filed late: referenced as an existing finding by two other defect nodes but never given a node of its own. The fault is a Rust panic inside prqlc 0.13.14, not inside pgorm and not in the campaign harness. The site is an Option::expect at prqlc/src/sql/gen_expr.rs:687, `name.expect(\"name of this column has not been to be set before generating SQL\")`, reached from Pipeline::into_sql during SQL generation. PyO3 surfaces it as pyo3_runtime.PanicException, a BaseException ordinary handlers cannot swallow, and the campaign executor catches it at executor.py:124 and records class UnexpectedNativePanic with that cause string. Because the panic happens while generating SQL, no SQL is ever emitted, so the item is recorded incomplete rather than defect: the subject produced no observation to compare and the reference side ran normally. Five items exhibit it. One is the originally filed copy at seed 20260911 index 83, whose trace shape is source, from, select, derive, sort, take_range, select, distinct, filter, source, from, select; evidence in security/generative/findings/pipeline-native-panic/, never minimised. Four more regenerated in the 2026-09-14 full profile at seed 20260913 in the pipeline family, all reduced: runtime-3287 is sort, take_range, select, join, distinct, and runtime-3722, runtime-3737 and runtime-4262 are all sort, take_range, select, distinct, select. Each of those four carries a standalone reduced reproducer in both languages, and the Rust one is five pgorm calls, which makes it the strongest attribution lead available. Correction to the acceptance document, which states at security/generative/acceptance/2026-09-14.md that these four retain no panic message and that the attribution is therefore plausible rather than established: all four oracle.json files do carry UnexpectedNativePanic with the exact cause, and they are the only four files among fifteen thousand runtime records containing that string. The attribution is established. Since pgorm already carries a pinned prqlc fork at necessary-nu/prql for the deterministic star expansion fix, a second commit on that fork is the natural route, but the expect must be understood before it is replaced: an unset column name at that point may be a symptom of the same nested-source scope loss that pipeline-hidden-order and nested-source-from-entry exhibit, in which case turning the panic into an error would hide a wrong-SQL defect rather than fix it."
             }
         )
     }
