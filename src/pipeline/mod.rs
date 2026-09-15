@@ -171,6 +171,7 @@ mod census;
 mod error;
 mod expr;
 mod funcs;
+mod naming;
 mod sources;
 mod terminal;
 mod window;

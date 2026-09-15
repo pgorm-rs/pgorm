@@ -260,6 +260,91 @@ pub(super) fn projected(node: &PlExpr) -> Projected<'_> {
     }
 }
 
+/// The verb a stage calls — `select`, `derive`, `sort`, `join` — or `None`
+/// for a stage that is not a plain call of a bare name.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn stage_verb(node: &PlExpr) -> Option<&str> {
+    let ExprKind::FuncCall(call) = &node.kind else {
+        return None;
+    };
+    let ExprKind::Ident(ident) = &call.name.kind else {
+        return None;
+    };
+    ident.path.is_empty().then_some(ident.name.as_str())
+}
+
+/// The tuple a single-argument stage carries — a projection's items, a
+/// sort's keys — reachable for replacement in place.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn tuple_items_mut(node: &mut PlExpr) -> Option<&mut Vec<PlExpr>> {
+    let ExprKind::FuncCall(call) = &mut node.kind else {
+        return None;
+    };
+    let ExprKind::Tuple(items) = &mut call.args.first_mut()?.kind else {
+        return None;
+    };
+    Some(items)
+}
+
+/// The name a projected item exposes to the stages after it: its alias, or
+/// the last segment of the column it names.
+///
+/// `None` is an expression left unnamed — which is precisely what `this`
+/// cannot expand, because there is nothing to file it in the namespace under.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn exposed_name(node: &PlExpr) -> Option<&str> {
+    if let Some(alias) = &node.alias {
+        return Some(alias);
+    }
+    match &node.kind {
+        ExprKind::Ident(ident) => Some(&ident.name),
+        _ => None,
+    }
+}
+
+/// The whole dotted path of a column reference — `fruit.name` — which is the
+/// identity a projection item and a sort key naming it have in common.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn column_path(node: &PlExpr) -> Option<String> {
+    let ExprKind::Ident(ident) = &node.kind else {
+        return None;
+    };
+    let mut path = ident.path.join(".");
+    if !path.is_empty() {
+        path.push('.');
+    }
+    path.push_str(&ident.name);
+    Some(path)
+}
+
+/// The column a sort key names, seen through the `desc`/`asc` marker that
+/// wraps it.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn sort_key_path(key: &PlExpr) -> Option<String> {
+    match &key.kind {
+        ExprKind::Unary(node) => sort_key_path(&node.expr),
+        _ => column_path(key),
+    }
+}
+
+/// Repoint a sort key at an unqualified name, keeping its direction marker.
+///
+/// `false` when the key is not a column reference and so has no name to
+/// move — an ordering computed from an expression cannot follow its relation
+/// across a binding boundary.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn rebind_sort_key(key: &mut PlExpr, name: &str) -> bool {
+    match &mut key.kind {
+        ExprKind::Unary(node) => rebind_sort_key(&mut node.expr, name),
+        ExprKind::Ident(ident) => {
+            ident.path.clear();
+            ident.name = name.to_owned();
+            true
+        }
+        _ => false,
+    }
+}
+
 /// Every alias set anywhere in `node`, in construction order.
 pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
     if let Some(alias) = &node.alias {

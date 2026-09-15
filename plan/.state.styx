@@ -742,7 +742,8 @@ assertions (
     {id pipeline-native-panic, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:28:05.205873Z}
     {id pipeline-hidden-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:05.303529Z}
     {id nested-source-from-entry, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:14.356897Z}
-    {id literal-temporal-precision, kind @doing, author "brendan@necessary.nu", at 2026-09-15T12:47:52.655356Z}
+    {id literal-temporal-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:48:16.275282Z}
+    {id distinct-drops-computed-column, kind @doing, author "brendan@necessary.nu", at 2026-09-15T13:11:53.447043Z}
 )
 
 impl_evidence (

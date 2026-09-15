@@ -10,6 +10,7 @@ use crate::EntityTrait;
 use super::adapter::{self, PlExpr, Projected};
 use super::binder::Binder;
 use super::expr::{Expr, ExprList, nodes_of};
+use super::naming;
 use super::window::Over;
 
 /// How prqlc will expand `this` — the whole-relation reference
@@ -55,8 +56,10 @@ impl Columns {
                     None => source = Some(name),
                 },
                 // Nameless, so `this` never expands it and it takes no
-                // position among the ones it does. Settling would not give
-                // it one back, so it is simply not this question's business.
+                // position among the ones it does — this question is about
+                // the order of the columns that do have one. Reaching the
+                // column at all is a matter of giving it a name, which
+                // `distinct` does before it reads this shape back.
                 Projected::Anonymous => {}
             }
         }
@@ -164,6 +167,18 @@ pub struct Pipeline {
     /// in separate queries, in the order the stages were written.
     // [spec:pgorm:req:pipeline.compose]
     pub(super) ranged: bool,
+    /// The `sort` stage that still describes the relation's order, or `None`
+    /// while nothing has ordered it since the columns were last replaced.
+    ///
+    /// PRQL's `group` resets the order, and prqlc's flattener deletes the
+    /// standalone `sort` that a group follows — so the ordering a
+    /// [`distinct`](Pipeline::distinct) inherits has to be written again on
+    /// the far side of the deduplication. That is exactly the `distinct` then
+    /// `sort` shape, which renders the `DISTINCT` in a binding with the
+    /// `ORDER BY` outside it, where PostgreSQL's rule that an ordering under
+    /// `DISTINCT` must be projected cannot bite.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) ordering: Option<PlExpr>,
 }
 
 /// Which rows a [`join`](Pipeline::join) keeps.
@@ -357,6 +372,7 @@ impl Grouped {
         // The relation is the keys followed by the aggregates, which are
         // introduced names and so trail them either way.
         self.pipeline.columns = Columns::of(&self.keys).with_introduced();
+        self.pipeline.ordering = None;
         let stage = adapter::call(
             "group",
             vec![
@@ -381,6 +397,7 @@ impl Pipeline {
             deduped: false,
             columns: Columns::Sourced { introduced: false },
             ranged: false,
+            ordering: None,
         };
         let reference = pipeline.embed(source.into_source());
         pipeline.stages.push(adapter::call("from", vec![reference]));
@@ -399,6 +416,7 @@ impl Pipeline {
             deduped: false,
             columns: Columns::Sourced { introduced: false },
             ranged: false,
+            ordering: None,
         }
     }
 
@@ -465,6 +483,16 @@ impl Pipeline {
 
     fn staged(mut self, nodes: Vec<PlExpr>) -> Self {
         self.stages.extend(nodes);
+        self
+    }
+
+    /// Append a `sort` stage and remember it as the order the relation now
+    /// carries, so a deduplication after it can restate the ordering a
+    /// `group` would otherwise reset.
+    // [spec:pgorm:req:pipeline.compose]
+    fn ordered_by(mut self, sort: PlExpr) -> Self {
+        self.ordering = Some(sort.clone());
+        self.stages.push(sort);
         self
     }
 
@@ -558,6 +586,10 @@ impl Pipeline {
 
     fn select_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
         self.columns = Columns::of(&nodes);
+        // A projection may drop the very columns an earlier sort ordered by,
+        // so the ordering it described no longer names anything this relation
+        // can be sorted on again.
+        self.ordering = None;
         self.stage(adapter::call("select", vec![adapter::tuple(nodes)]))
             .reshaping("select")
     }
@@ -627,14 +659,26 @@ impl Pipeline {
     fn window_nodes(mut self, nodes: Vec<PlExpr>, over: Over) -> Self {
         self.columns = self.columns.with_introduced();
         let derive_call = adapter::call("derive", vec![adapter::tuple(nodes)]);
-        self.staged(over.wrap(derive_call))
+        let staged = over.wrap(derive_call);
+        // An unpartitioned window's own ordering is a real pipeline stage, so
+        // it orders the output too, and a deduplication after it inherits
+        // that order exactly as it inherits a `sort`'s. A partitioned one
+        // nests its ordering inside the `group` instead, where it orders only
+        // the window.
+        if let Some(sort) = staged
+            .iter()
+            .find(|node| adapter::stage_verb(node) == Some("sort"))
+        {
+            self.ordering = Some(sort.clone());
+        }
+        self.staged(staged)
     }
 
     /// Sort by these keys ([`desc`](super::ExprOps::desc) marks one
     /// descending).
     // [spec:pgorm:req:pipeline.surface+3]
     pub fn sort(self, keys: impl ExprList<'static>) -> Self {
-        self.stage(adapter::call("sort", vec![adapter::tuple(nodes_of(keys))]))
+        self.ordered_by(adapter::call("sort", vec![adapter::tuple(nodes_of(keys))]))
     }
 
     /// Sort by keys computed with runtime values bound in the closure.
@@ -644,7 +688,7 @@ impl Pipeline {
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
     {
         let nodes = self.bound_nodes(f);
-        self.stage(adapter::call("sort", vec![adapter::tuple(nodes)]))
+        self.ordered_by(adapter::call("sort", vec![adapter::tuple(nodes)]))
     }
 
     /// Keep the first `rows` rows (`LIMIT`).
@@ -753,6 +797,10 @@ impl Pipeline {
         if self.deduped {
             self.settle();
         }
+        // The combined relation is not the one the ordering described, and
+        // for `intersect` and `remove` it does not even answer to the same
+        // names.
+        self.ordering = None;
         let reference = self.embed(other.into_source());
         self.stage(adapter::call(op, vec![reference]))
     }
@@ -769,19 +817,62 @@ impl Pipeline {
     /// than before it. Reading from a binding leaves the group a single
     /// freshly exposed relation, whose columns are that binding's projection
     /// in its own order with nothing in front of them.
+    ///
+    /// Because the key is a namespace, it reaches only the columns that have
+    /// a name of their own: an unnamed expression and the loser of a name
+    /// collision are both absent from it — and so from the result, which is
+    /// what the key projects. The projection is made addressable first, which
+    /// gives those columns names and settles the relation behind them.
+    ///
+    /// A `sort` in front of the deduplication is restated behind it. PRQL's
+    /// `group` resets the order, so an ordering written before one is undone
+    /// rather than applied; writing it again afterwards is the
+    /// `distinct` then `sort` shape, which renders the `DISTINCT` in a
+    /// binding and the `ORDER BY` outside it.
+    ///
+    /// ```
+    /// # use pgorm::pipeline::{ExprOps, Pipeline, alias, col};
+    /// # let accounts = alias("accounts");
+    /// let (sql, _) = Pipeline::from(accounts)
+    ///     .select((col(accounts, alias("id")), col(accounts, alias("name"))))
+    ///     .sort(col(accounts, alias("id")))
+    ///     .distinct()
+    ///     .into_sql()?;
+    /// assert_eq!(
+    ///     sql,
+    ///     "WITH table_0 AS (SELECT DISTINCT id, name FROM accounts) \
+    ///      SELECT id, name FROM table_0 ORDER BY id"
+    /// );
+    /// # Ok::<_, pgorm::pipeline::PipelineError>(())
+    /// ```
     // [spec:pgorm:req:pipeline.compose]
     pub fn distinct(mut self) -> Self {
-        if self.ranged || !self.columns.ordered() {
+        let naming = naming::disambiguate(&mut self.stages);
+        let ordering = self.ordering.take();
+        let settled = naming.renamed || self.ranged || !self.columns.ordered();
+        if settled {
             self.settle();
         }
         self.deduped = true;
-        self.stage(adapter::call(
+        let deduplicated = self.stage(adapter::call(
             "group",
             vec![
                 adapter::ident("this"),
                 adapter::call("take", vec![adapter::lit_int(1)]),
             ],
-        ))
+        ));
+        // Behind a binding the relation answers to bare names alone, so a key
+        // written against the source it came from has to be repointed — and
+        // one there is no name to repoint is left unrestated, which is the
+        // order the pipeline had before.
+        let restated = match ordering {
+            Some(sort) if settled => naming::rebound_sort(sort, &naming),
+            unsettled => unsettled,
+        };
+        match restated {
+            Some(sort) => deduplicated.ordered_by(sort),
+            None => deduplicated,
+        }
     }
 
     fn bound_nodes<F, const N: usize>(&mut self, f: F) -> Vec<PlExpr>

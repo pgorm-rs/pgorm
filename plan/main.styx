@@ -6916,6 +6916,13 @@ children (
                 kind @blocker
                 text "Found while fixing pipeline-renamed-column-order and distinct-sort-range-rows, and left unfixed there because it is a distinct fault of the same prqlc surface. A projection carrying an expression with no name of its own, for example select of a.id, a.score times 2, and a.name, loses that expression entirely once the relation is deduplicated: it is absent from the deduplication key and absent from the result, so the query silently returns fewer columns than were asked for. The cause is the same namespace-tree resolution of whole-relation `this` that the two fixed defects rest on. prqlc files a name into a module and orders the tree by name, and an expression that was never named has nothing to file, so walking the tree cannot recover it. Confirmed identical whether or not the pipeline is settled into its own binding first, which rules out the settle mechanism as either cause or cure. This is the most serious of the three siblings, because the other two reorder or drop a column the caller can still see is missing from the shape, whereas a computed column vanishing from a deduplicated projection changes the returned tuple without any error. Worth checking whether the same holds for an explicitly aliased computed column, since that would separate the fault cleanly into naming rather than computation."
             }
+
+            {
+                at 2026-09-15T13:11:53.447043Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -6951,6 +6958,7 @@ children (
         id literal-temporal-precision
         title "An inlined temporal literal keeps its sub-second digits"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T00:45:01.648858Z
@@ -6964,6 +6972,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T12:48:16.275282Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

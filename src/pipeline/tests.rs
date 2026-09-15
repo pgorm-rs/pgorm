@@ -1688,3 +1688,168 @@ fn a_dropped_sort_key_still_reaches_order_by() {
         assert!(carrier.contains(key), "{key} is not projected:\n{sql}");
     }
 }
+
+// [spec:pgorm:req:pipeline.compose/test]    a projected expression with no name
+// of its own survives the deduplication. prqlc resolves the group's `this` over
+// a namespace keyed by name, and an unnamed expression is filed in it nowhere,
+// so the column used to be absent from the key — and so from the result, which
+// came back two columns wide where three were asked for, with no error.
+#[test]
+fn an_unnamed_computed_column_survives_deduplication() {
+    let projection = || {
+        accounts().select((
+            col(ACCOUNTS, ID),
+            col(ACCOUNTS, alias("score")).mul(2),
+            col(ACCOUNTS, alias("name")),
+        ))
+    };
+    // Undeduplicated, the expression was never in question.
+    assert_eq!(
+        sql_of(projection()),
+        "SELECT id, score * 2, name FROM fixture.accounts"
+    );
+    assert_eq!(
+        sql_of(projection().distinct()),
+        "WITH table_0 AS (SELECT id, score * 2 AS _col_1, name FROM fixture.accounts) \
+         SELECT DISTINCT id, _col_1, name FROM table_0"
+    );
+
+    // The fault is naming, not computation: a name of the caller's own already
+    // reached the key, and still does, with nothing minted over it.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((
+                    col(ACCOUNTS, ID),
+                    col(ACCOUNTS, alias("score")).mul(2).as_(alias("doubled")),
+                    col(ACCOUNTS, alias("name")),
+                ))
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT id, score * 2 AS doubled, name FROM fixture.accounts) \
+         SELECT DISTINCT id, doubled, name FROM table_0"
+    );
+
+    // A minted name steps around a column already spelled that way rather
+    // than colliding with it.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((
+                    col(ACCOUNTS, ID),
+                    col(ACCOUNTS, alias("score")).mul(2),
+                    col(ACCOUNTS, alias("name")).as_(alias("_col_1")),
+                ))
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT id, score * 2 AS _col_2, name AS _col_1 FROM fixture.accounts) \
+         SELECT DISTINCT id, _col_2, _col_1 FROM table_0"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    two columns drawn from different
+// sources under one bare name both survive. Only one of them can be filed under
+// that name in the namespace `this` expands, so the loser used to be dropped
+// from the key and from the result — and `id` and `name` collide between almost
+// any pair of joined tables.
+#[test]
+fn a_collided_column_name_survives_deduplication() {
+    let joined = || {
+        Pipeline::from(cake::Entity).join(
+            JoinSide::Inner,
+            fruit::Entity,
+            cake::Column::Id.eq(fruit::Column::CakeId),
+        )
+    };
+    assert_eq!(
+        sql_of(
+            joined()
+                .select((cake::Column::Id, fruit::Column::Name, cake::Column::Name))
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT cake.id, fruit.name AS _col_1, cake.name FROM cake \
+         INNER JOIN fruit ON cake.id = fruit.cake_id) \
+         SELECT DISTINCT id, _col_1, name FROM table_0"
+    );
+
+    // The later of the two keeps the bare name, matching both prqlc's own
+    // namespace and its rendering, so a stage written against the surviving
+    // column still means what it meant. Naming it explicitly is the caller's
+    // way of choosing which one that is.
+    assert_eq!(
+        sql_of(
+            joined()
+                .select((
+                    cake::Column::Id,
+                    fruit::Column::Name,
+                    Expr::from(cake::Column::Name).as_(alias("cake_name")),
+                ))
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT cake.id, fruit.name, cake.name AS cake_name FROM cake \
+         INNER JOIN fruit ON cake.id = fruit.cake_id) \
+         SELECT DISTINCT id, name, cake_name FROM table_0"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a sort standing in front of a
+// deduplication still orders the result. PRQL's `group` resets the order and
+// prqlc's flattener deletes the standalone `sort` a group follows, so the
+// ordering was undone rather than applied and the rows came back deduplicated
+// but unordered. Restating it behind the group is the `distinct` then `sort`
+// shape, which already worked.
+#[test]
+fn a_sort_before_a_deduplication_still_orders() {
+    let projection = || accounts().select((col(ACCOUNTS, ID), col(ACCOUNTS, alias("name"))));
+    let ordered = "WITH table_0 AS (SELECT DISTINCT id, name FROM fixture.accounts) \
+                   SELECT id, name FROM table_0 ORDER BY id";
+    assert_eq!(
+        sql_of(projection().sort(col(ACCOUNTS, ID)).distinct()),
+        ordered
+    );
+    // Written the other way round it already worked, and renders identically.
+    assert_eq!(
+        sql_of(projection().distinct().sort(col(ACCOUNTS, ID))),
+        ordered
+    );
+
+    // The ordering belongs to a query of its own, never to the deduplicating
+    // one — PostgreSQL requires an ORDER BY under DISTINCT to be projected
+    // (42P10), and an ordering restated behind a binding never is.
+    let (query, _) = ordered
+        .rsplit_once(" ORDER BY ")
+        .expect("the restated ordering is the outermost clause");
+    let last = query
+        .rfind("SELECT")
+        .expect("the ordering has a query to belong to");
+    assert!(
+        !query[last..].starts_with("SELECT DISTINCT"),
+        "the ordering sits on the deduplicating select: {ordered}"
+    );
+
+    // A star relation orders by a column the projection never listed, which a
+    // binding still exposes.
+    assert_eq!(
+        sql_of(Pipeline::from(INVOICE).sort(total()).distinct()),
+        "WITH table_0 AS (SELECT DISTINCT * FROM invoice) SELECT * FROM table_0 ORDER BY total"
+    );
+
+    // Settled, the key follows its column: past the binding boundary the
+    // relation answers to bare names alone, and to the minted one where the
+    // projection had to rename.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((
+                    col(ACCOUNTS, ID),
+                    col(ACCOUNTS, alias("score")).mul(2),
+                    col(ACCOUNTS, alias("name")),
+                ))
+                .sort(col(ACCOUNTS, ID).desc())
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT id, score * 2 AS _col_1, name FROM fixture.accounts), \
+         table_1 AS (SELECT DISTINCT id, _col_1, name FROM table_0) \
+         SELECT id, _col_1, name FROM table_1 ORDER BY id DESC"
+    );
+}

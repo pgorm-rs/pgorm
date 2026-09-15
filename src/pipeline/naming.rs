@@ -1,0 +1,188 @@
+//! Making a projection addressable, so a deduplication can key on all of it.
+//!
+//! prqlc resolves `this` — the whole-relation reference
+//! [`distinct`](super::Pipeline::distinct) deduplicates on — by walking a
+//! namespace keyed by name. Two ordinary projections have columns that
+//! namespace cannot hold: an expression left unnamed is filed nowhere at all,
+//! and of two columns competing for one name only the last is filed. Either
+//! way the column is missing from the deduplication key *and* from the
+//! result, because the key is what the deduplicated relation projects.
+//!
+//! Naming is what makes a column addressable, so this module decides which
+//! items need a name of their own and what to call them — and, because a
+//! settled relation answers to bare names alone, how a sort key follows the
+//! column it names across that boundary.
+
+use std::collections::{HashMap, HashSet};
+
+use super::adapter::{self, PlExpr};
+
+/// The prefix a minted name carries: distinct from prqlc's own `_expr_N` so
+/// the two sequences cannot collide, and outside the reserved set
+/// [`into_sql`](super::Pipeline::into_sql) screens for.
+const MINTED: &str = "_col_";
+
+/// What making a projection addressable changed.
+// [spec:pgorm:req:pipeline.compose]
+#[derive(Debug, Default)]
+pub(super) struct Naming {
+    /// Whether any item gained a name it did not carry before.
+    ///
+    /// Renaming moves a column from the submodule of the source that
+    /// qualified it to the top level of the namespace, which is a different
+    /// column shape than the one the pipeline has been tracking. Settling at
+    /// a binding boundary re-exposes the whole projection as one input's own
+    /// columns — the shape that needs no tracking at all — so a renamed
+    /// projection settles rather than having its shape re-derived.
+    pub(super) renamed: bool,
+    /// Where a column ended up, keyed by the dotted path it had before:
+    /// what a sort key naming that column has to follow.
+    pub(super) exposed: HashMap<String, String>,
+}
+
+/// Give every column the trailing projection stages introduce a name of its
+/// own, rewriting those stages in place.
+///
+/// Only the stages back to the last one that replaced the relation's columns
+/// are considered: those are the ones whose items are still the projection.
+/// Of two items competing for a name the *later* keeps it, which matches both
+/// prqlc's namespace (the last filed wins) and its rendering (the earlier is
+/// the one it renames), so a reference written against the surviving column
+/// still means what it meant.
+///
+/// A `join` between the projection and here adds columns that are not read
+/// off any stage, so a collision with the far side is not caught; within what
+/// a projection lists, every collision is.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn disambiguate(stages: &mut [PlExpr]) -> Naming {
+    let projections = projection_stages(stages);
+    let mut names: Vec<Option<String>> = Vec::new();
+    for &index in &projections {
+        let Some(items) = adapter::tuple_items_mut(&mut stages[index]) else {
+            continue;
+        };
+        names.extend(
+            items
+                .iter()
+                .map(|item| adapter::exposed_name(item).map(str::to_owned)),
+        );
+    }
+
+    let minted = mint(&names);
+    if minted.is_empty() {
+        return Naming::default();
+    }
+
+    let mut naming = Naming {
+        renamed: true,
+        exposed: HashMap::new(),
+    };
+    let mut position = 0;
+    for &index in &projections {
+        let items = {
+            let Some(items) = adapter::tuple_items_mut(&mut stages[index]) else {
+                continue;
+            };
+            std::mem::take(items)
+        };
+        let renamed = items
+            .into_iter()
+            .map(|item| {
+                let at = position;
+                position += 1;
+                let Some(name) = minted.get(&at) else {
+                    return item;
+                };
+                if let Some(path) = adapter::column_path(&item) {
+                    naming.exposed.insert(path, name.clone());
+                }
+                adapter::aliased(item, name.clone())
+            })
+            .collect();
+        if let Some(items) = adapter::tuple_items_mut(&mut stages[index]) {
+            *items = renamed;
+        }
+    }
+    naming
+}
+
+/// A sort stage repointed at the names a settled binding exposes.
+///
+/// Behind a CTE the relation's columns answer to their own bare names and
+/// nothing else, so a key still qualified by the source it came from no
+/// longer resolves, and a key whose column was renamed has to follow it.
+/// `None` when some key is not a column reference — there is no bare name to
+/// find for an ordering computed from an expression, and leaving the order as
+/// it was beats emitting SQL prqlc refuses.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn rebound_sort(mut sort: PlExpr, naming: &Naming) -> Option<PlExpr> {
+    let keys = adapter::tuple_items_mut(&mut sort)?;
+    for key in keys.iter_mut() {
+        let path = adapter::sort_key_path(key)?;
+        let exposed = match naming.exposed.get(&path) {
+            Some(minted) => minted.clone(),
+            None => path.rsplit('.').next()?.to_owned(),
+        };
+        if !adapter::rebind_sort_key(key, &exposed) {
+            return None;
+        }
+    }
+    Some(sort)
+}
+
+/// Which positions need a name minted, and what to call them: the ones left
+/// unnamed, and the ones a later item takes the name of.
+///
+/// A minted name is checked against every name already in play and against
+/// the ones minted before it, so a projection that happens to carry a column
+/// spelled like one of these is stepped around rather than collided with.
+fn mint(names: &[Option<String>]) -> HashMap<usize, String> {
+    let mut taken: HashSet<String> = names.iter().flatten().cloned().collect();
+    let mut minted = HashMap::new();
+    for (position, name) in names.iter().enumerate() {
+        let unaddressable = match name {
+            None => true,
+            Some(name) => names[position + 1..]
+                .iter()
+                .flatten()
+                .any(|later| later == name),
+        };
+        if !unaddressable {
+            continue;
+        }
+        let mut suffix = position;
+        let mut candidate = format!("{MINTED}{suffix}");
+        while taken.contains(&candidate) {
+            suffix += 1;
+            candidate = format!("{MINTED}{suffix}");
+        }
+        taken.insert(candidate.clone());
+        minted.insert(position, candidate);
+    }
+    minted
+}
+
+/// The indices of the stages whose items are still the relation's own
+/// projection: every `select` and `derive` back to, and including, the last
+/// stage that replaced the relation's columns.
+///
+/// The walk stops at anything whose columns cannot be read off the stage
+/// itself — a source's own, an aggregate's, a set operation's — and leaves
+/// what it did not reach alone, so stopping early costs completeness and
+/// never correctness.
+fn projection_stages(stages: &[PlExpr]) -> Vec<usize> {
+    let mut found = Vec::new();
+    for (index, stage) in stages.iter().enumerate().rev() {
+        match adapter::stage_verb(stage) {
+            Some("select") => {
+                found.push(index);
+                break;
+            }
+            Some("derive") => found.push(index),
+            Some("from" | "group" | "append" | "intersect" | "remove") => break,
+            _ => {}
+        }
+    }
+    found.reverse();
+    found
+}
