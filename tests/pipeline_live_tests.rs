@@ -18,8 +18,8 @@ use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use jiff::{Timestamp, tz::Offset};
 use pgorm::pipeline::{
-    AliasName, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows, row_number,
-    sort_by, sum,
+    AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows,
+    named_runtime, row_number, sort_by, sum,
 };
 use pgorm::{ConnectionTrait, Schema, entity::*, set};
 use pretty_assertions::assert_eq;
@@ -434,6 +434,117 @@ async fn remove_pipeline_subtracts_matching_rows() {
 
     let rows: Vec<(i32,)> = pipeline.into_tuple().unwrap().all(&db).await.unwrap();
     assert_eq!(rows, vec![(seeded.alice,), (seeded.alice,)]);
+
+    ctx.delete().await;
+}
+
+/// A nested source may only read what the relation under it exposes.
+///
+/// prqlc built a `RelationInstance` for a declared table with an empty
+/// `cid_redirects` map — at that point the table is only a `TId` whose output
+/// columns do not exist yet, and nothing filled the map in once they did. An
+/// ordering inherited from a CTE is phrased in that CTE's interior cids, so
+/// translating it through an empty map was the identity and the interior cids
+/// leaked outward. Appended to an enclosing SELECT they re-materialised the
+/// expression that defined them, naming source columns a rename had replaced —
+/// PostgreSQL rejects that with SQLSTATE 42703 (`pipeline-hidden-order`).
+///
+/// It is a rejection rather than a wrong answer, so the assertion is that the
+/// SQL executes at all. The shape is the filed reproducer's: the source nested
+/// twice, every column renamed, a derived constant, an ordering over all of
+/// them, and a nested projection that keeps only some.
+// [spec:pgorm:req:pipeline.compose/test]
+#[pgorm_macros::test]
+async fn a_nested_source_reads_only_exposed_columns() {
+    let ctx = TestContext::new("pipeline_nested_source_scope").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    // The filed reproducer's shape exactly: the source nested twice, every
+    // column renamed, a derived constant, an ordering over all of them, then a
+    // nested projection that keeps only some — so the dropped sort keys have to
+    // be carried through a CTE boundary that no longer names them.
+    let origin = pgorm::pgorm_query::Alias::new("origin");
+    let renamed = Pipeline::from(named_runtime(
+        named_runtime(Pipeline::from(customer::Entity), origin.clone()),
+        origin.clone(),
+    ))
+    .select((
+        col(origin.clone(), ID).as_runtime(pgorm::pgorm_query::Alias::new("p_id")),
+        col(origin.clone(), NAME).as_runtime(pgorm::pgorm_query::Alias::new("p_name")),
+    ))
+    .derive(Expr::from(7i64).as_runtime(pgorm::pgorm_query::Alias::new("nonce")))
+    .sort((alias("p_id"), alias("p_name"), alias("nonce")));
+
+    let inner = pgorm::pgorm_query::Alias::new("nested_inner");
+    let narrowed = Pipeline::from(named_runtime(renamed, inner.clone()))
+        // p_id and p_name are ordered by, and dropped here.
+        .select(
+            col(inner.clone(), alias("nonce")).as_runtime(pgorm::pgorm_query::Alias::new("nonce")),
+        );
+    let outer = Pipeline::from(named_runtime(
+        narrowed,
+        pgorm::pgorm_query::Alias::new("nested_outer"),
+    ));
+
+    let rows: Vec<(i32,)> = outer.into_tuple().unwrap().all(&db).await.unwrap();
+    assert!(!rows.is_empty(), "the nested source returned nothing");
+
+    ctx.delete().await;
+}
+
+/// The other face of the same leak: an ordering that reaches an outer ORDER BY
+/// qualified by a relation the final FROM does not carry, which PostgreSQL
+/// rejects with SQLSTATE 42P01 (`nested-source-from-entry`).
+// [spec:pgorm:req:pipeline.compose/test]
+#[pgorm_macros::test]
+async fn a_nested_ordering_names_a_relation_in_scope() {
+    let ctx = TestContext::new("pipeline_nested_ordering_scope").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+    seed(&db).await;
+
+    // The same leak reaching an outer ORDER BY instead of an enclosing SELECT:
+    // a nested, ordered relation joined to another, where the ordering ends up
+    // qualified by a relation the final FROM does not carry.
+    let ranked = Pipeline::from(named_runtime(
+        named_runtime(
+            Pipeline::from(order::Entity),
+            pgorm::pgorm_query::Alias::new("o"),
+        ),
+        pgorm::pgorm_query::Alias::new("o"),
+    ))
+    .select((
+        col(pgorm::pgorm_query::Alias::new("o"), CUSTOMER_ID)
+            .as_runtime(pgorm::pgorm_query::Alias::new("p_customer")),
+        col(pgorm::pgorm_query::Alias::new("o"), alias("total"))
+            .as_runtime(pgorm::pgorm_query::Alias::new("p_total")),
+    ))
+    .take_range(1i64..=6i64)
+    .derive(Expr::from(alias("p_customer")).as_runtime(pgorm::pgorm_query::Alias::new("carried")))
+    .sort((alias("p_customer"), alias("p_total"), alias("carried")));
+    let held = pgorm::pgorm_query::Alias::new("held");
+    let joined = Pipeline::from(named_runtime(ranked, held.clone())).join(
+        JoinSide::Inner,
+        named_runtime(
+            Pipeline::from(customer::Entity).select((
+                C::Id.as_runtime(pgorm::pgorm_query::Alias::new("c_id")),
+                C::Name.as_runtime(pgorm::pgorm_query::Alias::new("c_name")),
+            )),
+            pgorm::pgorm_query::Alias::new("who"),
+        ),
+        col(held.clone(), alias("carried"))
+            .eq(col(pgorm::pgorm_query::Alias::new("who"), alias("c_id"))),
+    );
+    let rows: Vec<(String,)> = joined
+        .select(col(pgorm::pgorm_query::Alias::new("who"), alias("c_name")))
+        .into_tuple()
+        .unwrap()
+        .all(&db)
+        .await
+        .unwrap();
+    assert!(!rows.is_empty(), "the nested join returned nothing");
 
     ctx.delete().await;
 }

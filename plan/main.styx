@@ -6843,6 +6843,13 @@ children (
                 kind @blocker
                 text "Filed late: referenced as an existing finding by nested-source-from-entry but never given a node of its own. A nested pipeline source reads columns from a CTE that never exposed them, and PostgreSQL rejects the SQL with SQLSTATE 42703, column \"id\" does not exist. Found at seed 20260911 index 66 in a grammar run, so it carries no runtime-NNN campaign id. The emitted SQL is retained in full: table_1 is a CTE projecting id AS p_id, tenant AS p_tenant, name AS p_name, score AS p_score and rank AS p_rank, and table_2 then selects id AS p_id and name AS p_name from table_1, naming the source columns the rename replaced. The trailing ORDER BY on the outer select also keys on p_id and the other renamed names. The reference oracle executed normally. Evidence in security/generative/findings/pipeline-hidden-order/, including compiled.json with the SQL and its single bound i32 parameter, the original 58-node program, and a 33-node reduced reproducer whose fixture has no rows at all, since the rejection happens at plan time rather than on data. The shrink predicate is pinned to the subject's own error rather than to a verdict mismatch, with witness error, DatabaseError, 42703, and that precision earned its place: an earlier reduction reached 13 nodes but failed in PRQL compilation instead, a different defect wearing the same coarse reason, and the witness rejected it. Not regenerated in the 2026-09-14 full profile: there are zero 42703 records across all fifteen thousand runtime items in that run. Related but distinct from nested-source-from-entry, which is 42P01 on a table absent from the FROM clause rather than 42703 on a column a CTE never exposed; both are nested sources referring outward to something the enclosing scope no longer offers, so a single cause is plausible and worth testing before either is treated separately. Attribution is blocked on the same standalone Rust replay both findings record."
             }
+
+            {
+                at 2026-09-15T12:39:29.650023Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -6850,6 +6857,7 @@ children (
         id pipeline-native-panic
         title "A generated pipeline compiles to SQL without panicking"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-14T23:59:57.611286Z
@@ -6870,6 +6878,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T12:28:05.205873Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
