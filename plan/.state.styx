@@ -735,6 +735,7 @@ assertions (
     {id report, kind @doing, author "brendan@necessary.nu", at 2026-09-14T23:10:20.517261Z}
     {id rust, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:12:39.836152Z}
     {id codegen-datetime-crate-option, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:54:18.092258Z}
+    {id pipeline-renamed-column-order, kind @doing, author "brendan@necessary.nu", at 2026-09-15T00:28:37.111918Z}
 )
 
 impl_evidence (

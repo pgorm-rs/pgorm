@@ -173,9 +173,10 @@ mod expr;
 mod funcs;
 mod sources;
 mod terminal;
+mod window;
 
 pub use binder::Binder;
-pub use builder::{Grouped, IntoSource, JoinSide, Over, Pipeline, Source, by, over, sort_by};
+pub use builder::{Grouped, IntoSource, JoinSide, Pipeline, Source};
 pub use error::PipelineError;
 pub use expr::{Expr, ExprList, ExprOps, col, that, this};
 pub use funcs::{
@@ -185,6 +186,7 @@ pub use funcs::{
 pub use pgorm_query::{AliasName, alias};
 pub use sources::{Named, named_runtime};
 pub use sources::{SelectableSource, SelectedSources, SourceList};
+pub use window::{Over, by, over, sort_by};
 
 #[cfg(test)]
 mod tests;

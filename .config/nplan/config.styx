@@ -225,6 +225,12 @@ quality {
         // slice every other factory takes precisely so a generated call
         // site need not special-case the one arity that joins nothing;
         // the uniformity is the logic the gate cannot see
-        allow-names (new account_only)
+        //
+        // over is one of three sibling entry points into the window-spec
+        // builder. by and sort_by each delegate to it and add a call, so
+        // only over itself reads as a pass-through — but a caller writing
+        // Over::default() where its siblings read over(), by(..) and
+        // sort_by(..) is the outcome the trio exists to prevent
+        allow-names (new account_only over)
     }
 }

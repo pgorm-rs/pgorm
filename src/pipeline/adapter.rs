@@ -226,6 +226,40 @@ pub(super) fn rebase(
     }
 }
 
+/// Where a projected expression's name lands in the namespace prqlc resolves
+/// `this` against.
+///
+/// prqlc files a column that is still qualified by one of the relation's
+/// inputs under a submodule named for that input, and a name the pipeline
+/// introduced at the top level of the same namespace. The two are ordered by
+/// different keys — the input's position against the column's index — which
+/// is what the builder's `Columns` exists to see coming.
+// [spec:pgorm:req:pipeline.compose]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Projected<'a> {
+    /// Qualified by this source, and filed under its submodule.
+    Source(&'a str),
+    /// A name the pipeline introduces, filed at the top level.
+    Introduced,
+    /// Left unnamed, so it is filed nowhere and `this` never expands it.
+    Anonymous,
+}
+
+/// Classify one item of a projection by where its name will be filed.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn projected(node: &PlExpr) -> Projected<'_> {
+    if node.alias.is_some() {
+        return Projected::Introduced;
+    }
+    match &node.kind {
+        ExprKind::Ident(ident) => match ident.path.first() {
+            Some(source) => Projected::Source(source),
+            None => Projected::Introduced,
+        },
+        _ => Projected::Anonymous,
+    }
+}
+
 /// Every alias set anywhere in `node`, in construction order.
 pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
     if let Some(alias) = &node.alias {

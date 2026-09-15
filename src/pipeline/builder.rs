@@ -7,9 +7,82 @@ use pgorm_query::{Alias, AliasName, Iden, Value};
 
 use crate::EntityTrait;
 
-use super::adapter::{self, PlExpr};
+use super::adapter::{self, PlExpr, Projected};
 use super::binder::Binder;
 use super::expr::{Expr, ExprList, nodes_of};
+use super::window::Over;
+
+/// How prqlc will expand `this` — the whole-relation reference
+/// [`distinct`](Pipeline::distinct) deduplicates on — over the columns
+/// accumulated so far.
+///
+/// prqlc resolves `this` by walking a namespace tree rather than the
+/// relation's column list, and orders that tree by two incomparable keys: a
+/// column still qualified by an input sits under a submodule ordered by the
+/// *input's position*, while a name the pipeline introduced sits at the top
+/// level ordered by its *column index*. The order that falls out is the
+/// declared one only while the columns all answer to the same key, so the
+/// pipeline tracks which of those shapes it is in.
+// [spec:pgorm:req:pipeline.compose]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Columns {
+    /// The sources' own columns, in source order, optionally followed by
+    /// names this pipeline introduced — which `this` also expands last, so
+    /// the declared order survives.
+    Sourced { introduced: bool },
+    /// Only names this pipeline introduced, in the order they were declared.
+    Introduced,
+    /// Source columns and introduced names interleaved, or more than one
+    /// source projected explicitly. `this` regroups these by source, so the
+    /// declared order is not what comes out.
+    Regrouped,
+}
+
+impl Columns {
+    /// The shape of a projection, read off the items it lists.
+    fn of(items: &[PlExpr]) -> Self {
+        let mut source: Option<&str> = None;
+        let mut introduced = false;
+        for item in items {
+            match adapter::projected(item) {
+                Projected::Introduced => introduced = true,
+                Projected::Source(name) => match source {
+                    // A second source projected explicitly: `this` would
+                    // emit each source's columns together, whatever order
+                    // the list interleaved them in.
+                    Some(first) if first != name => return Columns::Regrouped,
+                    Some(_) => {}
+                    None => source = Some(name),
+                },
+                // Nameless, so `this` never expands it and it takes no
+                // position among the ones it does. Settling would not give
+                // it one back, so it is simply not this question's business.
+                Projected::Anonymous => {}
+            }
+        }
+        match (source, introduced) {
+            (Some(_), false) => Columns::Sourced { introduced: false },
+            (None, _) => Columns::Introduced,
+            (Some(_), true) => Columns::Regrouped,
+        }
+    }
+
+    /// Names appended after the columns already present — `derive`, `window`,
+    /// the aggregates of an `aggregate`. They land last either way, so they
+    /// only ever add a trailing run.
+    fn with_introduced(self) -> Self {
+        match self {
+            Columns::Sourced { .. } => Columns::Sourced { introduced: true },
+            other => other,
+        }
+    }
+
+    /// Whether `this` would expand these columns in the order they were
+    /// declared.
+    fn ordered(self) -> bool {
+        self != Columns::Regrouped
+    }
+}
 
 /// A relation-to-relation query pipeline in PRQL's shape.
 ///
@@ -77,6 +150,20 @@ pub struct Pipeline {
     /// so the flag records only whether that hoist is still owed.
     // [spec:pgorm:req:pipeline.compose]
     pub(super) deduped: bool,
+    /// How prqlc would expand `this` over the columns accumulated so far.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) columns: Columns,
+    /// Whether a row range is waiting in front of a
+    /// [`distinct`](Pipeline::distinct).
+    ///
+    /// prqlc lowers every `take` to the same transform and then renders the
+    /// deduplicating group's own `take 1` and the pipeline's range take into
+    /// one query, so the `LIMIT`/`OFFSET` lands *after* the deduplication
+    /// rather than before it — a different set of rows, not a different
+    /// order. Settling the range at a CTE boundary first keeps the two takes
+    /// in separate queries, in the order the stages were written.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) ranged: bool,
 }
 
 /// Which rows a [`join`](Pipeline::join) keeps.
@@ -231,111 +318,6 @@ impl IntoSource for Pipeline {
     }
 }
 
-/// What a [`window`](Pipeline::window) computes its columns over:
-/// partitioning, ordering and frame.
-///
-/// Built by [`by`] (partition), [`sort_by`] (ordering) or [`over`] (neither),
-/// then narrowed with [`rows`](Over::rows) or [`range`](Over::range).
-///
-/// The keys are `ExprList<'static>`, so a bound placeholder cannot enter a
-/// window spec: `Over` erases the brand it was built from, and a partition
-/// or ordering by a runtime value means nothing anyway.
-///
-/// ```compile_fail,E0521
-/// use pgorm::pipeline::{ExprOps, Pipeline, by};
-/// use pgorm::tests_cfg::cake::{self, Column as C};
-///
-/// let _ = Pipeline::from(cake::Entity).filter_with(|binder| {
-///     let _smuggled = by(binder.bind(1_i32));
-///     C::Id.gt(1)
-/// });
-/// ```
-// [spec:pgorm:req:pipeline.surface+3]
-#[derive(Debug, Clone, Default)]
-pub struct Over {
-    partition: Vec<PlExpr>,
-    sort: Vec<PlExpr>,
-    frame: Option<(&'static str, Option<i64>, Option<i64>)>,
-}
-
-/// A window over the whole relation, unpartitioned and unordered.
-pub fn over() -> Over {
-    Over::default()
-}
-
-/// A window partitioned by these keys: PRQL's `group`, SQL's `PARTITION BY`.
-pub fn by(keys: impl ExprList<'static>) -> Over {
-    over().by(keys)
-}
-
-/// A window ordered by these keys ([`desc`](super::ExprOps::desc) marks one
-/// descending).
-pub fn sort_by(keys: impl ExprList<'static>) -> Over {
-    over().sort_by(keys)
-}
-
-impl Over {
-    /// `PARTITION BY` these keys.
-    // [spec:pgorm:req:pipeline.params+4]
-    pub fn by(mut self, keys: impl ExprList<'static>) -> Self {
-        self.partition = nodes_of(keys);
-        self
-    }
-
-    /// `ORDER BY` these keys within the window.
-    ///
-    /// Without a partition the sort is a real pipeline stage, so it also
-    /// orders the output — PRQL semantics, kept rather than hidden.
-    // [spec:pgorm:req:pipeline.params+4]
-    pub fn sort_by(mut self, keys: impl ExprList<'static>) -> Self {
-        self.sort = nodes_of(keys);
-        self
-    }
-
-    /// A `ROWS BETWEEN ... AND ...` frame, in rows relative to the current
-    /// row: `0` is the current row, negative precedes, positive follows, and
-    /// `None` leaves that side unbounded.
-    pub fn rows(mut self, start: Option<i64>, end: Option<i64>) -> Self {
-        self.frame = Some(("rows", start, end));
-        self
-    }
-
-    /// A `RANGE BETWEEN ... AND ...` frame, in values, with bounds read as
-    /// in [`rows`](Over::rows).
-    pub fn range(mut self, start: Option<i64>, end: Option<i64>) -> Self {
-        self.frame = Some(("range", start, end));
-        self
-    }
-
-    fn wrap(self, derive_call: PlExpr) -> Vec<PlExpr> {
-        let window_call = match self.frame {
-            Some((kind, start, end)) => adapter::call_named(
-                "window",
-                vec![derive_call],
-                vec![(kind, adapter::int_range(start, end))],
-            ),
-            None => adapter::call("window", vec![derive_call]),
-        };
-        let sort_call = if self.sort.is_empty() {
-            None
-        } else {
-            Some(adapter::call("sort", vec![adapter::tuple(self.sort)]))
-        };
-        if self.partition.is_empty() {
-            sort_call.into_iter().chain([window_call]).collect()
-        } else {
-            let body = match sort_call {
-                Some(sort_call) => adapter::nested(vec![sort_call, window_call]),
-                None => window_call,
-            };
-            vec![adapter::call(
-                "group",
-                vec![adapter::tuple(self.partition), body],
-            )]
-        }
-    }
-}
-
 /// A pipeline that has been grouped and is waiting for its aggregates.
 ///
 /// [`Pipeline::group`] cannot produce a pipeline on its own — PRQL's `group`
@@ -371,7 +353,10 @@ impl Grouped {
         self.finish(nodes)
     }
 
-    fn finish(self, aggregates: Vec<PlExpr>) -> Pipeline {
+    fn finish(mut self, aggregates: Vec<PlExpr>) -> Pipeline {
+        // The relation is the keys followed by the aggregates, which are
+        // introduced names and so trail them either way.
+        self.pipeline.columns = Columns::of(&self.keys).with_introduced();
         let stage = adapter::call(
             "group",
             vec![
@@ -394,6 +379,8 @@ impl Pipeline {
             values: Vec::new(),
             reshaped: None,
             deduped: false,
+            columns: Columns::Sourced { introduced: false },
+            ranged: false,
         };
         let reference = pipeline.embed(source.into_source());
         pipeline.stages.push(adapter::call("from", vec![reference]));
@@ -410,6 +397,8 @@ impl Pipeline {
             values: Vec::new(),
             reshaped: None,
             deduped: false,
+            columns: Columns::Sourced { introduced: false },
+            ranged: false,
         }
     }
 
@@ -479,6 +468,28 @@ impl Pipeline {
         self
     }
 
+    /// Move the stages accumulated so far into their own binding, leaving
+    /// this pipeline reading from it.
+    ///
+    /// The CTE boundary settles everything the stages left unsettled: the
+    /// relation becomes a single freshly exposed input whose columns are its
+    /// own projection in its own order, and each stage that had to be
+    /// evaluated before whatever comes next now sits in its own query. A
+    /// pipeline that is still nothing but its source has nothing to settle.
+    // [spec:pgorm:req:pipeline.compose]
+    fn settle(&mut self) {
+        if self.stages.len() <= 1 {
+            return;
+        }
+        let stages = std::mem::take(&mut self.stages);
+        let name = adapter::binding_name(self.bindings.len());
+        self.bindings.push(stages);
+        self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
+        self.deduped = false;
+        self.ranged = false;
+        self.columns = Columns::Sourced { introduced: false };
+    }
+
     fn bound<F, T>(&mut self, f: F) -> T
     where
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> T,
@@ -511,10 +522,7 @@ impl Pipeline {
     /// Add computed columns, keeping the existing ones.
     // [spec:pgorm:req:pipeline.surface+3]
     pub fn derive(self, columns: impl ExprList<'static>) -> Self {
-        self.stage(adapter::call(
-            "derive",
-            vec![adapter::tuple(nodes_of(columns))],
-        ))
+        self.derive_nodes(nodes_of(columns))
     }
 
     /// Add computed columns, with runtime values bound in the closure.
@@ -524,17 +532,18 @@ impl Pipeline {
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
     {
         let nodes = self.bound_nodes(f);
+        self.derive_nodes(nodes)
+    }
+
+    fn derive_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
+        self.columns = self.columns.with_introduced();
         self.stage(adapter::call("derive", vec![adapter::tuple(nodes)]))
     }
 
     /// Replace the projection with exactly these columns.
     // [spec:pgorm:req:pipeline.surface+3]
     pub fn select(self, columns: impl ExprList<'static>) -> Self {
-        self.stage(adapter::call(
-            "select",
-            vec![adapter::tuple(nodes_of(columns))],
-        ))
-        .reshaping("select")
+        self.select_nodes(nodes_of(columns))
     }
 
     /// Replace the projection, with runtime values bound in the closure.
@@ -544,6 +553,11 @@ impl Pipeline {
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
     {
         let nodes = self.bound_nodes(f);
+        self.select_nodes(nodes)
+    }
+
+    fn select_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
+        self.columns = Columns::of(&nodes);
         self.stage(adapter::call("select", vec![adapter::tuple(nodes)]))
             .reshaping("select")
     }
@@ -593,8 +607,7 @@ impl Pipeline {
     /// stage; without one the window spans the whole relation.
     // [spec:pgorm:req:pipeline.surface+3]
     pub fn window(self, columns: impl ExprList<'static>, over: Over) -> Self {
-        let derive_call = adapter::call("derive", vec![adapter::tuple(nodes_of(columns))]);
-        self.staged(over.wrap(derive_call))
+        self.window_nodes(nodes_of(columns), over)
     }
 
     /// Derive columns over a window, with runtime values bound in the
@@ -608,6 +621,11 @@ impl Pipeline {
         F: for<'brand> FnOnce(&mut Binder<'brand>) -> [Expr<'brand>; N],
     {
         let nodes = self.bound_nodes(f);
+        self.window_nodes(nodes, over)
+    }
+
+    fn window_nodes(mut self, nodes: Vec<PlExpr>, over: Over) -> Self {
+        self.columns = self.columns.with_introduced();
         let derive_call = adapter::call("derive", vec![adapter::tuple(nodes)]);
         self.staged(over.wrap(derive_call))
     }
@@ -634,13 +652,15 @@ impl Pipeline {
     /// The count is a value, not an expression: PRQL rejects a parameterized
     /// `take`, so the signature takes the only form that compiles.
     // [spec:pgorm:req:pipeline.params+4]
-    pub fn take(self, rows: i64) -> Self {
+    pub fn take(mut self, rows: i64) -> Self {
+        self.ranged = true;
         self.stage(adapter::call("take", vec![adapter::lit_int(rows)]))
     }
 
     /// Keep an inclusive 1-based row range (`LIMIT`/`OFFSET`).
     // [spec:pgorm:req:pipeline.params+4]
-    pub fn take_range(self, rows: RangeInclusive<i64>) -> Self {
+    pub fn take_range(mut self, rows: RangeInclusive<i64>) -> Self {
+        self.ranged = true;
         self.stage(adapter::call(
             "take",
             vec![adapter::int_range(Some(*rows.start()), Some(*rows.end()))],
@@ -677,6 +697,13 @@ impl Pipeline {
     }
 
     fn join_node(mut self, side: JoinSide, relation: impl IntoSource, condition: PlExpr) -> Self {
+        // The joined relation's columns follow this one's, which is the order
+        // `this` expands them in — but only while no introduced name is
+        // already competing with an input for the same position.
+        self.columns = match self.columns {
+            Columns::Sourced { introduced: false } => Columns::Sourced { introduced: false },
+            _ => Columns::Regrouped,
+        };
         let reference = self.embed(relation.into_source());
         self.stage(adapter::call_named(
             "join",
@@ -724,11 +751,7 @@ impl Pipeline {
         // off directly moves into its own binding first, leaving this pipeline
         // reading from it, so the arity settles at the CTE boundary.
         if self.deduped {
-            let stages = std::mem::take(&mut self.stages);
-            let name = adapter::binding_name(self.bindings.len());
-            self.bindings.push(stages);
-            self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
-            self.deduped = false;
+            self.settle();
         }
         let reference = self.embed(other.into_source());
         self.stage(adapter::call(op, vec![reference]))
@@ -737,8 +760,20 @@ impl Pipeline {
     /// Keep one copy of each distinct row: PRQL's `group this (take 1)`,
     /// rendered `SELECT DISTINCT` — or folded into `UNION DISTINCT` when it
     /// directly follows [`append`](Pipeline::append).
+    ///
+    /// The deduplicating group does not compose with every stage that can
+    /// stand in front of it, so the pipeline is settled into its own binding
+    /// first where it would not: prqlc resolves the group's `this` against a
+    /// namespace rather than the relation's column list, and renders a row
+    /// range standing in front of the group *after* the deduplication rather
+    /// than before it. Reading from a binding leaves the group a single
+    /// freshly exposed relation, whose columns are that binding's projection
+    /// in its own order with nothing in front of them.
     // [spec:pgorm:req:pipeline.compose]
     pub fn distinct(mut self) -> Self {
+        if self.ranged || !self.columns.ordered() {
+            self.settle();
+        }
         self.deduped = true;
         self.stage(adapter::call(
             "group",

@@ -1439,3 +1439,211 @@ fn a_joined_deduplicated_relation_compiles_once() {
         assert_eq!(compile(), first, "one pipeline, one projection order");
     }
 }
+
+const ACCOUNTS: AliasName = alias("accounts");
+const FIXTURE: AliasName = alias("fixture");
+
+fn accounts() -> Pipeline {
+    Pipeline::from_schema(FIXTURE, ACCOUNTS)
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a renamed column keeps the position
+// it was declared in through a deduplication. prqlc files a column still
+// qualified by its source under that source's submodule and a renamed one at
+// the top level, then orders the two by different keys — the source's position
+// against the column's index — so `group this` used to emit every unrenamed
+// column first and the renamed one last.
+#[test]
+fn a_renamed_column_keeps_its_declared_position() {
+    let projection = || {
+        accounts().select((
+            col(ACCOUNTS, ID),
+            col(ACCOUNTS, alias("tenant")).as_(alias("p_tenant")),
+            col(ACCOUNTS, alias("name")),
+        ))
+    };
+    // Undeduplicated, the declared order was never in question.
+    assert_eq!(
+        sql_of(projection()),
+        "SELECT id, tenant AS p_tenant, name FROM fixture.accounts"
+    );
+    assert_eq!(
+        sql_of(projection().distinct()),
+        "WITH table_0 AS (SELECT id, tenant AS p_tenant, name FROM fixture.accounts) \
+         SELECT DISTINCT id, p_tenant, name FROM table_0"
+    );
+
+    // The shape the campaign reduced: one renamed column among four plain ones.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((
+                    col(ACCOUNTS, ID),
+                    col(ACCOUNTS, alias("tenant")).as_(alias("p_tenant")),
+                    col(ACCOUNTS, alias("name")),
+                    col(ACCOUNTS, alias("score")),
+                    col(ACCOUNTS, alias("rank")),
+                ))
+                .distinct()
+        ),
+        "WITH table_0 AS (SELECT id, tenant AS p_tenant, name, score, rank FROM fixture.accounts) \
+         SELECT DISTINCT id, p_tenant, name, score, rank FROM table_0"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    the same misordering, reached the
+// other way: two sources interleaved in one projection, which `this` regroups
+// by source however the projection ordered them.
+#[test]
+fn a_two_source_projection_keeps_its_declared_order() {
+    let built = sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Inner,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .select((cake::Column::Id, fruit::Column::CakeId, cake::Column::Name))
+            .distinct(),
+    );
+    assert_eq!(
+        built,
+        "WITH table_0 AS (SELECT cake.id, fruit.cake_id, cake.name FROM cake \
+         INNER JOIN fruit ON cake.id = fruit.cake_id) \
+         SELECT DISTINCT id, cake_id, name FROM table_0"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    a row range in front of a
+// deduplication is taken first. prqlc renders the group's own `take 1` and the
+// range take as one query, which applied the LIMIT/OFFSET after the
+// deduplication and so returned a different set of rows.
+#[test]
+fn a_row_range_is_taken_before_deduplication() {
+    let ranged = || {
+        accounts()
+            .select((
+                col(ACCOUNTS, ID).as_(alias("p_id")),
+                col(ACCOUNTS, alias("score")).as_(alias("p_score")),
+            ))
+            .take_range(3..=5)
+    };
+    assert_eq!(
+        sql_of(ranged()),
+        "SELECT id AS p_id, score AS p_score FROM fixture.accounts LIMIT 3 OFFSET 2"
+    );
+    assert_eq!(
+        sql_of(ranged().distinct()),
+        "WITH table_0 AS (SELECT id AS p_id, score AS p_score FROM fixture.accounts \
+         LIMIT 3 OFFSET 2) SELECT DISTINCT p_id, p_score FROM table_0"
+    );
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    the whole three-stage shape the
+// campaign filed (item runtime-947): deduplicate, sort, take a range, project,
+// deduplicate again. The range must be taken from the *sorted* relation, and
+// before the second deduplication — the emitted SQL used to carry no ORDER BY
+// at all and hung its LIMIT/OFFSET off the outermost SELECT DISTINCT, so it
+// returned one arbitrary row where two were due.
+#[test]
+fn a_deduplicated_sorted_range_keeps_its_rows() {
+    let (p_id, p_tenant, p_name, p_score, p_rank, nonce) = (
+        alias("p_id"),
+        alias("p_tenant"),
+        alias("p_name"),
+        alias("p_score"),
+        alias("p_rank"),
+        alias("nonce"),
+    );
+    let built = sql_of(
+        accounts()
+            .select((
+                col(ACCOUNTS, ID).as_(p_id),
+                col(ACCOUNTS, alias("tenant")).as_(p_tenant),
+                col(ACCOUNTS, alias("name")).as_(p_name),
+                col(ACCOUNTS, alias("score")).as_(p_score),
+                col(ACCOUNTS, alias("rank")).as_(p_rank),
+            ))
+            .derive(Expr::from(947_i64).cast(CastType::BigInt).as_(nonce))
+            .distinct()
+            .sort((
+                p_id.asc(),
+                p_tenant.desc(),
+                p_name.asc(),
+                p_score.asc(),
+                p_rank.asc(),
+                nonce.asc(),
+            ))
+            .take_range(3..=5)
+            .select((p_score, p_rank, nonce))
+            .distinct()
+            .select((p_score, p_rank, nonce)),
+    );
+    assert_eq!(
+        built,
+        "WITH table_1 AS (SELECT DISTINCT ON (id, tenant, name, score, rank, \
+         CAST(947 AS bigint)) score AS p_score, rank AS p_rank, \
+         CAST(947 AS bigint) AS nonce, id AS _expr_0, tenant AS _expr_1, name AS _expr_2 \
+         FROM fixture.accounts), \
+         table_2 AS (SELECT p_score, p_rank, nonce, _expr_0, _expr_1, _expr_2 FROM table_1 \
+         ORDER BY _expr_0, _expr_1 DESC, _expr_2, p_score, p_rank, nonce LIMIT 3 OFFSET 2), \
+         table_0 AS (SELECT p_score, p_rank, nonce, _expr_0, _expr_1, _expr_2 FROM table_2) \
+         SELECT DISTINCT p_score, p_rank, nonce FROM table_0"
+    );
+
+    // The two claims the golden is there to hold: the sort reaches the query the
+    // range is taken in, and the range is taken before the final deduplication.
+    let (ordered, deduplicated) = built
+        .split_once("SELECT DISTINCT p_score, p_rank, nonce")
+        .expect("the final deduplication is the outermost select");
+    assert!(ordered.contains("ORDER BY"), "{built}");
+    assert!(ordered.contains("LIMIT 3 OFFSET 2"), "{built}");
+    assert!(!deduplicated.contains("LIMIT"), "{built}");
+}
+
+// [spec:pgorm:req:pipeline.compose/test]    the shapes a deduplication composes
+// with untouched keep their rendering: nothing is settled that did not need it.
+#[test]
+fn a_composable_deduplication_mints_no_binding() {
+    // A bare source: `this` is the source's own wildcard.
+    assert_eq!(
+        sql_of(Pipeline::from(INVOICE).distinct()),
+        "SELECT DISTINCT * FROM invoice"
+    );
+    // One source, projected: every column answers to the same namespace.
+    assert_eq!(
+        sql_of(accounts().select(col(ACCOUNTS, ID)).distinct()),
+        "SELECT DISTINCT id FROM fixture.accounts"
+    );
+    // Only introduced names: they are ordered by their column index alone.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .select((
+                    col(ACCOUNTS, ID).as_(alias("p_id")),
+                    col(ACCOUNTS, alias("score")).as_(alias("p_score")),
+                ))
+                .distinct()
+        ),
+        "SELECT DISTINCT id AS p_id, score AS p_score FROM fixture.accounts"
+    );
+    // Derived names trail the source's columns either way.
+    assert_eq!(
+        sql_of(
+            accounts()
+                .derive(Expr::from(1_i32).as_(alias("z")))
+                .distinct()
+        ),
+        "SELECT DISTINCT *, 1 AS z FROM fixture.accounts"
+    );
+    // And the fold that makes a set operation's deduplication a UNION DISTINCT.
+    assert_eq!(
+        sql_of(
+            Pipeline::from(INVOICE)
+                .select(col(INVOICE, CUSTOMER_ID))
+                .append(Pipeline::from(alias("archive")).select(col(alias("archive"), CUSTOMER_ID)))
+                .distinct()
+        ),
+        "SELECT customer_id FROM invoice UNION DISTINCT SELECT customer_id FROM archive"
+    );
+}

@@ -6713,6 +6713,20 @@ children (
                 kind @blocker
                 text "A select that renames one of its columns and is then deduplicated emits the renamed column last rather than where it was declared. Declared id, p_tenant, name, score, rank comes back as id, name, score, rank, p_tenant, with p_tenant the only renamed column. Both sides return the same row with the same values, so the difference is purely positional, but a result set's column order is exactly what a positional decode reads, so it is real rather than cosmetic. Found by the live generative sweep at seed 20260913 index 34 in the pipeline family, one defect in 160 programs, then reduced from 50 nodes to 11 with a one-row fixture by the shrinker. The minimal Rust form needs no database at all: select of a plain column, a renamed column and another plain column, followed by distinct, emits SELECT DISTINCT id, name, tenant AS p_tenant. Critically this is NOT caused by the prqlc fork pinned for pipeline-join-distinct-order, which was the obvious suspect since that patch changes how a star expansion orders columns. The reproducer was built against both stock prqlc 0.13.14 from the registry and the pinned fork and emits identical SQL either way. The two defects share a surface but differ in kind: the other is nondeterministic ordering of an expanded star, this is deterministic misordering of an explicit projection."
             }
+
+            {
+                at 2026-09-15T00:28:37.111918Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T00:45:20.044269Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "The fix pushed src/pipeline/builder.rs over the fifty-function density cap, so the window-frame builder moved to its own module at src/pipeline/window.rs, taking Over, over, by, sort_by and Over's five methods with it. That is a real separation rather than a way around the gate: a window spec is built and finished on its own and reaches the pipeline only as a finished value, so it shares none of the builder's internals. Over::wrap widens from private to pub(super) because the pipeline calls it, and mod.rs re-exports the four public names from their new home so no caller sees the move."
+            }
         )
     }
 
@@ -6810,6 +6824,62 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Reproduced standalone in Rust with no database, which settles the attribution blocker both this node and pipeline-hidden-order recorded as standalone Rust replay is still required. The reproducer is examples/pipeline_panic_probe.rs, reduced from runtime-3287, and it panics inside into_sql before anything is sent. A backtrace narrows the path considerably and contradicts the natural reading of the panic message: the unset column name is not reached from projection but from ORDER BY generation, translate_select_pipeline at gen_query.rs:196 into translate_column_sort at gen_expr.rs:918 into translate_cid at gen_expr.rs:687. The triggering shape is therefore a relation sorted on a set of columns, a later select that projects some of those columns away, and then an operation forcing a new SELECT scope, a join or a distinct. The retained sort still holds column ids the projection dropped, and at ORDER BY time those ids have no name. PRQL treats sort as a property of a relation that survives a select, so the sort keys become hidden columns that must still be materialised through the CTE boundary for the outer ORDER BY to reference them, and that materialisation is what fails. This makes a single cause plausible for three filed defects rather than one: this panic, pipeline-hidden-order whose emitted SQL carries ORDER BY p_id on a select that never exposed p_id and is rejected 42703, and nested-source-from-entry whose join, sort and take_range shape is rejected 42P01 for a table absent from the FROM clause. All three are the same disagreement between a retained ordering and what an enclosing scope exposes. One caution carried into the fix: the expect must not simply become an error return, because an unset name here is a symptom, and converting the panic would turn the two SQL-rejection defects from loud failures into silently wrong SQL."
+            }
+        )
+    }
+
+    {
+        id distinct-drops-computed-column
+        title "A computed projected column survives deduplication"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T00:44:35.736926Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while fixing pipeline-renamed-column-order and distinct-sort-range-rows, and left unfixed there because it is a distinct fault of the same prqlc surface. A projection carrying an expression with no name of its own, for example select of a.id, a.score times 2, and a.name, loses that expression entirely once the relation is deduplicated: it is absent from the deduplication key and absent from the result, so the query silently returns fewer columns than were asked for. The cause is the same namespace-tree resolution of whole-relation `this` that the two fixed defects rest on. prqlc files a name into a module and orders the tree by name, and an expression that was never named has nothing to file, so walking the tree cannot recover it. Confirmed identical whether or not the pipeline is settled into its own binding first, which rules out the settle mechanism as either cause or cure. This is the most serious of the three siblings, because the other two reorder or drop a column the caller can still see is missing from the shape, whereas a computed column vanishing from a deduplicated projection changes the returned tuple without any error. Worth checking whether the same holds for an explicitly aliased computed column, since that would separate the fault cleanly into naming rather than computation."
+            }
+        )
+    }
+
+    {
+        id distinct-drops-collided-name
+        title "A cross-source name collision keeps both columns"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T00:44:48.875681Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while fixing pipeline-renamed-column-order and left unfixed there as a distinct fault. When a projection draws the same bare column name from two different sources, for example select of cake.id, fruit.name and cake.name, deduplication drops the renamed column rather than keeping both. Same prqlc namespace-tree cause as its siblings: `this` is resolved by walking a tree keyed by name, so two columns competing for one name cannot both survive the walk and one is silently lost. As with distinct-drops-computed-column the behaviour is identical settled and unsettled, so the settle mechanism neither causes nor cures it. The join case matters more than it looks, because drawing a same-named column from both sides of a join is ordinary rather than exotic; id and name collide between almost any pair of tables."
+            }
+        )
+    }
+
+    {
+        id distinct-drops-sort-order
+        title "A sort before a deduplication keeps its ORDER BY"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T00:44:50.05218Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while fixing distinct-sort-range-rows. A sort standing in front of a deduplication loses its ORDER BY: the emitted SQL deduplicates but comes back unordered. Deliberately not fixed there, on evidence rather than by omission. Settling the pipeline into its own binding first, which is what cures the range case, does not cure this one, because prqlc drops the CTE's ORDER BY as well; so making sort trigger a settle would cost a CTE and change nothing observable. Curing it means re-emitting the sort after the group rather than relying on it surviving, which amounts to giving pgorm's pipeline a sticky-sort semantics that PRQL itself does not promise, and that is a design decision well beyond the two defects that were being fixed. Closely related to pipeline-native-panic, where the same retained-ordering-versus-exposed-scope disagreement panics prqlc during ORDER BY generation instead of silently dropping the clause, so the upstream work on that node should be read before deciding this one."
+            }
+        )
+    }
+
+    {
+        id literal-temporal-precision
+        title "An inlined temporal literal keeps its sub-second digits"
+        kind @fix
+        log (
+            {
+                at 2026-09-15T00:45:01.648858Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while fixing bound-datetime-max-precision. value_to_string in pgorm-query/src/backend/query_builder.rs renders temporal literals through strftime with the formats year-month-day hour:minute:second and hour:minute:second, neither of which carries a fractional part, so every inlined temporal literal silently drops its sub-second digits. A value of 9999-12-31 23:59:59.999999 is written into SQL as 9999-12-31 23:59:59. This affects Time, DateTime and DateTimeWithTimeZone at all magnitudes, not only at the boundary, and it is the real reason the literal path appeared to succeed where binding failed: the literal path was not preserving the value, it was discarding the part that made binding hard. That makes it more serious than the binding defect it was contrasted against, because a bound parameter that refuses is loud while a literal that truncates is silent. Orthogonal to parameter binding and deliberately left for its own node, because the rendering change moves SQL goldens across the tree including doctests, which nextest does not run, so the doctest suite has to be run separately to see the full blast radius. Worth pairing with the jiff lenient-strftime hazard already recorded on jiff-temporal, that a directive jiff cannot fill is written verbatim into the output rather than failing, so whatever format replaces these must be tested to assert the rendered literal never contains a percent sign."
             }
         )
     }
