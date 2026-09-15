@@ -748,7 +748,7 @@ assertions (
     {id distinct-drops-sort-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T13:12:26.319579Z}
     {id settled-source-name-resolves, kind @complete, author "brendan@necessary.nu", at 2026-09-15T16:16:50.919262Z}
     {id set-op-keeps-deduplication, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:21:00.292691Z}
-    {id window-frame-bounds, kind @doing, author "brendan@necessary.nu", at 2026-09-15T17:27:03.379715Z}
+    {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
 )
 
 impl_evidence (

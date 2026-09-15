@@ -7126,6 +7126,7 @@ children (
         id window-frame-bounds
         title "A bounded window frame selects the rows it names"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T16:25:02.058288Z
@@ -7139,6 +7140,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-15T17:28:37.183269Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
