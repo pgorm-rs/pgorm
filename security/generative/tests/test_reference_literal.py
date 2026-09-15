@@ -32,7 +32,13 @@ class LiteralReferenceTests(unittest.TestCase):
         self.assertEqual(
             literal(wire.scalar("uuid", None, sql_null=True)).command(), ("%s", [None])
         )
+        # sql.render.value-literals+3 keeps the sub-second digits rather than
+        # truncating them, so the bound text carries what the value carried.
         self.assertEqual(
             literal(wire.scalar("time", "03:04:05.123456")).command(),
+            ("%s", ["03:04:05.123456"]),
+        )
+        self.assertEqual(
+            literal(wire.scalar("time", "03:04:05")).command(),
             ("%s", ["03:04:05"]),
         )

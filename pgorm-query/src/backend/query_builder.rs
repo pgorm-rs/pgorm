@@ -997,7 +997,7 @@ impl QueryBuilder {
 
     /// Convert a SQL value into syntax-specific string
     // [spec:pgorm:sem:sql.value.render+1]
-    // [spec:pgorm:def:sql.render.value-literals+2]
+    // [spec:pgorm:def:sql.render.value-literals+3]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {

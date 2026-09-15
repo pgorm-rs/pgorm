@@ -197,7 +197,7 @@ an ideal Postgres renderer would emit.
 > inverse mapping (a backslash followed by `0 b t n r` maps back to the
 > control character; any other escaped character maps to itself).
 
-> [spec:pgorm:def:sql.render.value-literals+2]
+> [spec:pgorm:def:sql.render.value-literals+3]
 > `value_to_string` defines the inline literal syntax per `Value` variant:
 >
 > Every `None` variant of every `Value` type renders as the bare keyword
@@ -212,9 +212,12 @@ an ideal Postgres renderer would emit.
 > renders its compact serialization as a quoted string. `Bytes` renders as a
 > Postgres hex bytea literal `'\xAB01…'` with uppercase two-digit hex per byte.
 > Temporal values render single-quoted with fixed formats: date `%Y-%m-%d`,
-> time `%H:%M:%S`, naive datetime `%Y-%m-%d %H:%M:%S`, and the zoned datetime
-> `%Y-%m-%d %H:%M:%S %:z`, always at `+00:00` because the value carries an
-> instant rather than an offset (fractional seconds are truncated). A format
+> time `%H:%M:%S%.f`, naive datetime `%Y-%m-%d %H:%M:%S%.f`, and the zoned
+> datetime `%Y-%m-%d %H:%M:%S%.f %:z`, always at `+00:00` because the value
+> carries an instant rather than an offset. Sub-second digits are kept, to the
+> microsecond PostgreSQL stores and the parameter path binds
+> (`sql.value.render+1`); `%.f` omits the fraction and its dot when it is zero,
+> so a whole second renders as it would without the directive. A format
 > string MUST NOT name a field its value lacks: an unfillable directive is
 > written through into the rendered text rather than refused. `Uuid`,
 > `IpNetwork`, and `MacAddress` render their `Display` form in single quotes.

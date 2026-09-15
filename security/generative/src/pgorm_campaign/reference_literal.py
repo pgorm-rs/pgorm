@@ -47,6 +47,11 @@ def float_text(value, pipeline):
     return text + ".0" if pipeline and "." not in text else text
 
 
+def fraction(value):
+    """The sub-second part, or nothing when it is zero — `%.f`'s behaviour."""
+    return f".{value.microsecond:06d}" if value.microsecond else ""
+
+
 def textual(value):
     kind, data = value["type"]["kind"], value["data"]
     if kind == "bytes":
@@ -56,14 +61,16 @@ def textual(value):
             data, ensure_ascii=False, separators=(",", ":"), sort_keys=True
         )
     if kind == "time":
-        # sql.render.value-literals+2 explicitly specifies whole seconds here.
-        return time.fromisoformat(data).replace(microsecond=0).isoformat()
+        # sql.render.value-literals+3 keeps sub-second digits; isoformat omits
+        # them when they are zero, which is what `%.f` does on the Rust side.
+        return time.fromisoformat(data).isoformat()
     if kind.startswith("datetime"):
-        value = datetime.fromisoformat(wire.temporal_text(data)).replace(microsecond=0)
+        value = datetime.fromisoformat(wire.temporal_text(data))
         if kind == "datetime":
             return value.isoformat(sep=" ")
-        text = value.strftime("%Y-%m-%d %H:%M:%S %z")
-        return text[:-2] + ":" + text[-2:]
+        text = value.strftime("%Y-%m-%d %H:%M:%S") + fraction(value)
+        offset = value.strftime("%z")
+        return f"{text} {offset[:-2]}:{offset[-2:]}"
     if kind == "vector":
         raise InvalidOracle("vector literal needs an installed pgvector oracle")
     return argument(value)

@@ -114,7 +114,7 @@ pub async fn ne_all_complements_eq_any_on_the_server() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:def:sql.render.value-literals+2/test]    against a live server: an
+// [spec:pgorm:def:sql.render.value-literals+3/test]    against a live server: an
 // empty array literal is typeable only because it carries its element type —
 // PostgreSQL rejects a bare `ARRAY []` with "cannot determine type of empty
 // array", which no parser oracle can see because the grammar accepts it
