@@ -7294,4 +7294,18 @@ children (
             }
         )
     }
+
+    {
+        id coverage-obligations-unreached
+        title "The generator reaches every obligation the matrix declares"
+        kind @fix
+        log (
+            {
+                at 2026-09-16T23:54:31.726124Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The full profile's remaining failure, and the only one left once every defect cleared. The run of 2026-09-17 records twenty thousand construction programs, five thousand live-database programs, five hundred invalid inputs and twenty-two controls, all passing with zero defects and zero incompletes, and still fails, because a hundred and seventy-three declared coverage obligations were never reached. That is a different claim from a defect: it says the campaign did not exercise everything its own matrix promised, so the silence over those cells means nothing rather than meaning clean. Pre-existing and stable rather than newly introduced, which the kept summary from the previous run establishes: the same hundred and seventy-three were outstanding there, and that run carried both coverage-unsatisfied and unexpected-verdict where this one carries only the first. So the fixes removed the defects and left the gap exactly as it was. The gap is broad rather than concentrated, which argues against one missing generator rule: twenty-seven obligations under value, twenty under pipeline, eighteen under graph, seventeen under crud, fourteen under types, ten each under entities, schema and sequences, nine each under names and patterns, and eight each under array and conditions. Several of the array cells name u64 and vector element types, which suggests some obligations may be declared for shapes the generator cannot currently construct at all rather than merely fails to reach by chance, and those two cases want different answers: a generator that cannot reach a cell needs a rule, while an obligation declared for a shape the library does not support should be retired from the matrix with that reason recorded. Establishing which of the two each cell is, before writing any generator code, is the first piece of work."
+            }
+        )
+    }
 )
