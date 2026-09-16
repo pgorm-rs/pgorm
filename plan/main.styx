@@ -7177,6 +7177,7 @@ children (
         id quoted-result-name-doubled
         title "A result column reports the name it was given"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T16:25:29.587324Z
@@ -7204,6 +7205,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-16T23:33:39.582401Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -7255,6 +7263,7 @@ children (
         id pipeline-rejects-backtick-name
         title "A pipeline refuses a name it cannot spell in PRQL"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-16T23:29:13.973394Z
@@ -7268,6 +7277,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Correction to this node's own filing, made before any work was done on it: pgorm is not exposed, and the premise that its pipeline mints PRQL text from caller identifiers is wrong. Tested rather than reasoned. Four names were pushed through a pipeline against the fixed fork, including the min-backtick-salary case that subverts the PRQL surface and a payload crafted to close the backtick quote and append further pipeline stages. All four render as ordinary quoted SQL identifiers and none changes the query's meaning: the crafted payload comes out as a single quoted column name containing spaces, pipes and braces. The reason is structural rather than lucky. pgorm builds prqlc's PL AST directly and hands it to pl_to_rq, so the lexer that cannot escape a backtick is never in the path, and an identifier travels as a Rust string in an AST node rather than as text to be re-parsed. The defect is therefore real in PRQL the language and absent from pgorm the library, and the node should be closed rather than fixed. Two things worth keeping from it. The fork carries a test pinning the current lexer behaviour so the hazard is recorded for anyone who later compiles PRQL source text through prqlc::compile rather than through the AST, which pgorm does in exactly one place, a test-only helper. And the sqlmap campaign's identifier controls cover double quotes with no backtick case at all, which is worth adding not because pgorm is vulnerable but because the control would prove it stays that way."
+            }
+
+            {
+                at 2026-09-16T23:33:44.99552Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

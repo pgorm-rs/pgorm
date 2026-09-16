@@ -751,7 +751,8 @@ assertions (
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
     {id outer-ordering-qualifier, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:17.205808Z}
-    {id quoted-result-name-doubled, kind @doing, author "brendan@necessary.nu", at 2026-09-16T23:33:06.286181Z}
+    {id quoted-result-name-doubled, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:39.582401Z}
+    {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
 )
 
 impl_evidence (
