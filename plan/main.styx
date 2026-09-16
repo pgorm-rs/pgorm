@@ -7198,6 +7198,13 @@ children (
                 kind @note
                 text "Root cause found, and it is upstream in prqlc with no pgorm involvement at all. Reproduced from plain PRQL source text, which removes the builder, the adapter and the whole AST path from the question: compiling a select that aliases a column to the three characters a, quote, b and compiling one that aliases it to a, quote, quote, b both emit the identical SQL, id AS quote a quote quote b quote. Two different names, one output, so the mapping from name to emitted identifier is not injective and one of the two names cannot be asked for. The direction is clearer from pgorm's side than the earlier reading suggested: it is not that a quote is lost in transit, it is that the emitter appears to un-escape an already-doubled pair before re-doubling, so a name carrying two quote characters collapses to one while a name carrying one survives. That also explains why the ordinary query builder is unaffected, since its quoted method does a plain replace of each quote by two and never inspects what it is given. Confirms the earlier probe's conclusion that the fault sits at the prqlc boundary rather than in pgorm's quoting, and narrows it from the boundary to the emitter. Still not an injection: aliases crafted to close the quoted identifier and open a new clause render correctly on both paths, because the failure is a collapse of two characters into one rather than a failure to escape. The fix belongs on the necessary-nu fork alongside the three commits already there, which is also where it can be tested against prqlc's own snapshot suite rather than only through pgorm."
             }
+
+            {
+                at 2026-09-16T23:33:06.286181Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -7240,6 +7247,27 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Doing → Done (nplan complete)"
+            }
+        )
+    }
+
+    {
+        id pipeline-rejects-backtick-name
+        title "A pipeline refuses a name it cannot spell in PRQL"
+        kind @fix
+        log (
+            {
+                at 2026-09-16T23:29:13.973394Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while fixing the quoted-name collapse upstream, and more serious than the defect it was found beside. PRQL quotes an identifier with backticks and its lexer has no escape for its own quoting character, so a name containing a backtick cannot be written in PRQL at all: the body of a backtick-quoted ident is taken verbatim, and a doubled backtick lexes as two adjacent idents rather than as one escaped character. Usually that is a hard parse error, which would be tolerable. Not always. Asking for a column whose name is min, backtick, salary compiles silently to a select of MIN of salary, identical to what an ordinary aggregate call would produce, so a name has become a function call and the query means something the caller did not ask for. That is injection through an identifier rather than through a value, and it matters directly for pgorm because the pipeline mints PRQL text from Rust-side identifiers that a caller supplies: Alias::new takes any string. The upstream compiler is the wrong place to fix it. Giving the surface grammar an escape is a language change rather than a bug fix, it would alter the meaning of inputs that compile today, and it is not pgorm's to make; the fork carries a test pinning the current behaviour so the decision is recorded rather than assumed. The fix belongs here: a pipeline should refuse a name it cannot spell, which means rejecting a backtick at the boundary where a name enters the PRQL text, with an error naming the character and the identifier. Worth checking the whole surface for the same hazard while doing it, since the sqlmap campaign's quoted-identifier controls test double quotes and have no backtick case at all, and the generative corpus reaches this only by accident."
+            }
+
+            {
+                at 2026-09-16T23:30:39.186277Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Correction to this node's own filing, made before any work was done on it: pgorm is not exposed, and the premise that its pipeline mints PRQL text from caller identifiers is wrong. Tested rather than reasoned. Four names were pushed through a pipeline against the fixed fork, including the min-backtick-salary case that subverts the PRQL surface and a payload crafted to close the backtick quote and append further pipeline stages. All four render as ordinary quoted SQL identifiers and none changes the query's meaning: the crafted payload comes out as a single quoted column name containing spaces, pipes and braces. The reason is structural rather than lucky. pgorm builds prqlc's PL AST directly and hands it to pl_to_rq, so the lexer that cannot escape a backtick is never in the path, and an identifier travels as a Rust string in an AST node rather than as text to be re-parsed. The defect is therefore real in PRQL the language and absent from pgorm the library, and the node should be closed rather than fixed. Two things worth keeping from it. The fork carries a test pinning the current lexer behaviour so the hazard is recorded for anyone who later compiles PRQL source text through prqlc::compile rather than through the AST, which pgorm does in exactly one place, a test-only helper. And the sqlmap campaign's identifier controls cover double quotes with no backtick case at all, which is worth adding not because pgorm is vulnerable but because the control would prove it stays that way."
             }
         )
     }

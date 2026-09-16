@@ -60,4 +60,4 @@ expect_used = "deny"
 # compiles different SQL from the one every pgorm test exercises. `build.rs`
 # fails the build when the two tables drift apart.
 [patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "12d01a77397ed59bb3c9ebe66b1d67e4550f2ee2" }
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "9023adad92b5028fcd3416706069477375e405e4" }
