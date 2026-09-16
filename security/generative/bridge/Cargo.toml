@@ -23,3 +23,10 @@ async-trait = "=0.1.92"
 
 [lints.rust]
 unsafe_code = "forbid"
+
+# This crate declares its own workspace above, and a crates-io patch table is
+# read from a workspace root and nowhere else — so the root's prqlc pin has to
+# be repeated here or the campaign's subject links upstream prqlc and tests a
+# different SQL generator from the one the fixes landed in.
+[patch.crates-io]
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "9023adad92b5028fcd3416706069477375e405e4" }
