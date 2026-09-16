@@ -12,7 +12,14 @@ use super::binder::Binder;
 use super::expr::{Expr, ExprList, nodes_of};
 use super::naming;
 use super::sets;
-use super::window::Over;
+use super::window::{self, Over};
+
+/// The window prqlc gives an aggregate used outside a grouping: the whole
+/// relation, unpartitioned and unordered. A stage that authored no window of
+/// its own writes this one, so a call pgorm renders itself keeps the reading
+/// prqlc gives the calls beside it.
+// [spec:pgorm:sem:pipeline.count-argument]
+const IMPLICIT_WINDOW: &str = " OVER ()";
 
 /// How prqlc will expand `this` — the whole-relation reference
 /// [`distinct`](Pipeline::distinct) deduplicates on — over the columns
@@ -385,6 +392,9 @@ impl Grouped {
         // introduced names and so trail them either way.
         self.pipeline.columns = Columns::of(&self.keys).with_introduced();
         self.pipeline.ordering = None;
+        // Inside an `aggregate` the grouping says what an aggregate ranges
+        // over, so a written one carries no `OVER` clause of its own.
+        let aggregates = window::written_aggregates(aggregates, "");
         let stage = adapter::call(
             "group",
             vec![
@@ -604,6 +614,7 @@ impl Pipeline {
 
     fn derive_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
         self.columns = self.columns.with_introduced();
+        let nodes = window::written_aggregates(nodes, IMPLICIT_WINDOW);
         self.stage(adapter::call("derive", vec![adapter::tuple(nodes)]))
     }
 
@@ -630,6 +641,7 @@ impl Pipeline {
         for node in &mut nodes {
             self.settled.requalify(node);
         }
+        let nodes = window::written_aggregates(nodes, IMPLICIT_WINDOW);
         self.columns = Columns::of(&nodes);
         // A projection may drop the very columns an earlier sort ordered by,
         // so the ordering it described no longer names anything this relation

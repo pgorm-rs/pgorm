@@ -85,8 +85,32 @@ FINDINGS = {
     },
     "window-semantics": {
         "finding": "window-semantics",
-        "state": "open",
-        "summary": "count(expr) emits COUNT(*); the dropped explicit frame is fixed",
+        "state": "resolved",
+        "summary": "count(expr) emitted COUNT(*) and an authored frame was dropped",
+        "regressions": [
+            {
+                "test": "a_counted_expression_reaches_the_aggregate",
+                "path": "src/pipeline/tests.rs",
+                "module": "pipeline::tests::a_counted_expression_reaches_the_aggregate",
+                "without_the_fix": (
+                    "prqlc's standard library discards the counted column and "
+                    "renders COUNT(*), so the aggregate answers the row count "
+                    "wherever the counted expression is nullable"
+                ),
+            },
+            {
+                "test": "every_frame_direction_reaches_a_frame_blind_function",
+                "path": "src/pipeline/tests.rs",
+                "module": (
+                    "pipeline::tests::every_frame_direction_reaches_a_frame_blind_function"
+                ),
+                "without_the_fix": (
+                    "prqlc emits a frame only for the calls its standard "
+                    "library annotates as frame-aware, so an authored frame "
+                    "never reaches FIRST_VALUE or LAST_VALUE"
+                ),
+            },
+        ],
     },
 }
 

@@ -7055,6 +7055,13 @@ children (
                 kind @blocker
                 text "The part of nested-source-from-entry that the prqlc cid_redirects fix did not reach. That node was closed on its reduced shape, which the fix in 12d01a77 genuinely repairs and which the live regression test alongside it exercises in both directions. The 2026-09-15 full profile then recorded runtime-887 still failing with its original error unchanged, SQLSTATE 42P01 missing FROM-clause entry for table table_4, so the empty redirect map was one cause and not the only one. nplan will not move a Done node back, hence a separate id; the errata on nested-source-from-entry points here. What is known: the full program joins, sorts, takes a range and nests, and its final ORDER BY is qualified by an interior relation that the enclosing FROM does not list, while the reduced form of the same program now compiles and executes. That difference is the lead. The reduction dropped whatever second path also carries a qualifier outward, so the useful next step is to diff the emitted SQL of the full program against the reduced one rather than to re-read the redirect code, and then to shrink the full program again under a predicate pinned to 42P01 so the reduction cannot escape the defect the way the last one did. Worth checking against prqlc's own postprocess::alias_last_sorting and the last-sorting cid-redirect walk, which the upstream work identified as where the damage showed even though the cause sat a layer earlier."
             }
+
+            {
+                at 2026-09-15T19:31:33.912638Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Not a distinct defect, and this node should not have been filed. The premise was that the prqlc redirect fix repaired the reduced shape while the full program still failed, so the empty redirect map must have been one cause among several. That premise came from a run whose subject had never linked the fork at all. pgorm-python declares its own workspace, deliberately, to keep Python configuration out of ordinary Rust builds, and cargo reads a crates-io patch table from the workspace root and nowhere else, so the root's prqlc pin never reached it. Its lockfile carried prqlc 0.13.14 from the registry with a checksum, and the campaign builds that extension with maturin under locked, so all three fork commits were invisible to every campaign run this session. Established rather than argued: the exact runtime-887 program was transcribed into a standalone crate, checked byte-identical against the campaign's own generated replay, and compiled twice. With the fork pinned it orders by the in-scope alias and the live server executes it; against registry prqlc it orders by table_4 and fails 42P01 exactly as filed. Deterministic over twenty-five runs. So no prqlc work was needed, the fork was untouched, and nested-source-from-entry was correctly closed the first time — the reopening was wrong and rests on this same mistake. The fix belongs to the pin rather than to the SQL: pgorm-python now carries the same patch table, its lock is refreshed to the git rev, and a build script fails the build when the two tables disagree, which was verified by removing the table and watching cargo silently re-resolve to registry prqlc. The wider lesson is the one campaign-refuses-stale-build already carries and now has a second instance: a campaign that builds its subject from a manifest nobody checks can test something other than what is checked out, and here it did so silently for every run."
+            }
         )
     }
 
@@ -7203,6 +7210,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The second half of the window-semantics finding, which bundles two unrelated discrepancies; the frame half is fixed and this one is not. Counting an expression emits COUNT star rather than COUNT of that expression, so a null row is counted where SQL says it should be skipped. The two forms differ exactly when the counted expression is null for some row, which makes this quiet rather than loud: a column with no nulls gives the same answer either way, and the defect only appears once a null reaches the aggregate. That is also why it is worth fixing rather than documenting, since a count that silently includes nulls is the kind of wrong answer a caller has no reason to check. Plausibly accounts for some of the ten findings originally grouped under the window frame heading, a two-against-one difference among them being the obvious candidate, so the count should be re-derived from a clean run rather than assumed once the frame fix is confirmed. The pipeline already distinguishes the two spellings at its own surface, since count_rows and count are separate functions, so the loss is in the translation rather than in what the caller can express. Worth checking count_distinct in the same pass, which has the same shape and the same opportunity to collapse to a star."
+            }
+
+            {
+                at 2026-09-15T19:31:58.483388Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

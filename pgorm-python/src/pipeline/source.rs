@@ -7,10 +7,12 @@ use pyo3::prelude::*;
 use super::{builder::PyPipeline, expression::alias_name};
 use crate::{entities::PyEntity, errors::ConstructionError, statements::PyTable};
 
+/// The pipeline arm is boxed because it is several times the size of a named
+/// table, and a `PySource` is cloned on every composition.
 #[derive(Clone, Debug)]
 pub(super) enum Relation {
     Table(NamedTable),
-    Pipeline(pl::Pipeline),
+    Pipeline(Box<pl::Pipeline>),
 }
 
 /// A source descriptor owns its Rust table or pipeline and an optional alias.
@@ -57,7 +59,7 @@ impl PySource {
                 }
                 None => Alias::new(table.name.table().to_string()).into_source(),
             },
-            Relation::Pipeline(pipeline) => pipeline.clone().into_source(),
+            Relation::Pipeline(pipeline) => (**pipeline).clone().into_source(),
         };
         match &self.alias {
             Some(name) => pl::named_runtime(source, Alias::new(name)).into_source(),
@@ -83,7 +85,7 @@ pub(super) fn pipeline_source(value: &Bound<'_, PyAny>) -> PyResult<PySource> {
     }
     if let Ok(pipeline) = value.extract::<PyRef<'_, PyPipeline>>() {
         return Ok(PySource {
-            relation: Relation::Pipeline(pipeline.inner.clone()),
+            relation: Relation::Pipeline(Box::new(pipeline.inner.clone())),
             alias: None,
         });
     }

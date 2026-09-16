@@ -46,12 +46,18 @@ pub fn stddev<'brand>(expr: impl Into<Expr<'brand>>) -> Expr<'brand> {
     unary_fn("stddev", expr)
 }
 
-/// `COUNT(expr)`.
+/// `COUNT(expr)`: how many rows the expression is not null on.
+///
+/// The counterpart of [`count_rows`], and a different answer wherever the
+/// expression is nullable — which is why they are two functions and not one
+/// ([spec:pgorm:sem:pipeline.count-argument]).
+// [spec:pgorm:sem:pipeline.count-argument]
 pub fn count<'brand>(expr: impl Into<Expr<'brand>>) -> Expr<'brand> {
     unary_fn("count", expr)
 }
 
-/// `COUNT(*)`.
+/// `COUNT(*)`: how many rows there are, nulls and all.
+// [spec:pgorm:sem:pipeline.count-argument]
 pub fn count_rows<'brand>() -> Expr<'brand> {
     unary_fn("count", name("this"))
 }

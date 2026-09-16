@@ -29,6 +29,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > PyO3, a Python linker configuration or scanner dependencies. Building the
 > extension MUST be explicit. Public artifacts MUST exclude fixture models,
 > deliberately vulnerable controls and campaign-only dependencies.
+>
+> The companion crate is its own Cargo workspace, which is what keeps Python
+> configuration out of ordinary Rust builds. Cargo reads a `patch` table from
+> the workspace root and nowhere else, so that separation MUST NOT be allowed
+> to change which dependency revisions the extension links: the companion
+> crate MUST repeat every dependency patch the pgorm workspace pins, and its
+> lockfile MUST resolve them to the pinned revisions. A divergence is silent
+> — the extension resolves the unpatched crate and behaves differently from
+> the library every pgorm test exercises, which for a compiler dependency
+> means the bindings emit SQL the Rust API does not — so it MUST be a build
+> failure rather than a difference discovered downstream.
 
 > [spec:pgorm:req:python.package]
 > The package MUST declare its Rust crate, Python distribution, import module,

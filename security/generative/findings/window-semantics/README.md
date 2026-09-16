@@ -1,9 +1,8 @@
 # Nullable count and explicit first/last frames
 
 Status: reproduced through the public Python module, an independent live
-PostgreSQL reference and standalone Rust. The count discrepancy is an open
-native behavior/contract discrepancy; no weakened comparison has been applied
-to it. The dropped-frame discrepancy is **fixed** — see the closing section.
+PostgreSQL reference and standalone Rust. Both halves are now **fixed** — see
+the two closing sections. No weakened comparison was applied to either.
 
 `count(score)` is documented as `COUNT(expr)` in `src/pipeline/funcs.rs`, with
 `count_rows()` separately documented as `COUNT(*)`. Both Python and Rust emit
@@ -51,5 +50,24 @@ emits a frame clause only for an annotated call, so `first`, `last`, `lag`,
 and dropped it. pgorm now writes the whole `OVER (...)` clause for those seven
 itself ([spec:pgorm:sem:pipeline.window-frame]). The retained artifacts here
 record the discrepancy as found; `known-first-last-frame.program.json` no
-longer reproduces the frame half. The `count(score)` → `COUNT(*)` discrepancy
-is untouched and remains open.
+longer reproduces the frame half.
+
+## The nullable count is fixed
+
+The reference was right and PostgreSQL settles it: `COUNT(expr)` counts
+non-null values and `COUNT(*)` counts rows, so with scores `[10, 10, 30, NULL]`
+the two answers are 3 and 4 and the subject was giving the second to both
+questions. The cause was not a disputed reading either. `prqlc/src/sql/
+std.sql.prql` declares `let count = column -> s"COUNT(*)"`, discarding the
+counted column, and that is the right rendering *of PRQL*: `std.prql` documents
+`count` as counting the relation's items, nulls included, and prqlc's resolver
+replaces the argument with a null before lowering. pgorm's surface is what
+separates the two — `count_rows()` is PRQL's `count this` and keeps prqlc's
+rendering, while `count(expr)` is now written out by pgorm with the counted
+expression interpolated, carrying no clause inside an `aggregate`, the
+window's own inside a `window`, and `OVER ()` elsewhere
+([spec:pgorm:sem:pipeline.count-argument]). `count_distinct` was already
+correct: prqlc renders it with its column.
+
+The retained artifacts record the discrepancy as found;
+`known-nullable-count.program.json` no longer reproduces it.

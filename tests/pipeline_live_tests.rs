@@ -18,8 +18,8 @@ use common::bakery_chain::{customer::Column as C, order::Column as O};
 pub use common::{TestContext, bakery_chain::*, setup::*};
 pub use jiff::{Timestamp, tz::Offset};
 use pgorm::pipeline::{
-    AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count_rows, first,
-    last, named_runtime, row_number, sort_by, sum,
+    AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count, count_rows,
+    first, last, named_runtime, row_number, sort_by, sum,
 };
 use pgorm::{ConnectionTrait, Schema, entity::*, set};
 use pretty_assertions::assert_eq;
@@ -39,6 +39,8 @@ const PARENT: AliasName = alias("parent");
 const ID: AliasName = alias("id");
 const NAME: AliasName = alias("name");
 const BODY: AliasName = alias("body");
+const MANAGED: AliasName = alias("managed");
+const EVERYONE: AliasName = alias("everyone");
 
 /// A table that refers to itself: every employee but the founder reports to
 /// another row of this same table.
@@ -684,6 +686,79 @@ async fn seed_employees(db: &impl ConnectionTrait) {
         .await
         .expect("could not insert employee");
     }
+}
+
+/// `COUNT(expr)` and `COUNT(*)` are different questions, and PostgreSQL is
+/// asked both here rather than trusted to agree with a golden: of the four
+/// employees exactly three report to someone, so counting the reference skips
+/// the founder's null and counting rows does not. The two spellings are the
+/// two answers, in an `aggregate` and under an explicit frame alike.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[pgorm_macros::test]
+async fn counting_a_nullable_column_skips_its_nulls() {
+    let ctx = TestContext::new("pipeline_count_nullable").await;
+    let db = ctx.db.get().await.unwrap();
+    create_entity_table(&db, employee::Entity).await;
+    seed_employees(&db).await;
+
+    // The independent reading: the server's own answer to both questions,
+    // asked in SQL this suite wrote rather than SQL the pipeline emitted.
+    let control = db
+        .query_one("SELECT COUNT(manager_id), COUNT(*) FROM employee", &[])
+        .await
+        .unwrap();
+    let (managed, everyone): (i64, i64) = (control.get(0), control.get(1));
+    assert_eq!((managed, everyone), (3, 4));
+
+    // Grouped by the same nullable reference, the founder's group is one row
+    // that counts as none: the two spellings separate there and nowhere else.
+    let per_manager: Vec<(i64, i64)> = db
+        .query_all(
+            "SELECT COUNT(manager_id) AS m, COUNT(*) AS e FROM employee \
+             GROUP BY manager_id ORDER BY m, e",
+            &[],
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| (row.get(0), row.get(1)))
+        .collect();
+    assert_eq!(per_manager, vec![(0, 1), (1, 1), (2, 2)]);
+
+    let grouped: Vec<(i64, i64)> = Pipeline::from(employee::Entity)
+        .group(employee::Column::ManagerId)
+        .aggregate((
+            count(employee::Column::ManagerId).as_(MANAGED),
+            count_rows().as_(EVERYONE),
+        ))
+        .select((MANAGED, EVERYONE))
+        .sort((MANAGED, EVERYONE))
+        .into_tuple()
+        .unwrap()
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(grouped, per_manager);
+
+    // The same distinction under a window wide enough to span the relation:
+    // the frame is the whole table, so every row carries both totals.
+    let windowed: Vec<(i64, i64)> = Pipeline::from(employee::Entity)
+        .window(
+            (
+                count(employee::Column::ManagerId).as_(MANAGED),
+                count_rows().as_(EVERYONE),
+            ),
+            sort_by(employee::Column::Id).rows(None, None),
+        )
+        .select((MANAGED, EVERYONE))
+        .into_tuple()
+        .unwrap()
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(windowed, vec![(managed, everyone); 4]);
+
+    ctx.delete().await;
 }
 
 // [spec:pgorm:sem:pipeline.self-join/test]    the classic employee-manager

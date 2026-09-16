@@ -340,8 +340,42 @@ of the crate, compiled in every build. Rules are grouped under
 > no ordering of its own — the ordering the relation already carried, which
 > is the ordering prqlc reads into such a window. A window mixing frame-aware
 > and frame-blind columns therefore renders one frame twice, identically, on
-> the two paths. Without an authored frame nothing is rewritten and the
-> stage is prqlc's `window` exactly as before.
+> the two paths. Without an authored frame none of these seven is rewritten
+> and the stage is prqlc's `window` exactly as before; the one call pgorm
+> writes whether or not a frame was authored is `count`, for the separate
+> reason given in `[spec:pgorm:sem:pipeline.count-argument]`.
+
+## Counting an expression
+
+> [spec:pgorm:sem:pipeline.count-argument]
+> `count(expr)` MUST emit `COUNT(expr)` and `count_rows()` MUST emit
+> `COUNT(*)`, in every position either can be written. The two are different
+> questions wherever the counted expression is nullable — PostgreSQL's
+> `COUNT(expr)` counts non-null values and `COUNT(*)` counts rows — and the
+> surface separates them, so the translation MUST NOT collapse one into the
+> other.
+>
+> PRQL's own `count` is the row count: the language documents it as counting
+> the items of the relation it is given, including nulls, and prqlc's SQL
+> standard library accordingly discards the argument and renders `COUNT(*)`.
+> That is the right reading of PRQL and is left alone — `count_rows()` is
+> PRQL's `count this` and stays prqlc's to render, frame and implicit window
+> included. `count(expr)` is pgorm's separate spelling and is written out
+> instead, by the same mechanism as
+> `[spec:pgorm:sem:pipeline.window-frame]`: an expression spelling its own
+> SQL, with the interpolated argument left for prqlc to resolve.
+>
+> A written call carries the clause its position gives it. Inside an
+> `aggregate` it carries none, because the grouping says what the aggregate
+> ranges over. Inside a `window` it carries that window's own `OVER (...)`,
+> partition, ordering and frame included — which is why `count` is written
+> even when no frame was authored, where the frame-blind seven are not. In
+> any other stage it carries `OVER ()`, the implicit window over the whole
+> relation that prqlc gives an aggregate used outside a grouping, so the
+> reading of `derive` and `select` is the one they already had.
+>
+> `count_distinct(expr)` needs no rewrite: prqlc's standard library renders
+> it with its column.
 
 ## Failure model
 

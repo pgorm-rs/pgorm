@@ -127,7 +127,7 @@ class HonestyTests(unittest.TestCase):
         document = _assemble()
         names = {item["finding"] for item in document["open_findings"]}
         self.assertIn("set-precedence", names)
-        self.assertIn("window-semantics", names)
+        self.assertIn("pipeline-hidden-order", names)
         self.assertIn("pipeline-renamed-column-order", names)
 
     def test_diverging_parity_families_are_named(self):

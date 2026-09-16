@@ -237,6 +237,143 @@ fn aggregate_functions_render_expected_sql() {
     );
 }
 
+/// `count(expr)` counts the expression and `count_rows()` counts rows; the
+/// two are different answers wherever the expression is nullable, so the
+/// counted expression has to reach the SQL.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn a_counted_expression_reaches_the_aggregate() {
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .group(col(INVOICE, CUSTOMER_ID))
+            .aggregate((count(total()).as_("scored"), count_rows().as_("n"))),
+    );
+    assert_eq!(
+        built,
+        "SELECT customer_id, COUNT(total) AS scored, COUNT(*) AS n \
+         FROM invoice GROUP BY customer_id"
+    );
+}
+
+/// The aggregate a `HAVING` inlines is the written one, not prqlc's.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn a_counted_expression_inlines_into_having() {
+    let scored = alias("scored");
+    let built = sql_of(
+        Pipeline::from(INVOICE)
+            .group(col(INVOICE, CUSTOMER_ID))
+            .aggregate(count(total()).as_(scored))
+            .filter_with(|binder| scored.gt(binder.bind(1_i64))),
+    );
+    assert_eq!(
+        built,
+        "SELECT customer_id, COUNT(total) AS scored FROM invoice \
+         GROUP BY customer_id HAVING COUNT(total) > $1"
+    );
+}
+
+/// Every position a counted expression can be written in, and the clause it
+/// carries there: none inside an `aggregate`, the window's own inside a
+/// [`window`](Pipeline::window), and the empty one everywhere else — which
+/// is the implicit window prqlc gives an aggregate used outside a grouping.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn a_counted_expression_carries_its_own_window() {
+    let scored = alias("scored");
+    let cases = [
+        (
+            Pipeline::from(INVOICE).derive(count(total()).as_(scored)),
+            "SELECT *, COUNT(total) OVER () AS scored FROM invoice",
+        ),
+        (
+            Pipeline::from(INVOICE).select(count(total()).as_(scored)),
+            "SELECT COUNT(total) OVER () AS scored FROM invoice",
+        ),
+        (
+            Pipeline::from(INVOICE).window(count(total()).as_(scored), over()),
+            "SELECT *, COUNT(total) OVER () AS scored FROM invoice",
+        ),
+        (
+            Pipeline::from(INVOICE)
+                .window(count(total()).as_(scored), by(col(INVOICE, CUSTOMER_ID))),
+            "SELECT *, COUNT(total) OVER (PARTITION BY customer_id) AS scored FROM invoice",
+        ),
+        (
+            Pipeline::from(INVOICE).window(
+                count(total()).as_(scored),
+                sort_by(col(INVOICE, ID)).rows(Some(-1), Some(0)),
+            ),
+            "SELECT *, COUNT(total) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING \
+             AND CURRENT ROW) AS scored FROM invoice ORDER BY id",
+        ),
+    ];
+    for (pipeline, expected) in cases {
+        assert_eq!(sql_of(pipeline), expected);
+    }
+}
+
+/// `count_rows()` is PRQL's `count this`, which prqlc renders as `COUNT(*)`
+/// already — including the window it is given.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn counting_rows_is_still_left_to_prqlc() {
+    let built = sql_of(Pipeline::from(INVOICE).window(
+        count_rows().as_(alias("n")),
+        sort_by(col(INVOICE, ID)).rows(Some(-1), Some(0)),
+    ));
+    assert_eq!(
+        built,
+        "SELECT *, COUNT(*) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING \
+         AND CURRENT ROW) AS n FROM invoice ORDER BY id"
+    );
+}
+
+/// A written call holds its argument inside an expression pgorm spelled, so
+/// every rewrite that walks the tree has to walk into one: embedding a
+/// pipeline shifts the placeholders of the counted expression like any other.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn an_embedded_count_renumbers_its_placeholder() {
+    let held = alias("held");
+    let counted = Pipeline::from(INVOICE).derive_with(|binder| {
+        let floor = binder.bind(5_i64);
+        [count(case([(total().gt(floor), total())], null())).as_(alias("scored"))]
+    });
+    let (sql, values) = Pipeline::from(INVOICE)
+        .filter_with(|binder| total().gt(binder.bind(1_i64)))
+        .join(
+            JoinSide::Inner,
+            counted.named(held),
+            col(INVOICE, ID).eq(col(held, ID)),
+        )
+        .select(col(held, alias("scored")))
+        .into_sql()
+        .expect("pipeline compiles");
+    assert_eq!(values.0, [Value::BigInt(Some(1)), Value::BigInt(Some(5))]);
+    assert!(
+        sql.contains("COUNT(CASE WHEN total > $2 THEN total ELSE NULL END) OVER ()"),
+        "{sql}"
+    );
+    assert!(sql.contains("total > $1"), "{sql}");
+}
+
+/// `count_distinct` already keeps its column — prqlc's standard library
+/// renders it with one — so it is left alone in every position.
+// [spec:pgorm:sem:pipeline.count-argument/test]
+#[test]
+fn counting_distinct_values_needs_no_rewrite() {
+    let built = sql_of(Pipeline::from(INVOICE).window(
+        count_distinct(total()).as_(alias("d")),
+        sort_by(col(INVOICE, ID)).rows(Some(-1), Some(0)),
+    ));
+    assert_eq!(
+        built,
+        "SELECT *, COUNT(DISTINCT total) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING \
+         AND CURRENT ROW) AS d FROM invoice ORDER BY id"
+    );
+}
+
 // [spec:pgorm:req:pipeline.surface+3/test]
 #[test]
 fn filter_after_aggregate_lands_in_having() {

@@ -6,29 +6,42 @@
 use super::adapter::{self, Piece, PlExpr};
 use super::expr::{ExprList, nodes_of};
 
-/// The window functions prqlc renders without the frame it was given, and
-/// what pgorm renders in its place: the PRQL name, the SQL function, and
-/// which of the call's arguments reach it, in SQL order.
+/// The calls prqlc renders wrongly and what pgorm renders in their place:
+/// the PRQL name, the SQL function, which of the call's arguments reach it
+/// in SQL order, and whether prqlc needs an authored frame before it goes
+/// wrong.
 ///
-/// prqlc emits a frame clause only for the calls its own standard library
-/// annotates as frame-aware — the aggregates — and drops it silently from
-/// every other window function. For `FIRST_VALUE` and `LAST_VALUE` the frame
-/// *is* the answer, so a dropped one is a different query; for the ranking
-/// and offset functions PostgreSQL ignores the frame either way, but they are
-/// written the same way so that one rule covers the vocabulary rather than
-/// the subset whose answer happens to move.
+/// Two things go wrong, and the last field is which. prqlc emits a frame
+/// clause only for the calls its own standard library annotates as
+/// frame-aware — the aggregates — and drops it silently from every other
+/// window function. For `FIRST_VALUE` and `LAST_VALUE` the frame *is* the
+/// answer, so a dropped one is a different query; for the ranking and offset
+/// functions PostgreSQL ignores the frame either way, but they are written
+/// the same way so that one rule covers the vocabulary rather than the subset
+/// whose answer happens to move. None of that arises without an authored
+/// frame, so those seven are left to prqlc until one is given.
+///
+/// `count` is the other thing, and it does not need a frame to go wrong:
+/// PRQL's `count` counts the rows of the relation it is given, and prqlc's
+/// standard library discards the counted column and emits `COUNT(*)`. pgorm's
+/// surface separates the two answers — [`count_rows`](super::count_rows) is
+/// `COUNT(*)` and [`count`](super::count) is `COUNT(expr)` — and they differ
+/// on every row whose expression is null, so the counted one is written
+/// wherever it appears, window or not.
 ///
 /// The ranking functions take no argument: PRQL's `rank` names the column
 /// being ranked, and `RANK()` has nowhere to put it.
 // [spec:pgorm:sem:pipeline.window-frame]
-const FRAME_BLIND: [(&str, &str, &[usize]); 7] = [
-    ("first", "FIRST_VALUE", &[0]),
-    ("lag", "LAG", &[1, 0]),
-    ("last", "LAST_VALUE", &[0]),
-    ("lead", "LEAD", &[1, 0]),
-    ("rank", "RANK", &[]),
-    ("rank_dense", "DENSE_RANK", &[]),
-    ("row_number", "ROW_NUMBER", &[]),
+// [spec:pgorm:sem:pipeline.count-argument]
+const WRITTEN: [(&str, &str, &[usize], bool); 8] = [
+    ("count", "COUNT", &[0], true),
+    ("first", "FIRST_VALUE", &[0], false),
+    ("lag", "LAG", &[1, 0], false),
+    ("last", "LAST_VALUE", &[0], false),
+    ("lead", "LEAD", &[1, 0], false),
+    ("rank", "RANK", &[], false),
+    ("rank_dense", "DENSE_RANK", &[], false),
+    ("row_number", "ROW_NUMBER", &[], false),
 ];
 
 /// What a [`window`](Pipeline::window) computes its columns over:
@@ -128,7 +141,7 @@ impl Over {
         let framed = self.frame.is_some();
         let (mut written, mut deferred) = (Vec::new(), Vec::new());
         for node in columns {
-            match framed.then(|| rewritten(&node, &clause)).flatten() {
+            match rewritten(&node, &clause, framed) {
                 Some(spelled) => written.push(spelled),
                 None => deferred.push(node),
             }
@@ -223,19 +236,48 @@ impl Over {
     }
 }
 
-/// `node` rewritten to spell its own `OVER (...)`, or `None` when prqlc
-/// renders it with the authored frame already.
+/// The columns of a stage that is not a window, with every call pgorm writes
+/// without needing a frame written out and `clause` appended.
+///
+/// `clause` is the `OVER ()` prqlc gives an aggregate used outside a
+/// grouping — an implicit window over the whole relation — and empty inside
+/// an `aggregate`, where the grouping says what the aggregate ranges over.
+/// The calls that are only wrong under a frame are left to prqlc here: this
+/// stage authored none.
+// [spec:pgorm:sem:pipeline.count-argument]
+pub(super) fn written_aggregates(nodes: Vec<PlExpr>, clause: &str) -> Vec<PlExpr> {
+    let clause: Vec<Piece> = match clause.is_empty() {
+        true => Vec::new(),
+        false => vec![Piece::Text(clause.to_owned())],
+    };
+    nodes
+        .into_iter()
+        .map(|node| rewritten(&node, &clause, false).unwrap_or(node))
+        .collect()
+}
+
+/// `node` rewritten to spell its own SQL, or `None` when prqlc renders it
+/// correctly as it stands. `framed` is whether the enclosing window authored
+/// a frame, which is what the calls prqlc renders frame-blind are waiting
+/// for.
 ///
 /// The call is written out rather than interpolated whole: prqlc appends an
 /// `OVER (...)` of its own to any window function it renders, so a call left
 /// intact inside the assembled expression would carry two.
 // [spec:pgorm:sem:pipeline.window-frame]
-fn rewritten(node: &PlExpr, clause: &[Piece]) -> Option<PlExpr> {
+// [spec:pgorm:sem:pipeline.count-argument]
+fn rewritten(node: &PlExpr, clause: &[Piece], framed: bool) -> Option<PlExpr> {
     // A window function call has the shape a stage does — a bare name applied
     // to arguments — so the same reader answers for both.
     let name = adapter::stage_verb(node)?;
-    let (_, sql, order) = FRAME_BLIND.iter().find(|(prql, ..)| *prql == name)?;
+    let (_, sql, order, unframed) = WRITTEN.iter().find(|(prql, ..)| *prql == name)?;
+    if !(framed || *unframed) {
+        return None;
+    }
     let args = adapter::call_args(node)?;
+    if counts_rows(name, args) {
+        return None;
+    }
     let mut pieces = vec![Piece::Text(format!("{sql}("))];
     for (position, arg) in order
         .iter()
@@ -251,6 +293,21 @@ fn rewritten(node: &PlExpr, clause: &[Piece]) -> Option<PlExpr> {
     pieces.extend(clause.iter().cloned());
     let alias = adapter::exposed_name(node).map(str::to_owned);
     Some(adapter::assembled(pieces, alias))
+}
+
+/// Whether this call is PRQL's `count this` — the row count, which pgorm
+/// spells [`count_rows`](super::count_rows) and prqlc already renders as
+/// `COUNT(*)`, frame included.
+///
+/// `this` is the relation itself, so it is the one argument `COUNT` has
+/// nowhere to put; writing the call out would put the name in the SQL.
+// [spec:pgorm:sem:pipeline.count-argument]
+fn counts_rows(name: &str, args: &[PlExpr]) -> bool {
+    name == "count"
+        && args
+            .first()
+            .and_then(adapter::column_path)
+            .is_some_and(|path| path == "this")
 }
 
 /// Append `text`, merging it into the text already at the end so that the

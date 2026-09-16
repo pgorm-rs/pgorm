@@ -263,6 +263,17 @@ fn walk_mut(node: &mut PlExpr, visit: &mut impl FnMut(&mut PlExpr)) {
                 walk_mut(&mut arm.value, visit);
             }
         }
+        // The interpolated nodes of an expression pgorm wrote itself
+        // ([`assembled`]) are ordinary expressions that prqlc resolves in
+        // place, so every rewrite that reaches a column reference has to
+        // reach the ones written inside one.
+        ExprKind::SString(items) => {
+            for item in items {
+                if let InterpolateItem::Expr { expr, .. } = item {
+                    walk_mut(expr, visit);
+                }
+            }
+        }
         _ => {}
     }
 }
