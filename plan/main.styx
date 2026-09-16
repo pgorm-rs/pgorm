@@ -7048,6 +7048,7 @@ children (
         id outer-ordering-qualifier
         title "An outer ORDER BY names a relation the FROM carries"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T14:07:16.27692Z
@@ -7061,6 +7062,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Not a distinct defect, and this node should not have been filed. The premise was that the prqlc redirect fix repaired the reduced shape while the full program still failed, so the empty redirect map must have been one cause among several. That premise came from a run whose subject had never linked the fork at all. pgorm-python declares its own workspace, deliberately, to keep Python configuration out of ordinary Rust builds, and cargo reads a crates-io patch table from the workspace root and nowhere else, so the root's prqlc pin never reached it. Its lockfile carried prqlc 0.13.14 from the registry with a checksum, and the campaign builds that extension with maturin under locked, so all three fork commits were invisible to every campaign run this session. Established rather than argued: the exact runtime-887 program was transcribed into a standalone crate, checked byte-identical against the campaign's own generated replay, and compiled twice. With the fork pinned it orders by the in-scope alias and the live server executes it; against registry prqlc it orders by table_4 and fails 42P01 exactly as filed. Deterministic over twenty-five runs. So no prqlc work was needed, the fork was untouched, and nested-source-from-entry was correctly closed the first time — the reopening was wrong and rests on this same mistake. The fix belongs to the pin rather than to the SQL: pgorm-python now carries the same patch table, its lock is refreshed to the git rev, and a build script fails the build when the two tables disagree, which was verified by removing the table and watching cargo silently re-resolve to registry prqlc. The wider lesson is the one campaign-refuses-stale-build already carries and now has a second instance: a campaign that builds its subject from a manifest nobody checks can test something other than what is checked out, and here it did so silently for every run."
+            }
+
+            {
+                at 2026-09-16T23:08:17.205808Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -7204,6 +7212,7 @@ children (
         id count-of-expression
         title "Counting an expression skips its nulls"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T17:26:47.262751Z
@@ -7217,6 +7226,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-16T23:08:15.50063Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
