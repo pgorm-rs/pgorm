@@ -7077,6 +7077,7 @@ children (
         id campaign-evidence-durable
         title "Retained campaign evidence survives an ordinary build clean"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T15:35:12.793326Z
@@ -7097,6 +7098,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-17T12:43:20.982163Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -7349,6 +7357,34 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The upstream half of distinct-star-projection, which pgorm now works around correctly but does not cause. prqlc lowers a group-take-one to a Take with a partition and then chooses between SELECT DISTINCT and DISTINCT ON by comparing the partition against the columns in frame; over a relation still projecting a wildcard those sets match while nothing else is fused into the query, and diverge as soon as a later stage is, at which point the wildcard itself lands in the DISTINCT ON key list. Whether that is legal turns on one line in gen_query, which omits the table prefix when the query holds exactly one table: with two or more relations the star is written qualified and PostgreSQL accepts it as a whole-row composite, and with one it is written bare and the grammar rejects it with syntax error at or near star, SQLSTATE 42601. So prqlc emits SQL outside the grammar it targets, in a case its own prefix rule creates. Two shapes of fix are available upstream and the choice is not obvious: qualify the star in a DISTINCT ON key regardless of the table count, which is minimal but makes the prefix rule conditional on context rather than on arity, or decline to choose DistinctOn at all when the partition holds a wildcard and fall back to the form that is already correct. The second is closer to the real invariant, that a wildcard is not a key expression. pgorm's own hoist settles the relation into a binding before the next stage can fuse, which is a correct workaround needing no pin change, so this is not urgent; it belongs on the necessary-nu fork beside the four commits already there, and it should carry a test in prqlc's own suite since the pgorm-side regression cannot see the multi-relation case that is already correct."
+            }
+
+            {
+                at 2026-09-17T12:59:29.508816Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Both halves of this node's filing were wrong, and the live server settled it rather than argument. The filing preferred declining DistinctOn when the partition holds a wildcard, on the reasoning that a wildcard is not a key expression. It is one: PostgreSQL accepts a qualified whole-row reference as a key and treats it as exactly equivalent to deduplicating whole rows, checked over a table with duplicates and again over an all-NULL left-join side. And the fallback that option implies would have changed the answer rather than only the spelling. Over four rows with a duplicate, deduplicating whole rows and then projecting returns three where SELECT DISTINCT over the projection returns two, and the qualified whole-row key returns three, so falling back would have silently given the wrong count. Worse, the fallback does not even reach SELECT DISTINCT: gating that branch lands in the row-number filter instead, which emits PARTITION BY star and fails with the identical syntax error, which the sqlite, mysql and glaredb targets already demonstrate today. So the qualifying option is right, and the objection to it is weaker than it reads, since the identifier translation was already conditional on context and prefix elision is cosmetic rather than semantic. The defect is also wider than filed. A bare star reaches three positions from plain PRQL, not one: the DISTINCT ON list, a window PARTITION BY, and GROUP BY. The first two are fixed by qualifying. GROUP BY is deliberately left broken and commented, because qualifying there only exchanges one error for another: PostgreSQL will not propagate a functional dependency from a whole-row var to its columns, so the query fails 42803 where it previously failed 42601, and the real answer is wildcard expansion, which is the one thing a wildcard says cannot be done."
+            }
+
+            {
+                at 2026-09-17T12:59:53.173083Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+        )
+    }
+
+    {
+        id prqlc-group-by-wildcard
+        title "Grouping by a whole relation names its columns"
+        kind @fix
+        log (
+            {
+                at 2026-09-17T12:59:45.4974Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The third position a bare star reaches in prqlc's output, left unfixed when the other two were repaired, and left with a comment in the source naming why. Grouping a star relation and aggregating emits GROUP BY star, which PostgreSQL rejects with SQLSTATE 42601, and qualifying the star the way the DISTINCT ON and PARTITION BY positions now do only exchanges one error for another: PostgreSQL will not propagate a functional dependency from a whole-row variable to the individual columns a projection selects, so the qualified form fails 42803 instead. That is why it was excluded rather than swept in. The real fix is to expand the wildcard into the relation's actual columns at that point, which is the one thing a wildcard means the compiler does not yet know; it therefore needs the column list to be resolved before lowering rather than a change at the rendering seam where the other two were fixed. Not urgent for pgorm: the pipeline settles a star relation into its own binding before any stage can fuse into a group, so the shape does not arise through the builder, and the campaign's generator does not construct it either. Reachable from plain PRQL source, so it matters to anyone compiling PRQL text through the fork, and it is pinned by a test in prqlc's own suite rather than left to be rediscovered."
             }
         )
     }

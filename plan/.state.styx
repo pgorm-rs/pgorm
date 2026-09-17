@@ -755,7 +755,8 @@ assertions (
     {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
     {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
-    {id campaign-evidence-durable, kind @doing, author "brendan@necessary.nu", at 2026-09-17T12:42:53.204223Z}
+    {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
+    {id prqlc-wildcard-distinct-key, kind @doing, author "brendan@necessary.nu", at 2026-09-17T12:59:53.173083Z}
 )
 
 impl_evidence (
