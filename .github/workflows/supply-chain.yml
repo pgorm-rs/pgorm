@@ -1,0 +1,57 @@
+name: supply chain
+
+# The schedule is the point of this workflow, not the pull-request trigger. A
+# dependency does not have to change to acquire an advisory: the tree can sit
+# untouched for a month and become vulnerable because someone else published a
+# finding. A check that only ran on PRs would stay green through exactly that.
+
+on:
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+      - '.github/workflows/supply-chain.yml'
+  schedule:
+    - cron: '17 4 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: cargo-deny
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install cargo-deny
+        # Pinned to the version the policy in deny.toml was written and
+        # validated against, and `--locked` so its own dependency resolution is
+        # the one it shipped with. A tool that audits supply chain should not
+        # float its own.
+        run: cargo install cargo-deny --version 0.19.9 --locked
+      - name: Resolve the dependency tree
+        # The root Cargo.lock is not tracked (see .gitignore), so there is
+        # nothing on disk to audit until it is resolved here.
+        run: cargo generate-lockfile
+      - name: Check advisories, licenses, sources and bans
+        run: cargo deny check
+      - name: Retain the audited lockfile
+        # Without this the run reports on a tree that cannot be reconstructed
+        # afterwards, which is the same gap that cost the campaign its baseline.
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supply-chain-lockfile
+          path: Cargo.lock
+          retention-days: 14
