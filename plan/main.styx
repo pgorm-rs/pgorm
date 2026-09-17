@@ -7235,6 +7235,7 @@ children (
         id campaign-refuses-stale-build
         title "A campaign run refuses a native build older than its source"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T16:37:58.593416Z
@@ -7248,6 +7249,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-17T00:41:30.128736Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

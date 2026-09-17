@@ -753,7 +753,7 @@ assertions (
     {id outer-ordering-qualifier, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:17.205808Z}
     {id quoted-result-name-doubled, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:39.582401Z}
     {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
-    {id campaign-refuses-stale-build, kind @doing, author "brendan@necessary.nu", at 2026-09-16T23:45:58.899831Z}
+    {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
 )
 
