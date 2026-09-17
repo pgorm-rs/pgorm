@@ -18,7 +18,7 @@ import sys
 import time
 
 from . import campaign_identity, campaign_plan, campaign_report, profiles
-from .build import ROOT
+from .build import ROOT, content_identity
 from .campaign_artifacts import Artifacts, fresh
 from .campaign_runner import Runner
 from .controls import Controls
@@ -105,6 +105,30 @@ def _progress(document, output):
     print(json.dumps({"passed": document["passed"], "output": str(output)}), flush=True)
 
 
+class StaleBuild(Exception):
+    """The installed extension was built from source other than what is here."""
+
+
+# [spec:pgorm:req:generative.build-amortization]
+def refuse_stale(build, root):
+    """Refuse a build whose recorded source is not the tree about to be tested.
+
+    The build records the digest it was made from, and rebuilding is already
+    conditioned on that digest; nothing on the run path consulted it, so a run
+    could report a fixed defect as still broken because its subject predated
+    the fix. Refusing rather than rebuilding keeps a long link out of what the
+    caller asked to be a read, and says what to run instead.
+    """
+    recorded = build.get("identity", {}).get("source_sha256")
+    actual = content_identity(root)
+    if recorded == actual:
+        return
+    raise StaleBuild(
+        f"the installed extension was built from source {recorded} but this tree "
+        f"is {actual}; run `python -m pgorm_campaign.build` and try again"
+    )
+
+
 # [spec:pgorm:req:generative.artifacts]
 async def main(arguments):
     """Create the run directory, execute the profile and report the outcome."""
@@ -112,6 +136,7 @@ async def main(arguments):
     time.tzset()
     profile = profiles.select(arguments.profile)
     build = json.loads(Path(arguments.build).read_text())
+    refuse_stale(build, Path(arguments.root))
     output = fresh(arguments.output, prefix=arguments.profile)
     print(str(output), flush=True)
     started = time.monotonic()
