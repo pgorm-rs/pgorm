@@ -34,7 +34,33 @@ def load():
                 "unsupported/compile-only paths need unique identities and reasons"
             )
         excluded.add(item["id"])
+    retired(value)
     return value
+
+
+def retired(value):
+    """Value/context cells withdrawn from the matrix, each with its reason.
+
+    A cell belongs here only when no generator rule could ever discharge it:
+    the shape is unconstructible, or the pinned environment cannot produce the
+    observation. The reason travels in matrix.json so a later reader sees why
+    the cell is absent instead of restoring it.
+    """
+    kinds = {item["kind"] for item in value["value_matrix"]}
+    spaces = {"value": value["value_contexts"], "array": value["array_contexts"]}
+    cells = set()
+    for item in value["value_exclusions"]:
+        wire.fields(item, {"space", "kind", "context", "reason"})
+        contexts = spaces.get(item["space"])
+        if contexts is None or item["kind"] not in kinds:
+            raise wire.FormatError("a retired cell must name a real space and kind")
+        if item["context"] not in contexts or not item["reason"]:
+            raise wire.FormatError("a retired cell needs a real context and a reason")
+        cell = (item["space"], item["kind"], item["context"])
+        if cell in cells:
+            raise wire.FormatError("duplicate retired value cell")
+        cells.add(cell)
+    return cells
 
 
 def obligations():
@@ -48,13 +74,15 @@ def obligations():
         )
     for category in ("registered_entities", "registered_graphs", "registered_sources"):
         required.update(category + "." + name for name in value[category])
+    withdrawn = retired(value)
     for row in value["value_matrix"]:
-        required.update(
-            "value." + row["kind"] + "." + context
-            for context in value["value_contexts"]
-        )
-        required.update(
-            "array." + row["kind"] + "." + context
-            for context in value["array_contexts"]
-        )
+        for space, contexts in (
+            ("value", value["value_contexts"]),
+            ("array", value["array_contexts"]),
+        ):
+            required.update(
+                space + "." + row["kind"] + "." + context
+                for context in contexts
+                if (space, row["kind"], context) not in withdrawn
+            )
     return frozenset(required)

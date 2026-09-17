@@ -1,0 +1,103 @@
+{
+  "counts": {
+    "compile_suite_invocations": {
+      "oracle_decided": false,
+      "reached_database": false,
+      "recorded": 1,
+      "scheduled": 1,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 1
+      }
+    },
+    "construction_only_programs_constructed": {
+      "oracle_decided": false,
+      "reached_database": false,
+      "recorded": 20000,
+      "scheduled": 20000,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 20000
+      }
+    },
+    "control_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 22,
+      "scheduled": 22,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 22
+      }
+    },
+    "invalid_input_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 500,
+      "scheduled": 500,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 500,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 0
+      }
+    },
+    "live_database_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 5000,
+      "scheduled": 5000,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 5000
+      }
+    },
+    "note": "run classes are counted separately and are never summed"
+  },
+  "coverage_outstanding": [
+    "array.u64.bound",
+    "array.u64.empty",
+    "array.u64.nullable-elements",
+    "array.u64.sql-null",
+    "array.vector.bound",
+    "array.vector.empty",
+    "array.vector.nullable-elements",
+    "array.vector.sql-null",
+    "crud.empty-batch",
+    "crud.omitted-write",
+    "entities.hooks",
+    "value.decimal.result-decode",
+    "value.enum.result-decode",
+    "value.ipnetwork.result-decode",
+    "value.json.result-decode",
+    "value.mac_address.result-decode",
+    "value.u64.bound",
+    "value.u64.literal",
+    "value.u64.typed-null",
+    "value.vector.bound",
+    "value.vector.literal",
+    "value.vector.typed-null"
+  ],
+  "dirty": true,
+  "fault_kinds": [
+    "coverage-unsatisfied"
+  ],
+  "findings": [],
+  "output": "target/generative-campaign/full-9ac7fe666cc5",
+  "passed": false,
+  "profile": "full",
+  "revision": "643d2a16478480b6a3c6e2797ce5ae2c6cb4a122"
+}

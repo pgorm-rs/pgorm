@@ -10,7 +10,7 @@ profile requires, and the outstanding obligations are recorded. A smoke run
 therefore cannot be read as a full run by omission: the gap is in its report.
 """
 
-from . import matrix
+from . import campaign_variations, matrix
 from .catalog import EFFECTS, OPERATIONS
 
 # Contexts the instruction catalog itself names, so attribution is read off the
@@ -48,16 +48,22 @@ def _operations(program, report):
     }
 
 
-def _effects(program, report):
-    """An effect counts once the subject dispatched it, error included."""
-    declared = {step["id"]: step["op"] for step in program["steps"]}
+def _dispatched(program, report):
+    """Declared effects the subject actually ran, each carrying its observation."""
+    declared = {step["id"]: step for step in program["steps"]}
     subject = report.get("subject") or {}
-    tokens = set()
+    steps = []
     for step in subject.get("steps", ()):
-        name = declared.get(step.get("id"))
-        if name in EFFECTS and step.get("status") in ("observed", "error"):
-            tokens.add("effect." + name)
-    return tokens
+        item = declared.get(step.get("id"))
+        if item is None or step.get("status") not in ("observed", "error"):
+            continue
+        steps.append(dict(item, observation=step.get("observation")))
+    return steps
+
+
+def _effects(steps):
+    """An effect counts once the subject dispatched it, error included."""
+    return {"effect." + step["op"] for step in steps if step["op"] in EFFECTS}
 
 
 def _payload(nodes, reference):
@@ -108,16 +114,42 @@ def _values(program, report):
     return tokens
 
 
-def _registrations(report, registry):
+def _registration_token(name, registry):
+    for category in REGISTRATION_CATEGORIES:
+        if name in registry.get(category, ()):
+            return category + "." + name
+    return None
+
+
+def _registrations(program, report, registry):
+    """Registrations the subject built, whether the native value names one or not.
+
+    An entity or graph object reports its own registration, but a pipeline
+    source list resolves to the selection it produced and carries no name back.
+    The catalog types those `data` fields as `registration` on all three, so the
+    declared instruction answers uniformly -- still gated on construction.
+    """
     subject = report.get("subject") or {}
     tokens = set()
     for event in subject.get("trace", ()):
         if event.get("status") != "constructed":
             continue
         name = (event.get("observation") or {}).get("registration")
-        for category in REGISTRATION_CATEGORIES:
-            if name in registry.get(category, ()):
-                tokens.add(category + "." + name)
+        token = _registration_token(name, registry)
+        if token is not None:
+            tokens.add(token)
+    nodes = {node["id"]: node for node in program["nodes"]}
+    for identity in _constructed(report):
+        node = nodes.get(identity)
+        operation = OPERATIONS.get((node or {}).get("op"))
+        if operation is None:
+            continue
+        for field, declared in operation.data.items():
+            if declared != "registration":
+                continue
+            token = _registration_token(node["data"].get(field), registry)
+            if token is not None:
+                tokens.add(token)
     return tokens
 
 
@@ -125,11 +157,13 @@ def _registrations(report, registry):
 def observed(program, report, *, registry=None):
     """Every obligation token this one executed program actually discharged."""
     registry = matrix.load() if registry is None else registry
+    steps = _dispatched(program, report)
     return (
         _operations(program, report)
-        | _effects(program, report)
+        | _effects(steps)
         | _values(program, report)
-        | _registrations(report, registry)
+        | _registrations(program, report, registry)
+        | campaign_variations.observed(program, _constructed(report), steps)
     )
 
 

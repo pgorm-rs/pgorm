@@ -2,7 +2,14 @@
 
 import unittest
 
-from pgorm_campaign import campaign_coverage, campaign_plan, grammar, profiles
+from pgorm_campaign import (
+    campaign_coverage,
+    campaign_plan,
+    grammar,
+    matrix,
+    profiles,
+    wire,
+)
 
 
 def executed(program, *, registration=None):
@@ -81,6 +88,99 @@ class ObservedCoverageTest(unittest.TestCase):
             program.data(), executed(program, registration="campaign.Account")
         )
         self.assertIn("registered_entities.campaign.Account", tokens)
+
+
+class FamilyVariationTest(unittest.TestCase):
+    """Family cells are discharged by construction evidence, like every token."""
+
+    def tokens(self, family, index=0):
+        program = grammar.generate(20260913, index, family=family).program
+        return campaign_coverage.observed(program.data(), executed(program))
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_declared_families_are_reachable_from_generated_programs(self):
+        reached = set()
+        for family in grammar.FAMILIES:
+            for index in range(60):
+                reached |= self.tokens(family, index)
+        declared = {
+            item["id"] + "." + variation
+            for item in matrix.load()["families"]
+            for variation in item["variations"]
+        }
+        # Construction alone cannot evidence cells that need a live observation
+        # (a decoded graph row, a stream's ending), so those are excluded here
+        # and covered by the runtime campaign instead.
+        observed_only = {
+            "graph.absent-source",
+            "graph.model-decode",
+            "sequences.stream-cancel",
+            "sequences.stream-complete",
+            "sequences.stream-early-close",
+        }
+        outstanding = declared - reached - observed_only
+        self.assertEqual(
+            outstanding,
+            {"crud.empty-batch", "crud.omitted-write", "entities.hooks"},
+        )
+
+    # [spec:pgorm:req:generative.verdict/test]
+    def test_an_unrun_program_attributes_no_variation(self):
+        program = grammar.generate(20260913, 0, family="sources").program
+        tokens = campaign_coverage.observed(program.data(), unexecuted(program))
+        self.assertEqual({token for token in tokens if "." in token}, set())
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_every_variation_token_is_a_declared_obligation(self):
+        declared = matrix.obligations()
+        families = {item["id"] for item in matrix.load()["families"]}
+        for family in grammar.FAMILIES:
+            for index in range(12):
+                for token in self.tokens(family, index):
+                    if token.split(".")[0] in families:
+                        self.assertIn(token, declared)
+
+    # [spec:pgorm:req:generative.verdict/test]
+    def test_pipeline_source_registrations_are_attributed(self):
+        for index in range(24):
+            tokens = self.tokens("sources", index)
+            found = {
+                token for token in tokens if token.startswith("registered_sources.")
+            }
+            if found:
+                self.assertTrue(found <= matrix.obligations())
+                return
+        self.fail("the sources family never attributed a registered source list")
+
+
+class RetiredCellTest(unittest.TestCase):
+    """A withdrawn value cell leaves the matrix, and says why in the matrix."""
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_retired_cells_are_not_obligations(self):
+        declared = matrix.obligations()
+        for kind in ("u64", "vector", "char"):
+            self.assertNotIn("value." + kind + ".result-decode", declared)
+            self.assertIn("value." + kind + ".literal", declared)
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_every_retired_cell_records_a_reason(self):
+        for item in matrix.load()["value_exclusions"]:
+            self.assertTrue(item["reason"].strip())
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_a_retired_cell_names_a_real_cell(self):
+        document = matrix.load()
+        for broken in (
+            {"space": "value", "kind": "nope", "context": "literal", "reason": "x"},
+            {"space": "value", "kind": "u64", "context": "nope", "reason": "x"},
+            {"space": "nope", "kind": "u64", "context": "literal", "reason": "x"},
+            {"space": "value", "kind": "u64", "context": "literal", "reason": ""},
+        ):
+            with self.subTest(broken=broken):
+                candidate = dict(document, value_exclusions=[broken])
+                with self.assertRaises(wire.FormatError):
+                    matrix.retired(candidate)
 
 
 class DeclaredCoverageTest(unittest.TestCase):

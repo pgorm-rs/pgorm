@@ -41,6 +41,11 @@
     {"kind": "enum", "postgres": "fixture.State\" 雪", "result_kind": "enum", "policy": "live"}
   ],
   "array_contexts": ["empty", "sql-null", "nullable-elements", "bound"],
+  "value_exclusions": [
+    {"space": "value", "kind": "u64", "context": "result-decode", "reason": "PostgreSQL has no unsigned 64-bit type, so no column can carry one back. The native Record decoder maps int8 to i64 and oid to u32 and never emits a u64 tag (pgorm-python/src/results/decode.rs), and u64 is named in the capability manifest's unsupported_kinds. Construction and explicit wire rejection stay required; a decode cell cannot exist."},
+    {"space": "value", "kind": "char", "context": "result-decode", "reason": "This row already declares result_kind text: a Rust Unicode char is carried by a PostgreSQL text column and comes back tagged text, so a decoded value can never carry the char tag. The row's own reason limits the char tag to construction evidence, and that context stays required. Retiring only the decode cell; literal, bound and typed-null remain."},
+    {"space": "value", "kind": "vector", "context": "result-decode", "reason": "The pinned PostgreSQL image ships no pgvector extension, so no column can have type vector and no row can decode as one. The decoder does handle a vector-named type, so this is an environment bound rather than a missing decode path; restoring it means adding the extension to the fixture image, not a generator rule."}
+  ],
   "hostile_contexts": ["value", "identifier", "pattern", "stored-value", "stored-identifier"],
   "hostile_features": ["quote", "comment", "separator", "dollar-string", "backslash", "unicode", "wildcard", "numeric-boundary"],
   "registered_entities": ["campaign.Account", "campaign.Note"],

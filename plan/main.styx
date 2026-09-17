@@ -7344,6 +7344,20 @@ children (
                 kind @blocker
                 text "The full profile's remaining failure, and the only one left once every defect cleared. The run of 2026-09-17 records twenty thousand construction programs, five thousand live-database programs, five hundred invalid inputs and twenty-two controls, all passing with zero defects and zero incompletes, and still fails, because a hundred and seventy-three declared coverage obligations were never reached. That is a different claim from a defect: it says the campaign did not exercise everything its own matrix promised, so the silence over those cells means nothing rather than meaning clean. Pre-existing and stable rather than newly introduced, which the kept summary from the previous run establishes: the same hundred and seventy-three were outstanding there, and that run carried both coverage-unsatisfied and unexpected-verdict where this one carries only the first. So the fixes removed the defects and left the gap exactly as it was. The gap is broad rather than concentrated, which argues against one missing generator rule: twenty-seven obligations under value, twenty under pipeline, eighteen under graph, seventeen under crud, fourteen under types, ten each under entities, schema and sequences, nine each under names and patterns, and eight each under array and conditions. Several of the array cells name u64 and vector element types, which suggests some obligations may be declared for shapes the generator cannot currently construct at all rather than merely fails to reach by chance, and those two cases want different answers: a generator that cannot reach a cell needs a rule, while an obligation declared for a shape the library does not support should be retired from the matrix with that reason recorded. Establishing which of the two each cell is, before writing any generator code, is the first piece of work."
             }
+
+            {
+                at 2026-09-17T13:15:00.938568Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "The filing's framing was wrong for most of the list, and the shape of the evidence said so before any code was read. A hundred and thirty-two of the hundred and seventy-three were family-variation cells and not one of them had ever been satisfied, which a twenty-thousand-program run does not achieve by chance across eleven independent families. The producer of coverage tokens emitted four token shapes and none of them could ever be a family-dot-variation token, so those obligations were declared in the matrix without the attribution that discharges them. They were generated all along and coverage could not see them. A second, smaller instance of the same thing: registered sources sat at zero of six while entities and graphs were complete, because construction reported a registration only for the two node kinds that carry a name and a sources list resolves to a value that carries none. So the breadth argued for one cause rather than twelve, which is the opposite of what the filing assumed. Only three cells were genuinely impossible, all decode cells and each one already declared so by the matrix's own result-kind field: an unsigned sixty-four bit decode, which PostgreSQL has no type for and the decoder never tags; a vector decode, which the pinned image cannot produce since it has no pgvector; and a char decode, whose row declares itself text because a Rust char travels in a text column. The array cells this node flagged as the likely impossible ones are not impossible at all, which was checked rather than assumed: the array type carries both tags, the wire layer takes the element type from the inferred type without a refusing arm, and the only refusal on that path is nested arrays. They stay in the matrix as generator gaps. Measured rather than estimated, the outstanding count went from a hundred and seventy-three to twenty-two, and a hundred and thirty-eight of the hundred and fifty-one closed needed no generator change whatsoever."
+            }
+
+            {
+                at 2026-09-17T13:15:21.019437Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -7351,6 +7365,7 @@ children (
         id prqlc-wildcard-distinct-key
         title "prqlc keeps a wildcard out of an unqualified DISTINCT ON key"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-17T00:37:16.543005Z
@@ -7372,6 +7387,13 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-09-17T13:00:20.568828Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -7385,6 +7407,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The third position a bare star reaches in prqlc's output, left unfixed when the other two were repaired, and left with a comment in the source naming why. Grouping a star relation and aggregating emits GROUP BY star, which PostgreSQL rejects with SQLSTATE 42601, and qualifying the star the way the DISTINCT ON and PARTITION BY positions now do only exchanges one error for another: PostgreSQL will not propagate a functional dependency from a whole-row variable to the individual columns a projection selects, so the qualified form fails 42803 instead. That is why it was excluded rather than swept in. The real fix is to expand the wildcard into the relation's actual columns at that point, which is the one thing a wildcard means the compiler does not yet know; it therefore needs the column list to be resolved before lowering rather than a change at the rendering seam where the other two were fixed. Not urgent for pgorm: the pipeline settles a star relation into its own binding before any stage can fuse into a group, so the shape does not arise through the builder, and the campaign's generator does not construct it either. Reachable from plain PRQL source, so it matters to anyone compiling PRQL text through the fork, and it is pinned by a test in prqlc's own suite rather than left to be rediscovered."
+            }
+        )
+    }
+
+    {
+        id coverage-remaining-gaps
+        title "The last twenty-two obligations are reached or retired"
+        kind @fix
+        log (
+            {
+                at 2026-09-17T13:15:14.501679Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "What survives the attribution fix, all of it a genuine generator gap rather than a reporting one, and in three groups that want different work. Five decode cells for decimal, json, enum, ipnetwork and mac address need a checked codec to survive the round trip, and the replay crate keeps those codecs private; reading them as their bare Rust type would silently change the value, which is exactly the class of defect this campaign exists to catch, so they are deliberately excluded rather than closed cheaply. Closing them means exporting the codecs. Fourteen cells for unsigned sixty-four bit and vector values and their arrays are constructible, which was verified against the type layer rather than assumed, but the grammar filters them out, and the obvious route is closed for a reason worth recording: construction-only programs contribute no coverage tokens at all, and the inspection oracle explicitly refuses a program holding an explicit unsigned value with an uncovered-semantics error. The remaining route is the rejection family, which matches the matrix policy's own construction-or-rejection wording. Three family cells are simply ungenerated: an empty insert batch, whose documented behaviour of reporting zero rather than writing is untested by the campaign despite being a stated contract; an omitted write; and entity hooks, since no active-model behaviour hook is exercised anywhere in the corpus. The empty batch is the one worth doing first, because the contract is written down and a campaign that never exercises it cannot notice the contract breaking."
             }
         )
     }

@@ -756,7 +756,8 @@ assertions (
     {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
     {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
-    {id prqlc-wildcard-distinct-key, kind @doing, author "brendan@necessary.nu", at 2026-09-17T12:59:53.173083Z}
+    {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
+    {id coverage-obligations-unreached, kind @doing, author "brendan@necessary.nu", at 2026-09-17T13:15:21.019437Z}
 )
 
 impl_evidence (

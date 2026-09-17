@@ -1,6 +1,7 @@
 """Registered entities, active models, graphs, cursors and runtime models."""
 
 from .emit_rust_values import (
+    PRELUDE,
     Q,
     REPLAY,
     VARIANTS,
@@ -38,6 +39,32 @@ SOURCE_SHAPES = {
 }
 # Query shapes whose rows decode into compiled models rather than result rows.
 TYPED_ROWS = ("entity_query", "graph_query", "cursor", "sources")
+# The Rust type each result column is read as, for kinds with one lossless
+# `FromSql` counterpart reachable from the entity prelude. Kinds needing a
+# checked codec to survive the round trip (decimal, json, enum, inet, macaddr)
+# stay out: the replay crate keeps those wrappers private, and reading them as
+# their bare Rust type would silently change the value.
+RESULT_READS = {
+    "bool": "bool",
+    "i8": "i8",
+    "i16": "i16",
+    "i32": "i32",
+    "i64": "i64",
+    "u32": "u32",
+    "f32": "f32",
+    "f64": "f64",
+    "text": "String",
+    "bytes": "Vec<u8>",
+    "uuid": f"{PRELUDE}::Uuid",
+    "date": f"{PRELUDE}::Date",
+    "time": f"{PRELUDE}::Time",
+    "datetime": f"{PRELUDE}::DateTime",
+    "datetime_utc": f"{PRELUDE}::DateTimeWithTimeZone",
+}
+# Variants whose payload is boxed in `pgorm_query::Value`.
+BOXED_READS = frozenset(
+    {"text", "bytes", "uuid", "date", "time", "datetime", "datetime_utc"}
+)
 
 
 # [spec:pgorm:req:generative.replay]
@@ -503,21 +530,13 @@ class ModelEmitter:
             raise UnsupportedInstruction(
                 "result.value has no typed Rust read for " + tag["kind"]
             )
-        native = {
-            "i32": "i32",
-            "i64": "i64",
-            "i16": "i16",
-            "bool": "bool",
-            "text": "String",
-            "f32": "f32",
-            "f64": "f64",
-        }.get(tag["kind"])
+        native = RESULT_READS.get(tag["kind"])
         if native is None:
             raise UnsupportedInstruction(
                 "result.value has no typed Rust read for " + tag["kind"]
             )
         rows = "r_" + d["step"]
         payload = f"{rows}[{d['row']}].try_get::<_, {native}>({literal(d['column'])})?"
-        if native == "String":
-            return f"{Q}::Value::String(Some(Box::new({payload})))"
+        if tag["kind"] in BOXED_READS:
+            return f"{Q}::Value::{VARIANTS[tag['kind']]}(Some(Box::new({payload})))"
         return f"{Q}::Value::{VARIANTS[tag['kind']]}(Some({payload}))"
