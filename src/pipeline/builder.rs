@@ -148,7 +148,7 @@ pub struct Pipeline {
     /// embedded pipeline that reshaped itself is a table-like relation whose
     /// resulting columns the CTE boundary re-exposes, so embedding does not
     /// propagate it.
-    // [spec:pgorm:sem:pipeline.select-sources+2]
+    // [spec:pgorm:sem:pipeline.select-sources+3]
     pub(super) reshaped: Option<&'static str>,
     /// Whether the stages accumulated so far end in a deduplicating `group`
     /// ([`distinct`](Pipeline::distinct)) that no binding has absorbed yet.
@@ -164,6 +164,30 @@ pub struct Pipeline {
     /// How prqlc would expand `this` over the columns accumulated so far.
     // [spec:pgorm:req:pipeline.compose]
     pub(super) columns: Columns,
+    /// Whether the relation still projects a wildcard — a column prqlc carries
+    /// as `*` because the source's schema is not something it can see.
+    ///
+    /// Every table is read that way, and a projection is what replaces it, so
+    /// this is true until a `select` or an `aggregate` says what the columns
+    /// are. A deduplication over such a relation keys on the wildcard too,
+    /// which is what [`bare_star_key`](naming::bare_star_key) then weighs.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) starred: bool,
+    /// Whether the stages end in a deduplication that keyed on a star prqlc
+    /// has no legal spelling for, and that no binding has absorbed yet.
+    ///
+    /// prqlc renders the deduplication as plain `SELECT DISTINCT *` while its
+    /// key is exactly the relation's frame, and falls through to
+    /// `DISTINCT ON (<key>)` as soon as the two differ — which any stage
+    /// landing in the same query makes them. The star is in that key, and
+    /// unqualified it is a syntax error, so the deduplication has to be the
+    /// last thing in its own query: the next stage hoists it into a binding,
+    /// where the frame settles and plain `DISTINCT` stands.
+    ///
+    /// The hoist is owed rather than performed so that a deduplication nothing
+    /// follows still renders as the one query it always was.
+    // [spec:pgorm:req:pipeline.compose]
+    pub(super) bare_star_key: bool,
     /// Whether a row range is waiting in front of a
     /// [`distinct`](Pipeline::distinct).
     ///
@@ -263,7 +287,7 @@ pub trait IntoSource {
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
     // [spec:pgorm:sem:pipeline.self-join]
-    // [spec:pgorm:sem:pipeline.select-sources+2]
+    // [spec:pgorm:sem:pipeline.select-sources+3]
     fn named(self, name: impl Into<AliasName>) -> Named<Self>
     where
         Self: Sized,
@@ -390,8 +414,11 @@ impl Grouped {
         }
         // The relation is the keys followed by the aggregates, which are
         // introduced names and so trail them either way.
-        self.pipeline.columns = Columns::of(&self.keys).with_introduced();
+        let columns = Columns::of(&self.keys).with_introduced();
         self.pipeline.ordering = None;
+        // An aggregation says what every resulting column is, so no wildcard
+        // survives it.
+        self.pipeline.starred = false;
         // Inside an `aggregate` the grouping says what an aggregate ranges
         // over, so a written one carries no `OVER` clause of its own.
         let aggregates = window::written_aggregates(aggregates, "");
@@ -402,7 +429,9 @@ impl Grouped {
                 adapter::call("aggregate", vec![adapter::tuple(aggregates)]),
             ],
         );
-        self.pipeline.stage(stage).reshaping("group().aggregate()")
+        let mut grouped = self.pipeline.stage(stage).reshaping("group().aggregate()");
+        grouped.columns = columns;
+        grouped
     }
 }
 
@@ -418,6 +447,8 @@ impl Pipeline {
             reshaped: None,
             deduped: false,
             columns: Columns::Sourced { introduced: false },
+            starred: false,
+            bare_star_key: false,
             ranged: false,
             settled: naming::Settled::default(),
             ordering: None,
@@ -438,6 +469,8 @@ impl Pipeline {
             reshaped: None,
             deduped: false,
             columns: Columns::Sourced { introduced: false },
+            starred: true,
+            bare_star_key: false,
             ranged: false,
             settled: naming::Settled::default(),
             ordering: None,
@@ -469,8 +502,17 @@ impl Pipeline {
 
     fn embed_kind(&mut self, kind: SourceKind) -> PlExpr {
         match kind {
-            SourceKind::Table(node) => node,
+            SourceKind::Table(node) => {
+                // A table is read as its own wildcard: prqlc has no catalog to
+                // enumerate it from, so its columns stay a star.
+                self.starred = true;
+                node
+            }
             SourceKind::Pipeline(other) => {
+                // An embedded pipeline exposes whatever its own stages
+                // projected, so a star crosses the binding only if one was
+                // still there to cross.
+                self.starred |= other.starred;
                 let params = self.values.len();
                 let binding_count = other.bindings.len();
                 let binding_offset = self.bindings.len();
@@ -497,9 +539,16 @@ impl Pipeline {
     ///
     /// Every stage the caller writes arrives through here, `staged` or
     /// `ordered_by`, so this is the one place a reference written against a
-    /// source the pipeline no longer exposes has to be caught.
+    /// source the pipeline no longer exposes has to be caught — and the one
+    /// place a deduplication that owes a hoist
+    /// ([`bare_star_key`](Pipeline::bare_star_key)) learns that something is
+    /// following it after all. The hoist happens before the stage is
+    /// repointed, so the repointing lands on the binding it just made.
     // [spec:pgorm:req:pipeline.compose]
     fn stage(mut self, mut node: PlExpr) -> Self {
+        if self.bare_star_key {
+            self.settle(&naming::Naming::default(), "distinct");
+        }
         self.settled.requalify(&mut node);
         self.stages.push(node);
         self
@@ -507,29 +556,28 @@ impl Pipeline {
 
     /// Record that `stage` replaced this pipeline's source namespaces,
     /// keeping the *first* offender — the one that did the replacing.
-    // [spec:pgorm:sem:pipeline.select-sources+2]
+    // [spec:pgorm:sem:pipeline.select-sources+3]
     fn reshaping(mut self, stage: &'static str) -> Self {
         self.reshaped.get_or_insert(stage);
         self
     }
 
-    fn staged(mut self, mut nodes: Vec<PlExpr>) -> Self {
-        for node in &mut nodes {
-            self.settled.requalify(node);
-        }
-        self.stages.extend(nodes);
-        self
+    fn staged(self, nodes: Vec<PlExpr>) -> Self {
+        nodes.into_iter().fold(self, Pipeline::stage)
     }
 
     /// Append a `sort` stage and remember it as the order the relation now
     /// carries, so a deduplication after it can restate the ordering a
     /// `group` would otherwise reset.
+    ///
+    /// The ordering is read back off the appended stage rather than the
+    /// argument, so it is the repointed spelling — the one that still resolves
+    /// against whatever binding the relation reads from now.
     // [spec:pgorm:req:pipeline.compose]
-    fn ordered_by(mut self, mut sort: PlExpr) -> Self {
-        self.settled.requalify(&mut sort);
-        self.ordering = Some(sort.clone());
-        self.stages.push(sort);
-        self
+    fn ordered_by(self, sort: PlExpr) -> Self {
+        let mut ordered = self.stage(sort);
+        ordered.ordering = ordered.stages.last().cloned();
+        ordered
     }
 
     /// Move the stages accumulated so far into their own binding, leaving
@@ -551,7 +599,7 @@ impl Pipeline {
     /// [`distinct`](Pipeline::distinct) that could not compose or a set
     /// operation that would otherwise have reassociated.
     // [spec:pgorm:req:pipeline.compose]
-    // [spec:pgorm:sem:pipeline.select-sources+2]
+    // [spec:pgorm:sem:pipeline.select-sources+3]
     fn settle(&mut self, naming: &naming::Naming, owed_to: &'static str) {
         if self.stages.len() <= 1 {
             return;
@@ -563,6 +611,7 @@ impl Pipeline {
         self.stages = vec![adapter::call("from", vec![adapter::ident(&name)])];
         self.reshaped.get_or_insert(owed_to);
         self.deduped = false;
+        self.bare_star_key = false;
         self.ranged = false;
         self.columns = Columns::Sourced { introduced: false };
     }
@@ -612,10 +661,14 @@ impl Pipeline {
         self.derive_nodes(nodes)
     }
 
-    fn derive_nodes(mut self, nodes: Vec<PlExpr>) -> Self {
-        self.columns = self.columns.with_introduced();
+    fn derive_nodes(self, nodes: Vec<PlExpr>) -> Self {
         let nodes = window::written_aggregates(nodes, IMPLICIT_WINDOW);
-        self.stage(adapter::call("derive", vec![adapter::tuple(nodes)]))
+        // The shape is recorded off the staged pipeline: appending may have
+        // discharged a hoist, and what the new names trail is then the
+        // binding's columns rather than the ones they were written beside.
+        let mut derived = self.stage(adapter::call("derive", vec![adapter::tuple(nodes)]));
+        derived.columns = derived.columns.with_introduced();
+        derived
     }
 
     /// Replace the projection with exactly these columns.
@@ -642,13 +695,19 @@ impl Pipeline {
             self.settled.requalify(node);
         }
         let nodes = window::written_aggregates(nodes, IMPLICIT_WINDOW);
-        self.columns = Columns::of(&nodes);
+        let columns = Columns::of(&nodes);
+        // A projection replaces the relation's columns, so whatever wildcard
+        // the sources carried is gone and the listed items are all there is.
+        self.starred = false;
         // A projection may drop the very columns an earlier sort ordered by,
         // so the ordering it described no longer names anything this relation
         // can be sorted on again.
         self.ordering = None;
-        self.stage(adapter::call("select", vec![adapter::tuple(nodes)]))
-            .reshaping("select")
+        let mut selected = self
+            .stage(adapter::call("select", vec![adapter::tuple(nodes)]))
+            .reshaping("select");
+        selected.columns = columns;
+        selected
     }
 
     /// Group rows by these keys; the aggregates follow.
@@ -713,8 +772,7 @@ impl Pipeline {
         self.window_nodes(nodes, over)
     }
 
-    fn window_nodes(mut self, nodes: Vec<PlExpr>, over: Over) -> Self {
-        self.columns = self.columns.with_introduced();
+    fn window_nodes(self, nodes: Vec<PlExpr>, over: Over) -> Self {
         // The ordering the relation already carries is the ordering prqlc
         // reads into an unpartitioned window that states none of its own, so
         // a window that writes its own `OVER` clause has to be told it.
@@ -730,13 +788,18 @@ impl Pipeline {
         // that order exactly as it inherits a `sort`'s. A partitioned one
         // nests its ordering inside the `group` instead, where it orders only
         // the window.
-        if let Some(sort) = staged
+        let ordering = staged
             .iter()
             .find(|node| adapter::stage_verb(node) == Some("sort"))
-        {
-            self.ordering = Some(sort.clone());
+            .cloned();
+        // As in `derive_nodes`, the shape is read off the staged pipeline so
+        // that a hoist discharged on the way in is what the new names trail.
+        let mut windowed = self.staged(staged);
+        windowed.columns = windowed.columns.with_introduced();
+        if let Some(sort) = ordering {
+            windowed.ordering = Some(sort);
         }
-        self.staged(staged)
+        windowed
     }
 
     /// Sort by these keys ([`desc`](super::ExprOps::desc) marks one
@@ -761,19 +824,21 @@ impl Pipeline {
     /// The count is a value, not an expression: PRQL rejects a parameterized
     /// `take`, so the signature takes the only form that compiles.
     // [spec:pgorm:req:pipeline.params+4]
-    pub fn take(mut self, rows: i64) -> Self {
-        self.ranged = true;
-        self.stage(adapter::call("take", vec![adapter::lit_int(rows)]))
+    pub fn take(self, rows: i64) -> Self {
+        let mut taken = self.stage(adapter::call("take", vec![adapter::lit_int(rows)]));
+        taken.ranged = true;
+        taken
     }
 
     /// Keep an inclusive 1-based row range (`LIMIT`/`OFFSET`).
     // [spec:pgorm:req:pipeline.params+4]
-    pub fn take_range(mut self, rows: RangeInclusive<i64>) -> Self {
-        self.ranged = true;
-        self.stage(adapter::call(
+    pub fn take_range(self, rows: RangeInclusive<i64>) -> Self {
+        let mut taken = self.stage(adapter::call(
             "take",
             vec![adapter::int_range(Some(*rows.start()), Some(*rows.end()))],
-        ))
+        ));
+        taken.ranged = true;
+        taken
     }
 
     /// Join another relation on an explicit condition.
@@ -806,24 +871,26 @@ impl Pipeline {
     }
 
     fn join_node(mut self, side: JoinSide, relation: impl IntoSource, condition: PlExpr) -> Self {
-        // The joined relation's columns follow this one's, which is the order
-        // `this` expands them in — but only while no introduced name is
-        // already competing with an input for the same position.
-        self.columns = match self.columns {
-            Columns::Sourced { introduced: false } => Columns::Sourced { introduced: false },
-            _ => Columns::Regrouped,
-        };
         let reference = self.embed(relation.into_source());
         // The joined relation is in scope from here under its own name, which
         // a settle may have shadowed earlier — so the condition's references
         // to it are the caller's, not a settled binding's, and must survive
         // the repointing the stage is about to go through.
         self.settled.rejoined(&reference);
-        self.stage(adapter::call_named(
+        let mut joined = self.stage(adapter::call_named(
             "join",
             vec![reference, condition],
             vec![("side", adapter::ident(side.keyword()))],
-        ))
+        ));
+        // The joined relation's columns follow this one's, which is the order
+        // `this` expands them in — but only while no introduced name is
+        // already competing with an input for the same position. Read after
+        // staging, so a hoist discharged on the way in is the left side here.
+        joined.columns = match joined.columns {
+            Columns::Sourced { introduced: false } => Columns::Sourced { introduced: false },
+            _ => Columns::Regrouped,
+        };
+        joined
     }
 
     /// Concatenate another relation's rows after this one's: PRQL's
@@ -927,6 +994,39 @@ impl Pipeline {
     /// `distinct` then `sort` shape, which renders the `DISTINCT` in a
     /// binding and the `ORDER BY` outside it.
     ///
+    /// One column has no name to be made addressable by: the wildcard a
+    /// relation whose columns no projection has yet replaced still carries.
+    /// The key holds it too, and prqlc can spell it there only while it
+    /// qualifies — `cake.*` is a whole-row reference, a bare `*` is not an
+    /// expression PostgreSQL has. So a deduplication over such a relation is
+    /// hoisted into a binding of its own as soon as another stage follows it,
+    /// which leaves the key equal to the relation's frame and the rendering
+    /// plain `SELECT DISTINCT *`. Nothing following means nothing owed, so a
+    /// deduplication that ends the pipeline still renders as the one query it
+    /// always was:
+    ///
+    /// ```
+    /// # use pgorm::pipeline::Pipeline;
+    /// # use pgorm::tests_cfg::cake::{self, Column as C};
+    /// let (alone, _) = Pipeline::from(cake::Entity).distinct().into_sql()?;
+    /// assert_eq!(alone, "SELECT DISTINCT * FROM cake");
+    ///
+    /// let (projected, _) = Pipeline::from(cake::Entity)
+    ///     .distinct()
+    ///     .select(C::Name)
+    ///     .into_sql()?;
+    /// assert_eq!(
+    ///     projected,
+    ///     "WITH table_0 AS (SELECT DISTINCT * FROM cake) SELECT name FROM table_0"
+    /// );
+    /// # Ok::<_, pgorm::pipeline::PipelineError>(())
+    /// ```
+    ///
+    /// The two are different questions and the hoist is what keeps them
+    /// apart: deduplicating whole rows and *then* projecting is not the same
+    /// relation as projecting and then deduplicating, which is what
+    /// `select` before `distinct` says.
+    ///
     /// ```
     /// # use pgorm::pipeline::{ExprOps, Pipeline, alias, col};
     /// # let accounts = alias("accounts");
@@ -950,6 +1050,14 @@ impl Pipeline {
         if settled {
             self.settle(&naming, "distinct");
         }
+        // Whether *this* deduplication's key will hold a star with no legal
+        // spelling, read after any hoist above, because that is the relation
+        // the group will key on.
+        let bare_key = naming::bare_star_key(&self.stages, self.starred);
+        // Deduplicating again adds nothing to the frame, so prqlc folds the
+        // two into one `DISTINCT` and a hoist an earlier one owes is not owed
+        // to this stage.
+        self.bare_star_key = false;
         self.deduped = true;
         let deduplicated = self.stage(adapter::call(
             "group",
@@ -966,6 +1074,12 @@ impl Pipeline {
             Some(sort) if settled => naming::rebound_sort(sort, &naming),
             unsettled => unsettled,
         };
+        let mut deduplicated = deduplicated;
+        deduplicated.bare_star_key = bare_key;
+        // The restated ordering is a stage like any other, so it discharges
+        // the hoist: the binding the group lands in is then the one prqlc
+        // would have minted for the `ORDER BY` anyway, rather than a second
+        // one wrapping it.
         match restated {
             Some(sort) => deduplicated.ordered_by(sort),
             None => deduplicated,

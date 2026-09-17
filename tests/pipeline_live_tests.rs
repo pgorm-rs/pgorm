@@ -990,7 +990,7 @@ async fn composed_prune_renumbers_across_the_join() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    two sources whose column
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    two sources whose column
 // names collide decode whole models under their own prefixes — the
 // _expr_N dissolution, proven by rows rather than by the emitted string
 #[pgorm_macros::test]
@@ -1044,7 +1044,7 @@ async fn select_sources_decodes_colliding_columns() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    a named restatement
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    a named restatement
 // decodes both occurrences of one table: employee beside manager, whole
 // models on each side
 #[pgorm_macros::test]
@@ -1090,7 +1090,7 @@ async fn select_sources_named_self_join_decodes_both_sides() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    under a right join the
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    under a right join the
 // *left* side is the absent one, and the first listed source decodes None —
 // what the all-optional row type exists to carry
 #[pgorm_macros::test]
@@ -1163,7 +1163,7 @@ async fn right_join_leaves_the_first_position_none() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    the allowed set composes
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the allowed set composes
 // live ahead of the terminal: filter, derive, sort, take and a join, then
 // whole models out
 #[pgorm_macros::test]
@@ -1200,7 +1200,7 @@ async fn select_sources_composes_with_allowed_stages_live() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    one and one_opt carry the
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    one and one_opt carry the
 // terminal's take-1 semantics: first row of the sorted pipeline, RecordNotFound
 // or None when nothing matches
 #[pgorm_macros::test]
@@ -1265,7 +1265,7 @@ mod cast_probe {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    a select_as override and
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    a select_as override and
 // the enum-array default alike reach the sources projection: a numeric column
 // read as text decodes, and a tea[] column reads back under text[]
 #[pgorm_macros::test]
@@ -1343,3 +1343,73 @@ mod tea_pot {
     impl ActiveModelBehavior for ActiveModel {}
 }
 use tea_pot::Tea;
+
+/// Deduplicating before projecting is a different question from projecting
+/// before deduplicating, and the pipeline's stage order is which one is asked.
+///
+/// Over a relation whose columns are still a star the deduplication used to be
+/// rendered `DISTINCT ON (.., *)` — a key PostgreSQL's grammar has no reading
+/// of at all — so neither answer came back. The rows here separate the two:
+/// four sightings, two of them identical, and two names shared across
+/// different ids. Deduplicating whole rows removes only the identical pair;
+/// deduplicating the projected name removes far more.
+// [spec:pgorm:req:pipeline.compose/test]
+#[pgorm_macros::test]
+async fn deduplicating_then_projecting_keeps_its_rows() -> Result<(), pgorm::Error> {
+    let ctx = TestContext::new("pipeline_distinct_star_projection").await;
+    let db = ctx.db.get().await?;
+    let sightings = alias("sightings");
+    db.batch_execute(
+        r#"CREATE TABLE sightings (id integer NOT NULL, name text NOT NULL);
+           INSERT INTO sightings VALUES (1, 'ada'), (2, 'ada'), (3, 'grace'), (3, 'grace');"#,
+    )
+    .await?;
+
+    // The server's own answer to both questions, in SQL this suite wrote.
+    async fn control(db: &impl ConnectionTrait, sql: &str) -> Vec<String> {
+        let mut names: Vec<String> = db
+            .query_all(sql, &[])
+            .await
+            .expect("the control query runs")
+            .iter()
+            .map(|row| row.get(0))
+            .collect();
+        names.sort();
+        names
+    }
+    let whole_rows = control(&db, "SELECT name FROM (SELECT DISTINCT * FROM sightings) t").await;
+    let projected = control(&db, "SELECT DISTINCT name FROM sightings").await;
+    assert_eq!(whole_rows, ["ada", "ada", "grace"]);
+    assert_eq!(projected, ["ada", "grace"]);
+
+    // Deduplicate, then project: the identical pair collapses, the two `ada`
+    // rows with different ids do not.
+    let mut deduplicated: Vec<String> = Pipeline::from(sightings)
+        .distinct()
+        .select(col(sightings, NAME))
+        .into_tuple::<(String,)>()?
+        .all(&db)
+        .await?
+        .into_iter()
+        .map(|(name,)| name)
+        .collect();
+    deduplicated.sort();
+    assert_eq!(deduplicated, whole_rows);
+
+    // Project, then deduplicate: the other question, and the other answer.
+    let mut narrowed: Vec<String> = Pipeline::from(sightings)
+        .select(col(sightings, NAME))
+        .distinct()
+        .into_tuple::<(String,)>()?
+        .all(&db)
+        .await?
+        .into_iter()
+        .map(|(name,)| name)
+        .collect();
+    narrowed.sort();
+    assert_eq!(narrowed, projected);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}

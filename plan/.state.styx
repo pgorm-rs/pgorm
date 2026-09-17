@@ -754,6 +754,7 @@ assertions (
     {id quoted-result-name-doubled, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:39.582401Z}
     {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
     {id campaign-refuses-stale-build, kind @doing, author "brendan@necessary.nu", at 2026-09-16T23:45:58.899831Z}
+    {id distinct-star-projection, kind @doing, author "brendan@necessary.nu", at 2026-09-17T00:37:22.921653Z}
 )
 
 impl_evidence (

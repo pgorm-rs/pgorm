@@ -1494,7 +1494,7 @@ fn nested_embedding_prunes_through_two_levels() {
 
 /// Like [`sql_of`], for the source-select terminal: golden output plus the
 /// grammar oracle.
-// [spec:pgorm:sem:pipeline.select-sources+2/test]
+// [spec:pgorm:sem:pipeline.select-sources+3/test]
 fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     let (sql, _) = selected.into_sql().expect("select_sources compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -1503,7 +1503,7 @@ fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     sql
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    two sources with a
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    two sources with a
 // colliding column name land under different prefixes by construction, so
 // prqlc never mints an _expr_N the decode could not predict
 #[test]
@@ -1526,7 +1526,7 @@ fn select_sources_prefixes_dissolve_expr_n() {
     assert!(!built.contains("_expr_"), "{built}");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    a single source needs no
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    a single source needs no
 // tuple and projects one block under s0_
 #[test]
 fn select_sources_takes_a_single_source() {
@@ -1534,7 +1534,7 @@ fn select_sources_takes_a_single_source() {
     assert_eq!(built, "SELECT id AS s0_id, name AS s0_name FROM cake");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    a named restatement
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    a named restatement
 // qualifies its block by the name, exactly as the join told the two
 // occurrences apart
 #[test]
@@ -1557,7 +1557,7 @@ fn select_sources_named_self_join_qualifies_by_name() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    the writer's cast
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the writer's cast
 // discipline reaches the PRQL side: an enum column reads back as text
 // [spec:pgorm:sem:query.graph.writer+4/test]
 #[test]
@@ -1569,7 +1569,7 @@ fn select_sources_casts_enum_columns_to_text() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    reshaping before the
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    reshaping before the
 // terminal is refused by the stage's own name, before prqlc compiles
 #[test]
 fn select_sources_refuses_a_reshaped_pipeline() {
@@ -1603,7 +1603,7 @@ fn select_sources_refuses_a_reshaped_pipeline() {
     assert_eq!(err, PipelineError::ReshapedSources("remove"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    the refusal names the
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the refusal names the
 // stage that did the replacing: the first offender, not the last
 #[test]
 fn select_sources_refusal_names_the_first_offender() {
@@ -1616,7 +1616,7 @@ fn select_sources_refusal_names_the_first_offender() {
     assert_eq!(err, PipelineError::ReshapedSources("select"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    the whole allowed set
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the whole allowed set
 // ahead of the terminal: filter, derive, sort, take, join, window, distinct
 // and append leave every source addressable
 #[test]
@@ -1642,7 +1642,7 @@ fn select_sources_composes_after_the_allowed_stages() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    append is in the allowed
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    append is in the allowed
 // set because the left side's naming survives it
 #[test]
 fn select_sources_composes_after_append() {
@@ -1657,7 +1657,7 @@ fn select_sources_composes_after_append() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    an embedded pipeline's
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    an embedded pipeline's
 // reshaping stays its own: the CTE boundary re-exposes its projection as a
 // table-like namespace, and the consumer's sources are untouched
 #[test]
@@ -1680,7 +1680,7 @@ fn select_sources_ignores_an_embedded_reshape() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    the catalog-less ceiling:
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the catalog-less ceiling:
 // a listed source the pipeline never read reaches prqlc, which refuses the
 // unresolvable columns as Compile diagnostics
 #[test]
@@ -2274,7 +2274,7 @@ fn a_join_after_a_settle_keeps_both_sides() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+2/test]    a settle replaces the
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    a settle replaces the
 // sources' namespaces exactly as `select` does, so the terminal that projects
 // *by* those names is refused by the same gate rather than reaching prqlc with
 // qualifiers nothing can resolve. The refusal names the deduplication that
@@ -2360,6 +2360,184 @@ fn a_sort_before_a_deduplication_still_orders() {
          table_1 AS (SELECT DISTINCT id, _col_1, name FROM table_0) \
          SELECT id, _col_1, name FROM table_1 ORDER BY id DESC"
     );
+}
+
+/// A deduplication whose key is a star hoists as soon as a stage follows it.
+///
+/// `distinct` is PRQL's `group this (take 1)`, and over a relation whose
+/// columns are still a wildcard prqlc expands `this` to a column set that
+/// holds the wildcard itself. While nothing is fused into the deduplicating
+/// query that set *is* the frame, so prqlc renders plain `SELECT DISTINCT *`;
+/// the moment a later stage lands in the same query the two differ and it
+/// falls through to `DISTINCT ON (<key>)` — with the wildcard still in the
+/// key, spelled `*`, which is not an expression PostgreSQL's grammar has.
+/// Reduced from campaign item `distinct-star-projection`.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn a_star_deduplication_hoists_before_the_next_stage() {
+    let one = alias("one");
+    // The filed shape: project after deduplicating a star relation.
+    assert_eq!(
+        sql_of(Pipeline::from(cake::Entity).distinct().select(NAME)),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) SELECT name FROM table_0"
+    );
+    // A derived column is added to the deduplicating query just the same.
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .derive(Expr::from(1_i32).as_(one))
+        ),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) SELECT *, 1 AS one FROM table_0"
+    );
+    // A join brings a second relation's columns in, and its condition names a
+    // column of this one, which is enough on its own.
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .join(
+                    JoinSide::Inner,
+                    fruit::Entity,
+                    cake::Column::Id.eq(fruit::Column::CakeId),
+                )
+                .select((cake::Column::Name, fruit::Column::Name))
+        ),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) \
+         SELECT table_0.name AS _expr_0, fruit.name FROM table_0 \
+         INNER JOIN fruit ON table_0.id = fruit.cake_id"
+    );
+    // An aggregate and a window both replace or extend the projection.
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .group(NAME)
+                .aggregate(count_rows().as_(alias("n")))
+        ),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) \
+         SELECT name, COUNT(*) AS n FROM table_0 GROUP BY name"
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .window(row_number().as_(alias("rn")), by(cake::Column::Id))
+        ),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) \
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY id) AS rn FROM table_0"
+    );
+    // A stage that keeps the projection intact still hoists, and renders as
+    // it always did — prqlc had to split the query there anyway.
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .filter(cake::Column::Id.gt(1))
+                .select(NAME)
+        ),
+        "WITH table_0 AS (SELECT DISTINCT * FROM cake) \
+         SELECT name FROM table_0 WHERE id > 1"
+    );
+    // And a star relation reached through a settle of its own is no different.
+    assert_eq!(
+        sql_of(Pipeline::from(cake::Entity).take(3).distinct().select(NAME)),
+        "WITH table_0 AS (SELECT * FROM cake LIMIT 3), \
+         table_1 AS (SELECT DISTINCT * FROM table_0) \
+         SELECT name FROM table_1"
+    );
+    // The ordering restated behind the deduplication discharges the hoist
+    // itself, so a sort written either side of it reaches the same query —
+    // the symmetry `a_sort_before_a_deduplication_still_orders` holds for a
+    // projected relation, now over a star one too.
+    let ordered = "WITH table_0 AS (SELECT DISTINCT * FROM cake) \
+                   SELECT name FROM table_0 ORDER BY name";
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .sort(cake::Column::Name)
+                .distinct()
+                .select(NAME)
+        ),
+        ordered
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .distinct()
+                .sort(cake::Column::Name)
+                .select(NAME)
+        ),
+        ordered
+    );
+}
+
+/// The renderings a star deduplication already had, which the hoist must not
+/// disturb: prqlc can spell the key in both, so nothing is owed.
+// [spec:pgorm:req:pipeline.compose/test]
+#[test]
+fn a_spellable_star_key_hoists_nothing() {
+    // Nothing follows, so the key is the frame and `SELECT DISTINCT *` stands.
+    assert_eq!(
+        sql_of(Pipeline::from(cake::Entity).distinct()),
+        "SELECT DISTINCT * FROM cake"
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(cake::Entity)
+                .derive(Expr::from(1_i32).as_(alias("one")))
+                .distinct()
+        ),
+        "SELECT DISTINCT *, 1 AS one FROM cake"
+    );
+    // Deduplicating twice adds nothing to the frame, so prqlc folds the two.
+    assert_eq!(
+        sql_of(Pipeline::from(cake::Entity).distinct().distinct()),
+        "SELECT DISTINCT * FROM cake"
+    );
+    // Two relations in the deduplicating query: prqlc qualifies every star it
+    // writes there (`omit_ident_prefix` is set only for a single table), and a
+    // qualified star is a whole-row reference PostgreSQL accepts as a key.
+    let joined = sql_of(
+        Pipeline::from(cake::Entity)
+            .join(
+                JoinSide::Inner,
+                fruit::Entity,
+                cake::Column::Id.eq(fruit::Column::CakeId),
+            )
+            .distinct()
+            .derive(Expr::from(1_i32).as_(alias("one"))),
+    );
+    assert!(
+        joined.contains("cake.*") && joined.contains("fruit.*"),
+        "{joined}"
+    );
+    assert!(!joined.contains("with_clause_placeholder"), "{joined}");
+}
+
+/// A star deduplication that owes a hoist refuses the per-source projection,
+/// exactly as one that already performed it does
+/// (`select_sources_refuses_a_settled_pipeline`): behind the binding the
+/// relation answers under that binding alone, which is the one thing a
+/// per-source projection cannot do without.
+// [spec:pgorm:sem:pipeline.select-sources+3/test]
+#[test]
+fn select_sources_refuses_a_star_deduplication() {
+    let err = Pipeline::from(cake::Entity)
+        .distinct()
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("the deduplication keys on a star it cannot project through");
+    assert_eq!(err, PipelineError::ReshapedSources("distinct"));
+
+    // A stage between the two does not make it addressable again.
+    let err = Pipeline::from(cake::Entity)
+        .distinct()
+        .filter(cake::Column::Id.gt(1))
+        .select_sources(cake::Entity)
+        .into_sql()
+        .expect_err("the filter discharged the hoist the deduplication owed");
+    assert_eq!(err, PipelineError::ReshapedSources("distinct"));
 }
 
 /// One column of the campaign's fixture table, the operand every set-operation

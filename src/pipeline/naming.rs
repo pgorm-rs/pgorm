@@ -13,6 +13,11 @@
 //! settled relation answers under the binding's name and no longer under the
 //! sources' own, how a reference written against a source follows the column
 //! it names across that boundary.
+//!
+//! One column resists naming altogether: the wildcard a relation whose schema
+//! prqlc cannot see still projects. It has no name to mint over, so
+//! [`bare_star_key`] answers the other question instead — whether the key it
+//! lands in can be written down at all.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -105,6 +110,32 @@ pub(super) fn disambiguate(stages: &mut [PlExpr]) -> Naming {
         }
     }
     naming
+}
+
+/// Whether deduplicating these stages would key on a star with no legal
+/// spelling.
+///
+/// `starred` says the relation still projects a wildcard, which `this` expands
+/// into the deduplication key alongside the named columns. A wildcard is
+/// renderable there only while prqlc qualifies it: `cake.*` is a whole-row
+/// reference PostgreSQL reads as a composite value, and a bare `*` is not an
+/// expression its grammar has at all. prqlc qualifies by table exactly when
+/// the query it is rendering reads more than one — `omit_ident_prefix` is set
+/// for a single table and nothing else — so counting the relations in scope
+/// answers it.
+///
+/// The count is of the stages that *bring* a relation, `from` and `join`,
+/// because those are the ones prqlc renders as tables of the same query; a
+/// stage appended after the deduplication belongs to a query that has already
+/// read from this one.
+// [spec:pgorm:req:pipeline.compose]
+pub(super) fn bare_star_key(stages: &[PlExpr], starred: bool) -> bool {
+    starred
+        && stages
+            .iter()
+            .filter(|stage| matches!(adapter::stage_verb(stage), Some("from" | "join")))
+            .count()
+            == 1
 }
 
 /// The source names a settle took out of scope, and where their columns went.

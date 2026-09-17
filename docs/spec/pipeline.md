@@ -256,6 +256,24 @@ of the crate, compiled in every build. Rules are grouped under
 > an entity-qualified reference no longer resolves — while after `append`
 > the left side's naming survives.
 >
+> `this` expands over a relation whose columns no projection has replaced
+> to the wildcard that relation still carries, so the deduplication key
+> holds one too. prqlc renders the deduplication as plain
+> `SELECT DISTINCT *` only while that key equals the query's own frame, and
+> falls through to `DISTINCT ON (<key>)` as soon as a later stage lands in
+> the same query and the two differ. The wildcard is spellable in that
+> position only qualified — `cake.*` is a whole-row reference PostgreSQL
+> reads as a composite value, a bare `*` is not an expression its grammar
+> has at all — and prqlc qualifies by table exactly when the query reads
+> more than one. A deduplication that reads a single relation and keys on a
+> wildcard MUST therefore be the last stage of its own query: the next
+> stage hoists it into a binding, where the frame settles and plain
+> `DISTINCT` stands. Nothing following means nothing owed, so a
+> deduplication that ends the pipeline renders as the one query it always
+> was. The hoist is what keeps the two readings apart — deduplicating whole
+> rows and then projecting is a different relation from projecting and then
+> deduplicating, and stage order is which one was asked for.
+>
 > A chain of set operations associates left: each one combines everything
 > written before it with its own operand, so `append(b)` then `intersect(c)`
 > means `(a UNION ALL b) INTERSECT ALL c`. Rendered flat that is not what
@@ -447,7 +465,7 @@ of the crate, compiled in every build. Rules are grouped under
 > so the limit belongs to it, in contrast to `SelectorRaw::one`, which
 > executes its text as written.
 
-> [spec:pgorm:sem:pipeline.select-sources+2]
+> [spec:pgorm:sem:pipeline.select-sources+3]
 > `select_sources(sources)` is the model-decode terminal: where
 > `into_model::<M>` asks the caller for a row type whose projection the
 > caller must have arranged, `select_sources` takes the relations
@@ -503,10 +521,23 @@ of the crate, compiled in every build. Rules are grouped under
 > typed `PipelineError` variant naming the offending stage — before prqlc
 > compiles, so the caller reads "select_sources after <stage>" rather
 > than an opaque unresolved-name diagnostic. `filter`, `derive`, `sort`,
-> `take` / `take_range`, `join`, `window`, `distinct` and `append` (whose
-> left-side naming survives) leave every source addressable and compose
-> freely ahead of the terminal; construction itself stays infallible per
+> `take` / `take_range`, `join`, `window` and `append` (whose left-side
+> naming survives) leave every source addressable and compose freely ahead
+> of the terminal; construction itself stays infallible per
 > `[spec:pgorm:req:pipeline.errors+2]`.
+>
+> `distinct` composes ahead of the terminal except where it settles the
+> pipeline into a binding, which is the one thing a per-source projection
+> cannot survive: behind a binding the relation answers under that
+> binding's name alone, and this projection is written in the sources' own.
+> The refusal is the same gate naming `distinct`, and it MUST fire whether
+> the settle has already happened or is still owed — a deduplication over a
+> single relation whose columns are still a wildcard owes one
+> (`[spec:pgorm:req:pipeline.compose]`), and this projection would be the
+> stage that discharges it. Where the deduplication reads more than one
+> relation nothing is owed and it composes as the other stages do. Listing
+> the sources before the deduplication, or decoding with `into_model`,
+> reaches the same rows.
 >
 > The catalog-less ceiling stands: a listed source the pipeline never
 > read compiles up to prqlc, which refuses the unresolvable columns as

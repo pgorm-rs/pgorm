@@ -7105,6 +7105,13 @@ children (
                 kind @blocker
                 text "Found while drafting a regression test for settled-source-name-resolves, and unrelated to it. A deduplication over a relation whose columns are still a star, followed by any projection, renders SQL PostgreSQL's grammar rejects: Pipeline::from(entity).distinct().select_sources(entity) emits SELECT DISTINCT ON (id, name, *) name, id FROM cake, where the star sits inside the DISTINCT ON key list alongside the named columns. Reproduces through plain PRQL text, so it is prqlc's rendering of a group over an unexpanded star rather than anything pgorm's builder does, and it involves no settle. Worth pairing with the existing knowledge that a star's expansion order is only made total by the pinned fork commit b2baa230, since both are the same underlying awkwardness about a relation whose column list is not yet known. The render oracle cannot catch this one either way: it is a grammar rejection, so a syntax-only oracle would catch it if the emitted text reached the oracle, which suggests checking whether any test path actually renders this shape rather than assuming the absence of a failure means absence of the defect."
             }
+
+            {
+                at 2026-09-17T00:37:22.921653Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -7305,6 +7312,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The full profile's remaining failure, and the only one left once every defect cleared. The run of 2026-09-17 records twenty thousand construction programs, five thousand live-database programs, five hundred invalid inputs and twenty-two controls, all passing with zero defects and zero incompletes, and still fails, because a hundred and seventy-three declared coverage obligations were never reached. That is a different claim from a defect: it says the campaign did not exercise everything its own matrix promised, so the silence over those cells means nothing rather than meaning clean. Pre-existing and stable rather than newly introduced, which the kept summary from the previous run establishes: the same hundred and seventy-three were outstanding there, and that run carried both coverage-unsatisfied and unexpected-verdict where this one carries only the first. So the fixes removed the defects and left the gap exactly as it was. The gap is broad rather than concentrated, which argues against one missing generator rule: twenty-seven obligations under value, twenty under pipeline, eighteen under graph, seventeen under crud, fourteen under types, ten each under entities, schema and sequences, nine each under names and patterns, and eight each under array and conditions. Several of the array cells name u64 and vector element types, which suggests some obligations may be declared for shapes the generator cannot currently construct at all rather than merely fails to reach by chance, and those two cases want different answers: a generator that cannot reach a cell needs a rule, while an obligation declared for a shape the library does not support should be retired from the matrix with that reason recorded. Establishing which of the two each cell is, before writing any generator code, is the first piece of work."
+            }
+        )
+    }
+
+    {
+        id prqlc-wildcard-distinct-key
+        title "prqlc keeps a wildcard out of an unqualified DISTINCT ON key"
+        kind @fix
+        log (
+            {
+                at 2026-09-17T00:37:16.543005Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The upstream half of distinct-star-projection, which pgorm now works around correctly but does not cause. prqlc lowers a group-take-one to a Take with a partition and then chooses between SELECT DISTINCT and DISTINCT ON by comparing the partition against the columns in frame; over a relation still projecting a wildcard those sets match while nothing else is fused into the query, and diverge as soon as a later stage is, at which point the wildcard itself lands in the DISTINCT ON key list. Whether that is legal turns on one line in gen_query, which omits the table prefix when the query holds exactly one table: with two or more relations the star is written qualified and PostgreSQL accepts it as a whole-row composite, and with one it is written bare and the grammar rejects it with syntax error at or near star, SQLSTATE 42601. So prqlc emits SQL outside the grammar it targets, in a case its own prefix rule creates. Two shapes of fix are available upstream and the choice is not obvious: qualify the star in a DISTINCT ON key regardless of the table count, which is minimal but makes the prefix rule conditional on context rather than on arity, or decline to choose DistinctOn at all when the partition holds a wildcard and fall back to the form that is already correct. The second is closer to the real invariant, that a wildcard is not a key expression. pgorm's own hoist settles the relation into a binding before the next stage can fuse, which is a correct workaround needing no pin change, so this is not urgent; it belongs on the necessary-nu fork beside the four commits already there, and it should carry a test in prqlc's own suite since the pgorm-side regression cannot see the multi-relation case that is already correct."
             }
         )
     }

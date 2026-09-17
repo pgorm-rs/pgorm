@@ -257,7 +257,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// override projecting something else — projects untouched, exactly as it
 /// stands outside the `SelectStatement` writer's guarantees too.
 // [spec:pgorm:sem:query.graph.writer+4]
-// [spec:pgorm:sem:pipeline.select-sources+2]
+// [spec:pgorm:sem:pipeline.select-sources+3]
 // [spec:pgorm:req:sql.ast.cast-shape]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
     use pgorm_query::SimpleExpr;
