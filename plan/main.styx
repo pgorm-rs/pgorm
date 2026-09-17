@@ -7432,4 +7432,18 @@ children (
             }
         )
     }
+
+    {
+        id prqlc-pin-incomplete
+        title "Every detached workspace resolves the pinned prqlc, discovered not listed"
+        kind @fix
+        log (
+            {
+                at 2026-09-17T13:28:34.570857Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Three manifests pin the prqlc fork; twelve are eligible. The eight that do not — security/sqlmap/adapter, security/generative/replay, pgorm-python/tests/application-binding, pgorm-python/tests/codegen-entities, and the five security/generative/findings reproducers — each declare their own [workspace], depend on pgorm by path, and so resolve prqlc 0.13.14 from crates.io. Verified in their committed lockfiles: source = \"registry+https://github.com/rust-lang/crates.io-index\", checksum 43a839cc.\n\nThe defect is in the guard I wrote, not only in the manifests. tests/prqlc_pin_tests.rs line 70 is `const DETACHED: [&str; 2] = [\"pgorm-python\", \"security/generative/bridge\"]` — a hand-written list of the two cases I already knew about. It reads like a guard against the class and is an assertion about two instances, so every detached workspace added since has been unprotected by construction and the test stayed green throughout. The fix is to discover the set rather than list it: walk the tree for Cargo.toml files declaring [workspace] that depend on pgorm or pgorm-codegen by path, and require the patch table of each. Then the next detached crate is covered on the day it is created.\n\nTwo of the eight matter beyond hygiene. security/sqlmap/adapter is the subject of the SQL-injection campaign, so the binary that campaign scans is not the binary that ships; the fork carries 9023adad, which changes how identifiers are quoted, and identifier handling is the one surface where injection in an ORM can actually live. security/generative/replay reproduces campaign findings while the bridge that generates them is pinned, so the generator and the replayer are two different compilers and a replay can diverge from its finding for reasons that have nothing to do with the defect.\n\nOn severity, stated carefully because I overstated it first. 9023adad is not a quote breakout in its main case. sqlparser's escape_quoted_string passes an already-doubled delimiter through and doubles a lone one, so `a\"b` and `a\"\"b` both render `\"a\"\"b\"`: the mapping is not injective and a name silently loses a character. That is a correctness defect, not an escape — a caller cannot leave the quoted context that way. The backslash case is the one worth testing rather than asserting, since escape_quoted_string also passes through a delimiter preceded by a backslash and PostgreSQL gives backslash no meaning inside a quoted identifier. Reaching any of it needs pipeline::named_runtime, the deliberate runtime-name entry point; the ordinary alias path is AliasName(&'static str) and cannot carry runtime data at all."
+            }
+        )
+    }
 )
