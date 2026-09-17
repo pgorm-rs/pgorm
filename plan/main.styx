@@ -7446,4 +7446,18 @@ children (
             }
         )
     }
+
+    {
+        id supply-chain-unscanned
+        title "The dependency tree is scanned for advisories on a schedule"
+        kind @ci
+        log (
+            {
+                at 2026-09-17T16:12:48.147713Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "The repository had no way to learn that a dependency had acquired a published advisory. No cargo-deny or cargo-audit config, no Dependabot, no SBOM, and no CI job running any of them; a grep for OWASP, ASVS, CWE, CVE and \"threat model\" returns nothing anywhere in the tree. The first notice of a vulnerability would have been someone happening to read a mailing list.\n\nMeasured before writing policy. cargo-deny was already installed, and over the tree as it stands: advisories ok, bans ok, sources ok. So there is nothing live to fix — the gap was never knowing, and never being able to know tomorrow.\n\nThe license allowlist in deny.toml is derived from `cargo deny list` rather than copied from a template, so every entry is a license already present and read. r-efi is the only crate offering a copyleft option and is licensed MIT OR Apache-2.0 OR LGPL-2.1-or-later, so omitting LGPL selects a permissive alternative rather than excluding the crate. The prqlc fork is named under sources.allow-git, which is what makes it a reviewed exception instead of an unremarked git dependency: a second fork now has to be a deliberate edit to that file.\n\nThe schedule is the substance of the CI workflow, not the pull-request trigger. A tree does not have to change to become vulnerable, so a check that only ran on PRs would stay green through exactly the case it exists to catch. The run uploads the resolved lockfile because the root Cargo.lock is untracked; without it a green run reports on a tree nobody can reconstruct afterwards, which is how the campaign lost its baseline.\n\nOne finding is deliberately reported rather than fixed. cargo-deny flags four wildcard dependencies — pgorm-pool and three siblings referred to by path with no version. My first read was that intra-workspace paths are exempt and this was a false positive; allow-wildcard-paths does not cover them, because none of pgorm, pgorm-pool, pgorm-query, pgorm-macros or pgorm-sql-macro sets publish = false and crates.io rejects a path dependency carrying no version. So `cargo publish` would fail on these today. That is real, but it is a defect in releasing rather than in supply chain, and the two fixes — a version alongside each path, or an explicit publish = false — are opposite claims about whether this fork is distributed. Settling that by config edit would bury the question, so wildcards is set to warn and the choice stays with the operator."
+            }
+        )
+    }
 )
