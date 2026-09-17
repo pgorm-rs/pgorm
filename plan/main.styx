@@ -7337,6 +7337,7 @@ children (
         id coverage-obligations-unreached
         title "The generator reaches every obligation the matrix declares"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-16T23:54:31.726124Z
@@ -7357,6 +7358,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-17T13:16:51.406337Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
