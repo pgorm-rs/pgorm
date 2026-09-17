@@ -7098,6 +7098,7 @@ children (
         id distinct-star-projection
         title "A deduplicated star relation projects to valid SQL"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-15T16:15:03.137963Z
@@ -7111,6 +7112,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-17T00:38:14.626726Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
