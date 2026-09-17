@@ -12,3 +12,19 @@ path = "native.rs"
 
 [dependencies]
 pgorm = { path = "../../../.." }
+
+# The workspace above is this crate's own, so it resolves [patch.crates-io]
+# here and never from the root.
+#
+# This crate was the one candidate for staying on stock prqlc: it reproduces
+# the nondeterministic star expansion the fork's b2baa230 fixes, and a pin
+# that made the reproducer pass would have destroyed the evidence. Measured
+# rather than assumed, on 2026-09-17: five runs of forty compilations on each
+# compiler, one rendering every time on both. pgorm now binds the
+# deduplicated join into a CTE, so the expansion the fork fixed is no longer
+# on this path and the reproducer no longer tells the two compilers apart.
+# Pinned with the rest — the surviving purpose of the crate is to exercise
+# what pgorm ships. The fixed behaviour is asserted in the pgorm suite proper
+# by `pipeline::tests::a_joined_deduplicated_relation_compiles_once`.
+[patch.crates-io]
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "d6f2fa9753699a4c97385679aa908a032a4afbe4" }

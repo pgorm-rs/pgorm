@@ -2,9 +2,17 @@
 
 **Fixed.** pgorm now pins a patched prqlc, and
 `pipeline::tests::a_joined_deduplicated_relation_compiles_once` asserts the
-compilation is stable. The material below is what the defect looked like; the
-standalone reproducer here still builds against stock prqlc and still fails
-there, which is what makes it evidence.
+compilation is stable. The material below is what the defect looked like.
+
+The reproducer here no longer separates the two compilers, and this crate is
+now pinned like every other detached workspace. It was left on stock prqlc so
+that it would keep failing, which it did; re-measured on 2026-09-17 it does
+not, on either compiler — five runs of forty compilations against stock
+`0.13.14` and five against the pinned fork, one rendering every time, and that
+rendering is `SELECT DISTINCT p_id, p_rank, j_id, j_account_id FROM table_1`.
+pgorm now binds the deduplicated join into a CTE, so the star expansion the
+fork made total is no longer on this path. The stock-prqlc failure recorded in
+`native.log` is the evidence; the crate reproduces it no longer.
 
 The same `Pipeline` value, compiled repeatedly without being rebuilt, emitted
 its projection columns in one of two orders, chosen at random per compilation:

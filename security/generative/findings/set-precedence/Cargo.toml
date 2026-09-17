@@ -13,3 +13,12 @@ path = "native.rs"
 [dependencies]
 pgorm = { path = "../../../.." }
 serde_json = "1"
+
+# The workspace above is this crate's own, so it resolves [patch.crates-io]
+# here and never from the root. No fork commit touches set-operation
+# rendering, and re-measuring on 2026-09-17 agreed: the crate emits
+# byte-identical SQL under stock 0.13.14 and under the pinned fork. Pinned
+# because the pin costs the reproducer nothing and it should demonstrate
+# against the compiler pgorm ships.
+[patch.crates-io]
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "d6f2fa9753699a4c97385679aa908a032a4afbe4" }

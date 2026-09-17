@@ -45,3 +45,11 @@ missing_panics_doc = "deny"
 # The report is written to stdout by contract, at exactly one site.
 print_stdout = "deny"
 print_stderr = "deny"
+
+# The detached workspace above resolves [patch.crates-io] from this manifest
+# and never from the root's, so the root's prqlc pin has to be repeated here.
+# The bridge that generates a finding is pinned; without the same pin the
+# harness that replays it compiles a different SQL generator, and a replay can
+# then diverge from its finding for a reason that is not the defect.
+[patch.crates-io]
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "d6f2fa9753699a4c97385679aa908a032a4afbe4" }
