@@ -1,9 +1,10 @@
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
 from pgorm_campaign.build import content_identity
-from pgorm_campaign.campaign_main import StaleBuild, refuse_stale
+from pgorm_campaign.campaign_main import StaleBuild, record_run, refuse_stale
 
 
 class BuildTests(unittest.TestCase):
@@ -75,3 +76,54 @@ class StaleBuildTests(unittest.TestCase):
             self._tree(root)
             with self.assertRaises(StaleBuild):
                 refuse_stale({}, root)
+
+
+class RunLedgerTests(unittest.TestCase):
+    """A run's identity outlives the build directory its artifacts sit in."""
+
+    # [spec:pgorm:req:generative.artifacts/test]
+    def test_a_run_records_its_findings_outside_target(self):
+        summary = {
+            "profile": "full",
+            "passed": False,
+            "output": "target/generative-campaign/full-abc123",
+            "counts": {"live_database_programs_checked": {"scheduled": 5000}},
+            "fault_kinds": ["coverage-unsatisfied"],
+            "coverage": ["value.decimal.scale", "array.u64.bound"],
+        }
+        document = {
+            "source": {"revision": "cafebabe", "dirty": False},
+            "findings": [
+                {
+                    "item": "runtime-887",
+                    "run_class": "runtime",
+                    "verdict": "defect",
+                    "program_sha256": "deadbeef",
+                    "directory": "target/gone-after-clean",
+                    "commands": {"replay": ["ignored"]},
+                },
+            ],
+        }
+        with TemporaryDirectory() as directory:
+            ledger = Path(directory) / "runs"
+            record_run(summary, document, ledger)
+            entry = json.loads((ledger / "full-abc123.json").read_text())
+
+        # What a comparison against the next run needs, and nothing that
+        # points back into a directory `cargo clean` will delete.
+        self.assertEqual((entry["revision"], entry["dirty"]), ("cafebabe", False))
+        self.assertEqual(
+            entry["findings"],
+            [
+                {
+                    "item": "runtime-887",
+                    "run_class": "runtime",
+                    "verdict": "defect",
+                    "program_sha256": "deadbeef",
+                }
+            ],
+        )
+        self.assertEqual(
+            entry["coverage_outstanding"], ["array.u64.bound", "value.decimal.scale"]
+        )
+        self.assertEqual(entry["fault_kinds"], ["coverage-unsatisfied"])

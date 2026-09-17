@@ -7091,6 +7091,13 @@ children (
                 kind @note
                 text "The first run this session whose answer is worth anything, and worth recording what made it so. Three conditions had to hold at once and each had failed separately before. The native bridge was rebuilt so build.json records the revision the tree is actually at, after a run tested a bridge three commits stale and reported a fixed defect as still broken. No agent was touching the database, after a run collided with three of them and returned 2947 FixtureFailure records out of 2972. And a list of the previous run's finding ids was copied out of target beforehand, so the two runs could be diffed by id rather than by remembering numbers. Under those conditions the profile went from ninety-two findings to nine. What that establishes is stronger than the arithmetic: every one of the four fixes confirmed here was confirmed on the original campaign programs rather than on a reduction, which is the distinction that closed nested-source-from-entry too early. The literal reconciliation cleared thirty-nine, the settle repointing thirty, the set-operation bracketing five, and the window frame nine of its ten, the tenth turning out to be the count half of a finding that bundled two discrepancies. The three that remain are each a single filed defect rather than a class. Until this node is fixed, the standing procedure is that a campaign run means nothing unless the bridge revision matches HEAD, nothing else holds the database, and the prior finding list has been preserved somewhere cargo clean cannot reach."
             }
+
+            {
+                at 2026-09-17T12:42:53.204223Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 

@@ -27,6 +27,7 @@ from .fixtures import Fixture
 from .oracles import Checker
 
 OUTPUT = "target/generative-campaign"
+LEDGER = "security/generative/runs"
 BUILD = "target/generative-build/build.json"
 
 
@@ -130,6 +131,48 @@ def refuse_stale(build, root):
 
 
 # [spec:pgorm:req:generative.artifacts]
+def record_run(summary, document, ledger):
+    """Keep enough of a run outside `target` to diff the next one against it.
+
+    A run's own artifacts live under `target`, which an ordinary `cargo clean`
+    deletes — it took the 2026-09-14 full run with it, and the next run's
+    ninety-two findings could not be told from the previous thirty-seven
+    because the baseline no longer existed. The bulk output stays disposable,
+    since the campaign is seeded, but the identity of each finding does not:
+    item, verdict and program digest are what a comparison needs, and they cost
+    a few kilobytes.
+    """
+    ledger.mkdir(parents=True, exist_ok=True)
+    findings = sorted(
+        (
+            {
+                "item": finding["item"],
+                "run_class": finding["run_class"],
+                "verdict": finding["verdict"],
+                "program_sha256": finding["program_sha256"],
+            }
+            for finding in document["findings"]
+        ),
+        key=lambda finding: finding["item"],
+    )
+    entry = {
+        "profile": summary["profile"],
+        "passed": summary["passed"],
+        "revision": document.get("source", {}).get("revision"),
+        "dirty": document.get("source", {}).get("dirty"),
+        "output": summary["output"],
+        "counts": summary["counts"],
+        "fault_kinds": summary["fault_kinds"],
+        "coverage_outstanding": sorted(summary["coverage"]),
+        "findings": findings,
+    }
+    name = Path(summary["output"]).name
+    (ledger / f"{name}.json").write_text(
+        json.dumps(entry, indent=2, sort_keys=True) + "\n"
+    )
+
+
+# [spec:pgorm:req:generative.artifacts]
 async def main(arguments):
     """Create the run directory, execute the profile and report the outcome."""
     os.environ["TZ"] = "UTC"
@@ -153,21 +196,17 @@ async def main(arguments):
         (output / "summary.json").write_text(json.dumps(failure, indent=2) + "\n")
         print(json.dumps(failure), flush=True)
         return 1
-    (output / "summary.json").write_text(
-        json.dumps(
-            {
-                "passed": document["passed"],
-                "profile": arguments.profile,
-                "output": str(output),
-                "counts": document["counts"],
-                "coverage": document["coverage"]["declared_missing"],
-                "fault_kinds": document["aggregate"]["fault_kinds"],
-                "seconds": document["timing"].get("total_seconds"),
-            },
-            indent=2,
-        )
-        + "\n"
-    )
+    summary = {
+        "passed": document["passed"],
+        "profile": arguments.profile,
+        "output": str(output),
+        "counts": document["counts"],
+        "coverage": document["coverage"]["declared_missing"],
+        "fault_kinds": document["aggregate"]["fault_kinds"],
+        "seconds": document["timing"].get("total_seconds"),
+    }
+    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    record_run(summary, document, Path(arguments.root) / arguments.ledger)
     _progress(document, output)
     return 0 if document["passed"] else 1
 
@@ -178,6 +217,7 @@ def parse(argv=None):
     parser.add_argument("--output", default=OUTPUT)
     parser.add_argument("--build", default=BUILD)
     parser.add_argument("--root", default=str(ROOT))
+    parser.add_argument("--ledger", default=LEDGER)
     return parser.parse_args(argv)
 
 
