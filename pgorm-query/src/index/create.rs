@@ -45,19 +45,16 @@ use super::common::*;
 ///     r#"CREATE INDEX IF NOT EXISTS "idx-glyph-aspect" ON "glyph" ("aspect")"#
 /// );
 /// ```
-/// Index with prefix
-/// ```
+/// A column takes no prefix length. That is MySQL's index-a-leading-substring
+/// syntax, which PostgreSQL rejects outright, so the tuple that spelled it does
+/// not typecheck:
+///
+/// ```compile_fail,E0277
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::create(Glyph::Table, (Glyph::Aspect, 128))
-///     .name("idx-glyph-aspect")
-///     .to_owned();
-///
-/// assert_eq!(
-///     index.to_string(),
-///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (128))"#
-/// );
+/// Index::create(Glyph::Table, (Glyph::Aspect, 128));
 /// ```
+///
 /// Index with order
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
@@ -86,20 +83,7 @@ use super::common::*;
 ///     r#"CREATE UNIQUE INDEX "idx-glyph-aspect" ON "glyph" ("image" ASC, "aspect" DESC)"#
 /// );
 /// ```
-/// Index with prefix and order
-/// ```
-/// use pgorm_query::{*, tests_cfg::*};
-///
-/// let index = Index::create(Glyph::Table, (Glyph::Aspect, 64, IndexOrder::Asc))
-///     .name("idx-glyph-aspect")
-///     .to_owned();
-///
-/// assert_eq!(
-///     index.to_string(),
-///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect" (64) ASC)"#
-/// );
-/// ```
-// [spec:pgorm:req:sql.ddl.index-create+4]
+// [spec:pgorm:req:sql.ddl.index-create+5]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -120,7 +104,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+4]
+// [spec:pgorm:req:sql.ddl.index-create+5]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -133,7 +117,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+4]
+// [spec:pgorm:req:sql.ddl.index-create+5]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,

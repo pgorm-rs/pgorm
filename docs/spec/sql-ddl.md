@@ -58,7 +58,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
 > ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+4]`) and `NULLS NOT
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+5]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis only
@@ -197,7 +197,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > All three take their targets in the constructor, because PostgreSQL rejects
 > every one of these statements with the name left out: `Table::drop(table)`
 > seeds the list and `table()` appends the rest, in the pattern
-> `[spec:pgorm:req:sql.ddl.index-create+4]` uses for index columns, so the
+> `[spec:pgorm:req:sql.ddl.index-create+5]` uses for index columns, so the
 > empty `DROP TABLE ` cannot be built; `Table::rename(from, to)` and
 > `Table::truncate(table)` take theirs whole and expose no setter. `take()` on
 > a drop copies the target list rather than moving it, so no target-less husk
@@ -243,7 +243,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+4]
+> [spec:pgorm:req:sql.ddl.index-create+5]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
 > `index_type` and `if_not_exists` flags. Its target table and its column list
@@ -270,8 +270,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > never a combination: `primary()` and `unique()` each set the kind outright,
 > replacing whatever was set before, and an index is never both a primary key
 > and a unique key. `is_primary_key()`, `is_unique_key()` and `kind()` read it
-> back. `IntoIndexColumn` accepts an iden, `(iden, u32)` prefix,
-> `(iden, IndexOrder)` or `(iden, u32, IndexOrder)`.
+> back. `IntoIndexColumn` accepts an iden or an `(iden, IndexOrder)` pair,
+> and nothing else: the MySQL prefix-length forms `(iden, u32)` and
+> `(iden, u32, IndexOrder)` are gone with the `IndexColumn::prefix` field they
+> fed, and MUST NOT return.
 >
 > Postgres spells `PRIMARY KEY` only as an inline table constraint, so
 > `IndexKind::PrimaryKey` has no standalone spelling and the standalone
@@ -287,8 +289,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
 > `<type>` is `BTREE`, `GIN` (the `FullText` mapping, also set by
 > `full_text()`), `HASH`, or a custom identifier, and each column renders as
-> `"name"[ (prefix)][ ASC|DESC]` — the MySQL-style `(prefix)` length is still
-> emitted even though Postgres does not accept it. Postgres defines
+> `"name"[ ASC|DESC]`. There is no prefix length: `"name" (128)` is MySQL's
+> syntax for indexing a leading substring, PostgreSQL rejects it outright, and
+> an index the server cannot accept MUST NOT be constructible — the expression
+> index is the legitimate occupant of that syntactic position. Postgres defines
 > `NULLS NOT DISTINCT` for unique indexes alone, so the flag MUST render only
 > when the kind is `Unique`; on any other kind it is carried but not spelled.
 >

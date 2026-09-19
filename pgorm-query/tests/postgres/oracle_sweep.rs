@@ -478,7 +478,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-create+5/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([

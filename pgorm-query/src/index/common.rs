@@ -10,7 +10,6 @@ pub struct TableIndex {
 #[derive(Debug, Clone)]
 pub struct IndexColumn {
     pub(crate) name: DynIden,
-    pub(crate) prefix: Option<u32>,
     pub(crate) order: Option<IndexOrder>,
 }
 
@@ -37,20 +36,6 @@ where
     fn into_index_column(self) -> IndexColumn {
         IndexColumn {
             name: self.into_iden(),
-            prefix: None,
-            order: None,
-        }
-    }
-}
-
-impl<I> IntoIndexColumn for (I, u32)
-where
-    I: IntoIden,
-{
-    fn into_index_column(self) -> IndexColumn {
-        IndexColumn {
-            name: self.0.into_iden(),
-            prefix: Some(self.1),
             order: None,
         }
     }
@@ -63,21 +48,7 @@ where
     fn into_index_column(self) -> IndexColumn {
         IndexColumn {
             name: self.0.into_iden(),
-            prefix: None,
             order: Some(self.1),
-        }
-    }
-}
-
-impl<I> IntoIndexColumn for (I, u32, IndexOrder)
-where
-    I: IntoIden,
-{
-    fn into_index_column(self) -> IndexColumn {
-        IndexColumn {
-            name: self.0.into_iden(),
-            prefix: Some(self.1),
-            order: Some(self.2),
         }
     }
 }

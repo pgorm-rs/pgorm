@@ -361,7 +361,7 @@ fn oracle_records_parse_valid_defects() {
 // them.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.alter-table+3/test]
-// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-create+5/test]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]
 #[test]
 fn empty_ddl_collections_do_not_construct() {
@@ -402,7 +402,7 @@ fn create_table_with_no_columns_is_valid() {
 // `compile_fail` doctests on each statement type prove the constructors refuse.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.create-table+6/test]
-// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-create+5/test]
 // [spec:pgorm:req:sql.ddl.index-drop+2/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 // [spec:pgorm:req:sql.ddl.alter-table+3/test]
@@ -442,7 +442,7 @@ fn ddl_targets_are_taken_by_construction() {
 // and `DROP INDEX` names a schema-scoped index rather than a table, so both stay
 // optional where the rest of the family moved into the constructor.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.index-create+4/test]
+// [spec:pgorm:req:sql.ddl.index-create+5/test]
 // [spec:pgorm:req:sql.ddl.index-drop+2/test]
 #[test]
 fn index_name_and_drop_table_stay_optional() {

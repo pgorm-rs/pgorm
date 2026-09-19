@@ -7534,6 +7534,7 @@ children (
                 id query-name-equality-defined
                 title "SQL name equality is defined behaviour, not a vtable comparison"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:04.819423Z
@@ -7548,6 +7549,13 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-19T23:36:13.598965Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -7561,6 +7569,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "IndexColumn carries prefix: u32 (pgorm-query/src/index/common.rs:11-15) and Index::create(t, (Glyph::Aspect, 128)) renders (\"aspect\" (128)) — MySQL prefix-length syntax PostgreSQL rejects outright (render at backend/query_builder.rs:2004-2019). The doctest at index/create.rs:48-59 goldens the invalid SQL, so the suite pins a statement no server will ever accept. Delete the field and the tuple impl feeding it; expression indexes (query-index-forms) are the legitimate feature in that syntactic position."
+                    }
+
+                    {
+                        at 2026-09-19T23:36:19.605334Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

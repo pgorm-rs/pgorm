@@ -759,7 +759,8 @@ assertions (
     {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
     {id query-comment-renders, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:23:59.814264Z}
-    {id query-name-equality-defined, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:24:06.093825Z}
+    {id query-name-equality-defined, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:36:13.598965Z}
+    {id query-index-prefix-retired, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:36:19.605334Z}
 )
 
 impl_evidence (

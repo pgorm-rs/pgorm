@@ -1929,7 +1929,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+4]
+    // [spec:pgorm:req:sql.ddl.index-create+5]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -2000,15 +2000,7 @@ impl QueryBuilder {
     }
 
     #[doc(hidden)]
-    /// Write the column index prefix.
-    fn write_column_index_prefix(&self, col_prefix: &Option<u32>, sql: &mut dyn SqlWriter) {
-        if let Some(prefix) = col_prefix {
-            write!(sql, " ({prefix})").unwrap();
-        }
-    }
-
-    #[doc(hidden)]
-    /// Write the column index prefix.
+    /// Write an index's column list.
     fn prepare_index_columns(&self, columns: &[IndexColumn], sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
         columns.iter().fold(true, |first, col| {
@@ -2016,7 +2008,6 @@ impl QueryBuilder {
                 write!(sql, ", ").unwrap();
             }
             col.name.prepare(sql.as_writer(), self.quote());
-            self.write_column_index_prefix(&col.prefix, sql);
             if let Some(order) = &col.order {
                 match order {
                     IndexOrder::Asc => write!(sql, " ASC").unwrap(),
