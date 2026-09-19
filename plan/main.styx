@@ -7495,4 +7495,415 @@ children (
             }
         )
     }
+
+    {
+        id query-refound
+        title "pgorm-query is re-founded: curated, coherent, and sufficient for PostgreSQL"
+        kind @refactor
+        children (
+            {
+                id query-comment-renders
+                title "Table and column comments render, or their setters are gone"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:11:03.377377Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "TableCreateStatement::comment (pgorm-query/src/table/create.rs:92-99) sets a field prepare_table_create_statement (backend/query_builder.rs:1713-1766) never reads; verified by reading the renderer. The type-level doc example (create.rs:23) even shows .comment(\"table's comment\") beside golden output containing no comment. ColumnDef::comment is equally skipped (table/column.rs:708-711). The standalone COMMENT ON statement (comment.rs) works and is what pgorm's Schema::create_comments_from_entity uses. Fix: render the carried comments as appended COMMENT ON statements, or delete both setters and point their docs at Comment."
+                    }
+                )
+            }
+
+            {
+                id query-name-equality-defined
+                title "SQL name equality is defined behaviour, not a vtable comparison"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:11:04.819423Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "SharedIden::PartialEq (pgorm-query/src/types.rs:65-74) transmutes trait objects to compare vtable pointers: equality is same-vtable-address AND same text. Rust guarantees neither uniqueness nor stability of vtables across codegen units, so two idens of the same type and text can legitimately compare unequal — and the test at types.rs:1002-1041 relies on the opposite. This underpins PartialEq for ColumnRef, TableName and the whole AST. Fix: compare rendered text plus TypeId (store it in SharedIden or add an accessor to the trait). Also removes the only unsafe block in shipped pgorm-query code."
+                    }
+                )
+            }
+
+            {
+                id query-index-prefix-retired
+                title "The index column prefix PostgreSQL rejects is gone"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:11:06.450398Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "IndexColumn carries prefix: u32 (pgorm-query/src/index/common.rs:11-15) and Index::create(t, (Glyph::Aspect, 128)) renders (\"aspect\" (128)) — MySQL prefix-length syntax PostgreSQL rejects outright (render at backend/query_builder.rs:2004-2019). The doctest at index/create.rs:48-59 goldens the invalid SQL, so the suite pins a statement no server will ever accept. Delete the field and the tuple impl feeding it; expression indexes (query-index-forms) are the legitimate feature in that syntactic position."
+                    }
+                )
+            }
+
+            {
+                id query-generated-virtual-guarded
+                title "A virtual generated column renders only where PostgreSQL accepts it"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:11:07.827784Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "ColumnSpec::Generated { stored: false } renders \" VIRTUAL\" (backend/query_builder.rs:1887-1891), which PostgreSQL accepts only from 18 — where it is also the default spelling — and rejects as a syntax error on every earlier release. Decide the supported floor: refuse stored: false at render with a named error, or render nothing and document the server requirement. Whichever way, the current silent emit-and-fail-at-the-server is the wrong behaviour for a builder whose value is catching this before execution."
+                    }
+                )
+            }
+
+            {
+                id query-tokenizer-postgres
+                title "The tokenizer speaks PostgreSQL and hides its cursor"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:11:09.064307Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "token.rs:332-353 treats backtick and [bracket] as quoting delimiters — MySQL/MSSQL residue in the one SQL parser the crate owns — so inject_parameters treats `x $1` as opaque quoted text and skips the marker. Separately, Tokenizer.chars and .p are pub (token.rs:11-12) and the module is glob re-exported, so a caller setting p past the end gets an index panic from next() (token.rs:48; end() at :55 checks == not >=). Fix: PostgreSQL delimiters only (single quote, double quote, dollar-quoting, E-strings), private fields."
+                    }
+                )
+            }
+
+            {
+                id query-dead-surface-gone
+                title "The zero-consumer residue is deleted, not deprecated"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:11:10.235617Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Census 2026-09-20: ~179 public items, ~94 with any consumer use, ~77 dead (own-tests-only counts as dead). The deletion candidates are the residue half: Expr::custom_keyword + Keyword::Custom, order_by_customs(_with_nulls), partition_by_custom(s), any!/all! macros, the Function enum (func.rs:12), IdenList + its tuple impls (types.rs:89, 685-719), the Expression trait (expr.rs:55), NotU8, Cond alias, the never-called Returning factory (query/returning.rs:21) — plus pgorm proper's debug_query!/debug_query_stmt!/DebugQuery (src/query/util.rs:105,72,4 — exported macros that cannot compile, their build impl commented out at :30-40; zero call sites), which ride along in the same sweep. Two cautions: the census (b) list is a candidate set, not a verdict — IntoColumnDef appears on it yet is the by-value embedder pattern query-verbs-keep-promises standardizes on, so each deletion is re-verified against consumers AND convention value at execution. And the (a) list stays: Extension builders, window Frame types, recursive-CTE Search/Cycle, PgInterval, PgLTree, the tsquery/ts_rank Func family are real PostgreSQL surface pgorm merely doesn't use yet. Leaked internals are query-reexports-curated's scope, not deletions here."
+                    }
+                )
+            }
+
+            {
+                id query-single-dialect
+                title "The backend admits it has exactly one dialect"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:11:51.915325Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The multi-backend trait is gone but its skeleton still governs backend/query_builder.rs: dialect knobs returning constants (placeholder() -> (\"$\", true) at :38; values_list_tuple_prefix \"\" :102-104; insert_default_keyword :1400-1403; column_spec_auto_increment_keyword \"\" :1566-1568; if_null/char_length/random_function :97-99, 1389-1398), no-op hooks prepare_output (:1210) and prepare_index_hints (:495), a precedence table split into common_* free functions merged with a pg_specific_answer (:2404-2516) for exactly one dialect, UFCS pseudo-dispatch spelled QueryBuilder::prepare_simple_expr(self, ..) (:1643, 1775, 1873, 1885), and #[doc(hidden)] on private methods — vestigial from when they were trait items. Quote is generalized over arbitrary (u8,u8) with five From impls (types.rs:618-654) though the crate has one quote (:13), and Quote::new(0xFF) panics in Iden::quoted (types.rs:21). The renderer's own comment marks the seam: \"START: impl that ought not be here … END: lol\" (:1428, 1478). Also here: the 12 MySQL/SQLite doc mentions, and IndexType::FullText -> Gin (index/create.rs:159, render :1993; codegen round-trips \"gin\" => FullText at pgorm-codegen/src/sql_schema/objects.rs:148). Inline the constants, delete the hooks, fold common_* in, name the index method for what it renders."
+                    }
+                )
+            }
+
+            {
+                id query-bound-quoting-contract
+                title "The bound is the quoting contract at every render site"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:11:53.187052Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Exactly three render sites emit a caller identifier unquoted — backend/query_builder.rs:994 (Keyword::Custom), :1551 (ColumnType::Custom), :1995 (IndexType::Custom) — against a builder that otherwise quotes everything via Iden::prepare (types.rs:14-23) or TypeName::prepare_part (:261-271). The bound does not distinguish them: Func::cust (func.rs:157-162) has the identical T: IntoIden and quotes correctly, and inside one enum ColumnType::Enum quotes (:1552-1556) while its Custom sibling two lines earlier does not. Same fix family: enum labels are typed IntoIden but rendered as bound parameters (extension.rs:650-659; push_param at query_builder.rs:2215, 2242-2263) — labels are data, take Into<String>; ExtensionCreateStatement.schema is Option<String> where every other identifier is a name type (extension.rs:75); TypeName::custom's doc promises a source literal its Into<String> bound doesn't enforce (types.rs:199-218) — &'static str per the types_alias.rs:30 precedent. Exit test, mechanically checkable: no DynIden reaches output in backend/ except through prepare or prepare_part; a grep for .unquoted( / .to_string() on idens in render code returns nothing."
+                    }
+                )
+            }
+
+            {
+                id query-verbs-keep-promises
+                title "take drains, embedders consume by value, with composes identically everywhere"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:11:54.437664Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "take() drains via mem::take on SelectStatement (query/select.rs:116-133), WindowStatement, TableIndex, TableCreateStatement — but IndexCreateStatement::take is self.clone() (index/create.rs:273-275, name promises a move), ForeignKeyCreateStatement::take half-drains (foreign_key/common.rs:130-140), and Insert/Update/Delete have no take() so every doc example clones with .to_owned(). Embedding into TableCreateStatement happens four different ways: .col() consumes by value (create.rs:102), .index(&mut) silently clones (:119-124, because that take is a clone), .foreign_key(&mut) silently drains the argument (:164-169), PendingTableAlter::add_foreign_key(&) borrows-and-clones (table/alter.rs:59-61) — reuse the argument after the call and you get three different outcomes. .with() diverges too: Select carries the clause and stays buildable (select_with.rs:65-71) while Insert/Update/Delete return WithQuery and end the builder (insert.rs:399-404, update.rs:286-289, delete.rs:226-229), with with_cte(&mut) as a third receiver convention. Standard to enforce: embedders take impl IntoX by value (the IntoColumnDef pattern, table/column.rs:742-752); take() drains or doesn't exist; with composes the way Select's does."
+                    }
+                )
+            }
+
+            {
+                id query-render-per-capability
+                title "Every parameter-carrying statement builds, every Display admits it inlines"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:11:55.609114Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "lib.rs:296-325 states \"a schema statement carries no bind parameters, so it has exactly one rendering\" — false: CREATE TYPE ... AS ENUM and ALTER TYPE push_param their labels (query_builder.rs:2215, 2242-2263), so their Display inlines values while their build_collect over SqlWriterValues emits $N with the values retrievable only through undocumented into_parts(). The render surface is three-tier: query statements have build() + build_collect + Display (query/traits.rs:50-93), Type statements have build_collect + Display but no build() (extension.rs:215-237), Table/Index/FK/Comment statements have Display only (table/create.rs:256-262). And nothing structural stops executing the inlined string — pgorm's executor accepts any &str via the sealed SqlText (src/database/connection.rs:33-45), so conn.execute(&stmt.to_string(), &[]) compiles and silently loses binding. Fix: every statement that ever calls push_param exposes a real build(); every Display impl carries the inline-literal warning on the impl itself, not only in lib.rs; the \"silent no-op settable field\" class (comment, ColumnSpec::Comment) is ruled out by a fields-read-by-renderer check."
+                    }
+                )
+            }
+
+            {
+                id query-update-from
+                title "UPDATE FROM and DELETE USING are expressible"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-19T23:12:32.833419Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "UpdateStatement has exactly four fields — table, values, where, returning (query/update.rs:76-81) — and DeleteStatement likewise has no USING (query/delete.rs:80-236). UPDATE ... FROM / DELETE ... USING is the join-write idiom every downstream app hits early; today it forces correlated-subquery contortions, which the crate's own doctests demonstrate (update.rs:267-276 routes through in_subquery against a CTE), or raw SQL. Ranked second of the three sufficiency gaps most worth closing in the 2026-09-20 review. The from machinery already exists on SelectStatement; the work is a from slot on the two write statements plus renderer support and multi-relation name resolution in the WHERE."
+                    }
+                )
+            }
+
+            {
+                id query-aggregate-modifiers
+                title "FILTER and WITHIN GROUP reach aggregate calls"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-19T23:12:33.920008Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "FuncArgMod carries only distinct (func.rs:52-55): FILTER (WHERE ...) and WITHIN GROUP (ORDER BY ...) — ordered-set aggregates like percentile_cont — are inexpressible, and both are baseline modern PostgreSQL. FILTER especially is the standard spelling of conditional aggregation that otherwise degrades to SUM(CASE WHEN ...). The shape: FunctionCall grows filter and within_group clauses, rendered after the argument list; the pipeline's aggregate verbs can then expose them too."
+                    }
+                )
+            }
+
+            {
+                id query-index-forms
+                title "Partial and expression indexes are expressible"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-19T23:12:36.11618Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "IndexCreateStatement's fields (index/create.rs:103-111) have no partial-index WHERE, no expression columns (IndexColumn is name-only, index/common.rs:11-15), no INCLUDE, no operator class, no CONCURRENTLY. NULLS NOT DISTINCT is already supported (create.rs:227), so the type is half-modernized. Partial and expression indexes are the priority — the 2026-09-20 sufficiency review classed them as baseline modern schema work — with INCLUDE and opclass behind them. Expression columns also supply the honest replacement for the deleted MySQL prefix tuple (query-index-prefix-retired)."
+                    }
+                )
+            }
+
+            {
+                id query-second-tier
+                title "The long tail of PostgreSQL constructs is expressible or explicitly ruled out"
+                kind @feat
+                log (
+                    {
+                        at 2026-09-19T23:12:37.402102Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The remainder of the 2026-09-20 sufficiency checklist, tracked so each item is either made expressible or ruled out in a documented out-of-scope list rather than silently absent: MERGE; GROUPING SETS/ROLLUP/CUBE; IS DISTINCT FROM; simple-form CASE (query/case.rs:71 is searched-only); array subscripts and slices; range types (no Value or ColumnType variant — Custom only); ON CONFLICT ON CONSTRAINT; INTERSECT ALL / EXCEPT ALL (select.rs:102-107); window frame GROUPS mode, EXCLUDE clause, and expression offsets like RANGE '1 day' PRECEDING (query/window.rs:44-57); COLLATE; AT TIME ZONE; BETWEEN SYMMETRIC; OVERRIDING SYSTEM VALUE; deferrable constraints (foreign_key/create.rs:143-150); partitioning DDL; EXCLUDE constraints; views and materialized views; sequences; CREATE TYPE composite/range (stubs commented out at extension.rs:478-487); table/column storage options. Already ruled reasonably out of scope: GRANT/REVOKE, triggers, RLS policies, COPY (protocol-level), procedural DO blocks, CREATE DATABASE/SCHEMA. This node is the decomposition point — seal it once each item has its own child or its line in the out-of-scope doc."
+                    }
+                )
+            }
+
+            {
+                id query-reexports-curated
+                title "The public surface is curated, not globbed"
+                kind @refactor
+                deps (query-dead-surface-gone)
+                log (
+                    {
+                        at 2026-09-19T23:12:30.471632Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "lib.rs:623-635 glob re-exports every module, leaking the render engine as public API: QueryBuilder, Mode, Oper, SqlWriter, SqlWriterValues, Quote, Tokenizer, Token, OrderExpr, JoinOn, JoinExpr, SelectDistinct, LockClause, WindowSelectType, ConditionExpression, ConditionHolder, AnyWithClause, the on-conflict typestate internals, and the six *Statement dispatch enums (QueryStatement, SubQueryStatement, TableStatement, IndexStatement, ForeignKeyStatement, SchemaStatement). Verified against every consumer's use pgorm_query:: imports: not one of these is imported anywhere, so curation breaks nothing. Two low-level items are genuinely imported and stay public: inject_parameters (pgorm-python statements/raw.rs, sqlmap adapter main.rs:131) and QueryStatementBuilder (one site). The cautionary detail: CustomExpr is the single hand-curated re-export in the file (lib.rs:613) and has zero consumers — curation without a consumer check is how that happens. Depends on the trim so the surviving surface is what gets curated."
+                    }
+                )
+            }
+
+            {
+                id query-raw-template-words
+                title "Verbatim SQL says raw, validated SQL says template, and custom says nothing"
+                kind @refactor
+                deps (query-dead-surface-gone)
+                log (
+                    {
+                        at 2026-09-19T23:11:56.726417Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "The word \"custom\" currently spans the entire safety spectrum: cust_with_values/CustomExpr are validated arity-checked templates, Expr::cust and the extra methods are verbatim Into<String>, order_by_customs/partition_by_custom(s) are verbatim ToString, custom_keyword/ColumnDef::custom/IndexType::Custom are verbatim wearing IntoIden, and BinOper::Custom is verbatim but honestly &'static str — five bounds for one semantic and one word for five semantics. Decided vocabulary, ratified 2026-09-20: unmarked = quoted identifier; raw = verbatim, accepting only &'static str or a RawSql newtype; template = validated and Result-returning (cust_with_values -> Expr::template, CustomExpr -> SqlTemplate). This aligns pgorm-query with the vocabulary pgorm proper already uses consistently — query_raw, execute_raw, SelectorRaw, from_raw_sql, TypeName::raw_text all mean exactly \"trusted SQL text\". Exit check, greppable: the strings \"custom\" and \"cust\" appear nowhere in pgorm-query's public API. Most of the offenders are deleted by query-dead-surface-gone rather than renamed, which is why that node is a dep."
+                    }
+                )
+            }
+
+            {
+                id query-name-vocabulary
+                title "An SQL name is a Name, known statically or minted at runtime"
+                kind @refactor
+                deps (query-dead-surface-gone)
+                log (
+                    {
+                        at 2026-09-19T23:11:57.861408Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "\"Identity\" is triple-booked: the Iden family names SQL identifiers; pgorm's Identity (src/entity/identity.rs:12) is a key-column set — which also impl Iden by concatenating its members with no separator (:69-75), the multi-part-name bug — and PostgreSQL's own identity columns are the one meaning the codebase can't express. The Iden root is inherited: trait Iden dates to the import commit 5c602d13, and SharedIden is sea-query's SeaRc de-branded (f57ae221) — the fork stripped the vendor name but kept both the implementation-leaking \"Shared\" and the non-word root, then also kept DynIden as a second name for the same type (types.rs:48). Meanwhile every type this fork designed already says Name: TableName/FromItem (99b969d7), NamedTable (f2d2d609), AliasName (97b703da). Decided, ratified 2026-09-20 — finish that migration: SharedIden/DynIden -> Name (one type, Arc inside is private); trait Iden -> SqlName, mirroring pgorm's existing SqlText convention; IntoIden -> IntoName; IdenStatic + pgorm's reinvented IdenStr -> one StaticName; Alias::new(x) -> Name::runtime(x), killing the Alias/alias lookalike and reusing the fork's established \"runtime\" marker (named_runtime, as_runtime) so every untrusted-data entry into identifier position becomes greppable; pgorm's Identity -> Key, freeing the word for query-identity-columns."
+                    }
+                )
+            }
+
+            {
+                id query-raw-relation
+                title "A raw SQL fragment can stand in relation position"
+                kind @feat
+                deps (query-raw-template-words)
+                log (
+                    {
+                        at 2026-09-19T23:12:31.604424Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "FromItem (types.rs:393-402) offers Table/SubQuery/ValuesList/FunctionCall — no raw variant, so a foreign SQL fragment cannot enter a built query as a relation. Expression position has Expr::cust; relation position has nothing. The crate's own executor paid for this twice: wrap_raw_select (src/executor/paginator.rs:395-402) and the count path (:129-133) hand-format \"SELECT * FROM ({select}) AS ...\" around a caller's raw statement, then need a pg_query-based marker census (:411-450) to make the interpolation safe. The fix is a validated raw relation riding the existing template machinery (single-SELECT check, $N renumbering — exactly what the paginator already hand-rolls), after which wrap_raw_select is deleted and the paginator becomes an ordinary builder consumer. Naming follows query-raw-template-words, hence the dep."
+                    }
+                )
+            }
+
+            {
+                id query-identity-columns
+                title "Identity columns are what the word Identity means"
+                kind @feat
+                deps (query-name-vocabulary)
+                log (
+                    {
+                        at 2026-09-19T23:12:35.006019Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "AutoIncrement renders the legacy serial family only (backend/query_builder.rs:1430-1434); GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY — PostgreSQL's recommended replacement since 10 — is inexpressible, and codegen consequently cannot round-trip a modern schema faithfully. Deliberately blocked on query-name-vocabulary: that rename moves pgorm's key-column Identity type to Key, freeing the word so the type that expresses GENERATED AS IDENTITY can be called what PostgreSQL calls it without colliding with an unrelated concept in the same workspace."
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id api-honesty
+        title "The ORM surface says what it does and does what it says"
+        kind @fix
+        children (
+            {
+                id loader-one-refuses-many
+                title "load_one errors on a second row instead of discarding it"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:20.432271Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "load_one (src/query/loader.rs:125) runs the same batched read as load_many, then .map(|bucket| bucket.into_iter().next_back()) (:149) — if the database returns n rows for a key, n-1 vanish with no error and no warning. The only cardinality checks are on the declared RelationType (:135-140), never on the data, so a missing UNIQUE constraint on the FK column turns a schema mistake into silent row loss at read time. Fix: a bucket of length > 1 is an Error naming the key, consistent with the fork's existing rule that load_one errors on an unmatched key instead of yielding None silently."
+                    }
+                )
+            }
+
+            {
+                id migration-status-reads
+                title "Checking migration status writes nothing"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:21.561024Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Migrator::status (pgorm-migration/src/migrator.rs:368, doc \"Check the status of all migrations\") and the get_* accessors (:159, :175, :231, :241) all call Self::install first (:317), which runs CREATE TABLE, conditionally ALTER TABLE ADD COLUMN, and adopt_legacy_ledger (:295), whose DO block takes pg_advisory_xact_lock and issues ALTER TABLE \"seaql_migrations\" RENAME (:302). A caller reaching for a read-only health check — a readiness probe, a CI gate — mutates the schema on every call, and needs DDL privileges to ask a question. Fix: split a genuinely read-only status/get path (absent ledger reported as pending-everything) from the self-provisioning path that up/down legitimately use."
+                    }
+                )
+            }
+
+            {
+                id update-nothing-distinct
+                title "An update with nothing to set is distinguishable from matching nothing"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:22.776899Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "UpdateMany::exec returns Ok(0) without sending any statement when the value list is empty (src/executor/update.rs:61-67), and exec_returning_models returns Ok(vec![]) the same way (:85-87); neither doc mentions it. Ok(0) therefore conflates \"the WHERE matched nothing\" with \"you gave me nothing to SET\" — and the input is easy to produce, since UpdateMany::set skips Unchanged/NotSet fields (src/query/update.rs:216), so an ActiveModel round-tripped from the database yields exactly this. The asymmetry proves the design intent: singular exec_returning_model handles the same case by issuing a SELECT and returning the row (:33-35), and DeleteMany has no short-circuit at all (src/executor/delete.rs:29). Fix: make the empty-set case an Err, or align with the singular path's semantics."
+                    }
+                )
+            }
+
+            {
+                id paginator-advances
+                title "The paginator's page step is named for what it does and fails where it fails"
+                kind @refactor
+                log (
+                    {
+                        at 2026-09-19T23:13:23.984582Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Two defects on one type. Paginator::next (src/executor/paginator.rs:228) is pub fn next(&mut self) { self.page += 1; } — no I/O, no return value, not Iterator::next — sitting beside fetch_and_next (:262), which is what actually fetches; tests/paginator_tests.rs:83 already shows the bare paginator.next(); statement reading like a fetch. Rename to advance. Second: PaginatorTrait::paginate for SelectorRaw is infallible-typed but stores wrap_raw_select's Result into the pub(crate) field (:371-373, :34), so an unparseable statement or a $N above the bind count produces a born-failed Paginator whose error surfaces only at the first fetch/num_items (:145-150). Surface the failure at construction."
+                    }
+                )
+            }
+
+            {
+                id pool-savepoint-quoted
+                title "A savepoint name cannot smuggle SQL"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:25.119681Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Transaction::savepoint (pgorm-pool/src/lib.rs:617) takes I: Into<String> and hands the name to tokio-postgres, which does format!(\"SAVEPOINT {}\", name) and runs it through batch_execute — the simple protocol, multi-statement, no quoting, no parameters (tokio-postgres transaction.rs:319-320). A runtime string interpolated into executable SQL, with nothing in pgorm's wrapper name or doc saying so — the same defect class as the pipeline identifier hole fixed in f48c6425, one layer down. Inherited from deadpool-postgres; one in-repo test call site. Fix: quote the name as an identifier (double and wrap, the fork's own rule) or bound it &'static str."
+                    }
+                )
+            }
+
+            {
+                id codegen-quotes-custom-type
+                title "Codegen splices a custom column type through quote, not format"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:26.365133Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pgorm-codegen/src/entity/column.rs:103 builds the derive attribute with format!(\"custom(\\\"{}\\\")\", iden.to_string()) — unescaped string interpolation into what pgorm-macros later re-parses with syn::parse_str::<TokenStream> (derives/entity_model.rs:60) and splices after ColumnType:: (derives/sql_type_match.rs:75). The expanded path 44 lines down does the same job correctly with quote! { ColumnType::custom(#s) } (column.rs:147). Compounding: validate_col_type checks ColumnType::Enum's name via safe_ident but waves ColumnType::Custom through unchecked (:244 vs :261-263). Reachable via the public TryFrom<ColumnDef> (:272) with a hostile catalog type name; a quote character most likely yields a confusing compile error in generated code rather than execution, but generated-code injection is not worth reasoning about — use quote! on both paths and validate Custom like Enum."
+                    }
+                )
+            }
+
+            {
+                id active-model-unknown-column
+                title "take and get refuse an unknown column the way set already does"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:27.346685Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The derive gives take and get a catch-all _ => ActiveValue::not_set() arm (pgorm-macros/src/derives/active_model.rs:121, :129), so asking for a column the model doesn't carry is indistinguishable from a field that is merely unset — while set, three lines later in the same trait, reports exactly that case as Err(Error::Type) and documents it (:132-141). Same trait, same failure, opposite handling. Also the doc bugs: ActiveModelTrait::take says \"Get a mutable ActiveValue\" but returns an owned value and mem::swaps NotSet into the field — it removes it (src/entity/active_model.rs:143; same wording on ActiveValue::take :650, and into_value's doc \"Check if a Value exists or not\" for a consuming getter :671). Fix: take/get return Result like set; docs say remove/consume."
+                    }
+                )
+            }
+
+            {
+                id metrics-rollback-honest
+                title "A failed commit is not recorded as a rollback"
+                kind @fix
+                log (
+                    {
+                        at 2026-09-19T23:13:28.345442Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "InstrumentedTransaction::commit records record_transaction_rollback on its Err arm and never calls record_query_error (src/metric/mod.rs:401-403), so an implementor's rollbacks_total counts failed commits and the error itself is dropped. rollback() records both hooks (:429), so the two exit paths also disagree with each other. The caveat lives only in rollback's own doc (:415-418) — not on commit, and not on the trait method an implementor actually reads (:94, \"Record transaction rollback\"). A failed COMMIT does abort the transaction server-side, so the semantic is defensible — but it must be stated at the trait, and the commit error must reach an error hook. Fix: either a distinct record_commit_failure hook or trait-level docs defining rollback as \"transaction ended without committing\", plus the missing error recording."
+                    }
+                )
+            }
+
+            {
+                id api-doc-honesty
+                title "The docs state what the code does, everywhere they state anything"
+                kind @docs
+                log (
+                    {
+                        at 2026-09-19T23:13:29.441625Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The collected doc-vs-code falsehoods, each small, together corrosive. src/lib.rs:83-87 lists four escape hatches taking SQL as text; six more exist (ConnectionTrait::execute/query_one/query_opt/query_all at database/connection.rs:77-112, Select::from_raw_sql at executor/select.rs:142, FromQueryResult::find_by_statement at entity/model.rs:175) — an auditor trusting the list misses the majority of the surface. pgorm::connect does no I/O (database/mod.rs:112, pool construction only), so bad credentials surface at pool.get(); the doc should say so. pgorm-pool Config::url's doc says other options override the URL (config.rs:66-69) but port and hostaddr append via tokio-postgres's push semantics (:356-363) — url plus port yields two ports. get_pg_config silently falls back to env::var(\"USER\") (:300-312), undocumented environment participation in a getter. prepare_comment_text is a second string escaper ('' doubling only, query_builder.rs:1815-1819) correct solely under standard_conforming_strings=on — document the assumption or unify with escape_string. Insert::add's model-dropping paths are documented at insert.rs:244-248 but nothing in the return type hints at it; cross-reference from the exec methods. Each item: fix the doc, or fix the code and keep the doc — decided per item, not blanket."
+                    }
+                )
+            }
+        )
+    }
 )
