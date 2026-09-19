@@ -218,6 +218,44 @@ mod tests_postgres {
         );
     }
 
+    // Each of PostgreSQL's quoting forms, with a marker on both sides of it:
+    // the one inside is opaque text, the one outside is still a reference.
+    // A form the tokenizer read wrongly would take the outside marker with it.
+    #[test]
+    fn markers_survive_every_quoting_form() {
+        let cases = [
+            // single-quoted literal
+            (r#"$1 = 'a $9 b' AND $1"#, r#"'X' = 'a $9 b' AND 'X'"#),
+            // doubled quote inside a literal: the body continues past it
+            (r#"$1 = 'it''s $9' AND $1"#, r#"'X' = 'it''s $9' AND 'X'"#),
+            // double-quoted identifier
+            (r#"$1 = "c $9 d" AND $1"#, r#"'X' = "c $9 d" AND 'X'"#),
+            (r#"$1 = "a""b $9" AND $1"#, r#"'X' = "a""b $9" AND 'X'"#),
+            // dollar-quoted body, bare and tagged
+            (r#"$1 = $$ $9 $$ AND $1"#, r#"'X' = $$ $9 $$ AND 'X'"#),
+            (r#"$1 = $t$ $9 $t$ AND $1"#, r#"'X' = $t$ $9 $t$ AND 'X'"#),
+            // escape string, whose backslash may not end the body early
+            (r#"$1 = E'a\'b $9' AND $1"#, r#"'X' = E'a\'b $9' AND 'X'"#),
+            // comments are lexical regions too
+            ("$1 -- $9\nAND $1", "'X' -- $9\nAND 'X'"),
+            ("$1 /* $9 */ AND $1", "'X' /* $9 */ AND 'X'"),
+            // `[` is a subscript, not SQL Server's quote, so a marker inside
+            // an array subscript is a marker — the case this pairing used to
+            // get wrong, leaving `$1` unsubstituted inside the brackets
+            (r#"a[$1] = $1"#, r#"a['X'] = 'X'"#),
+            // and an unpaired backtick no longer swallows the rest as a body
+            (r#"$1 = `x AND $1"#, r#"'X' = `x AND 'X'"#),
+        ];
+
+        for (sql, expected) in cases {
+            assert_eq!(
+                inject_parameters(sql, ["X".into()]).unwrap(),
+                expected,
+                "input: {sql}"
+            );
+        }
+    }
+
     #[test]
     fn a_zero_reference_is_refused() {
         assert_eq!(

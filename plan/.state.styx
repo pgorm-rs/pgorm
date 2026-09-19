@@ -761,7 +761,8 @@ assertions (
     {id query-comment-renders, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:23:59.814264Z}
     {id query-name-equality-defined, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:36:13.598965Z}
     {id query-index-prefix-retired, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:38:31.768223Z}
-    {id query-generated-virtual-guarded, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:38:37.499247Z}
+    {id query-generated-virtual-guarded, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:41:47.316724Z}
+    {id query-tokenizer-postgres, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:41:51.84322Z}
 )
 
 impl_evidence (

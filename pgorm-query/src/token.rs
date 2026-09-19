@@ -3,16 +3,16 @@
 use std::fmt::Write;
 use std::iter::Iterator;
 
-// [spec:pgorm:def:sql.token]
-// [spec:pgorm:sem:sql.token.limits+1]
+// [spec:pgorm:def:sql.token+1]
+// [spec:pgorm:sem:sql.token.limits+2]
 #[derive(Debug, Default)]
 pub struct Tokenizer {
     dollar_quotes: bool,
-    pub chars: Vec<char>,
-    pub p: usize,
+    chars: Vec<char>,
+    p: usize,
 }
 
-// [spec:pgorm:def:sql.token] (the four token classes)
+// [spec:pgorm:def:sql.token+1] (the four token classes)
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Quoted(String),
@@ -53,7 +53,7 @@ impl Tokenizer {
     }
 
     fn end(&self) -> bool {
-        self.p == self.chars.len()
+        self.p >= self.chars.len()
     }
 
     fn peek(&self, ahead: usize) -> Option<char> {
@@ -108,7 +108,7 @@ impl Tokenizer {
     /// [`Token::Quoted`]. A digit after the opening `$` is a placeholder
     /// spelling, never a tag, so `$1` stays punctuation; an unclosed body
     /// runs to the end of the input, reproduced verbatim.
-    // [spec:pgorm:req:sql.token.quoted+1]
+    // [spec:pgorm:req:sql.token.quoted+2]
     fn dollar_quoted(&mut self) -> Option<Token> {
         if !self.dollar_quotes || self.peek(0) != Some('$') {
             return None;
@@ -147,7 +147,7 @@ impl Tokenizer {
     /// An escape string, `E'…'`, lexed whole as one [`Token::Quoted`]: inside
     /// it a backslash escapes the next character — the closing quote included
     /// — and `''` doubling still continues the body.
-    // [spec:pgorm:req:sql.token.quoted+1]
+    // [spec:pgorm:req:sql.token.quoted+2]
     fn e_string(&mut self) -> Option<Token> {
         if !matches!(self.peek(0), Some('E' | 'e')) || self.peek(1) != Some('\'') {
             return None;
@@ -225,7 +225,7 @@ impl Tokenizer {
         }
     }
 
-    // [spec:pgorm:req:sql.token.quoted+1]
+    // [spec:pgorm:req:sql.token.quoted+2]
     fn quoted(&mut self) -> Option<Token> {
         let mut string = String::new();
         let mut first = true;
@@ -238,13 +238,13 @@ impl Tokenizer {
                 first = false;
                 start = c;
                 self.inc();
-            } else if !first && !escape && Self::is_string_delimiter_end_for(start, c) {
+            } else if !first && !escape && c == start {
                 write!(string, "{c}").unwrap();
                 self.inc();
                 if self.end() {
                     break;
                 }
-                if !Self::is_string_escape_for(start, self.get()) {
+                if self.get() != start {
                     break;
                 } else {
                     write!(string, "{}", self.get()).unwrap();
@@ -278,12 +278,12 @@ impl Tokenizer {
                 first = false;
                 start = c;
                 self.inc();
-            } else if !first && !escape && Self::is_string_delimiter_end_for(start, c) {
+            } else if !first && !escape && c == start {
                 self.inc();
                 if self.end() {
                     break;
                 }
-                if !Self::is_string_escape_for(start, self.get()) {
+                if self.get() != start {
                     break;
                 } else {
                     write!(string, "{c}").unwrap();
@@ -329,27 +329,16 @@ impl Tokenizer {
         c.is_alphabetic() || c.is_ascii_digit()
     }
 
+    /// PostgreSQL's two string delimiters: `'` for a literal, `"` for a
+    /// delimited identifier. Each closes with itself and doubles itself, so
+    /// the closing and continuation tests are both `c == start` and need no
+    /// table. The backtick and `[bracket]` forms the delimiter set used to
+    /// carry are MySQL and SQL Server syntax: PostgreSQL never opens a string
+    /// with either, so treating them as quoted made the tokenizer read plain
+    /// SQL as an opaque body and skip the placeholders inside it.
+    // [spec:pgorm:req:sql.token.quoted+2]
     fn is_string_delimiter_start(c: char) -> bool {
-        matches!(c, '`' | '[' | '\'' | '"')
-    }
-
-    fn is_string_escape_for(start: char, c: char) -> bool {
-        match start {
-            '`' => c == '`',
-            '\'' => c == '\'',
-            '"' => c == '"',
-            _ => false,
-        }
-    }
-
-    fn is_string_delimiter_end_for(start: char, c: char) -> bool {
-        match start {
-            '`' => c == '`',
-            '[' => c == ']',
-            '\'' => c == '\'',
-            '"' => c == '"',
-            _ => false,
-        }
+        matches!(c, '\'' | '"')
     }
 
     fn is_escape_char(c: char) -> bool {
@@ -443,7 +432,7 @@ impl std::fmt::Display for Token {
 // [spec:pgorm:req:sql.token.scan/test]
 // [spec:pgorm:req:sql.token.space+1/test]
 // [spec:pgorm:req:sql.token.word/test]
-// [spec:pgorm:req:sql.token.quoted+1/test]
+// [spec:pgorm:req:sql.token.quoted+2/test]
 // [spec:pgorm:sem:sql.token.unquote/test]
 // [spec:pgorm:thm:sql.token.roundtrip/test]
 #[cfg(test)]
@@ -451,399 +440,242 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    /// Assert the token stream `input` lexes to, and that the stream puts the
+    /// input back together — the losslessness property
+    /// (`[spec:pgorm:thm:sql.token.roundtrip]`) holds per case, so every case
+    /// checks it.
+    fn lexes(input: &str, expected: Vec<Token>) {
+        let tokens: Vec<Token> = Tokenizer::new(input).iter().collect();
+        assert_eq!(tokens, expected);
+        assert_eq!(
+            input,
+            tokens.iter().map(|t| t.to_string()).collect::<String>()
+        );
+    }
+
+    fn quoted(text: &str) -> Token {
+        Token::Quoted(text.to_owned())
+    }
+
+    fn word(text: &str) -> Token {
+        Token::Unquoted(text.to_owned())
+    }
+
+    fn space(text: &str) -> Token {
+        Token::Space(text.to_owned())
+    }
+
+    fn mark(text: &str) -> Token {
+        Token::Punctuation(text.to_owned())
+    }
+
     #[test]
     fn test_0() {
-        let tokenizer = Tokenizer::new("");
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(tokens, vec![]);
+        lexes("", vec![]);
     }
 
     #[test]
     fn test_1() {
-        let string = "SELECT * FROM `character`";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
+        lexes(
+            r#"SELECT * FROM "character""#,
             vec![
-                Token::Unquoted("SELECT".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("*".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Unquoted("FROM".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Quoted("`character`".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+                word("SELECT"),
+                space(" "),
+                mark("*"),
+                space(" "),
+                word("FROM"),
+                space(" "),
+                quoted(r#""character""#),
+            ],
         );
     }
 
     #[test]
     fn test_2() {
-        let string = "SELECT * FROM `character` WHERE id = ?";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
+        lexes(
+            r#"SELECT * FROM "character" WHERE id = ?"#,
             vec![
-                Token::Unquoted("SELECT".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("*".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Unquoted("FROM".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Quoted("`character`".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Unquoted("WHERE".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Unquoted("id".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("=".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("?".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+                word("SELECT"),
+                space(" "),
+                mark("*"),
+                space(" "),
+                word("FROM"),
+                space(" "),
+                quoted(r#""character""#),
+                space(" "),
+                word("WHERE"),
+                space(" "),
+                word("id"),
+                space(" "),
+                mark("="),
+                space(" "),
+                mark("?"),
+            ],
         );
     }
 
     #[test]
     fn test_3() {
-        let string = r#"? = "?" "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
+        lexes(
+            r#"? = "?" "#,
             vec![
-                Token::Punctuation("?".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("=".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Quoted(r#""?""#.to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+                mark("?"),
+                space(" "),
+                mark("="),
+                space(" "),
+                quoted(r#""?""#),
+                space(" "),
+            ],
         );
     }
 
     #[test]
     fn test_4() {
-        let string = r#""a\"bc""#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(tokens, vec![Token::Quoted("\"a\\\"bc\"".to_string())]);
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes(r#""a\"bc""#, vec![quoted(r#""a\"bc""#)]);
     }
 
     #[test]
     fn test_5() {
-        let string = "abc123";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(tokens, vec![Token::Unquoted(string.to_string())]);
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes("abc123", vec![word("abc123")]);
     }
 
     #[test]
     fn test_6() {
-        let string = "2.3*4";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Unquoted("2".to_string()),
-                Token::Punctuation(".".to_string()),
-                Token::Unquoted("3".to_string()),
-                Token::Punctuation("*".to_string()),
-                Token::Unquoted("4".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+        lexes(
+            "2.3*4",
+            vec![word("2"), mark("."), word("3"), mark("*"), word("4")],
         );
     }
 
     #[test]
     fn test_7() {
-        let string = r#""a\\" B"#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Quoted("\"a\\\\\"".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Unquoted("B".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+        lexes(
+            r#""a\\" B"#,
+            vec![quoted(r#""a\\""#), space(" "), word("B")],
         );
     }
 
     #[test]
     fn test_8() {
-        let string = r#"`a"b` "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Quoted("`a\"b`".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        // A backtick is MySQL's quote, not PostgreSQL's: it is punctuation,
+        // and the `"` inside opens the only string here.
+        lexes(r#"`a"b` "#, vec![mark("`"), word("a"), quoted(r#""b` "#)]);
     }
 
     #[test]
     fn test_9() {
-        let string = r#"[ab] "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Quoted("[ab]".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        // `[ab]` is SQL Server's quote; to PostgreSQL it is subscript
+        // punctuation around a word, and it lexes that way.
+        lexes("[ab] ", vec![mark("["), word("ab"), mark("]"), space(" ")]);
     }
 
     #[test]
     fn test_10() {
-        let string = r#" 'a"b' "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Space(" ".to_string()),
-                Token::Quoted("'a\"b'".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+        lexes(
+            r#" 'a"b' "#,
+            vec![space(" "), quoted(r#"'a"b'"#), space(" ")],
         );
     }
 
     #[test]
     fn test_11() {
-        let string = r#" `a``b` "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
+        lexes(
+            " `a``b` ",
             vec![
-                Token::Space(" ".to_string()),
-                Token::Quoted("`a``b`".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+                space(" "),
+                mark("`"),
+                word("a"),
+                mark("`"),
+                mark("`"),
+                word("b"),
+                mark("`"),
+                space(" "),
+            ],
         );
     }
 
     #[test]
     fn test_12() {
-        let string = r#" 'a''b' "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Space(" ".to_string()),
-                Token::Quoted("'a''b'".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes(" 'a''b' ", vec![space(" "), quoted("'a''b'"), space(" ")]);
     }
 
     #[test]
     fn test_13() {
-        let string = r#"(?)"#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Punctuation("(".to_string()),
-                Token::Punctuation("?".to_string()),
-                Token::Punctuation(")".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes("(?)", vec![mark("("), mark("?"), mark(")")]);
     }
 
     #[test]
     fn test_14() {
-        let string = r#"($1 = $2)"#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
+        lexes(
+            "($1 = $2)",
             vec![
-                Token::Punctuation("(".to_string()),
-                Token::Punctuation("$".to_string()),
-                Token::Unquoted("1".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("=".to_string()),
-                Token::Space(" ".to_string()),
-                Token::Punctuation("$".to_string()),
-                Token::Unquoted("2".to_string()),
-                Token::Punctuation(")".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+                mark("("),
+                mark("$"),
+                word("1"),
+                space(" "),
+                mark("="),
+                space(" "),
+                mark("$"),
+                word("2"),
+                mark(")"),
+            ],
         );
     }
 
     #[test]
     fn test_15() {
-        let string = r#" "Hello World" "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Space(" ".to_string()),
-                Token::Quoted("\"Hello World\"".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+        lexes(
+            r#" "Hello World" "#,
+            vec![space(" "), quoted(r#""Hello World""#), space(" ")],
         );
     }
 
     #[test]
     fn test_16() {
-        let string = "abc_$123";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(tokens, vec![Token::Unquoted(string.to_string())]);
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes("abc_$123", vec![word("abc_$123")]);
     }
 
     #[test]
     fn test_17() {
         // `$abc$` opens a tagged dollar quote; without a closer the body runs
         // to the end of the input, verbatim.
-        let string = "$abc$123";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(tokens, vec![Token::Quoted("$abc$123".to_string())]);
-        let template = Tokenizer::new_without_dollar_quoting(string);
+        lexes("$abc$123", vec![quoted("$abc$123")]);
+
+        let template = Tokenizer::new_without_dollar_quoting("$abc$123");
         assert_eq!(
             template.iter().collect::<Vec<_>>(),
-            vec![
-                Token::Punctuation("$".to_string()),
-                Token::Unquoted("abc$123".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+            vec![mark("$"), word("abc$123")]
         );
     }
 
     #[test]
     fn test_18() {
-        let string = "_$abc_123$";
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Punctuation("_".to_string()),
-                Token::Quoted("$abc_123$".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
-        );
+        lexes("_$abc_123$", vec![mark("_"), quoted("$abc_123$")]);
     }
 
     #[test]
     fn test_19() {
-        let string = r#""a\"bc""#;
-        let tokenizer = Tokenizer::new(string);
-        assert_eq!(tokenizer.unquote(), "a\\\"bc".to_owned());
+        assert_eq!(Tokenizer::new(r#""a\"bc""#).unquote(), r#"a\"bc"#);
     }
 
     #[test]
     fn test_20() {
-        let string = r#""a""bc""#;
-        let tokenizer = Tokenizer::new(string);
-        assert_eq!(tokenizer.unquote(), "a\"bc".to_owned());
+        assert_eq!(Tokenizer::new(r#""a""bc""#).unquote(), r#"a"bc"#);
     }
 
     #[test]
     fn test_21() {
         assert_eq!(
-            Token::Quoted("'a\\nb'".to_owned()).unquote().unwrap(),
-            "a\\nb".to_owned()
+            Token::Quoted(r"'a\nb'".to_owned()).unquote().unwrap(),
+            r"a\nb"
         );
     }
 
     #[test]
     fn test_22() {
-        let string = r#" "Hello\nWorld" "#;
-        let tokenizer = Tokenizer::new(string);
-        let tokens: Vec<Token> = tokenizer.iter().collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Space(" ".to_string()),
-                Token::Quoted("\"Hello\\nWorld\"".to_string()),
-                Token::Space(" ".to_string()),
-            ]
-        );
-        assert_eq!(
-            string,
-            tokens.iter().map(|x| x.to_string()).collect::<String>()
+        lexes(
+            r#" "Hello\nWorld" "#,
+            vec![space(" "), quoted(r#""Hello\nWorld""#), space(" ")],
         );
     }
 }
@@ -872,7 +704,7 @@ mod context_tests {
         assert!(matches!(&toks[2], Token::Space(s) if s == "/* $1 */"));
     }
 
-    // [spec:pgorm:req:sql.token.quoted+1/test]    a dollar-quoted body is one
+    // [spec:pgorm:req:sql.token.quoted+2/test]    a dollar-quoted body is one
     // quoted token — tagged, unclosed and placeholder-adjacent forms included
     // — while `$1` stays punctuation
     #[test]
@@ -886,7 +718,7 @@ mod context_tests {
         assert_eq!(unclosed.len(), 1);
     }
 
-    // [spec:pgorm:req:sql.token.quoted+1/test]    an escape string honours the
+    // [spec:pgorm:req:sql.token.quoted+2/test]    an escape string honours the
     // backslash, so an escaped quote does not end the body
     #[test]
     fn escape_strings_lex_as_quoted() {

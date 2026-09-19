@@ -7592,6 +7592,7 @@ children (
                 id query-generated-virtual-guarded
                 title "A virtual generated column renders only where PostgreSQL accepts it"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:07.827784Z
@@ -7606,6 +7607,13 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-19T23:41:47.316724Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -7619,6 +7627,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "token.rs:332-353 treats backtick and [bracket] as quoting delimiters — MySQL/MSSQL residue in the one SQL parser the crate owns — so inject_parameters treats `x $1` as opaque quoted text and skips the marker. Separately, Tokenizer.chars and .p are pub (token.rs:11-12) and the module is glob re-exported, so a caller setting p past the end gets an index panic from next() (token.rs:48; end() at :55 checks == not >=). Fix: PostgreSQL delimiters only (single quote, double quote, dollar-quoting, E-strings), private fields."
+                    }
+
+                    {
+                        at 2026-09-19T23:41:51.84322Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }
