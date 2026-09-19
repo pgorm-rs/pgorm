@@ -7621,6 +7621,7 @@ children (
                 id query-tokenizer-postgres
                 title "The tokenizer speaks PostgreSQL and hides its cursor"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:09.064307Z
@@ -7634,6 +7635,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-19T23:52:15.576491Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
