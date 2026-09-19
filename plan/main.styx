@@ -7981,4 +7981,18 @@ children (
             }
         )
     }
+
+    {
+        id tokenizer-backslash-standard
+        title "The tokenizer honours backslash escapes only where PostgreSQL does"
+        kind @fix
+        log (
+            {
+                at 2026-09-19T23:55:14.421271Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found during query-tokenizer-postgres (38b05af9) and deliberately left out of that commit: the tokenizer treats a backslash as an escape inside every quoted form, but PostgreSQL gives backslash meaning only in E'...' strings. Under standard_conforming_strings a plain 'C:\\' is a complete literal, so inject_parameters scanning WHERE a = 'C:\\' AND b = $1 believes the literal is still open and swallows the $1 marker — the same defect shape as the deleted backtick handling. Recorded explicitly in the sql.token.limits+2 limitations list, so the spec currently admits the gap. Fixing it means sql.token.quoted and sql.token.unquote change together: backslash is ordinary inside '...' and \"...\", an escape only inside E'...'. The tokenizer's one consumer pairing matters — inject_parameters both scans and re-renders, so the unquote side must match or a round-trip corrupts the literal."
+            }
+        )
+    }
 )
