@@ -5,7 +5,7 @@
 /// Construction itself is infallible; everything that can go wrong is
 /// reported here, at the [`into_sql`](super::Pipeline::into_sql) boundary,
 /// never as a panic.
-// [spec:pgorm:req:pipeline.errors+2]
+// [spec:pgorm:req:pipeline.errors+3]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PipelineError {
@@ -19,6 +19,36 @@ pub enum PipelineError {
     /// resolution failure.
     #[error("alias `{0}` collides with a PRQL built-in name; choose another alias")]
     ReservedAlias(String),
+    /// An identifier carries a character no quoted PostgreSQL identifier can
+    /// carry: a double quote, or a NUL byte.
+    ///
+    /// Quoting is the compiler's rather than pgorm's — a table, schema
+    /// segment, column or alias travels to prqlc as plain text and is
+    /// rendered there — so what an embedded `"` becomes is decided by
+    /// whichever prqlc the build resolved. The pinned fork doubles it; the
+    /// registry crate's escaper leaves a `"` that follows a backslash alone,
+    /// which closes the quoted identifier early and hands the rest of the
+    /// name to the server as SQL. A `[patch.crates-io]` table is honoured
+    /// only in the workspace that declares it, so pgorm cannot decide which
+    /// of those a consumer links, and a name whose meaning depends on that
+    /// has no rendering worth choosing. Doubling the quote here instead would
+    /// only move the ambiguity: the fork would double it a second time.
+    ///
+    /// So the name is refused rather than escaped, at
+    /// [`into_sql`](super::Pipeline::into_sql) and before prqlc is called, by
+    /// pgorm's own code — which is what makes the outcome the same under
+    /// either compiler. NUL is refused beside the quote because PostgreSQL
+    /// carries no identifier containing one under any quoting at all.
+    ///
+    /// Length is deliberately not part of this: an identifier past
+    /// PostgreSQL's 63-byte limit is truncated server-side and may then
+    /// collide with another, which is a correctness question with a different
+    /// answer.
+    #[error(
+        "identifier `{0}` contains a double quote or NUL byte, which no quoted PostgreSQL \
+         identifier can carry; rename it"
+    )]
+    UnquotableIdentifier(String),
     /// prqlc rejected the pipeline during lowering.
     ///
     /// Name-resolution failures — a PRQL built-in used as a value, a column
@@ -54,16 +84,35 @@ pub enum PipelineError {
     ReshapedSources(&'static str),
 }
 
-// [spec:pgorm:req:pipeline.errors+2]
+// [spec:pgorm:req:pipeline.errors+3]
 impl From<PipelineError> for crate::Error {
     fn from(err: PipelineError) -> Self {
         crate::Error::Query(crate::error::RuntimeError::Internal(err.to_string()))
     }
 }
 
+/// Whether `name` is a name pgorm refuses to render rather than quote, as
+/// [`PipelineError::UnquotableIdentifier`].
+///
+/// The set is two characters and closed. A double quote is the delimiter
+/// itself, and how an embedded one is escaped is decided by whichever prqlc
+/// the build resolved rather than by anything pgorm can pin for a consumer —
+/// so the name's meaning would be a property of the dependency graph. NUL is
+/// refused beside it because PostgreSQL carries no identifier containing one
+/// under any quoting at all.
+///
+/// Nothing else is: a name that merely *needs* quoting — a space, a capital,
+/// a keyword — is an ordinary name and renders, and a name past the 63-byte
+/// identifier limit is a different question, about what it may collide with
+/// once the server truncates it.
+// [spec:pgorm:req:pipeline.errors+3]
+pub(super) fn unquotable(name: &str) -> bool {
+    name.contains('"') || name.contains('\0')
+}
+
 /// The closed set of names an alias must not take: every top-level binding of
 /// prqlc 0.13's `std` module, its submodule names, and the PRQL keywords.
-// [spec:pgorm:req:pipeline.errors+2]
+// [spec:pgorm:req:pipeline.errors+3]
 pub(super) const RESERVED: &[&str] = &[
     "_append_by_name",
     "_eq",

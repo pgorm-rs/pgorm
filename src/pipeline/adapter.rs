@@ -465,46 +465,87 @@ pub(super) fn rebind_sort_key(key: &mut PlExpr, name: &str) -> bool {
     }
 }
 
-/// Every alias set anywhere in `node`, in construction order.
-pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
-    if let Some(alias) = &node.alias {
-        found.push(alias.clone());
-    }
+/// Visit `node` and every expression nested inside it, outermost first — the
+/// read-only counterpart of [`walk_mut`], for the screens `into_sql` runs
+/// before compiling.
+///
+/// It reaches two places [`walk_mut`] deliberately does not. A call's *name*
+/// is an expression too, and while a rewrite must not repoint the verb a
+/// stage applies, a screen has to see every name that leaves for prqlc. And
+/// an interpolated string's pieces are covered under both spellings prqlc
+/// has, `s` and `f`, so a node reachable through either is screened whether
+/// or not this module has a constructor for it yet. The two shapes it cannot
+/// reach — a `Func` body and an `Internal` operator name — are ones nothing
+/// here builds.
+fn walk(node: &PlExpr, visit: &mut impl FnMut(&PlExpr)) {
+    visit(node);
     match &node.kind {
         ExprKind::Tuple(items) | ExprKind::Array(items) => {
             for item in items {
-                collect_aliases(item, found);
+                walk(item, visit);
             }
         }
         ExprKind::Pipeline(pipeline) => {
             for item in &pipeline.exprs {
-                collect_aliases(item, found);
+                walk(item, visit);
             }
         }
         ExprKind::Range(range) => {
             for bound in [&range.start, &range.end].into_iter().flatten() {
-                collect_aliases(bound, found);
+                walk(bound, visit);
             }
         }
         ExprKind::Binary(node) => {
-            collect_aliases(&node.left, found);
-            collect_aliases(&node.right, found);
+            walk(&node.left, visit);
+            walk(&node.right, visit);
         }
-        ExprKind::Unary(node) => collect_aliases(&node.expr, found),
+        ExprKind::Unary(node) => walk(&node.expr, visit),
         ExprKind::FuncCall(node) => {
-            collect_aliases(&node.name, found);
+            walk(&node.name, visit);
             for arg in node.args.iter().chain(node.named_args.values()) {
-                collect_aliases(arg, found);
+                walk(arg, visit);
             }
         }
         ExprKind::Case(arms) => {
             for arm in arms {
-                collect_aliases(&arm.condition, found);
-                collect_aliases(&arm.value, found);
+                walk(&arm.condition, visit);
+                walk(&arm.value, visit);
+            }
+        }
+        ExprKind::SString(items) | ExprKind::FString(items) => {
+            for item in items {
+                if let InterpolateItem::Expr { expr, .. } = item {
+                    walk(expr, visit);
+                }
             }
         }
         _ => {}
     }
+}
+
+/// Every alias set anywhere in `node`, in construction order.
+pub(super) fn collect_aliases(node: &PlExpr, found: &mut Vec<String>) {
+    walk(node, &mut |node| found.extend(node.alias.clone()));
+}
+
+/// Every identifier anywhere in `node` that prqlc will render as a name:
+/// each alias, and each segment of each identifier reference — a schema, a
+/// table, a binding, a column — in construction order.
+///
+/// This is the whole set of text pgorm hands the compiler to *quote*, which
+/// is why the screen for a name that has no safe quoting
+/// ([`PipelineError::UnquotableIdentifier`](super::PipelineError::UnquotableIdentifier))
+/// reads it rather than the alias positions alone. The text between an
+/// assembled expression's interpolated nodes is not among them: that is SQL
+/// pgorm wrote itself, not a name a caller supplied.
+pub(super) fn collect_identifiers(node: &PlExpr, found: &mut Vec<String>) {
+    walk(node, &mut |node| {
+        found.extend(node.alias.clone());
+        if let ExprKind::Ident(ident) = &node.kind {
+            found.extend(ident.path.iter().cloned());
+            found.push(ident.name.clone());
+        }
+    });
 }
 
 /// Lower the assembled bindings and stages through prqlc: PL → RQ →

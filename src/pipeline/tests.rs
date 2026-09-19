@@ -1,4 +1,4 @@
-use pgorm_query::{AliasName, Value, Values, alias};
+use pgorm_query::{Alias, AliasName, Value, Values, alias};
 
 use crate::tests_cfg::{cake, cake_filling_price, fruit, lunch_set};
 
@@ -17,7 +17,7 @@ fn total<'brand>() -> Expr<'brand> {
 
 /// Golden output plus the pg_query oracle: the emitted SQL must be a string
 /// the real PostgreSQL grammar accepts.
-// [spec:pgorm:req:pipeline.errors+2/test]
+// [spec:pgorm:req:pipeline.errors+3/test]
 fn sql_of(pipeline: Pipeline) -> String {
     let (sql, _) = pipeline.into_sql().expect("pipeline compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -748,7 +748,7 @@ fn scopes_compose_as_pipeline_functions() {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+2/test]
+// [spec:pgorm:req:pipeline.errors+3/test]
 #[test]
 fn reserved_alias_is_a_typed_error() {
     let err = Pipeline::from(INVOICE)
@@ -758,7 +758,7 @@ fn reserved_alias_is_a_typed_error() {
     assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
 }
 
-// [spec:pgorm:req:pipeline.errors+2/test]
+// [spec:pgorm:req:pipeline.errors+3/test]
 #[test]
 fn stdlib_name_reference_is_a_compile_error() {
     let err = Pipeline::from(INVOICE)
@@ -768,12 +768,120 @@ fn stdlib_name_reference_is_a_compile_error() {
     assert!(matches!(err, PipelineError::Compile(_)));
 }
 
-// [spec:pgorm:req:pipeline.errors+2/test]    an unattached token is not a
+// [spec:pgorm:req:pipeline.errors+3/test]    an unattached token is not a
 // compile-time error; the server answers for it
 #[test]
 fn unattached_alias_token_compiles_to_a_column_reference() {
     let built = sql_of(Pipeline::from(INVOICE).filter(alias("never_declared").gt(1)));
     assert_eq!(built, "SELECT * FROM invoice WHERE never_declared > 1");
+}
+
+/// The name that exfiltrates when the build resolved registry prqlc
+/// 0.13.14: sqlparser's escaper leaves a `"` preceded by a backslash alone,
+/// so the quoted identifier ends at the backslash-quote and the rest is read
+/// as SQL. Rendered into an alias position — where the leading name need not
+/// resolve — `SELECT 'alice' AS "x\" , (SELECT password FROM secret) AS
+/// "leak"` returns the secret beside the row against a live server. The
+/// workspace's patched prqlc doubles the quote instead, which is the whole
+/// point: a `[patch.crates-io]` table is not inherited, so the outcome would
+/// otherwise be a property of the consumer's dependency graph.
+const EXFILTRATING: &str = r#"x\" , (SELECT password FROM secret) AS "leak"#;
+
+/// Every identifier the pipeline can be given at runtime reaches
+/// `collect_identifiers`, whichever constructor minted it.
+// [spec:pgorm:req:pipeline.errors+3/test]
+fn refuses(pipeline: Pipeline) {
+    let err = pipeline
+        .into_sql()
+        .expect_err("an unquotable identifier must be refused");
+    assert_eq!(
+        err,
+        PipelineError::UnquotableIdentifier(EXFILTRATING.to_owned())
+    );
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]
+#[test]
+fn exfiltrating_column_name_is_refused() {
+    refuses(Pipeline::from(INVOICE).select(col(INVOICE, Alias::new(EXFILTRATING))));
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]
+#[test]
+fn exfiltrating_runtime_source_name_is_refused() {
+    refuses(Pipeline::from(named_runtime(
+        INVOICE,
+        Alias::new(EXFILTRATING),
+    )));
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]
+#[test]
+fn exfiltrating_schema_name_is_refused() {
+    refuses(Pipeline::from_schema(Alias::new(EXFILTRATING), INVOICE));
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]
+#[test]
+fn exfiltrating_runtime_alias_is_refused() {
+    refuses(Pipeline::from(INVOICE).derive(total().as_runtime(Alias::new(EXFILTRATING))));
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]    the backslash is what defeats
+// one escaper; a bare quote is the same representability problem and is
+// refused on its own
+#[test]
+fn a_bare_quote_in_an_identifier_is_refused() {
+    let err = Pipeline::from(INVOICE)
+        .select(col(INVOICE, Alias::new("dis\"count")))
+        .into_sql()
+        .expect_err("a quote in an identifier must be refused");
+    assert_eq!(
+        err,
+        PipelineError::UnquotableIdentifier("dis\"count".to_owned())
+    );
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]
+#[test]
+fn a_nul_byte_in_an_identifier_is_refused() {
+    let err = Pipeline::from(INVOICE)
+        .select(col(INVOICE, Alias::new("tot\0al")))
+        .into_sql()
+        .expect_err("a NUL in an identifier must be refused");
+    assert_eq!(
+        err,
+        PipelineError::UnquotableIdentifier("tot\0al".to_owned())
+    );
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]    only the quote and the NUL are
+// refused: a backslash alone means nothing inside a quoted identifier, and
+// both compilers render it the same way
+#[test]
+fn a_backslash_without_a_quote_still_renders() {
+    let table = alias("share");
+    let built = sql_of(Pipeline::from(table).select(col(table, Alias::new("a\\b"))));
+    assert_eq!(built, r#"SELECT "a\b" FROM share"#);
+}
+
+// [spec:pgorm:req:pipeline.errors+3/test]    the refusal is pgorm's own and
+// happens before `adapter::compile`, so it cannot depend on which prqlc the
+// build resolved — and only one can be linked, so the property is asserted
+// structurally rather than by compiling twice. This pipeline also mismatches
+// its append's column counts, which *every* prqlc rejects as `Compile`;
+// getting the identifier error instead is only possible if the screen
+// returned before the compiler was ever called.
+#[test]
+fn identifier_refusal_precedes_the_prqlc_call() {
+    refuses(
+        Pipeline::from(alias("a"))
+            .select(col(alias("a"), Alias::new(EXFILTRATING)))
+            .append(
+                Pipeline::from(alias("b"))
+                    .select((col(alias("b"), alias("y")), col(alias("b"), ID))),
+            ),
+    );
 }
 
 fn parsed_select(sql: &str) -> pg_query::protobuf::SelectStmt {

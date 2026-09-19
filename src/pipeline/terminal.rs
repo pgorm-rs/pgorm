@@ -10,25 +10,39 @@ use crate::{
 use super::adapter;
 use super::builder::Pipeline;
 use super::census;
-use super::error::{PipelineError, RESERVED};
+use super::error::{PipelineError, RESERVED, unquotable};
 
 impl Pipeline {
     /// Compile the pipeline to PostgreSQL SQL and the values bound along the
     /// way, in placeholder order.
     ///
-    /// This is where everything fallible happens — reserved-alias screening,
-    /// then prqlc's name resolution and lowering — and it fails as a
-    /// [`PipelineError`], never a panic. The optimizer may prune an
-    /// expression nothing reads, placeholder and all, so the emitted SQL is
-    /// censused afterwards: values whose placeholders were optimized away
-    /// are discarded and the survivors renumber contiguously, keeping
+    /// This is where everything fallible happens — identifier screening,
+    /// reserved-alias screening, then prqlc's name resolution and lowering —
+    /// and it fails as a [`PipelineError`], never a panic. The optimizer may
+    /// prune an expression nothing reads, placeholder and all, so the emitted
+    /// SQL is censused afterwards: values whose placeholders were optimized
+    /// away are discarded and the survivors renumber contiguously, keeping
     /// position `N` in the SQL aligned with position `N` in the values.
-    // [spec:pgorm:req:pipeline.errors+2]
+    ///
+    /// The identifier screen is first and is the reason this boundary, rather
+    /// than the four constructors that mint identifiers, is where names are
+    /// judged: every table, schema segment, column and alias the pipeline
+    /// carries passes through here on its way to prqlc, so a name that cannot
+    /// be quoted is caught whichever stage introduced it — including stages
+    /// written after the screen was. Because the refusal is pgorm's own and
+    /// returns before the compiler is called at all, it does not depend on
+    /// which prqlc the build resolved, which a `[patch.crates-io]` table could
+    /// never guarantee for a downstream consumer.
+    // [spec:pgorm:req:pipeline.errors+3]
     // [spec:pgorm:req:pipeline.params+4]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
-        let mut aliases = Vec::new();
+        let (mut identifiers, mut aliases) = (Vec::new(), Vec::new());
         for stage in self.bindings.iter().flatten().chain(&self.stages) {
+            adapter::collect_identifiers(stage, &mut identifiers);
             adapter::collect_aliases(stage, &mut aliases);
+        }
+        if let Some(name) = identifiers.into_iter().find(|name| unquotable(name)) {
+            return Err(PipelineError::UnquotableIdentifier(name));
         }
         if let Some(name) = aliases
             .into_iter()
