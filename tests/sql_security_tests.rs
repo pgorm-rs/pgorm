@@ -251,29 +251,44 @@ async fn inline_control_characters_round_trip() {
     assert_eq!(inline, bound, "control character changed: {sql:?}");
 }
 
+/// A name carrying a double quote can render differently between quoting
+/// implementations, so the pipeline refuses it outright rather than trusting
+/// whichever prqlc is linked to escape it. The refusal is the security
+/// property: a name that cannot render cannot become SQL.
+#[tokio::test]
+async fn quote_bearing_pipeline_names_are_refused_not_rendered() {
+    use pgorm::pipeline::{ExprOps, Pipeline, PipelineError, col};
+    let err = Pipeline::from(Alias::new("sec\"table"))
+        .filter(col(Alias::new("sec\"table"), Alias::new("note\" OR TRUE --")).eq("x"))
+        .into_sql()
+        .expect_err("a quote-bearing identifier must refuse to render");
+    assert!(
+        matches!(err, PipelineError::UnquotableIdentifier(ref name) if name == "sec\"table"),
+        "expected the first offending name back, got {err:?}"
+    );
+}
+
 #[tokio::test]
 async fn pipeline_keeps_hostile_names_and_values_as_data() {
     use pgorm::pipeline::{ExprOps, Pipeline, col};
     let ctx = TestContext::new("security_pipeline_control").await;
     let db = ctx.db.get().await.unwrap();
-    db.batch_execute("CREATE TABLE \"sec\"\"table\" (\"note\"\" OR TRUE --\" text)")
+    db.batch_execute("CREATE TABLE \"sec'table\" (\"note' OR TRUE --\" text)")
         .await
         .unwrap();
     let payload = "\\'; SELECT 1; --";
-    db.execute("INSERT INTO \"sec\"\"table\" VALUES ($1)", &[&payload])
+    db.execute("INSERT INTO \"sec'table\" VALUES ($1)", &[&payload])
         .await
         .unwrap();
-    let table = || Alias::new("sec\"table");
-    let column = || col(table(), Alias::new("note\" OR TRUE --"));
+    let table = || Alias::new("sec'table");
+    let column = || col(table(), Alias::new("note' OR TRUE --"));
     let inline_sql = Pipeline::from(table())
         .filter(column().eq(payload))
         .select(column())
         .into_sql()
         .unwrap();
     let bound_sql = Pipeline::from(table())
-        .filter_with(|binder| {
-            col(table(), Alias::new("note\" OR TRUE --")).eq(binder.bind(payload))
-        })
+        .filter_with(|binder| col(table(), Alias::new("note' OR TRUE --")).eq(binder.bind(payload)))
         .select(column())
         .into_sql()
         .unwrap();
