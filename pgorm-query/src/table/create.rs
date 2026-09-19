@@ -1,5 +1,6 @@
 use crate::{
-    ColumnDef, IntoColumnDef, QueryBuilder, SimpleExpr, foreign_key::*, index::*, types::*,
+    ColumnDef, ColumnSpec, Comment, CommentStatement, IntoColumnDef, QueryBuilder, SimpleExpr,
+    foreign_key::*, index::*, types::*,
 };
 
 /// Create a table
@@ -52,6 +53,26 @@ use crate::{
 ///     ].join(" ")
 /// );
 /// ```
+///
+/// The comments are carried, not written into that SQL — PostgreSQL spells a
+/// comment as a statement of its own, which [`comments()`] renders:
+///
+/// ```
+/// # use pgorm_query::{*, tests_cfg::*};
+/// # let table = Table::create(Char::Table)
+/// #     .comment("table's comment")
+/// #     .col(ColumnDef::new(Char::FontSize).integer().not_null().comment("font's size"))
+/// #     .to_owned();
+/// assert_eq!(
+///     table.comments().iter().map(ToString::to_string).collect::<Vec<_>>(),
+///     [
+///         r#"COMMENT ON TABLE "character" IS 'table''s comment'"#,
+///         r#"COMMENT ON COLUMN "character"."font_size" IS 'font''s size'"#,
+///     ]
+/// );
+/// ```
+///
+/// [`comments()`]: TableCreateStatement::comments
 // [spec:pgorm:req:sql.ddl.create-table+6]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
@@ -90,6 +111,12 @@ impl TableCreateStatement {
     }
 
     /// Set table comment
+    ///
+    /// PostgreSQL has no comment clause of `CREATE TABLE`, so the text is
+    /// carried rather than written into this statement's SQL: render it with
+    /// [`comments()`](Self::comments), which yields the `COMMENT ON`
+    /// statements to execute after the create.
+    // [spec:pgorm:req:sql.ddl.comment+3]
     pub fn comment<T>(&mut self, comment: T) -> &mut Self
     where
         T: Into<String>,
@@ -178,6 +205,51 @@ impl TableCreateStatement {
 
     pub fn get_comment(&self) -> Option<&String> {
         self.comment.as_ref()
+    }
+
+    /// Every comment this statement carries, as the statements that render it
+    ///
+    /// On PostgreSQL a comment is a statement of its own, so the text handed
+    /// to [`comment`](Self::comment) and to [`ColumnDef::comment`] cannot ride
+    /// inside `CREATE TABLE`: this renders it out as the `COMMENT ON`
+    /// statements to execute after the create, table comment first and then
+    /// one per commented column in column order.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let table = Table::create(Char::Table)
+    ///     .comment("one row per character")
+    ///     .col(ColumnDef::new(Char::Id).integer().not_null().primary_key())
+    ///     .col(ColumnDef::new(Char::FontSize).integer().comment("in points"))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     table.comments().iter().map(ToString::to_string).collect::<Vec<_>>(),
+    ///     [
+    ///         r#"COMMENT ON TABLE "character" IS 'one row per character'"#,
+    ///         r#"COMMENT ON COLUMN "character"."font_size" IS 'in points'"#,
+    ///     ]
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.comment+3]
+    pub fn comments(&self) -> Vec<CommentStatement> {
+        let mut statements = Vec::new();
+        if let Some(comment) = &self.comment {
+            statements.push(Comment::on_table(self.table.clone(), comment.as_str()));
+        }
+        for column in &self.columns {
+            for spec in column.get_column_spec() {
+                if let ColumnSpec::Comment(text) = spec {
+                    statements.push(Comment::on_column(
+                        self.table.clone(),
+                        column.name.clone(),
+                        text.as_str(),
+                    ));
+                }
+            }
+        }
+        statements
     }
 
     pub fn get_foreign_key_create_stmts(&self) -> &Vec<ForeignKeyCreateStatement> {

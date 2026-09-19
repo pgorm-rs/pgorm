@@ -14,7 +14,7 @@ use crate::{DynIden, IntoIden, IntoTableName, QueryBuilder, TableName};
 
 /// Helper for constructing any comment statement
 // [spec:pgorm:req:sql.ddl+5]
-// [spec:pgorm:req:sql.ddl.comment+2]
+// [spec:pgorm:req:sql.ddl.comment+3]
 #[derive(Debug)]
 pub struct Comment;
 
@@ -57,7 +57,7 @@ pub enum CommentTarget {
 ///     r#"COMMENT ON TABLE "public"."character" IS 'it''s a table'"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.comment+2]
+// [spec:pgorm:req:sql.ddl.comment+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommentStatement {
     pub(crate) target: CommentTarget,

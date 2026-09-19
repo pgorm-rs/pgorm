@@ -758,6 +758,7 @@ assertions (
     {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
     {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
+    {id query-comment-renders, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:17:45.36004Z}
 )
 
 impl_evidence (

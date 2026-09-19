@@ -205,7 +205,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Comments
 
-> [spec:pgorm:req:sql.ddl.comment+2]
+> [spec:pgorm:req:sql.ddl.comment+3]
 > A comment is a statement of its own on Postgres, not a clause of `CREATE
 > TABLE`, so `CommentStatement` is built separately from the DDL creating the
 > object it describes. `Comment::on_table(table, text)` and
@@ -227,6 +227,19 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `[spec:pgorm:req:sql.render.string-escape+1]` does not apply here. The text is
 > never a bind parameter (a DDL statement yields SQL alone), so this
 > quoting is the whole injection boundary for comment text.
+>
+> The comment text a `TableCreateStatement` carries — its own
+> (`[spec:pgorm:req:sql.ddl.create-table+6]`) and each `ColumnSpec::Comment`
+> (`[spec:pgorm:req:sql.ddl.column-def+3]`) — MUST be reachable as those
+> statements: `TableCreateStatement::comments()` returns one
+> `CommentStatement` per carried comment, the table's first and then one per
+> commented column in column order, each targeting the statement's own table.
+> The setters therefore describe a table completely and no carried text is
+> unrenderable. They MUST NOT instead be appended to the create statement's
+> own SQL: that string is executed as a single prepared statement
+> (`[spec:pgorm:sem:conn.pool.statement-cache+2]`), and PostgreSQL refuses to
+> prepare a string holding more than one command, so appending would trade a
+> comment silently dropped for a `CREATE TABLE` that no longer runs.
 
 ## Indexes
 

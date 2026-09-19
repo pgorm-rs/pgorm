@@ -378,11 +378,22 @@ fn create_comments_from_entity_emits_statements() {
         "comments target the same qualified name the table projection uses"
     );
 
-    // The text still rides on the create statement, where it stays inert.
+    // The text rides on the create statement too, and renders off it: the
+    // create's own SQL is one preparable command, so the comments come out
+    // beside it as the same statements this projection builds.
     let table = schema.create_table_from_entity(widget::Entity);
     assert_eq!(
         table.get_comment().map(String::as_str),
         Some("one row per widget")
+    );
+    assert_eq!(
+        table
+            .comments()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        rendered,
+        "both projections of one entity's comments agree"
     );
     let create = table.to_string();
     assert!(!create.contains("one row per widget"), "{create}");

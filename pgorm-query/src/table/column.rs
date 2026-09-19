@@ -708,7 +708,11 @@ impl ColumnDef {
     /// Record a comment for this column.
     ///
     /// The spec is skipped when the column renders: on Postgres a column
-    /// comment is a `COMMENT ON` statement of its own.
+    /// comment is a `COMMENT ON` statement of its own. Render it off the
+    /// create statement this column goes into, with
+    /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments),
+    /// or build it directly with [`Comment::on_column`](crate::Comment::on_column).
+    // [spec:pgorm:req:sql.ddl.comment+3]
     pub fn comment<T>(&mut self, string: T) -> &mut Self
     where
         T: Into<String>,

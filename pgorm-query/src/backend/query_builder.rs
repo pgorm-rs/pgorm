@@ -1789,7 +1789,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`CommentStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.comment+2]
+    // [spec:pgorm:req:sql.ddl.comment+3]
     pub(crate) fn prepare_comment_statement(
         &self,
         statement: &CommentStatement,
@@ -1813,7 +1813,7 @@ impl QueryBuilder {
     }
 
     /// Write comment text as a standard-conforming string literal.
-    // [spec:pgorm:req:sql.ddl.comment+2]
+    // [spec:pgorm:req:sql.ddl.comment+3]
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
         write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
     }

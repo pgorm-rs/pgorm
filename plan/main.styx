@@ -7512,6 +7512,13 @@ children (
                         kind @note
                         text "TableCreateStatement::comment (pgorm-query/src/table/create.rs:92-99) sets a field prepare_table_create_statement (backend/query_builder.rs:1713-1766) never reads; verified by reading the renderer. The type-level doc example (create.rs:23) even shows .comment(\"table's comment\") beside golden output containing no comment. ColumnDef::comment is equally skipped (table/column.rs:708-711). The standalone COMMENT ON statement (comment.rs) works and is what pgorm's Schema::create_comments_from_entity uses. Fix: render the carried comments as appended COMMENT ON statements, or delete both setters and point their docs at Comment."
                     }
+
+                    {
+                        at 2026-09-19T23:17:45.36004Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 
