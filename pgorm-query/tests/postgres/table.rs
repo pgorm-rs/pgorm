@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+6/test]
-// [spec:pgorm:req:sql.ddl.column-def+3/test]
+// [spec:pgorm:req:sql.ddl.column-def+4/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+3/test]
 fn create_1() {
@@ -603,5 +603,32 @@ fn alter_take_leaves_the_source_whole() {
     assert_eq!(
         alter.to_string(),
         r#"ALTER TABLE "font" DROP COLUMN "name""#
+    );
+}
+
+// [spec:pgorm:req:sql.ddl.column-def+4/test]    a generated column is stored, and the virtual
+// spelling it no longer has a constructor for is one the grammar refuses
+#[test]
+fn generated_column_is_always_stored() {
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(
+                ColumnDef::new(Glyph::Aspect)
+                    .integer()
+                    .generated(Expr::col(Glyph::Id).mul(2))
+            )
+            .to_string(),
+        r#"CREATE TABLE "glyph" ( "aspect" integer GENERATED ALWAYS AS ("id" * 2) STORED )"#
+    );
+
+    // Why there is no non-stored spelling to ask for: PostgreSQL's own parser
+    // rejects it, so the render that used to emit it could only ever fail at
+    // the server.
+    assert!(
+        crate::oracle::parses(
+            r#"CREATE TABLE "glyph" ( "aspect" integer GENERATED ALWAYS AS ("id" * 2) VIRTUAL )"#
+        )
+        .is_err(),
+        "the grammar accepts VIRTUAL, so this refusal wants revisiting"
     );
 }

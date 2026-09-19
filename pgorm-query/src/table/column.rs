@@ -2,7 +2,7 @@ use crate::{expr::*, types::*};
 use std::sync::Arc;
 
 /// Specification of a table column
-// [spec:pgorm:req:sql.ddl.column-def+3]
+// [spec:pgorm:req:sql.ddl.column-def+4]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableName>,
@@ -153,7 +153,7 @@ impl ColumnType {
     /// The `serial` spelling this type is replaced by when the column carries
     /// [`ColumnSpec::AutoIncrement`], or `None` when Postgres has no serial
     /// form for it.
-    // [spec:pgorm:req:sql.ddl.column-def+3]
+    // [spec:pgorm:req:sql.ddl.column-def+4]
     pub fn serial_spelling(&self) -> Option<&'static str> {
         match self {
             ColumnType::SmallInteger => Some("smallserial"),
@@ -174,7 +174,7 @@ pub enum ColumnSpec {
     UniqueKey,
     PrimaryKey,
     Check(SimpleExpr),
-    Generated { expr: SimpleExpr, stored: bool },
+    Generated { expr: SimpleExpr },
     Extra(String),
     Comment(String),
 }
@@ -656,15 +656,40 @@ impl ColumnDef {
         self
     }
 
-    /// Sets the column as generated with SimpleExpr
-    pub fn generated<T>(&mut self, expr: T, stored: bool) -> &mut Self
+    /// Sets the column as generated from an expression, and stored.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Table::create(Glyph::Table)
+    ///         .col(
+    ///             ColumnDef::new(Glyph::Aspect)
+    ///                 .integer()
+    ///                 .generated(Expr::col(Glyph::Id).mul(2))
+    ///         )
+    ///         .to_string(),
+    ///     r#"CREATE TABLE "glyph" ( "aspect" integer GENERATED ALWAYS AS ("id" * 2) STORED )"#,
+    /// );
+    /// ```
+    ///
+    /// There is no virtual spelling to ask for. PostgreSQL has accepted
+    /// `VIRTUAL` only since 18 and rejects it as a syntax error on every
+    /// earlier release, and the builder cannot know which one it is writing
+    /// for; a column that cannot be stored is spelled as a view or a trigger
+    /// instead.
+    ///
+    /// ```compile_fail,E0061
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// ColumnDef::new(Glyph::Aspect).integer().generated(Expr::val(1), false);
+    /// ```
+    // [spec:pgorm:req:sql.ddl.column-def+4]
+    pub fn generated<T>(&mut self, expr: T) -> &mut Self
     where
         T: Into<SimpleExpr>,
     {
-        self.spec.push(ColumnSpec::Generated {
-            expr: expr.into(),
-            stored,
-        });
+        self.spec.push(ColumnSpec::Generated { expr: expr.into() });
         self
     }
 

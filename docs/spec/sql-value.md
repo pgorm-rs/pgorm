@@ -421,7 +421,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
 > and `LTree`. `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
-> (`[spec:pgorm:req:sql.ddl.column-def+3]`).
+> (`[spec:pgorm:req:sql.ddl.column-def+4]`).
 >
 > The vocabulary carries no MySQL-era spelling and no variant that renders
 > something other than what it names, and MUST NOT reacquire one. `Year` had

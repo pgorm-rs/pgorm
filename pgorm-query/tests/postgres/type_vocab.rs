@@ -403,7 +403,7 @@ fn string_len_and_the_convenience_constructors() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+3/test]    only the integer trio has a serial spelling
+// [spec:pgorm:req:sql.ddl.column-def+4/test]    only the integer trio has a serial spelling
 #[test]
 fn serial_spelling_covers_the_integer_trio() {
     assert_eq!(
@@ -418,7 +418,7 @@ fn serial_spelling_covers_the_integer_trio() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+3/test]    a type with no serial form renders itself
+// [spec:pgorm:req:sql.ddl.column-def+4/test]    a type with no serial form renders itself
 #[test]
 fn auto_increment_without_serial_form_renders_type() {
     assert_eq!(

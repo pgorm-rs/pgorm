@@ -448,7 +448,7 @@ fn sweep_table_ddl_shapes() {
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
-                    .generated(Expr::val(1), true),
+                    .generated(Expr::val(1)),
             )
             .to_string(),
         Table::alter(Glyph::Table)

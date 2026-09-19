@@ -7563,6 +7563,7 @@ children (
                 id query-index-prefix-retired
                 title "The index column prefix PostgreSQL rejects is gone"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:06.450398Z
@@ -7577,6 +7578,13 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-19T23:38:31.768223Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -7590,6 +7598,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "ColumnSpec::Generated { stored: false } renders \" VIRTUAL\" (backend/query_builder.rs:1887-1891), which PostgreSQL accepts only from 18 — where it is also the default spelling — and rejects as a syntax error on every earlier release. Decide the supported floor: refuse stored: false at render with a named error, or render nothing and document the server requirement. Whichever way, the current silent emit-and-fail-at-the-server is the wrong behaviour for a builder whose value is catching this before execution."
+                    }
+
+                    {
+                        at 2026-09-19T23:38:37.499247Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

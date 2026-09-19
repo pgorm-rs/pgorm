@@ -760,7 +760,8 @@ assertions (
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
     {id query-comment-renders, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:23:59.814264Z}
     {id query-name-equality-defined, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:36:13.598965Z}
-    {id query-index-prefix-retired, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:36:19.605334Z}
+    {id query-index-prefix-retired, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:38:31.768223Z}
+    {id query-generated-virtual-guarded, kind @doing, author "brendan@necessary.nu", at 2026-09-19T23:38:37.499247Z}
 )
 
 impl_evidence (

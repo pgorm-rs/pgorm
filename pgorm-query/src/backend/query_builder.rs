@@ -1455,7 +1455,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.column-def+3]
+    // [spec:pgorm:req:sql.ddl.column-def+4]
     fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
     where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
@@ -1780,9 +1780,7 @@ impl QueryBuilder {
             ColumnSpec::UniqueKey => write!(sql, "UNIQUE").unwrap(),
             ColumnSpec::PrimaryKey => write!(sql, "PRIMARY KEY").unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
-            ColumnSpec::Generated { expr, stored } => {
-                self.prepare_generated_column(expr, *stored, sql)
-            }
+            ColumnSpec::Generated { expr } => self.prepare_generated_column(expr, sql),
             ColumnSpec::Extra(string) => write!(sql, "{string}").unwrap(),
             ColumnSpec::Comment(_) => {}
         }
@@ -1875,20 +1873,15 @@ impl QueryBuilder {
     }
 
     /// Translate the generated column into SQL statement
-    pub(crate) fn prepare_generated_column(
-        &self,
-        gen_: &SimpleExpr,
-        stored: bool,
-        sql: &mut dyn SqlWriter,
-    ) {
+    ///
+    /// Always `STORED`: `VIRTUAL` is a syntax error on every PostgreSQL before
+    /// 18, so there is no non-stored generated column to render
+    /// (`[spec:pgorm:req:sql.ddl.column-def+4]`).
+    // [spec:pgorm:req:sql.ddl.column-def+4]
+    pub(crate) fn prepare_generated_column(&self, gen_: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
         QueryBuilder::prepare_simple_expr(self, gen_, sql);
-        write!(sql, ")").unwrap();
-        if stored {
-            write!(sql, " STORED").unwrap();
-        } else {
-            write!(sql, " VIRTUAL").unwrap();
-        }
+        write!(sql, ") STORED").unwrap();
     }
 
     /// Translate IF NOT EXISTS expression in [`TableCreateStatement`].

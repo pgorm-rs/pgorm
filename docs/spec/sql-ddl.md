@@ -86,10 +86,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+3]
+> [spec:pgorm:req:sql.ddl.column-def+4]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
-> `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr, stored }`,
+> `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr }`,
 > `Extra(String)`, `Comment(String)`), populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
@@ -98,8 +98,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > A column MUST render as the quoted name, one space, the type spelling, then
 > each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
 > `UNIQUE`, `PRIMARY KEY`, `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
-> STORED`/`VIRTUAL` (`VIRTUAL` is emitted for non-stored generated columns
-> even though Postgres does not accept it), and `Extra` verbatim.
+> STORED`, and `Extra` verbatim. A generated column is always stored and
+> `generated(expr)` takes no flag saying otherwise: `VIRTUAL` is a syntax
+> error on every PostgreSQL before 18, the builder cannot know which release
+> it is writing for, and rendering is infallible — there is no error channel
+> to refuse through, so the refusal is that the spec carries no `stored`
+> field and the non-stored column has no constructor
+> (`[dec:pgorm:invalid-states-unrepresentable]`). The `ColumnSpec::Generated
+> { expr, stored }` shape and the `VIRTUAL` render MUST NOT return.
 > `AutoIncrement` produces no keyword; instead it replaces the type spelling
 > with the serial family, which `ColumnType::serial_spelling` defines over the
 > integer trio alone — `SmallInteger`→`smallserial`, `Integer`→`serial`,
@@ -230,7 +236,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The comment text a `TableCreateStatement` carries — its own
 > (`[spec:pgorm:req:sql.ddl.create-table+6]`) and each `ColumnSpec::Comment`
-> (`[spec:pgorm:req:sql.ddl.column-def+3]`) — MUST be reachable as those
+> (`[spec:pgorm:req:sql.ddl.column-def+4]`) — MUST be reachable as those
 > statements: `TableCreateStatement::comments()` returns one
 > `CommentStatement` per carried comment, the table's first and then one per
 > commented column in column order, each targeting the statement's own table.
@@ -439,7 +445,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > serial substitution is likewise total: `auto_increment()` on a type outside
 > the integer trio renders the declared type rather than panicking with
 > `... doesn't support auto increment`
-> (`[spec:pgorm:req:sql.ddl.column-def+3]`). Neither guard is a `Result`; both
+> (`[spec:pgorm:req:sql.ddl.column-def+4]`). Neither guard is a `Result`; both
 > are closed by making the renderer's match exhaustive over spellings that
 > exist.
 >
