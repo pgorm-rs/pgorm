@@ -185,7 +185,7 @@ is what `EntityTrait::find()` produces.
 
 > [spec:pgorm:sem:query.build.alias+1]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
-> token (`[spec:pgorm:def:sql.types+5]`), not as a string repeated per site.
+> token (`[spec:pgorm:def:sql.types+6]`), not as a string repeated per site.
 > Every aliasing and referencing position on the builders takes it through the
 > existing conversions and needs no new one: the alias argument of `column_as`
 > / `expr_as` / `tbl_col_as`, the expression positions of `having`, `group_by`,

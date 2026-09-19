@@ -7505,6 +7505,7 @@ children (
                 id query-comment-renders
                 title "Table and column comments render, or their setters are gone"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:03.377377Z
@@ -7519,6 +7520,13 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-19T23:23:59.814264Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -7532,6 +7540,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "SharedIden::PartialEq (pgorm-query/src/types.rs:65-74) transmutes trait objects to compare vtable pointers: equality is same-vtable-address AND same text. Rust guarantees neither uniqueness nor stability of vtables across codegen units, so two idens of the same type and text can legitimately compare unequal — and the test at types.rs:1002-1041 relies on the opposite. This underpins PartialEq for ColumnRef, TableName and the whole AST. Fix: compare rendered text plus TypeId (store it in SharedIden or add an accessor to the trait). Also removes the only unsafe block in shipped pgorm-query code."
+                    }
+
+                    {
+                        at 2026-09-19T23:24:06.093825Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

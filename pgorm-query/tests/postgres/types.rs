@@ -148,3 +148,48 @@ fn alter_6() {
         r#"ALTER TYPE "schema"."font" RENAME TO "typeface""#
     )
 }
+
+// [spec:pgorm:def:sql.types+6/test]    equality is the concrete type and the rendered text,
+// both asked of values Rust never promised to place at one vtable address
+#[test]
+fn identifier_equality_is_type_and_text() {
+    struct Mine;
+    struct Yours;
+
+    impl Iden for Mine {
+        fn unquoted(&self, s: &mut dyn std::fmt::Write) {
+            write!(s, "same").unwrap();
+        }
+    }
+    impl Iden for Yours {
+        fn unquoted(&self, s: &mut dyn std::fmt::Write) {
+            write!(s, "same").unwrap();
+        }
+    }
+
+    // Two types rendering one text are two identifiers.
+    assert_eq!(Mine.to_string(), Yours.to_string());
+    assert_ne!(Mine.into_iden(), Yours.into_iden());
+
+    // One type rendering one text is one identifier, however the values
+    // reached the trait object.
+    assert_eq!(Mine.into_iden(), Mine.into_iden());
+    assert_eq!(
+        Alias::new("same").into_iden(),
+        Alias::new("same").into_iden()
+    );
+    assert_eq!(
+        SharedIden::new(Alias::new("same")),
+        Alias::new("same").into_iden()
+    );
+    assert_eq!(
+        Alias::new("same").into_iden(),
+        Alias::new("same").into_iden().clone()
+    );
+
+    // One type rendering two texts is two identifiers.
+    assert_ne!(
+        Alias::new("same").into_iden(),
+        Alias::new("other").into_iden()
+    );
+}

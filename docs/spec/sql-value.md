@@ -241,8 +241,8 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+5]
-> `Iden` is the identifier trait (bounded `Send + Sync`): implementors provide
+> [spec:pgorm:def:sql.types+6]
+> `Iden` is the identifier trait (bounded `Any + Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
 > which doubles any embedded quote character — and `prepare`, which writes the
 > identifier wrapped in the `Quote` pair. The Postgres `QueryBuilder` uses
@@ -253,10 +253,20 @@ including panic semantics and quirks inherited from sea-query.
 > `DynIden` is `SharedIden`, a non-generic wrapper over
 > `std::sync::Arc<dyn Iden>` (the inherited `SeaRc<T>` and the `RcOrArc`
 > re-export are gone; shared ownership of anything else is spelled `Arc`
-> directly). `SharedIden`
-> equality compares the trait-object vtable pointer and the unquoted string,
-> so two idens are equal only when they are the same concrete type rendering
-> the same text. `IntoIden` converts any `Iden + 'static` (or an existing
+> directly). `SharedIden` equality compares the erased identifier's `TypeId`
+> and the unquoted string, so two idens are equal exactly when they are the
+> same concrete type rendering the same text. Equality MUST NOT be decided by
+> the trait object's vtable address: Rust guarantees a vtable neither unique
+> per type nor stable across codegen units, so an address comparison can
+> report two identifiers of one type and one text unequal — and `SharedIden`
+> underpins `PartialEq` for `ColumnRef`, `TableName` and the rest of the AST,
+> where that is a wrong answer about SQL. The `TypeId` is asked of the value
+> rather than stored beside it — the `Any` bound on `Iden` is there for this,
+> and `&dyn Iden` upcasts to `&dyn Any` to ask — so a `DynIden` stays one
+> pointer pair wide, which it must: one sits in nearly every AST node, and a
+> field would have doubled them all. The crate is `#![forbid(unsafe_code)]`,
+> and the transmute the vtable comparison needed is what that forbids.
+> `IntoIden` converts any `Iden + 'static` (or an existing
 > `DynIden`) into a `DynIden`, and also accepts `&str` and `String`, wrapping
 > them in `Alias` so a string-spelled identifier escapes like any other;
 > `IdenList` is implemented for a single iden and for 2- and 3-tuples,

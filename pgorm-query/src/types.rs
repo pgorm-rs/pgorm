@@ -1,12 +1,12 @@
 //! Base types used throughout pgorm-query.
 
 use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*};
-use std::{fmt, mem, ops, sync::Arc};
+use std::{any::Any, fmt, ops, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
-// [spec:pgorm:def:sql.types+5]
+// [spec:pgorm:def:sql.types+6]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
@@ -38,7 +38,7 @@ macro_rules! iden_trait {
     };
 }
 
-iden_trait!(Send, Sync);
+iden_trait!(Any, Send, Sync);
 
 /// A shared, type-erased identifier: an `Arc<dyn Iden>` that can be compared.
 #[derive(Debug)]
@@ -61,15 +61,21 @@ impl Clone for SharedIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+5]
+/// Two identifiers are equal when their concrete types and their rendered text
+/// both are.
+///
+/// The type is asked of the identifier by [`TypeId`](std::any::TypeId), not
+/// read off the trait object's vtable address: Rust guarantees a vtable
+/// neither unique per type nor stable across codegen units, so an address
+/// comparison can answer that two `Alias`es both spelling `"id"` differ.
+/// `Iden` is bounded on [`Any`] so the erased value can still be asked, and
+/// asking costs the identifier no width — a `DynIden` sits in nearly every
+/// node of the AST.
+// [spec:pgorm:def:sql.types+6]
 impl PartialEq for SharedIden {
     fn eq(&self, other: &Self) -> bool {
-        let (self_vtable, other_vtable) = unsafe {
-            let (_, self_vtable) = mem::transmute::<&dyn Iden, (usize, usize)>(&*self.0);
-            let (_, other_vtable) = mem::transmute::<&dyn Iden, (usize, usize)>(&*other.0);
-            (self_vtable, other_vtable)
-        };
-        self_vtable == other_vtable && self.to_string() == other.to_string()
+        let (this, that): (&dyn Any, &dyn Any) = (&*self.0, &*other.0);
+        this.type_id() == that.type_id() && self.to_string() == other.to_string()
     }
 }
 
@@ -668,14 +674,14 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+5]
+// [spec:pgorm:def:sql.types+6]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+5]
+// [spec:pgorm:def:sql.types+6]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
@@ -982,7 +988,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+5/test]
+    // [spec:pgorm:def:sql.types+6/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -997,7 +1003,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+5/test]
+    // [spec:pgorm:def:sql.types+6/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

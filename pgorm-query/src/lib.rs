@@ -1,5 +1,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_debug_implementations)]
+// A SQL builder renders text; nothing it does needs the unsafe half of the
+// language. The one block that existed compared trait-object vtable addresses
+// for identifier equality, which `TypeId` answers with a guarantee behind it
+// (`[spec:pgorm:def:sql.types+6]`).
+#![forbid(unsafe_code)]
 
 //! # pgorm-query
 //!
