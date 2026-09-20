@@ -9,7 +9,7 @@ use crate::{QueryBuilder, types::*};
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// ForeignKey::drop().name("FK_character_id");
+/// ForeignKey::drop().name(Name::runtime("FK_character_id"));
 /// ```
 ///
 /// # Examples
@@ -17,7 +17,7 @@ use crate::{QueryBuilder, types::*};
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let foreign_key = ForeignKey::drop(Character::Table, "FK_character_id");
+/// let foreign_key = ForeignKey::drop(Character::Table, Name::runtime("FK_character_id"));
 ///
 /// assert_eq!(
 ///     foreign_key.to_string(),

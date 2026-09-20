@@ -14,7 +14,7 @@ use super::common::*;
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// Index::create(Glyph::Aspect).name("idx-glyph-aspect");
+/// Index::create(Glyph::Aspect).name(Name::runtime("idx-glyph-aspect"));
 /// ```
 ///
 /// # Examples
@@ -23,7 +23,7 @@ use super::common::*;
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let index = Index::create(Glyph::Table, Glyph::Aspect)
-///     .name("idx-glyph-aspect")
+///     .name(Name::runtime("idx-glyph-aspect"))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -37,7 +37,7 @@ use super::common::*;
 ///
 /// let index = Index::create(Glyph::Table, Glyph::Aspect)
 ///     .if_not_exists()
-///     .name("idx-glyph-aspect")
+///     .name(Name::runtime("idx-glyph-aspect"))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -60,7 +60,7 @@ use super::common::*;
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let index = Index::create(Glyph::Table, (Glyph::Aspect, IndexOrder::Desc))
-///     .name("idx-glyph-aspect")
+///     .name(Name::runtime("idx-glyph-aspect"))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -73,7 +73,7 @@ use super::common::*;
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let index = Index::create(Glyph::Table, (Glyph::Image, IndexOrder::Asc))
-///     .name("idx-glyph-aspect")
+///     .name(Name::runtime("idx-glyph-aspect"))
 ///     .col((Glyph::Aspect, IndexOrder::Desc))
 ///     .unique()
 ///     .to_owned();

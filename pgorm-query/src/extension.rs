@@ -45,8 +45,8 @@ impl Extension {
 /// use pgorm_query::{extension::Extension, *};
 ///
 /// assert_eq!(
-///     Extension::create("ltree")
-///         .schema("public")
+///     Extension::create(Name::runtime("ltree"))
+///         .schema(Name::runtime("public"))
 ///         .version("v0.1.0")
 ///         .cascade()
 ///         .if_not_exists()
@@ -62,7 +62,7 @@ impl Extension {
 /// ```compile_fail,E0061
 /// use pgorm_query::{extension::Extension, *};
 ///
-/// Extension::create().schema("public");
+/// Extension::create().schema(Name::runtime("public"));
 /// ```
 ///
 /// # References
@@ -148,7 +148,7 @@ impl ExtensionCreateStatement {
 /// use pgorm_query::{extension::Extension, *};
 ///
 /// assert_eq!(
-///     Extension::drop("ltree").cascade().if_exists().to_string(),
+///     Extension::drop(Name::runtime("ltree")).cascade().if_exists().to_string(),
 ///     r#"DROP EXTENSION IF EXISTS "ltree" CASCADE"#
 /// );
 /// ```

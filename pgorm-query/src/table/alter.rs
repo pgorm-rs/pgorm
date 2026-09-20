@@ -268,14 +268,14 @@ impl TableAlterStatement {
     ///
     /// let foreign_key_char =
     ///     TableForeignKey::new(Char::Table, Char::FontId, Glyph::Table, Char::FontId)
-    ///         .name("FK_character_glyph")
+    ///         .name(Name::runtime("FK_character_glyph"))
     ///         .col(Char::Id, Char::Id)
     ///         .on_delete(ForeignKeyAction::Cascade)
     ///         .on_update(ForeignKeyAction::Cascade)
     ///         .to_owned();
     ///
     /// let foreign_key_font = TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id)
-    ///     .name("FK_character_font")
+    ///     .name(Name::runtime("FK_character_font"))
     ///     .on_delete(ForeignKeyAction::Cascade)
     ///     .on_update(ForeignKeyAction::Cascade)
     ///     .to_owned();

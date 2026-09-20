@@ -389,12 +389,12 @@ where
     /// caller's:
     ///
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select(cake::Column::Name)
-    ///         .column_as(cake::Column::Id.count(), "count")
+    ///         .column_as(cake::Column::Id.count(), alias("count"))
     ///         .as_query()
     ///         .to_string(),
     ///     r#"SELECT "cake"."name", COUNT("cake"."id") AS "count" FROM "cake""#

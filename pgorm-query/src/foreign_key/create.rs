@@ -10,7 +10,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// ForeignKey::create().name("FK_character_font");
+/// ForeignKey::create().name(Name::runtime("FK_character_font"));
 /// ```
 ///
 /// and neither does one that names the referencing side alone:
@@ -29,7 +29,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-///     .name("FK_character_font")
+///     .name(Name::runtime("FK_character_font"))
 ///     .to_owned();
 ///
 /// assert_eq!(
@@ -47,7 +47,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Glyph::Table, Char::FontId)
-///     .name("FK_character_glyph")
+///     .name(Name::runtime("FK_character_glyph"))
 ///     .col(Char::Id, Glyph::Id)
 ///     .to_owned();
 ///
@@ -70,7 +70,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 ///     Character::Table,
 ///     Character::Id,
 /// )
-/// .name("FK_character_id")
+/// .name(Name::runtime("FK_character_id"))
 /// .to_owned();
 ///
 /// assert_eq!(
@@ -88,7 +88,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 ///     Character::Table,
 ///     Character::Id,
 /// )
-/// .name("FK_character_id")
+/// .name(Name::runtime("FK_character_id"))
 /// .on_delete(ForeignKeyAction::Cascade)
 /// .on_update(ForeignKeyAction::Cascade)
 /// .to_owned();

@@ -77,12 +77,12 @@ pub trait QuerySelect: Sized {
 
     /// Add a select column with alias
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
-    ///         .column_as(cake::Column::Id.count(), "count")
+    ///         .column_as(cake::Column::Id.count(), alias("count"))
     ///         .as_query()
     ///         .to_string(),
     ///     r#"SELECT COUNT("cake"."id") AS "count" FROM "cake""#
@@ -250,7 +250,7 @@ pub trait QuerySelect: Sized {
 
     /// Add a group by column
     /// ```
-    /// use pgorm::{entity::*, query::*, tests_cfg::cake};
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::cake};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
@@ -265,8 +265,8 @@ pub trait QuerySelect: Sized {
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
-    ///         .column_as(cake::Column::Id.count(), "count")
-    ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
+    ///         .column_as(cake::Column::Id.count(), alias("count"))
+    ///         .column_as(cake::Column::Id.sum(), alias("sum_of_id"))
     ///         .group_by(cake::Column::Name)
     ///         .as_query()
     ///         .to_string(),
@@ -300,7 +300,7 @@ pub trait QuerySelect: Sized {
     ///     cake::Entity::find()
     ///         .select_only()
     ///         .column_as(cake::Column::Id.count(), count)
-    ///         .column_as(cake::Column::Id.sum(), "sum_of_id")
+    ///         .column_as(cake::Column::Id.sum(), alias("sum_of_id"))
     ///         .group_by(cake::Column::Name)
     ///         .having(Expr::col(count).gt(6))
     ///         .as_query()
@@ -612,13 +612,13 @@ pub trait QuerySelect: Sized {
     /// Select column.
     /// ```
     /// use pgorm::pgorm_query::{Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{alias, entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .expr_as(
     ///             Func::upper(Expr::col((cake::Entity, cake::Column::Name))),
-    ///             "name_upper"
+    ///             alias("name_upper")
     ///         )
     ///         .as_query()
     ///         .to_string(),
@@ -638,12 +638,12 @@ pub trait QuerySelect: Sized {
     ///
     /// ```
     /// use pgorm::pgorm_query::{Expr, Func};
-    /// use pgorm::{entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
+    /// use pgorm::{alias, entity::*, tests_cfg::cake, QuerySelect, QueryTrait};
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
     ///         .select_only()
-    ///         .tbl_col_as((cake::Entity, cake::Column::Name), "cake_name")
+    ///         .tbl_col_as((cake::Entity, cake::Column::Name), alias("cake_name"))
     ///         .as_query()
     ///         .to_string(),
     ///     r#"SELECT "cake"."name" AS "cake_name" FROM "cake""#

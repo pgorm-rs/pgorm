@@ -536,7 +536,7 @@
 //!     Character::Table,
 //!     Character::Id,
 //! )
-//! .name("FK_character_id")
+//! .name(Name::runtime("FK_character_id"))
 //! .to_owned();
 //!
 //! assert_eq!(
@@ -549,7 +549,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let foreign_key = ForeignKey::drop(Character::Table, "FK_character_id");
+//! let foreign_key = ForeignKey::drop(Character::Table, Name::runtime("FK_character_id"));
 //!
 //! assert_eq!(
 //!     foreign_key.to_string(),
@@ -562,7 +562,7 @@
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
 //! let index = Index::create(Character::Table, Character::Id)
-//!     .name("idx-character-id")
+//!     .name(Name::runtime("idx-character-id"))
 //!     .to_owned();
 //!
 //! assert_eq!(
@@ -575,7 +575,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let index = Index::drop("idx-character-id")
+//! let index = Index::drop(Name::runtime("idx-character-id"))
 //!     .table(Character::Table)
 //!     .to_owned();
 //!

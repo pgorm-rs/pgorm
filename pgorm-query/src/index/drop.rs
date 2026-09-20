@@ -18,7 +18,7 @@ use crate::{QueryBuilder, types::*};
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let index = Index::drop("idx-character-id")
+/// let index = Index::drop(Name::runtime("idx-character-id"))
 ///     .table(Character::Table)
 ///     .to_owned();
 ///

@@ -30,7 +30,7 @@ use crate::{
 ///     .col(ColumnDef::new(Char::FontId).integer().default(Value::Int(None)))
 ///     .foreign_key(
 ///         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-///             .name("FK_2e303c3a712662f1fc2a4d0aad6")
+///             .name(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
 ///             .on_delete(ForeignKeyAction::Cascade)
 ///             .on_update(ForeignKeyAction::Cascade)
 ///             .to_owned()
