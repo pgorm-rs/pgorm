@@ -56,13 +56,13 @@ fn every_ddl_entry_point_is_reachable() {
 
     assert!(
         Type::create(Alias::new("tea"))
-            .values([Alias::new("green")])
+            .values(["green"])
             .to_string()
             .starts_with("CREATE TYPE")
     );
     assert!(
         Type::alter(Alias::new("tea"))
-            .add_value(Alias::new("black"))
+            .add_value("black")
             .to_string()
             .starts_with("ALTER TYPE")
     );

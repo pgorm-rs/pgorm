@@ -1333,16 +1333,17 @@ impl Expr {
     /// Cast to a type EXPRESSION rendered verbatim — `BIT(8)`,
     /// `numeric(12, 2)` — the escape hatch for spellings that are grammar
     /// rather than a name. The text is the caller's own SQL: nothing is
-    /// quoted or escaped, exactly as [`ColumnType::custom`] renders. A name
-    /// belongs in [`cast_as`](Self::cast_as), which quotes it.
+    /// quoted or escaped. The `&'static str` bound is what keeps that safe —
+    /// only a literal written in the calling source can reach it, never a
+    /// runtime string a value could have reached. A *name*, including one
+    /// that arrives at runtime, belongs in [`cast_as`](Self::cast_as) or
+    /// [`ColumnType::custom`](crate::ColumnType::custom), both of which quote
+    /// it.
     ///
     /// The verbatim text rides in the [`TypeName`], so this builds the same
     /// node as every other cast.
     // [spec:pgorm:req:sql.ast.cast-shape]
-    pub fn cast_as_custom<T>(self, type_expr: T) -> SimpleExpr
-    where
-        T: Into<String>,
-    {
+    pub fn cast_as_custom(self, type_expr: &'static str) -> SimpleExpr {
         self.cast_as_type(TypeName::custom(type_expr))
     }
 

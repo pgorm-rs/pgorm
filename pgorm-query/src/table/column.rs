@@ -48,7 +48,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -74,7 +74,11 @@ pub enum ColumnType {
     Json,
     JsonBinary,
     Uuid,
-    Custom(DynIden),
+    /// A type this crate has no variant for, named rather than spelled: the
+    /// payload is a [`TypeName`], so it renders through the same
+    /// quoted-or-safe-bare part policy every other type name does and a
+    /// hostile catalogue name becomes a name PostgreSQL refuses, never SQL.
+    Custom(TypeName),
     Enum {
         name: DynIden,
         schema: Option<DynIden>,
@@ -98,7 +102,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -108,7 +112,7 @@ impl PartialEq for ColumnType {
             (Self::Interval(l0), Self::Interval(r0)) => l0 == r0,
             (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::VarBit(l0), Self::VarBit(r0)) => l0 == r0,
-            (Self::Custom(l0), Self::Custom(r0)) => l0.to_string() == r0.to_string(),
+            (Self::Custom(l0), Self::Custom(r0)) => l0.raw_text() == r0.raw_text(),
             (
                 Self::Enum {
                     name: l_name,
@@ -136,11 +140,19 @@ impl PartialEq for ColumnType {
 }
 
 impl ColumnType {
+    /// A type named rather than spelled — `citext`, `tenant_a.status`.
+    ///
+    /// The name is data, not program text: it renders through
+    /// [`TypeName`]'s part policy, so a runtime `String` is safe here.
+    /// A type *expression* — `numeric(12, 2)` — is grammar rather than a
+    /// name and belongs in
+    /// [`Expr::cast_as_custom`](crate::Expr::cast_as_custom).
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
     pub fn custom<T>(ty: T) -> ColumnType
     where
         T: Into<String>,
     {
-        ColumnType::Custom(Alias::new(ty).into_iden())
+        ColumnType::Custom(TypeName::new(Alias::new(ty)))
     }
 
     pub fn string(length: Option<u32>) -> ColumnType {
@@ -184,7 +196,7 @@ pub enum ColumnSpec {
 /// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
 /// the precision sits on the second-bearing field spellings and on the
 /// unqualified form, and `interval HOUR(3)` has no spelling here.
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IntervalSpec {
     /// `interval`, or `interval(p)` — every field, with a fractional-seconds
@@ -197,7 +209,7 @@ pub enum IntervalSpec {
 /// Fractional-seconds precision of an interval type.
 ///
 /// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum IntervalPrecision {
     P0,
@@ -246,7 +258,7 @@ impl std::fmt::Display for IntervalPrecision {
 
 /// All interval field qualifiers; the second-bearing ones carry the precision
 /// PostgreSQL allows only there.
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,
@@ -467,7 +479,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+4]
+    // [spec:pgorm:def:sql.types.column-type+5]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self
@@ -550,12 +562,17 @@ impl ColumnDef {
         self
     }
 
-    /// Use a custom type on this column.
+    /// Use a custom type on this column, named rather than spelled.
+    ///
+    /// Takes anything a [`TypeName`] is built from — a bare name, or a
+    /// `TypeName` carrying a schema qualifier or an array suffix — and every
+    /// part renders quoted-or-safe-bare, never as SQL.
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
     pub fn custom<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: Into<TypeName>,
     {
-        self.types = Some(ColumnType::Custom(name.into_iden()));
+        self.types = Some(ColumnType::Custom(name.into()));
         self
     }
 

@@ -2,13 +2,13 @@ use super::*;
 use crate::oracle::assert_eq;
 use pgorm_query::extension::Type;
 
-// [spec:pgorm:req:sql.ddl.type-enum+3/test]
+// [spec:pgorm:req:sql.ddl.type-enum+4/test]
 #[test]
-// [spec:pgorm:req:sql.render.ddl.enum-type+3/test]
+// [spec:pgorm:req:sql.render.ddl.enum-type+4/test]
 fn create_1() {
     assert_eq!(
         Type::create(Font::Table)
-            .values([Font::Name, Font::Variant, Font::Language])
+            .values(["name", "variant", "language"])
             .to_string(),
         r#"CREATE TYPE "font" AS ENUM ('name', 'variant', 'language')"#
     );
@@ -18,7 +18,7 @@ fn create_1() {
 fn create_2() {
     assert_eq!(
         Type::create((Alias::new("schema"), Font::Table))
-            .values([Font::Name, Font::Variant, Font::Language])
+            .values(["name", "variant", "language"])
             .to_string(),
         r#"CREATE TYPE "schema"."font" AS ENUM ('name', 'variant', 'language')"#
     );
@@ -28,36 +28,27 @@ fn create_2() {
 fn create_3() {
     assert_eq!(
         Type::create(Tea::Enum)
-            .values([Tea::EverydayTea, Tea::BreakfastTea])
+            .values(["EverydayTea", "BreakfastTea"])
             .to_string(),
         r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
     );
 
-    // Variants are named after the SQL enum labels the assertion above expects.
-    #[allow(clippy::enum_variant_names)]
+    // The type is named by an `Iden`; its labels are data and are written as
+    // the string literals they render to.
     enum Tea {
         Enum,
-        EverydayTea,
-        BreakfastTea,
     }
 
     impl pgorm_query::Iden for Tea {
         fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-            write!(
-                s,
-                "{}",
-                match self {
-                    Self::Enum => "tea",
-                    Self::EverydayTea => "EverydayTea",
-                    Self::BreakfastTea => "BreakfastTea",
-                }
-            )
-            .unwrap();
+            match self {
+                Self::Enum => write!(s, "tea").unwrap(),
+            }
         }
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+3/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -87,13 +78,11 @@ fn drop_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+3/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
 #[test]
 fn alter_1() {
     assert_eq!(
-        Type::alter(Font::Table)
-            .add_value(Alias::new("weight"))
-            .to_string(),
+        Type::alter(Font::Table).add_value("weight").to_string(),
         r#"ALTER TYPE "font" ADD VALUE 'weight'"#
     )
 }
@@ -101,8 +90,8 @@ fn alter_1() {
 fn alter_2() {
     assert_eq!(
         Type::alter(Font::Table)
-            .add_value(Alias::new("weight"))
-            .before(Font::Variant)
+            .add_value("weight")
+            .before("variant")
             .to_string(),
         r#"ALTER TYPE "font" ADD VALUE 'weight' BEFORE 'variant'"#
     )
@@ -112,8 +101,8 @@ fn alter_2() {
 fn alter_3() {
     assert_eq!(
         Type::alter(Font::Table)
-            .add_value(Alias::new("weight"))
-            .after(Font::Variant)
+            .add_value("weight")
+            .after("variant")
             .to_string(),
         r#"ALTER TYPE "font" ADD VALUE 'weight' AFTER 'variant'"#
     )
@@ -133,7 +122,7 @@ fn alter_4() {
 fn alter_5() {
     assert_eq!(
         Type::alter(Font::Table)
-            .rename_value(Font::Variant, Font::Language)
+            .rename_value("variant", "language")
             .to_string(),
         r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
     )

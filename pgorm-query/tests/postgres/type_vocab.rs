@@ -384,7 +384,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+4/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+5/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -399,7 +399,7 @@ fn string_len_and_the_convenience_constructors() {
     );
     assert_eq!(
         ColumnType::custom("citext"),
-        ColumnType::Custom(Alias::new("citext").into_iden())
+        ColumnType::Custom(TypeName::new(Alias::new("citext")))
     );
 }
 
@@ -429,7 +429,7 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+4/test]    equality compares parameters, renders
+// [spec:pgorm:def:sql.types.column-type+5/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -464,7 +464,7 @@ fn column_type_equality_semantics() {
     // `Custom` compares by rendered identifier, not by concrete iden type.
     assert_eq!(
         ColumnType::custom("aspect"),
-        ColumnType::Custom(Glyph::Aspect.into_iden())
+        ColumnType::Custom(TypeName::new(Glyph::Aspect))
     );
     assert_ne!(ColumnType::custom("aspect"), ColumnType::custom("image"));
 
@@ -510,7 +510,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+4/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+5/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -552,7 +552,7 @@ fn pg_interval_display_and_parse_round_trip() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+4/test]    the precision vocabulary is the closed set
+// [spec:pgorm:def:sql.types.column-type+5/test]    the precision vocabulary is the closed set
 // PostgreSQL accepts, and nothing outside it constructs
 #[test]
 fn interval_precision_is_zero_through_six() {

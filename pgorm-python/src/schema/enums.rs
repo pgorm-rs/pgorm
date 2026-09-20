@@ -17,7 +17,9 @@ fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
     Ok(TypeRef::Type(PyIdentifier::new(name)?.alias().into_iden()))
 }
 
-fn label(value: &Bound<'_, PyAny>) -> PyResult<Alias> {
+/// An enum label: data, rendered as a string literal rather than as a name, so
+/// it is carried as a `String`.
+fn label(value: &Bound<'_, PyAny>) -> PyResult<String> {
     let text = value
         .extract::<&str>()
         .map_err(|_| ConstructionError::new_err("enum labels require strings"))?;
@@ -26,7 +28,7 @@ fn label(value: &Bound<'_, PyAny>) -> PyResult<Alias> {
             "enum labels require at most 63 UTF-8 bytes and no NUL",
         ));
     }
-    Ok(Alias::new(text))
+    Ok(text.to_owned())
 }
 
 // [spec:pgorm:req:python.schema]

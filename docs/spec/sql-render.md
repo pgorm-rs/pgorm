@@ -170,7 +170,7 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+2]
+> [spec:pgorm:req:sql.render.ident-quoting+3]
 > The quote is the double quote, and it is the only one: PostgreSQL has a
 > single identifier quote, so it is written at the render sites rather than
 > carried in a parameter that could hold another character. Every identifier
@@ -180,9 +180,26 @@ an ideal Postgres renderer would emit.
 > no reserved-word or safe-character check. This applies to column names, table
 > names, schema/database qualifiers, aliases, CTE names, window names, and
 > index/constraint/foreign-key names. Multi-part references join the quoted
-> parts with `.` (e.g. `"schema"."table"."column"`). By contrast,
-> `Function::Custom` function names are written via `Iden::unquoted`, i.e. raw
-> with no quoting.
+> parts with `.` (e.g. `"schema"."table"."column"`).
+>
+> No caller-supplied identifier reaches output unquoted. The bound is what
+> says so: a position that renders a *name* takes an identifier type or a
+> `TypeName`, and every such position renders through `Iden::prepare` or
+> through `TypeName`'s part policy (`sql.types.type-name`), which quotes
+> anything that is not already a safe lowercase identifier. In particular
+> `ColumnType::Custom` carries a `TypeName` and renders through
+> `to_sql_string`, `IndexType::Custom`'s access method renders through
+> `TypeName::prepare_part`, `Function::Custom` function names render under
+> the same part policy, and `ExtensionCreateStatement`'s schema is a
+> `DynIden` like every other schema qualifier. Each of those three was once
+> a bare `Iden::to_string`, which emitted a hostile catalogue name as SQL;
+> the fix is the one shared policy rather than a per-site escape, so a new
+> render site inherits it.
+>
+> Only two things in the crate render caller text verbatim, and neither is a
+> name: `TypeName::custom` (bound to `&'static str`, reachable only from
+> `Expr::cast_as_custom`) and `SimpleExpr::Custom`'s template. Both carry
+> program text rather than data, and their bounds are what keeps that true.
 
 > [spec:pgorm:req:sql.render.string-escape+1]
 > `QueryBuilder::escape_string` MUST apply exactly these replacements, in
@@ -567,7 +584,7 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types+3]
+> [spec:pgorm:def:sql.render.ddl.types+4]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
 > `varchar(n)`/`varchar`; Text → `text`; SmallInteger → `smallint`; Integer →
@@ -582,31 +599,37 @@ an ideal Postgres renderer would emit.
 > Money → `money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
 > `vector(n)`/`vector`; Cidr → `cidr`; Inet → `inet`; MacAddr → `macaddr`;
-> LTree → `ltree`; Custom/Enum → the identifier's raw string. The mapping is
+> LTree → `ltree`; Custom/Enum → the type name through `TypeName`'s part
+> policy (`sql.types.type-name`), a safe lowercase name bare and anything
+> else quoted, never the identifier's raw string. The mapping is
 > total — no variant is unsupported and none panics. An auto-increment column
 > instead renders `smallserial`, `serial`, or `bigserial` by integer width;
 > auto-increment on any other type renders that type's own spelling. Table
 > DDL (`CREATE TABLE … ( … )`, `ALTER TABLE`
 > add/modify/rename/drop column and add/drop foreign key, `DROP TABLE`,
 > `TRUNCATE TABLE`, `ALTER TABLE … RENAME TO`), index DDL
-> (`CREATE [UNIQUE ]INDEX … ON … [USING BTREE|GIN|HASH] (cols)` with
-> optional ` NULLS NOT DISTINCT`), and foreign-key DDL (`FOREIGN KEY (…)
+> (`CREATE [UNIQUE ]INDEX … ON … [USING BTREE|GIN|HASH|<method>] (cols)` with
+> optional ` NULLS NOT DISTINCT`, where a custom access method renders under
+> the same part policy), and foreign-key DDL (`FOREIGN KEY (…)
 > REFERENCES … (…) [ON DELETE action] [ON UPDATE action]` with actions
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered
 > by the same builder with identifiers quoted per `sql.render.ident-quoting`.
 
-> [spec:pgorm:req:sql.render.ddl.enum-type+3]
+> [spec:pgorm:req:sql.render.ddl.enum-type+4]
 > `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` — the name via
 > `TypeRef`'s quoted, dot-joined parts, so a schema-qualified type renders
-> `"schema"."name"` — where each enum label
-> is emitted per the label rules below. In cast and column-type position an
+> `"schema"."name"`. In cast and column-type position an
 > enum type renders through `TypeName`'s part policy
 > (`sql.types.type-name`): a safe lowercase part bare, anything else a
 > quoted identifier — so an enum name is a name there, never SQL, and
 > `enumeration(Alias::new("text, injected integer"))` yields a type
 > PostgreSQL refuses rather than an extra column.
-> is emitted through `prepare_value` — i.e. as a `$N` parameter in the
-> `build()` path and as a quoted string inline in the `to_string()` path.
+>
+> A LABEL is not a name. Each is carried as a `String` and emitted through
+> `push_param` — a `$N` parameter in the `build()` path and a quoted string
+> literal inline in the `to_string()` path — so a label is never an
+> identifier at either end: not in the type that holds it, and not in the
+> SQL it renders to.
 > `ALTER TYPE name` supports ` ADD VALUE v [BEFORE w | AFTER w]`,
 > ` RENAME TO v`, and ` RENAME VALUE v TO w`; every label operand is likewise
 > parameterized, but the `RENAME TO` target is a type name rather than a
@@ -615,11 +638,12 @@ an ideal Postgres renderer would emit.
 > these statements against PostgreSQL MUST use a rendering path that inlines
 > the labels, since Postgres does not accept bind parameters in DDL.
 
-> [spec:pgorm:sem:sql.render.ddl.extension+1]
+> [spec:pgorm:sem:sql.render.ddl.extension+2]
 > `CREATE EXTENSION [IF NOT EXISTS ]name [WITH SCHEMA s] [VERSION v]
 > [CASCADE]` and `DROP EXTENSION [IF EXISTS ]name [CASCADE|RESTRICT]` MUST
-> render the extension name and schema as quoted identifiers, escaped through
-> `Alias` like any other identifier, and the version as a single-quoted string
+> render the extension name and schema as quoted identifiers — both are
+> `DynIden`s and go through `Iden::prepare` like any other identifier, with
+> no re-wrapping at the render site — and the version as a single-quoted string
 > literal through `sql.render.string-escape` — the grammar takes a word or a
 > string there, and a version like `v0.1.0` is not a word. The one string a
 > DDL render still interpolates verbatim is `ColumnDef::extra`, which exists

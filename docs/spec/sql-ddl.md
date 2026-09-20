@@ -357,7 +357,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+3]
+> [spec:pgorm:req:sql.ddl.type-enum+4]
 > An enum type reference declares an optional schema — `Type::create` and its
 > siblings take any `IntoTypeRef`, so `(schema, name)` names a qualified type
 > and a bare name an unqualified one — and every DDL rendering MUST qualify
@@ -369,8 +369,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `CREATE TYPE <name>`, which PostgreSQL accepts as a shell type. `as_enum()`
 > makes it an enumeration and `values(iter)` appends labels, implying
 > `as_enum()` when it has not been called — the marker and the labels are one
-> field (`TypeAs::Enum(Vec<DynIden>)`), so no label list survives without the
-> `AS ENUM` that renders it. An enumeration MUST render `CREATE TYPE <name> AS
+> field (`TypeAs::Enum(Vec<String>)`), so no label list survives without the
+> `AS ENUM` that renders it. A label is DATA, not a name: it renders as a
+> string literal, so `values` is bound `Into<String>` and MUST NOT take an
+> identifier type. The two are not interchangeable — an identifier bound
+> would invite a caller to pass an `Iden` whose text is then emitted as a
+> literal, spelling a contract the render does not keep. An enumeration MUST render `CREATE TYPE <name> AS
 > ENUM (<labels>)` with the parentheses always present, empty list included:
 > `CREATE TYPE "t" AS ENUM ()` is an accepted spelling of the empty enum, and
 > it was the missing parentheses — `CREATE TYPE "t" AS ENUM` — that PostgreSQL
@@ -381,14 +385,18 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `TypeAs` has no other variants (composite/range/base are commented out
 > upstream).
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+> [spec:pgorm:req:sql.ddl.type-alter-drop+4]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
 > otherwise), `RENAME TO "new"`, or `RENAME VALUE 'old' TO 'new'`. The enum
 > labels go through the value pipeline and render as single-quoted string
 > literals; the `RENAME TO` target is a type name, not a label, and MUST
-> render as a quoted identifier. Unlike the other type builders,
+> render as a quoted identifier. The bounds MUST say which is which:
+> `add_value`, `rename_value`, `before` and `after` take `Into<String>` and
+> carry `String` in `TypeAlterOpt::Add` / `RenameValue` and
+> `TypeAlterAddOpt::Before` / `After`, while `rename_to` keeps `IntoIden`
+> and `TypeAlterOpt::Rename` keeps `DynIden`. Unlike the other type builders,
 > `TypeAlterStatement` methods take `self` by value.
 >
 > `Type::alter(name)` yields a `PendingTypeAlter` rather than a statement, and
@@ -407,7 +415,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Extensions
 
-> [spec:pgorm:req:sql.ddl.extension+3]
+> [spec:pgorm:req:sql.ddl.extension+4]
 > `ExtensionCreateStatement` MUST render `CREATE EXTENSION [IF NOT EXISTS ]
 > <name>[ WITH SCHEMA <schema>][ VERSION <version>][ CASCADE]`, and
 > `ExtensionDropStatement` MUST render `DROP EXTENSION [IF EXISTS ]<name>
@@ -418,10 +426,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > extension MUST NOT construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). An explicitly empty
 > identifier remains the caller's own to avoid, as `Alias::new("")` is
-> everywhere else in the crate. Schema and version stay plain `String`s, and
-> none of the three is written verbatim: name and schema render as quoted
-> identifiers and version as a quoted string literal
-> (`[spec:pgorm:sem:sql.render.ddl.extension+1]`). On drop, `CASCADE` and
+> everywhere else in the crate. The schema is a `DynIden` set by
+> `schema(impl IntoIden)` — a schema qualifier is a name, and it takes the
+> identifier type every other schema position in the crate takes — while the
+> version stays a `String`, because the grammar puts a string literal there
+> and text is what it is. None of the three is written verbatim: name and
+> schema render as quoted identifiers and version as a quoted string literal
+> (`[spec:pgorm:sem:sql.render.ddl.extension+2]`). On drop, `CASCADE` and
 > `RESTRICT` share one `ExtensionDropOpt` slot that `cascade()`/`restrict()`
 > overwrite, so the pair PostgreSQL rejects does not construct; a drop carries
 > no schema or version, because it renders neither.

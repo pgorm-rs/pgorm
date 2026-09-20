@@ -508,17 +508,17 @@ fn sweep_schema_object_ddl_shapes() {
             .to_string(),
         ForeignKey::drop(Char::Table, "fk").to_string(),
         Type::create(Alias::new("tea"))
-            .values([Alias::new("breakfast"), Alias::new("earl grey")])
+            .values(["breakfast", "earl grey"])
             .to_string(),
         Type::alter(Alias::new("tea"))
-            .add_value(Alias::new("oolong"))
+            .add_value("oolong")
             .to_string(),
         Type::alter(Alias::new("tea"))
-            .add_value(Alias::new("oolong"))
-            .after(Alias::new("breakfast"))
+            .add_value("oolong")
+            .after("breakfast")
             .to_string(),
         Type::alter(Alias::new("tea"))
-            .rename_value(Alias::new("oolong"), Alias::new("wulong"))
+            .rename_value("oolong", "wulong")
             .to_string(),
         Type::drop(Alias::new("tea"))
             .if_exists()
@@ -542,7 +542,7 @@ fn sweep_schema_object_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    every `ColumnType` that has a PostgreSQL spelling
-// [spec:pgorm:def:sql.render.ddl.types+3/test]
+// [spec:pgorm:def:sql.render.ddl.types+4/test]
 #[test]
 fn sweep_column_type_vocabulary() {
     let types = [

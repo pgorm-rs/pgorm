@@ -100,7 +100,7 @@ impl Column {
             ColumnType::Money => Some("Money".to_owned()),
             ColumnType::Text => Some("Text".to_owned()),
             ColumnType::JsonBinary => Some("JsonBinary".to_owned()),
-            ColumnType::Custom(iden) => Some(format!("custom(\"{}\")", iden.to_string())),
+            ColumnType::Custom(type_name) => Some(format!("custom(\"{}\")", type_name.raw_text())),
             ColumnType::Bytea => Some("Bytea".to_owned()),
             _ => None,
         };
@@ -142,8 +142,8 @@ impl Column {
                 ColumnType::Json => quote! { ColumnType::Json },
                 ColumnType::JsonBinary => quote! { ColumnType::JsonBinary },
                 ColumnType::Uuid => quote! { ColumnType::Uuid },
-                ColumnType::Custom(s) => {
-                    let s = s.to_string();
+                ColumnType::Custom(type_name) => {
+                    let s = type_name.raw_text();
                     quote! { ColumnType::custom(#s) }
                 }
                 ColumnType::Enum { name, .. } => {
@@ -315,7 +315,7 @@ impl TryFrom<&ColumnDef> for Column {
 #[cfg(test)]
 mod tests {
     use crate::Column;
-    use pgorm_query::{Alias, ColumnDef, ColumnType, SharedIden, StringLen};
+    use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen};
     use proc_macro2::TokenStream;
     use quote::quote;
 
@@ -338,10 +338,7 @@ mod tests {
         vec![
             make_col!("id", ColumnType::String(StringLen::N(255))),
             make_col!("id", ColumnType::String(StringLen::None)),
-            make_col!(
-                "cake_id",
-                ColumnType::Custom(SharedIden::new(Alias::new("cus_col")))
-            ),
+            make_col!("cake_id", ColumnType::custom("cus_col")),
             make_col!("CakeId", ColumnType::SmallInteger),
             make_col!("CakeId", ColumnType::Integer),
             make_col!("CakeFillingId", ColumnType::BigInteger),

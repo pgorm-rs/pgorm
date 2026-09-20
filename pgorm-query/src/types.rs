@@ -8,14 +8,14 @@ use std::{any::Any, fmt, ops, sync::Arc};
 pub trait Iden: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
-    // [spec:pgorm:req:sql.render.ident-quoting+2]
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
     }
 
     /// The identifier's text with embedded double quotes doubled, ready to sit
     /// between the quotes [`prepare`](Self::prepare) writes.
-    // [spec:pgorm:req:sql.render.ident-quoting+2]
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
     fn quoted(&self) -> String {
         self.to_string().replace('"', "\"\"")
     }
@@ -166,7 +166,7 @@ pub trait IntoColumnRef {
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+1]
+// [spec:pgorm:def:sql.types.type-name+2]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
@@ -197,16 +197,16 @@ impl TypeName {
     /// Reachable only through [`Expr::cast_as_custom`](crate::Expr::cast_as_custom),
     /// whose argument is a literal written in the calling source: the text is
     /// program text the author already controls, never data, so rendering it
-    /// as SQL adds no reach that writing the SQL by hand would not have. Any
-    /// type that arrives as a *name* — from a schema, a derive attribute, or
-    /// anything a value could reach — takes [`new`](Self::new) and is quoted.
-    pub fn custom<T>(type_expr: T) -> Self
-    where
-        T: Into<String>,
-    {
+    /// as SQL adds no reach that writing the SQL by hand would not have. The
+    /// `&'static str` bound is what enforces that — a runtime `String` cannot
+    /// reach this constructor, so no value-derived text can become SQL here.
+    /// Any type that arrives as a *name* — from a schema, a derive attribute,
+    /// or anything a value could reach — takes [`new`](Self::new) and is
+    /// quoted.
+    pub fn custom(type_expr: &'static str) -> Self {
         Self {
             schema: None,
-            name: Alias::new(type_expr.into()).into_iden(),
+            name: Alias::new(type_expr).into_iden(),
             array: false,
             verbatim: true,
         }
@@ -253,7 +253,15 @@ impl TypeName {
         out
     }
 
-    fn prepare_part(part: &DynIden, out: &mut String) {
+    /// Write one name part under the policy [`to_sql_string`](Self::to_sql_string)
+    /// documents: a safe lowercase identifier bare, everything else quoted.
+    ///
+    /// Shared with the render sites that emit a single caller-supplied name
+    /// which is not a `TypeName` — the index access method of
+    /// [`IndexType::Custom`](crate::IndexType::Custom) — so one policy covers
+    /// every name-shaped position rather than each site inventing its own.
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    pub(crate) fn prepare_part(part: &DynIden, out: &mut String) {
         let text = part.to_string();
         let mut chars = text.chars();
         let safe = matches!(chars.next(), Some('a'..='z' | '_'))

@@ -7714,6 +7714,13 @@ children (
                         kind @note
                         text "Exactly three render sites emit a caller identifier unquoted — backend/query_builder.rs:994 (Keyword::Custom), :1551 (ColumnType::Custom), :1995 (IndexType::Custom) — against a builder that otherwise quotes everything via Iden::prepare (types.rs:14-23) or TypeName::prepare_part (:261-271). The bound does not distinguish them: Func::cust (func.rs:157-162) has the identical T: IntoIden and quotes correctly, and inside one enum ColumnType::Enum quotes (:1552-1556) while its Custom sibling two lines earlier does not. Same fix family: enum labels are typed IntoIden but rendered as bound parameters (extension.rs:650-659; push_param at query_builder.rs:2215, 2242-2263) — labels are data, take Into<String>; ExtensionCreateStatement.schema is Option<String> where every other identifier is a name type (extension.rs:75); TypeName::custom's doc promises a source literal its Into<String> bound doesn't enforce (types.rs:199-218) — &'static str per the types_alias.rs:30 precedent. Exit test, mechanically checkable: no DynIden reaches output in backend/ except through prepare or prepare_part; a grep for .unquoted( / .to_string() on idens in render code returns nothing."
                     }
+
+                    {
+                        at 2026-09-20T00:52:41.044835Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

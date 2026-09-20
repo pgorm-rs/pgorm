@@ -183,7 +183,14 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<Type
         Some(schema) => (schema.clone(), name.clone()).into_type_ref(),
         None => name.clone().into_type_ref(),
     };
-    Some(Type::create(type_ref).values(variants.clone()).to_owned())
+    // Labels are data, not names: `TypeCreateStatement::values` renders them
+    // as string literals, so the variant idens are flattened to their text.
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    Some(
+        Type::create(type_ref)
+            .values(variants.iter().map(|v| v.to_string()))
+            .to_owned(),
+    )
 }
 
 // [spec:pgorm:sem:schema.from-entity.enum+3]

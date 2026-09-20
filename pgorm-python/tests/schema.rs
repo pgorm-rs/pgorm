@@ -60,7 +60,7 @@ fn programs() -> BTreeMap<&'static str, String> {
             "generated",
             base.col(
                 ColumnDef::new_with_type(a("twice"), ColumnType::Integer)
-                    .generated(Expr::col(a("id \"x\"")).mul(2i64), true),
+                    .generated(Expr::col(a("id \"x\"")).mul(2i64)),
             )
             .to_string(),
         ),
@@ -141,27 +141,27 @@ fn programs() -> BTreeMap<&'static str, String> {
             "enum",
             Type::create(kind.clone())
                 .as_enum()
-                .values([a(""), a("O'Brien \\ 雪"), a("busy")])
+                .values(["", "O'Brien \\ 雪", "busy"])
                 .to_string(),
         ),
         (
             "enum_before",
             Type::alter(kind.clone())
-                .add_value(a("new"))
-                .before(a("busy"))
+                .add_value("new")
+                .before("busy")
                 .to_string(),
         ),
         (
             "enum_after",
             Type::alter(kind.clone())
-                .add_value(a("new"))
-                .after(a("busy"))
+                .add_value("new")
+                .after("busy")
                 .to_string(),
         ),
         (
             "enum_rename_value",
             Type::alter(kind.clone())
-                .rename_value(a("busy"), a("calm"))
+                .rename_value("busy", "calm")
                 .to_string(),
         ),
         (

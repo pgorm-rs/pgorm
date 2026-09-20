@@ -7,7 +7,7 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
         let create = Type::create(Tea::Enum)
-            .values([Tea::EverydayTea, Tea::BreakfastTea])
+            .values(["EverydayTea", "BreakfastTea"])
             .to_owned();
         tx.execute(&create.to_string(), &[]).await?;
 
@@ -15,14 +15,10 @@ impl MigrationTrait for Migration {
     }
 }
 
-// Variants are named after the SQL enum labels this migration creates.
-#[allow(clippy::enum_variant_names)]
+// The type is named by an `Iden`; its labels are data and are written as the
+// string literals they render to.
 #[derive(DeriveIden)]
 pub enum Tea {
     #[pgorm(iden = "tea")]
     Enum,
-    #[pgorm(iden = "EverydayTea")]
-    EverydayTea,
-    #[pgorm(iden = "BreakfastTea")]
-    BreakfastTea,
 }

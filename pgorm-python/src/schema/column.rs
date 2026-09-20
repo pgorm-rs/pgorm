@@ -64,7 +64,7 @@ impl PyColumnDef {
     }
     fn generated(&self, expression: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut inner = self.inner.clone();
-        inner.generated(expressions::require_expr(expression)?.inner, true);
+        inner.generated(expressions::require_expr(expression)?.inner);
         Ok(Self { inner })
     }
 }

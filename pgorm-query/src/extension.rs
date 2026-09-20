@@ -68,11 +68,15 @@ impl Extension {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+3]
+// [spec:pgorm:req:sql.ddl.extension+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionCreateStatement {
     pub(crate) name: DynIden,
-    pub(crate) schema: Option<String>,
+    /// The schema the extension's objects are created in — an identifier, the
+    /// same type every other schema qualifier in the crate is, because that is
+    /// what it renders as.
+    pub(crate) schema: Option<DynIden>,
+    /// The version, a string literal in the grammar and so genuinely text.
     pub(crate) version: Option<String>,
 
     /// Conditional to execute query based on existance of the extension.
@@ -98,8 +102,12 @@ impl ExtensionCreateStatement {
     }
 
     /// Uses "WITH SCHEMA" on Create Extension Statement.
-    pub fn schema<T: Into<String>>(&mut self, schema: T) -> &mut Self {
-        self.schema = Some(schema.into());
+    ///
+    /// The schema is a name and renders as a quoted identifier, so the bound
+    /// is the identifier bound every other schema position takes.
+    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    pub fn schema<T: IntoIden>(&mut self, schema: T) -> &mut Self {
+        self.schema = Some(schema.into_iden());
         self
     }
 
@@ -157,7 +165,7 @@ impl ExtensionCreateStatement {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+3]
+// [spec:pgorm:req:sql.ddl.extension+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionDropStatement {
     pub(crate) name: DynIden,
@@ -173,7 +181,7 @@ pub struct ExtensionDropStatement {
 ///
 /// PostgreSQL takes one of `CASCADE` and `RESTRICT`, never both, so the two
 /// spellings share one slot.
-// [spec:pgorm:req:sql.ddl.extension+3]
+// [spec:pgorm:req:sql.ddl.extension+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtensionDropOpt {
     Cascade,
@@ -250,7 +258,10 @@ mod test {
             .to_owned();
 
         assert_eq!(create_extension_stmt.name.to_string(), "ltree");
-        assert_eq!(create_extension_stmt.schema, Some("public".to_string()));
+        assert_eq!(
+            create_extension_stmt.schema.as_ref().map(|s| s.to_string()),
+            Some("public".to_string())
+        );
         assert_eq!(create_extension_stmt.version, Some("v0.1.0".to_string()));
         assert!(create_extension_stmt.cascade);
         assert!(create_extension_stmt.if_not_exists);
@@ -270,7 +281,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+4]
+// [spec:pgorm:def:sql.types.column-type+5]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {
@@ -458,7 +469,7 @@ where
 /// ```compile_fail,E0061
 /// use pgorm_query::{extension::Type, tests_cfg::*, *};
 ///
-/// Type::create().values([Font::Name]);
+/// Type::create().values(["name"]);
 /// ```
 ///
 /// The name alone is a shell type, which PostgreSQL accepts; `as_enum` and
@@ -466,7 +477,7 @@ where
 /// rendered once it is one, because `CREATE TYPE "t" AS ENUM ()` is an accepted
 /// spelling of the empty enum while `CREATE TYPE "t" AS ENUM` is not a
 /// statement at all.
-// [spec:pgorm:req:sql.ddl.type-enum+3]
+// [spec:pgorm:req:sql.ddl.type-enum+4]
 #[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
     pub(crate) name: TypeRef,
@@ -474,13 +485,17 @@ pub struct TypeCreateStatement {
 }
 
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
-// [spec:pgorm:req:sql.ddl.type-enum+3]
+// [spec:pgorm:req:sql.ddl.type-enum+4]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
     // Composite,
     /// `AS ENUM (..)`, carrying its labels: the marker and the values are one
     /// fact, so no value list survives without the `AS ENUM` that renders it.
-    Enum(Vec<DynIden>),
+    ///
+    /// A label is *data* — it renders as a string literal, never as an
+    /// identifier — so it is carried as a `String` rather than as a name.
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    Enum(Vec<String>),
     /* Range,
      * Base,
      * Array, */
@@ -497,7 +512,7 @@ pub enum TypeAs {
 ///
 /// Type::drop().if_exists();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
 #[derive(Debug, Clone)]
 pub struct TypeDropStatement {
     pub(crate) first: TypeRef,
@@ -517,7 +532,7 @@ pub struct TypeDropStatement {
 ///
 /// Type::alter(Font::Table).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
 #[derive(Debug, Clone)]
 pub struct PendingTypeAlter {
     name: TypeRef,
@@ -529,7 +544,7 @@ pub struct PendingTypeAlter {
 /// option: it is reachable only by choosing an option on a
 /// [`PendingTypeAlter`], so the `ALTER TYPE "font"` PostgreSQL rejects has no
 /// constructor.
-// [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
 #[derive(Debug, Clone)]
 pub struct TypeAlterStatement {
     pub(crate) name: TypeRef,
@@ -542,17 +557,26 @@ pub enum TypeDropOpt {
     Restrict,
 }
 
+/// What an `ALTER TYPE` does.
+///
+/// Enum labels are data and are carried as `String`; `Rename`'s payload is the
+/// type's own name and is carried as an identifier, because that is what it
+/// renders as.
+// [spec:pgorm:req:sql.render.ddl.enum-type+4]
 #[derive(Debug, Clone)]
 pub enum TypeAlterOpt {
-    Add(DynIden, Option<TypeAlterAddOpt>),
+    Add(String, Option<TypeAlterAddOpt>),
     Rename(DynIden),
-    RenameValue(DynIden, DynIden),
+    RenameValue(String, String),
 }
 
+/// Where an added enum label goes relative to an existing one — both labels,
+/// so both data.
+// [spec:pgorm:req:sql.render.ddl.enum-type+4]
 #[derive(Debug, Clone)]
 pub enum TypeAlterAddOpt {
-    Before(DynIden),
-    After(DynIden),
+    Before(String),
+    After(String),
 }
 
 impl Type {
@@ -614,47 +638,39 @@ impl TypeCreateStatement {
     /// Append enum values, defining the type as an enumeration if it is not one
     /// already
     ///
+    /// A label is data, not a name: it renders as a string literal — a bound
+    /// parameter in [`build`](Self::build), a quoted literal in `Display` —
+    /// so the bound is `Into<String>` and not an identifier type.
+    ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
     ///
     /// enum FontFamily {
     ///     Type,
-    ///     Serif,
-    ///     Sans,
-    ///     Monospace,
     /// }
     ///
     /// impl Iden for FontFamily {
     ///     fn unquoted(&self, s: &mut dyn Write) {
-    ///         write!(
-    ///             s,
-    ///             "{}",
-    ///             match self {
-    ///                 Self::Type => "font_family",
-    ///                 Self::Serif => "serif",
-    ///                 Self::Sans => "sans",
-    ///                 Self::Monospace => "monospace",
-    ///             }
-    ///         )
-    ///         .unwrap();
+    ///         write!(s, "font_family").unwrap();
     ///     }
     /// }
     ///
     /// assert_eq!(
     ///     Type::create(FontFamily::Type)
-    ///         .values([FontFamily::Serif, FontFamily::Sans, FontFamily::Monospace])
+    ///         .values(["serif", "sans", "monospace"])
     ///         .to_string(),
     ///     r#"CREATE TYPE "font_family" AS ENUM ('serif', 'sans', 'monospace')"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
-        T: IntoIden,
+        T: Into<String>,
         I: IntoIterator<Item = T>,
     {
         self.as_enum();
         if let Some(TypeAs::Enum(existing)) = self.as_type.as_mut() {
-            existing.extend(values.into_iter().map(IntoIden::into_iden));
+            existing.extend(values.into_iter().map(Into::into));
         }
         self
     }
@@ -783,47 +799,42 @@ impl PendingTypeAlter {
 
     /// Add an enum value
     ///
+    /// The label is data and renders as a string literal, so the bound is
+    /// `Into<String>`; contrast [`rename_to`](Self::rename_to), whose
+    /// argument is the type's name and renders as an identifier.
+    ///
     /// ```
     /// use pgorm_query::{*, extension::Type};
     ///
     /// enum FontFamily {
     ///     Type,
-    ///     Serif,
-    ///     Sans,
-    ///     Monospace,
     /// }
     ///
     /// impl Iden for FontFamily {
     ///     fn unquoted(&self, s: &mut dyn Write) {
-    ///         write!(
-    ///             s,
-    ///             "{}",
-    ///             match self {
-    ///                 Self::Type => "font_family",
-    ///                 Self::Serif => "serif",
-    ///                 Self::Sans => "sans",
-    ///                 Self::Monospace => "monospace",
-    ///             }
-    ///         )
-    ///         .unwrap();
+    ///         write!(s, "font_family").unwrap();
     ///     }
     /// }
     ///
     /// assert_eq!(
     ///     Type::alter(FontFamily::Type)
-    ///         .add_value(Alias::new("cursive"))
+    ///         .add_value("cursive")
     ///         .to_string(),
     ///     r#"ALTER TYPE "font_family" ADD VALUE 'cursive'"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     pub fn add_value<T>(self, value: T) -> TypeAlterStatement
     where
-        T: IntoIden,
+        T: Into<String>,
     {
-        self.with(TypeAlterOpt::Add(value.into_iden(), None))
+        self.with(TypeAlterOpt::Add(value.into(), None))
     }
 
     /// Rename the type
+    ///
+    /// The argument is the type's new *name* and renders as a quoted
+    /// identifier, so this keeps the identifier bound the label methods drop.
     pub fn rename_to<T>(self, name: T) -> TypeAlterStatement
     where
         T: IntoIden,
@@ -833,25 +844,25 @@ impl PendingTypeAlter {
 
     /// Rename an enum value
     ///
+    /// Both labels are data and render as string literals.
+    ///
     /// ```
     /// use pgorm_query::{*, extension::Type, tests_cfg::*};
     ///
     /// assert_eq!(
     ///     Type::alter(Font::Table)
-    ///         .rename_value(Alias::new("variant"), Alias::new("language"))
+    ///         .rename_value("variant", "language")
     ///         .to_string(),
     ///     r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
     /// )
     /// ```
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     pub fn rename_value<T, V>(self, existing: T, new_name: V) -> TypeAlterStatement
     where
-        T: IntoIden,
-        V: IntoIden,
+        T: Into<String>,
+        V: Into<String>,
     {
-        self.with(TypeAlterOpt::RenameValue(
-            existing.into_iden(),
-            new_name.into_iden(),
-        ))
+        self.with(TypeAlterOpt::RenameValue(existing.into(), new_name.into()))
     }
 }
 
@@ -863,25 +874,28 @@ impl TypeAlterStatement {
     ///
     /// assert_eq!(
     ///     Type::alter(Font::Table)
-    ///         .add_value(Alias::new("weight"))
-    ///         .before(Font::Variant)
+    ///         .add_value("weight")
+    ///         .before("variant")
     ///         .to_string(),
     ///     r#"ALTER TYPE "font" ADD VALUE 'weight' BEFORE 'variant'"#
     /// )
     /// ```
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     #[must_use]
     pub fn before<T>(mut self, value: T) -> Self
     where
-        T: IntoIden,
+        T: Into<String>,
     {
         self.option = self.option.before(value);
         self
     }
 
+    /// Add a enum value after an existing value
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     #[must_use]
     pub fn after<T>(mut self, value: T) -> Self
     where
-        T: IntoIden,
+        T: Into<String>,
     {
         self.option = self.option.after(value);
         self
@@ -892,11 +906,11 @@ impl TypeAlterOpt {
     /// Changes only `ADD VALUE x` options into `ADD VALUE x BEFORE` options, does nothing otherwise
     pub fn before<T>(self, value: T) -> Self
     where
-        T: IntoIden,
+        T: Into<String>,
     {
         match self {
-            TypeAlterOpt::Add(iden, _) => {
-                Self::Add(iden, Some(TypeAlterAddOpt::Before(value.into_iden())))
+            TypeAlterOpt::Add(label, _) => {
+                Self::Add(label, Some(TypeAlterAddOpt::Before(value.into())))
             }
             _ => self,
         }
@@ -905,11 +919,11 @@ impl TypeAlterOpt {
     /// Changes only `ADD VALUE x` options into `ADD VALUE x AFTER` options, does nothing otherwise
     pub fn after<T>(self, value: T) -> Self
     where
-        T: IntoIden,
+        T: Into<String>,
     {
         match self {
-            TypeAlterOpt::Add(iden, _) => {
-                Self::Add(iden, Some(TypeAlterAddOpt::After(value.into_iden())))
+            TypeAlterOpt::Add(label, _) => {
+                Self::Add(label, Some(TypeAlterAddOpt::After(value.into())))
             }
             _ => self,
         }

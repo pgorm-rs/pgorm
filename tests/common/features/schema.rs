@@ -19,7 +19,7 @@ pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
     let create_enum_stmts = {
         let schema = Schema::new();
         let enum_create_stmt = Type::create(alias("tea"))
-            .values([alias("EverydayTea"), alias("BreakfastTea")])
+            .values(["EverydayTea", "BreakfastTea"])
             .to_owned();
         assert_eq!(
             enum_create_stmt.to_string(),
@@ -621,36 +621,12 @@ where
                 .auto_increment()
                 .primary_key(),
         )
-        .col(
-            ColumnDef::new(bits::Column::Bit0)
-                .custom(alias("BIT"))
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(bits::Column::Bit1)
-                .custom(alias("BIT(1)"))
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(bits::Column::Bit8)
-                .custom(alias("BIT(8)"))
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(bits::Column::Bit16)
-                .custom(alias("BIT(16)"))
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(bits::Column::Bit32)
-                .custom(alias("BIT(32)"))
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(bits::Column::Bit64)
-                .custom(alias("BIT(64)"))
-                .not_null(),
-        )
+        .col(ColumnDef::new(bits::Column::Bit0).bit(None).not_null())
+        .col(ColumnDef::new(bits::Column::Bit1).bit(Some(1)).not_null())
+        .col(ColumnDef::new(bits::Column::Bit8).bit(Some(8)).not_null())
+        .col(ColumnDef::new(bits::Column::Bit16).bit(Some(16)).not_null())
+        .col(ColumnDef::new(bits::Column::Bit32).bit(Some(32)).not_null())
+        .col(ColumnDef::new(bits::Column::Bit64).bit(Some(64)).not_null())
         .to_owned();
 
     create_table(db, &create_table_stmt, Bits).await

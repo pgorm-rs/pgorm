@@ -1,6 +1,9 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
-use pgorm_query::error::{Error, TemplateError};
+use pgorm_query::{
+    error::{Error, TemplateError},
+    extension::{Extension, Type},
+};
 
 fn select() -> SelectStatement {
     Query::select()
@@ -112,6 +115,123 @@ fn ddl_targets_have_no_unrenderable_shape() {
         let sql = Table::truncate(name).to_string();
         assert!(sql.starts_with("TRUNCATE TABLE "), "{sql}");
     }
+}
+
+/// The hostile name every quoting assertion below is made against: a double
+/// quote, a space, and a comment introducer, so an unquoted render either
+/// ends the statement early or splices a second token.
+const HOSTILE: &str = "hostile\" name --";
+
+/// The same name after the identifier rule: doubled inner quote, wrapped.
+const HOSTILE_QUOTED: &str = r#""hostile"" name --""#;
+
+// [spec:pgorm:req:sql.render.ident-quoting+3/test]    a caller-supplied type NAME reaches output
+// quoted, in every position a `ColumnType::Custom` is rendered from
+#[test]
+fn a_custom_column_type_name_is_quoted() {
+    let create = Table::create(Glyph::Table)
+        .col(ColumnDef::new(Glyph::Aspect).custom(Alias::new(HOSTILE)))
+        .to_string();
+    assert_eq!(
+        create,
+        format!(r#"CREATE TABLE "glyph" ( "aspect" {HOSTILE_QUOTED} )"#)
+    );
+
+    // The convenience constructor takes the name as data and quotes it too.
+    let via_ctor = Table::create(Glyph::Table)
+        .col(ColumnDef::new_with_type(
+            Glyph::Aspect,
+            ColumnType::custom(HOSTILE),
+        ))
+        .to_string();
+    assert_eq!(via_ctor, create);
+
+    // A safe lowercase name keeps the bare spelling PostgreSQL's grammar sugar
+    // needs — quoting is the fallback, not a blanket rewrite.
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new_with_type(
+                Glyph::Aspect,
+                ColumnType::custom("citext")
+            ))
+            .to_string(),
+        r#"CREATE TABLE "glyph" ( "aspect" citext )"#
+    );
+
+    // And a cast to the same custom type, the other position the arm renders in.
+    assert_eq!(
+        Query::select()
+            .expr(Expr::col(Glyph::Aspect).cast_as(Alias::new(HOSTILE)))
+            .from(Glyph::Table)
+            .to_string(),
+        format!(r#"SELECT CAST("aspect" AS {HOSTILE_QUOTED}) FROM "glyph""#)
+    );
+}
+
+// [spec:pgorm:req:sql.render.ident-quoting+3/test]    a caller-supplied index access method
+// reaches output quoted
+#[test]
+fn a_custom_index_access_method_is_quoted() {
+    assert_eq!(
+        Index::create(Glyph::Table, Glyph::Aspect)
+            .name("idx")
+            .index_type(IndexType::Custom(Alias::new(HOSTILE).into_iden()))
+            .to_string(),
+        format!(r#"CREATE INDEX "idx" ON "glyph" USING {HOSTILE_QUOTED} ("aspect")"#)
+    );
+
+    // A safe lowercase access method stays bare, as the built-in spellings are.
+    assert_eq!(
+        Index::create(Glyph::Table, Glyph::Aspect)
+            .name("idx")
+            .index_type(IndexType::Custom(Alias::new("gist").into_iden()))
+            .to_string(),
+        r#"CREATE INDEX "idx" ON "glyph" USING gist ("aspect")"#
+    );
+}
+
+// [spec:pgorm:req:sql.render.ident-quoting+3/test]    the schema of a `CREATE EXTENSION` is an
+// identifier like every other schema qualifier, and is quoted like one
+#[test]
+fn an_extension_schema_is_quoted() {
+    assert_eq!(
+        Extension::create("ltree")
+            .schema(Alias::new(HOSTILE))
+            .to_string(),
+        format!(r#"CREATE EXTENSION "ltree" WITH SCHEMA {HOSTILE_QUOTED}"#)
+    );
+}
+
+// [spec:pgorm:req:sql.render.ddl.enum-type+4/test]    an enum LABEL is data, not a name: it
+// renders as a string literal inline and as a bound parameter through the values sink, and a
+// hostile label reaches neither position as SQL
+#[test]
+fn enum_labels_render_as_data_in_both_paths() {
+    let create = Type::create(Alias::new("mood"))
+        .values([HOSTILE])
+        .to_owned();
+    assert_eq!(
+        create.to_string(),
+        r#"CREATE TYPE "mood" AS ENUM ('hostile" name --')"#
+    );
+
+    // Through the values sink the label is a placeholder and the text never
+    // enters the SQL at all. The oracle is bypassed deliberately: PostgreSQL
+    // accepts no bind parameter in DDL, which is the whole reason the inline
+    // rendering exists.
+    let mut sink = SqlWriterValues::new("$", true);
+    let sql = create.build_collect(&mut sink);
+    assert_eq_unparsed!(sql, r#"CREATE TYPE "mood" AS ENUM ($1)"#);
+    let (_, values) = sink.into_parts();
+    assert_eq!(values.0, vec![Value::from(HOSTILE)]);
+
+    let alter = Type::alter(Alias::new("mood"))
+        .add_value(HOSTILE)
+        .after(HOSTILE);
+    assert_eq!(
+        alter.to_string(),
+        r#"ALTER TYPE "mood" ADD VALUE 'hostile" name --' AFTER 'hostile" name --'"#
+    );
 }
 
 // [spec:pgorm:def:sql.render.writer+2/test]    `String` is the inline-rendering sink: `push_param`

@@ -381,7 +381,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+1]
+> [spec:pgorm:def:sql.types.type-name+2]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<DynIden>`,
 > `name: DynIden`, `array: bool`, `verbatim: bool`. Rendering
@@ -394,22 +394,28 @@ including panic semantics and quirks inherited from sea-query.
 > a name: text that is not an identifier becomes a quoted identifier
 > PostgreSQL refuses, never SQL it executes. `raw_text` gives the unquoted
 > dotted spelling for consumers that quote downstream (the pipeline
-> adapter). `Function::Custom` names render under the same part policy.
+> adapter). `Function::Custom` names render under the same part policy, and
+> so does `IndexType::Custom`'s access method, which reaches
+> `prepare_part` directly because it is a single name rather than a
+> `TypeName` — one policy, not a per-site escape.
 >
 > Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names, and they
 > are the one exception: `TypeName::custom` sets `verbatim`, which makes
 > `to_sql_string` short-circuit to `raw_text` and emit the caller's own SQL
-> unquoted and unescaped. `verbatim` is set nowhere else. Its only
-> constructor is reached only from `Expr::cast_as_custom`, whose argument is
-> a literal in the calling source — program text the author already
-> controls, never data — so the set of expressions that can emit an
-> unescaped type name is one a reader can enumerate. `Func::cast_as` is
-> deleted, `cast_as` quoting by default instead.
+> unquoted and unescaped. `verbatim` is set nowhere else. Its argument is
+> bound `&'static str`, so only a literal written in the calling source can
+> reach it and no runtime `String` — nothing a value could have reached —
+> can become SQL there; the bound is the enforcement, not the doc. It is
+> called only from `Expr::cast_as_custom`, which carries the same bound, so
+> the set of expressions that can emit an unescaped type name is one a
+> reader can enumerate. A type that arrives as a *name*, including at
+> runtime, takes `TypeName::new` or `ColumnType::custom` and is quoted.
+> `Func::cast_as` is deleted, `cast_as` quoting by default instead.
 >
 > Carrying the answer here rather than in a second node shape is what lets a
 > cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
-> [spec:pgorm:def:sql.types.column-type+4]
+> [spec:pgorm:def:sql.types.column-type+5]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -417,7 +423,11 @@ including panic semantics and quirks inherited from sea-query.
 > `BigInteger`, `Float`, `Double`, `Decimal(Option<(u32, u32)>)`, `Timestamp`,
 > `TimestampWithTimeZone`, `Time`, `Date`, `Interval(IntervalSpec)`,
 > `Bit(Option<u32>)`, `VarBit(u32)`, `Boolean`, `Money`,
-> `Json`, `JsonBinary`, `Uuid`, `Custom(DynIden)`,
+> `Json`, `JsonBinary`, `Uuid`, `Custom(TypeName)` (a type this vocabulary
+> has no variant for, named rather than spelled: the payload is a `TypeName`
+> so it renders under the one part policy — `ColumnType::custom(text)` and
+> `ColumnDef::custom(name)` both build one, and the name may be
+> schema-qualified or an array),
 > `Enum { name, schema, variants }` (`schema: Option<DynIden>` — a qualified
 > enum type carries its schema in the type itself, so every rendering that
 > names the type can qualify),

@@ -498,7 +498,7 @@ fn enum_and_unique_index_round_trip() {
         vec![task.take()]
     };
     let enum_type = Type::create(alias("task_state"))
-        .values(vec![alias("open"), alias("done")])
+        .values(["open", "done"])
         .to_string();
     let text = statements()
         .iter()

@@ -1329,7 +1329,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.ddl.panics+4]
-    // [spec:pgorm:def:sql.render.ddl.types+3] (serial family for auto-increment columns)
+    // [spec:pgorm:def:sql.render.ddl.types+4] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
             Some(serial) => write!(sql, "{serial}").unwrap(),
@@ -1393,7 +1393,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:req:sql.ddl.column-types+3]
-    // [spec:pgorm:def:sql.render.ddl.types+3]
+    // [spec:pgorm:def:sql.render.ddl.types+4]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1456,7 +1456,8 @@ impl QueryBuilder {
                     Some(size) => format!("vector({size})"),
                     None => "vector".into(),
                 },
-                ColumnType::Custom(iden) => iden.to_string(),
+                // [spec:pgorm:req:sql.render.ident-quoting+3]
+                ColumnType::Custom(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. } => {
                     let mut type_name = TypeName::new(SharedIden::clone(name));
                     type_name.schema = schema.clone();
@@ -1891,7 +1892,12 @@ impl QueryBuilder {
                     IndexType::BTree => "BTREE".to_owned(),
                     IndexType::Gin => "GIN".to_owned(),
                     IndexType::Hash => "HASH".to_owned(),
-                    IndexType::Custom(custom) => custom.to_string(),
+                    // [spec:pgorm:req:sql.render.ident-quoting+3]
+                    IndexType::Custom(custom) => {
+                        let mut part = String::new();
+                        TypeName::prepare_part(custom, &mut part);
+                        part
+                    }
                 }
             )
             .unwrap();
@@ -2092,7 +2098,7 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
-    // [spec:pgorm:req:sql.ddl.type-enum+3]
+    // [spec:pgorm:req:sql.ddl.type-enum+4]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
         match as_type {
             TypeAs::Enum(values) => {
@@ -2101,7 +2107,7 @@ impl QueryBuilder {
                     if count > 0 {
                         write!(sql, ", ").unwrap();
                     }
-                    sql.push_param(val.to_string().into());
+                    sql.push_param(val.as_str().into());
                 }
                 write!(sql, ")").unwrap();
             }
@@ -2120,7 +2126,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.render.ddl.enum-type+3] (ALTER TYPE label operands parameterized)
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2128,17 +2134,17 @@ impl QueryBuilder {
                 match placement {
                     Some(add_option) => match add_option {
                         TypeAlterAddOpt::Before(before_value) => {
-                            sql.push_param(value.to_string().into());
+                            sql.push_param(value.as_str().into());
                             write!(sql, " BEFORE ").unwrap();
-                            sql.push_param(before_value.to_string().into());
+                            sql.push_param(before_value.as_str().into());
                         }
                         TypeAlterAddOpt::After(after_value) => {
-                            sql.push_param(value.to_string().into());
+                            sql.push_param(value.as_str().into());
                             write!(sql, " AFTER ").unwrap();
-                            sql.push_param(after_value.to_string().into());
+                            sql.push_param(after_value.as_str().into());
                         }
                     },
-                    None => sql.push_param(value.to_string().into()),
+                    None => sql.push_param(value.as_str().into()),
                 }
             }
             TypeAlterOpt::Rename(new_name) => {
@@ -2147,15 +2153,15 @@ impl QueryBuilder {
             }
             TypeAlterOpt::RenameValue(existing, new_name) => {
                 write!(sql, " RENAME VALUE ").unwrap();
-                sql.push_param(existing.to_string().into());
+                sql.push_param(existing.as_str().into());
                 write!(sql, " TO ").unwrap();
-                sql.push_param(new_name.to_string().into());
+                sql.push_param(new_name.as_str().into());
             }
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+3]
-    // [spec:pgorm:req:sql.render.ddl.enum-type+3]
+    // [spec:pgorm:req:sql.ddl.type-enum+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,
@@ -2171,7 +2177,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+4]
     pub(crate) fn prepare_type_drop_statement(
         &self,
         drop: &TypeDropStatement,
@@ -2197,7 +2203,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+3]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+4]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
@@ -2230,8 +2236,8 @@ impl QueryBuilder {
     }
 
     // EXTENSION
-    // [spec:pgorm:req:sql.ddl.extension+3]
-    // [spec:pgorm:sem:sql.render.ddl.extension+1] (CREATE EXTENSION)
+    // [spec:pgorm:req:sql.ddl.extension+4]
+    // [spec:pgorm:sem:sql.render.ddl.extension+2] (CREATE EXTENSION)
     pub(crate) fn prepare_extension_create_statement(
         &self,
         create: &ExtensionCreateStatement,
@@ -2247,7 +2253,7 @@ impl QueryBuilder {
 
         if let Some(schema) = create.schema.as_ref() {
             write!(sql, " WITH SCHEMA ").unwrap();
-            Alias::new(schema).prepare(sql.as_writer());
+            schema.prepare(sql.as_writer());
         }
 
         if let Some(version) = create.version.as_ref() {
@@ -2262,8 +2268,8 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.extension+3]
-    // [spec:pgorm:sem:sql.render.ddl.extension+1] (DROP EXTENSION)
+    // [spec:pgorm:req:sql.ddl.extension+4]
+    // [spec:pgorm:sem:sql.render.ddl.extension+2] (DROP EXTENSION)
     pub(crate) fn prepare_extension_drop_statement(
         &self,
         drop: &ExtensionDropStatement,
