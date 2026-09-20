@@ -3,6 +3,7 @@ use pgorm_query::{tests_cfg::*, *};
 mod comment;
 mod extension;
 mod foreign_key;
+mod func;
 mod index;
 mod oracle;
 mod oracle_pins;
@@ -16,6 +17,7 @@ mod type_vocab;
 mod types;
 mod value;
 mod window;
+mod write_relations;
 
 #[path = "../common.rs"]
 mod common;

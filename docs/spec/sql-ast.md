@@ -691,19 +691,75 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+3]
+> [spec:pgorm:def:sql.ast.func+4]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
 > built-ins with typed constructors on the `Func` helper: aggregates `max`,
 > `min`, `sum`, `avg`, `count`, `count_distinct` (the DISTINCT argument
-> modifier), `bit_and`, `bit_or`; scalar helpers `abs`, `char_length`,
-> `if_null`, `coalesce`, `lower`, `upper`, `round`, `round_with_precision`,
-> `random`, `starts_with`, `gen_random_uuid`; the PostgreSQL
-> full-text family `to_tsquery`, `to_tsvector`, `phraseto_tsquery`,
-> `plainto_tsquery`, `websearch_to_tsquery` (each with an optional `regconfig`
-> OID prepended as first argument), `ts_rank`, `ts_rank_cd`; and array/subquery
-> comparators `any`, `some`, `all`.
+> modifier), `bit_and`, `bit_or`; the ordered-set aggregates
+> `percentile_cont` and `percentile_disc`; scalar helpers `abs`,
+> `char_length`, `if_null`, `coalesce`, `lower`, `upper`, `round`,
+> `round_with_precision`, `random`, `starts_with`, `gen_random_uuid`; the
+> PostgreSQL full-text family `to_tsquery`, `to_tsvector`,
+> `phraseto_tsquery`, `plainto_tsquery`, `websearch_to_tsquery` (each with an
+> optional `regconfig` OID prepended as first argument), `ts_rank`,
+> `ts_rank_cd`; and array/subquery comparators `any`, `some`, `all`.
+>
+> Beyond its arguments a call carries the two clauses PostgreSQL admits after
+> them, each optional and each empty by default:
+>
+> - A FILTER condition, set by `filter(cond)` taking any `IntoCondition`.
+>   Each call REPLACES the previous one rather than accumulating — a
+>   conjunction is a single `Condition`, so accumulation would give one
+>   meaning two spellings and make `filter` the only builder method on the
+>   type whose second call means something other than its first.
+> - A WITHIN GROUP ordering, a `Vec<OrderExpr>` accumulated by
+>   `within_group(col, order)` and `within_group_expr(expr, order)`, mirroring
+>   `order_by` / `order_by_expr` of `sql.ast.order`. It accumulates because
+>   the hypothetical-set aggregates rank against several columns at once.
+>   `OrderExpr`'s fields are not public, so these constructors are the only
+>   way to build the payload and there is no list-taking form to offer.
+>
+> The pair is stored as one `Option<Box<..>>` rather than as two inline
+> fields, and that is a size decision rather than a stylistic one.
+> `SimpleExpr::FunctionCall` holds a `FunctionCall` inline, and `SelectExpr`,
+> `Search` and `Cycle` hold a `SimpleExpr` inline in turn, so every byte here
+> is paid by the whole expression tree — including by the scalar calls
+> (`LOWER`, `COALESCE`, `ROUND`) that can never carry either clause. Two
+> inline fields grew `AnyWithClause` past clippy's `large_enum_variant`
+> threshold; one boxed field that is `None` until a clause is set costs eight
+> bytes and one allocation only on the calls that actually aggregate.
+>
+> `get_func`, `get_args`, `get_mods`, `get_filter` and `get_within_group`
+> expose the whole of a call for inspection: a consumer outside this crate
+> reads a `FunctionCall` only through these, so a field added without one
+> would be invisible to it — and since the modifiers are stored boxed and
+> merged, the accessors are what make that storage an implementation detail
+> rather than a shape a caller has to know. `get_within_group` MUST answer
+> the empty slice, not an `Option`, when no ordering was supplied: absent and
+> empty are the same statement about the call.
+>
+> The AST does not police which functions the two clauses are meaningful on.
+> `FILTER` is valid on any aggregate and `WITHIN GROUP` only on an ordered-set
+> or hypothetical-set one, but that is a property of the function the server
+> resolves — including `Function::Named` ones this enum has never heard of —
+> so the check belongs to PostgreSQL, which makes it, and not to a builder
+> that would have to guess.
+>
+> Both clauses stop at this crate's own builders. `pgorm::pipeline`'s
+> aggregate verbs do NOT expose them, and that is a boundary rather than an
+> omission: the pipeline's SQL is written by prqlc from its RQ, never by this
+> renderer, and prqlc has no representation to carry either clause — every
+> function it constructs in `sql/gen_expr.rs` is built with `filter: None`
+> and `within_group: vec![]`, with no PL or RQ construct that reaches them.
+> The only route would be the written-SQL mechanism
+> `[spec:pgorm:sem:pipeline.count-argument]` uses, which would mean
+> respelling every aggregate verb as a written call and re-deriving its
+> interaction with the OVER attachment those rewrites already perform. That
+> is its own piece of work, not a pass-through, and until it is done a
+> pipeline caller writes conditional aggregation the way PRQL does: filtering
+> before the group, or aggregating over a `case`.
 >
 > A cast is not among them. `CAST` is written by `SimpleExpr::AsEnum`
 > (`[spec:pgorm:req:sql.ast.cast-shape]`), so there is no `Function::Cast`

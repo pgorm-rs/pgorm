@@ -742,6 +742,8 @@ impl QueryBuilder {
                     Function::Min => "MIN",
                     Function::Sum => "SUM",
                     Function::Avg => "AVG",
+                    Function::PercentileCont => "PERCENTILE_CONT",
+                    Function::PercentileDisc => "PERCENTILE_DISC",
                     Function::Abs => "ABS",
                     Function::Coalesce => "COALESCE",
                     Function::Count => "COUNT",
@@ -772,6 +774,9 @@ impl QueryBuilder {
         }
     }
 
+    /// Translate a [`FunctionCall`]'s argument list and the aggregate
+    /// modifiers that follow it.
+    // [spec:pgorm:req:sql.render.func-mods]
     fn prepare_function_arguments(&self, func: &FunctionCall, sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
         for (i, expr) in func.args.iter().enumerate() {
@@ -784,6 +789,28 @@ impl QueryBuilder {
             self.prepare_simple_expr(expr, sql);
         }
         write!(sql, ")").unwrap();
+
+        let Some(aggregate) = &func.aggregate else {
+            return;
+        };
+
+        if !aggregate.within_group.is_empty() {
+            write!(sql, " WITHIN GROUP (ORDER BY ").unwrap();
+            aggregate.within_group.iter().fold(true, |first, expr| {
+                if !first {
+                    write!(sql, ", ").unwrap()
+                }
+                self.prepare_order_expr(expr, sql);
+                false
+            });
+            write!(sql, ")").unwrap();
+        }
+
+        if let Some(condition) = &aggregate.filter {
+            write!(sql, " FILTER (WHERE ").unwrap();
+            self.prepare_condition_where(condition, sql);
+            write!(sql, ")").unwrap();
+        }
     }
 
     // [spec:pgorm:req:sql.render.cte+3]

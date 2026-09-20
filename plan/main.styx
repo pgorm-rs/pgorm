@@ -7830,6 +7830,13 @@ children (
                         kind @note
                         text "FuncArgMod carries only distinct (func.rs:52-55): FILTER (WHERE ...) and WITHIN GROUP (ORDER BY ...) — ordered-set aggregates like percentile_cont — are inexpressible, and both are baseline modern PostgreSQL. FILTER especially is the standard spelling of conditional aggregation that otherwise degrades to SUM(CASE WHEN ...). The shape: FunctionCall grows filter and within_group clauses, rendered after the argument list; the pipeline's aggregate verbs can then expose them too."
                     }
+
+                    {
+                        at 2026-09-20T18:33:20.101021Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

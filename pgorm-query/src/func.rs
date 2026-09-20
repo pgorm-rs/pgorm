@@ -1,12 +1,12 @@
 //! For calling built-in SQL functions.
 
-use crate::{expr::*, types::*};
+use crate::{Condition, IntoCondition, expr::*, types::*};
 
 /// Functions
 ///
 /// A cast is not one of them: `CAST` is [`SimpleExpr::AsEnum`], so matching a
 /// `FunctionCall` never has to account for a cast.
-// [spec:pgorm:def:sql.ast.func+3]
+// [spec:pgorm:def:sql.ast.func+4]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Function {
@@ -14,6 +14,8 @@ pub enum Function {
     Min,
     Sum,
     Avg,
+    PercentileCont,
+    PercentileDisc,
     Abs,
     Count,
     IfNull,
@@ -42,12 +44,25 @@ pub enum Function {
 }
 
 /// Function call.
-// [spec:pgorm:def:sql.ast.func+3]
+// [spec:pgorm:def:sql.ast.func+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub(crate) func: Function,
     pub(crate) args: Vec<SimpleExpr>,
     pub(crate) mods: Vec<FuncArgMod>,
+    /// The aggregate modifier clauses, boxed and absent until one is set: a
+    /// `FunctionCall` is held inline by `SimpleExpr`, which several AST nodes
+    /// hold inline in turn, so a scalar call paying for clauses it will never
+    /// carry is a cost the whole expression tree pays.
+    pub(crate) aggregate: Option<Box<AggregateMods>>,
+}
+
+/// The two clauses PostgreSQL admits after an aggregate's argument list.
+// [spec:pgorm:def:sql.ast.func+4]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) struct AggregateMods {
+    pub(crate) within_group: Vec<OrderExpr>,
+    pub(crate) filter: Option<Condition>,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
@@ -61,6 +76,7 @@ impl FunctionCall {
             func,
             args: Vec::new(),
             mods: Vec::new(),
+            aggregate: None,
         }
     }
 
@@ -91,6 +107,117 @@ impl FunctionCall {
         self
     }
 
+    /// Restrict an aggregate to the rows satisfying `condition`, rendering
+    /// `FILTER (WHERE ..)` after the argument list.
+    ///
+    /// This is the standard spelling of conditional aggregation, and says
+    /// what `SUM(CASE WHEN c THEN x END)` only implies: rows failing the
+    /// condition are not fed to the aggregate at all, rather than being fed
+    /// to it as nulls. The two agree for `SUM` and `AVG`; they disagree for
+    /// `COUNT`, where the CASE form's `ELSE NULL` is what keeps the count
+    /// honest and an `ELSE 0` quietly would not.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::count(Expr::col(Character::Id)).filter(Expr::col(Character::FontSize).gt(12)))
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT COUNT("id") FILTER (WHERE "font_size" > 12) FROM "character""#
+    /// );
+    /// ```
+    ///
+    /// Each call replaces the previous filter; a conjunction is written as one
+    /// [`Condition`].
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::sum(Expr::col(Character::SizeW)).filter(
+    ///             Condition::all()
+    ///                 .add(Expr::col(Character::FontSize).gt(12))
+    ///                 .add(Expr::col(Character::Ascii).eq(true)),
+    ///         ))
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT SUM("size_w") FILTER (WHERE "font_size" > 12 AND "ascii" = TRUE) FROM "character""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.func+4]
+    pub fn filter<C>(mut self, condition: C) -> Self
+    where
+        C: IntoCondition,
+    {
+        self.aggregate.get_or_insert_default().filter = Some(condition.into_condition());
+        self
+    }
+
+    /// Supply the ordering an ordered-set aggregate is defined over,
+    /// rendering `WITHIN GROUP (ORDER BY ..)` after the argument list.
+    ///
+    /// Ordered-set aggregates — `percentile_cont`, `percentile_disc`, `mode`,
+    /// `rank` and friends — take their direct arguments in the parentheses
+    /// and the column they rank against here.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::percentile_cont(0.5).within_group(Character::SizeW, Order::Asc))
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "size_w" ASC) FROM "character""#
+    /// );
+    /// ```
+    ///
+    /// Repeated calls accumulate, for the hypothetical-set aggregates that
+    /// rank against several columns at once.
+    // [spec:pgorm:def:sql.ast.func+4]
+    pub fn within_group<T>(self, col: T, order: Order) -> Self
+    where
+        T: IntoColumnRef,
+    {
+        self.within_group_expr(SimpleExpr::Column(col.into_column_ref()), order)
+    }
+
+    /// [`within_group`][Self::within_group] over an arbitrary expression
+    /// rather than a plain column.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(
+    ///             Func::percentile_disc(0.9)
+    ///                 .within_group_expr(Expr::col(Character::SizeW).mul(2), Order::Desc)
+    ///         )
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT PERCENTILE_DISC(0.9) WITHIN GROUP (ORDER BY "size_w" * 2 DESC) FROM "character""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.func+4]
+    pub fn within_group_expr<T>(mut self, expr: T, order: Order) -> Self
+    where
+        T: Into<SimpleExpr>,
+    {
+        self.aggregate
+            .get_or_insert_default()
+            .within_group
+            .push(OrderExpr {
+                expr: expr.into(),
+                order,
+                nulls: None,
+            });
+        self
+    }
+
     pub fn get_func(&self) -> &Function {
         &self.func
     }
@@ -99,13 +226,28 @@ impl FunctionCall {
         &self.args
     }
 
+    /// The ordering supplied by [`within_group`][Self::within_group], empty
+    /// when the call has none.
+    pub fn get_within_group(&self) -> &[OrderExpr] {
+        self.aggregate
+            .as_ref()
+            .map_or(&[][..], |mods| &mods.within_group)
+    }
+
+    /// The condition supplied by [`filter`][Self::filter], if any.
+    pub fn get_filter(&self) -> Option<&Condition> {
+        self.aggregate
+            .as_ref()
+            .and_then(|mods| mods.filter.as_ref())
+    }
+
     pub fn get_mods(&self) -> &[FuncArgMod] {
         &self.mods
     }
 }
 
 /// Function call helper.
-// [spec:pgorm:def:sql.ast.func+3]
+// [spec:pgorm:def:sql.ast.func+4]
 #[derive(Debug, Clone)]
 pub struct Func;
 
@@ -248,6 +390,56 @@ impl Func {
         T: Into<SimpleExpr>,
     {
         FunctionCall::new(Function::Avg).arg(expr)
+    }
+
+    /// Call `PERCENTILE_CONT`, the continuous percentile: the value at
+    /// `fraction` through the ordering, interpolating between the two
+    /// neighbouring rows when the fraction lands between them.
+    ///
+    /// It is an ordered-set aggregate, so it is incomplete until it is given
+    /// an ordering by [`within_group`][FunctionCall::within_group].
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::percentile_cont(0.5).within_group(Character::SizeW, Order::Asc))
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "size_w" ASC) FROM "character""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.func+4]
+    pub fn percentile_cont<T>(fraction: T) -> FunctionCall
+    where
+        T: Into<SimpleExpr>,
+    {
+        FunctionCall::new(Function::PercentileCont).arg(fraction)
+    }
+
+    /// Call `PERCENTILE_DISC`, the discrete percentile: the first value in the
+    /// ordering whose cumulative distribution reaches `fraction`. Unlike
+    /// [`percentile_cont`][Self::percentile_cont] it never interpolates, so it
+    /// always returns a value that is actually in the column.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::percentile_disc(0.5).within_group(Character::SizeW, Order::Asc))
+    ///         .from(Character::Table)
+    ///         .to_string(),
+    ///     r#"SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY "size_w" ASC) FROM "character""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.func+4]
+    pub fn percentile_disc<T>(fraction: T) -> FunctionCall
+    where
+        T: Into<SimpleExpr>,
+    {
+        FunctionCall::new(Function::PercentileDisc).arg(fraction)
     }
 
     /// Call `ABS` function.

@@ -425,6 +425,35 @@ an ideal Postgres renderer would emit.
 > a `$N` parameter in the `build()` path, the literal inline — then a space
 > and the keyword (`$1 PRECEDING`, `2 FOLLOWING`).
 
+> [spec:pgorm:req:sql.render.func-mods]
+> `prepare_function_arguments` MUST render a call's parenthesized argument
+> list — comma-separated, each argument prefixed `DISTINCT ` when its
+> `FuncArgMod` says so — and then, in this order, the two aggregate modifier
+> clauses of `sql.ast.func`: ` WITHIN GROUP (ORDER BY ` order-exprs `)` when
+> the ordering is non-empty, then ` FILTER (WHERE ` condition `)` when a
+> filter is set. Each renders nothing at all when absent, so a call with
+> neither is byte-identical to what it rendered before the clauses existed.
+>
+> The order is PostgreSQL's and is not a choice: its grammar puts WITHIN GROUP
+> before FILTER, and both before `OVER`. `OVER` is rendered by
+> `prepare_select_expr` (`sql.render.window`) after the whole function
+> expression, so `agg(x) FILTER (WHERE c) OVER w` falls out of the two rules
+> composing rather than needing either to know about the other — which is the
+> reason the modifiers render here, inside the arguments function, rather than
+> at the two call sites that reach it.
+>
+> Both clauses render through the paths their contents already have — order
+> expressions through `prepare_order_expr`, the condition through
+> `prepare_condition_where` — so a `$N` parameter inside a filter is numbered
+> in the enclosing statement's sequence exactly as one in a WHERE is, and a
+> filter is subject to the same escaping and quoting as any other condition.
+>
+> The renderer emits the clauses on whatever function carries them, including
+> a `Function::Named` one and a `FromItem::FunctionCall`. It has nothing to
+> refuse: per `sql.ast.func` whether a clause is meaningful on a given
+> function is PostgreSQL's determination, and a renderer that second-guessed
+> it would reject valid calls on functions this enum does not enumerate.
+
 > [spec:pgorm:req:sql.render.subquery+2]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
 > `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
