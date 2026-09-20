@@ -2,7 +2,7 @@
 
 This spec covers `pgorm-query/src/token.rs`: a small, lossless SQL tokenizer
 used by the rendering layer (`inject_parameters` and
-`SimpleExpr::CustomWithExpr` in `sql.render`) to locate placeholder markers
+`SimpleExpr::Template` in `sql.render`) to locate placeholder markers
 without being fooled by quoted text. It is not a SQL parser; it has no notion
 of keywords, statements, or expressions.
 

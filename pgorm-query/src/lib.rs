@@ -55,7 +55,7 @@
 //! 1. Advanced
 //!     1. [Aggregate Functions](#aggregate-functions)
 //!     1. [Casting](#casting)
-//!     1. [Custom Function](#custom-function)
+//!     1. [Named Function](#named-function)
 //!
 //! 1. Schema Statement
 //!
@@ -227,7 +227,7 @@
 //!         .and_where(
 //!             Expr::col(Character::FontSize).in_subquery(
 //!                 Query::select()
-//!                     .expr(Expr::cust_with_values("ln($1 ^ $2)", [2.4, 1.2])?)
+//!                     .expr(Expr::template("ln($1 ^ $2)", [2.4, 1.2])?)
 //!                     .take()
 //!             )
 //!         )
@@ -436,7 +436,7 @@
 //! );
 //! ```
 //!
-//! ### Custom Function
+//! ### Named Function
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
@@ -449,7 +449,7 @@
 //! }
 //!
 //! let query = Query::select()
-//!     .expr(Func::cust(MyFunction).arg(Expr::val("hello")))
+//!     .expr(Func::named(MyFunction).arg(Expr::val("hello")))
 //!     .to_owned();
 //!
 //! assert_eq!(
@@ -621,7 +621,7 @@ pub mod query;
 pub mod schema;
 pub mod table;
 mod template;
-pub use template::CustomExpr;
+pub use template::SqlTemplate;
 pub mod token;
 pub mod types;
 pub mod value;

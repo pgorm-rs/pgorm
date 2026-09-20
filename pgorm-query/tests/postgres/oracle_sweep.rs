@@ -66,7 +66,7 @@ fn sweep_select_clause_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    expression rendering, including the parenthesis
 // elision of `sql.render.precedence`
-// [spec:pgorm:req:sql.render.parens+1/test]
+// [spec:pgorm:req:sql.render.parens+2/test]
 #[test]
 fn sweep_expression_shapes() {
     let exprs: Vec<SimpleExpr> = vec![
@@ -87,8 +87,8 @@ fn sweep_expression_shapes() {
         Expr::col(Glyph::Id).ne_all([1, 2]),
         Expr::col(Glyph::Id).ne_all(Vec::<i32>::new()),
         Expr::col(Glyph::Aspect).cast_as(Alias::new("text")),
-        Expr::cust("now()"),
-        Expr::cust_with_values("$1 + $2", [1, 2]).expect("template arity"),
+        Expr::raw("now()"),
+        Expr::template("$1 + $2", [1, 2]).expect("template arity"),
         Expr::tuple([Expr::val(1).into(), Expr::val(2).into()]).into(),
         Expr::col(Glyph::Tokens).get_json_field("a"),
         Expr::col(Glyph::Tokens).cast_json_field("b"),
@@ -196,7 +196,7 @@ fn sweep_join_shapes() {
         Query::select()
             .column(Asterisk)
             .from_function(
-                Func::cust(Alias::new("generate_series")).arg(1),
+                Func::named(Alias::new("generate_series")).arg(1),
                 Alias::new("g"),
             )
             .to_string(),
@@ -542,7 +542,7 @@ fn sweep_schema_object_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    every `ColumnType` that has a PostgreSQL spelling
-// [spec:pgorm:def:sql.render.ddl.types+4/test]
+// [spec:pgorm:def:sql.render.ddl.types+5/test]
 #[test]
 fn sweep_column_type_vocabulary() {
     let types = [
@@ -594,7 +594,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+3/test]
+// [spec:pgorm:def:sql.render.operators+4/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [
@@ -639,7 +639,7 @@ fn sweep_binary_operator_vocabulary() {
         BinOper::EuclideanDistance,
         BinOper::NegativeInnerProduct,
         BinOper::CosineDistance,
-        BinOper::Custom("~~"),
+        BinOper::Raw("~~"),
     ];
 
     sweep(opers.into_iter().map(|oper| {
@@ -711,7 +711,7 @@ fn oracle_shim_fires_on_a_string() {
         .col(
             ColumnDef::new(Glyph::Id)
                 .integer()
-                .extra("ANYTHING I WANT TO SAY".to_owned()),
+                .raw_suffix("ANYTHING I WANT TO SAY"),
         )
         .to_string();
     crate::oracle::assert_eq!(rendered, rendered.clone());

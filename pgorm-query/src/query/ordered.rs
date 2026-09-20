@@ -1,6 +1,6 @@
 use crate::{expr::*, types::*};
 
-// [spec:pgorm:req:sql.ast.order+2]
+// [spec:pgorm:req:sql.ast.order+3]
 pub trait OrderedStatement {
     #[doc(hidden)]
     // Implementation for the trait.
@@ -29,7 +29,7 @@ pub trait OrderedStatement {
     /// );
     /// ```
     ///
-    /// Order by custom field ordering
+    /// Order by an explicit field ordering
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///

@@ -125,12 +125,12 @@ const HOSTILE: &str = "hostile\" name --";
 /// The same name after the identifier rule: doubled inner quote, wrapped.
 const HOSTILE_QUOTED: &str = r#""hostile"" name --""#;
 
-// [spec:pgorm:req:sql.render.ident-quoting+3/test]    a caller-supplied type NAME reaches output
+// [spec:pgorm:req:sql.render.ident-quoting+4/test]    a caller-supplied type NAME reaches output
 // quoted, in every position a `ColumnType::Custom` is rendered from
 #[test]
 fn a_custom_column_type_name_is_quoted() {
     let create = Table::create(Glyph::Table)
-        .col(ColumnDef::new(Glyph::Aspect).custom(Alias::new(HOSTILE)))
+        .col(ColumnDef::new(Glyph::Aspect).named(Alias::new(HOSTILE)))
         .to_string();
     assert_eq!(
         create,
@@ -141,7 +141,7 @@ fn a_custom_column_type_name_is_quoted() {
     let via_ctor = Table::create(Glyph::Table)
         .col(ColumnDef::new_with_type(
             Glyph::Aspect,
-            ColumnType::custom(HOSTILE),
+            ColumnType::named(HOSTILE),
         ))
         .to_string();
     assert_eq!(via_ctor, create);
@@ -152,7 +152,7 @@ fn a_custom_column_type_name_is_quoted() {
         Table::create(Glyph::Table)
             .col(ColumnDef::new_with_type(
                 Glyph::Aspect,
-                ColumnType::custom("citext")
+                ColumnType::named("citext")
             ))
             .to_string(),
         r#"CREATE TABLE "glyph" ( "aspect" citext )"#
@@ -168,14 +168,14 @@ fn a_custom_column_type_name_is_quoted() {
     );
 }
 
-// [spec:pgorm:req:sql.render.ident-quoting+3/test]    a caller-supplied index access method
+// [spec:pgorm:req:sql.render.ident-quoting+4/test]    a caller-supplied index access method
 // reaches output quoted
 #[test]
 fn a_custom_index_access_method_is_quoted() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .index_type(IndexType::Custom(Alias::new(HOSTILE).into_iden()))
+            .index_type(IndexType::Named(Alias::new(HOSTILE).into_iden()))
             .to_string(),
         format!(r#"CREATE INDEX "idx" ON "glyph" USING {HOSTILE_QUOTED} ("aspect")"#)
     );
@@ -184,13 +184,13 @@ fn a_custom_index_access_method_is_quoted() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .index_type(IndexType::Custom(Alias::new("gist").into_iden()))
+            .index_type(IndexType::Named(Alias::new("gist").into_iden()))
             .to_string(),
         r#"CREATE INDEX "idx" ON "glyph" USING gist ("aspect")"#
     );
 }
 
-// [spec:pgorm:req:sql.render.ident-quoting+3/test]    the schema of a `CREATE EXTENSION` is an
+// [spec:pgorm:req:sql.render.ident-quoting+4/test]    the schema of a `CREATE EXTENSION` is an
 // identifier like every other schema qualifier, and is quoted like one
 #[test]
 fn an_extension_schema_is_quoted() {
@@ -355,46 +355,46 @@ fn selecting(expr: SimpleExpr) -> String {
     Query::select().expr(expr).to_string()
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$N` names the Nth value counting from one,
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    `$N` names the Nth value counting from one,
 // and may be written as often as the template likes
 #[test]
 fn custom_expr_indices_start_at_one_and_repeat() {
     assert_eq!(
-        selecting(Expr::cust_with_values("6 = $1 * $2", [2, 3]).expect("template arity")),
+        selecting(Expr::template("6 = $1 * $2", [2, 3]).expect("template arity")),
         "SELECT 6 = 2 * 3"
     );
     assert_eq!(
-        selecting(Expr::cust_with_values("$2 * $1", [2, 3]).expect("template arity")),
+        selecting(Expr::template("$2 * $1", [2, 3]).expect("template arity")),
         "SELECT 3 * 2"
     );
     assert_eq!(
-        selecting(Expr::cust_with_values("$1 + $1 + $1", [7]).expect("template arity")),
+        selecting(Expr::template("$1 + $1 + $1", [7]).expect("template arity")),
         "SELECT 7 + 7 + 7"
     );
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$$` writes one literal `$`, and quoted
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    `$$` writes one literal `$`, and quoted
 // regions are opaque to the tokenizer so placeholder-shaped text inside them is left alone
 #[test]
 fn custom_expr_escape_and_quoted_regions_survive_untouched() {
     // A lone `$` is not a PostgreSQL operator, so this one is held to the
     // escape's own contract rather than to the render oracle.
     assert_eq_unparsed!(
-        selecting(Expr::cust_with_values("$1 $$ $2", ["a", "b"]).expect("template arity")),
+        selecting(Expr::template("$1 $$ $2", ["a", "b"]).expect("template arity")),
         "SELECT 'a' $ 'b'"
     );
     assert_eq!(
-        selecting(Expr::cust_with_values("'$2' || $1", ["a"]).expect("template arity")),
+        selecting(Expr::template("'$2' || $1", ["a"]).expect("template arity")),
         "SELECT '$2' || 'a'"
     );
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    a template naming more values than it was
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    a template naming more values than it was
 // given is refused where it is written, rather than indexing off the end at render
 #[test]
 fn custom_expr_under_supply_is_refused_at_construction() {
     assert_eq!(
-        Expr::cust_with_values("6 = $1 * $2", [2]).unwrap_err(),
+        Expr::template("6 = $1 * $2", [2]).unwrap_err(),
         Error::Template {
             template: "6 = $1 * $2".to_owned(),
             reason: TemplateError::IndexOutOfRange {
@@ -403,16 +403,16 @@ fn custom_expr_under_supply_is_refused_at_construction() {
             },
         }
     );
-    assert!(Expr::cust_with_exprs("$1 + $2", [Expr::val(1).into()]).is_err());
-    assert!(Expr::cust_with_expr("$1 + $2", Expr::val(1)).is_err());
+    assert!(Expr::template_with_exprs("$1 + $2", [Expr::val(1).into()]).is_err());
+    assert!(Expr::template_with_expr("$1 + $2", Expr::val(1)).is_err());
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    a value the template never names is refused
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    a value the template never names is refused
 // too: silently dropping it would render something the caller did not write
 #[test]
 fn custom_expr_over_supply_is_refused_at_construction() {
     assert_eq!(
-        Expr::cust_with_values("6 = $1", [2, 3]).unwrap_err(),
+        Expr::template("6 = $1", [2, 3]).unwrap_err(),
         Error::Template {
             template: "6 = $1".to_owned(),
             reason: TemplateError::UnreferencedValue {
@@ -421,15 +421,15 @@ fn custom_expr_over_supply_is_refused_at_construction() {
             },
         }
     );
-    assert!(Expr::cust_with_expr("now()", Expr::val(1)).is_err());
+    assert!(Expr::template_with_expr("now()", Expr::val(1)).is_err());
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    the census demands exactly `1..=len`, so a
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    the census demands exactly `1..=len`, so a
 // hole in the numbering is a refusal even when the count happens to line up
 #[test]
 fn custom_expr_arity_hole_is_refused_at_construction() {
     assert_eq!(
-        Expr::cust_with_values("$1 + $3", [1, 2, 3]).unwrap_err(),
+        Expr::template("$1 + $3", [1, 2, 3]).unwrap_err(),
         Error::Template {
             template: "$1 + $3".to_owned(),
             reason: TemplateError::UnreferencedValue {
@@ -440,43 +440,43 @@ fn custom_expr_arity_hole_is_refused_at_construction() {
     );
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    `$0` names nothing, and a `$` that is neither
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    `$0` names nothing, and a `$` that is neither
 // an escape nor an index is a malformed placeholder rather than silent text loss
 #[test]
 fn zero_and_malformed_placeholders_are_refused() {
     assert_eq!(
-        Expr::cust_with_values("$0", [1]).unwrap_err(),
+        Expr::template("$0", [1]).unwrap_err(),
         Error::Template {
             template: "$0".to_owned(),
             reason: TemplateError::ZeroIndex,
         }
     );
     assert_eq!(
-        Expr::cust_with_values("$abc", [1]).unwrap_err(),
+        Expr::template("$abc", [1]).unwrap_err(),
         Error::Template {
             template: "$abc".to_owned(),
             reason: TemplateError::MalformedPlaceholder { position: 0 },
         }
     );
-    assert!(Expr::cust_with_values("a $ b", [1]).is_err());
-    assert!(Expr::cust_with_values("$1 $", [1]).is_err());
+    assert!(Expr::template("a $ b", [1]).is_err());
+    assert!(Expr::template("$1 $", [1]).is_err());
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    a template with no placeholders and no values
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    a template with no placeholders and no values
 // is a complete pair, and renders verbatim
 #[test]
 fn custom_expr_empty_census_is_a_complete_pair() {
     assert_eq!(
-        selecting(Expr::cust_with_exprs("now()", []).expect("template arity")),
+        selecting(Expr::template_with_exprs("now()", []).expect("template arity")),
         "SELECT now()"
     );
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]    every template that survives construction
+// [spec:pgorm:req:sql.render.custom-expr+2/test]    every template that survives construction
 // renders, through either sink, without reaching for a value it does not hold
 #[test]
 fn custom_expr_that_was_constructed_always_renders() {
-    let expr = Expr::cust_with_values("$1 $$ $2 || $1", ["a", "b"]).expect("template arity");
+    let expr = Expr::template("$1 $$ $2 || $1", ["a", "b"]).expect("template arity");
 
     assert_eq_unparsed!(selecting(expr.clone()), "SELECT 'a' $ 'b' || 'a'");
 

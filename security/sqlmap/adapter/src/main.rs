@@ -115,7 +115,7 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
         },
         "order" => strings(&db,select().order_by(Alias::new(input),q::Order::Asc).build()).await?,
         "group" => strings(&db,Query::select().column(Alias::new(input)).from(a()).group_by_col(Alias::new(input)).build()).await?,
-        "function" => strings(&db,Query::select().expr(Func::cust(Alias::new(input)).arg(Expr::val("Alice"))).build()).await?,
+        "function" => strings(&db,Query::select().expr(Func::named(Alias::new(input)).arg(Expr::val("Alice"))).build()).await?,
         "cast" => strings(&db,Query::select().column(n()).from(a()).and_where(Expr::col(n()).eq(Expr::val("alice").cast_as(Alias::new(input)))).build()).await?,
         "enum" => {
             let sql = Query::select().column(n()).from(Alias::new("reviews")).and_where(Expr::col(Alias::new("status")).eq(Expr::val("ready").cast_as_type(q::TypeName::new(Alias::new(input)).schema(Alias::new("fixture"))))).to_string();

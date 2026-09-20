@@ -107,7 +107,7 @@ impl ExtensionCreateStatement {
     ///
     /// The schema is a name and renders as a quoted identifier, so the bound
     /// is the identifier bound every other schema position takes.
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
     pub fn schema<T: IntoIden>(&mut self, schema: T) -> &mut Self {
         self.schema = Some(schema.into_iden());
         self
@@ -286,7 +286,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {

@@ -227,7 +227,7 @@ fn named_from_item_forms_render() {
 // [spec:pgorm:def:sql.types.table-ref+2/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+2/test]
-// [spec:pgorm:req:sql.ast.update+3/test]
+// [spec:pgorm:req:sql.ast.update+4/test]
 // [spec:pgorm:def:sql.ast.delete+3/test]
 #[test]
 fn aliased_dml_targets_render() {
@@ -291,7 +291,7 @@ fn value_producing_from_item_forms_render() {
     );
 
     let function_call = FromItem::FunctionCall(
-        Func::cust(Alias::new("generate_series")).arg(1i32),
+        Func::named(Alias::new("generate_series")).arg(1i32),
         Alias::new("f").into_iden(),
     );
     assert_eq!(
@@ -303,7 +303,7 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+2/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+3/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -314,7 +314,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+2/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+3/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -374,7 +374,7 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::EuclideanDistance, "<->"),
         (BinOper::NegativeInnerProduct, "<#>"),
         (BinOper::CosineDistance, "<=>"),
-        (BinOper::Custom("~~"), "~~"),
+        (BinOper::Raw("~~"), "~~"),
     ] {
         assert_eq_unparsed!(
             rendered(op),
@@ -384,7 +384,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+5/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+6/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -398,8 +398,8 @@ fn string_len_and_the_convenience_constructors() {
         ColumnType::String(StringLen::None)
     );
     assert_eq!(
-        ColumnType::custom("citext"),
-        ColumnType::Custom(TypeName::new(Alias::new("citext")))
+        ColumnType::named("citext"),
+        ColumnType::Named(TypeName::new(Alias::new("citext")))
     );
 }
 
@@ -429,7 +429,7 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+5/test]    equality compares parameters, renders
+// [spec:pgorm:def:sql.types.column-type+6/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -463,10 +463,10 @@ fn column_type_equality_semantics() {
 
     // `Custom` compares by rendered identifier, not by concrete iden type.
     assert_eq!(
-        ColumnType::custom("aspect"),
-        ColumnType::Custom(TypeName::new(Glyph::Aspect))
+        ColumnType::named("aspect"),
+        ColumnType::Named(TypeName::new(Glyph::Aspect))
     );
-    assert_ne!(ColumnType::custom("aspect"), ColumnType::custom("image"));
+    assert_ne!(ColumnType::named("aspect"), ColumnType::named("image"));
 
     // `Enum` compares name and variant list, both by rendered text.
     let tea = ColumnType::Enum {
@@ -510,7 +510,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+5/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+6/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -552,7 +552,7 @@ fn pg_interval_display_and_parse_round_trip() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+5/test]    the precision vocabulary is the closed set
+// [spec:pgorm:def:sql.types.column-type+6/test]    the precision vocabulary is the closed set
 // PostgreSQL accepts, and nothing outside it constructs
 #[test]
 fn interval_precision_is_zero_through_six() {

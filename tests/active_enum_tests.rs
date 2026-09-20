@@ -317,7 +317,7 @@ pub async fn insert_active_enum_vec(db: &DatabaseConnection) -> Result<(), Error
         Entity::find()
             .filter(Column::Id.eq(1))
             .filter(
-                Expr::cust_with_values(r#"$1 = ANY("categories")"#, vec![Category::Big])
+                Expr::template(r#"$1 = ANY("categories")"#, vec![Category::Big])
                     .expect("template arity")
             )
             .one(db)

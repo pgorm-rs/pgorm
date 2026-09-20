@@ -101,13 +101,13 @@ an ideal Postgres renderer would emit.
 > values in an `Order::Field` ordering (see `sql.render.select-order`) are
 > inlined via `value_to_string` even in parameterized mode.
 
-> [spec:pgorm:req:sql.render.cast-param-type+2]
+> [spec:pgorm:req:sql.render.cast-param-type+3]
 > A `SimpleExpr::Value` cast operand MUST be rendered through
 > `push_param_source_typed` rather than `push_param`. There is one place this
 > can arise, because a cast has one shape
 > (`[spec:pgorm:req:sql.ast.cast-shape]`): the operand of a
 > `SimpleExpr::AsEnum`, which every `cast_as` / `as_enum` / `save_as` /
-> `cast_as_custom` spelling builds and which renders as
+> `cast_as_raw` spelling builds and which renders as
 > `CAST(operand AS <TypeName>)`.
 > Postgres infers a placeholder's type from the cast target, but the driver
 > writes the value in the format of the type it *is*, so an unpinned cast
@@ -170,7 +170,7 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+3]
+> [spec:pgorm:req:sql.render.ident-quoting+4]
 > The quote is the double quote, and it is the only one: PostgreSQL has a
 > single identifier quote, so it is written at the render sites rather than
 > carried in a parameter that could hold another character. Every identifier
@@ -187,9 +187,9 @@ an ideal Postgres renderer would emit.
 > `TypeName`, and every such position renders through `Iden::prepare` or
 > through `TypeName`'s part policy (`sql.types.type-name`), which quotes
 > anything that is not already a safe lowercase identifier. In particular
-> `ColumnType::Custom` carries a `TypeName` and renders through
-> `to_sql_string`, `IndexType::Custom`'s access method renders through
-> `TypeName::prepare_part`, `Function::Custom` function names render under
+> `ColumnType::Named` carries a `TypeName` and renders through
+> `to_sql_string`, `IndexType::Named`'s access method renders through
+> `TypeName::prepare_part`, `Function::Named` function names render under
 > the same part policy, and `ExtensionCreateStatement`'s schema is a
 > `DynIden` like every other schema qualifier. Each of those three was once
 > a bare `Iden::to_string`, which emitted a hostile catalogue name as SQL;
@@ -197,9 +197,10 @@ an ideal Postgres renderer would emit.
 > render site inherits it.
 >
 > Only two things in the crate render caller text verbatim, and neither is a
-> name: `TypeName::custom` (bound to `&'static str`, reachable only from
-> `Expr::cast_as_custom`) and `SimpleExpr::Custom`'s template. Both carry
-> program text rather than data, and their bounds are what keeps that true.
+> name: `TypeName::raw` (bound to `&'static str`, reachable only from
+> `Expr::cast_as_raw`) and `SimpleExpr::Raw` (bound to `&'static str` by
+> `Expr::raw`). Both carry program text rather than data, and their bounds
+> are what keeps that true.
 
 > [spec:pgorm:req:sql.render.string-escape+1]
 > `QueryBuilder::escape_string` MUST apply exactly these replacements, in
@@ -260,7 +261,7 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+3]
+> [spec:pgorm:def:sql.render.operators+4]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`, `IN`,
 > `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `AS`. Comparison: `=`, `<>`,
@@ -274,7 +275,7 @@ an ideal Postgres renderer would emit.
 > (HasAnyJsonKeys), `?&` (HasAllJsonKeys), `~` (Regex), `~*`
 > (RegexCaseInsensitive), and pgvector's `<->` (EuclideanDistance), `<#>`
 > (NegativeInnerProduct), `<=>` (CosineDistance).
-> `BinOper::Custom(raw)` emits its raw string verbatim. Note the deliberate
+> `BinOper::Raw(op)` emits its operator text verbatim. Note the deliberate
 > lexeme collisions: `%` serves both Mod and Similarity, `<->` both
 > SimilarityDistance and EuclideanDistance. The only unary operator is
 > `UnOper::Not` → `NOT`.
@@ -310,7 +311,7 @@ an ideal Postgres renderer would emit.
 > return JSON or text) do not. All other combinations are considered unknown
 > and keep their parentheses.
 
-> [spec:pgorm:req:sql.render.parens+1]
+> [spec:pgorm:req:sql.render.parens+2]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by
 > default, dropping parentheses only in these cases. Left operand: dropped when
 > `sql.render.precedence` says the left is higher-precedence, or when the left
@@ -327,7 +328,7 @@ an ideal Postgres renderer would emit.
 > The other two hacks this once carried are gone with the shapes that needed
 > them. `LIKE`'s `ESCAPE` tail is a `SimpleExpr::LikePattern` rather than a
 > nested binary, and a cast is a `SimpleExpr::AsEnum` rather than an `AS`
-> binary over a raw `SimpleExpr::Custom`
+> binary over a `SimpleExpr::Raw`
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — both are atoms in
 > `sql.render.precedence`, so ordinary elision covers them and no operator
 > pair needs a special case.
@@ -519,13 +520,14 @@ an ideal Postgres renderer would emit.
 
 ## Custom expressions
 
-> [spec:pgorm:req:sql.render.custom-expr+1]
-> `SimpleExpr::Custom(s)` MUST be written verbatim, unescaped.
-> `SimpleExpr::CustomWithExpr` carries a `CustomExpr`, whose template and
+> [spec:pgorm:req:sql.render.custom-expr+2]
+> `SimpleExpr::Raw(s)` MUST be written verbatim, unescaped; its payload is
+> `&'static str`, so only program text can reach it.
+> `SimpleExpr::Template` carries a `SqlTemplate`, whose template and
 > substitutions are resolved against each other at CONSTRUCTION —
-> `CustomExpr::new`, reached through `Expr::cust_with_values`,
-> `cust_with_expr` and `cust_with_exprs`, all of which return
-> `Result` — and never at render.
+> `SqlTemplate::new`, reached through `Expr::template`,
+> `Expr::template_with_expr` and `Expr::template_with_exprs`, all of which
+> return `Result` — and never at render.
 >
 > Construction tokenizes the template with the SQL tokenizer (`sql.token`) and
 > reads each `$` punctuation token: `$` followed by another `$` contributes one
@@ -557,7 +559,7 @@ an ideal Postgres renderer would emit.
 >
 > A `SimpleExpr::AsEnum(type, expr)` at the top level is rewritten to a cast and
 > renders as `CAST(expr AS type)`, with the type name written raw (unquoted) as
-> a Custom expression.
+> a verbatim expression.
 
 ## Parameter injection
 
@@ -588,7 +590,7 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types+4]
+> [spec:pgorm:def:sql.render.ddl.types+5]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
 > `varchar(n)`/`varchar`; Text → `text`; SmallInteger → `smallint`; Integer →
@@ -603,7 +605,7 @@ an ideal Postgres renderer would emit.
 > Money → `money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
 > `vector(n)`/`vector`; Cidr → `cidr`; Inet → `inet`; MacAddr → `macaddr`;
-> LTree → `ltree`; Custom/Enum → the type name through `TypeName`'s part
+> LTree → `ltree`; Named/Enum → the type name through `TypeName`'s part
 > policy (`sql.types.type-name`), a safe lowercase name bare and anything
 > else quoted, never the identifier's raw string. The mapping is
 > total — no variant is unsupported and none panics. An auto-increment column
@@ -613,7 +615,7 @@ an ideal Postgres renderer would emit.
 > add/modify/rename/drop column and add/drop foreign key, `DROP TABLE`,
 > `TRUNCATE TABLE`, `ALTER TABLE … RENAME TO`), index DDL
 > (`CREATE [UNIQUE ]INDEX … ON … [USING BTREE|GIN|HASH|<method>] (cols)` with
-> optional ` NULLS NOT DISTINCT`, where a custom access method renders under
+> optional ` NULLS NOT DISTINCT`, where a named access method renders under
 > the same part policy), and foreign-key DDL (`FOREIGN KEY (…)
 > REFERENCES … (…) [ON DELETE action] [ON UPDATE action]` with actions
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered

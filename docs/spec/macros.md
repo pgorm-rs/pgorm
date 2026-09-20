@@ -48,7 +48,7 @@ known limitations.
 
 ## DeriveEntityModel
 
-> [spec:pgorm:sem:macros.derive.entity-model+4]
+> [spec:pgorm:sem:macros.derive.entity-model+5]
 > `DeriveEntityModel` is the composite derive: applied to a `Model` struct, it expands
 > the entity-model generation and then re-runs `DeriveModel` and `DeriveActiveModel` on
 > the same input, so one derive yields the full entity module. The entity-model portion
@@ -59,11 +59,11 @@ known limitations.
 > overrides for columns carrying `select_as`/`save_as` attributes. What those
 > attributes carry is a type *expression* the entity's own author wrote — `BIT(8)`,
 > `numeric(10,2)` — and not an identifier, so the override MUST cast through
-> `cast_as_custom`, which renders the text as written. Routing it through the
+> `cast_as_raw`, which renders the text as written. Routing it through the
 > identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
 > PostgreSQL has no type for. The verbatim rendering is sound exactly because the
 > text is a compile-time literal in the caller's source, unreachable from data;
-> `[spec:pgorm:def:sql.types.type-name+2]` is where that text rides — the
+> `[spec:pgorm:def:sql.types.type-name+3]` is where that text rides — the
 > `verbatim` flag of the ordinary cast node, not a shape of its own
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — and it keeps every
 > *identifier*-borne type name quoted

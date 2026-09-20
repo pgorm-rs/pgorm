@@ -47,11 +47,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("expr.starts_with", "pgorm_query::Func::starts_with"),
         (
             "expr.contains_text",
-            "pgorm_query::Func::cust(strpos), Expr::gt",
+            "pgorm_query::Func::named(strpos), Expr::gt",
         ),
         (
             "expr.ends_with",
-            "pgorm_query::Func::cust(right), Func::char_length, Expr::eq",
+            "pgorm_query::Func::named(right), Func::char_length, Expr::eq",
         ),
         ("like_pattern", "pgorm_query::LikeExpr"),
         ("expr.like", "pgorm_query::SimpleExpr::like"),

@@ -74,7 +74,7 @@ impl PyCreateIndex {
         let kind = match name {
             "btree" => IndexType::BTree,
             "hash" => IndexType::Hash,
-            "gin" | "gist" | "spgist" | "brin" => IndexType::Custom(Alias::new(name).into_iden()),
+            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Alias::new(name).into_iden()),
             _ => {
                 return Err(UnsupportedCapabilityError::new_err(
                     "unsupported index access method",

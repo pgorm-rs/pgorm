@@ -4,7 +4,7 @@ use crate::oracle::{assert_eq, assert_eq_unparsed};
 // [spec:pgorm:req:sql.ddl.create-table+7/test]
 // [spec:pgorm:req:sql.ddl.column-def+4/test]
 #[test]
-// [spec:pgorm:def:sql.render.ddl.types+4/test]
+// [spec:pgorm:def:sql.render.ddl.types+5/test]
 fn create_1() {
     assert_eq!(
         Table::create(Glyph::Table)
@@ -106,13 +106,13 @@ fn create_3() {
 fn create_4() {
     assert_eq!(
         Table::create(Glyph::Table)
-            .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
+            .col(ColumnDef::new(Glyph::Image).named(Glyph::Aspect))
             .to_string(),
         r#"CREATE TABLE "glyph" ( "image" aspect )"#
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+3/test]
+// [spec:pgorm:req:sql.ddl.column-types+4/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -138,7 +138,7 @@ fn create_6() {
                 ColumnDef::new(Glyph::Id)
                     .integer()
                     .not_null()
-                    .extra("ANYTHING I WANT TO SAY".to_owned())
+                    .raw_suffix("ANYTHING I WANT TO SAY")
             )
             .to_string(),
         [
@@ -207,7 +207,7 @@ fn create_9() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+5/test]    a precision rides on the second-bearing
+// [spec:pgorm:def:sql.types.column-type+6/test]    a precision rides on the second-bearing
 // field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {
@@ -249,7 +249,7 @@ fn create_11() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+3/test]
+// [spec:pgorm:req:sql.ddl.column-types+4/test]
 #[test]
 fn create_12() {
     assert_eq!(
@@ -271,7 +271,7 @@ fn create_12() {
 fn create_14() {
     assert_eq!(
         Table::create((Alias::new("schema"), Glyph::Table))
-            .col(ColumnDef::new(Glyph::Image).custom(Glyph::Aspect))
+            .col(ColumnDef::new(Glyph::Image).named(Glyph::Aspect))
             .to_string(),
         [
             r#"CREATE TABLE "schema"."glyph" ("#,

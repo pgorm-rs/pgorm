@@ -271,8 +271,8 @@ async fn error_pool_from_acquisition_timeout() -> Result<(), Error> {
 // in via `From`, so `?` crosses the crate boundary without a `map_err`
 #[test]
 fn query_builder_errors_convert_via_from() {
-    fn build() -> Result<pgorm::pgorm_query::CustomExpr, Error> {
-        Ok(pgorm::pgorm_query::CustomExpr::new("$1 <-> $3", [])?)
+    fn build() -> Result<pgorm::pgorm_query::SqlTemplate, Error> {
+        Ok(pgorm::pgorm_query::SqlTemplate::new("$1 <-> $3", [])?)
     }
 
     let err = build().expect_err("a placeholder past the supplied values");

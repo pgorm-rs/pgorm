@@ -164,7 +164,9 @@ pub enum IndexType {
     BTree,
     Gin,
     Hash,
-    Custom(DynIden),
+    /// An access method this enum has no variant for, named rather than
+    /// spelled: the name renders quoted-or-safe-bare, never as SQL.
+    Named(DynIden),
 }
 
 impl IndexCreateStatement {

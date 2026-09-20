@@ -8,14 +8,14 @@ use std::{any::Any, fmt, ops, sync::Arc};
 pub trait Iden: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
     }
 
     /// The identifier's text with embedded double quotes doubled, ready to sit
     /// between the quotes [`prepare`](Self::prepare) writes.
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
     fn quoted(&self) -> String {
         self.to_string().replace('"', "\"\"")
     }
@@ -96,7 +96,7 @@ impl fmt::Debug for dyn Iden {
 
 /// Column references
 // [spec:pgorm:def:sql.types.column-ref]
-// [spec:pgorm:def:sql.ast.keywords+3]
+// [spec:pgorm:def:sql.ast.keywords+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(DynIden),
@@ -166,7 +166,7 @@ pub trait IntoColumnRef {
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+2]
+// [spec:pgorm:def:sql.types.type-name+3]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
@@ -194,7 +194,7 @@ impl TypeName {
     /// A type EXPRESSION — `BIT(8)`, `numeric(12, 2)` — rendered verbatim,
     /// nothing quoted or escaped.
     ///
-    /// Reachable only through [`Expr::cast_as_custom`](crate::Expr::cast_as_custom),
+    /// Reachable only through [`Expr::cast_as_raw`](crate::Expr::cast_as_raw),
     /// whose argument is a literal written in the calling source: the text is
     /// program text the author already controls, never data, so rendering it
     /// as SQL adds no reach that writing the SQL by hand would not have. The
@@ -203,7 +203,7 @@ impl TypeName {
     /// Any type that arrives as a *name* — from a schema, a derive attribute,
     /// or anything a value could reach — takes [`new`](Self::new) and is
     /// quoted.
-    pub fn custom(type_expr: &'static str) -> Self {
+    pub fn raw(type_expr: &'static str) -> Self {
         Self {
             schema: None,
             name: Alias::new(type_expr).into_iden(),
@@ -235,7 +235,7 @@ impl TypeName {
     /// Every other part renders as a QUOTED identifier, case preserved — so
     /// a name is a name, and text that is not one (`int4) + 100 --`) becomes
     /// an identifier PostgreSQL refuses rather than SQL it executes. A
-    /// [`custom`](Self::custom) type expression is the one exception and
+    /// [`raw`](Self::raw) type expression is the one exception and
     /// renders as written.
     pub fn to_sql_string(&self) -> String {
         if self.verbatim {
@@ -258,9 +258,9 @@ impl TypeName {
     ///
     /// Shared with the render sites that emit a single caller-supplied name
     /// which is not a `TypeName` — the index access method of
-    /// [`IndexType::Custom`](crate::IndexType::Custom) — so one policy covers
+    /// [`IndexType::Named`](crate::IndexType::Named) — so one policy covers
     /// every name-shaped position rather than each site inventing its own.
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
     pub(crate) fn prepare_part(part: &DynIden, out: &mut String) {
         let text = part.to_string();
         let mut chars = text.chars();
@@ -364,7 +364,7 @@ pub trait IntoTableName {
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let func = FromItem::FunctionCall(
-///     Func::cust(Alias::new("generate_series")).arg(1i32),
+///     Func::named(Alias::new("generate_series")).arg(1i32),
 ///     Alias::new("f").into_iden(),
 /// );
 /// Query::delete().from_table(func);
@@ -412,14 +412,14 @@ pub trait IntoFromItem {
 }
 
 /// Unary operator
-// [spec:pgorm:def:sql.types.opers+2]
+// [spec:pgorm:def:sql.types.opers+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
-// [spec:pgorm:def:sql.types.opers+2]
+// [spec:pgorm:def:sql.types.opers+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -480,7 +480,8 @@ pub enum BinOper {
     EuclideanDistance,
     NegativeInnerProduct,
     CosineDistance,
-    Custom(&'static str),
+    /// An operator this enum has no variant for, written verbatim.
+    Raw(&'static str),
 }
 
 /// Join types that carry an `ON` constraint
@@ -529,7 +530,7 @@ pub enum JoinOn {
 }
 
 /// Ordering options
-// [spec:pgorm:req:sql.ast.order+2]
+// [spec:pgorm:req:sql.ast.order+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     Asc,
@@ -586,7 +587,7 @@ pub struct Alias(String);
 pub struct Asterisk;
 
 /// SQL Keywords
-// [spec:pgorm:def:sql.ast.keywords+3]
+// [spec:pgorm:def:sql.ast.keywords+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,

@@ -1779,7 +1779,7 @@
     {
       "id": "function",
       "family": "Type/function names",
-      "api": "Func::cust",
+      "api": "Func::named",
       "method": "GET",
       "route": "/case/protected/function",
       "field": "input",

@@ -977,7 +977,7 @@ fn column_def_defaults_and_builders() {
     );
     assert_ne!(
         ColumnType::Integer.def().default_value(1),
-        ColumnType::Integer.def().default(Expr::cust("now()"))
+        ColumnType::Integer.def().default(Expr::raw("now()"))
     );
 
     // `get_column_type` reports whatever type the definition was built from.

@@ -84,7 +84,7 @@ pub struct TableCreateStatement {
     pub(crate) if_not_exists: bool,
     pub(crate) check: Vec<SimpleExpr>,
     pub(crate) comment: Option<String>,
-    pub(crate) extra: Option<String>,
+    pub(crate) raw_suffix: Option<&'static str>,
 }
 
 impl TableCreateStatement {
@@ -101,7 +101,7 @@ impl TableCreateStatement {
             if_not_exists: false,
             check: Vec::new(),
             comment: None,
-            extra: None,
+            raw_suffix: None,
         }
     }
 
@@ -272,7 +272,15 @@ impl TableCreateStatement {
         self.indexes.as_ref()
     }
 
-    /// Rewriting extra param. You should take care self about concat extra params. Add extra after options.
+    /// Append verbatim SQL after the table's own clauses — the escape hatch
+    /// for table options this vocabulary has no spelling for. One suffix per
+    /// statement: a second call replaces the first, so compose the whole tail
+    /// yourself.
+    ///
+    /// The `&'static str` bound is the contract, the same one
+    /// [`Expr::raw`](crate::Expr::raw) carries: only program text can be
+    /// appended, never a runtime string a value could have reached.
+    ///
     /// Example for PostgresSQL [Citus](https://github.com/citusdata/citus) extension:
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -280,18 +288,18 @@ impl TableCreateStatement {
     ///     .col(
     ///         ColumnDef::new(Char::Id)
     ///             .uuid()
-    ///             .extra("DEFAULT uuid_generate_v4()")
+    ///             .raw_suffix("DEFAULT uuid_generate_v4()")
     ///             .primary_key()
     ///             .not_null(),
     ///     )
     ///     .col(
     ///         ColumnDef::new(Char::CreatedAt)
     ///             .timestamp_with_time_zone()
-    ///             .extra("DEFAULT NOW()")
+    ///             .raw_suffix("DEFAULT NOW()")
     ///             .not_null(),
     ///     )
     ///     .col(ColumnDef::new(Char::UserData).json_binary().not_null())
-    ///     .extra("USING columnar")
+    ///     .raw_suffix("USING columnar")
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -306,16 +314,13 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn extra<T>(&mut self, extra: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.extra = Some(extra.into());
+    pub fn raw_suffix(&mut self, sql: &'static str) -> &mut Self {
+        self.raw_suffix = Some(sql);
         self
     }
 
-    pub fn get_extra(&self) -> Option<&String> {
-        self.extra.as_ref()
+    pub fn get_raw_suffix(&self) -> Option<&'static str> {
+        self.raw_suffix
     }
 
     /// Clone this statement out of a builder chain.
@@ -331,7 +336,7 @@ impl TableCreateStatement {
             if_not_exists: self.if_not_exists,
             check: std::mem::take(&mut self.check),
             comment: std::mem::take(&mut self.comment),
-            extra: std::mem::take(&mut self.extra),
+            raw_suffix: self.raw_suffix.take(),
         }
     }
 }

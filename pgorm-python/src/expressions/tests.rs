@@ -126,14 +126,14 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
             "p.col('text').starts_with('%_')",
             Func::starts_with(text.clone(), "%_").into(),
         )?;
-        let position = Func::cust("strpos").args([text.clone(), Expr::value("%_")]);
+        let position = Func::named("strpos").args([text.clone(), Expr::value("%_")]);
         parity(
             py,
             &globals,
             "p.col('text').contains_text('%_')",
             Expr::expr(position).gt(SimpleExpr::Constant(0i32.into())),
         )?;
-        let suffix = Func::cust("right").args([text, Func::char_length("%_").into()]);
+        let suffix = Func::named("right").args([text, Func::char_length("%_").into()]);
         parity(
             py,
             &globals,

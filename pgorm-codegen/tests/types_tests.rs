@@ -8,7 +8,7 @@ use pgorm_codegen::{Column, EntityTransformer, Error};
 use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen, Table};
 use std::sync::Arc;
 
-// [spec:pgorm:sem:codegen.entity.types+2/test]    `Column::get_rs_type` follows
+// [spec:pgorm:sem:codegen.entity.types+3/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
@@ -20,7 +20,7 @@ fn column_rust_types_follow_the_mapping_table() {
                 typed("c_char", ColumnType::Char(Some(1))),
                 typed("c_string", ColumnType::String(StringLen::N(10))),
                 typed("c_text", ColumnType::Text),
-                typed("c_custom", ColumnType::custom("citext")),
+                typed("c_named", ColumnType::named("citext")),
                 typed("c_small", ColumnType::SmallInteger),
                 typed("c_int", ColumnType::Integer),
                 typed("c_big", ColumnType::BigInteger),
@@ -53,7 +53,7 @@ fn column_rust_types_follow_the_mapping_table() {
         ("c_char", "String"),
         ("c_string", "String"),
         ("c_text", "String"),
-        ("c_custom", "String"),
+        ("c_named", "String"),
         ("c_small", "i16"),
         ("c_int", "i32"),
         ("c_big", "i64"),
@@ -74,7 +74,7 @@ fn column_rust_types_follow_the_mapping_table() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+2/test]    `Float` and `Double` also map
+// [spec:pgorm:sem:codegen.entity.types+3/test]    `Float` and `Double` also map
 // to `f32` / `f64`, and either one suppresses the Model's `Eq` derive —
 // recursively through `Array`
 #[test]

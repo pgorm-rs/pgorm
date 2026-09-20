@@ -21,7 +21,7 @@ pub enum Error {
 ///
 /// A template's placeholder census is fully known the moment the template
 /// meets its values, so every one of these is reported when the pair is built
-/// — see [`CustomExpr::new`](crate::CustomExpr::new) and
+/// — see [`SqlTemplate::new`](crate::SqlTemplate::new) and
 /// [`inject_parameters`](crate::inject_parameters).
 #[derive(Debug, PartialEq, Eq)]
 pub enum TemplateError {

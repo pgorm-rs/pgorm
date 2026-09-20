@@ -216,7 +216,7 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 }
 
 /// Method to derive an Model
-// [spec:pgorm:sem:macros.derive.entity-model+4]
+// [spec:pgorm:sem:macros.derive.entity-model+5]
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
@@ -388,15 +388,15 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                 // not an identifier and must not be quoted as one.
                 if let Some(select_as) = select_as {
                     columns_select_as.push(quote! {
-                        Self::#field_name => expr.cast_as_custom(#select_as)
+                        Self::#field_name => expr.cast_as_raw(#select_as)
                     });
                 }
                 if let Some(save_as) = save_as {
                     columns_save_as.push(quote! {
-                        Self::#field_name => val.cast_as_custom(#save_as)
+                        Self::#field_name => val.cast_as_raw(#save_as)
                     });
                     columns_save_array_as.push(quote! {
-                        Self::#field_name => val.cast_as_custom(concat!(#save_as, "[]"))
+                        Self::#field_name => val.cast_as_raw(concat!(#save_as, "[]"))
                     });
                 }
 

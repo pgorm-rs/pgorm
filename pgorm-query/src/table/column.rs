@@ -48,7 +48,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -78,7 +78,7 @@ pub enum ColumnType {
     /// payload is a [`TypeName`], so it renders through the same
     /// quoted-or-safe-bare part policy every other type name does and a
     /// hostile catalogue name becomes a name PostgreSQL refuses, never SQL.
-    Custom(TypeName),
+    Named(TypeName),
     Enum {
         name: DynIden,
         schema: Option<DynIden>,
@@ -102,7 +102,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -112,7 +112,7 @@ impl PartialEq for ColumnType {
             (Self::Interval(l0), Self::Interval(r0)) => l0 == r0,
             (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::VarBit(l0), Self::VarBit(r0)) => l0 == r0,
-            (Self::Custom(l0), Self::Custom(r0)) => l0.raw_text() == r0.raw_text(),
+            (Self::Named(l0), Self::Named(r0)) => l0.raw_text() == r0.raw_text(),
             (
                 Self::Enum {
                     name: l_name,
@@ -146,13 +146,13 @@ impl ColumnType {
     /// [`TypeName`]'s part policy, so a runtime `String` is safe here.
     /// A type *expression* — `numeric(12, 2)` — is grammar rather than a
     /// name and belongs in
-    /// [`Expr::cast_as_custom`](crate::Expr::cast_as_custom).
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
-    pub fn custom<T>(ty: T) -> ColumnType
+    /// [`Expr::cast_as_raw`](crate::Expr::cast_as_raw).
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    pub fn named<T>(ty: T) -> ColumnType
     where
         T: Into<String>,
     {
-        ColumnType::Custom(TypeName::new(Alias::new(ty)))
+        ColumnType::Named(TypeName::new(Alias::new(ty)))
     }
 
     pub fn string(length: Option<u32>) -> ColumnType {
@@ -189,7 +189,8 @@ pub enum ColumnSpec {
     Generated {
         expr: SimpleExpr,
     },
-    Extra(String),
+    /// Verbatim SQL appended after the column's own clauses.
+    RawSuffix(&'static str),
     /// Metadata, not a rendered clause: PostgreSQL has no column-comment
     /// clause of `CREATE TABLE`, so the renderer skips this spec and the text
     /// is carried for
@@ -205,7 +206,7 @@ pub enum ColumnSpec {
 /// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
 /// the precision sits on the second-bearing field spellings and on the
 /// unqualified form, and `interval HOUR(3)` has no spelling here.
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IntervalSpec {
     /// `interval`, or `interval(p)` — every field, with a fractional-seconds
@@ -218,7 +219,7 @@ pub enum IntervalSpec {
 /// Fractional-seconds precision of an interval type.
 ///
 /// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum IntervalPrecision {
     P0,
@@ -267,7 +268,7 @@ impl std::fmt::Display for IntervalPrecision {
 
 /// All interval field qualifiers; the second-bearing ones carry the precision
 /// PostgreSQL allows only there.
-// [spec:pgorm:def:sql.types.column-type+5]
+// [spec:pgorm:def:sql.types.column-type+6]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,
@@ -376,7 +377,7 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as char with custom length
+    /// Set column type as char with an explicit length
     pub fn char_len(&mut self, length: u32) -> &mut Self {
         self.types = Some(ColumnType::Char(Some(length)));
         self
@@ -388,7 +389,7 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as string with custom length
+    /// Set column type as string with an explicit length
     pub fn string_len(&mut self, length: u32) -> &mut Self {
         self.types = Some(ColumnType::String(StringLen::N(length)));
         self
@@ -436,7 +437,7 @@ impl ColumnDef {
         self
     }
 
-    /// Set column type as decimal with custom precision and scale
+    /// Set column type as decimal with an explicit precision and scale
     pub fn decimal_len(&mut self, precision: u32, scale: u32) -> &mut Self {
         self.types = Some(ColumnType::Decimal(Some((precision, scale))));
         self
@@ -488,7 +489,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+5]
+    // [spec:pgorm:def:sql.types.column-type+6]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self
@@ -571,17 +572,18 @@ impl ColumnDef {
         self
     }
 
-    /// Use a custom type on this column, named rather than spelled.
+    /// Use a type this vocabulary has no spelling for, named rather than
+    /// spelled.
     ///
     /// Takes anything a [`TypeName`] is built from — a bare name, or a
     /// `TypeName` carrying a schema qualifier or an array suffix — and every
     /// part renders quoted-or-safe-bare, never as SQL.
-    // [spec:pgorm:req:sql.render.ident-quoting+3]
-    pub fn custom<T>(&mut self, name: T) -> &mut Self
+    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    pub fn named<T>(&mut self, name: T) -> &mut Self
     where
         T: Into<TypeName>,
     {
-        self.types = Some(ColumnType::Custom(name.into()));
+        self.types = Some(ColumnType::Named(name.into()));
         self
     }
 
@@ -719,21 +721,26 @@ impl ColumnDef {
         self
     }
 
-    /// Some extra options in custom string
+    /// Append verbatim SQL after this column's own clauses — the escape hatch
+    /// for column specs this vocabulary has no spelling for.
+    ///
+    /// The `&'static str` bound is the contract, the same one
+    /// [`Expr::raw`](crate::Expr::raw) carries: only program text can be
+    /// appended, never a runtime string a value could have reached.
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     /// let table = Table::create(Char::Table)
     ///     .col(
     ///         ColumnDef::new(Char::Id)
     ///             .uuid()
-    ///             .extra("DEFAULT gen_random_uuid()")
+    ///             .raw_suffix("DEFAULT gen_random_uuid()")
     ///             .primary_key()
     ///             .not_null(),
     ///     )
     ///     .col(
     ///         ColumnDef::new(Char::CreatedAt)
     ///             .timestamp_with_time_zone()
-    ///             .extra("DEFAULT NOW()")
+    ///             .raw_suffix("DEFAULT NOW()")
     ///             .not_null(),
     ///     )
     ///     .to_owned();
@@ -748,11 +755,8 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn extra<T>(&mut self, string: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.spec.push(ColumnSpec::Extra(string.into()));
+    pub fn raw_suffix(&mut self, sql: &'static str) -> &mut Self {
+        self.spec.push(ColumnSpec::RawSuffix(sql));
         self
     }
 

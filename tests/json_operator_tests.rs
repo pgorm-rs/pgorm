@@ -223,7 +223,7 @@ pub async fn empty_key_lists_carry_vacuous_truth() {
 // a rejection the syntax-only oracle cannot see, because both forms parse.
 // The same statement also proves the rendered `?` survives the wire: parameters
 // are `$N`, so nothing between here and the server reads it as a placeholder
-// [spec:pgorm:def:sql.render.operators+3/test]
+// [spec:pgorm:def:sql.render.operators+4/test]
 #[pgorm_macros::test]
 pub async fn question_mark_needs_a_jsonb_operand() {
     let ctx = TestContext::new("question_mark_needs_a_jsonb_operand").await;

@@ -631,9 +631,9 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
     let conn = ctx.db.get().await?;
     let db = &conn;
 
-    let poisoned_bakery = || bakery::Entity::find().filter(Expr::cust("no_such_column IS NULL"));
-    let poisoned_baker = || baker::Entity::find().filter(Expr::cust("no_such_column IS NULL"));
-    let poisoned_cake = || cake::Entity::find().filter(Expr::cust("no_such_column IS NULL"));
+    let poisoned_bakery = || bakery::Entity::find().filter(Expr::raw("no_such_column IS NULL"));
+    let poisoned_baker = || baker::Entity::find().filter(Expr::raw("no_such_column IS NULL"));
+    let poisoned_cake = || cake::Entity::find().filter(Expr::raw("no_such_column IS NULL"));
 
     // The selectors really are unusable against this schema.
     assert!(poisoned_bakery().all(db).await.is_err());

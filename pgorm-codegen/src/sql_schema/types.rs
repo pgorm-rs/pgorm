@@ -16,7 +16,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+3]
+// [spec:pgorm:sem:codegen.ddl.types+4]
 pub(super) fn column_kind(
     type_name: &TypeName,
     enums: &Enums,
@@ -79,7 +79,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+3]
+// [spec:pgorm:sem:codegen.ddl.types+4]
 fn named_type(
     names: &[String],
     modifiers: &[u32],

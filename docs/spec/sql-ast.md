@@ -65,7 +65,7 @@ today, including panicking edges and deliberate failsafes.
 > carries the note that it inlines rather than binds, and points at `build`.
 > The inlined form escapes what it writes, so the warning is not about
 > injection; it is that the server re-parses the literal and the type pinning
-> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+2]`) is
+> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+3]`) is
 > lost.
 
 ## SELECT statements
@@ -156,7 +156,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Ordering
 
-> [spec:pgorm:req:sql.ast.order+2]
+> [spec:pgorm:req:sql.ast.order+3]
 > `SelectStatement` and `WindowStatement` — the two statements PostgreSQL
 > admits an ORDER BY on — share the `OrderedStatement` trait; the write
 > statements do not implement it, per `sql.ast.update` and `sql.ast.delete`.
@@ -165,11 +165,11 @@ today, including panicking edges and deliberate failsafes.
 > which attach a `NullOrdering` (`First`/`Last`) rendered as `NULLS
 > FIRST`/`NULLS LAST`. `clear_order_by` MUST remove all accumulated order
 > expressions. There is no raw-string ordering verb: a verbatim SQL fragment
-> reaches ORDER BY position only as an `Expr::cust` through `order_by_expr`.
+> reaches ORDER BY position only as an `Expr::raw` through `order_by_expr`.
 >
 > `Order` MUST support `Asc`, `Desc`, and `Field(Values)`; the `Field` variant
 > renders a `CASE WHEN col=v_i THEN i ... ELSE n END` expression implementing
-> explicit custom value ordering.
+> explicit value ordering.
 
 ## Conditions
 
@@ -221,23 +221,24 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+1]
+> [spec:pgorm:def:sql.ast.expr+2]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
-> `Value` (parameterised), `Values`, `Custom(String)` (verbatim SQL),
-> `CustomWithExpr(CustomExpr)`, `Keyword`, `AsEnum`, `Case`, and `Constant`
-> (inlined literal). `CustomExpr` holds a template with `$1`-style splices
+> `Value` (parameterised), `Values`, `Raw(&'static str)` (verbatim SQL),
+> `Template(SqlTemplate)`, `Keyword`, `AsEnum`, `Case`, and `Constant`
+> (inlined literal). `SqlTemplate` holds a template with `$1`-style splices
 > (`$$` escaping a literal `$`) already resolved against the expressions it
 > substitutes; its segments are private and its only constructor is
-> `CustomExpr::new`, which returns `Result`, so the AST cannot hold a template
+> `SqlTemplate::new`, which returns `Result`, so the AST cannot hold a template
 > whose placeholders and values disagree — see `sql.render.custom-expr`.
 >
 > `Expr` is the entry-point builder holding a left operand plus pending
 > unary/binary operator state; `Expr::col`, `Expr::val`, `Expr::expr`,
-> `Expr::tuple`, `Expr::value` and `Expr::cust` construct expressions from
-> columns, values, other expressions, and raw SQL, and
-> `Expr::cust_with_values`, `Expr::cust_with_expr` and `Expr::cust_with_exprs`
+> `Expr::tuple`, `Expr::value` and `Expr::raw` construct expressions from
+> columns, values, other expressions, and raw SQL — `Expr::raw` bound to
+> `&'static str`, so only program text can be written verbatim — and
+> `Expr::template`, `Expr::template_with_expr` and `Expr::template_with_exprs`
 > do the same for templates, each returning `Result` because each pairs a
 > template with substitutions.
 >
@@ -249,7 +250,7 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
-> [spec:pgorm:req:sql.ast.expr.operators+1]
+> [spec:pgorm:req:sql.ast.expr.operators+2]
 > `Expr` and `SimpleExpr` MUST provide combinators that produce `Binary`/`Unary`
 > nodes: comparisons `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, plus
 > `equals`/`not_equals` for column-to-column comparison; arithmetic `add`,
@@ -268,7 +269,7 @@ today, including panicking edges and deliberate failsafes.
 > and merge tests, and `sql.ast.expr.json` MUST NOT name duplicates of them.
 > The escape hatch `binary(op, rhs)` accepts any `BinOper`, whose variants
 > further include regex (`~`, `~*`), trigram similarity and distance operators,
-> pgvector distance operators, `Overlap`, and `Custom(&'static str)` for
+> pgvector distance operators, `Overlap`, and `Raw(&'static str)` for
 > arbitrary operator text. Casts are expressed with `cast_as`
 > (`CAST(expr AS type)`) and `as_enum`; aggregate shorthands `max`, `min`,
 > `sum`, `count`, `count_distinct`, and `if_null` wrap the expression in the
@@ -336,10 +337,10 @@ today, including panicking edges and deliberate failsafes.
 > The boundary is operators, not functions. PostgreSQL's `jsonb_*` calls —
 > `jsonb_set`, `jsonb_build_object`, `jsonb_array_elements`, `jsonb_typeof` and
 > the rest — are ordinary function applications a caller already spells with
-> `Func::cust`, and naming each one here would be a second, worse function-call
+> `Func::named`, and naming each one here would be a second, worse function-call
 > syntax. The operators pgorm does not name (`-` and `#-` key/path deletion,
 > the jsonpath operators `@?` and `@@`) stay reachable through `binary` with
-> `BinOper::Custom`; only `@@` has a variant, shared with full-text `matches`.
+> `BinOper::Raw`; only `@@` has a variant, shared with full-text `matches`.
 >
 > Containment (`@>`, `<@`) and concatenation (`||`) MUST NOT be duplicated
 > here: PostgreSQL defines one operator each across every type that has them,
@@ -375,12 +376,12 @@ today, including panicking edges and deliberate failsafes.
 > re-entering the builder with `Expr::expr`; `#>` exists so that the common
 > multi-step path needs one node instead of a nest of them.
 
-> [spec:pgorm:def:sql.ast.keywords+3]
+> [spec:pgorm:def:sql.ast.keywords+4]
 > `Keyword` represents bare SQL keywords usable as expressions, and the variant
 > set is closed: `Null`, `CurrentDate`, `CurrentTime`, and `CurrentTimestamp`,
 > constructed by `Expr::current_date()`, `Expr::current_time()` and
 > `Expr::current_timestamp()`. There is no caller-supplied keyword — an
-> arbitrary word reaches keyword position only as an `Expr::cust`, which says
+> arbitrary word reaches keyword position only as an `Expr::raw`, which says
 > raw SQL where a `Keyword` would have said identifier. Identifier helpers: `Alias`
 > wraps an arbitrary string as an identifier and `Asterisk` expresses `*` — as a bare projection or
 > table-qualified via `(Table, Asterisk)` rendering `"table".*`. `ColumnRef`
@@ -470,11 +471,11 @@ today, including panicking edges and deliberate failsafes.
 
 ## UPDATE and DELETE statements
 
-> [spec:pgorm:req:sql.ast.update+3]
+> [spec:pgorm:req:sql.ast.update+4]
 > `UpdateStatement` MUST accumulate SET assignments in call order as
 > `(column, expression)` pairs: `values(pairs)` pushes many, `value(col, expr)`
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
-> (values, keywords, `Expr::cust` fragments, subqueries). Duplicate columns are
+> (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
 > `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`, so
 > the target is a name with an optional alias and nothing else, rendering
@@ -604,14 +605,14 @@ today, including panicking edges and deliberate failsafes.
 > [spec:pgorm:req:sql.ast.cast-shape]
 > A cast has exactly ONE node shape: `SimpleExpr::AsEnum(TypeName, operand)`.
 > Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`, the
-> entity layer's enum casts, and the `cast_as_custom` escape hatch — builds
+> entity layer's enum casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
-> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+2]`), never by choosing
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+3]`), never by choosing
 > a different node.
 >
 > What this forbids is the second, `FunctionCall`-shaped cast whose type rode
-> as a raw `SimpleExpr::Custom` operand, and it forbids it for two reasons.
+> as a `SimpleExpr::Raw` operand, and it forbids it for two reasons.
 > A consumer reading a cast back off an expression must recognise one shape
 > rather than enumerate them: `source_read_cast` recognising only the
 > structured shape is why a `#[pgorm(select_as = "…")]` column's read cast
@@ -619,12 +620,12 @@ today, including panicking edges and deliberate failsafes.
 > type instead of its cast one — a defect no test of either shape alone could
 > have found. And raw text in expression position is an injection site by
 > construction; confining verbatim type text to one field of `TypeName`,
-> reachable only through `cast_as_custom`, makes the places that can emit an
+> reachable only through `cast_as_raw`, makes the places that can emit an
 > unescaped type name a finite list that inspection can enumerate.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+1]
+> [spec:pgorm:def:sql.ast.func+2]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -643,7 +644,7 @@ today, including panicking edges and deliberate failsafes.
 > and no `Func` constructor that produces one — a consumer matching on a
 > `FunctionCall` never has to consider a cast.
 >
-> `Func::cust(iden)` calls an arbitrary function by identifier
-> (`Function::Custom`). A `FunctionCall` converts into
+> `Func::named(iden)` calls an arbitrary function by identifier
+> (`Function::Named`). A `FunctionCall` converts into
 > `SimpleExpr::FunctionCall`, and can serve as a FROM item through
 > `SelectStatement::from_function`.

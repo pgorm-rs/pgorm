@@ -47,7 +47,7 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+2]
+    // [spec:pgorm:sem:codegen.entity.types+3]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
     // [spec:pgorm:req:codegen.entity.types.unsupported+1]
     pub fn get_rs_type(&self) -> TokenStream {
@@ -57,7 +57,7 @@ impl Column {
                 ColumnType::Char(_)
                 | ColumnType::String(_)
                 | ColumnType::Text
-                | ColumnType::Custom(_) => "String".to_owned(),
+                | ColumnType::Named(_) => "String".to_owned(),
                 ColumnType::SmallInteger => "i16".to_owned(),
                 ColumnType::Integer => "i32".to_owned(),
                 ColumnType::BigInteger => "i64".to_owned(),
@@ -91,7 +91,7 @@ impl Column {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+1]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+2]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -100,7 +100,7 @@ impl Column {
             ColumnType::Money => Some("Money".to_owned()),
             ColumnType::Text => Some("Text".to_owned()),
             ColumnType::JsonBinary => Some("JsonBinary".to_owned()),
-            ColumnType::Custom(type_name) => Some(format!("custom(\"{}\")", type_name.raw_text())),
+            ColumnType::Named(type_name) => Some(format!("named(\"{}\")", type_name.raw_text())),
             ColumnType::Bytea => Some("Bytea".to_owned()),
             _ => None,
         };
@@ -142,9 +142,9 @@ impl Column {
                 ColumnType::Json => quote! { ColumnType::Json },
                 ColumnType::JsonBinary => quote! { ColumnType::JsonBinary },
                 ColumnType::Uuid => quote! { ColumnType::Uuid },
-                ColumnType::Custom(type_name) => {
+                ColumnType::Named(type_name) => {
                     let s = type_name.raw_text();
-                    quote! { ColumnType::custom(#s) }
+                    quote! { ColumnType::named(#s) }
                 }
                 ColumnType::Enum { name, .. } => {
                     let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
@@ -241,7 +241,7 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
         ColumnType::Char(_)
         | ColumnType::String(_)
         | ColumnType::Text
-        | ColumnType::Custom(_)
+        | ColumnType::Named(_)
         | ColumnType::SmallInteger
         | ColumnType::Integer
         | ColumnType::BigInteger
@@ -338,7 +338,7 @@ mod tests {
         vec![
             make_col!("id", ColumnType::String(StringLen::N(255))),
             make_col!("id", ColumnType::String(StringLen::None)),
-            make_col!("cake_id", ColumnType::custom("cus_col")),
+            make_col!("cake_id", ColumnType::named("cus_col")),
             make_col!("CakeId", ColumnType::SmallInteger),
             make_col!("CakeId", ColumnType::Integer),
             make_col!("CakeFillingId", ColumnType::BigInteger),
@@ -440,7 +440,7 @@ mod tests {
         let col_defs = vec![
             "ColumnType::String(StringLen::N(255u32)).def()",
             "ColumnType::String(StringLen::None).def()",
-            "ColumnType::custom(\"cus_col\").def()",
+            "ColumnType::named(\"cus_col\").def()",
             "ColumnType::SmallInteger.def()",
             "ColumnType::Integer.def()",
             "ColumnType::BigInteger.def()",

@@ -95,7 +95,7 @@ fn programs() -> BTreeMap<&'static str, String> {
         (
             "index_gin",
             Index::create(table.clone(), a("moods"))
-                .index_type(IndexType::Custom(a("gin").into_iden()))
+                .index_type(IndexType::Named(a("gin").into_iden()))
                 .to_string(),
         ),
         (

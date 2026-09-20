@@ -70,7 +70,7 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ast.update+3]
+// [spec:pgorm:req:sql.ast.update+4]
 // [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
@@ -109,7 +109,7 @@ impl UpdateStatement {
     /// # Examples
     ///
     /// See [`UpdateStatement::values`]
-    // [spec:pgorm:req:sql.ast.update+3]
+    // [spec:pgorm:req:sql.ast.update+4]
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
@@ -139,7 +139,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.update+3]
+    // [spec:pgorm:req:sql.ast.update+4]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,
@@ -160,7 +160,7 @@ impl UpdateStatement {
     ///
     /// let query = Query::update()
     ///     .table(Glyph::Table)
-    ///     .value(Glyph::Aspect, Expr::cust("60 * 24 * 24"))
+    ///     .value(Glyph::Aspect, Expr::raw("60 * 24 * 24"))
     ///     .values([
     ///         (Glyph::Image, "24B0E11951B03B07F8300FD003983F03F0780060".into()),
     ///     ])

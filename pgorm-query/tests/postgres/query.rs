@@ -3,7 +3,7 @@ use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+1/test]
 // [spec:pgorm:def:sql.ast.select+2/test]
-// [spec:pgorm:req:sql.render.ident-quoting+3/test]
+// [spec:pgorm:req:sql.render.ident-quoting+4/test]
 #[test]
 fn select_1() {
     assert_eq!(
@@ -17,7 +17,7 @@ fn select_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.expr+1/test]
+// [spec:pgorm:def:sql.ast.expr+2/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -470,7 +470,7 @@ fn select_33() {
             .from(Glyph::Table)
             .and_where(
                 Expr::col(Glyph::Aspect)
-                    .in_subquery(Query::select().expr(Expr::cust("3 + 2 * 2")).take())
+                    .in_subquery(Query::select().expr(Expr::raw("3 + 2 * 2")).take())
             )
             .to_string(),
         r#"SELECT "image" FROM "glyph" WHERE "aspect" IN (SELECT 3 + 2 * 2)"#
@@ -792,7 +792,7 @@ fn select_48a() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+3/test]    `Asterisk` as a bare projection
+// [spec:pgorm:def:sql.ast.keywords+4/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -803,7 +803,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
-// [spec:pgorm:def:sql.ast.keywords+3/test]    `(Table, Asterisk)` renders `"table".*`
+// [spec:pgorm:def:sql.ast.keywords+4/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -822,7 +822,7 @@ fn select_50() {
     )
 }
 
-// [spec:pgorm:req:sql.ast.order+2/test]
+// [spec:pgorm:req:sql.ast.order+3/test]
 #[test]
 fn select_51() {
     assert_eq!(
@@ -977,7 +977,7 @@ fn select_56() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.order+2/test]
+// [spec:pgorm:req:sql.ast.order+3/test]
 #[test]
 fn select_57() {
     assert_eq!(
@@ -1060,7 +1060,7 @@ fn select_59() {
 // [spec:pgorm:req:sql.ast.build+3/test]
 // [spec:pgorm:req:sql.render.placeholders+1/test]
 // [spec:pgorm:req:sql.render.param-vs-inline+1/test]
-// [spec:pgorm:req:sql.render.custom-expr+1/test]
+// [spec:pgorm:req:sql.render.custom-expr+2/test]
 #[test]
 fn select_60() {
     let (cust_query, cust_values) = Query::select()
@@ -1070,7 +1070,7 @@ fn select_60() {
         .build();
 
     let (statement, values) = Query::select()
-        .expr(Expr::cust_with_values(&cust_query[7..], cust_values.0).expect("template arity"))
+        .expr(Expr::template(&cust_query[7..], cust_values.0).expect("template arity"))
         .limit(5)
         .build();
 
@@ -1081,7 +1081,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+1/test]
+// [spec:pgorm:req:sql.ast.expr.operators+2/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1637,7 +1637,7 @@ fn insert_returning_specific_columns() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.update+3/test]
+// [spec:pgorm:req:sql.ast.update+4/test]
 #[test]
 // [spec:pgorm:req:sql.render.update-delete+2/test]
 fn update_1() {
@@ -1662,7 +1662,7 @@ fn update_3() {
     assert_eq!(
         Query::update()
             .table(Glyph::Table)
-            .value(Glyph::Aspect, Expr::cust("60 * 24 * 24"))
+            .value(Glyph::Aspect, Expr::raw("60 * 24 * 24"))
             .values([(
                 Glyph::Image,
                 "24B0E11951B03B07F8300FD003983F03F0780060".into()
@@ -1694,7 +1694,7 @@ fn update_returning_all_columns() {
     assert_eq!(
         Query::update()
             .table(Glyph::Table)
-            .value(Glyph::Aspect, Expr::cust("60 * 24 * 24"))
+            .value(Glyph::Aspect, Expr::raw("60 * 24 * 24"))
             .values([(
                 Glyph::Image,
                 "24B0E11951B03B07F8300FD003983F03F0780060".into()
@@ -1711,7 +1711,7 @@ fn update_returning_specified_columns() {
     assert_eq!(
         Query::update()
             .table(Glyph::Table)
-            .value(Glyph::Aspect, Expr::cust("60 * 24 * 24"))
+            .value(Glyph::Aspect, Expr::raw("60 * 24 * 24"))
             .values([(
                 Glyph::Image,
                 "24B0E11951B03B07F8300FD003983F03F0780060".into()
@@ -1827,7 +1827,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+3/test]
+// [spec:pgorm:def:sql.render.operators+4/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -1902,14 +1902,14 @@ fn select_pgtrgm_strict_word_similarity_distance() {
 fn select_custom_operator() {
     assert_eq!(
         Query::select()
-            .expr(Expr::col(Font::Name).binary(BinOper::Custom("~*"), Expr::value("serif")))
+            .expr(Expr::col(Font::Name).binary(BinOper::Raw("~*"), Expr::value("serif")))
             .from(Font::Table)
             .to_string(),
         r#"SELECT "name" ~* 'serif' FROM "font""#
     );
     assert_eq!(
         Query::select()
-            .expr(Expr::col(Font::Name).binary(BinOper::Custom("~"), Expr::value("serif")))
+            .expr(Expr::col(Font::Name).binary(BinOper::Raw("~"), Expr::value("serif")))
             .from(Font::Table)
             .to_string(),
         r#"SELECT "name" ~ 'serif' FROM "font""#
@@ -1944,7 +1944,7 @@ fn union_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.func+1/test]
+// [spec:pgorm:def:sql.ast.func+2/test]
 #[test]
 fn sub_query_with_fn() {
     #[derive(Iden)]
@@ -1957,7 +1957,7 @@ fn sub_query_with_fn() {
         .to_owned();
 
     let select = Query::select()
-        .expr(Func::cust(ArrayFunc).arg(SimpleExpr::SubQuery(
+        .expr(Func::named(ArrayFunc).arg(SimpleExpr::SubQuery(
             None,
             Box::new(sub_select.into_sub_query_statement()),
         )))
@@ -2014,7 +2014,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+1/test]
+// [spec:pgorm:req:sql.ast.expr.operators+2/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2165,7 +2165,7 @@ fn empty_json_key_list_is_typed_array() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+1/test]    `@>`, `<@` and `||` are one
+// [spec:pgorm:req:sql.ast.expr.operators+2/test]    `@>`, `<@` and `||` are one
 // operator each across every type that has them, so the JSON family names no
 // duplicate: these are already the JSON containment and merge tests
 #[test]
@@ -2227,7 +2227,7 @@ fn regex_case_insensitive_bin_oper() {
 }
 
 #[test]
-// [spec:pgorm:req:sql.render.parens+1/test]
+// [spec:pgorm:req:sql.render.parens+2/test]
 fn test_issue_674_nested_logical() {
     let t = SimpleExpr::Value(true.into());
     let f = SimpleExpr::Value(false.into());
@@ -2324,7 +2324,7 @@ fn every_cast_spelling_builds_one_node_shape() {
     let operand = Expr::col(Char::SizeW);
     let casts = [
         operand.clone().cast_as(Alias::new("citext")),
-        operand.clone().cast_as_custom("numeric(10, 2)"),
+        operand.clone().cast_as_raw("numeric(10, 2)"),
         operand.clone().as_enum(Alias::new("citext")),
         operand
             .clone()
@@ -2350,7 +2350,7 @@ fn every_cast_spelling_builds_one_node_shape() {
         type_names,
         [
             TypeName::new(Alias::new("citext")),
-            TypeName::custom("numeric(10, 2)"),
+            TypeName::raw("numeric(10, 2)"),
             TypeName::new(Alias::new("citext")),
             TypeName::new(Alias::new("status")).schema(Alias::new("tenant_a")),
         ]
@@ -2371,12 +2371,12 @@ fn every_cast_spelling_builds_one_node_shape() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+2/test]
+// [spec:pgorm:req:sql.render.cast-param-type+3/test]
 #[test]
 fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
         Query::select()
-            .expr(Expr::val(8i64).cast_as_custom("BIT(8)"))
+            .expr(Expr::val(8i64).cast_as_raw("BIT(8)"))
             .build(),
         (
             r#"SELECT CAST($1::int8 AS BIT(8))"#.to_owned(),
@@ -2419,12 +2419,12 @@ fn cast_param_is_pinned_to_the_source_type() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+2/test]
+// [spec:pgorm:req:sql.render.cast-param-type+3/test]
 #[test]
 fn cast_param_is_not_pinned_when_rendered_inline() {
     assert_eq!(
         Query::select()
-            .expr(Expr::val(8i64).cast_as_custom("BIT(8)"))
+            .expr(Expr::val(8i64).cast_as_raw("BIT(8)"))
             .to_string(),
         r#"SELECT CAST(8 AS BIT(8))"#
     );
@@ -2438,7 +2438,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+3/test]    the bare-keyword expressions and their constructors
+// [spec:pgorm:def:sql.ast.keywords+4/test]    the bare-keyword expressions and their constructors
 #[test]
 fn keywords_1() {
     assert_eq!(
@@ -2452,7 +2452,7 @@ fn keywords_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+3/test]    `Alias` wraps an arbitrary string as an identifier,
+// [spec:pgorm:def:sql.ast.keywords+4/test]    `Alias` wraps an arbitrary string as an identifier,
 // and it is the only identifier helper — there is no empty-name alias
 #[test]
 fn keywords_2() {
@@ -2908,7 +2908,7 @@ fn carried_with_clause_renders_at_every_nesting_level() {
                 JoinType::InnerJoin,
                 inner(),
                 Alias::new("lat"),
-                Expr::cust("TRUE"),
+                Expr::raw("TRUE"),
             )
             .to_string(),
         format!(r#"SELECT "id" FROM "glyph" INNER JOIN LATERAL ({prefix}) AS "lat" ON TRUE"#)

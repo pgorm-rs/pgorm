@@ -157,7 +157,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > parses at all. Anything expressible through the typed setters MUST use them
 > instead.
 
-> [spec:pgorm:req:sql.ddl.column-types+3]
+> [spec:pgorm:req:sql.ddl.column-types+4]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
 > contract, and it is total: every variant has exactly one Postgres spelling
 > and none can fail. It MUST spell: `Char(Some(n))`→`char(n)`,
@@ -175,8 +175,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `VarBit(n)`→`varbit(n)`; `Boolean`→`bool`; `Money`→`money`; `Json`→`json`;
 > `JsonBinary`→`jsonb`; `Uuid`→`uuid`; `Array(t)`→ recursive element spelling
 > plus `[]`; `Vector(Some(n))`→`vector(n)`, `Vector(None)`→`vector`;
-> `Custom(iden)`→ the unquoted iden text; `Enum { name, .. }`→ the unquoted
-> enum type name; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
+> `Named(type_name)` and `Enum { name, .. }`→ the type name through
+> `TypeName`'s part policy (`sql.types.type-name`), a safe lowercase name
+> bare and anything else quoted; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
 > [spec:pgorm:req:sql.ddl.alter-table+4]

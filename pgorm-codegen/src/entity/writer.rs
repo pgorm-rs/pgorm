@@ -709,7 +709,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+1]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+2]
     // [spec:pgorm:sem:codegen.entity.compact.model+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(

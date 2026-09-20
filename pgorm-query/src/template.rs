@@ -30,7 +30,7 @@ pub(crate) enum Segment<T> {
 /// Which `$` convention a scan follows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Grammar {
-    /// Custom-expression templates: `$$` escapes a literal `$`, and a `$` that
+    /// Authored SQL templates: `$$` escapes a literal `$`, and a `$` that
     /// is neither an escape nor a placeholder index is refused, because a
     /// template is authored for this machinery and a stray `$` in one is a
     /// mistake rather than data.
@@ -42,7 +42,7 @@ pub(crate) enum Grammar {
 }
 
 /// Split `input` into literal text and placeholder references.
-// [spec:pgorm:req:sql.render.custom-expr+1] (the `Template` grammar: `$$` escape, `$N` index)
+// [spec:pgorm:req:sql.render.custom-expr+2] (the `Template` grammar: `$$` escape, `$N` index)
 // [spec:pgorm:sem:sql.render.inject+3] (the `Sql` grammar: only `$N`, everything else verbatim)
 pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
     let mark = "$";
@@ -117,7 +117,7 @@ pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
 
 /// Check the census of `chunks` against `supplied`: the distinct placeholder
 /// indices referenced must be exactly `1..=supplied`.
-// [spec:pgorm:req:sql.render.custom-expr+1]
+// [spec:pgorm:req:sql.render.custom-expr+2]
 // [spec:pgorm:sem:sql.render.inject+3]
 fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
     let mut referenced: Vec<usize> = chunks
@@ -153,7 +153,7 @@ fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
 
 /// Scan `input` and pair every placeholder with the value it names, or refuse
 /// the pairing. The result holds values, not indices.
-// [spec:pgorm:req:sql.render.custom-expr+1]
+// [spec:pgorm:req:sql.render.custom-expr+2]
 // [spec:pgorm:sem:sql.render.inject+3]
 pub(crate) fn resolve<T>(input: &str, grammar: Grammar, values: &[T]) -> Result<Vec<Segment<T>>>
 where
@@ -181,7 +181,7 @@ where
         .collect()
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+1/test]
+// [spec:pgorm:req:sql.render.custom-expr+2/test]
 // [spec:pgorm:sem:sql.render.inject+3/test]
 #[cfg(test)]
 mod tests {
@@ -336,25 +336,25 @@ mod tests {
     }
 }
 
-/// A custom SQL template and the expressions it substitutes, already resolved
-/// against each other.
+/// A validated SQL template and the expressions it substitutes, already
+/// resolved against each other.
 ///
 /// A template's placeholder census — which `$N` it names, and how many values
 /// it therefore needs — is knowable the moment the template meets its values,
-/// so [`CustomExpr::new`] settles it there. What survives construction is a
+/// so [`SqlTemplate::new`] settles it there. What survives construction is a
 /// flat sequence of literal text and resolved expressions carrying no indices
-/// at all, which is why rendering a custom expression cannot reach for a
+/// at all, which is why rendering a template cannot reach for a
 /// substitution that was never supplied.
 ///
-/// Reached through [`Expr::cust_with_values`], [`Expr::cust_with_expr`] and
-/// [`Expr::cust_with_exprs`].
-// [spec:pgorm:req:sql.render.custom-expr+1]
+/// Reached through [`Expr::template`], [`Expr::template_with_expr`] and
+/// [`Expr::template_with_exprs`].
+// [spec:pgorm:req:sql.render.custom-expr+2]
 #[derive(Debug, Clone, PartialEq)]
-pub struct CustomExpr {
+pub struct SqlTemplate {
     segments: Vec<Segment<SimpleExpr>>,
 }
 
-impl CustomExpr {
+impl SqlTemplate {
     /// Pair `template` with `values`, or refuse the pair.
     ///
     /// The template is tokenized, so placeholder-like text inside quoted
@@ -374,13 +374,13 @@ impl CustomExpr {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let paired = CustomExpr::new("$1 * $2", [Expr::val(2).into(), Expr::val(3).into()]);
+    /// let paired = SqlTemplate::new("$1 * $2", [Expr::val(2).into(), Expr::val(3).into()]);
     /// assert!(paired.is_ok());
     ///
-    /// let short = CustomExpr::new("$1 * $2", [Expr::val(2).into()]);
+    /// let short = SqlTemplate::new("$1 * $2", [Expr::val(2).into()]);
     /// assert!(short.is_err());
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+1]
+    // [spec:pgorm:req:sql.render.custom-expr+2]
     pub fn new<T, I>(template: T, values: I) -> Result<Self>
     where
         T: Into<String>,

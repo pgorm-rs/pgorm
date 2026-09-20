@@ -336,7 +336,7 @@ impl QueryBuilder {
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
     // [spec:pgorm:req:sql.render.subquery+1] (SubQuery/Tuple/Values expression arms)
-    // [spec:pgorm:req:sql.render.custom-expr+1]
+    // [spec:pgorm:req:sql.render.custom-expr+2]
     fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::Column(column_ref) => {
@@ -400,12 +400,12 @@ impl QueryBuilder {
                 });
                 write!(sql, ")").unwrap();
             }
-            SimpleExpr::Custom(s) => {
+            SimpleExpr::Raw(s) => {
                 write!(sql, "{s}").unwrap();
             }
-            // [spec:pgorm:req:sql.render.custom-expr+1]
-            SimpleExpr::CustomWithExpr(custom) => {
-                for segment in custom.segments() {
+            // [spec:pgorm:req:sql.render.custom-expr+2]
+            SimpleExpr::Template(template) => {
+                for segment in template.segments() {
                     match segment {
                         Segment::Text(text) => write!(sql, "{text}").unwrap(),
                         Segment::Value(expr) => self.prepare_simple_expr(expr, sql),
@@ -419,7 +419,7 @@ impl QueryBuilder {
             // one shape; the type a `TypeName`, so a name is a name and never
             // SQL; a `Value` operand keeps the source-typed placeholder pin of
             // `sql.render.cast-param-type`.
-            // [spec:pgorm:req:sql.render.cast-param-type+2]
+            // [spec:pgorm:req:sql.render.cast-param-type+3]
             // [spec:pgorm:req:sql.ast.cast-shape]
             SimpleExpr::AsEnum(type_name, expr) => {
                 write!(sql, "CAST(").unwrap();
@@ -443,7 +443,7 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+3]
+    // [spec:pgorm:def:sql.render.operators+4]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
         if let Some(escape) = like.escape {
@@ -602,7 +602,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+3] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+4] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -614,7 +614,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+3]
+    // [spec:pgorm:def:sql.render.operators+4]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -644,7 +644,7 @@ impl QueryBuilder {
                 BinOper::LShift => "<<",
                 BinOper::RShift => ">>",
                 BinOper::As => "AS",
-                BinOper::Custom(raw) => raw,
+                BinOper::Raw(raw) => raw,
                 BinOper::ILike => "ILIKE",
                 BinOper::NotILike => "NOT ILIKE",
                 BinOper::Matches => "@@",
@@ -692,7 +692,7 @@ impl QueryBuilder {
 
     /// Translate [`Function`] into SQL statement.
     fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
-        if let Function::Custom(iden) = function {
+        if let Function::Named(iden) = function {
             write!(
                 sql,
                 "{}",
@@ -717,7 +717,7 @@ impl QueryBuilder {
                     Function::Upper => "UPPER",
                     Function::BitAnd => "BIT_AND",
                     Function::BitOr => "BIT_OR",
-                    Function::Custom(_) => "",
+                    Function::Named(_) => "",
                     Function::Random => "RANDOM",
                     Function::Round => "ROUND",
                     Function::ToTsquery => "TO_TSQUERY",
@@ -1266,7 +1266,7 @@ impl QueryBuilder {
     }
 
     /// Translate a binary expr to SQL.
-    // [spec:pgorm:req:sql.render.parens+1]
+    // [spec:pgorm:req:sql.render.parens+2]
     fn binary_expr(
         &self,
         left: &SimpleExpr,
@@ -1339,7 +1339,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.ddl.panics+4]
-    // [spec:pgorm:def:sql.render.ddl.types+4] (serial family for auto-increment columns)
+    // [spec:pgorm:def:sql.render.ddl.types+5] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
             Some(serial) => write!(sql, "{serial}").unwrap(),
@@ -1402,8 +1402,8 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types+3]
-    // [spec:pgorm:def:sql.render.ddl.types+4]
+    // [spec:pgorm:req:sql.ddl.column-types+4]
+    // [spec:pgorm:def:sql.render.ddl.types+5]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1466,8 +1466,8 @@ impl QueryBuilder {
                     Some(size) => format!("vector({size})"),
                     None => "vector".into(),
                 },
-                // [spec:pgorm:req:sql.render.ident-quoting+3]
-                ColumnType::Custom(type_name) => type_name.to_sql_string(),
+                // [spec:pgorm:req:sql.render.ident-quoting+4]
+                ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. } => {
                     let mut type_name = TypeName::new(SharedIden::clone(name));
                     type_name.schema = schema.clone();
@@ -1568,7 +1568,7 @@ impl QueryBuilder {
                             }
                             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
                             ColumnSpec::Generated { .. } => {}
-                            ColumnSpec::Extra(string) => write!(sql, "{string}").unwrap(),
+                            ColumnSpec::RawSuffix(sql_text) => write!(sql, "{sql_text}").unwrap(),
                             ColumnSpec::Comment(_) => {}
                         }
                         false
@@ -1674,8 +1674,8 @@ impl QueryBuilder {
 
         write!(sql, " )").unwrap();
 
-        if let Some(extra) = &create.extra {
-            write!(sql, " {extra}").unwrap();
+        if let Some(raw_suffix) = create.raw_suffix {
+            write!(sql, " {raw_suffix}").unwrap();
         }
     }
 
@@ -1696,7 +1696,7 @@ impl QueryBuilder {
             ColumnSpec::PrimaryKey => write!(sql, "PRIMARY KEY").unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr } => self.prepare_generated_column(expr, sql),
-            ColumnSpec::Extra(string) => write!(sql, "{string}").unwrap(),
+            ColumnSpec::RawSuffix(sql_text) => write!(sql, "{sql_text}").unwrap(),
             ColumnSpec::Comment(_) => {}
         }
     }
@@ -1902,10 +1902,10 @@ impl QueryBuilder {
                     IndexType::BTree => "BTREE".to_owned(),
                     IndexType::Gin => "GIN".to_owned(),
                     IndexType::Hash => "HASH".to_owned(),
-                    // [spec:pgorm:req:sql.render.ident-quoting+3]
-                    IndexType::Custom(custom) => {
+                    // [spec:pgorm:req:sql.render.ident-quoting+4]
+                    IndexType::Named(method) => {
                         let mut part = String::new();
-                        TypeName::prepare_part(custom, &mut part);
+                        TypeName::prepare_part(method, &mut part);
                         part
                     }
                 }
@@ -2351,7 +2351,7 @@ impl QueryBuilder {
 
     /// The operators whose repetition renders flat: `a AND b AND c`,
     /// `a || b || c`.
-    // [spec:pgorm:req:sql.render.parens+1]
+    // [spec:pgorm:req:sql.render.parens+2]
     fn well_known_left_associative(&self, op: &BinOper) -> bool {
         matches!(
             op,

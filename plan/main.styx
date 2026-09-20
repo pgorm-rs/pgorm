@@ -7873,6 +7873,13 @@ children (
                         kind @decision
                         text "The word \"custom\" currently spans the entire safety spectrum: cust_with_values/CustomExpr are validated arity-checked templates, Expr::cust and the extra methods are verbatim Into<String>, order_by_customs/partition_by_custom(s) are verbatim ToString, custom_keyword/ColumnDef::custom/IndexType::Custom are verbatim wearing IntoIden, and BinOper::Custom is verbatim but honestly &'static str — five bounds for one semantic and one word for five semantics. Decided vocabulary, ratified 2026-09-20: unmarked = quoted identifier; raw = verbatim, accepting only &'static str or a RawSql newtype; template = validated and Result-returning (cust_with_values -> Expr::template, CustomExpr -> SqlTemplate). This aligns pgorm-query with the vocabulary pgorm proper already uses consistently — query_raw, execute_raw, SelectorRaw, from_raw_sql, TypeName::raw_text all mean exactly \"trusted SQL text\". Exit check, greppable: the strings \"custom\" and \"cust\" appear nowhere in pgorm-query's public API. Most of the offenders are deleted by query-dead-surface-gone rather than renamed, which is why that node is a dep."
                     }
+
+                    {
+                        at 2026-09-20T13:15:35.650007Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

@@ -123,7 +123,7 @@ fn on_conflict_renders_only_valid_shapes() {
 // limit where they belong: the SELECT that chooses the rows.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.render.update-delete+2/test]
-// [spec:pgorm:req:sql.ast.update+3/test]
+// [spec:pgorm:req:sql.ast.update+4/test]
 // [spec:pgorm:def:sql.ast.delete+3/test]
 #[test]
 fn writes_take_order_and_limit_by_subquery() {
@@ -232,8 +232,8 @@ fn alter_type_rename_emits_identifier() {
 // where the trailing field is SECOND, so the precision rides on the
 // second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.ddl.types+4/test]
-// [spec:pgorm:def:sql.types.column-type+5/test]
+// [spec:pgorm:def:sql.render.ddl.types+5/test]
+// [spec:pgorm:def:sql.types.column-type+6/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
     let hour = Table::create(Glyph::Table)
@@ -282,7 +282,7 @@ fn oracle_pins_extra_interpolated_raw() {
         .col(
             ColumnDef::new(Glyph::Id)
                 .integer()
-                .extra("ANYTHING I WANT TO SAY".to_owned()),
+                .raw_suffix("ANYTHING I WANT TO SAY"),
         )
         .to_string();
 
@@ -298,8 +298,8 @@ fn oracle_pins_extra_interpolated_raw() {
 // placeholder inside `ColumnDef::take`, which now clones the name, so the empty
 // identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.ident-quoting+3/test]
-// [spec:pgorm:def:sql.ast.keywords+3/test]
+// [spec:pgorm:req:sql.render.ident-quoting+4/test]
+// [spec:pgorm:def:sql.ast.keywords+4/test]
 #[test]
 fn alias_identifiers_are_never_empty() {
     let sql = Query::select()
@@ -318,8 +318,8 @@ fn alias_identifiers_are_never_empty() {
 // for `SimpleExpr::LikePattern`, the one place the grammar admits it, so it can
 // no longer be applied to two arbitrary operands.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.operators+3/test]
-// [spec:pgorm:def:sql.types.opers+2/test]
+// [spec:pgorm:def:sql.render.operators+4/test]
+// [spec:pgorm:def:sql.types.opers+3/test]
 #[test]
 fn escape_renders_only_inside_like() {
     let sql = Query::select()

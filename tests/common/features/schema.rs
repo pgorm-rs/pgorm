@@ -397,7 +397,7 @@ where
         )
         .col(
             ColumnDef::new(collection::Column::Name)
-                .custom(alias("citext"))
+                .named(alias("citext"))
                 .not_null(),
         )
         .col(

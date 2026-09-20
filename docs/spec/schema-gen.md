@@ -8,11 +8,11 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+3]
+> [spec:pgorm:sem:schema.from-entity+4]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
-> the declared `ColumnType` (with `Enum { name, .. }` rewritten to a custom
+> the declared `ColumnType` (with `Enum { name, .. }` rewritten to a named
 > type reference naming the Postgres enum), `NOT NULL` unless the column is
 > nullable, a unique key for `unique` columns, plus any default value and
 > column comment.

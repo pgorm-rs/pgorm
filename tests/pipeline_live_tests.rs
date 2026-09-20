@@ -1254,7 +1254,7 @@ mod cast_probe {
         #[pgorm(
             select_as = "text",
             save_as = "numeric",
-            column_type = "custom(\"numeric\")"
+            column_type = "named(\"numeric\")"
         )]
         pub amount: String,
     }

@@ -259,7 +259,7 @@ impl Expr {
     ///     .from(Char::Table)
     ///     .and_where(Expr::col(Char::SizeW).in_subquery(
     ///         Query::select()
-    ///             .expr(Expr::cust("3 + 2 * 2"))
+    ///             .expr(Expr::raw("3 + 2 * 2"))
     ///             .take()
     ///     ))
     ///     .to_owned();
@@ -291,7 +291,7 @@ impl Expr {
     ///     .from(Char::Table)
     ///     .and_where(Expr::col(Char::SizeW).not_in_subquery(
     ///         Query::select()
-    ///             .expr(Expr::cust("3 + 2 * 2"))
+    ///             .expr(Expr::raw("3 + 2 * 2"))
     ///             .take()
     ///     ))
     ///     .to_owned();

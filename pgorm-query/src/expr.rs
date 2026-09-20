@@ -4,7 +4,7 @@
 //!
 //! [`SimpleExpr`] is the expression common among select fields, where clauses and many other places.
 
-use crate::{error::Result, func::*, query::*, template::CustomExpr, types::*, value::*};
+use crate::{error::Result, func::*, query::*, template::SqlTemplate, types::*, value::*};
 
 #[path = "expr_json.rs"]
 mod json;
@@ -12,7 +12,7 @@ mod json;
 mod membership;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr+1]
+// [spec:pgorm:def:sql.ast.expr+2]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -25,7 +25,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr+1]
+// [spec:pgorm:def:sql.ast.expr+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -36,8 +36,10 @@ pub enum SimpleExpr {
     SubQuery(Option<SubQueryOper>, Box<SubQueryStatement>),
     Value(Value),
     Values(Vec<Value>),
-    Custom(String),
-    CustomWithExpr(CustomExpr),
+    /// Verbatim SQL: program text the author wrote, written out unchanged.
+    Raw(&'static str),
+    /// A validated template and the expressions it substitutes.
+    Template(SqlTemplate),
     Keyword(Keyword),
     /// THE cast: `CAST(operand AS type)`, and the only node shape a cast has.
     // [spec:pgorm:req:sql.ast.cast-shape]
@@ -266,7 +268,13 @@ impl Expr {
         v.into()
     }
 
-    /// Express any custom expression in [`&str`].
+    /// Write SQL verbatim.
+    ///
+    /// The `&'static str` bound is the contract: the text is program text the
+    /// author already controls, never data, so rendering it as SQL adds no
+    /// reach that writing the SQL by hand would not have. Text that arrives at
+    /// runtime cannot get here — a fragment carrying substitutions takes
+    /// [`Expr::template`], which validates its placeholder census.
     ///
     /// # Examples
     ///
@@ -276,7 +284,7 @@ impl Expr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .and_where(Expr::cust("1 = 1"))
+    ///     .and_where(Expr::raw("1 = 1"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -284,16 +292,14 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 = 1"#
     /// );
     /// ```
-    pub fn cust<T>(s: T) -> SimpleExpr
-    where
-        T: Into<String>,
-    {
-        SimpleExpr::Custom(s.into())
+    pub fn raw(s: &'static str) -> SimpleExpr {
+        SimpleExpr::Raw(s)
     }
 
-    /// Express any custom expression with [`Value`]. Use this if your expression needs variables.
+    /// A validated SQL template and the [`Value`]s it substitutes. Use this
+    /// if your fragment needs variables.
     ///
-    /// The template and its values are paired by [`CustomExpr::new`], which
+    /// The template and its values are paired by [`SqlTemplate::new`], which
     /// refuses a template whose `$N` census is not exactly `1..=v.len()`, so
     /// an arity mistake is a value you handle here rather than a panic later
     /// when the query is rendered.
@@ -307,7 +313,7 @@ impl Expr {
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
     ///     .and_where(Expr::col(Char::Id).eq(1))
-    ///     .and_where(Expr::cust_with_values("6 = $1 * $2", [2, 3])?)
+    ///     .and_where(Expr::template("6 = $1 * $2", [2, 3])?)
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -321,7 +327,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("6 = $1 * $2", [2, 3])?)
+    ///     .expr(Expr::template("6 = $1 * $2", [2, 3])?)
     ///     .to_owned();
     ///
     /// assert_eq!(query.to_string(), r#"SELECT 6 = 2 * 3"#);
@@ -333,7 +339,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("$1 $$ $2", ["a", "b"])?)
+    ///     .expr(Expr::template("$1 $$ $2", ["a", "b"])?)
     ///     .to_owned();
     ///
     /// assert_eq!(query.to_string(), r#"SELECT 'a' $ 'b'"#);
@@ -344,7 +350,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_values("data @? ($1::JSONPATH)", ["hello"])?)
+    ///     .expr(Expr::template("data @? ($1::JSONPATH)", ["hello"])?)
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -359,22 +365,23 @@ impl Expr {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// assert!(Expr::cust_with_values("6 = $1 * $2", [2]).is_err());
+    /// assert!(Expr::template("6 = $1 * $2", [2]).is_err());
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+1]
-    pub fn cust_with_values<T, V, I>(s: T, v: I) -> Result<SimpleExpr>
+    // [spec:pgorm:req:sql.render.custom-expr+2]
+    pub fn template<T, V, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
         V: Into<Value>,
         I: IntoIterator<Item = V>,
     {
-        CustomExpr::new(s, v.into_iter().map(|v| Into::<Value>::into(v).into()))
-            .map(SimpleExpr::CustomWithExpr)
+        SqlTemplate::new(s, v.into_iter().map(|v| Into::<Value>::into(v).into()))
+            .map(SimpleExpr::Template)
     }
 
-    /// Express any custom expression with [`SimpleExpr`]. Use this if your expression needs other expression.
+    /// A validated SQL template substituting one [`SimpleExpr`]. Use this if
+    /// your fragment needs another expression.
     ///
-    /// The single expression is `$1`; see [`Expr::cust_with_values`] for how
+    /// The single expression is `$1`; see [`Expr::template`] for how
     /// the template's census is checked.
     ///
     /// # Examples
@@ -384,7 +391,7 @@ impl Expr {
     /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
     ///     .expr(Expr::val(1).add(2))
-    ///     .expr(Expr::cust_with_expr("data @? ($1::JSONPATH)", "hello")?)
+    ///     .expr(Expr::template_with_expr("data @? ($1::JSONPATH)", "hello")?)
     ///     .to_owned();
     /// let (sql, values) = query.build();
     ///
@@ -400,7 +407,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     /// # fn main() -> pgorm_query::error::Result<()> {
     /// let query = Query::select()
-    ///     .expr(Expr::cust_with_expr(
+    ///     .expr(Expr::template_with_expr(
     ///         "json_agg(DISTINCT $1)",
     ///         Expr::col(Char::Character),
     ///     )?)
@@ -413,25 +420,26 @@ impl Expr {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+1]
-    pub fn cust_with_expr<T, E>(s: T, expr: E) -> Result<SimpleExpr>
+    // [spec:pgorm:req:sql.render.custom-expr+2]
+    pub fn template_with_expr<T, E>(s: T, expr: E) -> Result<SimpleExpr>
     where
         T: Into<String>,
         E: Into<SimpleExpr>,
     {
-        CustomExpr::new(s, [expr.into()]).map(SimpleExpr::CustomWithExpr)
+        SqlTemplate::new(s, [expr.into()]).map(SimpleExpr::Template)
     }
 
-    /// Express any custom expression with [`SimpleExpr`]. Use this if your expression needs other expressions.
+    /// A validated SQL template substituting several [`SimpleExpr`]s. Use this
+    /// if your fragment needs other expressions.
     ///
-    /// See [`Expr::cust_with_values`] for how the template's census is checked.
-    // [spec:pgorm:req:sql.render.custom-expr+1]
-    pub fn cust_with_exprs<T, I>(s: T, v: I) -> Result<SimpleExpr>
+    /// See [`Expr::template`] for how the template's census is checked.
+    // [spec:pgorm:req:sql.render.custom-expr+2]
+    pub fn template_with_exprs<T, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
         I: IntoIterator<Item = SimpleExpr>,
     {
-        CustomExpr::new(s, v).map(SimpleExpr::CustomWithExpr)
+        SqlTemplate::new(s, v).map(SimpleExpr::Template)
     }
 
     /// Express an equal (`=`) expression.
@@ -1040,7 +1048,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+1]
+    // [spec:pgorm:req:sql.ast.expr.operators+2]
     pub fn binary<O, T>(self, op: O, right: T) -> SimpleExpr
     where
         O: Into<BinOper>,
@@ -1337,14 +1345,14 @@ impl Expr {
     /// only a literal written in the calling source can reach it, never a
     /// runtime string a value could have reached. A *name*, including one
     /// that arrives at runtime, belongs in [`cast_as`](Self::cast_as) or
-    /// [`ColumnType::custom`](crate::ColumnType::custom), both of which quote
+    /// [`ColumnType::named`](crate::ColumnType::named), both of which quote
     /// it.
     ///
     /// The verbatim text rides in the [`TypeName`], so this builds the same
     /// node as every other cast.
     // [spec:pgorm:req:sql.ast.cast-shape]
-    pub fn cast_as_custom(self, type_expr: &'static str) -> SimpleExpr {
-        self.cast_as_type(TypeName::custom(type_expr))
+    pub fn cast_as_raw(self, type_expr: &'static str) -> SimpleExpr {
+        self.cast_as_type(TypeName::raw(type_expr))
     }
 
     /// Adds new `CASE WHEN` to existing case statement.
@@ -1941,7 +1949,7 @@ impl SimpleExpr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+1]
+    // [spec:pgorm:req:sql.ast.expr.operators+2]
     pub fn binary<O, T>(self, op: O, right: T) -> Self
     where
         O: Into<BinOper>,

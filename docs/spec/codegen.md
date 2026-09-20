@@ -287,14 +287,14 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+1]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+2]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
 > key, followed by `auto_increment = false` when that PK column is not
 > auto-increment; `column_type = "..."` for exactly the types whose default
 > mapping is ambiguous — `Float`, `Double`, `Decimal(Some((p, s)))`,
-> `Money`, `Text`, `JsonBinary`, `custom("...")`, `Bytea` — with
+> `Money`, `Text`, `JsonBinary`, `named("...")`, `Bytea` — with
 > `nullable` appended (only
 > alongside a `column_type`) when the column is nullable; and `unique` when
 > the column is unique. Fields needing none of these carry no `#[pgorm]`
@@ -356,13 +356,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+2]
+> [spec:pgorm:sem:codegen.entity.types+3]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
 > | ColumnType | Rust type |
 > |---|---|
-> | `Char(_)`, `String(_)`, `Text`, `Custom(_)` | `String` |
+> | `Char(_)`, `String(_)`, `Text`, `Named(_)` | `String` |
 > | `SmallInteger` / `Integer` / `BigInteger` | `i16` / `i32` / `i64` |
 > | `Float` / `Double` | `f32` / `f64` |
 > | `Json`, `JsonBinary` | `Json` |
@@ -716,7 +716,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
 > rejects. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+3]
+> [spec:pgorm:sem:codegen.ddl.types+4]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
@@ -743,7 +743,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > bound wraps the element type in `Array`; only one unsized `[]` is accepted.
 >
 > The map is close to a bijection because the forward contract
-> (`[spec:pgorm:req:sql.ddl.column-types+3]`) no longer spells one Postgres
+> (`[spec:pgorm:req:sql.ddl.column-types+4]`) no longer spells one Postgres
 > type under several names: `bytea`, `timestamp`, `smallint` and `money` each
 > have exactly one `ColumnType` to come back to, so `Bytea`, `Timestamp`,
 > `SmallInteger` and `Money` are recovered rather than chosen from a set. Where
@@ -751,7 +751,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > the collapse is stated rather than hidden: `varchar` reads as
 > `String(StringLen::None)`, since `StringLen::Max` renders the same bare
 > `varchar` and Postgres has no `varchar(max)` to have written it. Every other
-> `ColumnType` in the vocabulary has a reverse. `ColumnType::Custom`
+> `ColumnType` in the vocabulary has a reverse. `ColumnType::Named`
 > is deliberately not produced: a type name outside the table above is an error,
 > not a `String` column that quietly means something else. `varbit` without a
 > length, a modifier the vocabulary cannot hold (`timestamp(3)`), a sized or
@@ -792,7 +792,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+3]
+> [spec:pgorm:sem:codegen.ddl.objects+4]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -804,7 +804,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > A unique `CREATE INDEX` is folded into its table's indexes, keeping its name,
 > columns, `ASC`/`DESC` ordering, `NULLS NOT DISTINCT`, `IF NOT EXISTS` and
 > access method (`btree` is the default, `hash` → `IndexType::Hash`,
-> `gin` → `IndexType::Gin`, anything else `IndexType::Custom`);
+> `gin` → `IndexType::Gin`, anything else `IndexType::Named`);
 > `codegen.entity.transform` then reads a single-column unique index as that
 > column's `unique` flag. `COMMENT ON TABLE` becomes the statement's comment and
 > `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column. Neither

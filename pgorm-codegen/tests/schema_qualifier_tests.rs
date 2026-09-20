@@ -252,7 +252,7 @@ fn a_refusal_names_the_qualified_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+3/test]    an index attaches to the table
+// [spec:pgorm:sem:codegen.ddl.objects+4/test]    an index attaches to the table
 // its own name resolves to, not to whatever shares the bare name
 #[test]
 fn an_index_attaches_by_qualified_name() {
@@ -263,7 +263,7 @@ fn an_index_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+3/test]    and a qualified index that does
+// [spec:pgorm:sem:codegen.ddl.objects+4/test]    and a qualified index that does
 // name its table is folded into it, giving the column its `unique`
 #[test]
 fn a_qualified_index_reaches_its_own_table() {
@@ -279,7 +279,7 @@ fn a_qualified_index_reaches_its_own_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+3/test]    a comment resolves the same way
+// [spec:pgorm:sem:codegen.ddl.objects+4/test]    a comment resolves the same way
 #[test]
 fn a_comment_attaches_by_qualified_name() {
     assert_error(
@@ -289,7 +289,7 @@ fn a_comment_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+3/test]    an unqualified reference that
+// [spec:pgorm:sem:codegen.ddl.objects+4/test]    an unqualified reference that
 // two tables answer to is named as such, rather than attached to one of them
 #[test]
 fn an_ambiguous_unqualified_index_is_refused() {
@@ -341,7 +341,7 @@ fn qualified_enum_preserves_its_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+3/test]    a qualified reference resolves
+// [spec:pgorm:sem:codegen.ddl.types+4/test]    a qualified reference resolves
 // only its exact identity: a same-named enum under another qualification MUST
 // NOT satisfy it
 #[test]
@@ -354,7 +354,7 @@ fn qualified_enum_does_not_resolve_another_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+3/test]    nor does an unqualified
+// [spec:pgorm:sem:codegen.ddl.types+4/test]    nor does an unqualified
 // reference resolve a type declared only under a schema
 #[test]
 fn unqualified_reference_needs_an_unqualified_declaration() {

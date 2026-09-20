@@ -157,13 +157,15 @@ class ExprEmitter:
         if method == "starts_with":
             return f"{Q}::SimpleExpr::from({Q}::Func::starts_with({value}, {text}))"
         if method == "contains_text":
-            call = f'{Q}::Func::cust({Q}::Alias::new("strpos")).args([{value}, {text}])'
+            call = (
+                f'{Q}::Func::named({Q}::Alias::new("strpos")).args([{value}, {text}])'
+            )
             zero = f"{Q}::SimpleExpr::Constant({Q}::Value::Int(Some(0i32)))"
             return f"{Q}::Expr::expr({call}).gt({zero})"
         if method == "ends_with":
             length = f"{Q}::SimpleExpr::from({Q}::Func::char_length({text}))"
             call = (
-                f'{Q}::Func::cust({Q}::Alias::new("right")).args([{value}, {length}])'
+                f'{Q}::Func::named({Q}::Alias::new("right")).args([{value}, {length}])'
             )
             return f"{Q}::Expr::expr({call}).eq({text})"
         pattern = f"{Q}::LikeExpr::new({self.pattern_text(i['pattern'])})"

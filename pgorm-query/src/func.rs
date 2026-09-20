@@ -6,7 +6,7 @@ use crate::{expr::*, types::*};
 ///
 /// A cast is not one of them: `CAST` is [`SimpleExpr::AsEnum`], so matching a
 /// `FunctionCall` never has to account for a cast.
-// [spec:pgorm:def:sql.ast.func+1]
+// [spec:pgorm:def:sql.ast.func+2]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Function {
@@ -18,7 +18,8 @@ pub enum Function {
     Count,
     IfNull,
     CharLength,
-    Custom(DynIden),
+    /// A function this enum has no variant for, called by quoted name.
+    Named(DynIden),
     Coalesce,
     Lower,
     Upper,
@@ -41,7 +42,7 @@ pub enum Function {
 }
 
 /// Function call.
-// [spec:pgorm:def:sql.ast.func+1]
+// [spec:pgorm:def:sql.ast.func+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub(crate) func: Function,
@@ -104,12 +105,12 @@ impl FunctionCall {
 }
 
 /// Function call helper.
-// [spec:pgorm:def:sql.ast.func+1]
+// [spec:pgorm:def:sql.ast.func+2]
 #[derive(Debug, Clone)]
 pub struct Func;
 
 impl Func {
-    /// Call a custom function.
+    /// Call a function this vocabulary has no spelling for, by name.
     ///
     /// The name is an identifier, not SQL text: it is spelled bare only when
     /// it is already a safe lowercase name, and quoted otherwise. So a name
@@ -131,7 +132,7 @@ impl Func {
     /// }
     ///
     /// let query = Query::select()
-    ///     .expr(Func::cust(MyFunction).arg("hello"))
+    ///     .expr(Func::named(MyFunction).arg("hello"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -146,7 +147,7 @@ impl Func {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Func::cust(Alias::new("MyFunction")).arg("hello"))
+    ///     .expr(Func::named(Alias::new("MyFunction")).arg("hello"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -154,11 +155,11 @@ impl Func {
     ///     r#"SELECT "MyFunction"('hello')"#
     /// );
     /// ```
-    pub fn cust<T>(func: T) -> FunctionCall
+    pub fn named<T>(func: T) -> FunctionCall
     where
         T: IntoIden,
     {
-        FunctionCall::new(Function::Custom(func.into_iden()))
+        FunctionCall::new(Function::Named(func.into_iden()))
     }
 
     /// Call `MAX` function.

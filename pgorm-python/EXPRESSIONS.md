@@ -95,8 +95,8 @@ including `%`, `_`, backslashes and quotes. They lower to these Rust builders:
 | Helper | Rust composition |
 | --- | --- |
 | `starts_with(text)` | `Func::starts_with(expression, text)` |
-| `contains_text(text)` | `Func::cust("strpos").args(...) > 0` |
-| `ends_with(text)` | `Func::cust("right").args(expression, Func::char_length(text)) == text` |
+| `contains_text(text)` | `Func::named("strpos").args(...) > 0` |
+| `ends_with(text)` | `Func::named("right").args(expression, Func::char_length(text)) == text` |
 
 There is no second escaping implementation in the bindings. These helpers
 use PostgreSQL string functions and ordinary Rust value expressions.

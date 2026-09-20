@@ -422,7 +422,7 @@ pub async fn window_clause_ranks_rows_per_bakery() -> Result<(), Error> {
     let w = alias("w");
     let ranked = Cake::find()
         .select([cake::Column::BakeryId, cake::Column::Name])
-        .window_expr_as(Func::cust(alias("row_number")), w, alias("rank"))
+        .window_expr_as(Func::named(alias("row_number")), w, alias("rank"))
         .window(
             w,
             WindowStatement::partition_by(cake::Column::BakeryId)

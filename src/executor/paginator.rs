@@ -121,7 +121,7 @@ impl PagedQuery {
                 let mut counted = query.clone();
                 counted.reset_limit().reset_offset().clear_order_by();
                 Ok(SelectStatement::new()
-                    .expr(Expr::cust(COUNT_PROJECTION))
+                    .expr(Expr::raw(COUNT_PROJECTION))
                     .from_subquery(counted, alias(COUNT_SUBQUERY_ALIAS))
                     .to_owned()
                     .build())

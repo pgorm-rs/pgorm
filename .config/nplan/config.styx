@@ -231,6 +231,15 @@ quality {
         // only over itself reads as a pass-through — but a caller writing
         // Over::default() where its siblings read over(), by(..) and
         // sort_by(..) is the outcome the trio exists to prevent
-        allow-names (new account_only over)
+        //
+        // raw is one of the Expr family's entry points — col, val, value,
+        // template, raw. It reads as a pass-through only because its bound
+        // was tightened to &'static str, which deleted the conversion that
+        // used to sit in the body; the bound IS the contract the function
+        // exists to state. The alternative the gate implies — callers
+        // writing SimpleExpr::Raw(..) — makes the AST variant the
+        // ergonomic spelling and drops the one entry point where the
+        // verbatim-SQL decision is documented
+        allow-names (new account_only over raw)
     }
 }

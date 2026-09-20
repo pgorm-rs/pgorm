@@ -58,7 +58,7 @@ async fn custom_function_identifier_is_not_sql() {
     .await
     .unwrap();
     let (sql, values) = Query::select()
-        .expr(Func::cust(Alias::new("COALESCE(7) + 100 --")))
+        .expr(Func::named(Alias::new("COALESCE(7) + 100 --")))
         .build();
     let result = (sql.as_str(), values).into_tuple::<i32>().one(&db).await;
     drop(db);

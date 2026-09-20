@@ -238,7 +238,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+3]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+4]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,7 +257,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+3]
+// [spec:pgorm:sem:schema.from-entity+4]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -300,7 +300,7 @@ where
     stmt.take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+3]    column + primary-key projection
+// [spec:pgorm:sem:schema.from-entity+4]    column + primary-key projection
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
