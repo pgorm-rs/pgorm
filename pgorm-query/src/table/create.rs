@@ -117,7 +117,7 @@ impl TableCreateStatement {
     /// carried rather than written into this statement's SQL: render it with
     /// [`comments()`](Self::comments), which yields the `COMMENT ON`
     /// statements to execute after the create.
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     pub fn comment<T>(&mut self, comment: T) -> &mut Self
     where
         T: Into<String>,
@@ -244,7 +244,7 @@ impl TableCreateStatement {
     ///     ]
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     pub fn comments(&self) -> Vec<CommentStatement> {
         let mut statements = Vec::new();
         if let Some(comment) = &self.comment {
@@ -344,7 +344,7 @@ impl TableCreateStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for TableCreateStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

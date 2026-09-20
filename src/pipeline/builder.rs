@@ -252,7 +252,7 @@ impl JoinSide {
 /// source; [`alias`](pgorm_query::alias) and [`Name`] name a table no
 /// entity describes; and a whole [`Pipeline`] is a relation too, embedded as
 /// a `let`-bound subrelation.
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 pub trait IntoSource {
     /// The relation, ready to embed.
     fn into_source(self) -> Source;
@@ -333,7 +333,7 @@ impl IntoSource for Source {
     }
 }
 
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 impl<E: EntityTrait> IntoSource for E {
     fn into_source(self) -> Source {
         table_source(match self.schema_name() {
@@ -345,14 +345,14 @@ impl<E: EntityTrait> IntoSource for E {
     }
 }
 
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 impl IntoSource for AliasName {
     fn into_source(self) -> Source {
         table_source(adapter::ident(self.as_str()))
     }
 }
 
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 impl IntoSource for Name {
     fn into_source(self) -> Source {
         table_source(adapter::ident(&SqlName::to_string(&*self)))
@@ -459,7 +459,7 @@ impl Pipeline {
     }
 
     /// Start a pipeline from a schema-qualified table no entity describes.
-    // [spec:pgorm:sem:pipeline.qualify+2]
+    // [spec:pgorm:sem:pipeline.qualify+3]
     pub fn from_schema(schema: impl IntoName, table: impl IntoName) -> Self {
         let source = adapter::ident_in(
             vec![SqlName::to_string(&*schema.into_name())],

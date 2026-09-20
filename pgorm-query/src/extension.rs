@@ -70,7 +70,7 @@ impl Extension {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+4]
+// [spec:pgorm:req:sql.ddl.extension+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionCreateStatement {
     pub(crate) name: Name,
@@ -107,7 +107,7 @@ impl ExtensionCreateStatement {
     ///
     /// The schema is a name and renders as a quoted identifier, so the bound
     /// is the identifier bound every other schema position takes.
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     pub fn schema<T: IntoName>(&mut self, schema: T) -> &mut Self {
         self.schema = Some(schema.into_name());
         self
@@ -167,7 +167,7 @@ impl ExtensionCreateStatement {
 /// [Refer to the PostgreSQL Documentation][1]
 ///
 /// [1]: https://www.postgresql.org/docs/current/sql-createextension.html
-// [spec:pgorm:req:sql.ddl.extension+4]
+// [spec:pgorm:req:sql.ddl.extension+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionDropStatement {
     pub(crate) name: Name,
@@ -183,7 +183,7 @@ pub struct ExtensionDropStatement {
 ///
 /// PostgreSQL takes one of `CASCADE` and `RESTRICT`, never both, so the two
 /// spellings share one slot.
-// [spec:pgorm:req:sql.ddl.extension+4]
+// [spec:pgorm:req:sql.ddl.extension+5]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtensionDropOpt {
     Cascade,
@@ -235,7 +235,7 @@ macro_rules! impl_extension_statement_builder {
         /// Renders the statement with every value inlined as an escaped SQL
         /// literal. This is its only rendering: it binds nothing, so there is
         /// no placeholder form to choose between.
-        // [spec:pgorm:req:sql.ddl+6]
+        // [spec:pgorm:req:sql.ddl+7]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -286,7 +286,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {
@@ -482,7 +482,7 @@ where
 /// rendered once it is one, because `CREATE TYPE "t" AS ENUM ()` is an accepted
 /// spelling of the empty enum while `CREATE TYPE "t" AS ENUM` is not a
 /// statement at all.
-// [spec:pgorm:req:sql.ddl.type-enum+4]
+// [spec:pgorm:req:sql.ddl.type-enum+5]
 #[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
     pub(crate) name: TypeRef,
@@ -490,7 +490,7 @@ pub struct TypeCreateStatement {
 }
 
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
-// [spec:pgorm:req:sql.ddl.type-enum+4]
+// [spec:pgorm:req:sql.ddl.type-enum+5]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
     // Composite,
@@ -499,7 +499,7 @@ pub enum TypeAs {
     ///
     /// A label is *data* — it renders as a string literal, never as an
     /// identifier — so it is carried as a `String` rather than as a name.
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     Enum(Vec<String>),
     /* Range,
      * Base,
@@ -517,7 +517,7 @@ pub enum TypeAs {
 ///
 /// Type::drop().if_exists();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
 #[derive(Debug, Clone)]
 pub struct TypeDropStatement {
     pub(crate) first: TypeRef,
@@ -537,7 +537,7 @@ pub struct TypeDropStatement {
 ///
 /// Type::alter(Font::Table).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
 #[derive(Debug, Clone)]
 pub struct PendingTypeAlter {
     name: TypeRef,
@@ -549,7 +549,7 @@ pub struct PendingTypeAlter {
 /// option: it is reachable only by choosing an option on a
 /// [`PendingTypeAlter`], so the `ALTER TYPE "font"` PostgreSQL rejects has no
 /// constructor.
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
 #[derive(Debug, Clone)]
 pub struct TypeAlterStatement {
     pub(crate) name: TypeRef,
@@ -567,7 +567,7 @@ pub enum TypeDropOpt {
 /// Enum labels are data and are carried as `String`; `Rename`'s payload is the
 /// type's own name and is carried as an identifier, because that is what it
 /// renders as.
-// [spec:pgorm:req:sql.render.ddl.enum-type+4]
+// [spec:pgorm:req:sql.render.ddl.enum-type+5]
 #[derive(Debug, Clone)]
 pub enum TypeAlterOpt {
     Add(String, Option<TypeAlterAddOpt>),
@@ -577,7 +577,7 @@ pub enum TypeAlterOpt {
 
 /// Where an added enum label goes relative to an existing one — both labels,
 /// so both data.
-// [spec:pgorm:req:sql.render.ddl.enum-type+4]
+// [spec:pgorm:req:sql.render.ddl.enum-type+5]
 #[derive(Debug, Clone)]
 pub enum TypeAlterAddOpt {
     Before(String),
@@ -667,7 +667,7 @@ impl TypeCreateStatement {
     ///     r#"CREATE TYPE "font_family" AS ENUM ('serif', 'sans', 'monospace')"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: Into<String>,
@@ -828,7 +828,7 @@ impl PendingTypeAlter {
     ///     r#"ALTER TYPE "font_family" ADD VALUE 'cursive'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub fn add_value<T>(self, value: T) -> TypeAlterStatement
     where
         T: Into<String>,
@@ -861,7 +861,7 @@ impl PendingTypeAlter {
     ///     r#"ALTER TYPE "font" RENAME VALUE 'variant' TO 'language'"#
     /// )
     /// ```
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub fn rename_value<T, V>(self, existing: T, new_name: V) -> TypeAlterStatement
     where
         T: Into<String>,
@@ -885,7 +885,7 @@ impl TypeAlterStatement {
     ///     r#"ALTER TYPE "font" ADD VALUE 'weight' BEFORE 'variant'"#
     /// )
     /// ```
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     #[must_use]
     pub fn before<T>(mut self, value: T) -> Self
     where
@@ -896,7 +896,7 @@ impl TypeAlterStatement {
     }
 
     /// Add a enum value after an existing value
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     #[must_use]
     pub fn after<T>(mut self, value: T) -> Self
     where
@@ -946,7 +946,7 @@ macro_rules! impl_type_statement_builder {
         }
 
         #[doc = $display_doc]
-        // [spec:pgorm:req:sql.ddl+6]
+        // [spec:pgorm:req:sql.ddl+7]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -969,8 +969,8 @@ macro_rules! impl_type_statement_build {
             /// returns is for inspection — logging the labels apart from the
             /// SQL, feeding a proxy that expands them — and the statement you
             /// execute is the inlined `Display` rendering.
-            // [spec:pgorm:req:sql.ddl+6]
-            // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+            // [spec:pgorm:req:sql.ddl+7]
+            // [spec:pgorm:req:sql.render.ddl.enum-type+5]
             pub fn build(&self) -> (String, Values) {
                 let mut sql = SqlWriterValues::new("$", true);
                 self.build_collect(&mut sql);

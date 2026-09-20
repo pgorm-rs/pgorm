@@ -120,7 +120,7 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.batching+6]
+    // [spec:pgorm:sem:query.loader.batching+7]
     // [spec:pgorm:sem:query.loader.regroup+4]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
@@ -150,7 +150,7 @@ where
             .collect())
     }
 
-    // [spec:pgorm:sem:query.loader.batching+6]
+    // [spec:pgorm:sem:query.loader.batching+7]
     // [spec:pgorm:sem:query.loader.regroup+4]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
@@ -231,7 +231,7 @@ where
 const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
 
 /// The identifier the input entity's table is bound to inside a loader read.
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 fn source_alias() -> Name {
     Name::new(LOADER_SOURCE_ALIAS)
 }
@@ -245,7 +245,7 @@ fn source_alias() -> Name {
 /// whole — its column pairs, its `on_condition` and its `condition_type`
 /// composed by the same `join_condition` every other join goes through. The
 /// loader reconstructs no part of a relation and so can drop no part of one.
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 fn join_source<R, F>(graph: SelectGraph<R, ()>, rel: RelationDef) -> SelectGraph<R, (Req<F>,)>
 where
     R: EntityTrait,
@@ -300,7 +300,7 @@ where
 /// The whole of a direct load: the relation's target checked against what the
 /// graph can qualify, the keys read off the input models in input order, and
 /// the one graph read regrouped into a bucket per input.
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 async fn load_related<M, R, C>(
     models: &[M],
     select: Select<R>,
@@ -335,7 +335,7 @@ where
 /// from its declaration, never inherited from a builder a caller may have
 /// edited, and clearing before projecting is what makes the two statements
 /// the same one.
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 // [spec:pgorm:sem:query.loader.many-to-many+3]
 fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
     let mut query = select.into_query();
@@ -389,7 +389,7 @@ fn check_target_ref(rel: &RelationDef) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 fn resolve_column<Model>(col: &Name) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
@@ -404,7 +404,7 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 fn extract_key<Model>(target_col: &Key, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
@@ -416,7 +416,7 @@ where
     Ok(ValueTuple::from(values))
 }
 
-// [spec:pgorm:sem:query.loader.batching+6]
+// [spec:pgorm:sem:query.loader.batching+7]
 fn prepare_condition(table: &FromItem, col: &Key, keys: &[ValueTuple]) -> Result<Condition, Error> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
@@ -452,7 +452,7 @@ fn table_column(tbl: &FromItem, col: &Name) -> Result<ColumnRef, Error> {
     }
 }
 
-// [spec:pgorm:sem:query.loader.batching+6/test]    the one read a direct load
+// [spec:pgorm:sem:query.loader.batching+7/test]    the one read a direct load
 // issues: the caller's selector rooted, the input entity joined back under the
 // alias the key predicate qualifies against, and the authored relation carried
 // into the `ON` whole — its predicate under either composition

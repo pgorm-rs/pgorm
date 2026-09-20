@@ -93,7 +93,7 @@ use column_def::{enum_type_name, escape_like_text};
 
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
-// [spec:pgorm:def:entity.traits.column+5]
+// [spec:pgorm:def:entity.traits.column+6]
 pub trait ColumnTrait: StaticName + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
@@ -308,7 +308,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE 'cheese%'"#
     /// );
     /// ```
-    // [spec:pgorm:def:entity.traits.column+5]
+    // [spec:pgorm:def:entity.traits.column+6]
     fn starts_with<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,
@@ -328,7 +328,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese'"#
     /// );
     /// ```
-    // [spec:pgorm:def:entity.traits.column+5]
+    // [spec:pgorm:def:entity.traits.column+6]
     fn ends_with<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,
@@ -348,7 +348,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     ///     r#"SELECT "cake"."id", "cake"."name" FROM "cake" WHERE "cake"."name" LIKE '%cheese%'"#
     /// );
     /// ```
-    // [spec:pgorm:def:entity.traits.column+5]
+    // [spec:pgorm:def:entity.traits.column+6]
     fn contains<T>(&self, s: T) -> SimpleExpr
     where
         T: Into<String>,

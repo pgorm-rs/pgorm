@@ -6,7 +6,7 @@ use crate::{expr::*, types::*};
 ///
 /// A cast is not one of them: `CAST` is [`SimpleExpr::AsEnum`], so matching a
 /// `FunctionCall` never has to account for a cast.
-// [spec:pgorm:def:sql.ast.func+2]
+// [spec:pgorm:def:sql.ast.func+3]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Function {
@@ -42,7 +42,7 @@ pub enum Function {
 }
 
 /// Function call.
-// [spec:pgorm:def:sql.ast.func+2]
+// [spec:pgorm:def:sql.ast.func+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub(crate) func: Function,
@@ -105,7 +105,7 @@ impl FunctionCall {
 }
 
 /// Function call helper.
-// [spec:pgorm:def:sql.ast.func+2]
+// [spec:pgorm:def:sql.ast.func+3]
 #[derive(Debug, Clone)]
 pub struct Func;
 

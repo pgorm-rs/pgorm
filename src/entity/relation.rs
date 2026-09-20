@@ -47,7 +47,7 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+7]
+// [spec:pgorm:def:entity.relation.def+8]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
@@ -166,7 +166,7 @@ impl RelationDef {
     /// written for `(source, target)` never silently starts receiving
     /// `(target, source)`. A closure attached *after* reversing is authored
     /// against the reversed roles, as its author sees them.
-    // [spec:pgorm:def:entity.relation.def+7]
+    // [spec:pgorm:def:entity.relation.def+8]
     pub fn rev(mut self) -> Self {
         let on_condition = self.on_condition.take().map(|f| {
             Box::new(move |left: Name, right: Name| f(right, left))

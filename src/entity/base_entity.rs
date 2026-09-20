@@ -14,13 +14,13 @@ pub use strum::IntoEnumIterator as Iterable;
 /// a second trait of its own with the same method, which meant two traits with
 /// the same shape could be in scope at once and neither call site could say
 /// which it meant.
-// [spec:pgorm:def:entity.traits+1]
-// [spec:pgorm:sem:query.build.alias+1]    AliasName is a StaticName in pgorm-query, so a
+// [spec:pgorm:def:entity.traits+2]
+// [spec:pgorm:sem:query.build.alias+2]    AliasName is a StaticName in pgorm-query, so a
 // query-introduced name reaches the key positions that key on it
 pub use pgorm_query::StaticName;
 
 /// A Trait for mapping an Entity to a database table
-// [spec:pgorm:req:entity.traits.entity-name+1]
+// [spec:pgorm:req:entity.traits.entity-name+2]
 pub trait EntityName: StaticName + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {
@@ -61,7 +61,7 @@ pub trait EntityName: StaticName + Default {
 /// - Insert: `insert`, `insert_*`
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
-// [spec:pgorm:def:entity.traits+1]
+// [spec:pgorm:def:entity.traits+2]
 // [spec:pgorm:req:entity.traits.crud+3]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]

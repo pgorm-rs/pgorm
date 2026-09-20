@@ -150,7 +150,7 @@ pub enum Flavour {
     Secret,
 }
 
-// [spec:pgorm:def:macros.derive+1/test]    every derive in the catalogue is reachable and wired up
+// [spec:pgorm:def:macros.derive+2/test]    every derive in the catalogue is reachable and wired up
 #[test]
 fn the_whole_derive_catalogue_is_exposed() {
     // Entity-side derives, composite and longhand.

@@ -104,7 +104,7 @@ fn impl_sql_name_for_enum(
     })
 }
 
-// [spec:pgorm:sem:macros.derive.iden+1]
+// [spec:pgorm:sem:macros.derive.iden+2]
 pub fn expand_derive_sql_name(input: DeriveInput) -> syn::Result<TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 

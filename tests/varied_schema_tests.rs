@@ -235,7 +235,7 @@ fn anvil() -> tenant_a::item::Model {
     }
 }
 
-// [spec:pgorm:req:entity.traits.entity-name+1/test]    a declared schema
+// [spec:pgorm:req:entity.traits.entity-name+2/test]    a declared schema
 // qualifies the generated DDL and every CRUD statement: create, insert with
 // RETURNING, a guarded no-op update, a TryInsert conflict, and delete all
 // land on tenant_a.item
@@ -300,11 +300,11 @@ async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.traits.entity-name+1/test]    finds, filters,
+// [spec:pgorm:req:entity.traits.entity-name+2/test]    finds, filters,
 // ordering, pagination, keyset cursors and the schema-qualified enum's value
 // predicates all address tenant_a.item
 // [spec:pgorm:sem:entity.traits.column.enum-cast+4/test]
-// [spec:pgorm:sem:exec.cursor.keyset+4/test]
+// [spec:pgorm:sem:exec.cursor.keyset+5/test]
 #[pgorm_macros::test]
 async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_finds").await;
@@ -370,7 +370,7 @@ async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
 // junction fold inside tenant_a, an INNER join from tenant_a.item to the
 // unqualified owner, grouped rows and a graph cursor — every source
 // qualified by its own declaration
-// [spec:pgorm:sem:query.graph.cursor+1/test]
+// [spec:pgorm:sem:query.graph.cursor+2/test]
 #[pgorm_macros::test]
 async fn graph_reads_span_schemas() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_graph").await;
@@ -442,7 +442,7 @@ async fn graph_reads_span_schemas() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+6/test]    loaders ride the graph
+// [spec:pgorm:sem:query.loader.batching+7/test]    loaders ride the graph
 // across the schema boundary and through a qualified junction
 #[pgorm_macros::test]
 async fn loaders_work_across_qualified_schemas() -> Result<(), Error> {
@@ -482,7 +482,7 @@ async fn loaders_work_across_qualified_schemas() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:entity.traits.entity-name+1/test]    the same table name in
+// [spec:pgorm:req:entity.traits.entity-name+2/test]    the same table name in
 // two schemas: both entities read side by side and return their own rows, so
 // resolution is by declared schema, never by search_path
 #[pgorm_macros::test]

@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 
 use syn::{DeriveInput, Error, parse_macro_input};
 
-// [spec:pgorm:def:macros.derive+1]
+// [spec:pgorm:def:macros.derive+2]
 #[cfg(feature = "derive")]
 mod derives;
 
@@ -153,7 +153,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// `Cargo.toml` (`my_orm = { package = "pgorm", .. }`), alias it back with
 /// `use my_orm as pgorm;` there or at the crate root; otherwise every generated path is
 /// an `E0433`. There is no `#[pgorm(crate = ...)]` override.
-// [spec:pgorm:def:macros.derive+1]
+// [spec:pgorm:def:macros.derive+2]
 // [spec:pgorm:sem:macros.derive.entity-model+5]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
@@ -697,7 +697,7 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
 /// (`use my_migration as pgorm_migration;`) in the module holding the migration or at
 /// the crate root, exactly as `pgorm` itself does. There is no `#[pgorm(crate = ...)]`
 /// override.
-// [spec:pgorm:def:macros.derive+1]
+// [spec:pgorm:def:macros.derive+2]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveMigrationName)]
 pub fn derive_migration_name(input: TokenStream) -> TokenStream {

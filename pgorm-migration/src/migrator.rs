@@ -16,7 +16,7 @@ use pgorm::{
 const CHECKSUM_COLUMN: &str = "checksum";
 
 /// The table `migration_table_name()` resolves to unless a migrator overrides it.
-// [spec:pgorm:def:migration.runner+1]    the ledger's default physical name
+// [spec:pgorm:def:migration.runner+2]    the ledger's default physical name
 pub const DEFAULT_LEDGER_TABLE: &str = "pgorm_migrations";
 
 /// The name this crate inherited from SeaORM and no longer creates. A database
@@ -27,7 +27,7 @@ pub const LEGACY_LEDGER_TABLE: &str = "seaql_migrations";
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 /// Status of migration
-// [spec:pgorm:def:migration.runner+1]    reported status vocabulary
+// [spec:pgorm:def:migration.runner+2]    reported status vocabulary
 pub enum MigrationStatus {
     /// Not yet applied
     Pending,
@@ -63,7 +63,7 @@ impl Migration {
 }
 
 /// Performing migrations on a database
-// [spec:pgorm:def:migration.runner+1]    runner surface
+// [spec:pgorm:def:migration.runner+2]    runner surface
 // [spec:pgorm:req:migration.up-only]    no down/fresh/refresh/reset
 #[async_trait::async_trait]
 pub trait MigratorTrait: Send {
@@ -313,7 +313,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Create migration table `pgorm_migrations` in the database
-    // [spec:pgorm:def:migration.runner+1]    self-provisioning ledger under migration_table_name()
+    // [spec:pgorm:def:migration.runner+2]    self-provisioning ledger under migration_table_name()
     // [spec:pgorm:req:migration.checksum]    a ledger predating the column is widened in place
     // [spec:pgorm:req:migration.ledger-upgrade]    adoption precedes creation, widening follows it
     async fn install(db: &(impl ConnectionTrait)) -> Result<(), Error> {

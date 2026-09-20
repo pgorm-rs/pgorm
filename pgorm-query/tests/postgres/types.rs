@@ -2,9 +2,9 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::extension::Type;
 
-// [spec:pgorm:req:sql.ddl.type-enum+4/test]
+// [spec:pgorm:req:sql.ddl.type-enum+5/test]
 #[test]
-// [spec:pgorm:req:sql.render.ddl.enum-type+4/test]
+// [spec:pgorm:req:sql.render.ddl.enum-type+5/test]
 fn create_1() {
     assert_eq!(
         Type::create(Font::Table)
@@ -48,7 +48,7 @@ fn create_3() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -78,7 +78,7 @@ fn drop_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -138,7 +138,7 @@ fn alter_6() {
     )
 }
 
-// [spec:pgorm:def:sql.types+8/test]    equality is the concrete type and the rendered text,
+// [spec:pgorm:def:sql.types+9/test]    equality is the concrete type and the rendered text,
 // both asked of values Rust never promised to place at one vtable address
 #[test]
 fn identifier_equality_is_type_and_text() {
@@ -171,7 +171,7 @@ fn identifier_equality_is_type_and_text() {
     assert_ne!(Name::runtime("same"), Name::runtime("other"));
 }
 
-// [spec:pgorm:req:sql.ddl+6/test]    the two type statements that bind expose `build()`, and its
+// [spec:pgorm:req:sql.ddl+7/test]    the two type statements that bind expose `build()`, and its
 // pair is the SQL with `$N` placeholders plus the labels in emission order
 #[test]
 fn the_label_binding_type_statements_build() {

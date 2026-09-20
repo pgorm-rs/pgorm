@@ -207,7 +207,7 @@ fn create_9() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+6/test]    a precision rides on the second-bearing
+// [spec:pgorm:def:sql.types.column-type+7/test]    a precision rides on the second-bearing
 // field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {
@@ -308,7 +308,7 @@ fn create_15() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -493,7 +493,7 @@ fn alter_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 #[test]
 fn rename_1() {
     assert_eq!(

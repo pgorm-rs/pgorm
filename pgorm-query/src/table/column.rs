@@ -48,7 +48,7 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -102,7 +102,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -147,7 +147,7 @@ impl ColumnType {
     /// A type *expression* — `numeric(12, 2)` — is grammar rather than a
     /// name and belongs in
     /// [`Expr::cast_as_raw`](crate::Expr::cast_as_raw).
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     pub fn named<T>(ty: T) -> ColumnType
     where
         T: Into<String>,
@@ -197,7 +197,7 @@ pub enum ColumnSpec {
     /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments)
     /// — and for consumers reading it back off `get_column_spec` — to turn
     /// into the `COMMENT ON COLUMN` statement it really is.
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     Comment(String),
 }
 
@@ -206,7 +206,7 @@ pub enum ColumnSpec {
 /// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
 /// the precision sits on the second-bearing field spellings and on the
 /// unqualified form, and `interval HOUR(3)` has no spelling here.
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IntervalSpec {
     /// `interval`, or `interval(p)` — every field, with a fractional-seconds
@@ -219,7 +219,7 @@ pub enum IntervalSpec {
 /// Fractional-seconds precision of an interval type.
 ///
 /// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum IntervalPrecision {
     P0,
@@ -268,7 +268,7 @@ impl std::fmt::Display for IntervalPrecision {
 
 /// All interval field qualifiers; the second-bearing ones carry the precision
 /// PostgreSQL allows only there.
-// [spec:pgorm:def:sql.types.column-type+6]
+// [spec:pgorm:def:sql.types.column-type+7]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,
@@ -489,7 +489,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+6]
+    // [spec:pgorm:def:sql.types.column-type+7]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self
@@ -578,7 +578,7 @@ impl ColumnDef {
     /// Takes anything a [`TypeName`] is built from — a bare name, or a
     /// `TypeName` carrying a schema qualifier or an array suffix — and every
     /// part renders quoted-or-safe-bare, never as SQL.
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     pub fn named<T>(&mut self, name: T) -> &mut Self
     where
         T: Into<TypeName>,
@@ -767,7 +767,7 @@ impl ColumnDef {
     /// create statement this column goes into, with
     /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments),
     /// or build it directly with [`Comment::on_column`](crate::Comment::on_column).
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     pub fn comment<T>(&mut self, string: T) -> &mut Self
     where
         T: Into<String>,

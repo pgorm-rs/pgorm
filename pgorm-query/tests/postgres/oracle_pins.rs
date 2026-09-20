@@ -203,7 +203,7 @@ fn column_rename_is_its_own_statement() {
 // than a `TableName`, so the qualified form a rename cannot honour — the table
 // stays in the schema it is already in — no longer typechecks.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 #[test]
 fn table_rename_target_is_bare_name() {
     let sql = Table::rename(
@@ -220,7 +220,7 @@ fn table_rename_target_is_bare_name() {
 // name, not an enum label, so it leaves the value pipeline and renders as the
 // quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
 #[test]
 fn alter_type_rename_emits_identifier() {
     let sql = Type::alter(Font::Table)
@@ -237,7 +237,7 @@ fn alter_type_rename_emits_identifier() {
 // second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:def:sql.render.ddl.types+5/test]
-// [spec:pgorm:def:sql.types.column-type+6/test]
+// [spec:pgorm:def:sql.types.column-type+7/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
     let hour = Table::create(Glyph::Table)
@@ -260,7 +260,7 @@ fn interval_precision_rides_on_seconds() {
 // [dec:pgorm:invalid-states-unrepresentable]: PostgreSQL takes at most one drop
 // behaviour, so the two spellings share one slot and the later call wins.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.extension+4/test]
+// [spec:pgorm:req:sql.ddl.extension+5/test]
 #[test]
 fn extension_drop_takes_one_behaviour() {
     let sql = Extension::drop(Name::runtime("ltree"))
@@ -279,7 +279,7 @@ fn extension_drop_takes_one_behaviour() {
 // the type vocabulary cannot spell, documented as caller responsibility by
 // `sql.ddl.column-def`, so it keeps its pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:sem:sql.render.ddl.extension+2/test]
+// [spec:pgorm:sem:sql.render.ddl.extension+3/test]
 // [spec:pgorm:req:sql.ddl.column-def+4/test]
 #[test]
 fn oracle_pins_extra_interpolated_raw() {
@@ -307,8 +307,8 @@ fn oracle_pins_extra_interpolated_raw() {
 // placeholder inside `ColumnDef::take`, which now clones the name, so the empty
 // identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.ident-quoting+4/test]
-// [spec:pgorm:def:sql.ast.keywords+4/test]
+// [spec:pgorm:req:sql.render.ident-quoting+5/test]
+// [spec:pgorm:def:sql.ast.keywords+5/test]
 #[test]
 fn alias_identifiers_are_never_empty() {
     let sql = Query::select()
@@ -412,8 +412,8 @@ fn create_table_with_no_columns_is_valid() {
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.create-table+7/test]
 // [spec:pgorm:req:sql.ddl.index-create+7/test]
-// [spec:pgorm:req:sql.ddl.index-drop+2/test]
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
+// [spec:pgorm:req:sql.ddl.index-drop+3/test]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 // [spec:pgorm:req:sql.ddl.alter-table+4/test]
 // [spec:pgorm:req:sql.ddl.foreign-key+4/test]
 #[test]
@@ -452,7 +452,7 @@ fn ddl_targets_are_taken_by_construction() {
 // optional where the rest of the family moved into the constructor.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.index-create+7/test]
-// [spec:pgorm:req:sql.ddl.index-drop+2/test]
+// [spec:pgorm:req:sql.ddl.index-drop+3/test]
 #[test]
 fn index_name_and_drop_table_stay_optional() {
     let unnamed = Index::create(Glyph::Table, Glyph::Aspect).to_string();
@@ -530,9 +530,9 @@ fn foreign_keys_name_two_tables_and_a_pair() {
 // and the option-less `ALTER TYPE` PostgreSQL rejects have nowhere to come
 // from. The `compile_fail` doctests on each statement type prove it.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+4/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+4/test]
-// [spec:pgorm:req:sql.ddl.extension+4/test]
+// [spec:pgorm:req:sql.ddl.type-enum+5/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
+// [spec:pgorm:req:sql.ddl.extension+5/test]
 #[test]
 fn type_and_extension_names_are_taken() {
     let rendered = [
@@ -564,7 +564,7 @@ fn type_and_extension_names_are_taken() {
 // missing values, that PostgreSQL rejected, so the list is always parenthesised
 // once the type is an enum and both accepted shapes stay buildable.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+4/test]
+// [spec:pgorm:req:sql.ddl.type-enum+5/test]
 #[test]
 fn empty_enum_and_shell_type_are_valid() {
     let shell = Type::create(Name::runtime("font_family")).to_string();

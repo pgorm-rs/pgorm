@@ -351,7 +351,7 @@ fn select_as_and_save_as_cast_columns() {
 // [spec:pgorm:sem:macros.derive.entity-model+5/test]    the `json_key` arm: the
 // field's own name under `serde`'s renames, with the SQL naming attributes kept
 // out of it and the rest of `serde` stepped over
-// [spec:pgorm:def:entity.traits.column+5/test]    the namespace `json_key` names,
+// [spec:pgorm:def:entity.traits.column+6/test]    the namespace `json_key` names,
 // beside the SQL one `as_str` names
 #[test]
 fn json_key_reports_the_serde_key() {
@@ -521,7 +521,7 @@ fn sql_column_names_are_pinned_only_when_needed() {
     assert_eq!(renamed::Column::SecondName.to_string(), "explicit");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1/test]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+2/test]
 #[test]
 fn primary_key_value_type_and_auto_increment() {
     // A single key contributes a bare type...
@@ -541,7 +541,7 @@ fn primary_key_value_type_and_auto_increment() {
     assert!(!shared_auto_increment::PrimaryKey::auto_increment());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1/test]    what DerivePrimaryKey itself emits
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+2/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
     // `StaticName` maps the variant to its snake_case name, or a `column_name`
@@ -568,7 +568,7 @@ fn derive_primary_key_emits_iden_and_mapping() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityTrait associated types and the SqlName pair
+// [spec:pgorm:sem:macros.derive.entity+2/test]    EntityTrait associated types and the SqlName pair
 #[test]
 fn derive_entity_wires_up_the_entity_trait() {
     // The five associated types default to the conventional names.
@@ -596,7 +596,7 @@ fn derive_entity_wires_up_the_entity_trait() {
     assert_eq!(filling::Entity.to_string(), "filling");
 }
 
-// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityName only when table_name is present
+// [spec:pgorm:sem:macros.derive.entity+2/test]    EntityName only when table_name is present
 #[test]
 fn derive_entity_omits_entity_name_without_table_name() {
     // `no_table_name::Entity` carries `DeriveEntity` with no `table_name`, and a

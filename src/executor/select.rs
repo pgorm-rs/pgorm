@@ -549,7 +549,7 @@ where
     /// # }
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.selector-entry+1]
+    // [spec:pgorm:sem:exec.crud.selector-entry+2]
     pub fn from_select<M>(query: SelectStatement) -> Selector<SelectModel<M>>
     where
         M: FromQueryResult,
@@ -652,7 +652,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.selector-entry+1]
+    // [spec:pgorm:sem:exec.crud.selector-entry+2]
     pub fn into_tuple<T>(stmt: String, values: Values) -> SelectorRaw<SelectGetableTuple<T>>
     where
         T: TryGetableMany,

@@ -889,7 +889,7 @@ pub trait QueryOrder: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Perform a FILTER opertation on a statement
-// [spec:pgorm:sem:query.build.filter+1]
+// [spec:pgorm:sem:query.build.filter+2]
 pub trait QueryFilter: Sized {
     #[allow(missing_docs)]
     type QueryStatement: ConditionalStatement;

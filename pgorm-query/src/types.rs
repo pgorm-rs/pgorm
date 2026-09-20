@@ -8,18 +8,18 @@ use std::{any::Any, fmt, ops, sync::Arc};
 /// Spelled as the fork spells its other text contracts — `SqlText` is trusted
 /// SQL, `SqlName` is a name — so the two positions a string can land in are
 /// told apart by the trait it satisfies rather than by convention.
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
     }
 
     /// The identifier's text with embedded double quotes doubled, ready to sit
     /// between the quotes [`prepare`](Self::prepare) writes.
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     fn quoted(&self) -> String {
         self.to_string().replace('"', "\"\"")
     }
@@ -42,7 +42,7 @@ pub trait SqlName: Any + Send + Sync {
 /// are built from it. `Copy` and `'static` say the name is part of the shape of
 /// the program; `Debug` is what makes a column printable in the generic code
 /// that takes one.
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 pub trait StaticName: SqlName + Copy + fmt::Debug + 'static {
     /// The name as an unquoted string.
     fn as_str(&self) -> &str;
@@ -81,7 +81,7 @@ impl Clone for Name {
 /// `SqlName` is bounded on [`Any`] so the erased value can still be asked, and
 /// asking costs the identifier no width — a `Name` sits in nearly every
 /// node of the AST.
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 impl PartialEq for Name {
     fn eq(&self, other: &Self) -> bool {
         let (this, that): (&dyn Any, &dyn Any) = (&*self.0, &*other.0);
@@ -108,7 +108,7 @@ impl Name {
     ///
     /// The text is rendered as a QUOTED identifier like every other name, so
     /// this is not an escape hatch into SQL — only into naming.
-    // [spec:pgorm:def:sql.types+8]
+    // [spec:pgorm:def:sql.types+9]
     pub fn runtime<T>(text: T) -> Name
     where
         T: Into<String>,
@@ -130,7 +130,7 @@ impl fmt::Debug for dyn SqlName {
 
 /// Column references
 // [spec:pgorm:def:sql.types.column-ref]
-// [spec:pgorm:def:sql.ast.keywords+4]
+// [spec:pgorm:def:sql.ast.keywords+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(Name),
@@ -190,7 +190,7 @@ pub trait IntoColumnRef {
 ///
 /// Table::truncate(Glyph::Table.into_named_table().alias(Name::runtime("g")));
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 /// A type name in cast or column-type position: optionally
@@ -200,7 +200,7 @@ pub trait IntoColumnRef {
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+3]
+// [spec:pgorm:def:sql.types.type-name+4]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
@@ -294,7 +294,7 @@ impl TypeName {
     /// which is not a `TypeName` — the index access method of
     /// [`IndexType::Named`](crate::IndexType::Named) — so one policy covers
     /// every name-shaped position rather than each site inventing its own.
-    // [spec:pgorm:req:sql.render.ident-quoting+4]
+    // [spec:pgorm:req:sql.render.ident-quoting+5]
     pub(crate) fn prepare_part(part: &Name, out: &mut String) {
         let text = part.to_string();
         let mut chars = text.chars();
@@ -341,7 +341,7 @@ pub enum TableName {
 }
 
 /// Conversion into the [`TableName`] a DDL statement targets.
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 pub trait IntoTableName {
     /// Consume `self` and produce a [`TableName`]
     fn into_table_name(self) -> TableName;
@@ -403,7 +403,7 @@ pub trait IntoTableName {
 /// );
 /// Query::delete().from_table(func);
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedTable {
     /// The table this reference names
@@ -413,7 +413,7 @@ pub struct NamedTable {
 }
 
 /// Conversion into the [`NamedTable`] a DML statement targets.
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 pub trait IntoNamedTable {
     /// Consume `self` and produce a [`NamedTable`]
     fn into_named_table(self) -> NamedTable;
@@ -424,7 +424,7 @@ pub trait IntoNamedTable {
 /// A named table carries its alias beside it rather than in the variant, so
 /// aliasing is orthogonal to how the name is qualified; the value-producing
 /// forms carry the alias Postgres requires of them.
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FromItem {
@@ -439,7 +439,7 @@ pub enum FromItem {
 }
 
 /// Conversion into a [`FromItem`].
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 pub trait IntoFromItem {
     /// Consume `self` and produce a [`FromItem`]
     fn into_from_item(self) -> FromItem;
@@ -626,7 +626,7 @@ struct RuntimeName(String);
 pub struct Asterisk;
 
 /// SQL Keywords
-// [spec:pgorm:def:sql.ast.keywords+4]
+// [spec:pgorm:def:sql.ast.keywords+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,
@@ -748,7 +748,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 impl TableName {
     /// The table identifier, without its schema
     pub fn table(&self) -> &Name {
@@ -784,7 +784,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 impl NamedTable {
     /// Bind an alias to the name, replacing any alias already bound
     pub fn alias<A>(self, alias: A) -> Self
@@ -837,7 +837,7 @@ impl From<TableName> for FromItem {
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2]
+// [spec:pgorm:def:sql.types.table-ref+3]
 impl FromItem {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
@@ -872,7 +872,7 @@ impl FromItem {
     }
 }
 
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 impl SqlName for RuntimeName {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(s, "{}", self.0).unwrap();
@@ -928,7 +928,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+8/test]
+    // [spec:pgorm:def:sql.types+9/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Name::runtime("hel\"lo")).to_owned();
@@ -945,7 +945,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+8/test]
+    // [spec:pgorm:def:sql.types+9/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

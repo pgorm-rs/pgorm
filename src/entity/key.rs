@@ -9,7 +9,7 @@ pub use pgorm_query::{IntoBoundary, IntoKey, Key};
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+7]
+// [spec:pgorm:def:entity.relation.def+8]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (Name, Name),

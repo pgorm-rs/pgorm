@@ -186,7 +186,7 @@ pub(crate) fn create_enum_from_column_type(col_type: &ColumnType) -> Option<Type
     };
     // Labels are data, not names: `TypeCreateStatement::values` renders them
     // as string literals, so the variant idens are flattened to their text.
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     Some(
         Type::create(type_ref)
             .values(variants.iter().map(|v| v.to_string()))

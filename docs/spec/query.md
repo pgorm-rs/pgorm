@@ -51,7 +51,7 @@ is what `EntityTrait::find()` produces.
 > positions: it is implemented for every `ColumnTrait` type (producing a
 > column reference), for `Expr` and for `SimpleExpr` (identity).
 
-> [spec:pgorm:sem:query.build.filter+1]
+> [spec:pgorm:sem:query.build.filter+2]
 > `QueryFilter::filter` converts its argument through `IntoCondition` and adds
 > it with `cond_where`; repeated `filter` calls accumulate as AND-ed
 > conditions. Condition trees (`Condition::any()` / `Condition::all()`,
@@ -63,12 +63,13 @@ is what `EntityTrait::find()` produces.
 > `QueryFilter::belongs_to(model)` adds one equality filter per primary-key
 > column of the model's entity (`col.eq(model.get(col))`);
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
-> table alias. That alias is taken as `impl IntoIden`, not as a `&str`: its
+> table alias. That alias is taken as `impl IntoName`, not as a `&str`: its
 > in-tree caller is `ModelTrait::find_linked`, which has a `LinkedAlias`
 > (`[spec:pgorm:req:entity.relation.linked+4]`) in hand and would otherwise
 > have to render it back to a string for the callee to parse into an
-> identifier again. A string literal still passes, through
-> `IntoIden for &str`.
+> identifier again. A computed name passes as `Name::runtime(..)`: there is
+> no `IntoName for &str` (`[spec:pgorm:def:sql.types+9]`), so the conversion
+> is written rather than inferred.
 
 > [spec:pgorm:sem:query.build.modifiers+8]
 > `QuerySelect` mutates the select statement in place: `column` appends a
@@ -182,30 +183,29 @@ is what `EntityTrait::find()` produces.
 > `order_by_with_nulls` for `NULLS FIRST`/`LAST`); calls accumulate and are
 > never deduplicated.
 
-> [spec:pgorm:sem:query.build.alias+1]
+> [spec:pgorm:sem:query.build.alias+2]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
-> token (`[spec:pgorm:def:sql.types+6]`), not as a string repeated per site.
+> token (`[spec:pgorm:def:sql.types+9]`), not as a string repeated per site.
 > Every aliasing and referencing position on the builders takes it through the
 > existing conversions and needs no new one: the alias argument of `column_as`
 > / `expr_as` / `tbl_col_as`, the expression positions of `having`, `group_by`,
 > `order_by*` and `filter`, the qualifier of a `(table, column)` pair, the
 > table alias of `join_as` / `join_as_rev` / `from_alias`, a lateral join's
 > alias, a window name, and a CTE's name and columns. `alias` and `AliasName`
-> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+3]`).
+> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+4]`).
 >
-> Reaching the `Identity` positions — `column_as`'s alias, `cursor_by`, a
-> cursor's secondary ordering — takes one more impl, because `IntoIdentity`
-> keys on the entity layer's `IdenStr` (`[spec:pgorm:def:entity.traits+1]`)
-> rather than on `Iden`. `AliasName` implements it, so a single token spelling
-> reaches every position in the crate and there is no position where a caller
-> is pushed back to a string.
+> Reaching the `Key` positions — `column_as`'s alias, `cursor_by`, a
+> cursor's secondary ordering — takes no extra impl at the ORM layer, because
+> `IntoKey` keys on `StaticName` (`[spec:pgorm:def:entity.traits+2]`) and
+> `AliasName` is one, so a single token spelling reaches every position in the
+> crate and there is no position where a caller is pushed back to a string.
 >
-> `Alias` is NOT deprecated by this and MUST remain: a name computed at run
-> time cannot be a `&'static str` token, and the ORM builds such names itself
-> — the loader's join-back alias, the source graph's `s{i}_` column prefixes
-> (`[spec:pgorm:sem:query.graph.writer+4]`), an entity's schema qualifier. The
-> token is the paved road for the static case, not a replacement for the
-> dynamic one.
+> `Name::runtime` is NOT deprecated by this and MUST remain: a name computed
+> at run time cannot be a `&'static str` token, and the ORM builds such names
+> itself — the loader's join-back alias, the source graph's `s{i}_` column
+> prefixes (`[spec:pgorm:sem:query.graph.writer+4]`), an entity's schema
+> qualifier. The token is the paved road for the static case, not a
+> replacement for the dynamic one; each is the only spelling of its case.
 >
 > The ceiling is the same one the token carries at the query layer, and it is
 > worth restating where a caller meets it: the token is evidence of nothing.
@@ -229,7 +229,7 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `Condition::any()` according to `rel.condition_type`; and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+7]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+8]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -501,7 +501,7 @@ what makes it total over partially-set models.
 > `via` junction or if the target relation is not `HasOne`. An empty input
 > slice short-circuits to an empty result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+6]
+> [spec:pgorm:sem:query.loader.batching+7]
 > Every loader operation issues one graph read (`[spec:pgorm:def:query.graph]`),
 > built the same way: the caller's target selector is re-rooted as the graph and
 > the input entity's own table is joined back as the single `Req` slot
@@ -511,7 +511,7 @@ what makes it total over partially-set models.
 > `join_condition` behind it (`[spec:pgorm:sem:query.build.join+3]`), whole: its
 > column pairs, its authored `on_condition` — receiving its two identifiers in
 > the roles it was written with, `RelationDef::rev` itself re-swapping them
-> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+7]`) — and
+> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+8]`) — and
 > its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
 > part of a relation as a predicate of its own, which is what makes dropping a
 > part of one unrepresentable rather than merely unintended.
@@ -526,8 +526,8 @@ what makes it total over partially-set models.
 > that names a table the statement does not select from.
 >
 > Keys are collected in input order: for each input model, `extract_key` walks
-> the from side of the relation's `columns`, projected as an `Identity`
-> (`[spec:pgorm:def:entity.relation.def+7]`), into one `ValueTuple` — one walk
+> the from side of the relation's `columns`, projected as an `Key`
+> (`[spec:pgorm:def:entity.relation.def+8]`), into one `ValueTuple` — one walk
 > at every arity, resolving each column name back to the entity's `Column` enum
 > via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
@@ -607,7 +607,7 @@ what makes it total over partially-set models.
 > rather than the input entity. That reversal is a direction, not a change of
 > meaning: an authored `on_condition` MUST still receive its two identifiers
 > in the roles the relation was written with
-> (`[spec:pgorm:def:entity.relation.def+7]`), so the loader re-swaps the
+> (`[spec:pgorm:def:entity.relation.def+8]`), so the loader re-swaps the
 > closure's arguments when it reverses a def. The `via()` hop joins LEFT and
 > the slot INNER, which selects the rows two INNER joins did: the slot's ON
 > references the junction's columns and NULLs do not satisfy it.

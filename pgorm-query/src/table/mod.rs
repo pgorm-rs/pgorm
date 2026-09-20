@@ -26,7 +26,7 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 #[derive(Debug)]
 pub struct Table;
 
@@ -103,7 +103,7 @@ impl Table {
 /// Dispatches to the variant's own rendering, which inlines every value as an
 /// escaped SQL literal. This is its only rendering: no table statement
 /// exposes a placeholder-emitting build, so nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for TableStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

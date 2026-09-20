@@ -331,14 +331,14 @@ These rules capture what the code does today, including known gaps.
 > with the Postgres `QueryBuilder`, then binds each `Value` through the
 > `ValueHolder` `ToSql` adapter (see `exec.cursor.binding`).
 
-> [spec:pgorm:sem:exec.crud.selector-entry+1]
+> [spec:pgorm:sem:exec.crud.selector-entry+2]
 > A caller who has built a `SelectStatement` outside the entity builders —
 > a CTE used as the driving table has no entity behind it at all — MUST
 > still be able to name a decode target without collapsing the statement to
 > a string. `Selector` therefore has one constructor per decode shape:
 > `from_select::<M>(SelectStatement)` for a `FromQueryResult` type,
 > `into_tuple::<T>(SelectStatement)` for an ordinal tuple, and
-> `with_columns::<T, C>(SelectStatement)` for a tuple named by an `Iden`
+> `with_columns::<T, C>(SelectStatement)` for a tuple named by an `SqlName`
 > enum. `SelectorRaw` mirrors the last two over `(String, Values)`:
 > `from_statement::<M>`, `into_tuple::<T>` and `with_columns::<T, C>`.
 >

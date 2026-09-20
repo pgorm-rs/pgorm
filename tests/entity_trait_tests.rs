@@ -311,7 +311,7 @@ fn via_default<E: Default>() -> E {
     E::default()
 }
 
-// [spec:pgorm:def:entity.traits+1/test]    `StaticName` as the base identifier
+// [spec:pgorm:def:entity.traits+2/test]    `StaticName` as the base identifier
 // contract (`as_str` alongside `SqlName`'s quoting), `EntityName: StaticName +
 // Default`, and `EntityTrait`'s five associated types resolving for both a
 // derive-macro entity and a fully hand-written one
@@ -348,7 +348,7 @@ fn entity_trait_family() {
     assert_eq!(entity.as_str(), copied.as_str());
 }
 
-// [spec:pgorm:req:entity.traits.entity-name+1/test]    `table_name` is the only
+// [spec:pgorm:req:entity.traits.entity-name+2/test]    `table_name` is the only
 // required method; `schema_name` and `comment` default to `None` and
 // `module_name` to `table_name()`; `table_ref` yields a bare `TableName::Table`
 // without a schema and a `SchemaTable` with one, and every statement that names
@@ -714,7 +714,7 @@ fn sql(expr: pgorm_query::SimpleExpr) -> String {
 
 const SELECT_ITEM: &str = r#"SELECT "item"."id", "item"."name", "item"."note" FROM "item" WHERE "#;
 
-// [spec:pgorm:def:entity.traits.column+5/test]    the expression-building surface
+// [spec:pgorm:def:entity.traits.column+6/test]    the expression-building surface
 // `ColumnTrait` wraps around `Expr`: comparisons, ranges, pattern matching and
 // its sugar, aggregates, null checks, set membership and subqueries — plus
 // `def`, `entity_name`, `as_column_ref`, `into_expr` and `into_returning_expr`
@@ -866,7 +866,7 @@ fn column_trait_expression_surface() {
     let _: ColumnType = pgorm_query::ColumnType::Integer;
 }
 
-// [spec:pgorm:def:entity.traits.column+5/test]    the column-to-column family
+// [spec:pgorm:def:entity.traits.column+6/test]    the column-to-column family
 // `eq_col` / `ne_col` / `gt_col` / `gte_col` / `lt_col` / `lte_col` and the
 // expression form `eq_expr` — each side qualified by its own entity, same SQL as
 // the `Expr::col` escape they replace, and the value-taking `eq` left alone
@@ -1005,7 +1005,7 @@ fn column_def_defaults_and_builders() {
 // entity.traits.primary-key
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.primary-key+2/test]    `PrimaryKeyArity::ARITY` is
+// [spec:pgorm:def:entity.traits.primary-key+3/test]    `PrimaryKeyArity::ARITY` is
 // 1 for any single scalar and matches the component count for tuples up to 12;
 // `auto_increment` reports whether the key is database-generated; and
 // `PrimaryKeyToColumn` maps variants to columns and back, with `from_column`

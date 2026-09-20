@@ -7,17 +7,18 @@ explicit limitations.
 
 ## Entity traits
 
-> [spec:pgorm:def:entity.traits+1]
+> [spec:pgorm:def:entity.traits+2]
 > The entity trait family is defined in `src/entity/` and re-exported from
-> `pgorm::entity` (`src/entity/mod.rs`). `IdenStr` (`base_entity.rs`) is the base
-> identifier contract: `Iden + Copy + Debug + 'static` plus `as_str(&self) -> &str`.
-> It MUST NOT be named `IdenStatic`: `pgorm_query::IdenStatic` is a different
-> trait with the same method name and an incompatible signature
-> (`-> &'static str`, `[spec:pgorm:def:sql.types+2]`), and the two are reachable
-> together, so sharing the name made implementing the wrong one an unreadable
-> unsatisfied-bound error. They cannot be one trait: an entity's name is
-> borrowed from `self` through `EntityName::table_name`, not `'static`.
-> `EntityName: IdenStr + Default` maps an entity to a table. `EntityTrait: EntityName`
+> `pgorm::entity` (`src/entity/mod.rs`). Its base identifier contract is
+> `pgorm_query::StaticName` (`[spec:pgorm:def:sql.types+9]`), re-exported from
+> `base_entity.rs`: `SqlName + Copy + Debug + 'static` plus
+> `as_str(&self) -> &str`. There MUST be exactly one such trait in the
+> workspace. The entity layer used to declare a second of its own under a
+> different name because the query layer's returned `&'static str`, which an
+> entity's name — borrowed from `self` through `EntityName::table_name` —
+> cannot be; the two are now one trait at the looser return, so a glob of both
+> modules is unambiguous and implementing the wrong one is not a state.
+> `EntityName: StaticName + Default` maps an entity to a table. `EntityTrait: EntityName`
 > is the abstract entity, carrying five associated types: `Model`
 > (`ModelTrait<Entity = Self> + FromQueryResult`), `ActiveModel`
 > (`ActiveModelBehavior<Entity = Self>`), `Column` (`ColumnTrait`), `Relation`
@@ -28,11 +29,11 @@ explicit limitations.
 > `src/entity/prelude.rs` (`DeriveEntityModel`, `DeriveActiveModel`, `DerivePrimaryKey`,
 > `DeriveRelation`, and friends), but every trait can be implemented by hand.
 
-> [spec:pgorm:req:entity.traits.entity-name+1]
+> [spec:pgorm:req:entity.traits.entity-name+2]
 > `EntityName::table_name` is the only required method and MUST return the table's SQL
 > name. `schema_name` and `comment` default to `None`; `module_name` defaults to
 > `table_name()`. `table_ref` MUST produce a schema-qualified `TableName`
-> (`(Alias::new(schema), entity)`) when `schema_name` returns `Some`, and a bare
+> (`(Name::runtime(schema), entity)`) when `schema_name` returns `Some`, and a bare
 > `TableName::Table` otherwise (`src/entity/base_entity.rs`). It is the DDL-position
 > type, so schema projection targets take it directly; query positions widen it to a
 > `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
@@ -62,8 +63,8 @@ explicit limitations.
 > Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
 > composite keys are passed as tuples.
 
-> [spec:pgorm:def:entity.traits.column+5]
-> `ColumnTrait: IdenStr + Iterable + FromStr` (`src/entity/column.rs`) describes one
+> [spec:pgorm:def:entity.traits.column+6]
+> `ColumnTrait: StaticName + Iterable + FromStr` (`src/entity/column.rs`) describes one
 > column of an entity. `def()` returns the column's `ColumnDef`; `entity_name()` and
 > `as_column_ref()` qualify the column with its `EntityName`. The trait exposes an
 > expression-building surface wrapping `pgorm_query::Expr`: comparison operators `eq`,
@@ -94,7 +95,7 @@ explicit limitations.
 > compared against another column of the same enum type needs no cast.
 >
 > `json_key()` names the key the column occupies in a JSON object, which is a
-> different namespace from the SQL name `IdenStr::as_str` gives: the `with-json`
+> different namespace from the SQL name `StaticName::as_str` gives: the `with-json`
 > conversions of `[spec:pgorm:req:entity.active-model.json+3]` deserialize through the
 > entity's `Model`, so the key is the model field's name as `serde` spells it.
 > `DeriveEntityModel` MUST emit it from the field the column was derived from and the
@@ -147,8 +148,8 @@ explicit limitations.
 > spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
 > scalar and array comparisons of one column cannot disagree about its cast.
 
-> [spec:pgorm:def:entity.traits.primary-key+2]
-> `PrimaryKeyTrait: IdenStr + Iterable` (`src/entity/primary_key.rs`) defines an
+> [spec:pgorm:def:entity.traits.primary-key+3]
+> `PrimaryKeyTrait: StaticName + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
 > `Sized + Send + Debug + PartialEq + IntoValueTuple + TryFromValueTuple
@@ -193,11 +194,11 @@ explicit limitations.
 > `DerivePartialModel` is a compile error rather than a query with an empty
 > projection (`query.build.modifiers`).
 
-> [spec:pgorm:def:entity.traits.active-enum+1]
+> [spec:pgorm:def:entity.traits.active-enum+2]
 > `ActiveEnum: Sized + Iterable` (`src/entity/active_enum.rs`) maps a Rust enum onto a
 > database value. `Value` is the backing Rust type and must implement `ActiveEnumValue`
 > (`Into<Value> + ValueType + Nullable + TryGetable`). `name()` returns the database
-> enum's identifier as a `DynIden`; `to_value` / `into_value` convert a variant to its
+> enum's identifier as a `Name`; `to_value` / `into_value` convert a variant to its
 > database value; `try_from_value` performs the fallible reverse mapping, returning
 > `Error` for unknown values; `db_type()` returns the column definition used for the
 > enum column. `as_enum()` wraps a value expression in a cast to the enum's type name,
@@ -358,7 +359,7 @@ explicit limitations.
 > Presence detection and deserialization MUST read the same key namespace, and that
 > namespace is `serde`'s: the key a column occupies is the model field's name as
 > `serde` spells it, read from `ColumnTrait::json_key`
-> (`[spec:pgorm:def:entity.traits.column+5]`) — never the SQL column name, which the
+> (`[spec:pgorm:def:entity.traits.column+6]`) — never the SQL column name, which the
 > deserializer never sees. `DeriveEntityModel` computes each column's key from the
 > field it derived that column from, applying `#[serde(rename = "..")]` and
 > `#[serde(rename_all = "..")]` (the deserialize half where the split form is used);
@@ -397,13 +398,13 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+7]
+> [spec:pgorm:def:entity.relation.def+8]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
 > `is_owner`, optional `on_delete` /
 > `on_update` foreign-key actions (`pgorm_query::ForeignKeyAction`), an optional
-> boxed `on_condition` closure receiving the left and right join idens, an optional
+> boxed `on_condition` closure receiving the left and right join names, an optional
 > `fk_name`, and a `condition_type` (`All` = AND, `Any` = OR). `rev()` swaps the
 > from/to tables and columns, negates `is_owner`, clears `fk_name`, and keeps the
 > remaining attributes; an attached `on_condition` keeps its authored roles, its
@@ -413,35 +414,39 @@ explicit limitations.
 > self-join disambiguation; `on_condition(f)` replaces any existing custom condition;
 > `condition_type(t)` sets how the ON clauses combine.
 >
-> `ColumnPairs` (`src/entity/identity.rs`) is the column set a relation joins on,
+> `ColumnPairs` (`src/entity/key.rs`) is the column set a relation joins on,
 > held as a first `(from, to)` pair plus any further pairs. The two sides of a
 > relation are therefore one value, not two: the only constructor,
 > `ColumnPairs::new(from, to)`, takes a pair, `and(from, to)` / `push(from, to)`
 > extend by a pair, and `rev()` swaps within each pair. A set of join columns is
 > consequently non-empty and equal-sided by construction — the arities cannot
 > disagree, so no consumer has to reconcile them and none can silently drop a
-> column. `arity()` reports the number of pairs; `from_identity()` /
-> `to_identity()` project one side as an `Identity` for consumers that key on a
+> column. `arity()` reports the number of pairs; `from_key()` /
+> `to_key()` project one side as a `Key` for consumers that key on a
 > single side.
 >
-> `Identity` (`src/entity/identity.rs`) is a newtype over `Vec<DynIden>`: the
+> `Key` (`pgorm-query/src/key.rs`) is a newtype over `Vec<Name>`: the
 > columns a lookup keys on, in declared order, at every arity. It MUST NOT tag
 > its arity in its representation, so a column set of a given width has one
 > spelling and every consumer walks it rather than dispatching on how many
 > columns it holds — `iter()`, `IntoIterator`, `arity()`, and `single()`, which
-> answers with the one column of a unary set and declines for a wider one. `From<DynIden>`, `From<Vec<DynIden>>` and `FromIterator<DynIden>` build
-> one. `IntoIdentity` converts `&str` and `String` (via `Alias`), any `IdenStr`,
-> and tuples of up to 12 identifiers; `IdentityOf<E>`, a subtrait of
-> `IntoIdentity`, restricts conversions to columns of entity `E`.
+> answers with the one column of a unary set and declines for a wider one. `From<Name>`, `From<Vec<Name>>` and `FromIterator<Name>` build
+> one. `IntoKey` converts a `Name`, any `StaticName`, and tuples of up to 12
+> names; `KeyOf<E>` (`src/entity/key.rs`), a subtrait of `IntoKey`, restricts
+> conversions to columns of entity `E`. `Key`, `IntoKey` and `IntoBoundary`
+> live in pgorm-query and are re-exported: `IntoKey`'s blanket impl is over
+> `StaticName`, and Rust admits no concrete sibling impl — not `Name`, not a
+> tuple — beside a blanket over a trait foreign to the crate, so the trait and
+> its impls MUST share a crate.
 >
-> Each `IntoIdentity` impl also names a `ValueType`: the tuple of `Value` of the
-> same length as the columns it produces, or `ValueTuple` for `Identity` itself,
+> Each `IntoKey` impl also names a `ValueType`: the tuple of `Value` of the
+> same length as the columns it produces, or `ValueTuple` for `Key` itself,
 > whose arity is only known at runtime. `IntoBoundary<K>` is the matching
 > relation on the value side, implemented exactly for the tuples whose length `K`
 > describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
-> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+4]`)
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+5]`)
 > therefore gets the arity agreement from the type system rather than by
-> checking it, and the `Identity` case is the only one left to check.
+> checking it, and the `Key` case is the only one left to check.
 >
 > The `on_condition` closure receives the two identifiers *so that its
 > predicate can follow the tables under whatever names the join binds them
@@ -500,7 +505,7 @@ explicit limitations.
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+7]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def+8]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
@@ -551,7 +556,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+3]
+> [spec:pgorm:def:entity.prelude+4]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -569,7 +574,7 @@ explicit limitations.
 > connection types `DatabasePool`, `DatabaseConnection`, `DatabaseTransaction`,
 > `ConnectionTrait`, `TransactionTrait`; `Iterable`, `Condition`, `JoinType`,
 > `Value`, the `error` module's contents, and the handful of `pgorm_query`
-> names an entity definition needs (`Expr`, `DynIden`, `SharedIden`, `StringLen`,
+> names an entity definition needs (`Expr`, `Name`, `StringLen`,
 > `ForeignKeyAction`, `Arc`).
 >
 > `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.
@@ -588,16 +593,15 @@ explicit limitations.
 > hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+4]`).
 >
 > The alias vocabulary `alias` and `AliasName` are members
-> (`[spec:pgorm:sem:query.build.alias+1]`) on the same grounds as `Expr`: a name
+> (`[spec:pgorm:sem:query.build.alias+2]`) on the same grounds as `Expr`: a name
 > the query introduces is written where the query is written, and a token is
-> only cheaper than `Alias::new` when it is already in scope. `LinkedAlias` is
+> only cheaper than `Name::runtime` when it is already in scope. `LinkedAlias` is
 > NOT a member — it is reached as the return of a `Linked` method, so a caller
 > never has to name the type.
 >
-> `IdenStr` is a member, and it is the reason the base identifier contract is
-> NOT named `IdenStatic` (`[spec:pgorm:def:entity.traits+1]`):
-> `pgorm_query::IdenStatic` is a different trait with the same method and an
-> incompatible signature, and a prelude that globbed one of them into every
-> file made the collision reachable from anywhere. Under the distinct name the
-> two coexist, and the hazard is one the rename retires rather than one a
-> reader has to remember.
+> `StaticName` is a member — pgorm_query's, re-exported
+> (`[spec:pgorm:def:entity.traits+2]`). The entity layer once declared a
+> second trait of its own with the same method and an incompatible signature,
+> and a prelude that globs one of them into every file made that collision
+> reachable from anywhere; there is now one trait, so the hazard is retired
+> rather than something a reader has to remember.

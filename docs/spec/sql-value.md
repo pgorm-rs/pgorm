@@ -241,75 +241,86 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+8]
-> `Iden` is the identifier trait (bounded `Any + Send + Sync`): implementors provide
+> [spec:pgorm:def:sql.types+9]
+> `SqlName` is the name trait (bounded `Any + Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted()` —
 > which doubles any embedded double quote — and `prepare`, which writes the
 > identifier wrapped in double quotes. Neither takes a quote character:
 > PostgreSQL has one identifier quote, so there is no `Quote` type and no
 > parameter that could carry a different one (which is also how the panic on a
-> non-ASCII quote byte stopped existing).
-> `IdenStatic` adds `as_str() -> &'static str` for `Copy + 'static`
-> identifiers.
+> non-ASCII quote byte stopped existing). It is spelled `SqlName` beside the
+> crate's `SqlText`, so the two things a string can be — a name, or trusted
+> SQL — are told apart by the trait a value satisfies.
+> `StaticName` adds `as_str(&self) -> &str` for `Copy + Debug + 'static` names
+> whose text the program fixes. It is ONE trait: the entity layer MUST NOT
+> declare a second with the same shape, which is what made a glob of both
+> modules ambiguous.
 >
-> `DynIden` is `SharedIden`, a non-generic wrapper over
-> `std::sync::Arc<dyn Iden>` (the inherited `SeaRc<T>` and the `RcOrArc`
+> `Name` is the erased, shared form: a non-generic wrapper over
+> `std::sync::Arc<dyn SqlName>` (the inherited `SeaRc<T>` and the `RcOrArc`
 > re-export are gone; shared ownership of anything else is spelled `Arc`
-> directly). `SharedIden` equality compares the erased identifier's `TypeId`
-> and the unquoted string, so two idens are equal exactly when they are the
-> same concrete type rendering the same text. Equality MUST NOT be decided by
-> the trait object's vtable address: Rust guarantees a vtable neither unique
-> per type nor stable across codegen units, so an address comparison can
-> report two identifiers of one type and one text unequal — and `SharedIden`
-> underpins `PartialEq` for `ColumnRef`, `TableName` and the rest of the AST,
-> where that is a wrong answer about SQL. The `TypeId` is asked of the value
-> rather than stored beside it — the `Any` bound on `Iden` is there for this,
-> and `&dyn Iden` upcasts to `&dyn Any` to ask — so a `DynIden` stays one
-> pointer pair wide, which it must: one sits in nearly every AST node, and a
-> field would have doubled them all. The crate is `#![forbid(unsafe_code)]`,
-> and the transmute the vtable comparison needed is what that forbids.
-> `IntoIden` converts any `Iden + 'static` (or an existing
-> `DynIden`) into a `DynIden`, and also accepts `&str` and `String`, wrapping
-> them in `Alias` so a string-spelled identifier escapes like any other. It is
-> the whole conversion surface: there is no separate one-or-many identifier
-> trait, so a call site that wants several identifiers takes an iterator of
-> `IntoIden`.
+> directly). It is the only exported spelling — the `DynIden`/`SharedIden`
+> pair that named one type twice is gone. `Name` equality compares the erased
+> name's `TypeId` and the unquoted string, so two names are equal exactly when
+> they are the same concrete type rendering the same text. Equality MUST NOT
+> be decided by the trait object's vtable address: Rust guarantees a vtable
+> neither unique per type nor stable across codegen units, so an address
+> comparison can report two names of one type and one text unequal — and
+> `Name` underpins `PartialEq` for `ColumnRef`, `TableName` and the rest of
+> the AST, where that is a wrong answer about SQL. The `TypeId` is asked of
+> the value rather than stored beside it — the `Any` bound on `SqlName` is
+> there for this, and `&dyn SqlName` upcasts to `&dyn Any` to ask — so a
+> `Name` stays one pointer pair wide, which it must: one sits in nearly every
+> AST node, and a field would have doubled them all. The crate is
+> `#![forbid(unsafe_code)]`, and the transmute the vtable comparison needed is
+> what that forbids.
 >
-> `Alias` wraps an arbitrary `String` as an identifier. There is no empty-name
-> identifier type: PostgreSQL rejects a zero-length delimited identifier, so
-> the `NullAlias` that rendered one — and only ever served as a placeholder
-> inside `ColumnDef::take` — is gone
+> `IntoName` converts any `SqlName + 'static` (or an existing `Name`) into a
+> `Name`. It MUST NOT accept `&str` or `String`: text reaches identifier
+> position through `Name::runtime(impl Into<String>)` and nowhere else, so
+> every point at which a value becomes a name is one grep away rather than an
+> inference away. The inner type `Name::runtime` wraps is private, so there is
+> no second door. `IntoName` is the whole conversion surface: there is no
+> separate one-or-many identifier trait, so a call site that wants several
+> names takes an iterator of `IntoName`.
+>
+> There is no empty-name identifier type: PostgreSQL rejects a zero-length
+> delimited identifier, so the `NullAlias` that rendered one — and only ever
+> served as a placeholder inside `ColumnDef::take` — is gone
 > (`[dec:pgorm:invalid-states-unrepresentable]`).
 >
-> `AliasName` is the token form of an identifier the query text spells
+> `AliasName` is the token form of a name the query text spells
 > literally, minted by the free function `alias(name)` over a `&'static str`.
-> It is `Copy`, `Iden` and `IdenStatic`, so `IntoIden`, `IntoColumnRef` and
-> every other identifier position accepts it with no conversion, and one
+> It is `Copy`, `SqlName` and `StaticName`, so `IntoName`, `IntoColumnRef` and
+> every other name position accepts it with no conversion, and one
 > `let rn = alias("rn")` binding serves as both the declaration and every
 > reference — the name is spelled once instead of once per site.
 >
 > The motivating case is a name the query itself introduces, where the token
 > is what makes a reference unable to miss its declaration; but the remit is
 > the whole statically-known set, so a cast target, a `CREATE TYPE` name or a
-> custom column type is written the same way rather than in a second spelling
+> named column type is written the same way rather than in a second spelling
 > that a reader would have to tell apart. The split that matters is against
-> `Alias`, which remains for names computed at runtime — a `format!`-built
-> alias, a `&str` arriving from a caller — and which is where the
+> `Name::runtime`, which is for names computed at run time — a `format!`-built
+> alias, a `String` arriving from a caller — and which is where the
 > `&'static str` bound draws the line: a name known only at run time cannot
-> be a token, and no amount of interning would make it one.
+> be a token, and no amount of interning would make it one. The two are no
+> longer near-homographs: the type that took runtime text was called `Alias`
+> next to a free function called `alias` that took static text, and only the
+> latter survives under that word.
 >
 > The token carries no evidence that its name was ever attached to anything:
 > a token no projection declares still compiles, and the server reports the
 > unknown column exactly as it would for a mistyped string.
 
 > [spec:pgorm:def:sql.types.column-ref]
-> `ColumnRef` has five forms: `Column(DynIden)`, `TableColumn(DynIden,
-> DynIden)`, `SchemaTableColumn(DynIden, DynIden, DynIden)`, `Asterisk` and
-> `TableAsterisk(DynIden)`. `IntoColumnRef` maps a bare iden to `Column`, a
+> `ColumnRef` has five forms: `Column(Name)`, `TableColumn(Name,
+> Name)`, `SchemaTableColumn(Name, Name, Name)`, `Asterisk` and
+> `TableAsterisk(Name)`. `IntoColumnRef` maps a bare name to `Column`, a
 > 2-tuple to `TableColumn`, a 3-tuple to `SchemaTableColumn`, the `Asterisk`
-> unit type to `Asterisk`, and `(iden, Asterisk)` to `TableAsterisk`.
+> unit type to `Asterisk`, and `(name, Asterisk)` to `TableAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+2]
+> [spec:pgorm:def:sql.types.table-ref+3]
 > Table references are split by position, so that a reference which names no
 > table cannot reach a statement that needs one. There are three positions,
 > and each takes the widest type its position admits: DDL targets a name,
@@ -317,22 +328,22 @@ including panic semantics and quirks inherited from sea-query.
 > additionally admits the value-producing forms.
 >
 > `TableName` is the DDL-position reference and has exactly two forms:
-> `Table(DynIden)` and `SchemaTable(DynIden, DynIden)`. There is no
+> `Table(Name)` and `SchemaTable(Name, Name)`. There is no
 > database-qualified form — Postgres rejects a cross-database reference at
-> execution, so the shape is not offered. `IntoTableName` maps a bare iden to
+> execution, so the shape is not offered. `IntoTableName` maps a bare name to
 > `Table` and a 2-tuple to `SchemaTable`, and accepts a `TableName`
-> unchanged. `TableName::table()` returns the table iden;
-> `TableName::schema()` returns the schema iden when the name carries one.
+> unchanged. `TableName::table()` returns the table name;
+> `TableName::schema()` returns the schema name when the name carries one.
 >
 > `NamedTable` is the DML-position reference: a struct of a `name: TableName`
-> and an `alias: Option<DynIden>`, which is exactly what PostgreSQL's write
+> and an `alias: Option<Name>`, which is exactly what PostgreSQL's write
 > statements target. `IntoNamedTable` accepts a `NamedTable` unchanged and
-> widens anything `IntoTableName` accepts — a bare iden, a 2-tuple, a
+> widens anything `IntoTableName` accepts — a bare name, a 2-tuple, a
 > `TableName` — to the unaliased form, so a DML target spelled as a bare name
 > needs no ceremony; `From<TableName> for NamedTable` is the same widening as
 > a value conversion. `NamedTable::alias(a)` binds or replaces the alias, and
 > `NamedTable::qualifier()` returns the identifier a column of the table is
-> qualified by — the bound alias when there is one, otherwise the table iden.
+> qualified by — the bound alias when there is one, otherwise the table name.
 >
 > `FromItem` is the query-position reference: `Table(NamedTable)` — the DML
 > reference reused, so aliasing is expressed in one place — plus the three
@@ -381,10 +392,10 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+3]
+> [spec:pgorm:def:sql.types.type-name+4]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
-> type in cast or column-type position: `schema: Option<DynIden>`,
-> `name: DynIden`, `array: bool`, `verbatim: bool`. Rendering
+> type in cast or column-type position: `schema: Option<Name>`,
+> `name: Name`, `array: bool`, `verbatim: bool`. Rendering
 > (`to_sql_string`) joins the
 > parts with `.` and appends a structural `[]` for arrays; a part that is a
 > safe lowercase identifier (`^[a-z_][a-z0-9_]*$`) renders bare — unquoted
@@ -415,7 +426,7 @@ including panic semantics and quirks inherited from sea-query.
 > Carrying the answer here rather than in a second node shape is what lets a
 > cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
-> [spec:pgorm:def:sql.types.column-type+6]
+> [spec:pgorm:def:sql.types.column-type+7]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -428,7 +439,7 @@ including panic semantics and quirks inherited from sea-query.
 > so it renders under the one part policy — `ColumnType::named(text)` and
 > `ColumnDef::named(name)` both build one, and the name may be
 > schema-qualified or an array),
-> `Enum { name, schema, variants }` (`schema: Option<DynIden>` — a qualified
+> `Enum { name, schema, variants }` (`schema: Option<Name>` — a qualified
 > enum type carries its schema in the type itself, so every rendering that
 > names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`

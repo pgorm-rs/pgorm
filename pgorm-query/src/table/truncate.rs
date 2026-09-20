@@ -20,7 +20,7 @@ use crate::{QueryBuilder, types::*};
 ///
 /// assert_eq!(table.to_string(), r#"TRUNCATE TABLE "font""#);
 /// ```
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
 #[derive(Debug, Clone)]
 pub struct TableTruncateStatement {
     pub(crate) table: TableName,
@@ -41,7 +41,7 @@ impl TableTruncateStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for TableTruncateStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

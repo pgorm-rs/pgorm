@@ -22,12 +22,12 @@ use super::*;
 /// let rn = alias("rn");
 /// assert_eq!(SqlName::to_string(&rn), "rn");
 /// ```
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AliasName(&'static str);
 
 /// Mint an [`AliasName`] token for a name the query introduces.
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 pub const fn alias(name: &'static str) -> AliasName {
     AliasName(name)
 }
@@ -39,21 +39,21 @@ impl AliasName {
     }
 }
 
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 impl SqlName for AliasName {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(s, "{}", self.0).unwrap();
     }
 }
 
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 impl StaticName for AliasName {
     fn as_str(&self) -> &'static str {
         self.0
     }
 }
 
-// [spec:pgorm:def:sql.types+8]
+// [spec:pgorm:def:sql.types+9]
 impl From<&'static str> for AliasName {
     fn from(name: &'static str) -> Self {
         AliasName(name)

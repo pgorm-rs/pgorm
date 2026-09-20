@@ -367,7 +367,7 @@ fn behavior_and_into_active_model_derives() {
     assert_eq!(active.id, ActiveValue::NotSet);
 }
 
-// [spec:pgorm:sem:macros.derive.column+2/test]    default_as_str / StaticName / SqlName
+// [spec:pgorm:sem:macros.derive.column+3/test]    default_as_str / StaticName / SqlName
 #[test]
 fn derive_column_names() {
     // `default_as_str` is the snake_case of the variant, or the `column_name`
@@ -385,7 +385,7 @@ fn derive_column_names() {
     assert_eq!(PlainColumn::LastName.to_string(), "lAsTnAmE");
 }
 
-// [spec:pgorm:sem:macros.derive.column+2/test]    FromStr accepts both spellings
+// [spec:pgorm:sem:macros.derive.column+3/test]    FromStr accepts both spellings
 #[test]
 fn derive_column_from_str() {
     assert!(matches!(
@@ -413,7 +413,7 @@ fn derive_column_from_str() {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.column+2/test]    DeriveCustomColumn leaves as_str to the user
+// [spec:pgorm:sem:macros.derive.column+3/test]    DeriveCustomColumn leaves as_str to the user
 #[test]
 fn derive_custom_column_leaves_as_str_to_user() {
     // The inherent `default_as_str` and `FromStr` are still generated...
@@ -432,7 +432,7 @@ fn derive_custom_column_leaves_as_str_to_user() {
     assert_eq!(CustomColumn::Id.to_string(), "id");
 }
 
-// [spec:pgorm:sem:macros.derive.column+2/test]    neither derive adds EnumIter
+// [spec:pgorm:sem:macros.derive.column+3/test]    neither derive adds EnumIter
 #[test]
 fn column_derives_do_not_add_enum_iter_themselves() {
     // `EnumIter` is derived alongside above; without it `Column::iter()` would

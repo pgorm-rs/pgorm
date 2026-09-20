@@ -12,7 +12,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## The runner and its ledger
 
-> [spec:pgorm:def:migration.runner+1]
+> [spec:pgorm:def:migration.runner+2]
 > A migration is a `MigrationTrait` implementor: `MigrationName + Send + Sync`
 > plus a single `async fn up(&self, tx: &DatabaseTransaction<'_>)`, and an
 > optional `fn checksum(&self) -> Option<String>` defaulting to `None`. A
@@ -21,7 +21,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > migration the project owns.
 >
 > `MigratorTrait` provides, on top of that list: `migration_table_name() ->
-> DynIden` (defaulting to the `ledger` entity's iden), `install(db)` to create
+> Name` (defaulting to the `ledger` entity's name), `install(db)` to create
 > the ledger, `adopt_legacy_ledger(db)` to take over one left under the
 > inherited name, `up(db, steps)` to apply pending migrations, `status(db)` to
 > log each migration's state, `lock_key()` and `lock(tx)` for the run's advisory

@@ -53,7 +53,7 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    `IntoTableName` maps iden / 2-tuple
+// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
@@ -66,7 +66,7 @@ fn into_table_name_maps_the_two_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    `IntoNamedTable` maps the same spellings to an
+// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoNamedTable` maps the same spellings to an
 // unaliased named table, and a `TableName` or `NamedTable` passes through
 #[test]
 fn into_named_table_maps_the_named_forms() {
@@ -100,7 +100,7 @@ fn into_named_table_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    `IntoFromItem` widens every named spelling, and
+// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoFromItem` widens every named spelling, and
 // a `TableName` or `NamedTable` converts infallibly
 #[test]
 fn into_from_item_maps_the_named_forms() {
@@ -128,7 +128,7 @@ fn into_from_item_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    `alias` binds an alias and replaces an existing
+// [spec:pgorm:def:sql.types.table-ref+3/test]    `alias` binds an alias and replaces an existing
 // one, on the named form and on the value-producing forms alike
 #[test]
 fn from_item_alias_adds_or_replaces() {
@@ -165,7 +165,7 @@ fn from_item_alias_adds_or_replaces() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    a column of a from item is qualified by its
+// [spec:pgorm:def:sql.types.table-ref+3/test]    a column of a from item is qualified by its
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
@@ -193,7 +193,7 @@ fn from_item_qualifier_prefers_the_alias() {
     assert_eq!(values.table_name(), None);
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    the named form renders as dotted, quoted parts
+// [spec:pgorm:def:sql.types.table-ref+3/test]    the named form renders as dotted, quoted parts
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
@@ -222,7 +222,7 @@ fn named_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    the write statements take the same named table,
+// [spec:pgorm:def:sql.types.table-ref+3/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+2/test]
 // [spec:pgorm:req:sql.ast.update+4/test]
@@ -260,7 +260,7 @@ fn aliased_dml_targets_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+2/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+3/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
 fn value_producing_from_item_forms_render() {
@@ -382,7 +382,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+6/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+7/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -427,7 +427,7 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+6/test]    equality compares parameters, renders
+// [spec:pgorm:def:sql.types.column-type+7/test]    equality compares parameters, renders
 // `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
@@ -502,7 +502,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+6/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+7/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -544,7 +544,7 @@ fn pg_interval_display_and_parse_round_trip() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+6/test]    the precision vocabulary is the closed set
+// [spec:pgorm:def:sql.types.column-type+7/test]    the precision vocabulary is the closed set
 // PostgreSQL accepts, and nothing outside it constructs
 #[test]
 fn interval_precision_is_zero_through_six() {

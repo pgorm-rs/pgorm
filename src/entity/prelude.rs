@@ -20,8 +20,8 @@
 //! writing it as a token instead of a string is only cheaper than
 //! `Name::runtime` if the token is already in scope.
 
-// [spec:pgorm:def:entity.prelude+3]
-// [spec:pgorm:sem:query.build.alias+1]
+// [spec:pgorm:def:entity.prelude+4]
+// [spec:pgorm:sem:query.build.alias+2]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
     ActiveValue::{NotSet, Set, Unchanged},

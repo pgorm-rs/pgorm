@@ -333,7 +333,7 @@ async fn graph_related_and_via() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+1/test]    a graph's cursor orders on the
+// [spec:pgorm:sem:query.graph.cursor+2/test]    a graph's cursor orders on the
 // root and tiebreaks on the declared slot's primary key, so a page that ends
 // inside a run of rows sharing a root resumes exactly through `after_with` —
 // where the order-column boundary can only skip the rest of the run — and the
@@ -414,7 +414,7 @@ async fn graph_cursor_tie_straddles_a_page_boundary() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+1/test]    `cursor_by_on` orders on the
+// [spec:pgorm:sem:query.graph.cursor+2/test]    `cursor_by_on` orders on the
 // slot its position names, typed against that slot's entity, completes that
 // slot's own key, and then tiebreaks on the root's primary key
 #[pgorm_macros::test]
@@ -456,7 +456,7 @@ async fn graph_cursor_on_a_slot() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+1/test]    an `_as` slot's tiebreak is
+// [spec:pgorm:sem:query.graph.cursor+2/test]    an `_as` slot's tiebreak is
 // qualified by its alias: the bare table is not in the query at all, so a
 // tiebreak naming it would be SQL PostgreSQL refuses
 #[pgorm_macros::test]
@@ -497,7 +497,7 @@ async fn graph_cursor_alias_qualifies_the_tiebreak() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+1/test]    the inherited NULL limitation is
+// [spec:pgorm:sem:query.graph.cursor+2/test]    the inherited NULL limitation is
 // live on a graph: an unmatched `Opt` slot's primary key is null, so the
 // extended boundary's tie disjunct is dead and such a row is reached through
 // the order-column boundary instead — documented, not worked around
@@ -956,7 +956,7 @@ async fn graph_grouped_composite_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+1/test]    equal order-column values
+// [spec:pgorm:sem:query.graph.cursor+2/test]    equal order-column values
 // under one root stay reachable: the ordered slot's own key completes the
 // boundary, so resuming mid-run yields the sibling instead of skipping it
 #[pgorm_macros::test]

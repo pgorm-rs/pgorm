@@ -238,7 +238,7 @@ fn into_simple_expr_accepts_three_shapes() {
     );
 }
 
-// [spec:pgorm:sem:query.build.filter+1/test]    repeated `filter` calls AND
+// [spec:pgorm:sem:query.build.filter+2/test]    repeated `filter` calls AND
 // together; condition trees, `add_option` and raw pgorm-query expressions all
 // arrive through the same entry point
 #[test]
@@ -294,7 +294,7 @@ fn filter_accumulates_and_accepts_trees() {
     );
 }
 
-// [spec:pgorm:def:entity.traits.column+5/test]    `eq_any` / `ne_all` spend one
+// [spec:pgorm:def:entity.traits.column+6/test]    `eq_any` / `ne_all` spend one
 // parameter on the whole list, so the statement text is the same at every
 // cardinality, where `is_in` / `is_not_in` spend one per element
 #[test]
@@ -384,7 +384,7 @@ fn eq_any_casts_enum_arrays_as_a_whole() {
     );
 }
 
-// [spec:pgorm:sem:query.build.filter+1/test]    `belongs_to` emits one equality
+// [spec:pgorm:sem:query.build.filter+2/test]    `belongs_to` emits one equality
 // per primary-key column of the model's entity; `belongs_to_tbl_alias`
 // qualifies the same columns with a table alias
 #[test]
@@ -1357,7 +1357,7 @@ fn delete_many_is_unconstrained_until_filtered() {
     );
 }
 
-// [spec:pgorm:sem:query.build.alias+1/test]    one token binding serves the
+// [spec:pgorm:sem:query.build.alias+2/test]    one token binding serves the
 // aliasing position and every reference to the name it introduced, across the
 // `IntoKey`, `IntoName` and `IntoColumnRef` conversions alike
 #[test]

@@ -13,8 +13,8 @@
 use crate::{IntoName, IntoTableName, Name, QueryBuilder, TableName};
 
 /// Helper for constructing any comment statement
-// [spec:pgorm:req:sql.ddl+6]
-// [spec:pgorm:req:sql.ddl.comment+3]
+// [spec:pgorm:req:sql.ddl+7]
+// [spec:pgorm:req:sql.ddl.comment+4]
 #[derive(Debug)]
 pub struct Comment;
 
@@ -57,7 +57,7 @@ pub enum CommentTarget {
 ///     r#"COMMENT ON TABLE "public"."character" IS 'it''s a table'"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.comment+3]
+// [spec:pgorm:req:sql.ddl.comment+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommentStatement {
     pub(crate) target: CommentTarget,
@@ -106,7 +106,7 @@ impl CommentStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for CommentStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(128);

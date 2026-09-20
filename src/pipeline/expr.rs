@@ -51,7 +51,7 @@ pub(super) fn name<'brand>(name: &str) -> Expr<'brand> {
 /// name becomes ambiguous the moment a join enters the pipeline. Minting the
 /// reference from a `(table, column)` [`SqlName`] pair makes the qualified form
 /// the only representable one.
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 pub fn col<'brand>(table: impl IntoName, column: impl IntoName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec![SqlName::to_string(&*table.into_name())],
@@ -90,7 +90,7 @@ pub fn this<'brand>(column: impl IntoName) -> Expr<'brand> {
 
 /// An entity column is a table-qualified expression: the column enum carries
 /// its entity, so the qualification is recovered rather than restated.
-// [spec:pgorm:sem:pipeline.qualify+2]
+// [spec:pgorm:sem:pipeline.qualify+3]
 impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
     fn from(column: C) -> Self {
         branded(adapter::ident_in(

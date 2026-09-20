@@ -19,7 +19,7 @@ pub trait MigrationName {
 }
 
 /// The migration definition
-// [spec:pgorm:def:migration.runner+1]    author-facing half
+// [spec:pgorm:def:migration.runner+2]    author-facing half
 // [spec:pgorm:req:migration.up-only]    `up` is the only direction
 #[async_trait::async_trait]
 pub trait MigrationTrait: MigrationName + Send + Sync {

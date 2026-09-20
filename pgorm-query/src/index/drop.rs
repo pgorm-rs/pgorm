@@ -27,7 +27,7 @@ use crate::{QueryBuilder, types::*};
 ///     r#"DROP INDEX "idx-character-id""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-drop+2]
+// [spec:pgorm:req:sql.ddl.index-drop+3]
 #[derive(Debug, Clone)]
 pub struct IndexDropStatement {
     pub(crate) table: Option<TableName>,
@@ -66,7 +66,7 @@ impl IndexDropStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for IndexDropStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

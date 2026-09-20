@@ -220,7 +220,7 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+1]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+5]
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+2]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
     let mut table_name = None;

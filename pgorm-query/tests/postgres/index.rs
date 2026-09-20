@@ -128,7 +128,7 @@ fn nulls_not_distinct_needs_the_unique_kind() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-drop+2/test]
+// [spec:pgorm:req:sql.ddl.index-drop+3/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -137,7 +137,7 @@ fn drop_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-drop+2/test]
+// [spec:pgorm:req:sql.ddl.index-drop+3/test]
 #[test]
 fn drop_2() {
     assert_eq!(

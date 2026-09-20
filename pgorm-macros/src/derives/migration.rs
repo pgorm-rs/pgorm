@@ -27,7 +27,7 @@ impl DeriveMigrationName {
 }
 
 /// Method to derive a MigrationName
-// [spec:pgorm:def:macros.derive+1]
+// [spec:pgorm:def:macros.derive+2]
 pub fn expand_derive_migration_name(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     Ok(DeriveMigrationName::new(input).expand())
 }

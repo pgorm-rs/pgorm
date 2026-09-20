@@ -3,21 +3,21 @@
 This spec covers the procedural macro suite: the `pgorm-macros` crate (entity/model
 derives, active enums, relations, partial models, the vendored strum `EnumIter`, and the
 `#[pgorm_macros::test]` harness attribute), the two pgorm-query proc-macro crates
-(`pgorm-query-derive` for `Iden`/`IdenStatic`, `pgorm-query-attr` for `#[enum_def]`), and
+(`pgorm-query-derive` for `SqlName`/`StaticName`, `pgorm-query-attr` for `#[enum_def]`), and
 `pgorm-sql-macro` (the compile-time-checked `sql!` and `prql!` literals). Rules are
 maintenance-scope: they describe what the macros generate and reject today, including
 known limitations.
 
 ## The macro suite
 
-> [spec:pgorm:def:macros.derive+1]
+> [spec:pgorm:def:macros.derive+2]
 > The `pgorm-macros` crate exposes the ORM's derive macros, all gated behind the crate's
 > `derive` feature except `EnumIter`, which is gated behind `strum`: `DeriveEntity`,
 > `DeriveEntityModel`, `DerivePrimaryKey`, `DeriveColumn`, `DeriveCustomColumn`,
 > `DeriveModel`, `DeriveActiveModel`, `DeriveIntoActiveModel`, `DeriveActiveModelBehavior`,
 > `DeriveActiveEnum`, `FromQueryResult`, `DeriveRelation`,
 > `DeriveMigrationName`, `FromJsonQueryResult`, `DerivePartialModel`, `DeriveValueType`,
-> `DeriveDisplay`, `DeriveIden`, and `EnumIter`, plus the `#[pgorm_macros::test]`
+> `DeriveDisplay`, `DeriveSqlName`, and `EnumIter`, plus the `#[pgorm_macros::test]`
 > attribute macro. Every entity-side derive reads its configuration from the shared
 > `#[pgorm(...)]` helper attribute (`EnumIter` uses `#[strum(...)]`).
 >
@@ -42,7 +42,7 @@ known limitations.
 > `pgorm::pgorm_query` re-export; `pgorm-migration`, which `DeriveMigrationName` names
 > directly, follows the same rule as `pgorm`.
 >
-> Separately, `pgorm-query-derive` provides `Iden` and `IdenStatic` derives using the
+> Separately, `pgorm-query-derive` provides `SqlName` and `StaticName` derives using the
 > `iden` and `method` helper attributes, and `pgorm-query-attr` provides the `#[enum_def]`
 > attribute macro.
 
@@ -63,7 +63,7 @@ known limitations.
 > identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
 > PostgreSQL has no type for. The verbatim rendering is sound exactly because the
 > text is a compile-time literal in the caller's source, unreachable from data;
-> `[spec:pgorm:def:sql.types.type-name+3]` is where that text rides — the
+> `[spec:pgorm:def:sql.types.type-name+4]` is where that text rides — the
 > `verbatim` flag of the ordinary cast node, not a shape of its own
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — and it keeps every
 > *identifier*-borne type name quoted
@@ -74,7 +74,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+1]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+2]`).
 >
 > The `json_key()` arm is the one place the derive reads an attribute outside the
 > `#[pgorm(...)]` namespace: the key is the field's own name, put through
@@ -84,7 +84,7 @@ known limitations.
 > parameter is stepped over unread. Column naming does not take part in either
 > direction — `#[pgorm(column_name)]` and `#[pgorm(enum_name)]` move the SQL name and
 > the variant, not the key — which is the point of the two namespaces being separate
-> (`[spec:pgorm:def:entity.traits.column+5]`).
+> (`[spec:pgorm:def:entity.traits.column+6]`).
 
 > [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier
@@ -191,7 +191,7 @@ known limitations.
 > `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`).
 >
 > The parallel `ArrayType` table that `DeriveValueType` reads
-> (`[spec:pgorm:sem:macros.derive.value-type+2]`) is matched the same way and carries the
+> (`[spec:pgorm:sem:macros.derive.value-type+3]`) is matched the same way and carries the
 > same rows mapped to their `ArrayType` counterparts, with two divergences. `Vec<u8>`
 > it does not carry at all. And the timezone-aware datetime row splits:
 > `DateTimeUtc`→`ChronoDateTimeUtc`, `DateTimeLocal`→`ChronoDateTimeLocal`,
@@ -203,7 +203,7 @@ known limitations.
 > `DeriveValueType` too: a newtype over one of the four refused types is the same
 > compile error.
 
-> [spec:pgorm:sem:macros.derive.entity-model.primary-key+1]
+> [spec:pgorm:sem:macros.derive.entity-model.primary-key+2]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
 > its type to `PrimaryKeyTrait::ValueType` — a bare type for a single key, a tuple for
 > composite keys. `auto_increment()` returns true only when there is exactly one primary
@@ -211,31 +211,31 @@ known limitations.
 > shared: a `false` on any field flips it globally).
 >
 > `DerivePrimaryKey` itself (enums only; other inputs are a compile error) generates
-> `Iden` delegating to `IdenStr::as_str`, an `IdenStr` impl mapping each variant
+> `SqlName` delegating to `StaticName::as_str`, an `StaticName` impl mapping each variant
 > to its snake_case name (or a `column_name` attribute override), and a
 > `PrimaryKeyToColumn` impl whose `into_column`/`from_column` map variants to the
 > same-named variants of a sibling type hard-coded as `Column`.
 
-> [spec:pgorm:sem:macros.derive.entity+1]
+> [spec:pgorm:sem:macros.derive.entity+2]
 > `DeriveEntity` wires up the entity unit struct. It always generates
 > `impl EntityTrait` with associated types `Model`, `ActiveModel`, `Column`,
 > `PrimaryKey`, `Relation` — each identifier defaulting to those names but overridable
 > via struct-level `#[pgorm(model = Ident, active_model = Ident, column = Ident,
-> primary_key = Ident, relation = Ident)]` — plus `Iden` and `IdenStr` impls that
+> primary_key = Ident, relation = Ident)]` — plus `SqlName` and `StaticName` impls that
 > render `EntityName::table_name`. An `EntityName` impl (with optional `schema_name`)
 > is generated only when a `table_name` attribute is present; the `DeriveEntityModel`
 > path omits it because the composite writes its own `EntityName` impl.
 
 ## Column, Model and ActiveModel derives
 
-> [spec:pgorm:sem:macros.derive.column+2]
+> [spec:pgorm:sem:macros.derive.column+3]
 > `DeriveColumn` (enums only; other inputs are a compile error) generates: an inherent
 > `default_as_str` returning the snake_case of the variant name or a
 > `#[pgorm(column_name = "...")]` override; a `FromStr` impl accepting either the
 > snake_case or the lowerCamelCase spelling of each variant and returning
-> `ColumnFromStrError(input)` otherwise; an `Iden` impl writing `IdenStr::as_str`; and
-> an `IdenStr` impl whose `as_str` is `default_as_str`. `DeriveCustomColumn`
-> generates the same minus the `IdenStr` impl, leaving `as_str` to the user (who may
+> `ColumnFromStrError(input)` otherwise; an `SqlName` impl writing `StaticName::as_str`; and
+> an `StaticName` impl whose `as_str` is `default_as_str`. `DeriveCustomColumn`
+> generates the same minus the `StaticName` impl, leaving `as_str` to the user (who may
 > delegate to `default_as_str`) — this is the escape hatch for non-snake-case column
 > names. Note that neither derive adds `EnumIter`; callers derive it alongside.
 
@@ -283,7 +283,7 @@ known limitations.
 
 ## Active enums
 
-> [spec:pgorm:syn:macros.derive.active-enum+1]
+> [spec:pgorm:syn:macros.derive.active-enum+2]
 > `DeriveActiveEnum` applies to enums only ("you can only derive ActiveEnum on enums").
 > Container attributes: `rs_type = "Type"` and `db_type = "ColumnType expr"` are
 > mandatory — missing either produces the compile error "Missing macro attribute
@@ -291,7 +291,7 @@ known limitations.
 > UpperCamelCase of the enum name), `schema_name = "string"` and
 > `rename_all = "style"` are optional. The special
 > spelling `db_type = "Enum"` expands to
-> `Enum { name: Self::name(), schema, variants: Self::iden_values() }`, where
+> `Enum { name: Self::name(), schema, variants: Self::name_values() }`, where
 > `schema` is the `schema_name` attribute as an iden when given and `None`
 > otherwise — attribute order does not matter. Variant attributes:
 > `string_value = "s"`, `num_value = int`, `rename = "style"`, and `display_value`
@@ -304,11 +304,11 @@ known limitations.
 > literals written with unary minus (other unary operators are rejected); a variant with
 > neither attribute nor usable discriminant is a compile error.
 
-> [spec:pgorm:sem:macros.derive.active-enum.expansion+1]
-> The expansion generates: a unit struct `{Enum}Enum` with an `Iden` impl writing the
+> [spec:pgorm:sem:macros.derive.active-enum.expansion+2]
+> The expansion generates: a unit struct `{Enum}Enum` with an `SqlName` impl writing the
 > `enum_name`; when any variant has a string value (explicit or via rename), an enum
-> `{Enum}Variant` deriving `EnumIter` with an `Iden` impl writing the raw string values
-> and an inherent `iden_values()` returning them as `DynIden`s; an `ActiveEnum` impl
+> `{Enum}Variant` deriving `EnumIter` with an `SqlName` impl writing the raw string values
+> and an inherent `name_values()` returning them as `Name`s; an `ActiveEnum` impl
 > with `Value = rs_type`, `ValueVec = Vec<rs_type>`, `name()` returning the
 > `{Enum}Enum` iden, `to_value()` matching variants to their values, `try_from_value()`
 > matching back (comparing `v.as_ref()` for strings) and failing with
@@ -414,7 +414,7 @@ known limitations.
 > column, and silent data loss against a nullable one. The panic is documented on the
 > derive.
 
-> [spec:pgorm:sem:macros.derive.value-type+2]
+> [spec:pgorm:sem:macros.derive.value-type+3]
 > `DeriveValueType` targets newtype tuple structs; it reads only the first unnamed
 > field. Any other input shape is a compile error spanned at the struct identifier —
 > "DeriveValueType can only be derived on a tuple struct", or "DeriveValueType requires
@@ -430,23 +430,23 @@ known limitations.
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to
 > the inner type with `type_name()` = the struct name; no `Nullable` impl is generated.
 
-## Iden derives and query helpers
+## Name derives and query helpers
 
-> [spec:pgorm:sem:macros.derive.iden+1]
-> `DeriveIden` (in `pgorm-macros`) supports enums and unit structs; anything else is
-> the compile error "you can only derive DeriveIden on unit struct or enum", and an
+> [spec:pgorm:sem:macros.derive.iden+2]
+> `DeriveSqlName` (in `pgorm-macros`) supports enums and unit structs; anything else is
+> the compile error "you can only derive DeriveSqlName on unit struct or enum", and an
 > empty enum expands to nothing. A unit struct renders the snake_case of its type name,
 > overridable with container `#[pgorm(iden = "...")]`. An enum renders each variant's
 > snake_case name, except the special variant `Table`, which renders the snake_case of
 > the enum's own name; per-variant `#[pgorm(iden = "...")]` substitutes a literal
-> string. The `Iden::prepare` override (which wraps the name in quote characters) is
+> string. The `SqlName::prepare` override (which wraps the name in quote characters) is
 > emitted only when every rendered name is a "valid iden" (first char `_` or ASCII
 > alphabetic, rest `_` or ASCII alphanumeric); otherwise the trait default handles
 > quoting. A malformed variant-level attribute is the parser's own spanned compile
 > error, propagated out of the derive rather than panicking the macro.
 
 > [spec:pgorm:sem:macros.derive.iden.query]
-> `pgorm-query-derive` defines `Iden` and `IdenStatic` derives over enums and unit
+> `pgorm-query-derive` defines `SqlName` and `StaticName` derives over enums and unit
 > structs (helper attributes `iden` and `method`; empty enums expand to nothing; other
 > shapes are a compile error). The container name defaults to the snake_case type name
 > and may only be renamed with `#[iden = "name"]` — list forms at container level are
@@ -456,8 +456,11 @@ known limitations.
 > variant (multi-field or unit variants are "Must have a single field is supported for
 > flattenning"); the variant `Table` renders the container name; everything else
 > snake_cases the variant. `prepare` is emitted only when all names are statically
-> valid idens (`method`/`flatten` disqualify). `IdenStatic` additionally generates
-> `as_str() -> &'static str` and `AsRef<str>` from the same naming rules. Limitation:
+> valid idens (`method`/`flatten` disqualify). `StaticName` additionally generates
+> `as_str(&self) -> &str` and `AsRef<str>` from the same naming rules. The
+> derive keeps the attribute word `iden` — the ratified rename covers the
+> types and the derives, not the attribute key, which sits beside
+> `column_name` / `enum_name` / `table_name` keys that mean other things. Limitation:
 > `TryFrom<Meta> for IdenAttr` ends in a bare `todo!()` for any attribute path other
 > than `iden`/`method` (pgorm-query-derive/src/iden_attr.rs:91); it is unreachable
 > today only because `find_attr` pre-filters to those two paths, and any new call path
@@ -467,14 +470,14 @@ known limitations.
 > `#[enum_def]` (in `pgorm-query-attr`) applies to named-field structs — anything else
 > panics with "#[enum_def] can only be used on structs" — and re-emits the input
 > unchanged followed by a generated
-> `pub enum {prefix}{Struct}{suffix}` (defaults: empty prefix, suffix `Iden`, so
-> `StructIden`) deriving `Debug, Clone, Copy, PartialEq, Eq, Hash`, with a `Table`
-> variant plus one PascalCase variant per field. Its `Iden::unquoted` writes
+> `pub enum {prefix}{Struct}{suffix}` (defaults: empty prefix, suffix `Name`, so
+> `StructName`) deriving `Debug, Clone, Copy, PartialEq, Eq, Hash`, with a `Table`
+> variant plus one PascalCase variant per field. Its `SqlName::unquoted` writes
 > `stringify!` of the table name identifier for `Table` — defaulting to the snake_case
 > struct name, overridable with `table_name = "..."` (which must itself be a valid
 > identifier, since it is re-parsed as one) — and `stringify!` of the original field
 > identifier for each field variant. The `crate_name = "..."` argument (default
-> `pgorm_query`) rewrites the `Iden` trait path but not the hard-coded
+> `pgorm_query`) rewrites the `SqlName` trait path but not the hard-coded
 > `pgorm_query::Write` argument type in the generated method.
 
 ## Iteration and test harness

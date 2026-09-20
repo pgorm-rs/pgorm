@@ -23,7 +23,7 @@ use crate::{QueryBuilder, types::*};
 ///     r#"ALTER TABLE "font" RENAME TO "font_new""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+// [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
 #[derive(Debug, Clone)]
 pub struct TableRenameStatement {
     pub(crate) from_name: TableName,
@@ -50,7 +50,7 @@ impl TableRenameStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for TableRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
@@ -117,7 +117,7 @@ impl ColumnRenameStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+6]
+// [spec:pgorm:req:sql.ddl+7]
 impl std::fmt::Display for ColumnRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

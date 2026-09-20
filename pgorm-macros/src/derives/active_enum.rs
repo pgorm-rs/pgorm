@@ -29,7 +29,7 @@ struct ActiveEnumVariant {
 }
 
 impl ActiveEnum {
-    // [spec:pgorm:syn:macros.derive.active-enum+1]
+    // [spec:pgorm:syn:macros.derive.active-enum+2]
     fn new(input: syn::DeriveInput) -> Result<Self, Error> {
         let ident_span = input.ident.span();
         let ident = input.ident;
@@ -211,7 +211,7 @@ impl ActiveEnum {
         })
     }
 
-    // [spec:pgorm:sem:macros.derive.active-enum.expansion+1]
+    // [spec:pgorm:sem:macros.derive.active-enum.expansion+2]
     fn expand(&self) -> syn::Result<TokenStream> {
         let expanded_impl_active_enum = self.impl_active_enum();
 

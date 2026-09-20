@@ -1461,7 +1461,7 @@ impl QueryBuilder {
                     Some(size) => format!("vector({size})"),
                     None => "vector".into(),
                 },
-                // [spec:pgorm:req:sql.render.ident-quoting+4]
+                // [spec:pgorm:req:sql.render.ident-quoting+5]
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. } => {
                     let mut type_name = TypeName::new(Name::clone(name));
@@ -1592,7 +1592,7 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
     pub(crate) fn prepare_table_rename_statement(
         &self,
         rename: &TableRenameStatement,
@@ -1697,7 +1697,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`CommentStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     pub(crate) fn prepare_comment_statement(
         &self,
         statement: &CommentStatement,
@@ -1721,13 +1721,13 @@ impl QueryBuilder {
     }
 
     /// Write comment text as a standard-conforming string literal.
-    // [spec:pgorm:req:sql.ddl.comment+3]
+    // [spec:pgorm:req:sql.ddl.comment+4]
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
         write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
     }
 
     /// Translate [`TableDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+    // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
     pub(crate) fn prepare_table_drop_statement(
         &self,
         drop: &TableDropStatement,
@@ -1869,7 +1869,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.index-drop+2]
+    // [spec:pgorm:req:sql.ddl.index-drop+3]
     pub(crate) fn prepare_index_drop_statement(
         &self,
         drop: &IndexDropStatement,
@@ -1897,7 +1897,7 @@ impl QueryBuilder {
                     IndexType::BTree => "BTREE".to_owned(),
                     IndexType::Gin => "GIN".to_owned(),
                     IndexType::Hash => "HASH".to_owned(),
-                    // [spec:pgorm:req:sql.render.ident-quoting+4]
+                    // [spec:pgorm:req:sql.render.ident-quoting+5]
                     IndexType::Named(method) => {
                         let mut part = String::new();
                         TypeName::prepare_part(method, &mut part);
@@ -2093,7 +2093,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`NamedTable`] into SQL statement.
-    // [spec:pgorm:def:sql.types.table-ref+2]
+    // [spec:pgorm:def:sql.types.table-ref+3]
     fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {
@@ -2103,7 +2103,7 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
-    // [spec:pgorm:req:sql.ddl.type-enum+4]
+    // [spec:pgorm:req:sql.ddl.type-enum+5]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
         match as_type {
             TypeAs::Enum(values) => {
@@ -2131,7 +2131,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4] (ALTER TYPE label operands parameterized)
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5] (ALTER TYPE label operands parameterized)
     fn prepare_alter_type_opt(&self, opt: &TypeAlterOpt, sql: &mut dyn SqlWriter) {
         match opt {
             TypeAlterOpt::Add(value, placement) => {
@@ -2165,8 +2165,8 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+4]
-    // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+    // [spec:pgorm:req:sql.ddl.type-enum+5]
+    // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub(crate) fn prepare_type_create_statement(
         &self,
         create: &TypeCreateStatement,
@@ -2182,7 +2182,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+5]
     pub(crate) fn prepare_type_drop_statement(
         &self,
         drop: &TypeDropStatement,
@@ -2208,7 +2208,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+5]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,
@@ -2241,8 +2241,8 @@ impl QueryBuilder {
     }
 
     // EXTENSION
-    // [spec:pgorm:req:sql.ddl.extension+4]
-    // [spec:pgorm:sem:sql.render.ddl.extension+2] (CREATE EXTENSION)
+    // [spec:pgorm:req:sql.ddl.extension+5]
+    // [spec:pgorm:sem:sql.render.ddl.extension+3] (CREATE EXTENSION)
     pub(crate) fn prepare_extension_create_statement(
         &self,
         create: &ExtensionCreateStatement,
@@ -2273,8 +2273,8 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.extension+4]
-    // [spec:pgorm:sem:sql.render.ddl.extension+2] (DROP EXTENSION)
+    // [spec:pgorm:req:sql.ddl.extension+5]
+    // [spec:pgorm:sem:sql.render.ddl.extension+3] (DROP EXTENSION)
     pub(crate) fn prepare_extension_drop_statement(
         &self,
         drop: &ExtensionDropStatement,

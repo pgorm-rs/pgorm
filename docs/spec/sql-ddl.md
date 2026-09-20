@@ -10,7 +10,7 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+6]
+> [spec:pgorm:req:sql.ddl+7]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
@@ -25,7 +25,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > one.
 >
 > `TypeCreateStatement` and `TypeAlterStatement` push their enum labels through
-> `push_param` (`[spec:pgorm:req:sql.render.ddl.enum-type+4]`), so they have a
+> `push_param` (`[spec:pgorm:req:sql.render.ddl.enum-type+5]`), so they have a
 > second rendering and MUST expose it as `build() -> (String, Values)` beside
 > the `build_collect(sink)` they already had — the capability named, rather
 > than reachable only by constructing a `SqlWriterValues` and calling the
@@ -51,11 +51,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Every identifier a
 > DDL statement renders — table, column and type names, and index, constraint
-> and foreign-key names alike — MUST go through `Iden::prepare` and so render
+> and foreign-key names alike — MUST go through `SqlName::prepare` and so render
 > double-quoted (quote character `"`, embedded quotes doubled); no identifier
 > is interpolated raw between quote characters. Index and constraint names are
-> held as `DynIden` and accepted as `IntoIden`, so a `&str` or `String` name
-> escapes through `Alias` like any other identifier. `TableStatement` is an
+> held as `Name` and accepted as `IntoName`, so a runtime name minted by
+> `Name::runtime` escapes like any other. `TableStatement` is an
 > enum wrapper whose `Display` dispatches to the variant's own; `IndexStatement`,
 > `ForeignKeyStatement` and `SchemaStatement` are plain wrapper enums whose
 > variants render through the same builders.
@@ -227,12 +227,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Extra` string, comma-separated. `AutoIncrement`, `Generated` and `Comment`
 > specs are ignored in modify.
 
-> [spec:pgorm:req:sql.ddl.drop-rename-truncate+3]
+> [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
 > `TableDropStatement` accumulates multiple `TableName`s and MUST render
 > `DROP TABLE [IF EXISTS ]"t1", "t2"[ RESTRICT][ CASCADE]` (`restrict()` and
 > `cascade()` append `TableDropOpt`s in call order). `TableRenameStatement`
 > MUST render `ALTER TABLE <from> RENAME TO <to>`, where the source is a
-> `TableName` and the target is a bare `DynIden`: `RENAME TO` cannot move a
+> `TableName` and the target is a bare `Name`: `RENAME TO` cannot move a
 > table between schemas, so a qualified target does not construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). `TableTruncateStatement`
 > MUST render `TRUNCATE TABLE <table>`; no `CASCADE`/`RESTART IDENTITY`
@@ -249,21 +249,21 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Comments
 
-> [spec:pgorm:req:sql.ddl.comment+3]
+> [spec:pgorm:req:sql.ddl.comment+4]
 > A comment is a statement of its own on Postgres, not a clause of `CREATE
 > TABLE`, so `CommentStatement` is built separately from the DDL creating the
 > object it describes. `Comment::on_table(table, text)` and
 > `Comment::on_column(table, column, text)` are the only constructors and both
 > take target and text up front, so every `CommentStatement` denotes a
 > complete statement and no build path can fail or panic. The target table is
-> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+2]`) — the same type
+> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+3]`) — the same type
 > every other DDL statement targets, reached through `IntoTableName` from an
 > iden or a `(schema, table)` tuple — so a comment can only name a table the
 > DDL beside it could also name, and there is no conversion to fail.
 >
 > Rendering MUST emit `COMMENT ON TABLE <table> IS '<text>'` or
 > `COMMENT ON COLUMN <table>.<column> IS '<text>'`, where the table, schema
-> and column names render through `Iden::prepare` (double-quoted,
+> and column names render through `SqlName::prepare` (double-quoted,
 > embedded quotes doubled) and the text renders as a standard-conforming
 > string literal: wrapped in single quotes with every embedded single quote
 > doubled and nothing else altered — backslashes are literal, so no `E''`
@@ -349,9 +349,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > target is a `TableName`, so both of its forms render and no other shape is
 > constructible.
 
-> [spec:pgorm:req:sql.ddl.index-drop+2]
+> [spec:pgorm:req:sql.ddl.index-drop+3]
 > `IndexDropStatement` MUST render `DROP INDEX [IF EXISTS ]["schema".]"name"`.
-> The index name is a `DynIden` taken by `Index::drop(name)`, being the whole
+> The index name is a `Name` taken by `Index::drop(name)`, being the whole
 > of what the statement names: PostgreSQL rejects `DROP INDEX ` at end of
 > input, so the nameless drop does not construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The table is the part that
@@ -405,7 +405,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+4]
+> [spec:pgorm:req:sql.ddl.type-enum+5]
 > An enum type reference declares an optional schema — `Type::create` and its
 > siblings take any `IntoTypeRef`, so `(schema, name)` names a qualified type
 > and a bare name an unqualified one — and every DDL rendering MUST qualify
@@ -421,7 +421,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `AS ENUM` that renders it. A label is DATA, not a name: it renders as a
 > string literal, so `values` is bound `Into<String>` and MUST NOT take an
 > identifier type. The two are not interchangeable — an identifier bound
-> would invite a caller to pass an `Iden` whose text is then emitted as a
+> would invite a caller to pass an `SqlName` whose text is then emitted as a
 > literal, spelling a contract the render does not keep. An enumeration MUST render `CREATE TYPE <name> AS
 > ENUM (<labels>)` with the parentheses always present, empty list included:
 > `CREATE TYPE "t" AS ENUM ()` is an accepted spelling of the empty enum, and
@@ -433,7 +433,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `TypeAs` has no other variants (composite/range/base are commented out
 > upstream).
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop+4]
+> [spec:pgorm:req:sql.ddl.type-alter-drop+5]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
@@ -443,8 +443,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > render as a quoted identifier. The bounds MUST say which is which:
 > `add_value`, `rename_value`, `before` and `after` take `Into<String>` and
 > carry `String` in `TypeAlterOpt::Add` / `RenameValue` and
-> `TypeAlterAddOpt::Before` / `After`, while `rename_to` keeps `IntoIden`
-> and `TypeAlterOpt::Rename` keeps `DynIden`. Unlike the other type builders,
+> `TypeAlterAddOpt::Before` / `After`, while `rename_to` keeps `IntoName`
+> and `TypeAlterOpt::Rename` keeps `Name`. Unlike the other type builders,
 > `TypeAlterStatement` methods take `self` by value.
 >
 > `Type::alter(name)` yields a `PendingTypeAlter` rather than a statement, and
@@ -463,28 +463,28 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Extensions
 
-> [spec:pgorm:req:sql.ddl.extension+4]
+> [spec:pgorm:req:sql.ddl.extension+5]
 > `ExtensionCreateStatement` MUST render `CREATE EXTENSION [IF NOT EXISTS ]
 > <name>[ WITH SCHEMA <schema>][ VERSION <version>][ CASCADE]`, and
 > `ExtensionDropStatement` MUST render `DROP EXTENSION [IF EXISTS ]<name>
-> [ CASCADE| RESTRICT]`. The name is a `DynIden` taken by
+> [ CASCADE| RESTRICT]`. The name is a `Name` taken by
 > `Extension::create(name)` / `Extension::drop(name)` and has no setter: it used
 > to default to the empty `String`, which renders as the zero-length delimited
 > identifier `""` PostgreSQL rejects, so a statement that never names an
 > extension MUST NOT construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). An explicitly empty
-> identifier remains the caller's own to avoid, as `Alias::new("")` is
-> everywhere else in the crate. The schema is a `DynIden` set by
-> `schema(impl IntoIden)` — a schema qualifier is a name, and it takes the
+> identifier remains the caller's own to avoid, as `Name::runtime("")` is
+> everywhere else in the crate. The schema is a `Name` set by
+> `schema(impl IntoName)` — a schema qualifier is a name, and it takes the
 > identifier type every other schema position in the crate takes — while the
 > version stays a `String`, because the grammar puts a string literal there
 > and text is what it is. None of the three is written verbatim: name and
 > schema render as quoted identifiers and version as a quoted string literal
-> (`[spec:pgorm:sem:sql.render.ddl.extension+2]`). On drop, `CASCADE` and
+> (`[spec:pgorm:sem:sql.render.ddl.extension+3]`). On drop, `CASCADE` and
 > `RESTRICT` share one `ExtensionDropOpt` slot that `cascade()`/`restrict()`
 > overwrite, so the pair PostgreSQL rejects does not construct; a drop carries
 > no schema or version, because it renders neither.
-> `PgLTree` is a ready-made `Iden` rendering `ltree` (usable directly as an
+> `PgLTree` is a ready-made `SqlName` rendering `ltree` (usable directly as an
 > extension name); the ltree column type itself is `ColumnType::LTree`.
 
 ## Panics and unsupported forms
@@ -513,7 +513,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > Table reference shape was the third, and MUST NOT come back
 > either. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
 > and foreign-key targets and comment targets take a `TableName`
-> (`[spec:pgorm:def:sql.types.table-ref+2]`), which has no form the renderer
+> (`[spec:pgorm:def:sql.types.table-ref+3]`), which has no form the renderer
 > could refuse. The five `Not supported` panics and the `TableRef with values
 > is not support` panic that guarded these positions are gone, and a caller
 > cannot reintroduce them: binding an alias makes a reference a `NamedTable`,

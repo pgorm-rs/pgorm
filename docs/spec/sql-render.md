@@ -170,12 +170,12 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+4]
+> [spec:pgorm:req:sql.render.ident-quoting+5]
 > The quote is the double quote, and it is the only one: PostgreSQL has a
 > single identifier quote, so it is written at the render sites rather than
 > carried in a parameter that could hold another character. Every identifier
-> rendered through `Iden::prepare` MUST be wrapped in double quotes with any
-> embedded `"` doubled (`Iden::quoted` replaces `"` with `""`: `he"llo` →
+> rendered through `SqlName::prepare` MUST be wrapped in double quotes with any
+> embedded `"` doubled (`SqlName::quoted` replaces `"` with `""`: `he"llo` →
 > `"he""llo"`). Quoting is unconditional — there is
 > no reserved-word or safe-character check. This applies to column names, table
 > names, schema/database qualifiers, aliases, CTE names, window names, and
@@ -184,15 +184,15 @@ an ideal Postgres renderer would emit.
 >
 > No caller-supplied identifier reaches output unquoted. The bound is what
 > says so: a position that renders a *name* takes an identifier type or a
-> `TypeName`, and every such position renders through `Iden::prepare` or
+> `TypeName`, and every such position renders through `SqlName::prepare` or
 > through `TypeName`'s part policy (`sql.types.type-name`), which quotes
 > anything that is not already a safe lowercase identifier. In particular
 > `ColumnType::Named` carries a `TypeName` and renders through
 > `to_sql_string`, `IndexType::Named`'s access method renders through
 > `TypeName::prepare_part`, `Function::Named` function names render under
 > the same part policy, and `ExtensionCreateStatement`'s schema is a
-> `DynIden` like every other schema qualifier. Each of those three was once
-> a bare `Iden::to_string`, which emitted a hostile catalogue name as SQL;
+> `Name` like every other schema qualifier. Each of those three was once
+> a bare `SqlName::to_string`, which emitted a hostile catalogue name as SQL;
 > the fix is the one shared policy rather than a per-site escape, so a new
 > render site inherits it.
 >
@@ -621,14 +621,14 @@ an ideal Postgres renderer would emit.
 > `RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`) are rendered
 > by the same builder with identifiers quoted per `sql.render.ident-quoting`.
 
-> [spec:pgorm:req:sql.render.ddl.enum-type+4]
+> [spec:pgorm:req:sql.render.ddl.enum-type+5]
 > `CREATE TYPE` renders `CREATE TYPE name AS ENUM (…)` — the name via
 > `TypeRef`'s quoted, dot-joined parts, so a schema-qualified type renders
 > `"schema"."name"`. In cast and column-type position an
 > enum type renders through `TypeName`'s part policy
 > (`sql.types.type-name`): a safe lowercase part bare, anything else a
 > quoted identifier — so an enum name is a name there, never SQL, and
-> `enumeration(Alias::new("text, injected integer"))` yields a type
+> `enumeration(Name::runtime("text, injected integer"))` yields a type
 > PostgreSQL refuses rather than an extra column.
 >
 > A LABEL is not a name. Each is carried as a `String` and emitted through
@@ -644,11 +644,11 @@ an ideal Postgres renderer would emit.
 > these statements against PostgreSQL MUST use a rendering path that inlines
 > the labels, since Postgres does not accept bind parameters in DDL.
 
-> [spec:pgorm:sem:sql.render.ddl.extension+2]
+> [spec:pgorm:sem:sql.render.ddl.extension+3]
 > `CREATE EXTENSION [IF NOT EXISTS ]name [WITH SCHEMA s] [VERSION v]
 > [CASCADE]` and `DROP EXTENSION [IF EXISTS ]name [CASCADE|RESTRICT]` MUST
 > render the extension name and schema as quoted identifiers — both are
-> `DynIden`s and go through `Iden::prepare` like any other identifier, with
+> `Name`s and go through `SqlName::prepare` like any other identifier, with
 > no re-wrapping at the render site — and the version as a single-quoted string
 > literal through `sql.render.string-escape` — the grammar takes a word or a
 > string there, and a version like `v0.1.0` is not a word. The one string a

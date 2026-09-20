@@ -376,14 +376,15 @@ today, including panicking edges and deliberate failsafes.
 > re-entering the builder with `Expr::expr`; `#>` exists so that the common
 > multi-step path needs one node instead of a nest of them.
 
-> [spec:pgorm:def:sql.ast.keywords+4]
+> [spec:pgorm:def:sql.ast.keywords+5]
 > `Keyword` represents bare SQL keywords usable as expressions, and the variant
 > set is closed: `Null`, `CurrentDate`, `CurrentTime`, and `CurrentTimestamp`,
 > constructed by `Expr::current_date()`, `Expr::current_time()` and
 > `Expr::current_timestamp()`. There is no caller-supplied keyword — an
 > arbitrary word reaches keyword position only as an `Expr::raw`, which says
-> raw SQL where a `Keyword` would have said identifier. Identifier helpers: `Alias`
-> wraps an arbitrary string as an identifier and `Asterisk` expresses `*` — as a bare projection or
+> raw SQL where a `Keyword` would have said identifier. Name helpers:
+> `Name::runtime` wraps a runtime string as an identifier and `Asterisk`
+> expresses `*` — as a bare projection or
 > table-qualified via `(Table, Asterisk)` rendering `"table".*`. `ColumnRef`
 > spans `Column`, `TableColumn`, `SchemaTableColumn`, `Asterisk`, and
 > `TableAsterisk`; `TableName` spans plain and schema-qualified tables, and
@@ -394,7 +395,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+2]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -477,7 +478,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
 > (per `sql.ast.condition.holder`), an optional `ReturningClause`, and an
@@ -493,7 +494,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+3]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a WHERE `ConditionHolder` shared with the condition rules, and an
 > optional `ReturningClause`. Like the other three statements it carries an
@@ -608,7 +609,7 @@ today, including panicking edges and deliberate failsafes.
 > entity layer's enum casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
-> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+3]`), never by choosing
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+4]`), never by choosing
 > a different node.
 >
 > What this forbids is the second, `FunctionCall`-shaped cast whose type rode
@@ -625,7 +626,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+2]
+> [spec:pgorm:def:sql.ast.func+3]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -644,7 +645,7 @@ today, including panicking edges and deliberate failsafes.
 > and no `Func` constructor that produces one — a consumer matching on a
 > `FunctionCall` never has to consider a cast.
 >
-> `Func::named(iden)` calls an arbitrary function by identifier
+> `Func::named(name)` calls an arbitrary function by identifier
 > (`Function::Named`). A `FunctionCall` converts into
 > `SimpleExpr::FunctionCall`, and can serve as a FROM item through
 > `SelectStatement::from_function`.

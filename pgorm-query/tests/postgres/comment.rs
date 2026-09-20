@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.comment+3/test]    both targets render, at every level of qualification
+// [spec:pgorm:req:sql.ddl.comment+4/test]    both targets render, at every level of qualification
 #[test]
 fn comment_statements_render_their_targets() {
     assert_eq!(
@@ -38,7 +38,7 @@ fn comment_statements_render_their_targets() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.comment+3/test]    comment text is a standard-conforming string literal:
+// [spec:pgorm:req:sql.ddl.comment+4/test]    comment text is a standard-conforming string literal:
 // only the single quote is escaped, by doubling
 #[test]
 fn comment_text_is_a_quoted_literal() {
@@ -76,7 +76,7 @@ fn comment_text_is_a_quoted_literal() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.comment+3/test]    one `TableName` value serves a comment target and a
+// [spec:pgorm:req:sql.ddl.comment+4/test]    one `TableName` value serves a comment target and a
 // DDL target, so a comment cannot name a table the DDL beside it could not
 #[test]
 fn comment_and_ddl_share_one_table_name() {
@@ -97,7 +97,7 @@ fn comment_and_ddl_share_one_table_name() {
     assert_eq!(name.table().to_string(), "glyph");
 }
 
-// [spec:pgorm:req:sql.ddl.comment+3/test]    a create statement renders the comments it carries,
+// [spec:pgorm:req:sql.ddl.comment+4/test]    a create statement renders the comments it carries,
 // table first then columns in order, each on the statement's own table
 #[test]
 fn create_statement_renders_the_comments_it_carries() {

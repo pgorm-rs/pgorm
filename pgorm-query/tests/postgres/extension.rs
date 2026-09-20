@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 use pgorm_query::extension::{Extension, PgLTree};
 
-// [spec:pgorm:req:sql.ddl.extension+4/test]    every part of the CREATE EXTENSION grammar
+// [spec:pgorm:req:sql.ddl.extension+5/test]    every part of the CREATE EXTENSION grammar
 #[test]
 fn create_1() {
     assert_eq!(
@@ -11,7 +11,7 @@ fn create_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+4/test]
+// [spec:pgorm:req:sql.ddl.extension+5/test]
 #[test]
 fn create_2() {
     assert_eq!(
@@ -25,7 +25,7 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+4/test]    `PgLTree` is a ready-made `SqlName` rendering `ltree`,
+// [spec:pgorm:req:sql.ddl.extension+5/test]    `PgLTree` is a ready-made `SqlName` rendering `ltree`,
 // usable as an extension name through `From<PgLTree> for String`
 #[test]
 fn create_3() {
@@ -44,7 +44,7 @@ fn create_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+4/test]    on drop, `cascade` and `restrict` share one slot,
+// [spec:pgorm:req:sql.ddl.extension+5/test]    on drop, `cascade` and `restrict` share one slot,
 // so the last call wins and the pair PostgreSQL rejects cannot be built
 #[test]
 fn drop_1() {
@@ -74,7 +74,7 @@ fn drop_1() {
     );
 }
 
-// [spec:pgorm:sem:sql.render.ddl.extension+2/test]    name and schema are quoted identifiers and
+// [spec:pgorm:sem:sql.render.ddl.extension+3/test]    name and schema are quoted identifiers and
 // version a quoted literal, so an embedded quote escapes rather than ending the token
 #[test]
 fn extension_strings_are_quoted() {

@@ -256,8 +256,8 @@ chapter is stated twice anywhere else.
 > root twice; adjacency is a property of primary-key ordering, not a
 > precondition of correctness.
 
-> [spec:pgorm:sem:query.graph.cursor+1]
-> `cursor_by<C: IdentityOf<E>>(cols)` re-homes the joined keyset cursor
+> [spec:pgorm:sem:query.graph.cursor+2]
+> `cursor_by<C: KeyOf<E>>(cols)` re-homes the joined keyset cursor
 > onto the graph: order columns on the root's table, then the root's own
 > primary key, then the primary-key columns of every decoded slot
 > installed as unary secondary order entries — qualified with each slot's
@@ -265,7 +265,7 @@ chapter is stated twice anywhere else.
 > `[spec:pgorm:req:query.graph.aliases]`), in slot declaration order.
 > `cursor_by_on::<Si>(cols)` is the generalization of the retired
 > `cursor_by_other`: the slot is selected by its position at compile time,
-> the order columns are typed `IdentityOf` that slot's entity and
+> the order columns are typed `KeyOf` that slot's entity and
 > qualified with its effective identifier, and the tiebreaks are that
 > slot's own primary key first — completing the ordered source's
 > continuation key, so two decoded rows sharing an order-column value
@@ -275,14 +275,14 @@ chapter is stated twice anywhere else.
 > restates one of the order columns is dropped rather than installed
 > twice. Both return `Cursor<GraphRow<E, S>, C::ValueType>`, so the
 > boundary arity is typed by the order columns exactly as
-> `[spec:pgorm:def:exec.cursor+4]` states.
+> `[spec:pgorm:def:exec.cursor+5]` states.
 >
 > The machinery MUST NOT move: the keyset construction, the boundary
 > disjuncts, `before` / `after` at order-column arity and `before_with` /
 > `after_with` at whole-keyset arity, the direction resolution, the
 > arity-mismatch error, and the NULL-tiebreak limitation are
-> `[spec:pgorm:sem:exec.cursor.keyset+4]` and
-> `[spec:pgorm:sem:exec.cursor.order+3]`, unchanged and not restated
+> `[spec:pgorm:sem:exec.cursor.keyset+5]` and
+> `[spec:pgorm:sem:exec.cursor.order+4]`, unchanged and not restated
 > here. The NULL limitation is live on a graph: an unmatched `Opt` slot's
 > primary key IS null, so a row whose tiebreak is null is reachable
 > through the order-column boundary, not an extended one — resuming with
@@ -293,7 +293,7 @@ chapter is stated twice anywhere else.
 > no call site naming a column twice.
 >
 > One seam is inherited knowingly: `Cursor` itself implements
-> `QuerySelect` (`[spec:pgorm:def:exec.cursor+4]`), so a graph's cursor
+> `QuerySelect` (`[spec:pgorm:def:exec.cursor+5]`), so a graph's cursor
 > can append to the generated projection even though the graph could not.
 > The unrepresentability claims of `[spec:pgorm:sem:query.graph.slots+1]`
 > are claims about `SelectGraph`, not about every value derived from it;
@@ -305,8 +305,8 @@ chapter is stated twice anywhere else.
 > [spec:pgorm:req:query.graph.aliases]
 > The same table enters a graph twice under a caller-bound alias:
 > `join_maybe_as::<F>(rel, alias)` / `join_one_as::<F>(rel, alias)` take
-> the alias as `impl IntoIden` — the `AliasName` token for a static name
-> (`[spec:pgorm:sem:query.build.alias+1]`), `Alias` for a computed one —
+> the alias as `impl IntoName` — the `AliasName` token for a static name
+> (`[spec:pgorm:sem:query.build.alias+2]`), `Name::runtime` for a computed one —
 > re-bind `rel.to_tbl` to it, and that alias is then the slot's one
 > identifier everywhere: the ON condition's right side, the projection
 > qualifier, a cursor tiebreak's qualifier. Distinctness is not checked
@@ -324,7 +324,7 @@ chapter is stated twice anywhere else.
 > shape and ANDs the produced condition into the join's ON clause *in
 > addition to* whatever `on_condition` the relation already carries —
 > where `RelationDef::on_condition` replaces
-> (`[spec:pgorm:def:entity.relation.def+7]`), the sugar composes, so a
+> (`[spec:pgorm:def:entity.relation.def+8]`), the sugar composes, so a
 > call-site narrowing cannot silently drop an authored predicate. ON
 > versus WHERE is the point of its existence: under a LEFT JOIN a
 > predicate in ON narrows which rows *match* (unmatched roots survive,
@@ -335,7 +335,7 @@ chapter is stated twice anywhere else.
 > spells it.
 >
 > The standing hazard is the authored closure that ignores its
-> parameters (`[spec:pgorm:def:entity.relation.def+7]`): a hardcoded
+> parameters (`[spec:pgorm:def:entity.relation.def+8]`): a hardcoded
 > table qualification renders verbatim, so under an `_as` slot the
 > predicate constrains the un-aliased name — a table not in the query,
 > or another join of it — and nothing errors client-side. The graph

@@ -9,17 +9,17 @@ bound parameter is held to.
 
 ## Cursor pagination (`exec.cursor`)
 
-> [spec:pgorm:def:exec.cursor+4]
+> [spec:pgorm:def:exec.cursor+5]
 > `Cursor<S, K>` wraps a `SelectStatement` plus the target table, an
-> `Identity` of one or more order columns, an optional `Window` row
+> `Key` of one or more order columns, an optional `Window` row
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
-> the boundary shape the order columns fix — the `IntoIdentity::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+7]` — and defaults to
+> the boundary shape the order columns fix — the `IntoKey::ValueType`
+> of `[spec:pgorm:def:entity.relation.def+8]` — and defaults to
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
-> `K` (`[spec:pgorm:sem:exec.cursor.keyset+4]`). Cursors are created via
+> `K` (`[spec:pgorm:sem:exec.cursor.keyset+5]`). Cursors are created via
 > `Select::cursor_by` (order columns on the entity's table) and, for joined
 > reads, `SelectGraph::cursor_by` / `cursor_by_on`
 > (`[spec:pgorm:sem:query.graph.cursor]`: order columns on the root or on a
@@ -36,11 +36,11 @@ bound parameter is held to.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+4]
+> [spec:pgorm:sem:exec.cursor.keyset+5]
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
-> (`[spec:pgorm:sem:exec.cursor.order+3]`). `ORDER BY` and the boundary
+> (`[spec:pgorm:sem:exec.cursor.order+4]`). `ORDER BY` and the boundary
 > comparison MUST both be built from that one list, so the row order and
 > the predicate that resumes it cannot disagree about where a page ends.
 >
@@ -81,7 +81,7 @@ bound parameter is held to.
 > `IntoBoundary<K>` are those of the same length — so
 > `cursor_by((A, B)).after(1)` does not compile, and neither does
 > `cursor_by(A).after((1, 2))`. The one exception is a runtime-built
-> `Identity`, whose `ValueType` is `ValueTuple`: that `K` admits any
+> `Key`, whose `ValueType` is `ValueTuple`: that `K` admits any
 > `IntoValueTuple`, keeping the arity check for execution. The extended
 > arity has no such `K` to be checked against — it is the order columns'
 > length plus a secondary count fixed at run time — so `before_with` and
@@ -115,7 +115,7 @@ bound parameter is held to.
 > decoding, so `all` always returns rows in the cursor's logical
 > (`asc`/`desc`) order regardless of windowing direction.
 
-> [spec:pgorm:sem:exec.cursor.order+3]
+> [spec:pgorm:sem:exec.cursor.order+4]
 > `Cursor::all` composes each execution onto a *copy* of the stored query:
 > the limit, then the order clause, then the boundary filters are applied
 > to the clone, which is then built and executed via `query_all` and
@@ -133,10 +133,10 @@ bound parameter is held to.
 > table, in declared order, then its secondary order entries qualified with
 > theirs — all using the single resolved direction of
 > `exec.cursor.window`. This is the same list the boundary comparison of
-> `[spec:pgorm:sem:exec.cursor.keyset+4]` is built from. Only
-> unary secondary entries take part — those whose `Identity` has arity 1
-> (`[spec:pgorm:def:entity.relation.def+7]`), a length now read rather than
-> matched on; composite secondary identities are silently ignored, in the
+> `[spec:pgorm:sem:exec.cursor.keyset+5]` is built from. Only
+> unary secondary entries take part — those whose `Key` has arity 1
+> (`[spec:pgorm:def:entity.relation.def+8]`), a length now read rather than
+> matched on; composite secondary keys are silently ignored, in the
 > ordering and in the boundary alike. A joined read installs those entries from its declaration rather
 > than from a call site (`[spec:pgorm:sem:query.graph.cursor]`), so a joined
 > cursor is totally ordered and can be resumed mid-tie through `after_with`

@@ -27,7 +27,8 @@ trait family keeps its bound.
       (`Alias` retained; `IntoName for &str/String` retained)
 - [x] L2 `Alias::new` → `Name::runtime`, delete `IntoName for &str/String`
       and `IntoKey for &str/String` (replaced by `IntoKey for Name`)
-- [ ] L3 spec pass (bump + repin), node completion, plan residue
+- [x] L3 spec pass (bump + repin) — 53 rules bumped, 5 unversioned corrected
+- [ ] L4 doctests, node completion, plan residue
 
 The `#[iden = ..]` / `#[pgorm(iden = ..)]` derive attribute is deliberately NOT
 renamed: it is not in the ratified mapping, and `#[pgorm(name = ..)]` would sit

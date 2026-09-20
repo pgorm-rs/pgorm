@@ -75,7 +75,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Every scalar position takes `impl Into<Expr>` and every list position takes
 > `impl ExprList`. `Into<Expr>` is implemented for `Expr` itself, for any
 > `ColumnTrait` column (qualified by its own entity,
-> `[spec:pgorm:sem:pipeline.qualify+2]`), for an `AliasName` token, and for
+> `[spec:pgorm:sem:pipeline.qualify+3]`), for an `AliasName` token, and for
 > the Rust literals `i32`, `i64`, `f64`, `bool` and `&str`. `ExprList` is
 > implemented for a single expression, for `[T; N]` and `Vec<T>` of one
 > convertible type, and for tuples of up to twelve mixed ones — the mixed
@@ -454,20 +454,20 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Qualification
 
-> [spec:pgorm:sem:pipeline.qualify+2]
+> [spec:pgorm:sem:pipeline.qualify+3]
 > Column references are table-qualified by construction. An entity column
 > already carries its entity, so `Into<Expr>` for `ColumnTrait` recovers the
 > qualification from `entity_name()` rather than making the caller restate
 > it, and a bare `order::Column::Total` mints the two-part identifier. The
 > unqualified form — ambiguous the moment a join appears — is never
 > constructed from a column. `col(table, column)` remains for the tables an
-> entity does not describe and for disambiguation, taking an `Iden` pair.
+> entity does not describe and for disambiguation, taking an `SqlName` pair.
 >
 > `IntoSource` is any relation a pipeline can read — the source, the join
 > operand, a set-operation operand — and there are four: an `EntityTrait`
 > entity (which contributes its `table_name` and, when it has one, its
 > `EntityName::schema_name`, so an entity source is schema-correct without a
-> second spelling), an `AliasName` token, an `Alias`, and a whole `Pipeline`
+> second spelling), an `AliasName` token, a `Name`, and a whole `Pipeline`
 > ([spec:pgorm:req:pipeline.compose]). `into_source` yields the opaque
 > `Source` carrier, whose contents only the pipeline module can construct,
 > so the set of relation shapes is closed.
@@ -518,7 +518,7 @@ of the crate, compiled in every build. Rules are grouped under
 > cannot disagree about a column's read cast — and aliased `s{i}_{col}`
 > under the writer's 63-byte-bounded spelling,
 > qualified by the source's name — the `named` token, or the entity's own
-> qualification (`[spec:pgorm:sem:pipeline.qualify+2]`). An explicitly
+> qualification (`[spec:pgorm:sem:pipeline.qualify+3]`). An explicitly
 > aliased projection is what dissolves prqlc's `_expr_N` renaming: two
 > sources sharing a column name land under different prefixes by
 > construction, so the compiler never has to invent names the decode

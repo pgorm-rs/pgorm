@@ -40,7 +40,7 @@ use crate::{
 /// # let _ = selector;
 /// # }
 /// ```
-// [spec:pgorm:sem:exec.crud.selector-entry+1]
+// [spec:pgorm:sem:exec.crud.selector-entry+2]
 pub trait DecodeSelect {
     /// Decode each row into a [`FromQueryResult`] type.
     fn into_model<M>(self) -> Selector<SelectModel<M>>
@@ -59,7 +59,7 @@ pub trait DecodeSelect {
         C: strum::IntoEnumIterator + pgorm_query::SqlName;
 }
 
-// [spec:pgorm:sem:exec.crud.selector-entry+1]    statement-first entry
+// [spec:pgorm:sem:exec.crud.selector-entry+2]    statement-first entry
 impl DecodeSelect for SelectStatement {
     fn into_model<M>(self) -> Selector<SelectModel<M>>
     where
@@ -104,7 +104,7 @@ impl DecodeSelect for SelectStatement {
 ///     .into_tuple::<(i32, String)>();
 /// # let _ = selector;
 /// ```
-// [spec:pgorm:sem:exec.crud.selector-entry+1]
+// [spec:pgorm:sem:exec.crud.selector-entry+2]
 pub trait DecodeRaw {
     /// Decode each row into a [`FromQueryResult`] type.
     fn into_model<M>(self) -> SelectorRaw<SelectModel<M>>
@@ -123,7 +123,7 @@ pub trait DecodeRaw {
         C: strum::IntoEnumIterator + pgorm_query::SqlName;
 }
 
-// [spec:pgorm:sem:exec.crud.selector-entry+1]    raw-statement entry, over any spelling of the SQL
+// [spec:pgorm:sem:exec.crud.selector-entry+2]    raw-statement entry, over any spelling of the SQL
 impl<S> DecodeRaw for (S, Values)
 where
     S: Into<String>,

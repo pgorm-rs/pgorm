@@ -110,7 +110,7 @@ use tokio_postgres::row::RowIndex;
 ///
 /// impl ActiveModelBehavior for ActiveModel {}
 /// ```
-// [spec:pgorm:def:entity.traits.active-enum+1]
+// [spec:pgorm:def:entity.traits.active-enum+2]
 pub trait ActiveEnum: Sized + Iterable {
     /// Define the Rust type that each enum variant corresponds.
     type Value: ActiveEnumValue;

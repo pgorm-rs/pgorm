@@ -8,11 +8,11 @@ use pgorm_migration::prelude::*;
 
 /// A fresh database has nothing applied; `up` installs the tracking table and
 /// runs every pending migration in order.
-// [spec:pgorm:def:migration.runner+1/test]
+// [spec:pgorm:def:migration.runner+2/test]
 // [spec:pgorm:sem:migration.up+2/test]
 // [spec:pgorm:sem:migration.name+3/test]    asserted names are file stems
 // [spec:pgorm:req:migration.ledger-upgrade/test]    the fresh-install half: the legacy name is never created
-// [spec:pgorm:def:macros.derive+1/test]    `DeriveMigrationName` names each migration after the file stem
+// [spec:pgorm:def:macros.derive+2/test]    `DeriveMigrationName` names each migration after the file stem
 #[tokio::test]
 async fn fresh_install_applies_all_pending() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_fresh").await;
@@ -84,7 +84,7 @@ async fn repeated_up_is_idempotent() -> Result<(), Error> {
 
 /// `steps` bounds how many pending migrations are applied, and `status` reports
 /// the split without altering it.
-// [spec:pgorm:def:migration.runner+1/test]
+// [spec:pgorm:def:migration.runner+2/test]
 // [spec:pgorm:sem:migration.up+2/test]
 #[tokio::test]
 async fn stepped_up_reports_status() -> Result<(), Error> {
@@ -120,7 +120,7 @@ async fn stepped_up_reports_status() -> Result<(), Error> {
 }
 
 /// `migration_table_name` is honoured everywhere, including by `install`.
-// [spec:pgorm:def:migration.runner+1/test]
+// [spec:pgorm:def:migration.runner+2/test]
 #[tokio::test]
 async fn migration_table_name_is_overridable() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_table_name").await;
