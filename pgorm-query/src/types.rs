@@ -6,12 +6,12 @@ use std::{any::Any, fmt, ops, sync::Arc};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quote(pub(crate) u8, pub(crate) u8);
 
-// [spec:pgorm:def:sql.types+6]
+// [spec:pgorm:def:sql.types+7]
 macro_rules! iden_trait {
     ($($bounds:ident),*) => {
         /// Identifier
         pub trait Iden where $(Self: $bounds),* {
-            // [spec:pgorm:req:sql.render.ident-quoting] (wrap in quote pair; embedded right-quote doubled)
+            // [spec:pgorm:req:sql.render.ident-quoting+1] (wrap in quote pair; embedded right-quote doubled)
             fn prepare(&self, s: &mut dyn fmt::Write, q: Quote) {
                 write!(s, "{}{}{}", q.left(), self.quoted(q), q.right()).unwrap();
             }
@@ -71,7 +71,7 @@ impl Clone for SharedIden {
 /// `Iden` is bounded on [`Any`] so the erased value can still be asked, and
 /// asking costs the identifier no width — a `DynIden` sits in nearly every
 /// node of the AST.
-// [spec:pgorm:def:sql.types+6]
+// [spec:pgorm:def:sql.types+7]
 impl PartialEq for SharedIden {
     fn eq(&self, other: &Self) -> bool {
         let (this, that): (&dyn Any, &dyn Any) = (&*self.0, &*other.0);
@@ -92,12 +92,6 @@ pub trait IntoIden {
     fn into_iden(self) -> DynIden;
 }
 
-pub trait IdenList {
-    type IntoIter: Iterator<Item = DynIden>;
-
-    fn into_iter(self) -> Self::IntoIter;
-}
-
 impl fmt::Debug for dyn Iden {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.unquoted(formatter);
@@ -107,7 +101,7 @@ impl fmt::Debug for dyn Iden {
 
 /// Column references
 // [spec:pgorm:def:sql.types.column-ref]
-// [spec:pgorm:def:sql.ast.keywords+2]
+// [spec:pgorm:def:sql.ast.keywords+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(DynIden),
@@ -532,7 +526,7 @@ pub enum JoinOn {
 }
 
 /// Ordering options
-// [spec:pgorm:req:sql.ast.order+1]
+// [spec:pgorm:req:sql.ast.order+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     Asc,
@@ -589,14 +583,13 @@ pub struct Alias(String);
 pub struct Asterisk;
 
 /// SQL Keywords
-// [spec:pgorm:def:sql.ast.keywords+2]
+// [spec:pgorm:def:sql.ast.keywords+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,
     CurrentDate,
     CurrentTime,
     CurrentTimestamp,
-    Custom(DynIden),
 }
 
 /// Like Expression
@@ -674,53 +667,17 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+6]
+// [spec:pgorm:def:sql.types+7]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+6]
+// [spec:pgorm:def:sql.types+7]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
-    }
-}
-
-impl<I> IdenList for I
-where
-    I: IntoIden,
-{
-    type IntoIter = std::iter::Once<DynIden>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        std::iter::once(self.into_iden())
-    }
-}
-
-impl<A, B> IdenList for (A, B)
-where
-    A: IntoIden,
-    B: IntoIden,
-{
-    type IntoIter = std::array::IntoIter<DynIden, 2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        [self.0.into_iden(), self.1.into_iden()].into_iter()
-    }
-}
-
-impl<A, B, C> IdenList for (A, B, C)
-where
-    A: IntoIden,
-    B: IntoIden,
-    C: IntoIden,
-{
-    type IntoIter = std::array::IntoIter<DynIden, 3>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        [self.0.into_iden(), self.1.into_iden(), self.2.into_iden()].into_iter()
     }
 }
 
@@ -988,7 +945,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+6/test]
+    // [spec:pgorm:def:sql.types+7/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -1003,7 +960,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+6/test]
+    // [spec:pgorm:def:sql.types+7/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

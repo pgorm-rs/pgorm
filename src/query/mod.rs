@@ -7,7 +7,6 @@ mod loader;
 mod select;
 mod traits;
 mod update;
-mod util;
 
 pub use delete::*;
 pub use graph::{Opt, Req, SelectGraph, Slot, SlotAt, Slots};
@@ -17,6 +16,5 @@ pub use loader::*;
 pub use select::*;
 pub use traits::*;
 pub use update::*;
-pub use util::*;
 
 pub use crate::{ConnectionTrait, CursorTrait, TransactionTrait, Value};

@@ -241,7 +241,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+6]
+> [spec:pgorm:def:sql.types+7]
 > `Iden` is the identifier trait (bounded `Any + Send + Sync`): implementors provide
 > `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
 > which doubles any embedded quote character — and `prepare`, which writes the
@@ -268,9 +268,10 @@ including panic semantics and quirks inherited from sea-query.
 > and the transmute the vtable comparison needed is what that forbids.
 > `IntoIden` converts any `Iden + 'static` (or an existing
 > `DynIden`) into a `DynIden`, and also accepts `&str` and `String`, wrapping
-> them in `Alias` so a string-spelled identifier escapes like any other;
-> `IdenList` is implemented for a single iden and for 2- and 3-tuples,
-> yielding `DynIden`s in order.
+> them in `Alias` so a string-spelled identifier escapes like any other. It is
+> the whole conversion surface: there is no separate one-or-many identifier
+> trait, so a call site that wants several identifiers takes an iterator of
+> `IntoIden`.
 >
 > `Alias` wraps an arbitrary `String` as an identifier. There is no empty-name
 > identifier type: PostgreSQL rejects a zero-length delimited identifier, so

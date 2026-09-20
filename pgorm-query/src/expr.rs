@@ -1029,10 +1029,11 @@ impl Expr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .cond_where(all![
-    ///         Expr::col(Char::SizeW).binary(BinOper::SmallerThan, 10),
-    ///         Expr::col(Char::SizeW).binary(BinOper::GreaterThan, Expr::col(Char::SizeH))
-    ///     ])
+    ///     .cond_where(
+    ///         Condition::all()
+    ///             .add(Expr::col(Char::SizeW).binary(BinOper::SmallerThan, 10))
+    ///             .add(Expr::col(Char::SizeW).binary(BinOper::GreaterThan, Expr::col(Char::SizeH))),
+    ///     )
     ///     .to_owned();
     /// assert_eq!(
     ///     query.to_string(),
@@ -1454,29 +1455,6 @@ impl Expr {
         Expr::new_with_left(Keyword::CurrentTimestamp)
     }
 
-    /// Custom keyword.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::*;
-    ///
-    /// let query = Query::select()
-    ///     .expr(Expr::custom_keyword(Alias::new("test")))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"SELECT test"#
-    /// );
-    /// ```
-    pub fn custom_keyword<T>(i: T) -> Expr
-    where
-        T: IntoIden,
-    {
-        Expr::new_with_left(Keyword::Custom(i.into_iden()))
-    }
-
     /// Express an postgres concatenate (`||`) expression.
     ///
     /// `||` concatenates strings, arrays and `jsonb` documents alike, so this
@@ -1710,10 +1688,9 @@ impl SimpleExpr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .cond_where(any![
-    ///         Expr::col(Char::SizeW).eq(1).and(Expr::col(Char::SizeH).eq(2)),
-    ///         Expr::col(Char::SizeW).eq(3).and(Expr::col(Char::SizeH).eq(4)),
-    ///     ])
+    ///     .cond_where(Condition::any()
+    ///         .add(Expr::col(Char::SizeW).eq(1).and(Expr::col(Char::SizeH).eq(2)))
+    ///         .add(Expr::col(Char::SizeW).eq(3).and(Expr::col(Char::SizeH).eq(4))))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1952,10 +1929,11 @@ impl SimpleExpr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .cond_where(all![
-    ///         Expr::value(10).binary(BinOper::SmallerThan, Expr::col(Char::SizeW)),
-    ///         Expr::value(20).binary(BinOper::GreaterThan, Expr::col(Char::SizeH))
-    ///     ])
+    ///     .cond_where(
+    ///         Condition::all()
+    ///             .add(Expr::value(10).binary(BinOper::SmallerThan, Expr::col(Char::SizeW)))
+    ///             .add(Expr::value(20).binary(BinOper::GreaterThan, Expr::col(Char::SizeH))),
+    ///     )
     ///     .to_owned();
     /// assert_eq!(
     ///     query.to_string(),

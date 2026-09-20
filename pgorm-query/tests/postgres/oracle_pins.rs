@@ -39,7 +39,7 @@ fn window_frame_offset_renders_spaced() {
 // rejection it used to be pinned to is proved by the `compile_fail` doctest on
 // `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.ast.window-statement+2/test]
+// [spec:pgorm:def:sql.ast.window-statement+3/test]
 // [spec:pgorm:req:sql.render.window+3/test]
 #[test]
 fn over_attaches_only_to_function_calls() {
@@ -298,8 +298,8 @@ fn oracle_pins_extra_interpolated_raw() {
 // placeholder inside `ColumnDef::take`, which now clones the name, so the empty
 // identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.ident-quoting/test]
-// [spec:pgorm:def:sql.ast.keywords+2/test]
+// [spec:pgorm:req:sql.render.ident-quoting+1/test]
+// [spec:pgorm:def:sql.ast.keywords+3/test]
 #[test]
 fn alias_identifiers_are_never_empty() {
     let sql = Query::select()

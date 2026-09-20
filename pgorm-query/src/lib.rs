@@ -3,7 +3,7 @@
 // A SQL builder renders text; nothing it does needs the unsafe half of the
 // language. The one block that existed compared trait-object vtable addresses
 // for identifier equality, which `TypeId` answers with a guarantee behind it
-// (`[spec:pgorm:def:sql.types+6]`).
+// (`[spec:pgorm:def:sql.types+7]`).
 #![forbid(unsafe_code)]
 
 //! # pgorm-query
@@ -261,14 +261,14 @@
 //!         .column(Character::Id)
 //!         .from(Character::Table)
 //!         .cond_where(
-//!             Cond::any()
+//!             Condition::any()
 //!                 .add(
-//!                     Cond::all()
+//!                     Condition::all()
 //!                         .add(Expr::col(Character::FontSize).is_null())
 //!                         .add(Expr::col(Character::Character).is_null())
 //!                 )
 //!                 .add(
-//!                     Cond::all()
+//!                     Condition::all()
 //!                         .add(Expr::col(Character::FontSize).is_in([3, 4]))
 //!                         .add(Expr::col(Character::Character).like("A%"))
 //!                 )
@@ -285,17 +285,19 @@
 //! );
 //! ```
 //!
-//! There is also the [`any!`] and [`all!`] macro at your convenience:
+//! Nested conditions compose the same way:
 //!
 //! ```
 //! # use pgorm_query::{*, tests_cfg::*};
-//! Query::select().cond_where(any![
-//!     Expr::col(Character::FontSize).is_in([3, 4]),
-//!     all![
-//!         Expr::col(Character::FontSize).is_null(),
-//!         Expr::col(Character::Character).like("A%")
-//!     ]
-//! ]);
+//! Query::select().cond_where(
+//!     Condition::any()
+//!         .add(Expr::col(Character::FontSize).is_in([3, 4]))
+//!         .add(
+//!             Condition::all()
+//!                 .add(Expr::col(Character::FontSize).is_null())
+//!                 .add(Expr::col(Character::Character).like("A%")),
+//!         ),
+//! );
 //! ```
 //!
 //! ### Statement Builders
@@ -387,7 +389,7 @@
 //! let query = Query::delete()
 //!     .from_table(Character::Table)
 //!     .cond_where(
-//!         Cond::any()
+//!         Condition::any()
 //!             .add(Expr::col(Character::Id).lt(1))
 //!             .add(Expr::col(Character::Id).gt(10)),
 //!     )

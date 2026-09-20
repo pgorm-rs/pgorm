@@ -562,7 +562,7 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+2]
+    // [spec:pgorm:def:sql.ast.window-statement+3]
     pub fn expr_window(&mut self, func: FunctionCall, window: WindowStatement) -> &mut Self {
         self.expr(SelectExpr {
             expr: func.into(),
@@ -593,7 +593,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+2]
+    // [spec:pgorm:def:sql.ast.window-statement+3]
     pub fn expr_window_as<A>(
         &mut self,
         func: FunctionCall,
@@ -632,7 +632,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+2]
+    // [spec:pgorm:def:sql.ast.window-statement+3]
     pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
     where
         W: IntoIden,
@@ -663,7 +663,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+2]
+    // [spec:pgorm:def:sql.ast.window-statement+3]
     pub fn expr_window_name_as<W, A>(
         &mut self,
         func: FunctionCall,
@@ -960,10 +960,9 @@ impl SelectStatement {
     ///         .from(Char::Table)
     ///         .left_join(
     ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
+    ///             Condition::all()
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
     ///         .to_owned();
     ///
@@ -1006,10 +1005,9 @@ impl SelectStatement {
     ///         .from(Char::Table)
     ///         .right_join(
     ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
+    ///             Condition::all()
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
     ///         .to_owned();
     ///
@@ -1052,10 +1050,9 @@ impl SelectStatement {
     ///         .from(Char::Table)
     ///         .inner_join(
     ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
+    ///             Condition::all()
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
     ///         .to_owned();
     ///
@@ -1098,10 +1095,9 @@ impl SelectStatement {
     ///         .from(Char::Table)
     ///         .full_outer_join(
     ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
+    ///             Condition::all()
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
     ///         .to_owned();
     ///
@@ -1145,10 +1141,9 @@ impl SelectStatement {
     ///         .join(
     ///             JoinType::RightJoin,
     ///             Font::Table,
-    ///             all![
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///                 Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)),
-    ///             ]
+    ///             Condition::all()
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///         )
     ///         .to_owned();
     ///
@@ -1496,13 +1491,13 @@ impl SelectStatement {
     ///         Glyph::Aspect,
     ///     ])
     ///     .cond_having(
-    ///         all![
-    ///             Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]),
-    ///             any![
-    ///                 Expr::col((Glyph::Table, Glyph::Image)).like("A%"),
-    ///                 Expr::col((Glyph::Table, Glyph::Image)).like("B%")
-    ///             ]
-    ///         ]
+    ///         Condition::all()
+    ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
+    ///             .add(
+    ///                 Condition::any()
+    ///                     .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
+    ///                     .add(Expr::col((Glyph::Table, Glyph::Image)).like("B%")),
+    ///             ),
     ///     )
     ///     .to_owned();
     ///
@@ -1911,10 +1906,6 @@ impl OrderedStatement for SelectStatement {
         T: IntoColumnRef;
 
     pub fn order_by_expr(&mut self, expr: SimpleExpr, order: Order) -> &mut Self;
-    pub fn order_by_customs<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order)>;
     pub fn order_by_columns<I, T>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,
@@ -1933,10 +1924,6 @@ impl OrderedStatement for SelectStatement {
         order: Order,
         nulls: NullOrdering,
     ) -> &mut Self;
-    pub fn order_by_customs_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order, NullOrdering)>;
     pub fn order_by_columns_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,

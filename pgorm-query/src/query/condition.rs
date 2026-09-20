@@ -7,7 +7,7 @@ pub enum ConditionType {
 }
 
 /// Represents the value of an [`Condition::any`] or [`Condition::all`]: a set of disjunctive or conjunctive conditions.
-// [spec:pgorm:def:sql.ast.condition]
+// [spec:pgorm:def:sql.ast.condition+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Condition {
     pub(crate) negate: bool,
@@ -15,12 +15,10 @@ pub struct Condition {
     pub(crate) conditions: Vec<ConditionExpression>,
 }
 
-// [spec:pgorm:def:sql.ast.condition]
+// [spec:pgorm:def:sql.ast.condition+1]
 pub trait IntoCondition {
     fn into_condition(self) -> Condition;
 }
-
-pub type Cond = Condition;
 
 /// Represents anything that can be passed to an [`Condition::any`] or [`Condition::all`]'s [`Condition::add`] method.
 ///
@@ -50,7 +48,7 @@ impl Condition {
     ///     .column(Glyph::Id)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .add(Expr::col(Glyph::Aspect).eq(0).into_condition().not())
     ///             .add(Expr::col(Glyph::Id).eq(0).into_condition().not()),
     ///     )
@@ -90,7 +88,7 @@ impl Condition {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .add_option(Some(Expr::col((Glyph::Table, Glyph::Image)).like("A%")))
     ///             .add_option(None::<SimpleExpr>),
     ///     )
@@ -124,7 +122,7 @@ impl Condition {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::any()
+    ///         Condition::any()
     ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
     ///             .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
     ///     )
@@ -154,7 +152,7 @@ impl Condition {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
     ///             .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
     ///     )
@@ -184,7 +182,7 @@ impl Condition {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .not()
     ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
     ///             .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
@@ -205,14 +203,14 @@ impl Condition {
     /// let query = Query::select()
     ///     .column(Glyph::Id)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .add(
-    ///                 Cond::all()
+    ///                 Condition::all()
     ///                     .not()
     ///                     .add(Expr::val(1).eq(1))
     ///                     .add(Expr::val(2).eq(2)),
     ///             )
-    ///             .add(Cond::any().add(Expr::val(3).eq(3)).add(Expr::val(4).eq(4))),
+    ///             .add(Condition::any().add(Expr::val(3).eq(3)).add(Expr::val(4).eq(4))),
     ///     )
     ///     .to_owned();
     ///
@@ -234,7 +232,7 @@ impl Condition {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let is_empty = Cond::all().is_empty();
+    /// let is_empty = Condition::all().is_empty();
     ///
     /// assert!(is_empty);
     /// ```
@@ -249,7 +247,7 @@ impl Condition {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let len = Cond::all().len();
+    /// let len = Condition::all().len();
     ///
     /// assert_eq!(len, 0);
     /// ```
@@ -296,77 +294,6 @@ impl From<SimpleExpr> for ConditionExpression {
     fn from(condition: SimpleExpr) -> Self {
         ConditionExpression::SimpleExpr(condition)
     }
-}
-
-/// Macro to easily create an [`Condition::any`].
-///
-/// # Examples
-///
-/// ```
-/// use pgorm_query::{*, tests_cfg::*};
-///
-/// let query = Query::select()
-///     .column(Glyph::Image)
-///     .from(Glyph::Table)
-///     .cond_where(
-///         any![
-///             Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]),
-///             Expr::col((Glyph::Table, Glyph::Image)).like("A%")
-///         ]
-///     )
-///     .to_owned();
-///
-/// assert_eq!(
-///     query.to_string(),
-///     r#"SELECT "image" FROM "glyph" WHERE "glyph"."aspect" IN (3, 4) OR "glyph"."image" LIKE 'A%'"#
-/// );
-/// ```
-#[macro_export]
-macro_rules! any {
-    ( $( $x:expr ),* $(,)?) => {
-        {
-            let mut tmp = $crate::Condition::any();
-            $(
-                tmp = tmp.add($x);
-            )*
-            tmp
-        }
-    };
-}
-
-/// Macro to easily create an [`Condition::all`].
-///
-/// # Examples
-///
-/// ```
-/// use pgorm_query::{*, tests_cfg::*};
-///
-/// let query = Query::select()
-///     .column(Glyph::Image)
-///     .from(Glyph::Table)
-///     .cond_where(
-///         all![
-///             Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]),
-///             Expr::col((Glyph::Table, Glyph::Image)).like("A%")
-///         ]
-///     )
-///     .to_owned();
-///
-/// assert_eq!(
-///     query.to_string(),
-///     r#"SELECT "image" FROM "glyph" WHERE "glyph"."aspect" IN (3, 4) AND "glyph"."image" LIKE 'A%'"#
-/// );
-#[macro_export]
-macro_rules! all {
-    ( $( $x:expr ),* $(,)?) => {
-        {
-            let mut tmp = $crate::Condition::all();
-            $(
-                tmp = tmp.add($x);
-            )*
-            tmp
-        }
-    };
 }
 
 pub trait ConditionalStatement {
@@ -431,9 +358,9 @@ pub trait ConditionalStatement {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         Cond::all()
+    ///         Condition::all()
     ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
-    ///             .add(Cond::any()
+    ///             .add(Condition::any()
     ///                 .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
     ///                 .add(Expr::col((Glyph::Table, Glyph::Image)).like("B%"))
     ///             )
@@ -455,13 +382,14 @@ pub trait ConditionalStatement {
     ///     .column(Glyph::Image)
     ///     .from(Glyph::Table)
     ///     .cond_where(
-    ///         all![
-    ///             Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]),
-    ///             any![
-    ///                 Expr::col((Glyph::Table, Glyph::Image)).like("A%"),
-    ///                 Expr::col((Glyph::Table, Glyph::Image)).like("B%"),
-    ///             ]
-    ///         ])
+    ///         Condition::all()
+    ///             .add(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([3, 4]))
+    ///             .add(
+    ///                 Condition::any()
+    ///                     .add(Expr::col((Glyph::Table, Glyph::Image)).like("A%"))
+    ///                     .add(Expr::col((Glyph::Table, Glyph::Image)).like("B%")),
+    ///             ),
+    ///     )
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -480,7 +408,7 @@ pub trait ConditionalStatement {
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
     ///         .cond_where(Expr::col(Glyph::Id).eq(1))
-    ///         .cond_where(any![Expr::col(Glyph::Id).eq(2), Expr::col(Glyph::Id).eq(3)])
+    ///         .cond_where(Condition::any().add(Expr::col(Glyph::Id).eq(2)).add(Expr::col(Glyph::Id).eq(3)))
     ///         .to_owned()
     ///         .to_string(),
     ///     r#"SELECT "id" FROM "glyph" WHERE "id" = 1 AND ("id" = 2 OR "id" = 3)"#
@@ -490,7 +418,7 @@ pub trait ConditionalStatement {
     ///     Query::select()
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
-    ///         .cond_where(any![Expr::col(Glyph::Id).eq(2), Expr::col(Glyph::Id).eq(3)])
+    ///         .cond_where(Condition::any().add(Expr::col(Glyph::Id).eq(2)).add(Expr::col(Glyph::Id).eq(3)))
     ///         .cond_where(Expr::col(Glyph::Id).eq(1))
     ///         .to_owned()
     ///         .to_string(),
@@ -507,8 +435,8 @@ pub trait ConditionalStatement {
     ///     Query::select()
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
-    ///         .cond_where(any![Expr::col(Glyph::Id).eq(1), Expr::col(Glyph::Id).eq(2)])
-    ///         .cond_where(any![Expr::col(Glyph::Id).eq(3), Expr::col(Glyph::Id).eq(4)])
+    ///         .cond_where(Condition::any().add(Expr::col(Glyph::Id).eq(1)).add(Expr::col(Glyph::Id).eq(2)))
+    ///         .cond_where(Condition::any().add(Expr::col(Glyph::Id).eq(3)).add(Expr::col(Glyph::Id).eq(4)))
     ///         .to_owned()
     ///         .to_string(),
     ///     r#"SELECT "id" FROM "glyph" WHERE ("id" = 1 OR "id" = 2) AND ("id" = 3 OR "id" = 4)"#
@@ -518,8 +446,8 @@ pub trait ConditionalStatement {
     ///     Query::select()
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
-    ///         .cond_where(all![Expr::col(Glyph::Id).eq(1), Expr::col(Glyph::Id).eq(2)])
-    ///         .cond_where(all![Expr::col(Glyph::Id).eq(3), Expr::col(Glyph::Id).eq(4)])
+    ///         .cond_where(Condition::all().add(Expr::col(Glyph::Id).eq(1)).add(Expr::col(Glyph::Id).eq(2)))
+    ///         .cond_where(Condition::all().add(Expr::col(Glyph::Id).eq(3)).add(Expr::col(Glyph::Id).eq(4)))
     ///         .to_owned()
     ///         .to_string(),
     ///     r#"SELECT "id" FROM "glyph" WHERE "id" = 1 AND "id" = 2 AND "id" = 3 AND "id" = 4"#
@@ -536,13 +464,13 @@ pub trait ConditionalStatement {
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
     ///         .cond_where(
-    ///             Cond::all()
+    ///             Condition::all()
     ///                 .not()
     ///                 .add(Expr::col(Glyph::Id).eq(1))
     ///                 .add(Expr::col(Glyph::Id).eq(2)),
     ///         )
     ///         .cond_where(
-    ///             Cond::all()
+    ///             Condition::all()
     ///                 .add(Expr::col(Glyph::Id).eq(3))
     ///                 .add(Expr::col(Glyph::Id).eq(4)),
     ///         )
@@ -556,12 +484,12 @@ pub trait ConditionalStatement {
     ///         .column(Glyph::Id)
     ///         .from(Glyph::Table)
     ///         .cond_where(
-    ///             Cond::all()
+    ///             Condition::all()
     ///                 .add(Expr::col(Glyph::Id).eq(3))
     ///                 .add(Expr::col(Glyph::Id).eq(4)),
     ///         )
     ///         .cond_where(
-    ///             Cond::all()
+    ///             Condition::all()
     ///                 .not()
     ///                 .add(Expr::col(Glyph::Id).eq(1))
     ///                 .add(Expr::col(Glyph::Id).eq(2)),

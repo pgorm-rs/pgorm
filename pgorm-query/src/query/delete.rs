@@ -13,10 +13,9 @@ use inherent::inherent;
 ///
 /// let query = Query::delete()
 ///     .from_table(Glyph::Table)
-///     .cond_where(any![
-///         Expr::col(Glyph::Id).lt(1),
-///         Expr::col(Glyph::Id).gt(10),
-///     ])
+///     .cond_where(Condition::any()
+///         .add(Expr::col(Glyph::Id).lt(1))
+///         .add(Expr::col(Glyph::Id).gt(10)))
 ///     .to_owned();
 ///
 /// assert_eq!(

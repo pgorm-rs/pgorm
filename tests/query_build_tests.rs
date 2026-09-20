@@ -21,10 +21,10 @@ use pgorm::tests_cfg::{
     lunch_set, vendor,
 };
 use pgorm::{
-    ActiveValue, ColumnTrait, Condition, DebugQuery, Delete, DeleteMany, DeleteOne, EntityTrait,
-    Error, IdenStr, Insert, IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, TryInsert,
-    Update, UpdateMany, UpdateOne,
+    ActiveValue, ColumnTrait, Condition, Delete, DeleteMany, DeleteOne, EntityTrait, Error,
+    IdenStr, Insert, IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, TryInsert, Update,
+    UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -1351,37 +1351,6 @@ fn delete_many_is_unconstrained_until_filtered() {
             .as_query()
             .to_string(),
         r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Apple%'"#
-    );
-}
-
-// [spec:pgorm:def:query.build.debug-query/test]    `DebugQuery` is a plain
-// holder of a `&Q` and a value — the `build` impls the two macros would target
-// are commented out of the source, so the type carries no rendering method and
-// raw SQL comes from `QueryTrait::build` instead
-#[test]
-fn debug_query_is_a_vestigial_holder() {
-    let query = Insert::one(apple());
-    let debug = DebugQuery {
-        query: &query,
-        value: 1_u8,
-    };
-
-    // Both fields are public and hold exactly what was put in them.
-    assert_eq!(debug.value, 1);
-    assert_eq!(
-        debug.query.as_query().to_string(),
-        r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
-    );
-
-    // The working replacement: the parameterised form from `QueryTrait`.
-    let (sql, values) = query.build();
-    assert_eq!(sql, r#"INSERT INTO "cake" ("id", "name") VALUES ($1, $2)"#);
-    assert_eq!(
-        values,
-        Values(vec![
-            Value::Int(Some(1)),
-            Value::String(Some(Box::new("Apple Pie".to_owned()))),
-        ])
     );
 }
 

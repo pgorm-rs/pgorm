@@ -138,16 +138,16 @@ today, including panicking edges and deliberate failsafes.
 
 ## Ordering
 
-> [spec:pgorm:req:sql.ast.order+1]
+> [spec:pgorm:req:sql.ast.order+2]
 > `SelectStatement` and `WindowStatement` — the two statements PostgreSQL
 > admits an ORDER BY on — share the `OrderedStatement` trait; the write
 > statements do not implement it, per `sql.ast.update` and `sql.ast.delete`.
 > Order expressions MUST accumulate in call order via `order_by` (column +
-> `Order`), `order_by_expr`, `order_by_customs` (raw string rendered verbatim
-> as `SimpleExpr::Custom`), `order_by_columns`, and the `*_with_nulls` variants
+> `Order`), `order_by_expr`, `order_by_columns`, and the `*_with_nulls` variants
 > which attach a `NullOrdering` (`First`/`Last`) rendered as `NULLS
 > FIRST`/`NULLS LAST`. `clear_order_by` MUST remove all accumulated order
-> expressions.
+> expressions. There is no raw-string ordering verb: a verbatim SQL fragment
+> reaches ORDER BY position only as an `Expr::cust` through `order_by_expr`.
 >
 > `Order` MUST support `Asc`, `Desc`, and `Field(Values)`; the `Field` variant
 > renders a `CASE WHEN col=v_i THEN i ... ELSE n END` expression implementing
@@ -155,15 +155,15 @@ today, including panicking edges and deliberate failsafes.
 
 ## Conditions
 
-> [spec:pgorm:def:sql.ast.condition]
-> `Condition` (aliased as `Cond`) is a tree node holding a `condition_type`
+> [spec:pgorm:def:sql.ast.condition+1]
+> `Condition` is a tree node holding a `condition_type`
 > (`ConditionType::All` = conjunction, `ConditionType::Any` = disjunction), a
 > `negate` flag, and child `ConditionExpression`s, where each child is either a
 > nested `Condition` or a leaf `SimpleExpr`. `Condition::all()` and
 > `Condition::any()` construct empty sets; `add` pushes a child; `add_option`
 > pushes only when `Some`; `not()` toggles the negate flag; `is_empty`/`len`
-> inspect the children. The `all![...]` and `any![...]` macros are shorthand
-> for building the corresponding set from a list of expressions.
+> inspect the children. Those constructors are the only spelling — the type
+> carries no shorthand alias and no shorthand macro.
 >
 > The `IntoCondition` trait converts arguments at API boundaries: a
 > `SimpleExpr` becomes `Condition::all().add(expr)` and a `Condition` passes
@@ -357,11 +357,13 @@ today, including panicking edges and deliberate failsafes.
 > re-entering the builder with `Expr::expr`; `#>` exists so that the common
 > multi-step path needs one node instead of a nest of them.
 
-> [spec:pgorm:def:sql.ast.keywords+2]
-> `Keyword` represents bare SQL keywords usable as expressions: `Null`,
-> `CurrentDate`, `CurrentTime`, `CurrentTimestamp`, and `Custom(DynIden)`;
-> `Expr::current_date()`, `Expr::current_time()`, `Expr::current_timestamp()`,
-> and `Expr::custom_keyword(..)` construct them. Identifier helpers: `Alias`
+> [spec:pgorm:def:sql.ast.keywords+3]
+> `Keyword` represents bare SQL keywords usable as expressions, and the variant
+> set is closed: `Null`, `CurrentDate`, `CurrentTime`, and `CurrentTimestamp`,
+> constructed by `Expr::current_date()`, `Expr::current_time()` and
+> `Expr::current_timestamp()`. There is no caller-supplied keyword — an
+> arbitrary word reaches keyword position only as an `Expr::cust`, which says
+> raw SQL where a `Keyword` would have said identifier. Identifier helpers: `Alias`
 > wraps an arbitrary string as an identifier and `Asterisk` expresses `*` — as a bare projection or
 > table-qualified via `(Table, Asterisk)` rendering `"table".*`. `ColumnRef`
 > spans `Column`, `TableColumn`, `SchemaTableColumn`, `Asterisk`, and
@@ -537,10 +539,10 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+2]
+> [spec:pgorm:def:sql.ast.window-statement+3]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
-> (`partition_by`, `partition_by_custom`, and the `OverStatement` trait's
-> `partition_by_columns`/`partition_by_customs`), ORDER BY expressions (shared
+> (`partition_by`, and the `OverStatement` trait's
+> `partition_by_columns`), ORDER BY expressions (shared
 > `OrderedStatement` trait), and an optional `FrameClause` — a `FrameType`
 > (`Range` or `Rows`) with a start `Frame` and optional end `Frame`
 > (`UnboundedPreceding`, `Preceding(n)`, `CurrentRow`, `Following(n)`,

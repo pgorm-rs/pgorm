@@ -9,7 +9,7 @@ use crate::{
 };
 use std::ops::Deref;
 
-// [spec:pgorm:req:sql.render.ident-quoting] (the double-quote pair; doubling in Iden::quoted)
+// [spec:pgorm:req:sql.render.ident-quoting+1] (the double-quote pair; doubling in Iden::quoted)
 const QUOTE: Quote = Quote(b'"', b'"');
 
 /// Discard sub-microsecond digits before a temporal value is rendered as a
@@ -991,13 +991,12 @@ impl QueryBuilder {
             Keyword::CurrentDate => write!(sql, "CURRENT_DATE").unwrap(),
             Keyword::CurrentTime => write!(sql, "CURRENT_TIME").unwrap(),
             Keyword::CurrentTimestamp => write!(sql, "CURRENT_TIMESTAMP").unwrap(),
-            Keyword::Custom(iden) => iden.unquoted(sql.as_writer()),
         }
     }
 
     /// Convert a SQL value into syntax-specific string
     // [spec:pgorm:sem:sql.value.render+1]
-    // [spec:pgorm:def:sql.render.value-literals+3]
+    // [spec:pgorm:def:sql.render.value-literals+4]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {

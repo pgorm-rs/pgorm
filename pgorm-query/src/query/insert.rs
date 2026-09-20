@@ -131,7 +131,7 @@ impl InsertStatement {
     ///     .select_from(
     ///         Query::select()
     ///             .expr(Expr::val("hello"))
-    ///             .cond_where(Cond::all().not().add(Expr::exists(
+    ///             .cond_where(Condition::all().not().add(Expr::exists(
     ///                 Query::select().expr(Expr::val("world")).to_owned(),
     ///             )))
     ///             .to_owned(),

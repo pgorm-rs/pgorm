@@ -7657,6 +7657,13 @@ children (
                         kind @note
                         text "Census 2026-09-20: ~179 public items, ~94 with any consumer use, ~77 dead (own-tests-only counts as dead). The deletion candidates are the residue half: Expr::custom_keyword + Keyword::Custom, order_by_customs(_with_nulls), partition_by_custom(s), any!/all! macros, the Function enum (func.rs:12), IdenList + its tuple impls (types.rs:89, 685-719), the Expression trait (expr.rs:55), NotU8, Cond alias, the never-called Returning factory (query/returning.rs:21) — plus pgorm proper's debug_query!/debug_query_stmt!/DebugQuery (src/query/util.rs:105,72,4 — exported macros that cannot compile, their build impl commented out at :30-40; zero call sites), which ride along in the same sweep. Two cautions: the census (b) list is a candidate set, not a verdict — IntoColumnDef appears on it yet is the by-value embedder pattern query-verbs-keep-promises standardizes on, so each deletion is re-verified against consumers AND convention value at execution. And the (a) list stays: Extension builders, window Frame types, recursive-CTE Search/Cycle, PgInterval, PgLTree, the tsquery/ts_rank Func family are real PostgreSQL surface pgorm merely doesn't use yet. Leaked internals are query-reexports-curated's scope, not deletions here."
                     }
+
+                    {
+                        at 2026-09-19T23:56:16.688448Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

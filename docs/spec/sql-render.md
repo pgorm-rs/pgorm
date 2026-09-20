@@ -169,7 +169,7 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting]
+> [spec:pgorm:req:sql.render.ident-quoting+1]
 > The quote pair is `Quote(b'"', b'"')`. Every identifier rendered through
 > `Iden::prepare` MUST be wrapped in double quotes with any embedded `"`
 > doubled (`Iden::quoted` replaces the right-quote character with itself
@@ -178,8 +178,8 @@ an ideal Postgres renderer would emit.
 > names, schema/database qualifiers, aliases, CTE names, window names, and
 > index/constraint/foreign-key names. Multi-part references join the quoted
 > parts with `.` (e.g. `"schema"."table"."column"`). By contrast,
-> `Function::Custom` function names and `Keyword::Custom` keywords are written
-> via `Iden::unquoted`, i.e. raw with no quoting.
+> `Function::Custom` function names are written via `Iden::unquoted`, i.e. raw
+> with no quoting.
 
 > [spec:pgorm:req:sql.render.string-escape+1]
 > `QueryBuilder::escape_string` MUST apply exactly these replacements, in
@@ -197,7 +197,7 @@ an ideal Postgres renderer would emit.
 > inverse mapping (a backslash followed by `0 b t n r` maps back to the
 > control character; any other escaped character maps to itself).
 
-> [spec:pgorm:def:sql.render.value-literals+3]
+> [spec:pgorm:def:sql.render.value-literals+4]
 > `value_to_string` defines the inline literal syntax per `Value` variant:
 >
 > Every `None` variant of every `Value` type renders as the bare keyword
@@ -236,7 +236,7 @@ an ideal Postgres renderer would emit.
 > `'[f1,f2,…]'`.
 >
 > `Keyword` expressions render as bare `NULL`, `CURRENT_DATE`, `CURRENT_TIME`,
-> or `CURRENT_TIMESTAMP`; `Keyword::Custom` is written unquoted.
+> or `CURRENT_TIMESTAMP` — the whole lexicon, with no caller-supplied arm.
 
 ## Operators, precedence, and parentheses
 

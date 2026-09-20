@@ -90,13 +90,13 @@ impl CaseStatement {
     /// let query = Query::select()
     ///     .expr_as(
     ///         Expr::case(
-    ///             Cond::any()
+    ///             Condition::any()
     ///                 .add(Expr::col((Character::Table, Character::FontSize)).gt(48))
     ///                 .add(Expr::col((Character::Table, Character::SizeW)).gt(500)),
     ///             "large"
     ///         )
     ///         .case(
-    ///             Cond::any()
+    ///             Condition::any()
     ///                 .add(Expr::col((Character::Table, Character::FontSize)).between(24,48))
     ///                 .add(Expr::col((Character::Table, Character::SizeW)).between(300,500)),
     ///             "medium"

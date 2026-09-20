@@ -3,7 +3,7 @@ use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast/test]
 // [spec:pgorm:def:sql.ast.select+2/test]
-// [spec:pgorm:req:sql.render.ident-quoting/test]
+// [spec:pgorm:req:sql.render.ident-quoting+1/test]
 #[test]
 fn select_1() {
     assert_eq!(
@@ -291,17 +291,18 @@ fn select_21() {
         Query::select()
             .columns([Char::Character])
             .from(Char::Table)
-            .cond_where(any![
-                Expr::col(Char::Character).like("A%"),
-                Expr::col(Char::Character).like("%B"),
-                Expr::col(Char::Character).like("%C%"),
-            ])
+            .cond_where(
+                Condition::any()
+                    .add(Expr::col(Char::Character).like("A%"))
+                    .add(Expr::col(Char::Character).like("%B"))
+                    .add(Expr::col(Char::Character).like("%C%"))
+            )
             .to_string(),
         r#"SELECT "character" FROM "character" WHERE "character" LIKE 'A%' OR "character" LIKE '%B' OR "character" LIKE '%C%'"#
     );
 }
 
-// [spec:pgorm:def:sql.ast.condition/test]
+// [spec:pgorm:def:sql.ast.condition+1/test]
 #[test]
 fn select_22() {
     assert_eq!(
@@ -309,13 +310,15 @@ fn select_22() {
             .column(Char::Character)
             .from(Char::Table)
             .cond_where(
-                Cond::all()
+                Condition::all()
                     .add(
-                        Cond::any().add(Expr::col(Char::Character).like("C")).add(
-                            Expr::col(Char::Character)
-                                .like("D")
-                                .and(Expr::col(Char::Character).like("E"))
-                        )
+                        Condition::any()
+                            .add(Expr::col(Char::Character).like("C"))
+                            .add(
+                                Expr::col(Char::Character)
+                                    .like("D")
+                                    .and(Expr::col(Char::Character).like("E"))
+                            )
                     )
                     .add(
                         Expr::col(Char::Character)
@@ -410,11 +413,12 @@ fn select_28() {
         Query::select()
             .columns([Char::Character, Char::SizeW, Char::SizeH])
             .from(Char::Table)
-            .cond_where(any![
-                Expr::col(Char::SizeW).eq(3),
-                Expr::col(Char::SizeH).eq(4),
-                Expr::col(Char::SizeH).eq(5),
-            ])
+            .cond_where(
+                Condition::any()
+                    .add(Expr::col(Char::SizeW).eq(3))
+                    .add(Expr::col(Char::SizeH).eq(4))
+                    .add(Expr::col(Char::SizeH).eq(5))
+            )
             .to_string(),
         r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" = 3 OR "size_h" = 4 OR "size_h" = 5"#
     );
@@ -481,15 +485,20 @@ fn select_34a() {
             .expr(Expr::col(Glyph::Image).max())
             .from(Glyph::Table)
             .group_by_columns([Glyph::Aspect])
-            .cond_having(any![
-                Expr::col(Glyph::Aspect)
-                    .gt(2)
-                    .or(Expr::col(Glyph::Aspect).lt(8)),
-                Expr::col(Glyph::Aspect)
-                    .gt(12)
-                    .and(Expr::col(Glyph::Aspect).lt(18)),
-                Expr::col(Glyph::Aspect).gt(32),
-            ])
+            .cond_having(
+                Condition::any()
+                    .add(
+                        Expr::col(Glyph::Aspect)
+                            .gt(2)
+                            .or(Expr::col(Glyph::Aspect).lt(8))
+                    )
+                    .add(
+                        Expr::col(Glyph::Aspect)
+                            .gt(12)
+                            .and(Expr::col(Glyph::Aspect).lt(18))
+                    )
+                    .add(Expr::col(Glyph::Aspect).gt(32))
+            )
             .to_string(),
         [
             r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect""#,
@@ -521,7 +530,7 @@ fn select_36() {
     let (statement, values) = Query::select()
         .column(Glyph::Id)
         .from(Glyph::Table)
-        .cond_where(Cond::any().add(Expr::col(Glyph::Aspect).is_null()))
+        .cond_where(Condition::any().add(Expr::col(Glyph::Aspect).is_null()))
         .build();
 
     assert_eq!(
@@ -537,7 +546,7 @@ fn select_37() {
     let (statement, values) = Query::select()
         .column(Glyph::Id)
         .from(Glyph::Table)
-        .cond_where(Cond::any().add(Cond::all()).add(Cond::any()))
+        .cond_where(Condition::any().add(Condition::all()).add(Condition::any()))
         .build();
 
     assert_eq!(statement, r#"SELECT "id" FROM "glyph" WHERE TRUE OR FALSE"#);
@@ -550,9 +559,9 @@ fn select_37a() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all()
-                .add(Cond::all().not())
-                .add(Cond::any().not())
+            Condition::all()
+                .add(Condition::all().not())
+                .add(Condition::any().not())
                 .not(),
         )
         .build();
@@ -570,7 +579,7 @@ fn select_38() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::any()
+            Condition::any()
                 .add(Expr::col(Glyph::Aspect).is_null())
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
@@ -589,7 +598,7 @@ fn select_39() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all()
+            Condition::all()
                 .add(Expr::col(Glyph::Aspect).is_null())
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
@@ -607,13 +616,15 @@ fn select_40() {
     let statement = Query::select()
         .column(Glyph::Id)
         .from(Glyph::Table)
-        .cond_where(any![
-            Expr::col(Glyph::Aspect).is_null(),
-            all![
-                Expr::col(Glyph::Aspect).is_not_null(),
-                Expr::col(Glyph::Aspect).lt(8)
-            ]
-        ])
+        .cond_where(
+            Condition::any()
+                .add(Expr::col(Glyph::Aspect).is_null())
+                .add(
+                    Condition::all()
+                        .add(Expr::col(Glyph::Aspect).is_not_null())
+                        .add(Expr::col(Glyph::Aspect).lt(8)),
+                ),
+        )
         .to_string();
 
     assert_eq!(
@@ -630,7 +641,7 @@ fn select_41() {
             .exprs([Expr::col(Glyph::Image).max()])
             .from(Glyph::Table)
             .group_by_columns([Glyph::Aspect])
-            .cond_having(any![Expr::col(Glyph::Aspect).gt(2)])
+            .cond_having(Condition::any().add(Expr::col(Glyph::Aspect).gt(2)))
             .to_string(),
         r#"SELECT "aspect", MAX("image") FROM "glyph" GROUP BY "aspect" HAVING "aspect" > 2"#
     );
@@ -642,7 +653,7 @@ fn select_42() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all()
+            Condition::all()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
         )
@@ -660,7 +671,7 @@ fn select_43() {
     let statement = Query::select()
         .column(Glyph::Id)
         .from(Glyph::Table)
-        .cond_where(Cond::all().add_option::<SimpleExpr>(None))
+        .cond_where(Condition::all().add_option::<SimpleExpr>(None))
         .to_string();
 
     assert_eq!(statement, r#"SELECT "id" FROM "glyph" WHERE TRUE"#);
@@ -672,7 +683,7 @@ fn select_44() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::any()
+            Condition::any()
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8))),
         )
@@ -690,7 +701,7 @@ fn select_45() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::any()
+            Condition::any()
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
@@ -709,7 +720,7 @@ fn select_46() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all()
+            Condition::all()
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8))),
         )
@@ -727,7 +738,7 @@ fn select_47() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all()
+            Condition::all()
                 .not()
                 .add_option(Some(Expr::col(Glyph::Aspect).lt(8)))
                 .add(Expr::col(Glyph::Aspect).is_not_null()),
@@ -746,7 +757,7 @@ fn select_48() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all().add_option(Some(ConditionExpression::SimpleExpr(
+            Condition::all().add_option(Some(ConditionExpression::SimpleExpr(
                 Expr::tuple([Expr::col(Glyph::Aspect).into(), Expr::value(100)])
                     .lt(Expr::tuple([Expr::value(8), Expr::value(100)])),
             ))),
@@ -765,7 +776,7 @@ fn select_48a() {
         .column(Glyph::Id)
         .from(Glyph::Table)
         .cond_where(
-            Cond::all().add_option(Some(ConditionExpression::SimpleExpr(
+            Condition::all().add_option(Some(ConditionExpression::SimpleExpr(
                 Expr::tuple([
                     Expr::col(Glyph::Aspect).into(),
                     Expr::value(String::from("100")),
@@ -781,7 +792,7 @@ fn select_48a() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+2/test]    `Asterisk` as a bare projection
+// [spec:pgorm:def:sql.ast.keywords+3/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -792,7 +803,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
-// [spec:pgorm:def:sql.ast.keywords+2/test]    `(Table, Asterisk)` renders `"table".*`
+// [spec:pgorm:def:sql.ast.keywords+3/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -811,7 +822,7 @@ fn select_50() {
     )
 }
 
-// [spec:pgorm:req:sql.ast.order+1/test]
+// [spec:pgorm:req:sql.ast.order+2/test]
 #[test]
 fn select_51() {
     assert_eq!(
@@ -966,7 +977,7 @@ fn select_56() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.order+1/test]
+// [spec:pgorm:req:sql.ast.order+2/test]
 #[test]
 fn select_57() {
     assert_eq!(
@@ -1115,7 +1126,7 @@ fn select_62() {
 
 // [spec:pgorm:def:sql.ast.insert+1/test]
 // [spec:pgorm:req:sql.render.insert/test]
-// [spec:pgorm:def:sql.render.value-literals+3/test]
+// [spec:pgorm:def:sql.render.value-literals+4/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_2() {
@@ -2427,7 +2438,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+2/test]    the bare-keyword expressions and their constructors
+// [spec:pgorm:def:sql.ast.keywords+3/test]    the bare-keyword expressions and their constructors
 #[test]
 fn keywords_1() {
     assert_eq!(
@@ -2435,14 +2446,13 @@ fn keywords_1() {
             .expr(Expr::current_date())
             .expr(Expr::current_time())
             .expr(Expr::current_timestamp())
-            .expr(Expr::custom_keyword(Alias::new("DEFAULT")))
             .expr(Keyword::Null)
             .to_string(),
-        "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DEFAULT, NULL"
+        "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, NULL"
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+2/test]    `Alias` wraps an arbitrary string as an identifier,
+// [spec:pgorm:def:sql.ast.keywords+3/test]    `Alias` wraps an arbitrary string as an identifier,
 // and it is the only identifier helper — there is no empty-name alias
 #[test]
 fn keywords_2() {
@@ -2472,7 +2482,7 @@ fn condition_holder_1() {
         Query::select()
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(1)))
             .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1"#
     );
@@ -2498,7 +2508,7 @@ fn condition_holder_2() {
         Query::select()
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(1)))
             .and_where(Expr::col(Glyph::Aspect).eq(2))
             .to_string(),
         expected
@@ -2509,7 +2519,7 @@ fn condition_holder_2() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .and_where(Expr::col(Glyph::Aspect).eq(1))
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(2)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(2)))
             .to_string(),
         expected
     );
@@ -2524,12 +2534,13 @@ fn condition_holder_3a() {
             .column(Glyph::Aspect)
             .from(Glyph::Table)
             .group_by_col(Glyph::Aspect)
-            .cond_having(Cond::all().add(Expr::col(Glyph::Aspect).gt(1)))
+            .cond_having(Condition::all().add(Expr::col(Glyph::Aspect).gt(1)))
             .and_having(Expr::col(Glyph::Aspect).lt(9))
-            .cond_having(any![
-                Expr::col(Glyph::Aspect).eq(3),
-                Expr::col(Glyph::Aspect).eq(5)
-            ])
+            .cond_having(
+                Condition::any()
+                    .add(Expr::col(Glyph::Aspect).eq(3))
+                    .add(Expr::col(Glyph::Aspect).eq(5))
+            )
             .to_string(),
         [
             r#"SELECT "aspect" FROM "glyph" GROUP BY "aspect""#,
@@ -2549,11 +2560,11 @@ fn condition_holder_4() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .cond_where(
-                Cond::all()
+                Condition::all()
                     .add(Expr::col(Glyph::Aspect).eq(1))
                     .add(Expr::col(Glyph::Aspect).eq(2))
             )
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(3)))
             .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" = 1 AND "aspect" = 2 AND "aspect" = 3"#
     );
@@ -2569,9 +2580,9 @@ fn condition_holder_5() {
         Query::select()
             .column(Glyph::Id)
             .from(Glyph::Table)
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(1)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(1)))
             .cond_where(
-                Cond::any()
+                Condition::any()
                     .add(Expr::col(Glyph::Aspect).eq(2))
                     .add(Expr::col(Glyph::Aspect).eq(3))
             )
@@ -2585,11 +2596,11 @@ fn condition_holder_5() {
             .column(Glyph::Id)
             .from(Glyph::Table)
             .cond_where(
-                Cond::any()
+                Condition::any()
                     .add(Expr::col(Glyph::Aspect).eq(1))
                     .add(Expr::col(Glyph::Aspect).eq(2))
             )
-            .cond_where(Cond::all().add(Expr::col(Glyph::Aspect).eq(3)))
+            .cond_where(Condition::all().add(Expr::col(Glyph::Aspect).eq(3)))
             .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE ("aspect" = 1 OR "aspect" = 2) AND "aspect" = 3"#
     );

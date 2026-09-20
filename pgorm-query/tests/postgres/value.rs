@@ -188,7 +188,7 @@ fn display_renders_a_postgres_literal() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+3/test]    an empty array literal
+// [spec:pgorm:def:sql.render.value-literals+4/test]    an empty array literal
 // carries a cast to its element type: PostgreSQL rejects a bare `ARRAY []` with
 // "cannot determine type of empty array", there being no element to infer from
 #[test]
@@ -353,7 +353,7 @@ fn decimal_to_f64_converts_the_payload() {
     assert_eq!(Value::Decimal(None).decimal_to_f64(), None);
 }
 
-// [spec:pgorm:def:sql.render.value-literals+3/test]    a char renders as its whole
+// [spec:pgorm:def:sql.render.value-literals+4/test]    a char renders as its whole
 // UTF-8 text, quoted and escaped exactly like a one-character string
 #[test]
 fn char_renders_whole_scalar_not_low_byte() {
@@ -367,7 +367,7 @@ fn char_renders_whole_scalar_not_low_byte() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+3/test]    the char literals the renderer
+// [spec:pgorm:def:sql.render.value-literals+4/test]    the char literals the renderer
 // emits are ones the PostgreSQL grammar accepts
 #[test]
 fn char_literals_parse_as_postgres_literals() {

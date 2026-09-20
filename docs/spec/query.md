@@ -477,16 +477,6 @@ what makes it total over partially-set models.
 > and the error. `Delete::many(entity)` builds a bare `DELETE FROM <table>`;
 > constraining it is the caller's job via `QueryFilter`.
 
-> [spec:pgorm:def:query.build.debug-query]
-> `DebugQuery<'a, Q, T>` (`util.rs`) is a plain holder of a `&Q` query and a
-> value, paired with the `debug_query_stmt!` and `debug_query!` macros that
-> expand to constructing a `DebugQuery` and calling `.build()` on it.
-> Limitation: every `debug_query_build!` invocation that would generate the
-> per-value `build` impls is commented out in the current source, so
-> `DebugQuery` has no methods and the two macros have no working `build`
-> target; the type is vestigial and raw SQL is obtained via
-> `QueryTrait::build()` instead.
-
 ## Batched loading
 
 > [spec:pgorm:req:query.loader+1]

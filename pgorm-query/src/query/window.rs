@@ -14,18 +14,6 @@ pub trait OverStatement {
         self.add_partition_by(SimpleExpr::Column(col.into_column_ref()))
     }
 
-    /// Partition by custom string.
-    fn partition_by_customs<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = T>,
-    {
-        cols.into_iter().for_each(|c| {
-            self.add_partition_by(SimpleExpr::Custom(c.to_string()));
-        });
-        self
-    }
-
     /// Partition by vector of columns.
     fn partition_by_columns<I, T>(&mut self, cols: I) -> &mut Self
     where
@@ -71,7 +59,7 @@ pub struct FrameClause {
 /// 1. <https://dev.mysql.com/doc/refman/8.0/en/window-function-descriptions.html>
 /// 2. <https://www.sqlite.org/windowfunctions.html>
 /// 3. <https://www.postgresql.org/docs/current/tutorial-window.html>
-// [spec:pgorm:def:sql.ast.window-statement+2]
+// [spec:pgorm:def:sql.ast.window-statement+3]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,
@@ -100,16 +88,6 @@ impl WindowStatement {
     {
         let mut window = Self::new();
         window.add_partition_by(SimpleExpr::Column(col.into_column_ref()));
-        window
-    }
-
-    /// Construct a new [`WindowStatement`] with PARTITION BY custom
-    pub fn partition_by_custom<T>(col: T) -> Self
-    where
-        T: ToString,
-    {
-        let mut window = Self::new();
-        window.add_partition_by(SimpleExpr::Custom(col.to_string()));
         window
     }
 
@@ -196,10 +174,6 @@ impl OrderedStatement for WindowStatement {
         T: IntoColumnRef;
 
     pub fn order_by_expr(&mut self, expr: SimpleExpr, order: Order) -> &mut Self;
-    pub fn order_by_customs<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order)>;
     pub fn order_by_columns<I, T>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,
@@ -218,10 +192,6 @@ impl OrderedStatement for WindowStatement {
         order: Order,
         nulls: NullOrdering,
     ) -> &mut Self;
-    pub fn order_by_customs_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order, NullOrdering)>;
     pub fn order_by_columns_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,

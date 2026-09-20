@@ -1,6 +1,6 @@
 use crate::{expr::*, types::*};
 
-// [spec:pgorm:req:sql.ast.order+1]
+// [spec:pgorm:req:sql.ast.order+2]
 pub trait OrderedStatement {
     #[doc(hidden)]
     // Implementation for the trait.
@@ -77,22 +77,6 @@ pub trait OrderedStatement {
         })
     }
 
-    /// Order by custom string.
-    fn order_by_customs<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order)>,
-    {
-        cols.into_iter().for_each(|(c, order)| {
-            self.add_order_by(OrderExpr {
-                expr: SimpleExpr::Custom(c.to_string()),
-                order,
-                nulls: None,
-            });
-        });
-        self
-    }
-
     /// Order by vector of columns.
     fn order_by_columns<I, T>(&mut self, cols: I) -> &mut Self
     where
@@ -149,22 +133,6 @@ pub trait OrderedStatement {
             order,
             nulls: Some(nulls),
         })
-    }
-
-    /// Order by custom string with nulls order option.
-    fn order_by_customs_with_nulls<I, T>(&mut self, cols: I) -> &mut Self
-    where
-        T: ToString,
-        I: IntoIterator<Item = (T, Order, NullOrdering)>,
-    {
-        cols.into_iter().for_each(|(c, order, nulls)| {
-            self.add_order_by(OrderExpr {
-                expr: SimpleExpr::Custom(c.to_string()),
-                order,
-                nulls: Some(nulls),
-            });
-        });
-        self
     }
 
     /// Order by vector of columns with nulls order option.
