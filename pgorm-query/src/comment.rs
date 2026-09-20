@@ -52,7 +52,7 @@ pub enum CommentTarget {
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// assert_eq!(
-///     Comment::on_table((Alias::new("public"), Char::Table), "it's a table")
+///     Comment::on_table((Name::runtime("public"), Char::Table), "it's a table")
 ///         .to_string(),
 ///     r#"COMMENT ON TABLE "public"."character" IS 'it''s a table'"#
 /// );

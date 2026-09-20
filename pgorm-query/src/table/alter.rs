@@ -89,7 +89,7 @@ impl PendingTableAlter {
 /// use pgorm_query::{tests_cfg::*, *};
 ///
 /// let table = Table::alter(Font::Table).add_column(
-///     ColumnDef::new(Alias::new("new_col"))
+///     ColumnDef::new(Name::runtime("new_col"))
 ///         .integer()
 ///         .not_null()
 ///         .default(100),
@@ -162,9 +162,9 @@ impl TableAlterStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let table = Table::alter(Font::Table)
-    ///     .drop_column(Alias::new("old_col"))
+    ///     .drop_column(Name::runtime("old_col"))
     ///     .add_column(
-    ///         ColumnDef::new(Alias::new("new_col"))
+    ///         ColumnDef::new(Name::runtime("new_col"))
     ///             .integer()
     ///             .not_null()
     ///             .default(100),
@@ -192,7 +192,7 @@ impl TableAlterStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let table = Table::alter(Font::Table).add_column_if_not_exists(
-    ///     ColumnDef::new(Alias::new("new_col"))
+    ///     ColumnDef::new(Name::runtime("new_col"))
     ///         .integer()
     ///         .not_null()
     ///         .default(100),
@@ -215,7 +215,7 @@ impl TableAlterStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let table = Table::alter(Font::Table).modify_column(
-    ///     ColumnDef::new(Alias::new("new_col"))
+    ///     ColumnDef::new(Name::runtime("new_col"))
     ///         .big_integer()
     ///         .default(999),
     /// );
@@ -241,7 +241,7 @@ impl TableAlterStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table = Table::alter(Font::Table).drop_column(Alias::new("new_column"));
+    /// let table = Table::alter(Font::Table).drop_column(Name::runtime("new_column"));
     ///
     /// assert_eq!(
     ///     table.to_string(),
@@ -314,8 +314,8 @@ impl TableAlterStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let table = Table::alter(Character::Table)
-    ///     .drop_foreign_key(Alias::new("FK_character_glyph"))
-    ///     .drop_foreign_key(Alias::new("FK_character_font"))
+    ///     .drop_foreign_key(Name::runtime("FK_character_glyph"))
+    ///     .drop_foreign_key(Name::runtime("FK_character_font"))
     ///     .to_owned();
     ///
     /// assert_eq!(

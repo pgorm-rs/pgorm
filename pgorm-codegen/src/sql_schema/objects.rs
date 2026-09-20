@@ -5,7 +5,7 @@ use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
 use pgorm_query::{
-    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _, IntoTableName,
+    Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _, IntoTableName, Name,
     TableName,
 };
 
@@ -93,7 +93,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
         if element.nulls_ordering != SortByNulls::SortbyNullsDefault as i32 {
             return Err(on("a NULLS FIRST or NULLS LAST clause"));
         }
-        let column = Alias::new(element.name.as_str());
+        let column = Name::runtime(element.name.as_str());
         columns.push(match SortByDir::try_from(element.ordering) {
             Ok(SortByDir::SortbyDefault) => column.into_index_column(),
             Ok(SortByDir::SortbyAsc) => (column, IndexOrder::Asc).into_index_column(),
@@ -108,7 +108,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     };
     let mut index = Index::create(target(&table), first);
     if !stmt.idxname.is_empty() {
-        index.name(stmt.idxname.as_str());
+        index.name(Name::runtime(stmt.idxname.as_str()));
     }
     if stmt.if_not_exists {
         index.if_not_exists();
@@ -134,9 +134,9 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
 /// A parsed identity back as the name a statement targets.
 // [spec:pgorm:sem:codegen.ddl.objects+4]
 fn target(ident: &TableIdent) -> TableName {
-    let table = Alias::new(ident.table.as_str());
+    let table = Name::runtime(ident.table.as_str());
     match ident.schema.as_deref() {
-        Some(schema) => (Alias::new(schema), table).into_table_name(),
+        Some(schema) => (Name::runtime(schema), table).into_table_name(),
         None => table.into_table_name(),
     }
 }
@@ -146,7 +146,7 @@ fn index_type(access_method: &str) -> Option<IndexType> {
         "" | "btree" => None,
         "hash" => Some(IndexType::Hash),
         "gin" => Some(IndexType::Gin),
-        other => Some(IndexType::Named(pgorm_query::Name::new(Alias::new(other)))),
+        other => Some(IndexType::Named(pgorm_query::Name::runtime(other))),
     }
 }
 

@@ -48,7 +48,7 @@ mod tests {
     use crate::{
         ColumnTrait, EntityTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait, RelationTrait,
     };
-    use pgorm_query::{ConditionType, Expr, IntoCondition, JoinType, alias};
+    use pgorm_query::{ConditionType, Expr, IntoCondition, JoinType, Name, alias};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -403,7 +403,7 @@ mod tests {
 
         assert_eq!(
             cake::Entity::find()
-                .column_as(Expr::col((fruit_alias, fruit::Column::Name)), "fruit_name")
+                .column_as(Expr::col((fruit_alias, fruit::Column::Name)), Name::runtime("fruit_name"))
                 .join_as(
                     JoinType::LeftJoin,
                     cake::Relation::Fruit
@@ -433,7 +433,7 @@ mod tests {
             cake::Entity::find()
                 .column_as(
                     Expr::col((cf_alias, cake_filling::Column::CakeId)),
-                    "cake_filling_cake_id"
+                    Name::runtime("cake_filling_cake_id")
                 )
                 .join(JoinType::LeftJoin, cake::Relation::TropicalFruit.def())
                 .join_as_rev(
@@ -466,7 +466,7 @@ mod tests {
             cake::Entity::find()
                 .column_as(
                     Expr::col((cf_alias, cake_filling::Column::CakeId)),
-                    "cake_filling_cake_id"
+                    Name::runtime("cake_filling_cake_id")
                 )
                 .join(JoinType::LeftJoin, cake::Relation::OrTropicalFruit.def())
                 .join_as_rev(

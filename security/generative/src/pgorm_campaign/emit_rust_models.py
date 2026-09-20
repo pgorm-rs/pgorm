@@ -329,8 +329,8 @@ class ModelEmitter:
             raise UnsupportedInstruction("source is outside the registered graph shape")
         qualifier = ENTITY_TABLES[ACCOUNT] if index == 0 else aliases[index - 1]
         reference = (
-            f"({Q}::Alias::new({literal(qualifier)}), "
-            f"{Q}::Alias::new({literal(d['column'])}))"
+            f"({Q}::Name::runtime({literal(qualifier)}), "
+            f"{Q}::Name::runtime({literal(d['column'])}))"
         )
         return f"{Q}::SimpleExpr::from({Q}::Expr::col({reference}))"
 
@@ -376,9 +376,7 @@ class ModelEmitter:
         for logical in selected:
             if logical not in fields:
                 raise UnsupportedInstruction("unknown runtime model field")
-            column = (
-                f"{Q}::IntoName::into_name({Q}::Alias::new({literal(fields[logical])}))"
-            )
+            column = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(fields[logical])}))"
             items.append(
                 (
                     f"{Q}::SimpleExpr::from({Q}::Expr::col({self.table_column(table, column)}))",
@@ -395,7 +393,7 @@ class ModelEmitter:
                 if d["name"] not in fields:
                     raise UnsupportedInstruction("unknown runtime model field")
                 table = self.nodes[i["model"]]["inputs"]["table"]
-                column = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(fields[d['name']])}))"
+                column = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(fields[d['name']])}))"
                 reference = self.table_column(table, column)
                 return f"{Q}::SimpleExpr::from({Q}::Expr::col({reference}))"
             case "model.select":
@@ -411,7 +409,7 @@ class ModelEmitter:
         body = [f"    let mut query = {Q}::Query::select();"]
         for expression, logical in self.model_projection(i["model"]):
             body.append(
-                f"    query.expr_as({expression}, {Q}::Alias::new({literal(logical)}));"
+                f"    query.expr_as({expression}, {Q}::Name::runtime({literal(logical)}));"
             )
         body.append(f"    query.from({self.use(i['model'])});")
         if "predicate" in i:
@@ -437,7 +435,7 @@ class ModelEmitter:
             if columns:
                 self.helpers.add("arity")
                 names = ", ".join(
-                    f"{Q}::Alias::new({literal(column)})" for column in columns
+                    f"{Q}::Name::runtime({literal(column)})" for column in columns
                 )
                 body.append(f"    query.columns(vec![{names}]);")
                 body.append(
@@ -455,7 +453,7 @@ class ModelEmitter:
                 )
             for column, value in zip(columns, values, strict=True):
                 body.append(
-                    f"    query.value({Q}::Alias::new({literal(column)}), {value});"
+                    f"    query.value({Q}::Name::runtime({literal(column)}), {value});"
                 )
         else:
             body = [
@@ -471,7 +469,7 @@ class ModelEmitter:
         model = self.nodes[i["query"]]["inputs"]["model"]
         items = []
         for expression, logical in self.model_projection(model, d["columns"]):
-            alias = f"{Q}::Alias::new({literal(logical)})"
+            alias = f"{Q}::Name::runtime({literal(logical)})"
             items.append(
                 f"{expression}.binary({Q}::BinOper::As, "
                 f"{Q}::SimpleExpr::from({Q}::Expr::col({alias})))"

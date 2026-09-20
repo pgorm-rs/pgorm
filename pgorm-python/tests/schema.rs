@@ -1,14 +1,14 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    Alias, ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, StringLen, Table,
+    ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, Name, StringLen, Table,
     TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
 use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
-fn a(name: &str) -> Alias {
-    Alias::new(name)
+fn a(name: &str) -> Name {
+    Name::runtime(name)
 }
 
 fn programs() -> BTreeMap<&'static str, String> {

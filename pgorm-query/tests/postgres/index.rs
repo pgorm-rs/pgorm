@@ -6,7 +6,7 @@ use crate::oracle::assert_eq;
 fn create_1() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx-glyph-aspect")
+            .name(Name::runtime("idx-glyph-aspect"))
             .to_string(),
         r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect")"#
     );
@@ -17,7 +17,7 @@ fn create_2() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .unique()
-            .name("idx-glyph-aspect-image")
+            .name(Name::runtime("idx-glyph-aspect-image"))
             .col(Glyph::Image)
             .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "glyph" ("aspect", "image")"#
@@ -29,7 +29,7 @@ fn create_3() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Image)
             .gin()
-            .name("idx-glyph-image")
+            .name(Name::runtime("idx-glyph-image"))
             .to_string(),
         r#"CREATE INDEX "idx-glyph-image" ON "glyph" USING GIN ("image")"#
     );
@@ -41,7 +41,7 @@ fn create_4() {
         Index::create(Glyph::Table, Glyph::Image)
             .if_not_exists()
             .gin()
-            .name("idx-glyph-image")
+            .name(Name::runtime("idx-glyph-image"))
             .to_string(),
         r#"CREATE INDEX IF NOT EXISTS "idx-glyph-image" ON "glyph" USING GIN ("image")"#
     );
@@ -50,9 +50,9 @@ fn create_4() {
 #[test]
 fn create_5() {
     assert_eq!(
-        Index::create((Alias::new("schema"), Glyph::Table), Glyph::Aspect)
+        Index::create((Name::runtime("schema"), Glyph::Table), Glyph::Aspect)
             .unique()
-            .name("idx-glyph-aspect-image")
+            .name(Name::runtime("idx-glyph-aspect-image"))
             .col(Glyph::Image)
             .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "schema"."glyph" ("aspect", "image")"#
@@ -66,7 +66,7 @@ fn create_6() {
         Index::create(Glyph::Table, Glyph::Aspect)
             .unique()
             .nulls_not_distinct()
-            .name("idx-glyph-aspect-image")
+            .name(Name::runtime("idx-glyph-aspect-image"))
             .col(Glyph::Image)
             .to_string(),
         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-image" ON "glyph" ("aspect", "image") NULLS NOT DISTINCT"#
@@ -78,7 +78,7 @@ fn create_6() {
 fn standalone_index_spells_plain_or_unique_only() {
     let index = || {
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .to_owned()
     };
     let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
@@ -114,7 +114,7 @@ fn index_kind_accessors_are_mutually_exclusive() {
 fn nulls_not_distinct_needs_the_unique_kind() {
     let index = || {
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .nulls_not_distinct()
             .to_owned()
     };
@@ -132,7 +132,7 @@ fn nulls_not_distinct_needs_the_unique_kind() {
 #[test]
 fn drop_1() {
     assert_eq!(
-        Index::drop("idx-glyph-aspect").to_string(),
+        Index::drop(Name::runtime("idx-glyph-aspect")).to_string(),
         r#"DROP INDEX "idx-glyph-aspect""#
     );
 }
@@ -141,8 +141,8 @@ fn drop_1() {
 #[test]
 fn drop_2() {
     assert_eq!(
-        Index::drop("idx-glyph-aspect")
-            .table((Alias::new("schema"), Glyph::Table))
+        Index::drop(Name::runtime("idx-glyph-aspect"))
+            .table((Name::runtime("schema"), Glyph::Table))
             .to_string(),
         r#"DROP INDEX "schema"."idx-glyph-aspect""#
     );
@@ -151,7 +151,7 @@ fn drop_2() {
 #[test]
 fn drop_3() {
     assert_eq!(
-        Index::drop("idx-glyph-aspect")
+        Index::drop(Name::runtime("idx-glyph-aspect"))
             .table(Glyph::Table)
             .to_string(),
         r#"DROP INDEX "idx-glyph-aspect""#
@@ -163,7 +163,7 @@ fn drop_3() {
 #[test]
 fn index_embeds_by_value() {
     let index = Index::create(Glyph::Table, Glyph::Aspect)
-        .name("idx")
+        .name(Name::runtime("idx"))
         .unique()
         .to_owned();
 

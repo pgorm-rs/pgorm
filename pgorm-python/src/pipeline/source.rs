@@ -1,11 +1,12 @@
 use pgorm::{
-    pgorm_query::{Alias, IntoNamedTable, NamedTable},
+    pgorm_query::{IntoNamedTable, NamedTable},
     pipeline::{self as pl, IntoSource},
 };
 use pyo3::prelude::*;
 
 use super::{builder::PyPipeline, expression::alias_name};
 use crate::{entities::PyEntity, errors::ConstructionError, statements::PyTable};
+use pgorm::pgorm_query::Name;
 
 /// The pipeline arm is boxed because it is several times the size of a named
 /// table, and a `PySource` is cloned on every composition.
@@ -33,10 +34,10 @@ impl PySource {
         match (&self.relation, &self.alias) {
             (Relation::Table(table), None) => match table.name.schema() {
                 Some(schema) => pl::Pipeline::from_schema(
-                    Alias::new(schema.to_string()),
-                    Alias::new(table.name.table().to_string()),
+                    Name::runtime(schema.to_string()),
+                    Name::runtime(table.name.table().to_string()),
                 ),
-                None => pl::Pipeline::from(Alias::new(table.name.table().to_string())),
+                None => pl::Pipeline::from(Name::runtime(table.name.table().to_string())),
             },
             _ => pl::Pipeline::from(self.source()),
         }
@@ -48,21 +49,21 @@ impl PySource {
                 Some(schema) => {
                     let table_name = table.name.table().to_string();
                     let pipeline = pl::Pipeline::from_schema(
-                        Alias::new(schema.to_string()),
-                        Alias::new(&table_name),
+                        Name::runtime(schema.to_string()),
+                        Name::runtime(&table_name),
                     );
                     pl::named_runtime(
                         pipeline,
-                        Alias::new(self.alias.clone().unwrap_or(table_name)),
+                        Name::runtime(self.alias.clone().unwrap_or(table_name)),
                     )
                     .into_source()
                 }
-                None => Alias::new(table.name.table().to_string()).into_source(),
+                None => Name::runtime(table.name.table().to_string()).into_source(),
             },
             Relation::Pipeline(pipeline) => (**pipeline).clone().into_source(),
         };
         match &self.alias {
-            Some(name) => pl::named_runtime(source, Alias::new(name)).into_source(),
+            Some(name) => pl::named_runtime(source, Name::runtime(name)).into_source(),
             None => source,
         }
     }
@@ -98,8 +99,8 @@ pub(super) fn pipeline_source(value: &Bound<'_, PyAny>) -> PyResult<PySource> {
     if let Ok(entity) = value.extract::<PyRef<'_, PyEntity>>() {
         let info = entity.backend.info();
         let table = match &info.schema {
-            Some(schema) => (Alias::new(schema), Alias::new(&info.table)).into_named_table(),
-            None => Alias::new(&info.table).into_named_table(),
+            Some(schema) => (Name::runtime(schema), Name::runtime(&info.table)).into_named_table(),
+            None => Name::runtime(&info.table).into_named_table(),
         };
         return Ok(PySource {
             relation: Relation::Table(table),

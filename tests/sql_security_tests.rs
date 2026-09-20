@@ -9,7 +9,7 @@
 pub mod common;
 use common::TestContext;
 use pgorm::{DecodeRaw, entity::prelude::*};
-use pgorm_query::{Alias, Expr, Func, Query, inject_parameters};
+use pgorm_query::{Expr, Func, Query, inject_parameters};
 
 #[tokio::test]
 async fn inline_parameters_preserve_block_comments() {
@@ -58,7 +58,7 @@ async fn custom_function_identifier_is_not_sql() {
     .await
     .unwrap();
     let (sql, values) = Query::select()
-        .expr(Func::named(Alias::new("COALESCE(7) + 100 --")))
+        .expr(Func::named(Name::runtime("COALESCE(7) + 100 --")))
         .build();
     let result = (sql.as_str(), values).into_tuple::<i32>().one(&db).await;
     drop(db);
@@ -77,7 +77,7 @@ async fn cast_type_identifier_is_not_sql() {
         .await
         .unwrap();
     let (sql, values) = Query::select()
-        .expr(Expr::val(7).cast_as(Alias::new("int4) + 100 --")))
+        .expr(Expr::val(7).cast_as(Name::runtime("int4) + 100 --")))
         .build();
     let result = (sql.as_str(), values).into_tuple::<i32>().one(&db).await;
     drop(db);
@@ -98,8 +98,8 @@ async fn enum_type_identifier_preserves_case() {
     let (sql, values) = Query::select()
         .expr(
             Expr::val("ready")
-                .as_enum(Alias::new("ReviewStatus"))
-                .cast_as(Alias::new("text")),
+                .as_enum(Name::runtime("ReviewStatus"))
+                .cast_as(Name::runtime("text")),
         )
         .build();
     let result = (sql.as_str(), values).into_tuple::<String>().one(&db).await;
@@ -187,7 +187,7 @@ async fn quoted_identifier_keeps_sql_payload_as_name() {
     let db = ctx.db.get().await.unwrap();
     let name = "value\" FROM nowhere; SELECT 7 --";
     let query = Query::select()
-        .expr_as(Expr::val(9), Alias::new(name))
+        .expr_as(Expr::val(9), Name::runtime(name))
         .to_owned();
     let row = db.query_one(&query.to_string(), &[]).await.unwrap();
     assert_eq!(row.columns()[0].name(), name);
@@ -220,10 +220,12 @@ async fn enum_ddl_name_cannot_add_a_column() {
     db.batch_execute(r#"CREATE TYPE "text, injected integer" AS ENUM ('ready')"#)
         .await
         .unwrap();
-    let sql = pgorm_query::Table::create(Alias::new("security_enum_ddl"))
+    let sql = pgorm_query::Table::create(Name::runtime("security_enum_ddl"))
         .col(
-            pgorm_query::ColumnDef::new(Alias::new("value"))
-                .enumeration(Alias::new("text, injected integer"), ["ready"]),
+            pgorm_query::ColumnDef::new(Name::runtime("value")).enumeration(
+                Name::runtime("text, injected integer"),
+                [Name::runtime("ready")],
+            ),
         )
         .to_string();
     let result = db.execute(&sql, &[]).await;
@@ -258,8 +260,14 @@ async fn inline_control_characters_round_trip() {
 #[tokio::test]
 async fn quote_bearing_pipeline_names_are_refused_not_rendered() {
     use pgorm::pipeline::{ExprOps, Pipeline, PipelineError, col};
-    let err = Pipeline::from(Alias::new("sec\"table"))
-        .filter(col(Alias::new("sec\"table"), Alias::new("note\" OR TRUE --")).eq("x"))
+    let err = Pipeline::from(Name::runtime("sec\"table"))
+        .filter(
+            col(
+                Name::runtime("sec\"table"),
+                Name::runtime("note\" OR TRUE --"),
+            )
+            .eq("x"),
+        )
         .into_sql()
         .expect_err("a quote-bearing identifier must refuse to render");
     assert!(
@@ -280,15 +288,17 @@ async fn pipeline_keeps_hostile_names_and_values_as_data() {
     db.execute("INSERT INTO \"sec'table\" VALUES ($1)", &[&payload])
         .await
         .unwrap();
-    let table = || Alias::new("sec'table");
-    let column = || col(table(), Alias::new("note' OR TRUE --"));
+    let table = || Name::runtime("sec'table");
+    let column = || col(table(), Name::runtime("note' OR TRUE --"));
     let inline_sql = Pipeline::from(table())
         .filter(column().eq(payload))
         .select(column())
         .into_sql()
         .unwrap();
     let bound_sql = Pipeline::from(table())
-        .filter_with(|binder| col(table(), Alias::new("note' OR TRUE --")).eq(binder.bind(payload)))
+        .filter_with(|binder| {
+            col(table(), Name::runtime("note' OR TRUE --")).eq(binder.bind(payload))
+        })
         .select(column())
         .into_sql()
         .unwrap();
@@ -349,7 +359,7 @@ async fn pipeline_values_keep_sql_payload_as_data() {
     db.execute("INSERT INTO security_items VALUES (2, $1)", &[&payload])
         .await
         .unwrap();
-    let column = || col(Alias::new("security_items"), Alias::new("name"));
+    let column = || col(Name::runtime("security_items"), Name::runtime("name"));
     let inline_sql = Pipeline::from(item::Entity)
         .filter(column().eq(payload))
         .select(column())
@@ -357,7 +367,7 @@ async fn pipeline_values_keep_sql_payload_as_data() {
         .unwrap();
     let bound_sql = Pipeline::from(item::Entity)
         .filter_with(|binder| {
-            col(Alias::new("security_items"), Alias::new("name")).eq(binder.bind(payload))
+            col(Name::runtime("security_items"), Name::runtime("name")).eq(binder.bind(payload))
         })
         .select(column())
         .into_sql()

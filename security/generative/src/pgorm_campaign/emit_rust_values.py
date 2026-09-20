@@ -123,17 +123,17 @@ def json_source(value):
 
 
 def type_name(name, schema):
-    result = f"{Q}::TypeName::new({Q}::Alias::new({literal(name)}))"
+    result = f"{Q}::TypeName::new({Q}::Name::runtime({literal(name)}))"
     if schema is not None:
-        result += f".schema({Q}::Alias::new({literal(schema)}))"
+        result += f".schema({Q}::Name::runtime({literal(schema)}))"
     return result
 
 
 def type_ref(name, schema):
-    local = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
+    local = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(name)}))"
     if schema is None:
         return f"{Q}::extension::TypeRef::Type({local})"
-    outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
+    outer = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(schema)}))"
     return f"{Q}::extension::TypeRef::SchemaType({outer}, {local})"
 
 
@@ -250,7 +250,7 @@ class ValueEmitter:
         """An identifier that is either declared data or a runtime Identifier."""
         if key in node["inputs"]:
             return self.use(node["inputs"][key])
-        return f"{Q}::Alias::new({literal(node['data'][key])})"
+        return f"{Q}::Name::runtime({literal(node['data'][key])})"
 
     # -- table and column identity ------------------------------------------
 
@@ -261,12 +261,12 @@ class ValueEmitter:
         if schema is None:
             table = f"{Q}::TableName::Table({inner})"
         else:
-            outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
+            outer = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(schema)}))"
             table = f"{Q}::TableName::SchemaTable({outer}, {inner})"
         result = f"{Q}::NamedTable::from({table})"
         alias = node["data"].get("alias")
         if alias is not None:
-            result += f".alias({Q}::Alias::new({literal(alias)}))"
+            result += f".alias({Q}::Name::runtime({literal(alias)}))"
         return result
 
     def table_identity(self, reference):
@@ -288,12 +288,14 @@ class ValueEmitter:
         alias = table["data"].get("alias")
         schema = table["data"].get("schema")
         if alias is not None:
-            qualifier = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(alias)}))"
+            qualifier = (
+                f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(alias)}))"
+            )
             return f"{Q}::ColumnRef::TableColumn({qualifier}, {column})"
         name = f"{Q}::IntoName::into_name({self.alias_of(table, 'name')})"
         if schema is None:
             return f"{Q}::ColumnRef::TableColumn({name}, {column})"
-        outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
+        outer = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(schema)}))"
         return f"{Q}::ColumnRef::SchemaTableColumn({outer}, {name}, {column})"
 
     def column_source(self, node):

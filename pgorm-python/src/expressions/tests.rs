@@ -1,6 +1,8 @@
 use std::ffi::CString;
 
-use pgorm::pgorm_query::{Condition, Expr, Func, LikeExpr, Query, SimpleExpr, TypeName, Value};
+use pgorm::pgorm_query::{
+    Condition, Expr, Func, LikeExpr, Name, Query, SimpleExpr, TypeName, Value,
+};
 use pyo3::{prelude::*, types::PyDict};
 
 use super::{Compiled, PyExpr};
@@ -39,7 +41,12 @@ fn expression_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
         let globals = module(py)?;
-        let column: SimpleExpr = Expr::col(("schema", "table", "x")).into();
+        let column: SimpleExpr = Expr::col((
+            Name::runtime("schema"),
+            Name::runtime("table"),
+            Name::runtime("x"),
+        ))
+        .into();
         let cases = [
             ("p.col('x', table='table', schema='schema')", column.clone()),
             (
@@ -48,34 +55,41 @@ fn expression_structure_matches_rust_builders() -> PyResult<()> {
             ),
             (
                 "(p.col('a') == 1) & ((p.col('b') > 2) | p.col('c').is_null())",
-                Expr::col("a")
-                    .eq(1i64)
-                    .and(Expr::col("b").gt(2i64).or(Expr::col("c").is_null())),
+                Expr::col(Name::runtime("a")).eq(1i64).and(
+                    Expr::col(Name::runtime("b"))
+                        .gt(2i64)
+                        .or(Expr::col(Name::runtime("c")).is_null()),
+                ),
             ),
-            ("~(p.col('x') < 3)", Expr::col("x").lt(3i64).not()),
+            (
+                "~(p.col('x') < 3)",
+                Expr::col(Name::runtime("x")).lt(3i64).not(),
+            ),
             (
                 "p.col('x').between(p.literal(1), 2)",
-                Expr::col("x").between(SimpleExpr::Constant(1i64.into()), Expr::value(2i64)),
+                Expr::col(Name::runtime("x"))
+                    .between(SimpleExpr::Constant(1i64.into()), Expr::value(2i64)),
             ),
             (
                 "p.col('x').not_between(1, 2)",
-                Expr::col("x").not_between(1i64, 2i64),
+                Expr::col(Name::runtime("x")).not_between(1i64, 2i64),
             ),
             (
                 "p.col('x').is_in([1, p.literal(2)])",
-                Expr::col("x").is_in([Expr::value(1i64), SimpleExpr::Constant(2i64.into())]),
+                Expr::col(Name::runtime("x"))
+                    .is_in([Expr::value(1i64), SimpleExpr::Constant(2i64.into())]),
             ),
             (
                 "p.col('x').is_in([])",
-                Expr::col("x").is_in(Vec::<SimpleExpr>::new()),
+                Expr::col(Name::runtime("x")).is_in(Vec::<SimpleExpr>::new()),
             ),
             (
                 "p.col('x').is_not_in([])",
-                Expr::col("x").is_not_in(Vec::<SimpleExpr>::new()),
+                Expr::col(Name::runtime("x")).is_not_in(Vec::<SimpleExpr>::new()),
             ),
             (
                 "p.tuple_expr(p.col('x'), 2)",
-                Expr::tuple([Expr::col("x").into(), Expr::value(2i64)]).into(),
+                Expr::tuple([Expr::col(Name::runtime("x")).into(), Expr::value(2i64)]).into(),
             ),
         ];
         for (source, expected) in cases {
@@ -95,20 +109,22 @@ fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
             py,
             &globals,
             "p.bind(p.Value('calm', p.TypeName('Mood', schema='Tenant')))",
-            Expr::value("calm").cast_as_type(TypeName::new("Mood").schema("Tenant")),
+            Expr::value("calm")
+                .cast_as_type(TypeName::new(Name::runtime("Mood")).schema(Name::runtime("Tenant"))),
         )?;
         parity(
             py,
             &globals,
             "p.literal(p.Value('calm', p.TypeName('Mood', schema='Tenant')))",
             SimpleExpr::Constant(Value::from("calm"))
-                .cast_as_type(TypeName::new("Mood").schema("Tenant")),
+                .cast_as_type(TypeName::new(Name::runtime("Mood")).schema(Name::runtime("Tenant"))),
         )?;
         parity(
             py,
             &globals,
             "p.col('x').cast(p.TypeName('integer'), array=True)",
-            Expr::col("x").cast_as_type(TypeName::new("integer").array()),
+            Expr::col(Name::runtime("x"))
+                .cast_as_type(TypeName::new(Name::runtime("integer")).array()),
         )
     })
 }
@@ -119,21 +135,22 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
         let globals = module(py)?;
-        let text: SimpleExpr = Expr::col("text").into();
+        let text: SimpleExpr = Expr::col(Name::runtime("text")).into();
         parity(
             py,
             &globals,
             "p.col('text').starts_with('%_')",
             Func::starts_with(text.clone(), "%_").into(),
         )?;
-        let position = Func::named("strpos").args([text.clone(), Expr::value("%_")]);
+        let position = Func::named(Name::runtime("strpos")).args([text.clone(), Expr::value("%_")]);
         parity(
             py,
             &globals,
             "p.col('text').contains_text('%_')",
             Expr::expr(position).gt(SimpleExpr::Constant(0i32.into())),
         )?;
-        let suffix = Func::named("right").args([text, Func::char_length("%_").into()]);
+        let suffix =
+            Func::named(Name::runtime("right")).args([text, Func::char_length("%_").into()]);
         parity(
             py,
             &globals,
@@ -144,13 +161,13 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
             py,
             &globals,
             "p.col('text').like(p.LikePattern('!%_', escape='!'))",
-            Expr::col("text").like(LikeExpr::new("!%_").escape('!')),
+            Expr::col(Name::runtime("text")).like(LikeExpr::new("!%_").escape('!')),
         )?;
         parity(
             py,
             &globals,
             "p.col('text').ilike(p.LikePattern('!%_', escape='!'))",
-            Expr::col("text").ilike(LikeExpr::new("!%_").escape('!')),
+            Expr::col(Name::runtime("text")).ilike(LikeExpr::new("!%_").escape('!')),
         )
     })
 }
@@ -161,7 +178,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
         let globals = module(py)?;
-        let x = Expr::col("x");
+        let x = Expr::col(Name::runtime("x"));
         let cases = [
             ("lower", Func::lower(x.clone())),
             ("upper", Func::upper(x.clone())),
@@ -207,11 +224,13 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
             ("~p.Condition.all()", Condition::all().not()),
             (
                 "p.Condition.all(p.col('a') == 1, p.Condition.any(p.col('b') == 2, p.col('c') == 3))",
-                Condition::all().add(Expr::col("a").eq(1i64)).add(
-                    Condition::any()
-                        .add(Expr::col("b").eq(2i64))
-                        .add(Expr::col("c").eq(3i64)),
-                ),
+                Condition::all()
+                    .add(Expr::col(Name::runtime("a")).eq(1i64))
+                    .add(
+                        Condition::any()
+                            .add(Expr::col(Name::runtime("b")).eq(2i64))
+                            .add(Expr::col(Name::runtime("c")).eq(3i64)),
+                    ),
             ),
         ];
         for (source, condition) in cases {

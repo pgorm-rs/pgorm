@@ -1,7 +1,8 @@
 //! Independent Rust construction checks the Python lowering's SQL and Values.
 
+use pgorm::pgorm_query::Name;
 use pgorm::{
-    pgorm_query::{Alias, Values},
+    pgorm_query::Values,
     pipeline::{self as pl, ExprOps, IntoSource, Pipeline},
 };
 use pgorm_python::expressions::Compiled;
@@ -9,38 +10,38 @@ use pyo3::prelude::*;
 use std::{collections::BTreeMap, ffi::CString};
 
 fn programs() -> BTreeMap<&'static str, Pipeline> {
-    let base = Pipeline::from(Alias::new("items"));
-    let key = pl::col(Alias::new("items"), Alias::new("id"));
-    let category = pl::col(Alias::new("items"), Alias::new("category"));
-    let amount = pl::col(Alias::new("items"), Alias::new("amount"));
+    let base = Pipeline::from(Name::runtime("items"));
+    let key = pl::col(Name::runtime("items"), Name::runtime("id"));
+    let category = pl::col(Name::runtime("items"), Name::runtime("category"));
+    let amount = pl::col(Name::runtime("items"), Name::runtime("amount"));
     let total = pl::alias("total");
     let rank = pl::alias("row_rank");
     let left = base
         .clone()
-        .filter_with(|b| pl::col(Alias::new("items"), Alias::new("id")).gt(b.bind(1i32)))
+        .filter_with(|b| pl::col(Name::runtime("items"), Name::runtime("id")).gt(b.bind(1i32)))
         .select((
-            pl::col(Alias::new("items"), Alias::new("id")),
-            pl::col(Alias::new("items"), Alias::new("category")),
-            pl::col(Alias::new("items"), Alias::new("amount")),
+            pl::col(Name::runtime("items"), Name::runtime("id")),
+            pl::col(Name::runtime("items"), Name::runtime("category")),
+            pl::col(Name::runtime("items"), Name::runtime("amount")),
         ));
     let right = base
         .clone()
-        .filter_with(|b| pl::col(Alias::new("items"), Alias::new("id")).lt(b.bind(8i32)))
+        .filter_with(|b| pl::col(Name::runtime("items"), Name::runtime("id")).lt(b.bind(8i32)))
         .select((
-            pl::col(Alias::new("items"), Alias::new("id")),
-            pl::col(Alias::new("items"), Alias::new("category")),
-            pl::col(Alias::new("items"), Alias::new("amount")),
+            pl::col(Name::runtime("items"), Name::runtime("id")),
+            pl::col(Name::runtime("items"), Name::runtime("category")),
+            pl::col(Name::runtime("items"), Name::runtime("amount")),
         ));
     BTreeMap::from([
         (
             "literal",
             base.clone()
-                .filter(pl::col(Alias::new("items"), Alias::new("id")).gt(2i64))
+                .filter(pl::col(Name::runtime("items"), Name::runtime("id")).gt(2i64))
                 .select((
-                    pl::col(Alias::new("items"), Alias::new("id")),
-                    pl::col(Alias::new("items"), Alias::new("amount")),
+                    pl::col(Name::runtime("items"), Name::runtime("id")),
+                    pl::col(Name::runtime("items"), Name::runtime("amount")),
                 ))
-                .sort(pl::col(Alias::new("items"), Alias::new("id")).desc())
+                .sort(pl::col(Name::runtime("items"), Name::runtime("id")).desc())
                 .take(3),
         ),
         (
@@ -48,21 +49,22 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
             base.clone().filter_with(|b| {
                 b.bind("unused");
                 let value = b.bind(2i32);
-                pl::col(Alias::new("items"), Alias::new("id"))
+                pl::col(Name::runtime("items"), Name::runtime("id"))
                     .gt(value.clone())
-                    .and(pl::col(Alias::new("items"), Alias::new("id")).lt(value.add(10i64)))
+                    .and(pl::col(Name::runtime("items"), Name::runtime("id")).lt(value.add(10i64)))
             }),
         ),
         (
             "literal_string",
-            base.clone()
-                .filter(pl::col(Alias::new("items"), Alias::new("category")).eq("O'Brien; -- 雪")),
+            base.clone().filter(
+                pl::col(Name::runtime("items"), Name::runtime("category")).eq("O'Brien; -- 雪"),
+            ),
         ),
         (
             "derive",
             base.clone()
                 .derive(
-                    pl::col(Alias::new("items"), Alias::new("amount"))
+                    pl::col(Name::runtime("items"), Name::runtime("amount"))
                         .add(2i64)
                         .as_(total),
                 )
@@ -71,7 +73,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         (
             "derive_with",
             base.clone().derive_with(|b| {
-                [pl::col(Alias::new("items"), Alias::new("amount"))
+                [pl::col(Name::runtime("items"), Name::runtime("amount"))
                     .add(b.bind(2i64))
                     .as_(total)]
             }),
@@ -80,7 +82,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
             "select_with",
             base.clone().select_with(|b| {
                 [
-                    pl::col(Alias::new("items"), Alias::new("id")),
+                    pl::col(Name::runtime("items"), Name::runtime("id")),
                     b.bind("payload").as_("payload"),
                 ]
             }),
@@ -88,21 +90,25 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         (
             "group",
             base.clone()
-                .group(pl::col(Alias::new("items"), Alias::new("category")))
-                .aggregate(pl::sum(pl::col(Alias::new("items"), Alias::new("amount"))).as_(total))
+                .group(pl::col(Name::runtime("items"), Name::runtime("category")))
+                .aggregate(
+                    pl::sum(pl::col(Name::runtime("items"), Name::runtime("amount"))).as_(total),
+                )
                 .filter(total.gt(3i64)),
         ),
         (
             "group_with",
             base.clone()
                 .group_with(|b| {
-                    [pl::col(Alias::new("items"), Alias::new("category"))
+                    [pl::col(Name::runtime("items"), Name::runtime("category"))
                         .coalesce(b.bind("missing"))]
                 })
                 .aggregate_with(|b| {
-                    [pl::sum(pl::col(Alias::new("items"), Alias::new("amount")))
-                        .add(b.bind(1i64))
-                        .as_(total)]
+                    [
+                        pl::sum(pl::col(Name::runtime("items"), Name::runtime("amount")))
+                            .add(b.bind(1i64))
+                            .as_(total),
+                    ]
                 }),
         ),
         (
@@ -111,8 +117,8 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
                 .window(
                     pl::row_number().as_(rank),
                     pl::over()
-                        .by(pl::col(Alias::new("items"), Alias::new("category")))
-                        .sort_by(pl::col(Alias::new("items"), Alias::new("id")))
+                        .by(pl::col(Name::runtime("items"), Name::runtime("category")))
+                        .sort_by(pl::col(Name::runtime("items"), Name::runtime("id")))
                         .rows(None, Some(0)),
                 )
                 .filter(rank.lte(2i64)),
@@ -120,18 +126,22 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         (
             "window_with",
             base.clone().window_with(
-                pl::over().sort_by(pl::col(Alias::new("items"), Alias::new("id"))),
+                pl::over().sort_by(pl::col(Name::runtime("items"), Name::runtime("id"))),
                 |b| {
-                    [pl::sum(pl::col(Alias::new("items"), Alias::new("amount")))
-                        .add(b.bind(2i64))
-                        .as_(total)]
+                    [
+                        pl::sum(pl::col(Name::runtime("items"), Name::runtime("amount")))
+                            .add(b.bind(2i64))
+                            .as_(total),
+                    ]
                 },
             ),
         ),
         (
             "sort_with",
             base.clone()
-                .sort_with(|b| [pl::col(Alias::new("items"), Alias::new("id")).add(b.bind(1i64))])
+                .sort_with(|b| {
+                    [pl::col(Name::runtime("items"), Name::runtime("id")).add(b.bind(1i64))]
+                })
                 .take_range(2..=4),
         ),
         (
@@ -139,22 +149,25 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
             base.clone()
                 .join(
                     pl::JoinSide::Left,
-                    Alias::new("items").named("peer"),
-                    pl::col(Alias::new("items"), Alias::new("id"))
-                        .eq(pl::col(Alias::new("peer"), Alias::new("id"))),
+                    Name::runtime("items").named("peer"),
+                    pl::col(Name::runtime("items"), Name::runtime("id"))
+                        .eq(pl::col(Name::runtime("peer"), Name::runtime("id"))),
                 )
                 .select((
-                    pl::col(Alias::new("items"), Alias::new("id")),
-                    pl::col(Alias::new("peer"), Alias::new("amount")).as_("peer_amount"),
+                    pl::col(Name::runtime("items"), Name::runtime("id")),
+                    pl::col(Name::runtime("peer"), Name::runtime("amount")).as_("peer_amount"),
                 )),
         ),
         (
             "join_with",
             base.clone()
                 .join_with(pl::JoinSide::Inner, right.clone().named("peer"), |b| {
-                    pl::col(Alias::new("items"), Alias::new("id"))
-                        .eq(pl::col(Alias::new("peer"), Alias::new("id")))
-                        .and(pl::col(Alias::new("items"), Alias::new("amount")).gt(b.bind(1i64)))
+                    pl::col(Name::runtime("items"), Name::runtime("id"))
+                        .eq(pl::col(Name::runtime("peer"), Name::runtime("id")))
+                        .and(
+                            pl::col(Name::runtime("items"), Name::runtime("amount"))
+                                .gt(b.bind(1i64)),
+                        )
                 }),
         ),
         ("append", left.clone().append(right.clone())),
@@ -166,7 +179,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
             base.clone().select(
                 pl::case(
                     [(
-                        pl::col(Alias::new("items"), Alias::new("id")).gt(1i64),
+                        pl::col(Name::runtime("items"), Name::runtime("id")).gt(1i64),
                         "yes",
                     )],
                     "no",
@@ -177,7 +190,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         (
             "in_array",
             base.clone().filter_with(|b| {
-                pl::col(Alias::new("items"), Alias::new("id"))
+                pl::col(Name::runtime("items"), Name::runtime("id"))
                     .in_array([b.bind(1i32), b.bind(2i32)])
             }),
         ),
@@ -190,10 +203,11 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         ),
         (
             "qualified",
-            Pipeline::from_schema(Alias::new("schema \"β\""), Alias::new("items \"β\"")).select(
-                pl::col(Alias::new("items \"β\""), Alias::new("id \"β\""))
-                    .as_runtime(Alias::new("out \"β\"")),
-            ),
+            Pipeline::from_schema(Name::runtime("schema \"β\""), Name::runtime("items \"β\""))
+                .select(
+                    pl::col(Name::runtime("items \"β\""), Name::runtime("id \"β\""))
+                        .as_runtime(Name::runtime("out \"β\"")),
+                ),
         ),
     ])
 }

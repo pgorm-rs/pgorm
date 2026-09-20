@@ -79,7 +79,7 @@ fn create_3() {
             )
             .foreign_key(
                 ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-                    .name("FK_2e303c3a712662f1fc2a4d0aad6")
+                    .name(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
                     .on_delete(ForeignKeyAction::Cascade)
                     .on_update(ForeignKeyAction::Cascade)
                     .to_owned()
@@ -270,7 +270,7 @@ fn create_12() {
 #[test]
 fn create_14() {
     assert_eq!(
-        Table::create((Alias::new("schema"), Glyph::Table))
+        Table::create((Name::runtime("schema"), Glyph::Table))
             .col(ColumnDef::new(Glyph::Image).named(Glyph::Aspect))
             .to_string(),
         [
@@ -292,7 +292,7 @@ fn create_15() {
                 Index::create(Glyph::Table, Glyph::Aspect)
                     .unique()
                     .nulls_not_distinct()
-                    .name("idx-glyph-aspect-image")
+                    .name(Name::runtime("idx-glyph-aspect-image"))
                     .col(Glyph::Image)
                     .to_owned()
             )
@@ -323,8 +323,8 @@ fn drop_1() {
 #[test]
 fn drop_2() {
     assert_eq!(
-        Table::drop((Alias::new("schema1"), Glyph::Table))
-            .table((Alias::new("schema2"), Char::Table))
+        Table::drop((Name::runtime("schema1"), Glyph::Table))
+            .table((Name::runtime("schema2"), Char::Table))
             .cascade()
             .to_string(),
         r#"DROP TABLE "schema1"."glyph", "schema2"."character" CASCADE"#
@@ -342,7 +342,7 @@ fn truncate_1() {
 #[test]
 fn truncate_2() {
     assert_eq!(
-        Table::truncate((Alias::new("schema"), Font::Table)).to_string(),
+        Table::truncate((Name::runtime("schema"), Font::Table)).to_string(),
         r#"TRUNCATE TABLE "schema"."font""#
     );
 }
@@ -353,7 +353,7 @@ fn alter_1() {
     assert_eq!(
         Table::alter(Font::Table)
             .add_column(
-                ColumnDef::new(Alias::new("new_col"))
+                ColumnDef::new(Name::runtime("new_col"))
                     .integer()
                     .not_null()
                     .default(100)
@@ -369,7 +369,7 @@ fn alter_2() {
     assert_eq!(
         Table::alter(Font::Table)
             .modify_column(
-                ColumnDef::new(Alias::new("new_col"))
+                ColumnDef::new(Name::runtime("new_col"))
                     .big_integer()
                     .default(999)
             )
@@ -386,8 +386,12 @@ fn alter_2() {
 #[test]
 fn alter_3() {
     assert_eq!(
-        Table::rename_column(Font::Table, Alias::new("new_col"), Alias::new("new_column"))
-            .to_string(),
+        Table::rename_column(
+            Font::Table,
+            Name::runtime("new_col"),
+            Name::runtime("new_column")
+        )
+        .to_string(),
         r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
     );
 }
@@ -396,7 +400,7 @@ fn alter_3() {
 fn alter_4() {
     assert_eq!(
         Table::alter(Font::Table)
-            .drop_column(Alias::new("new_column"))
+            .drop_column(Name::runtime("new_column"))
             .to_string(),
         r#"ALTER TABLE "font" DROP COLUMN "new_column""#
     );
@@ -406,9 +410,9 @@ fn alter_4() {
 fn alter_5() {
     assert_eq!(
         Table::rename_column(
-            (Alias::new("schema"), Font::Table),
-            Alias::new("new_col"),
-            Alias::new("new_column")
+            (Name::runtime("schema"), Font::Table),
+            Name::runtime("new_col"),
+            Name::runtime("new_column")
         )
         .to_string(),
         r#"ALTER TABLE "schema"."font" RENAME COLUMN "new_col" TO "new_column""#
@@ -421,7 +425,7 @@ fn alter_5() {
 fn alter_7() {
     assert_eq!(
         Table::alter(Font::Table)
-            .add_column(ColumnDef::new(Alias::new("new_col")).integer())
+            .add_column(ColumnDef::new(Name::runtime("new_col")).integer())
             .drop_column(Font::Name)
             .to_string(),
         r#"ALTER TABLE "font" ADD COLUMN "new_col" integer, DROP COLUMN "name""#
@@ -493,7 +497,7 @@ fn alter_10() {
 #[test]
 fn rename_1() {
     assert_eq!(
-        Table::rename(Font::Table, Alias::new("font_new")).to_string(),
+        Table::rename(Font::Table, Name::runtime("font_new")).to_string(),
         r#"ALTER TABLE "font" RENAME TO "font_new""#
     );
 }
@@ -501,7 +505,11 @@ fn rename_1() {
 #[test]
 fn rename_2() {
     assert_eq!(
-        Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new")).to_string(),
+        Table::rename(
+            (Name::runtime("schema"), Font::Table),
+            Name::runtime("font_new")
+        )
+        .to_string(),
         r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#
     );
 }
@@ -582,7 +590,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     .join(" ");
     let index = || {
         Index::create(Glyph::Table, Glyph::Id)
-            .name("pk-glyph")
+            .name(Name::runtime("pk-glyph"))
             .col(Glyph::Image)
             .to_owned()
     };
@@ -597,7 +605,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
     let key = TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id)
-        .name("fk-character-font_id")
+        .name(Name::runtime("fk-character-font_id"))
         .to_owned();
 
     assert_eq!(

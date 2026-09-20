@@ -61,7 +61,7 @@ pub async fn left_join() {
     let select = baker::Entity::find()
         .left_join(bakery::Entity)
         .select(baker::Column::Name)
-        .column_as(bakery::Column::Name, "bakery_name")
+        .column_as(bakery::Column::Name, Name::runtime("bakery_name"))
         .filter(baker::Column::Name.contains("Baker 1"));
 
     let result = select
@@ -97,7 +97,7 @@ pub async fn left_join() {
     let select = baker::Entity::find()
         .left_join(bakery::Entity)
         .select(baker::Column::Name)
-        .column_as(bakery::Column::Name, "bakery_name")
+        .column_as(bakery::Column::Name, Name::runtime("bakery_name"))
         .filter(baker::Column::Name.contains("Baker 2"));
 
     let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
@@ -161,7 +161,7 @@ pub async fn right_join() {
     let select = order::Entity::find()
         .right_join(customer::Entity)
         .select(customer::Column::Name)
-        .column_as(order::Column::Total, "order_total")
+        .column_as(order::Column::Total, Name::runtime("order_total"))
         .filter(customer::Column::Name.contains("Kate"));
 
     let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
@@ -170,7 +170,7 @@ pub async fn right_join() {
     let select = order::Entity::find()
         .right_join(customer::Entity)
         .select(customer::Column::Name)
-        .column_as(order::Column::Total, "order_total")
+        .column_as(order::Column::Total, Name::runtime("order_total"))
         .filter(customer::Column::Name.contains("Jim"));
 
     let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
@@ -245,7 +245,7 @@ pub async fn inner_join() {
     let select = order::Entity::find()
         .inner_join(customer::Entity)
         .select(customer::Column::Name)
-        .column_as(order::Column::Total, "order_total");
+        .column_as(order::Column::Total, Name::runtime("order_total"));
 
     let results = select.into_model::<SelectResult>().all(&db).await.unwrap();
 
@@ -327,10 +327,10 @@ pub async fn group_by() {
     let select = customer::Entity::find()
         .left_join(order::Entity)
         .select(customer::Column::Name)
-        .column_as(order::Column::Total.count(), "number_orders")
-        .column_as(order::Column::Total.sum(), "total_spent")
-        .column_as(order::Column::Total.min(), "min_spent")
-        .column_as(order::Column::Total.max(), "max_spent")
+        .column_as(order::Column::Total.count(), Name::runtime("number_orders"))
+        .column_as(order::Column::Total.sum(), Name::runtime("total_spent"))
+        .column_as(order::Column::Total.min(), Name::runtime("min_spent"))
+        .column_as(order::Column::Total.max(), Name::runtime("max_spent"))
         .group_by(customer::Column::Name);
 
     let result = select.into_model::<SelectResult>().one(&db).await.unwrap();
@@ -443,7 +443,7 @@ pub async fn having() {
     let results = customer::Entity::find()
         .inner_join(order::Entity)
         .select(customer::Column::Name)
-        .column_as(order::Column::Total, "order_total")
+        .column_as(order::Column::Total, Name::runtime("order_total"))
         .group_by(customer::Column::Name)
         .group_by(order::Column::Total)
         .having(order::Column::Total.gt(rust_dec(90.00)))
@@ -878,8 +878,8 @@ pub async fn linked() -> Result<(), Error> {
         .join(JoinType::LeftJoin, lineitem::Relation::Order.def())
         .join(JoinType::LeftJoin, order::Relation::Customer.def())
         .select_only()
-        .column_as(baker::Column::Name, "baker_name")
-        .column_as(customer::Column::Name, "customer_name")
+        .column_as(baker::Column::Name, Name::runtime("baker_name"))
+        .column_as(customer::Column::Name, Name::runtime("customer_name"))
         .group_by(baker::Column::Id)
         .group_by(customer::Column::Id)
         .group_by(baker::Column::Name)
@@ -1560,10 +1560,10 @@ fn relation_def_record_and_combinators() {
     );
 
     // `Key` holds a column set of any width in one representation, and
-    // `IntoKey` reaches it from `&str`, `String`, any `StaticName`, and
+    // `IntoKey` reaches it from a runtime-minted `Name`, any `StaticName`, and
     // tuples: the arity is the length, not a variant.
-    assert_eq!("code".into_key().arity(), 1);
-    assert_eq!("code".to_owned().into_key().arity(), 1);
+    assert_eq!(Name::runtime("code").into_key().arity(), 1);
+    assert_eq!(Name::runtime("code".to_owned()).into_key().arity(), 1);
     assert_eq!(bakery::Column::Id.into_key().arity(), 1);
     assert_eq!(
         (bakery::Column::Id, bakery::Column::Name)
@@ -1686,7 +1686,7 @@ fn relation_builder_accumulates_a_definition() {
 #[test]
 fn column_pairs_keep_the_two_sides_equal() {
     use pgorm::ColumnPairs;
-    use pgorm_query::Alias;
+    use pgorm_query::Name;
 
     let count = |identity: &Key| identity.clone().into_iter().count();
     let balanced = |columns: &ColumnPairs| {
@@ -1699,7 +1699,10 @@ fn column_pairs_keep_the_two_sides_equal() {
     let mut columns = ColumnPairs::new(alias("a1"), alias("b1"));
     for n in 2..=5 {
         balanced(&columns);
-        columns = columns.and(Alias::new(format!("a{n}")), Alias::new(format!("b{n}")));
+        columns = columns.and(
+            Name::runtime(format!("a{n}")),
+            Name::runtime(format!("b{n}")),
+        );
     }
     balanced(&columns);
     balanced(&columns.clone().rev());

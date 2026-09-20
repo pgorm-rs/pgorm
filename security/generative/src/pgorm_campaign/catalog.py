@@ -29,7 +29,7 @@ QUERY = "select|insert|update|delete|raw|ddl|pipeline|entity_query|graph_query|c
 # [spec:pgorm:req:generative.matrix]
 OPERATIONS = {
     "value": op("value", {}, {"value": "value"}, "pgorm_query::Value", "types"),
-    "name": op("name", {"value": "value"}, {}, "pgorm_query::Alias", "names"),
+    "name": op("name", {"value": "value"}, {}, "pgorm_query::Name", "names"),
     "result.value": op(
         "value",
         {},

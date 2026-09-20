@@ -128,7 +128,7 @@ impl ActiveEnum {
 mod tests {
     use super::*;
     use crate::entity::writer::{bonus_attributes, bonus_derive};
-    use pgorm_query::{Alias, IntoName};
+
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("media_type").into_name(),
+                enum_name: Name::runtime("media_type"),
                 values: vec![
                     "UNKNOWN",
                     "BITMAP",
@@ -151,7 +151,7 @@ mod tests {
                     "3D",
                 ]
                 .into_iter()
-                .map(|variant| Alias::new(variant).into_name())
+                .map(Name::runtime)
                 .collect(),
             }
             .impl_active_enum(
@@ -198,10 +198,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("media_type").into_name(),
+                enum_name: Name::runtime("media_type"),
                 values: vec!["UNKNOWN", "BITMAP",]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_name())
+                    .map(Name::runtime)
                     .collect(),
             }
             .impl_active_enum(
@@ -236,10 +236,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("coinflip_result_type").into_name(),
+                enum_name: Name::runtime("coinflip_result_type"),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_name())
+                    .map(Name::runtime)
                     .collect(),
             }
             .impl_active_enum(
@@ -273,10 +273,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("coinflip_result_type").into_name(),
+                enum_name: Name::runtime("coinflip_result_type"),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_name())
+                    .map(Name::runtime)
                     .collect(),
             }
             .impl_active_enum(
@@ -315,7 +315,7 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("ty").into_name(),
+                enum_name: Name::runtime("ty"),
                 values: vec![
                     "Question",
                     "QuestionsAdditional",
@@ -327,7 +327,7 @@ mod tests {
                     "你好",
                 ]
                 .into_iter()
-                .map(|variant| Alias::new(variant).into_name())
+                .map(Name::runtime)
                 .collect(),
             }
             .impl_active_enum(

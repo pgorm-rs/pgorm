@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
     RelationType, Select, SelectGraph,
 };
-use pgorm_query::{Alias, IntoName, IntoTableName, IntoValueTuple, TableName};
+use pgorm_query::{IntoName, IntoTableName, IntoValueTuple, Name, TableName};
 pub use strum::IntoEnumIterator as Iterable;
 
 /// The base identifier contract of the entity layer: entities, columns and
@@ -43,7 +43,7 @@ pub trait EntityName: StaticName + Default {
     /// Get the [TableName] from invoking the `self.schema_name()`
     fn table_ref(&self) -> TableName {
         match self.schema_name() {
-            Some(schema) => (Alias::new(schema).into_name(), self.into_name()).into_table_name(),
+            Some(schema) => (Name::runtime(schema), self.into_name()).into_table_name(),
             None => self.into_table_name(),
         }
     }

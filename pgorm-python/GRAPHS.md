@@ -14,7 +14,7 @@ every source entity, then supply a factory that builds the concrete graph:
 
 ```rust
 use pgorm::{EntityTrait, Opt};
-use pgorm::pgorm_query::Alias;
+use pgorm::pgorm_query::Name;
 
 registry.entity::<account::Entity>("app.Account")?;
 registry.entity::<note::Entity>("app.Note")?;
@@ -22,7 +22,7 @@ registry.graph::<account::Entity, (Opt<note::Entity>,), _>(
     "app.AccountNotes",
     |aliases| account::Entity::graph().join_maybe_as::<note::Entity>(
         account::Entity::has_many(note::Entity).into(),
-        Alias::new(&aliases[0]),
+        Name::runtime(&aliases[0]),
     ),
 )?;
 ```

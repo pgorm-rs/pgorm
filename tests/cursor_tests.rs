@@ -1010,7 +1010,7 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     let after: IpNetwork = "10.0.0.2/32".parse().unwrap();
     assert_eq!(
         Entity::find()
-            .cursor_by("ip")
+            .cursor_by(Name::runtime("ip"))
             .after(after)
             .first(2)
             .all(&db)
@@ -1021,7 +1021,7 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     let before: IpNetwork = "10.0.0.3/32".parse().unwrap();
     assert_eq!(
         Entity::find()
-            .cursor_by("ip")
+            .cursor_by(Name::runtime("ip"))
             .before(before)
             .last(2)
             .all(&db)
@@ -1032,7 +1032,7 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     let after_mac: MacAddress = "00:11:22:33:44:03".parse().unwrap();
     assert_eq!(
         Entity::find()
-            .cursor_by("mac")
+            .cursor_by(Name::runtime("mac"))
             .after(after_mac)
             .first(2)
             .all(&db)

@@ -22,7 +22,7 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{Alias, Condition, Expr, IntoName, JoinType, Name, SelectExpr, SelectStatement};
+use pgorm_query::{Condition, Expr, IntoName, JoinType, Name, SelectExpr, SelectStatement};
 
 use super::helper::join_condition;
 use crate::executor::result_name::result_column_name;
@@ -289,7 +289,7 @@ pub(crate) fn project_source<F: EntityTrait>(
         let expr = Expr::col((Name::clone(&qualifier), col.into_name()));
         query.expr(SelectExpr::new_as(
             col.select_as(expr),
-            Name::new(Alias::new(alias)),
+            Name::runtime(alias),
         ));
     }
 }

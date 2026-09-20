@@ -255,10 +255,10 @@ class EmitRustTests(unittest.TestCase):
         name = emit_rust.literal('State" 雪')
         self.assertIn(
             f"cast_as_type(pgorm::pgorm_query::TypeName::new("
-            f"pgorm::pgorm_query::Alias::new({name}))",
+            f"pgorm::pgorm_query::Name::runtime({name}))",
             source,
         )
-        self.assertIn('.schema(pgorm::pgorm_query::Alias::new("fixture"))', source)
+        self.assertIn('.schema(pgorm::pgorm_query::Name::runtime("fixture"))', source)
 
     def test_unsupported_instructions_raise_naming_the_reason(self):
         # `Cursor<S, K>` derives Clone, so the bound lands on `GraphRow`, which

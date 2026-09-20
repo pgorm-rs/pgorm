@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{Error, WithSerde};
-use pgorm_query::{Alias, ColumnDef, ColumnType};
+use pgorm_query::{ColumnDef, ColumnType, Name};
 use std::str::FromStr;
 
 fn task_schema() -> Vec<pgorm_query::TableCreateStatement> {
@@ -158,7 +158,7 @@ fn hidden_column_check_wins_for_hidden_pk() {
         vec![table_with(
             "task",
             vec![
-                ColumnDef::new_with_type(Alias::new("_id"), ColumnType::Integer)
+                ColumnDef::new_with_type(Name::runtime("_id"), ColumnType::Integer)
                     .not_null()
                     .primary_key()
                     .to_owned(),

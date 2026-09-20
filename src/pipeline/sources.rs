@@ -11,7 +11,7 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{Alias, SqlName, Values};
+use pgorm_query::{Name, SqlName, Values};
 
 use crate::query::graph::{source_column_alias, source_read_cast};
 use crate::{
@@ -430,10 +430,10 @@ pub struct Named<R> {
 /// Like [`IntoSource::named`], this preserves the relation's source type
 /// for [`Pipeline::select_sources`].
 // [spec:pgorm:req:python.pipeline]
-pub fn named_runtime<R: IntoSource>(relation: R, name: Alias) -> Named<R> {
+pub fn named_runtime<R: IntoSource>(relation: R, name: Name) -> Named<R> {
     Named {
         relation,
-        name: SqlName::to_string(&name),
+        name: SqlName::to_string(&*name),
     }
 }
 

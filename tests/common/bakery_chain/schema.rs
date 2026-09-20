@@ -1,7 +1,7 @@
 use super::*;
 use crate::common::setup::create_table;
 use pgorm::{ConnectionTrait, DatabasePool, error::*, pgorm_query};
-use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Table};
+use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Name, Table};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
     let db = &db.get().await?;
@@ -66,7 +66,7 @@ where
                 bakery::Entity,
                 bakery::Column::Id,
             )
-            .name("fk-baker-bakery_id")
+            .name(Name::runtime("fk-baker-bakery_id"))
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::Cascade)
             .to_owned(),
@@ -130,7 +130,7 @@ where
                 bakery::Entity,
                 bakery::Column::Id,
             )
-            .name("fk-order-bakery_id")
+            .name(Name::runtime("fk-order-bakery_id"))
             .to_owned(),
         )
         .foreign_key(
@@ -140,7 +140,7 @@ where
                 customer::Entity,
                 customer::Column::Id,
             )
-            .name("fk-order-customer_id")
+            .name(Name::runtime("fk-order-customer_id"))
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
             .to_owned(),
@@ -189,7 +189,7 @@ where
                 order::Entity,
                 order::Column::Id,
             )
-            .name("fk-lineitem-order_id")
+            .name(Name::runtime("fk-lineitem-order_id"))
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
             .to_owned(),
@@ -201,7 +201,7 @@ where
                 cake::Entity,
                 cake::Column::Id,
             )
-            .name("fk-lineitem-cake_id")
+            .name(Name::runtime("fk-lineitem-cake_id"))
             .to_owned(),
         )
         .to_owned();
@@ -226,7 +226,7 @@ where
         )
         .primary_key(
             Index::create(cakes_bakers::Entity, cakes_bakers::Column::CakeId)
-                .name("pk-cakes_bakers")
+                .name(Name::runtime("pk-cakes_bakers"))
                 .col(cakes_bakers::Column::BakerId)
                 .to_owned(),
         )
@@ -237,7 +237,7 @@ where
                 cake::Entity,
                 cake::Column::Id,
             )
-            .name("fk-cakes_bakers-cake_id")
+            .name(Name::runtime("fk-cakes_bakers-cake_id"))
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
             .to_owned(),
@@ -249,7 +249,7 @@ where
                 baker::Entity,
                 baker::Column::Id,
             )
-            .name("fk-cakes_bakers-baker_id")
+            .name(Name::runtime("fk-cakes_bakers-baker_id"))
             .to_owned(),
         )
         .to_owned();
@@ -283,7 +283,7 @@ where
                 bakery::Entity,
                 bakery::Column::Id,
             )
-            .name("fk-cake-bakery_id")
+            .name(Name::runtime("fk-cake-bakery_id"))
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::Cascade)
             .to_owned(),

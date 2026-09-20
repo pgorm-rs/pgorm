@@ -37,9 +37,9 @@ impl PyConflictTarget {
         let first = columns.next().ok_or_else(|| {
             ConstructionError::new_err("conflict target requires at least one column")
         })?;
-        let mut inner = OnConflict::column(PyIdentifier::new(&first)?.alias());
+        let mut inner = OnConflict::column(PyIdentifier::new(&first)?.name());
         for column in columns {
-            inner = inner.and_column(PyIdentifier::new(&column)?.alias());
+            inner = inner.and_column(PyIdentifier::new(&column)?.name());
         }
         Ok(Self { inner })
     }
@@ -65,9 +65,9 @@ impl PyConflictTarget {
         let mut inner = self
             .inner
             .clone()
-            .update_column(PyIdentifier::new(&first)?.alias());
+            .update_column(PyIdentifier::new(&first)?.name());
         for column in columns {
-            inner = inner.update_column(PyIdentifier::new(&column)?.alias());
+            inner = inner.update_column(PyIdentifier::new(&column)?.name());
         }
         Ok(PyConflictUpdate { inner })
     }
@@ -81,7 +81,7 @@ impl PyConflictTarget {
             inner: self
                 .inner
                 .clone()
-                .value(PyIdentifier::new(column)?.alias(), coerce(value)?.inner),
+                .value(PyIdentifier::new(column)?.name(), coerce(value)?.inner),
         })
     }
 }
@@ -100,7 +100,7 @@ impl PyConflictUpdate {
             inner: self
                 .inner
                 .clone()
-                .value(PyIdentifier::new(column)?.alias(), coerce(value)?.inner),
+                .value(PyIdentifier::new(column)?.name(), coerce(value)?.inner),
         })
     }
 
@@ -109,7 +109,7 @@ impl PyConflictUpdate {
             inner: self
                 .inner
                 .clone()
-                .update_column(PyIdentifier::new(column)?.alias()),
+                .update_column(PyIdentifier::new(column)?.name()),
         })
     }
 

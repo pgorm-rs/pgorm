@@ -17,7 +17,7 @@ pub fn register(registry: &mut Registry) -> PyResult<()> {
 mod tests {
     use super::*;
     use pgorm::{
-        pgorm_query::Alias,
+        pgorm_query::Name,
         pipeline::{self as pl, ExprOps, IntoSource},
     };
     use pgorm_python::expressions::Compiled;
@@ -64,16 +64,16 @@ mod tests {
                 })?;
                 assert_eq!((actual.sql, actual.values), expected);
             }
-            let alias = Alias::new("runtime alias \"雪\"");
+            let alias = Name::runtime("runtime alias \"雪\"");
             let expr: pl::Expr<'_> = alias.clone().into();
-            let (sql, _) = pl::Pipeline::from(pl::named_runtime(A, Alias::new("a")))
-                .derive(pl::col(Alias::new("a"), Alias::new("id")).as_runtime(alias))
+            let (sql, _) = pl::Pipeline::from(pl::named_runtime(A, Name::runtime("a")))
+                .derive(pl::col(Name::runtime("a"), Name::runtime("id")).as_runtime(alias))
                 .filter(expr.gt(1i64))
                 .into_sql()
                 .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;
             let token = pl::alias("runtime alias \"雪\"");
             let (expected, _) = pl::Pipeline::from(A.named("a"))
-                .derive(pl::col(Alias::new("a"), Alias::new("id")).as_(token))
+                .derive(pl::col(Name::runtime("a"), Name::runtime("id")).as_(token))
                 .filter(token.gt(1i64))
                 .into_sql()
                 .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;

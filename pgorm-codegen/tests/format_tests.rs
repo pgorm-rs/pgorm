@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::WithSerde;
-use pgorm_query::{Alias, ColumnDef, ColumnType, IntoName, StringLen, Table};
+use pgorm_query::{ColumnDef, ColumnType, Name, StringLen, Table};
 
 // [spec:pgorm:def:codegen.entity.compact+1/test]    the compact format emits
 // imports, Model, Relation, the Related impls and ActiveModelBehavior, in order
@@ -61,10 +61,10 @@ fn compact_model_attribute_and_empty_relation_enum() {
 fn compact_field_attribute_parts_assembled_in_fixed_order() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("ledger"))
+            Table::create(Name::runtime("ledger"))
                 .col(
                     ColumnDef::new_with_type(
-                        Alias::new("camelCase"),
+                        Name::runtime("camelCase"),
                         ColumnType::Decimal(Some((10, 2))),
                     )
                     .primary_key()
@@ -167,11 +167,11 @@ fn compact_fields_without_applicable_parts_carry_no_attribute() {
 fn compact_model_assembles_derives_attributes_fields_in_order() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("cake"))
+            Table::create(Name::runtime("cake"))
                 .col(serial_pk("id"))
                 // not snake_case: the raw DB name is preserved by `column_name`
                 .col(
-                    ColumnDef::new_with_type(Alias::new("bakedAt"), ColumnType::Timestamp)
+                    ColumnDef::new_with_type(Name::runtime("bakedAt"), ColumnType::Timestamp)
                         .not_null()
                         .to_owned(),
                 )
@@ -211,7 +211,7 @@ fn compact_model_pk_membership_uses_raw_column_name() {
         vec![table_with(
             "ledger",
             vec![
-                ColumnDef::new_with_type(Alias::new("entryId"), ColumnType::Integer)
+                ColumnDef::new_with_type(Name::runtime("entryId"), ColumnType::Integer)
                     .not_null()
                     .primary_key()
                     .to_owned(),
@@ -319,7 +319,7 @@ fn expanded_entity_name_carries_schema_name_when_configured() {
 fn expanded_column_def_chains_null_unique_enum_type() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("task"))
+            Table::create(Name::runtime("task"))
                 .col(serial_pk("id"))
                 .col(typed_null("note", ColumnType::Text))
                 .col(typed("email", ColumnType::String(StringLen::None)))
@@ -487,8 +487,8 @@ fn import_block_matches_the_with_serde_variant() {
 fn entity_imports_each_enum_once_in_first_use() {
     let alpha = || ColumnType::Enum {
         schema: None,
-        name: Alias::new("alpha").into_name(),
-        variants: vec![Alias::new("one").into_name()],
+        name: Name::runtime("alpha"),
+        variants: vec![Name::runtime("one")],
     };
 
     let generated = generate(
@@ -500,7 +500,7 @@ fn entity_imports_each_enum_once_in_first_use() {
                 enum_col("first", "zeta", &["a", "b"]),
                 enum_col("second", "alpha", &["one"]),
                 enum_col("third", "zeta", &["a", "b"]),
-                ColumnDef::new(Alias::new("fourth"))
+                ColumnDef::new(Name::runtime("fourth"))
                     .array(alpha())
                     .not_null()
                     .to_owned(),

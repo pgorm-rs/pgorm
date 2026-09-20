@@ -568,27 +568,28 @@ async fn a_nested_source_reads_only_exposed_columns() {
     // column renamed, a derived constant, an ordering over all of them, then a
     // nested projection that keeps only some — so the dropped sort keys have to
     // be carried through a CTE boundary that no longer names them.
-    let origin = pgorm::pgorm_query::Alias::new("origin");
+    let origin = pgorm::pgorm_query::Name::runtime("origin");
     let renamed = Pipeline::from(named_runtime(
         named_runtime(Pipeline::from(customer::Entity), origin.clone()),
         origin.clone(),
     ))
     .select((
-        col(origin.clone(), ID).as_runtime(pgorm::pgorm_query::Alias::new("p_id")),
-        col(origin.clone(), NAME).as_runtime(pgorm::pgorm_query::Alias::new("p_name")),
+        col(origin.clone(), ID).as_runtime(pgorm::pgorm_query::Name::runtime("p_id")),
+        col(origin.clone(), NAME).as_runtime(pgorm::pgorm_query::Name::runtime("p_name")),
     ))
-    .derive(Expr::from(7i64).as_runtime(pgorm::pgorm_query::Alias::new("nonce")))
+    .derive(Expr::from(7i64).as_runtime(pgorm::pgorm_query::Name::runtime("nonce")))
     .sort((alias("p_id"), alias("p_name"), alias("nonce")));
 
-    let inner = pgorm::pgorm_query::Alias::new("nested_inner");
+    let inner = pgorm::pgorm_query::Name::runtime("nested_inner");
     let narrowed = Pipeline::from(named_runtime(renamed, inner.clone()))
         // p_id and p_name are ordered by, and dropped here.
         .select(
-            col(inner.clone(), alias("nonce")).as_runtime(pgorm::pgorm_query::Alias::new("nonce")),
+            col(inner.clone(), alias("nonce"))
+                .as_runtime(pgorm::pgorm_query::Name::runtime("nonce")),
         );
     let outer = Pipeline::from(named_runtime(
         narrowed,
-        pgorm::pgorm_query::Alias::new("nested_outer"),
+        pgorm::pgorm_query::Name::runtime("nested_outer"),
     ));
 
     let rows: Vec<(i32,)> = outer.into_tuple().unwrap().all(&db).await.unwrap();
@@ -614,34 +615,39 @@ async fn a_nested_ordering_names_a_relation_in_scope() {
     let ranked = Pipeline::from(named_runtime(
         named_runtime(
             Pipeline::from(order::Entity),
-            pgorm::pgorm_query::Alias::new("o"),
+            pgorm::pgorm_query::Name::runtime("o"),
         ),
-        pgorm::pgorm_query::Alias::new("o"),
+        pgorm::pgorm_query::Name::runtime("o"),
     ))
     .select((
-        col(pgorm::pgorm_query::Alias::new("o"), CUSTOMER_ID)
-            .as_runtime(pgorm::pgorm_query::Alias::new("p_customer")),
-        col(pgorm::pgorm_query::Alias::new("o"), alias("total"))
-            .as_runtime(pgorm::pgorm_query::Alias::new("p_total")),
+        col(pgorm::pgorm_query::Name::runtime("o"), CUSTOMER_ID)
+            .as_runtime(pgorm::pgorm_query::Name::runtime("p_customer")),
+        col(pgorm::pgorm_query::Name::runtime("o"), alias("total"))
+            .as_runtime(pgorm::pgorm_query::Name::runtime("p_total")),
     ))
     .take_range(1i64..=6i64)
-    .derive(Expr::from(alias("p_customer")).as_runtime(pgorm::pgorm_query::Alias::new("carried")))
+    .derive(
+        Expr::from(alias("p_customer")).as_runtime(pgorm::pgorm_query::Name::runtime("carried")),
+    )
     .sort((alias("p_customer"), alias("p_total"), alias("carried")));
-    let held = pgorm::pgorm_query::Alias::new("held");
+    let held = pgorm::pgorm_query::Name::runtime("held");
     let joined = Pipeline::from(named_runtime(ranked, held.clone())).join(
         JoinSide::Inner,
         named_runtime(
             Pipeline::from(customer::Entity).select((
-                C::Id.as_runtime(pgorm::pgorm_query::Alias::new("c_id")),
-                C::Name.as_runtime(pgorm::pgorm_query::Alias::new("c_name")),
+                C::Id.as_runtime(pgorm::pgorm_query::Name::runtime("c_id")),
+                C::Name.as_runtime(pgorm::pgorm_query::Name::runtime("c_name")),
             )),
-            pgorm::pgorm_query::Alias::new("who"),
+            pgorm::pgorm_query::Name::runtime("who"),
         ),
         col(held.clone(), alias("carried"))
-            .eq(col(pgorm::pgorm_query::Alias::new("who"), alias("c_id"))),
+            .eq(col(pgorm::pgorm_query::Name::runtime("who"), alias("c_id"))),
     );
     let rows: Vec<(String,)> = joined
-        .select(col(pgorm::pgorm_query::Alias::new("who"), alias("c_name")))
+        .select(col(
+            pgorm::pgorm_query::Name::runtime("who"),
+            alias("c_name"),
+        ))
         .into_tuple()
         .unwrap()
         .all(&db)

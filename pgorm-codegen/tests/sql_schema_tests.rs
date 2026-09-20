@@ -497,7 +497,7 @@ fn enum_and_unique_index_round_trip() {
         task.index(unique_index("task", "code").to_owned());
         vec![task.take()]
     };
-    let enum_type = Type::create(alias("task_state"))
+    let enum_type = Type::create(runtime_name("task_state"))
         .values(["open", "done"])
         .to_string();
     let text = statements()

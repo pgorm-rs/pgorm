@@ -1,7 +1,6 @@
 use crate::{
-    Alias, ColumnRef, DeleteStatement, FromItem, InsertStatement, IntoName, Name,
-    QueryStatementBuilder, SelectExpr, SelectStatement, SimpleExpr, SubQueryStatement,
-    UpdateStatement,
+    ColumnRef, DeleteStatement, FromItem, InsertStatement, IntoName, Name, QueryStatementBuilder,
+    SelectExpr, SelectStatement, SimpleExpr, SubQueryStatement, UpdateStatement,
 };
 
 /// A table definition inside a WITH clause ([WithClause] or [RecursiveWithClause]).
@@ -97,7 +96,10 @@ impl CommonTableExpression {
             return None;
         };
 
-        Some(Alias::new(format!("cte_{}", table.qualifier().to_string())).into_name())
+        Some(Name::runtime(format!(
+            "cte_{}",
+            table.qualifier().to_string()
+        )))
     }
 
     /// Set up the columns of the CTE to match the given [SelectStatement] selected columns.
@@ -126,11 +128,15 @@ impl CommonTableExpression {
                         SimpleExpr::Column(column) => match column {
                             ColumnRef::Column(iden) => Some(iden.clone()),
                             ColumnRef::TableColumn(table, column) => Some(
-                                Alias::new(format!("{}_{}", table.to_string(), column.to_string()))
-                                    .into_name(),
+                                Name::runtime(format!(
+                                    "{}_{}",
+                                    table.to_string(),
+                                    column.to_string()
+                                ))
+                                .into_name(),
                             ),
                             ColumnRef::SchemaTableColumn(schema, table, column) => Some(
-                                Alias::new(format!(
+                                Name::runtime(format!(
                                     "{}_{}_{}",
                                     schema.to_string(),
                                     table.to_string(),
@@ -254,18 +260,18 @@ impl Cycle {
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let common_table_expression = CommonTableExpression::new(
-///         Alias::new("cte"),
+///         Name::runtime("cte"),
 ///         SelectStatement::new()
-///             .column(Alias::new("id"))
-///             .from(Alias::new("table"))
+///             .column(Name::runtime("id"))
+///             .from(Name::runtime("table"))
 ///             .to_owned(),
 ///     )
-///     .column(Alias::new("id"))
+///     .column(Name::runtime("id"))
 ///     .to_owned();
 ///
 /// let query = SelectStatement::new()
 ///         .column(ColumnRef::Asterisk)
-///         .from(Alias::new("cte"))
+///         .from(Name::runtime("cte"))
 ///         .with(WithClause::new(common_table_expression))
 ///         .to_owned();
 ///
@@ -325,43 +331,43 @@ impl WithClause {
 /// use pgorm_query::{*, IntoName, tests_cfg::*};
 ///
 /// let base_query = SelectStatement::new()
-///                     .column(Alias::new("id"))
+///                     .column(Name::runtime("id"))
 ///                     .expr(1i32)
-///                     .column(Alias::new("next"))
-///                     .column(Alias::new("value"))
-///                     .from(Alias::new("table"))
+///                     .column(Name::runtime("next"))
+///                     .column(Name::runtime("value"))
+///                     .from(Name::runtime("table"))
 ///                     .to_owned();
 ///
 /// let cte_referencing = SelectStatement::new()
-///                             .column(Alias::new("id"))
-///                             .expr(Expr::col(Alias::new("depth")).add(1i32))
-///                             .column(Alias::new("next"))
-///                             .column(Alias::new("value"))
-///                             .from(Alias::new("table"))
+///                             .column(Name::runtime("id"))
+///                             .expr(Expr::col(Name::runtime("depth")).add(1i32))
+///                             .column(Name::runtime("next"))
+///                             .column(Name::runtime("value"))
+///                             .from(Name::runtime("table"))
 ///                             .join(
 ///                                 JoinType::InnerJoin,
-///                                 Alias::new("cte_traversal"),
-///                                 Expr::col((Alias::new("cte_traversal"), Alias::new("next"))).equals((Alias::new("table"), Alias::new("id")))
+///                                 Name::runtime("cte_traversal"),
+///                                 Expr::col((Name::runtime("cte_traversal"), Name::runtime("next"))).equals((Name::runtime("table"), Name::runtime("id")))
 ///                             )
 ///                             .to_owned();
 ///
 /// let common_table_expression = CommonTableExpression::new(
-///         Alias::new("cte_traversal"),
+///         Name::runtime("cte_traversal"),
 ///         base_query.clone().union(UnionType::All, cte_referencing).to_owned(),
 ///     )
-///     .column(Alias::new("id"))
-///     .column(Alias::new("depth"))
-///     .column(Alias::new("next"))
-///     .column(Alias::new("value"))
+///     .column(Name::runtime("id"))
+///     .column(Name::runtime("depth"))
+///     .column(Name::runtime("next"))
+///     .column(Name::runtime("value"))
 ///     .to_owned();
 ///
 /// let with_clause = RecursiveWithClause::new(common_table_expression)
-///         .cycle(Cycle::new(SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_name())), Alias::new("looped"), Alias::new("traversal_path")))
+///         .cycle(Cycle::new(SimpleExpr::Column(ColumnRef::Column(Name::runtime("id"))), Name::runtime("looped"), Name::runtime("traversal_path")))
 ///         .to_owned();
 ///
 /// let query = SelectStatement::new()
 ///         .column(ColumnRef::Asterisk)
-///         .from(Alias::new("cte_traversal"))
+///         .from(Name::runtime("cte_traversal"))
 ///         .with(with_clause)
 ///         .to_owned();
 ///
@@ -451,36 +457,36 @@ impl SelectStatement {
     /// use pgorm_query::{*, IntoCondition, IntoName, tests_cfg::*};
     ///
     /// let base_query = SelectStatement::new()
-    ///                     .column(Alias::new("id"))
+    ///                     .column(Name::runtime("id"))
     ///                     .expr(1i32)
-    ///                     .column(Alias::new("next"))
-    ///                     .column(Alias::new("value"))
-    ///                     .from(Alias::new("table"))
+    ///                     .column(Name::runtime("next"))
+    ///                     .column(Name::runtime("value"))
+    ///                     .from(Name::runtime("table"))
     ///                     .to_owned();
     ///
     /// let cte_referencing = SelectStatement::new()
-    ///                             .column(Alias::new("id"))
-    ///                             .expr(Expr::col(Alias::new("depth")).add(1i32))
-    ///                             .column(Alias::new("next"))
-    ///                             .column(Alias::new("value"))
-    ///                             .from(Alias::new("table"))
+    ///                             .column(Name::runtime("id"))
+    ///                             .expr(Expr::col(Name::runtime("depth")).add(1i32))
+    ///                             .column(Name::runtime("next"))
+    ///                             .column(Name::runtime("value"))
+    ///                             .from(Name::runtime("table"))
     ///                             .join(
     ///                                 JoinType::InnerJoin,
-    ///                                 Alias::new("cte_traversal"),
-    ///                                 Expr::col((Alias::new("cte_traversal"), Alias::new("next"))).equals((Alias::new("table"), Alias::new("id")))
+    ///                                 Name::runtime("cte_traversal"),
+    ///                                 Expr::col((Name::runtime("cte_traversal"), Name::runtime("next"))).equals((Name::runtime("table"), Name::runtime("id")))
     ///                             )
     ///                             .to_owned();
     ///
     /// let common_table_expression = CommonTableExpression::new(
-    ///             Alias::new("cte_traversal"),
+    ///             Name::runtime("cte_traversal"),
     ///             base_query.clone().union(UnionType::All, cte_referencing).to_owned(),
     ///         )
-    ///         .columns([Alias::new("id"), Alias::new("depth"), Alias::new("next"), Alias::new("value")])
+    ///         .columns([Name::runtime("id"), Name::runtime("depth"), Name::runtime("next"), Name::runtime("value")])
     ///         .to_owned();
     ///
     /// let query = SelectStatement::new()
     ///         .column(ColumnRef::Asterisk)
-    ///         .from(Alias::new("cte_traversal"))
+    ///         .from(Name::runtime("cte_traversal"))
     ///         .with(RecursiveWithClause::new(common_table_expression))
     ///         .to_owned();
     ///
@@ -512,7 +518,7 @@ impl InsertStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let cte = CommonTableExpression::new(
-    ///     Alias::new("cte"),
+    ///     Name::runtime("cte"),
     ///     Query::select()
     ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
     ///         .from(Glyph::Table)
@@ -527,7 +533,7 @@ impl InsertStatement {
     ///     .select_from(
     ///         Query::select()
     ///             .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-    ///             .from(Alias::new("cte"))
+    ///             .from(Name::runtime("cte"))
     ///             .to_owned(),
     ///     )
     ///     .unwrap()
@@ -562,7 +568,7 @@ impl UpdateStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let cte = CommonTableExpression::new(
-    ///     Alias::new("cte"),
+    ///     Name::runtime("cte"),
     ///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
     /// )
     /// .column(Glyph::Id)
@@ -572,7 +578,7 @@ impl UpdateStatement {
     ///     .table(Glyph::Table)
     ///     .value(Glyph::Aspect, 2.1345)
     ///     .and_where(Expr::col(Glyph::Id).in_subquery(
-    ///         Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned(),
+    ///         Query::select().column(Glyph::Id).from(Name::runtime("cte")).to_owned(),
     ///     ))
     ///     .with(WithClause::new(cte))
     ///     .to_owned();
@@ -605,7 +611,7 @@ impl DeleteStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let cte = CommonTableExpression::new(
-    ///     Alias::new("cte"),
+    ///     Name::runtime("cte"),
     ///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
     /// )
     /// .column(Glyph::Id)
@@ -614,7 +620,7 @@ impl DeleteStatement {
     /// let query = Query::delete()
     ///     .from_table(Glyph::Table)
     ///     .and_where(Expr::col(Glyph::Id).in_subquery(
-    ///         Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned(),
+    ///         Query::select().column(Glyph::Id).from(Name::runtime("cte")).to_owned(),
     ///     ))
     ///     .with(WithClause::new(cte))
     ///     .to_owned();

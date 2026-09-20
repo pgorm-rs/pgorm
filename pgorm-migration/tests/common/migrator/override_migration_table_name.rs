@@ -16,6 +16,6 @@ impl MigratorTrait for Migrator {
     }
 
     fn migration_table_name() -> pgorm::Name {
-        Alias::new("override_migration_table_name").into_name()
+        Name::runtime("override_migration_table_name")
     }
 }

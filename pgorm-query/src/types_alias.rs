@@ -12,8 +12,9 @@ use super::*;
 /// `ORDER BY` key — accepts the token with no conversion.
 ///
 /// The name is `&'static str` by construction: an introduced name is part of
-/// the shape of the query, not a runtime value. [`Alias`] remains for names
-/// computed at runtime.
+/// the shape of the query, not a runtime value.
+/// [`Name::runtime`](crate::Name::runtime) mints the names computed at run
+/// time.
 ///
 /// ```
 /// use pgorm_query::{SqlName, alias};

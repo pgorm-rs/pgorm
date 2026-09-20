@@ -62,7 +62,7 @@ impl InsertStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::insert()
-    ///     .into_table(Glyph::Table.into_named_table().alias(Alias::new("g")))
+    ///     .into_table(Glyph::Table.into_named_table().alias(Name::runtime("g")))
     ///     .columns([Glyph::Image])
     ///     .values_panic(["12A".into()])
     ///     .to_owned();
@@ -176,7 +176,7 @@ impl InsertStatement {
     ///     .columns([Glyph::Aspect, Glyph::Image])
     ///     .values([
     ///         2.into(),
-    ///         Expr::val("2020-02-02 00:00:00").cast_as(Alias::new("date")),
+    ///         Expr::val("2020-02-02 00:00:00").cast_as(Name::runtime("date")),
     ///     ])
     ///     .unwrap()
     ///     .to_owned();

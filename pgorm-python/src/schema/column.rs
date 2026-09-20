@@ -16,7 +16,7 @@ impl PyColumnDef {
     fn new(name: &Bound<'_, PyAny>, kind: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: ColumnDef::new_with_type(
-                PyIdentifier::new(name)?.alias(),
+                PyIdentifier::new(name)?.name(),
                 PyDataType::coerce(kind)?.inner,
             ),
         })

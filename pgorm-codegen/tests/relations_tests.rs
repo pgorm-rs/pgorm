@@ -4,7 +4,7 @@
 mod common;
 
 use common::*;
-use pgorm_query::{Alias, ColumnDef, ForeignKey, ForeignKeyAction, Table, TableCreateStatement};
+use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Name, Table, TableCreateStatement};
 
 fn bare(table: &str) -> TableCreateStatement {
     table_with(table, vec![serial_pk("id")])
@@ -12,65 +12,77 @@ fn bare(table: &str) -> TableCreateStatement {
 
 /// `cake` with a self-referencing `base_id`.
 fn self_referencing_cake() -> TableCreateStatement {
-    Table::create(Alias::new("cake"))
+    Table::create(Name::runtime("cake"))
         .col(serial_pk("id"))
-        .col(ColumnDef::new(Alias::new("base_id")).integer().to_owned())
+        .col(
+            ColumnDef::new(Name::runtime("base_id"))
+                .integer()
+                .to_owned(),
+        )
         .foreign_key(ForeignKey::create(
-            Alias::new("cake"),
-            Alias::new("base_id"),
-            Alias::new("cake"),
-            Alias::new("id"),
+            Name::runtime("cake"),
+            Name::runtime("base_id"),
+            Name::runtime("cake"),
+            Name::runtime("id"),
         ))
         .to_owned()
 }
 
 fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateStatement {
-    Table::create(Alias::new(name))
+    Table::create(Name::runtime(name))
         .col(
-            ColumnDef::new(Alias::new(left.1))
+            ColumnDef::new(Name::runtime(left.1))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .col(
-            ColumnDef::new(Alias::new(right.1))
+            ColumnDef::new(Name::runtime(right.1))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .foreign_key(ForeignKey::create(
-            Alias::new(name),
-            Alias::new(left.1),
-            Alias::new(left.0),
-            Alias::new("id"),
+            Name::runtime(name),
+            Name::runtime(left.1),
+            Name::runtime(left.0),
+            Name::runtime("id"),
         ))
         .foreign_key(ForeignKey::create(
-            Alias::new(name),
-            Alias::new(right.1),
-            Alias::new(right.0),
-            Alias::new("id"),
+            Name::runtime(name),
+            Name::runtime(right.1),
+            Name::runtime(right.0),
+            Name::runtime("id"),
         ))
         .to_owned()
 }
 
 fn basket_with_two_fruit_keys() -> TableCreateStatement {
-    Table::create(Alias::new("basket"))
+    Table::create(Name::runtime("basket"))
         .col(serial_pk("id"))
-        .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
-        .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
+        .col(
+            ColumnDef::new(Name::runtime("fruit_id1"))
+                .integer()
+                .to_owned(),
+        )
+        .col(
+            ColumnDef::new(Name::runtime("fruit_id2"))
+                .integer()
+                .to_owned(),
+        )
         .foreign_key(ForeignKey::create(
-            Alias::new("basket"),
-            Alias::new("fruit_id1"),
-            Alias::new("fruit"),
-            Alias::new("id"),
+            Name::runtime("basket"),
+            Name::runtime("fruit_id1"),
+            Name::runtime("fruit"),
+            Name::runtime("id"),
         ))
         .foreign_key(ForeignKey::create(
-            Alias::new("basket"),
-            Alias::new("fruit_id2"),
-            Alias::new("fruit"),
-            Alias::new("id"),
+            Name::runtime("basket"),
+            Name::runtime("fruit_id2"),
+            Name::runtime("fruit"),
+            Name::runtime("id"),
         ))
         .to_owned()
 }
@@ -143,30 +155,38 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
             table_with(
                 "cake",
                 vec![
-                    ColumnDef::new(Alias::new("id"))
+                    ColumnDef::new(Name::runtime("id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
-                    ColumnDef::new(Alias::new("kind"))
+                    ColumnDef::new(Name::runtime("kind"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 ],
             ),
-            Table::create(Alias::new("fruit"))
+            Table::create(Name::runtime("fruit"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("cake_kind"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(
                     ForeignKey::create(
-                        Alias::new("fruit"),
-                        Alias::new("cake_id"),
-                        Alias::new("cake"),
-                        Alias::new("id"),
+                        Name::runtime("fruit"),
+                        Name::runtime("cake_id"),
+                        Name::runtime("cake"),
+                        Name::runtime("id"),
                     )
-                    .col(Alias::new("cake_kind"), Alias::new("kind"))
+                    .col(Name::runtime("cake_kind"), Name::runtime("kind"))
                     .to_owned(),
                 )
                 .to_owned(),
@@ -187,7 +207,7 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
 // appear only when the FK declared an action, and cover all five actions
 #[test]
 fn foreign_key_actions_render_only_when_declared() {
-    let mut audit = Table::create(Alias::new("audit"));
+    let mut audit = Table::create(Name::runtime("audit"));
     audit.col(serial_pk("id"));
 
     let cases = [
@@ -200,13 +220,13 @@ fn foreign_key_actions_render_only_when_declared() {
     let mut schema: Vec<TableCreateStatement> = Vec::new();
     for (target, action, _) in &cases {
         let column = format!("{target}_id");
-        audit.col(ColumnDef::new(Alias::new(&column)).integer().to_owned());
+        audit.col(ColumnDef::new(Name::runtime(&column)).integer().to_owned());
         audit.foreign_key(
             ForeignKey::create(
-                Alias::new("audit"),
-                Alias::new(&column),
-                Alias::new(*target),
-                Alias::new("id"),
+                Name::runtime("audit"),
+                Name::runtime(&column),
+                Name::runtime(*target),
+                Name::runtime("id"),
             )
             .on_delete(*action)
             .on_update(*action)
@@ -215,12 +235,16 @@ fn foreign_key_actions_render_only_when_declared() {
         schema.push(bare(target));
     }
     // one more FK with no declared action at all
-    audit.col(ColumnDef::new(Alias::new("plain_id")).integer().to_owned());
+    audit.col(
+        ColumnDef::new(Name::runtime("plain_id"))
+            .integer()
+            .to_owned(),
+    );
     audit.foreign_key(ForeignKey::create(
-        Alias::new("audit"),
-        Alias::new("plain_id"),
-        Alias::new("plain"),
-        Alias::new("id"),
+        Name::runtime("audit"),
+        Name::runtime("plain_id"),
+        Name::runtime("plain"),
+        Name::runtime("id"),
     ));
     schema.push(bare("plain"));
     schema.push(audit);
@@ -256,19 +280,19 @@ fn inverse_relations_render_without_from_and_to() {
     let has_one = generate(
         vec![
             bare("users"),
-            Table::create(Alias::new("profile"))
+            Table::create(Name::runtime("profile"))
                 .col(
-                    ColumnDef::new(Alias::new("user_id"))
+                    ColumnDef::new(Name::runtime("user_id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("profile"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
+                    Name::runtime("profile"),
+                    Name::runtime("user_id"),
+                    Name::runtime("users"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -352,14 +376,18 @@ fn conjunct_shadowed_relations_lose_their_plain_related_impl() {
     let generated = generate(
         vec![
             bare("users"),
-            Table::create(Alias::new("bills"))
+            Table::create(Name::runtime("bills"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("user_id"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("bills"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
+                    Name::runtime("bills"),
+                    Name::runtime("user_id"),
+                    Name::runtime("users"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
             junction("users_votes", ("users", "user_id"), ("bills", "bill_id")),

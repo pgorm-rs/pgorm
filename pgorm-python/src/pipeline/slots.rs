@@ -1,7 +1,7 @@
 //! Registered Rust source tuples and their actual optional model decoders.
 
 use crate::entities::{PyEntityModel, Registry, generic::ModelAdapter, metadata::EntityInfo};
-use pgorm::{EntityTrait, IntoActiveModel, pgorm_query::Alias, pipeline as pl};
+use pgorm::{EntityTrait, IntoActiveModel, pgorm_query::Name, pipeline as pl};
 use pyo3::prelude::*;
 use std::sync::Arc;
 
@@ -66,7 +66,10 @@ where
         pipeline: pl::Pipeline,
         qualifiers: &[String],
     ) -> pl::SelectedSources<Self::Selection> {
-        pipeline.select_sources(pl::named_runtime(E::default(), Alias::new(&qualifiers[0])))
+        pipeline.select_sources(pl::named_runtime(
+            E::default(),
+            Name::runtime(&qualifiers[0]),
+        ))
     }
     fn models(row: Option<E::Model>, bindings: &SourceBindings) -> Vec<Option<PyEntityModel>> {
         vec![model::<E>(row, &bindings.entities[0])]
@@ -87,7 +90,7 @@ macro_rules! sources {
                 Ok(SourceBindings {entities: vec![$(registry.registered::<$entity>()?,)+]})
             }
             fn select(pipeline: pl::Pipeline, qualifiers: &[String]) -> pl::SelectedSources<Self::Selection> {
-                pipeline.select_sources(($(pl::named_runtime($entity::default(), Alias::new(&qualifiers[$index])),)+))
+                pipeline.select_sources(($(pl::named_runtime($entity::default(), Name::runtime(&qualifiers[$index])),)+))
             }
             fn models(row: <Self::Selection as pl::SourceList>::Row, bindings: &SourceBindings) -> Vec<Option<PyEntityModel>> {
                 vec![$(model::<$entity>(row.$index, &bindings.entities[$index]),)+]

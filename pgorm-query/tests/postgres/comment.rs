@@ -9,7 +9,7 @@ fn comment_statements_render_their_targets() {
         r#"COMMENT ON TABLE "glyph" IS 'one row per glyph'"#
     );
     assert_eq!(
-        Comment::on_table((Alias::new("public"), Glyph::Table), "qualified").to_string(),
+        Comment::on_table((Name::runtime("public"), Glyph::Table), "qualified").to_string(),
         r#"COMMENT ON TABLE "public"."glyph" IS 'qualified'"#
     );
     assert_eq!(
@@ -18,7 +18,7 @@ fn comment_statements_render_their_targets() {
     );
     assert_eq!(
         Comment::on_column(
-            (Alias::new("public"), Glyph::Table),
+            (Name::runtime("public"), Glyph::Table),
             Glyph::Aspect,
             "the ratio"
         )
@@ -66,7 +66,12 @@ fn comment_text_is_a_quoted_literal() {
 
     // Identifiers keep their own quoting rule: embedded double quotes are doubled.
     assert_eq!(
-        Comment::on_column(Alias::new(r#"gl"yph"#), Alias::new(r#"as"pect"#), "odd").to_string(),
+        Comment::on_column(
+            Name::runtime(r#"gl"yph"#),
+            Name::runtime(r#"as"pect"#),
+            "odd"
+        )
+        .to_string(),
         r#"COMMENT ON COLUMN "gl""yph"."as""pect" IS 'odd'"#
     );
 }
@@ -75,7 +80,7 @@ fn comment_text_is_a_quoted_literal() {
 // DDL target, so a comment cannot name a table the DDL beside it could not
 #[test]
 fn comment_and_ddl_share_one_table_name() {
-    let name = (Alias::new("public"), Glyph::Table).into_table_name();
+    let name = (Name::runtime("public"), Glyph::Table).into_table_name();
 
     assert_eq!(
         Comment::on_table(name.clone(), "shared").to_string(),
@@ -96,7 +101,7 @@ fn comment_and_ddl_share_one_table_name() {
 // table first then columns in order, each on the statement's own table
 #[test]
 fn create_statement_renders_the_comments_it_carries() {
-    let table = Table::create((Alias::new("public"), Glyph::Table))
+    let table = Table::create((Name::runtime("public"), Glyph::Table))
         .comment("one row per glyph")
         .col(ColumnDef::new(Glyph::Id).integer().not_null())
         .col(ColumnDef::new(Glyph::Aspect).integer().comment("the ratio"))

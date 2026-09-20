@@ -1,9 +1,10 @@
-use pgorm::pgorm_query::Alias;
+use pgorm::pgorm_query::Name;
+
 use pgorm::pipeline::{self as pl, Pipeline};
 
 fn main() {
-    let original = Pipeline::from_schema(Alias::new("fixture"), Alias::new("accounts"))
-        .select(pl::col(Alias::new("accounts"), Alias::new("id")));
+    let original = Pipeline::from_schema(Name::runtime("fixture"), Name::runtime("accounts"))
+        .select(pl::col(Name::runtime("accounts"), Name::runtime("id")));
     let appended = original.clone().append(original.clone());
     let intersected = appended.clone().intersect(original.clone());
     let queries = [appended, intersected.clone(), intersected.remove(original)];

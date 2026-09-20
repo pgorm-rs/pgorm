@@ -6,7 +6,7 @@ use crate::oracle::assert_eq;
 fn create_1() {
     assert_eq!(
         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-            .name("FK_2e303c3a712662f1fc2a4d0aad6")
+            .name(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
             .to_string(),
@@ -23,12 +23,12 @@ fn create_1() {
 fn create_2() {
     assert_eq!(
         ForeignKey::create(
-            (Alias::new("schema"), Char::Table),
+            (Name::runtime("schema"), Char::Table),
             Char::FontId,
             Font::Table,
             Font::Id
         )
-        .name("FK_2e303c3a712662f1fc2a4d0aad6")
+        .name(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
         .on_delete(ForeignKeyAction::Cascade)
         .on_update(ForeignKeyAction::Cascade)
         .to_string(),
@@ -45,7 +45,7 @@ fn create_2() {
 #[test]
 fn drop_1() {
     assert_eq!(
-        ForeignKey::drop(Char::Table, "FK_2e303c3a712662f1fc2a4d0aad6").to_string(),
+        ForeignKey::drop(Char::Table, Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6")).to_string(),
         r#"ALTER TABLE "character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
     );
 }
@@ -54,8 +54,8 @@ fn drop_1() {
 fn drop_2() {
     assert_eq!(
         ForeignKey::drop(
-            (Alias::new("schema"), Char::Table),
-            "FK_2e303c3a712662f1fc2a4d0aad6"
+            (Name::runtime("schema"), Char::Table),
+            Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6")
         )
         .to_string(),
         r#"ALTER TABLE "schema"."character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#

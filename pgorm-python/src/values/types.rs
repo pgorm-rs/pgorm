@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{Alias, ArrayType, TypeName, Value};
+use pgorm::pgorm_query::{ArrayType, Name, TypeName, Value};
 use pyo3::prelude::*;
 
 use crate::errors::ConstructionError;
@@ -44,9 +44,9 @@ impl PyTypeName {
 impl PyTypeName {
     /// Lower through Rust's qualified identifier constructor, never verbatim SQL.
     pub fn rust_type(&self) -> TypeName {
-        let name = TypeName::new(Alias::new(&self.name));
+        let name = TypeName::new(Name::runtime(&self.name));
         match &self.schema {
-            Some(schema) => name.schema(Alias::new(schema)),
+            Some(schema) => name.schema(Name::runtime(schema)),
             None => name,
         }
     }

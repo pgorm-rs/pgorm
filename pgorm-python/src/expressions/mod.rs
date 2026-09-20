@@ -7,7 +7,7 @@ mod options;
 #[cfg(test)]
 mod tests;
 
-use pgorm::pgorm_query::{Alias, BinOper, Expr, Func, Query, SimpleExpr};
+use pgorm::pgorm_query::{BinOper, Expr, Func, Name, Query, SimpleExpr};
 use pyo3::{basic::CompareOp, prelude::*};
 
 use crate::{
@@ -181,14 +181,14 @@ impl PyExpr {
     }
     fn contains_text(&self, text: &Bound<'_, PyAny>) -> PyResult<Self> {
         let position =
-            Func::named(Alias::new("strpos")).args([self.inner.clone(), coerce(text)?.inner]);
+            Func::named(Name::runtime("strpos")).args([self.inner.clone(), coerce(text)?.inner]);
         Ok(Self::from_rust(
             Expr::expr(position).gt(SimpleExpr::Constant(0i32.into())),
         ))
     }
     fn ends_with(&self, text: &Bound<'_, PyAny>) -> PyResult<Self> {
         let text = coerce(text)?.inner;
-        let suffix = Func::named(Alias::new("right"))
+        let suffix = Func::named(Name::runtime("right"))
             .args([self.inner.clone(), Func::char_length(text.clone()).into()]);
         Ok(Self::from_rust(Expr::expr(suffix).eq(text)))
     }

@@ -1,6 +1,6 @@
 //! The columns a lookup keys on, and the value shape that lines up with them.
 
-use crate::{Alias, Name, SqlName, StaticName, Value, ValueTuple, value::IntoValueTuple};
+use crate::{Name, SqlName, StaticName, Value, ValueTuple, value::IntoValueTuple};
 use std::fmt;
 
 /// The columns a lookup keys on, in declared order.
@@ -111,19 +111,15 @@ impl IntoKey for Key {
 
 impl<V> IntoBoundary<Value> for V where V: Into<Value> {}
 
-impl IntoKey for String {
+/// A name minted at run time keys a lookup the same as one the program
+/// spells. There is deliberately no `impl` for `&str` or `String`: text
+/// becomes a name at [`Name::runtime`] and nowhere else, so the conversion
+/// stays greppable here too.
+impl IntoKey for Name {
     type ValueType = Value;
 
     fn into_key(self) -> Key {
-        self.as_str().into_key()
-    }
-}
-
-impl IntoKey for &str {
-    type ValueType = Value;
-
-    fn into_key(self) -> Key {
-        Key::from(Name::new(Alias::new(self)))
+        Key::from(self)
     }
 }
 

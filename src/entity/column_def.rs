@@ -196,7 +196,7 @@ mod tests {
         mod housed {
             use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::pgorm_query::{Alias, Name};
+            use crate::pgorm_query::Name;
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -242,9 +242,9 @@ mod tests {
                     match self {
                         Self::Id => ColumnType::Integer.def(),
                         Self::Status => ColumnType::Enum {
-                            name: Name::new(Alias::new("status")),
-                            schema: Some(Name::new(Alias::new("custom"))),
-                            variants: vec![Name::new(Alias::new("open"))],
+                            name: Name::runtime("status"),
+                            schema: Some(Name::runtime("custom")),
+                            variants: vec![Name::runtime("open")],
                         }
                         .def(),
                     }

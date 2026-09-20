@@ -157,16 +157,12 @@ class ExprEmitter:
         if method == "starts_with":
             return f"{Q}::SimpleExpr::from({Q}::Func::starts_with({value}, {text}))"
         if method == "contains_text":
-            call = (
-                f'{Q}::Func::named({Q}::Alias::new("strpos")).args([{value}, {text}])'
-            )
+            call = f'{Q}::Func::named({Q}::Name::runtime("strpos")).args([{value}, {text}])'
             zero = f"{Q}::SimpleExpr::Constant({Q}::Value::Int(Some(0i32)))"
             return f"{Q}::Expr::expr({call}).gt({zero})"
         if method == "ends_with":
             length = f"{Q}::SimpleExpr::from({Q}::Func::char_length({text}))"
-            call = (
-                f'{Q}::Func::named({Q}::Alias::new("right")).args([{value}, {length}])'
-            )
+            call = f'{Q}::Func::named({Q}::Name::runtime("right")).args([{value}, {length}])'
             return f"{Q}::Expr::expr({call}).eq({text})"
         pattern = f"{Q}::LikeExpr::new({self.pattern_text(i['pattern'])})"
         escape = d.get("escape")
@@ -286,7 +282,8 @@ class ExprEmitter:
                 )
                 if d["columns"]:
                     items = ", ".join(
-                        f"{Q}::Alias::new({literal(column)})" for column in d["columns"]
+                        f"{Q}::Name::runtime({literal(column)})"
+                        for column in d["columns"]
                     )
                     body.append(f"    query.columns(vec![{items}]);")
             case "update":
@@ -356,7 +353,7 @@ class ExprEmitter:
             case "insert.conflict":
                 return [f"    query.on_conflict({self.conflict(d)});"]
             case "update.set":
-                column = f"{Q}::Alias::new({literal(d['column'])})"
+                column = f"{Q}::Name::runtime({literal(d['column'])})"
                 return [f"    query.value({column}, {self.coerce(i['value'])});"]
             case "write.all":
                 return []
@@ -368,9 +365,9 @@ class ExprEmitter:
         keys = list(data["keys"])
         if not keys:
             raise UnsupportedInstruction("insert.conflict needs a target column")
-        target = f"{Q}::OnConflict::column({Q}::Alias::new({literal(keys[0])}))"
+        target = f"{Q}::OnConflict::column({Q}::Name::runtime({literal(keys[0])}))"
         for key in keys[1:]:
-            target += f".and_column({Q}::Alias::new({literal(key)}))"
+            target += f".and_column({Q}::Name::runtime({literal(key)}))"
         if data["action"] == "nothing":
             return target + ".do_nothing()"
         columns = data.get("columns")
@@ -380,7 +377,7 @@ class ExprEmitter:
             )
         update = target
         for column in columns:
-            update += f".update_column({Q}::Alias::new({literal(column)}))"
+            update += f".update_column({Q}::Name::runtime({literal(column)}))"
         return f"{Q}::OnConflict::from({update})"
 
     # -- DDL ----------------------------------------------------------------
@@ -392,9 +389,9 @@ class ExprEmitter:
             outer = (
                 "None"
                 if schema is None
-                else f"Some({Q}::IntoName::into_name({Q}::Alias::new({literal(schema)})))"
+                else f"Some({Q}::IntoName::into_name({Q}::Name::runtime({literal(schema)})))"
             )
-            local = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
+            local = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(name)}))"
             return f"{Q}::ColumnType::Enum {{ name: {local}, schema: {outer}, {variants} }}"
         array = kind.endswith("[]")
         base = kind[:-2] if array else kind
@@ -414,7 +411,7 @@ class ExprEmitter:
                 for column in d["columns"]:
                     definition = (
                         f"{Q}::ColumnDef::new_with_type("
-                        f"{Q}::Alias::new({literal(column['name'])}), "
+                        f"{Q}::Name::runtime({literal(column['name'])}), "
                         f"{self.data_type(column['kind'])})"
                     )
                     body.append(f"    let mut column = {definition};")
@@ -431,9 +428,9 @@ class ExprEmitter:
                 return f"{Q}::Table::drop({self.ddl_table(i['table'])}).to_string()"
             case "schema.rename":
                 table = self.ddl_table(i["table"])
-                target = f"{Q}::Alias::new({literal(d['name'])})"
+                target = f"{Q}::Name::runtime({literal(d['name'])})"
                 if "column" in d:
-                    column = f"{Q}::Alias::new({literal(d['column'])})"
+                    column = f"{Q}::Name::runtime({literal(d['column'])})"
                     return (
                         f"{Q}::Table::rename_column({table}, {column}, {target})"
                         ".to_string()"
@@ -446,12 +443,12 @@ class ExprEmitter:
                 table = self.ddl_table(i["table"])
                 body = [
                     f"    let mut statement = {Q}::Index::create("
-                    f"{table}, {Q}::Alias::new({literal(first)}));",
-                    f"    statement.name({Q}::Alias::new({literal(d['name'])}));",
+                    f"{table}, {Q}::Name::runtime({literal(first)}));",
+                    f"    statement.name({Q}::Name::runtime({literal(d['name'])}));",
                 ]
                 for column in rest:
                     body.append(
-                        f"    statement.col({Q}::Alias::new({literal(column)}));"
+                        f"    statement.col({Q}::Name::runtime({literal(column)}));"
                     )
                 if d["unique"]:
                     body.append("    statement.unique();")
@@ -459,7 +456,7 @@ class ExprEmitter:
                 return "{\n" + "\n".join(body) + "\n    }"
             case "schema.enum":
                 labels = ", ".join(
-                    f"{Q}::Alias::new({literal(label)})" for label in d["labels"]
+                    f"{Q}::Name::runtime({literal(label)})" for label in d["labels"]
                 )
                 body = [
                     f"    let mut statement = {Q}::extension::Type::create("
@@ -476,10 +473,10 @@ class ExprEmitter:
         schema, name, alias = self.table_identity(reference)
         if alias is not None:
             raise UnsupportedInstruction("DDL table targets cannot have an alias")
-        inner = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
+        inner = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(name)}))"
         if schema is None:
             return f"{Q}::TableName::Table({inner})"
-        outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
+        outer = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(schema)}))"
         return f"{Q}::TableName::SchemaTable({outer}, {inner})"
 
     def enum_change(self, data):
@@ -490,7 +487,7 @@ class ExprEmitter:
             raise UnsupportedInstruction(
                 "schema.enum_change " + data["method"] + " needs a value"
             )
-        label = f"{Q}::Alias::new({literal(data['value'])})"
+        label = f"{Q}::Name::runtime({literal(data['value'])})"
         if data["method"] == "add":
             return (
                 f"{Q}::extension::Type::alter({target}).add_value({label}).to_string()"
@@ -499,7 +496,7 @@ class ExprEmitter:
             raise UnsupportedInstruction(
                 "schema.enum_change rename needs its replacement value"
             )
-        renamed = f"{Q}::Alias::new({literal(data['new_value'])})"
+        renamed = f"{Q}::Name::runtime({literal(data['new_value'])})"
         return (
             f"{Q}::extension::Type::alter({target})"
             f".rename_value({label}, {renamed}).to_string()"

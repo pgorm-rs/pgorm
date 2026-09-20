@@ -6,7 +6,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{EntityTransformer, EntityWriterContext, Error, WithSerde};
-use pgorm_query::{Alias, ColumnDef, ColumnType, Table};
+use pgorm_query::{ColumnDef, ColumnType, Name, Table};
 use std::path::Path;
 
 const HEADER: &str = concat!(
@@ -16,10 +16,10 @@ const HEADER: &str = concat!(
 
 fn vendor_schema() -> Vec<pgorm_query::TableCreateStatement> {
     vec![
-        Table::create(Alias::new("vendor"))
+        Table::create(Name::runtime("vendor"))
             .col(serial_pk("id"))
             .col(
-                ColumnDef::new(Alias::new("name"))
+                ColumnDef::new(Name::runtime("name"))
                     .string()
                     .not_null()
                     .to_owned(),
@@ -99,8 +99,8 @@ fn entity_model_carries_column_relation_and_pk_facts() {
 // [spec:pgorm:def:codegen.entity+2/test]    errors are the two-variant `Error` enum
 #[test]
 fn errors_are_the_two_variant_error_enum() {
-    let untyped = Table::create(Alias::new("cake"))
-        .col(ColumnDef::new(Alias::new("id")))
+    let untyped = Table::create(Name::runtime("cake"))
+        .col(ColumnDef::new(Name::runtime("id")))
         .to_owned();
     match EntityTransformer::transform(vec![untyped]) {
         Err(Error::TransformError(msg)) => assert_eq!(
@@ -124,10 +124,10 @@ fn every_context_option_selects_generated_output() {
             vec![
                 serial_pk("id"),
                 enum_col("state", "task_state", &["open", "done"]),
-                ColumnDef::new_with_type(Alias::new("_secret"), ColumnType::Integer)
+                ColumnDef::new_with_type(Name::runtime("_secret"), ColumnType::Integer)
                     .not_null()
                     .to_owned(),
-                ColumnDef::new_with_type(Alias::new("due"), ColumnType::Timestamp).to_owned(),
+                ColumnDef::new_with_type(Name::runtime("due"), ColumnType::Timestamp).to_owned(),
             ],
         )]
     };
@@ -459,11 +459,11 @@ fn temporal_columns_reach_model_and_value_type() {
         vec![table_with(
             "event",
             vec![
-                ColumnDef::new_with_type(Alias::new("at"), ColumnType::Date)
+                ColumnDef::new_with_type(Name::runtime("at"), ColumnType::Date)
                     .not_null()
                     .primary_key()
                     .to_owned(),
-                ColumnDef::new_with_type(Alias::new("seen"), ColumnType::Timestamp)
+                ColumnDef::new_with_type(Name::runtime("seen"), ColumnType::Timestamp)
                     .not_null()
                     .to_owned(),
             ],

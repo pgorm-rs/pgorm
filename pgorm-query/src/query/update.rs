@@ -95,9 +95,9 @@ impl UpdateStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::update()
-    ///     .table(Glyph::Table.into_named_table().alias(Alias::new("g")))
+    ///     .table(Glyph::Table.into_named_table().alias(Name::runtime("g")))
     ///     .value(Glyph::Aspect, 1.23)
-    ///     .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+    ///     .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).eq(1))
     ///     .to_owned();
     ///
     /// assert_eq!(

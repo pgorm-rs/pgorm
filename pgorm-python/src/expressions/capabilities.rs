@@ -2,7 +2,7 @@ use serde_json::{Map, Value, json};
 
 pub(crate) fn operations() -> Map<String, Value> {
     [
-        ("identifier", "pgorm_query::Alias"),
+        ("identifier", "pgorm_query::Name"),
         ("col", "pgorm_query::Expr::col"),
         ("bind", "pgorm_query::Expr::value"),
         ("literal", "pgorm_query::SimpleExpr::Constant"),
@@ -71,7 +71,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::SelectStatement::cond_where, SelectStatement::build",
         ),
         ("order_by", "pgorm_query::Order, pgorm_query::NullOrdering"),
-        ("expr.as_", "pgorm_query::SimpleExpr, pgorm_query::Alias"),
+        ("expr.as_", "pgorm_query::SimpleExpr, pgorm_query::Name"),
     ]
     .into_iter()
     .map(|(name, rust_api)| (name.into(), json!({"rust_api": rust_api, "features": []})))

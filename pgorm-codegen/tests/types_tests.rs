@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{Column, EntityTransformer, Error};
-use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen, Table};
+use pgorm_query::{ColumnDef, ColumnType, Name, StringLen, Table};
 use std::sync::Arc;
 
 // [spec:pgorm:sem:codegen.entity.types+3/test]    `Column::get_rs_type` follows
@@ -32,11 +32,11 @@ fn column_rust_types_follow_the_mapping_table() {
                 typed("c_bytea", ColumnType::Bytea),
                 typed("c_bool", ColumnType::Boolean),
                 enum_col("c_enum", "tea_kind", &["black", "green"]),
-                ColumnDef::new(Alias::new("c_array"))
+                ColumnDef::new(Name::runtime("c_array"))
                     .array(ColumnType::Integer)
                     .not_null()
                     .to_owned(),
-                ColumnDef::new(Alias::new("c_nested_array"))
+                ColumnDef::new(Name::runtime("c_nested_array"))
                     .array(ColumnType::Array(Arc::new(ColumnType::Integer)))
                     .not_null()
                     .to_owned(),
@@ -120,7 +120,7 @@ fn float_and_double_columns_suppress_the_eq_derive() {
             "sample",
             vec![
                 serial_pk("id"),
-                ColumnDef::new(Alias::new("ratios"))
+                ColumnDef::new(Name::runtime("ratios"))
                     .array(ColumnType::Float)
                     .not_null()
                     .to_owned(),
@@ -206,7 +206,7 @@ fn column_conversion_rejects_unsupported_type() {
         ColumnType::Inet,
         ColumnType::Array(Arc::new(ColumnType::Inet)),
     ] {
-        let col_def = ColumnDef::new_with_type(Alias::new("address"), col_type).to_owned();
+        let col_def = ColumnDef::new_with_type(Name::runtime("address"), col_type).to_owned();
         match Column::try_from(&col_def) {
             Err(Error::TransformError(msg)) => assert_eq!(
                 msg,
@@ -234,7 +234,7 @@ fn expanded_pk_value_type_is_type_or_tuple() {
         vec![table_with(
             "setting",
             vec![
-                ColumnDef::new_with_type(Alias::new("key"), ColumnType::Text)
+                ColumnDef::new_with_type(Name::runtime("key"), ColumnType::Text)
                     .not_null()
                     .primary_key()
                     .to_owned(),
@@ -251,16 +251,16 @@ fn expanded_pk_value_type_is_type_or_tuple() {
 fn expanded_pk_auto_increment_looks_at_every_column() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("ticket"))
+            Table::create(Name::runtime("ticket"))
                 .col(
-                    ColumnDef::new_with_type(Alias::new("code"), ColumnType::Text)
+                    ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 // not part of the primary key, yet it flips `auto_increment()`
                 .col(
-                    ColumnDef::new(Alias::new("seq"))
+                    ColumnDef::new(Name::runtime("seq"))
                         .integer()
                         .not_null()
                         .auto_increment()
@@ -283,7 +283,7 @@ fn expanded_pk_auto_increment_looks_at_every_column() {
         vec![table_with(
             "ticket",
             vec![
-                ColumnDef::new_with_type(Alias::new("code"), ColumnType::Text)
+                ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
                     .not_null()
                     .primary_key()
                     .to_owned(),

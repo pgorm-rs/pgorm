@@ -3,7 +3,7 @@
 use super::sources::Named;
 use std::ops::RangeInclusive;
 
-use pgorm_query::{Alias, AliasName, SqlName, Value};
+use pgorm_query::{AliasName, IntoName, Name, SqlName, Value};
 
 use crate::EntityTrait;
 
@@ -249,7 +249,7 @@ impl JoinSide {
 /// [`join`](Pipeline::join) and the set operations.
 ///
 /// An entity brings its own table name and schema, so it is the ordinary
-/// source; [`alias`](pgorm_query::alias) and [`Alias`] name a table no
+/// source; [`alias`](pgorm_query::alias) and [`Name`] name a table no
 /// entity describes; and a whole [`Pipeline`] is a relation too, embedded as
 /// a `let`-bound subrelation.
 // [spec:pgorm:sem:pipeline.qualify+2]
@@ -353,9 +353,9 @@ impl IntoSource for AliasName {
 }
 
 // [spec:pgorm:sem:pipeline.qualify+2]
-impl IntoSource for Alias {
+impl IntoSource for Name {
     fn into_source(self) -> Source {
-        table_source(adapter::ident(&SqlName::to_string(&self)))
+        table_source(adapter::ident(&SqlName::to_string(&*self)))
     }
 }
 
@@ -460,10 +460,10 @@ impl Pipeline {
 
     /// Start a pipeline from a schema-qualified table no entity describes.
     // [spec:pgorm:sem:pipeline.qualify+2]
-    pub fn from_schema(schema: impl SqlName, table: impl SqlName) -> Self {
+    pub fn from_schema(schema: impl IntoName, table: impl IntoName) -> Self {
         let source = adapter::ident_in(
-            vec![SqlName::to_string(&schema)],
-            SqlName::to_string(&table),
+            vec![SqlName::to_string(&*schema.into_name())],
+            SqlName::to_string(&*table.into_name()),
         );
         Pipeline {
             bindings: Vec::new(),

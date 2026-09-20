@@ -32,14 +32,14 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 
 | Python | Corresponding Rust boundary |
 | --- | --- |
-| `Identifier(name)` | owned `Alias`; one validated identifier part |
+| `Identifier(name)` | owned `Name`; one validated identifier part |
 | `col(name, table=..., schema=...)` | `Expr::col` with `ColumnRef` qualification |
 | `bind(value)` | `Expr::value`; a separately collected parameter |
 | `literal(value)` | `SimpleExpr::Constant`; rendered by Rust as a literal |
 | `TypeName(name, schema=...)` | identifier-only Rust `TypeName` |
 | `expr.cast(type_name, array=False)` | `SimpleExpr::cast_as_type` |
 | `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape` |
-| `expr.as_(name)` | owned projection expression plus validated `Alias` |
+| `expr.as_(name)` | owned projection expression plus validated `Name` |
 | `expr.asc()` / `expr.desc()` | owned expression plus Rust `Order` |
 | `OrderBy(expr, Direction.Asc, nulls=Nulls.First)` | typed direction and `NullOrdering` |
 

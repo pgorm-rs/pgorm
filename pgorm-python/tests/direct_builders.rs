@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use pgorm::pgorm_query::{
-    Alias, Condition, Expr, IntoNamedTable, JoinType, NullOrdering, Order, Query, SimpleExpr,
-    Value, Values,
+    Condition, Expr, IntoNamedTable, JoinType, Name, NullOrdering, Order, Query, SimpleExpr, Value,
+    Values,
 };
 use pgorm_python::values::PyValue;
 use pyo3::prelude::*;
@@ -29,8 +29,16 @@ fn operand(value: impl Into<Value>, literal: bool) -> SimpleExpr {
 
 fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
     let schema = text(report, "schema")?;
-    let accounts = (Alias::new(schema), Alias::new(text(report, "accounts")?)).into_named_table();
-    let events = (Alias::new(schema), Alias::new(text(report, "events")?)).into_named_table();
+    let accounts = (
+        Name::runtime(schema),
+        Name::runtime(text(report, "accounts")?),
+    )
+        .into_named_table();
+    let events = (
+        Name::runtime(schema),
+        Name::runtime(text(report, "events")?),
+    )
+        .into_named_table();
     let literal = text(run, "mode")? == "literal";
     let variant = run["variant"].as_i64().ok_or("missing variant")?;
     let term = text(run, "term")?;
@@ -38,9 +46,12 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
     let mut programs = Programs::new();
 
     let mut insert = Query::insert();
-    insert
-        .into_table(accounts.clone())
-        .columns(["id", "name", "active", "visits"]);
+    insert.into_table(accounts.clone()).columns([
+        Name::runtime("id"),
+        Name::runtime("name"),
+        Name::runtime("active"),
+        Name::runtime("visits"),
+    ]);
     for (id, name, visits) in [
         (1i64, "Nora O'Brien", 10i64),
         (2, "Beta%_\\雪", 20),
@@ -55,9 +66,12 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
     }
     programs.insert("insert_accounts", insert.build());
     let mut insert = Query::insert();
-    insert
-        .into_table(events.clone())
-        .columns(["id", "account_id", "kind", "points"]);
+    insert.into_table(events.clone()).columns([
+        Name::runtime("id"),
+        Name::runtime("account_id"),
+        Name::runtime("kind"),
+        Name::runtime("points"),
+    ]);
     for (id, account, kind, points) in [
         (10i64, 1i64, term, 2i64),
         (11, 1, "other", 3),
@@ -74,31 +88,49 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
 
     let mut select = Query::select();
     select
-        .expr_as(Expr::col(("a", "id")), "account_id")
-        .column(("a", "name"))
-        .expr_as(Expr::col(("e", "id")), "event_id")
-        .column(("e", "kind"))
-        .from(accounts.clone().alias("a"))
+        .expr_as(
+            Expr::col((Name::runtime("a"), Name::runtime("id"))),
+            Name::runtime("account_id"),
+        )
+        .column((Name::runtime("a"), Name::runtime("name")))
+        .expr_as(
+            Expr::col((Name::runtime("e"), Name::runtime("id"))),
+            Name::runtime("event_id"),
+        )
+        .column((Name::runtime("e"), Name::runtime("kind")))
+        .from(accounts.clone().alias(Name::runtime("a")))
         .join(
             JoinType::LeftJoin,
-            events.clone().alias("e"),
-            Expr::col(("a", "id")).equals(("e", "account_id")),
+            events.clone().alias(Name::runtime("e")),
+            Expr::col((Name::runtime("a"), Name::runtime("id")))
+                .equals((Name::runtime("e"), Name::runtime("account_id"))),
         );
     let mut predicate = Condition::all()
-        .add(Expr::col(("a", "active")).eq(operand(true, literal)))
+        .add(Expr::col((Name::runtime("a"), Name::runtime("active"))).eq(operand(true, literal)))
         .add(
             Condition::any()
-                .add(Expr::col(("e", "kind")).eq(operand(term, literal)))
-                .add(Expr::col(("e", "id")).is_null()),
+                .add(
+                    Expr::col((Name::runtime("e"), Name::runtime("kind")))
+                        .eq(operand(term, literal)),
+                )
+                .add(Expr::col((Name::runtime("e"), Name::runtime("id"))).is_null()),
         )
-        .add(Expr::col(("a", "visits")).gte(operand(threshold, literal)));
+        .add(
+            Expr::col((Name::runtime("a"), Name::runtime("visits")))
+                .gte(operand(threshold, literal)),
+        );
     if variant != 0 {
-        predicate = predicate.add(Expr::col(("a", "id")).gte(operand(2i64, literal)));
+        predicate = predicate
+            .add(Expr::col((Name::runtime("a"), Name::runtime("id"))).gte(operand(2i64, literal)));
     }
     select
         .cond_where(predicate)
-        .order_by(("a", "id"), Order::Asc)
-        .order_by_with_nulls(("e", "id"), Order::Asc, NullOrdering::Last);
+        .order_by((Name::runtime("a"), Name::runtime("id")), Order::Asc)
+        .order_by_with_nulls(
+            (Name::runtime("e"), Name::runtime("id")),
+            Order::Asc,
+            NullOrdering::Last,
+        );
     if variant != 0 {
         select.limit(2);
     }
@@ -109,34 +141,38 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
         Query::update()
             .table(accounts.clone())
             .value(
-                "visits",
-                Expr::col("visits").add(operand(5 + variant, literal)),
+                Name::runtime("visits"),
+                Expr::col(Name::runtime("visits")).add(operand(5 + variant, literal)),
             )
-            .and_where(Expr::col("id").eq(operand(1i64, literal)))
-            .returning(Query::returning().columns(["id", "name", "visits"]))
+            .and_where(Expr::col(Name::runtime("id")).eq(operand(1i64, literal)))
+            .returning(Query::returning().columns([
+                Name::runtime("id"),
+                Name::runtime("name"),
+                Name::runtime("visits"),
+            ]))
             .build(),
     );
     programs.insert(
         "delete_event",
         Query::delete()
             .from_table(events)
-            .and_where(Expr::col("id").eq(operand(11i64, literal)))
+            .and_where(Expr::col(Name::runtime("id")).eq(operand(11i64, literal)))
             .build(),
     );
     programs.insert(
         "select_missing",
         Query::select()
-            .column("id")
+            .column(Name::runtime("id"))
             .from(accounts.clone())
-            .and_where(Expr::col("id").eq(operand(999i64, literal)))
+            .and_where(Expr::col(Name::runtime("id")).eq(operand(999i64, literal)))
             .build(),
     );
     programs.insert(
         "select_final",
         Query::select()
-            .columns(["id", "visits"])
+            .columns([Name::runtime("id"), Name::runtime("visits")])
             .from(accounts)
-            .order_by("id", Order::Asc)
+            .order_by(Name::runtime("id"), Order::Asc)
             .build(),
     );
     Ok(programs)

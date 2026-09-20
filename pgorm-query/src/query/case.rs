@@ -26,7 +26,7 @@ impl CaseStatement {
     ///         CaseStatement::new()
     ///             .case(Expr::col((Glyph::Table, Glyph::Aspect)).is_in([2, 4]), true)
     ///             .finally(false),
-    ///          Alias::new("is_even")
+    ///          Name::runtime("is_even")
     ///     )
     ///     .from(Glyph::Table)
     ///     .to_owned();
@@ -58,7 +58,7 @@ impl CaseStatement {
     ///                 "negative"
     ///              )
     ///             .finally("zero"),
-    ///          Alias::new("polarity")
+    ///          Name::runtime("polarity")
     ///     )
     ///     .from(Glyph::Table)
     ///     .to_owned();
@@ -102,7 +102,7 @@ impl CaseStatement {
     ///             "medium"
     ///         )
     ///         .finally("small"),
-    ///         Alias::new("char_size"))
+    ///         Name::runtime("char_size"))
     ///     .from(Character::Table)
     ///     .to_owned();
     ///
@@ -141,15 +141,15 @@ mod test {
     #[test]
     fn test_where_case_eq() {
         let case_statement: SimpleExpr = Expr::case(
-            Expr::col(Alias::new("col")).lt(5),
-            Expr::col(Alias::new("othercol")),
+            Expr::col(Name::runtime("col")).lt(5),
+            Expr::col(Name::runtime("othercol")),
         )
-        .finally(Expr::col(Alias::new("finalcol")))
+        .finally(Expr::col(Name::runtime("finalcol")))
         .into();
 
         let result = Query::select()
             .column(Asterisk)
-            .from(Alias::new("tbl"))
+            .from(Name::runtime("tbl"))
             .and_where(case_statement.eq(10))
             .to_string();
         assert_eq!(

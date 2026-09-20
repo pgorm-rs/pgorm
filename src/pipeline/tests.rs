@@ -1,4 +1,4 @@
-use pgorm_query::{Alias, AliasName, Value, Values, alias};
+use pgorm_query::{AliasName, Name, Value, Values, alias};
 
 use crate::tests_cfg::{cake, cake_filling_price, fruit, lunch_set};
 
@@ -803,7 +803,7 @@ fn refuses(pipeline: Pipeline) {
 // [spec:pgorm:req:pipeline.errors+3/test]
 #[test]
 fn exfiltrating_column_name_is_refused() {
-    refuses(Pipeline::from(INVOICE).select(col(INVOICE, Alias::new(EXFILTRATING))));
+    refuses(Pipeline::from(INVOICE).select(col(INVOICE, Name::runtime(EXFILTRATING))));
 }
 
 // [spec:pgorm:req:pipeline.errors+3/test]
@@ -811,20 +811,20 @@ fn exfiltrating_column_name_is_refused() {
 fn exfiltrating_runtime_source_name_is_refused() {
     refuses(Pipeline::from(named_runtime(
         INVOICE,
-        Alias::new(EXFILTRATING),
+        Name::runtime(EXFILTRATING),
     )));
 }
 
 // [spec:pgorm:req:pipeline.errors+3/test]
 #[test]
 fn exfiltrating_schema_name_is_refused() {
-    refuses(Pipeline::from_schema(Alias::new(EXFILTRATING), INVOICE));
+    refuses(Pipeline::from_schema(Name::runtime(EXFILTRATING), INVOICE));
 }
 
 // [spec:pgorm:req:pipeline.errors+3/test]
 #[test]
 fn exfiltrating_runtime_alias_is_refused() {
-    refuses(Pipeline::from(INVOICE).derive(total().as_runtime(Alias::new(EXFILTRATING))));
+    refuses(Pipeline::from(INVOICE).derive(total().as_runtime(Name::runtime(EXFILTRATING))));
 }
 
 // [spec:pgorm:req:pipeline.errors+3/test]    the backslash is what defeats
@@ -833,7 +833,7 @@ fn exfiltrating_runtime_alias_is_refused() {
 #[test]
 fn a_bare_quote_in_an_identifier_is_refused() {
     let err = Pipeline::from(INVOICE)
-        .select(col(INVOICE, Alias::new("dis\"count")))
+        .select(col(INVOICE, Name::runtime("dis\"count")))
         .into_sql()
         .expect_err("a quote in an identifier must be refused");
     assert_eq!(
@@ -846,7 +846,7 @@ fn a_bare_quote_in_an_identifier_is_refused() {
 #[test]
 fn a_nul_byte_in_an_identifier_is_refused() {
     let err = Pipeline::from(INVOICE)
-        .select(col(INVOICE, Alias::new("tot\0al")))
+        .select(col(INVOICE, Name::runtime("tot\0al")))
         .into_sql()
         .expect_err("a NUL in an identifier must be refused");
     assert_eq!(
@@ -861,7 +861,7 @@ fn a_nul_byte_in_an_identifier_is_refused() {
 #[test]
 fn a_backslash_without_a_quote_still_renders() {
     let table = alias("share");
-    let built = sql_of(Pipeline::from(table).select(col(table, Alias::new("a\\b"))));
+    let built = sql_of(Pipeline::from(table).select(col(table, Name::runtime("a\\b"))));
     assert_eq!(built, r#"SELECT "a\b" FROM share"#);
 }
 
@@ -876,7 +876,7 @@ fn a_backslash_without_a_quote_still_renders() {
 fn identifier_refusal_precedes_the_prqlc_call() {
     refuses(
         Pipeline::from(alias("a"))
-            .select(col(alias("a"), Alias::new(EXFILTRATING)))
+            .select(col(alias("a"), Name::runtime(EXFILTRATING)))
             .append(
                 Pipeline::from(alias("b"))
                     .select((col(alias("b"), alias("y")), col(alias("b"), ID))),
@@ -1872,7 +1872,7 @@ fn a_joined_deduplicated_relation_compiles_once() {
             ))
             .join(
                 JoinSide::Left,
-                named_runtime(inner, pgorm_query::Alias::new("n")),
+                named_runtime(inner, pgorm_query::Name::runtime("n")),
                 that(alias("j_account_id")).eq(this(alias("p_rank"))),
             )
             .distinct()

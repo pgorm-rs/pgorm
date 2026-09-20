@@ -50,10 +50,10 @@ impl PyCreateTable {
     fn primary_key(&self, first: &Bound<'_, PyAny>, rest: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let mut key = Index::create(
             self.inner.get_table_name().clone(),
-            PyIdentifier::new(first)?.alias(),
+            PyIdentifier::new(first)?.name(),
         );
         for column in rest {
-            key.col(PyIdentifier::new(&column)?.alias());
+            key.col(PyIdentifier::new(&column)?.name());
         }
         let mut inner = self.inner.clone();
         inner.primary_key(key);
@@ -70,14 +70,14 @@ impl PyCreateTable {
     ) -> PyResult<Self> {
         let mut key = Index::create(
             self.inner.get_table_name().clone(),
-            PyIdentifier::new(first)?.alias(),
+            PyIdentifier::new(first)?.name(),
         );
         for column in rest {
-            key.col(PyIdentifier::new(&column)?.alias());
+            key.col(PyIdentifier::new(&column)?.name());
         }
         key.unique();
         if let Some(name) = name {
-            key.name(PyIdentifier::new(name)?.alias());
+            key.name(PyIdentifier::new(name)?.name());
         }
         if nulls_not_distinct {
             key.nulls_not_distinct();
@@ -121,7 +121,7 @@ pub(super) fn rename_table(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult
     Ok(PyDDL {
         inner: Statement::RenameTable(Table::rename(
             table_name(table)?,
-            PyIdentifier::new(name)?.alias(),
+            PyIdentifier::new(name)?.name(),
         )),
     })
 }
@@ -135,8 +135,8 @@ pub(super) fn rename_column(
     Ok(PyDDL {
         inner: Statement::RenameColumn(Table::rename_column(
             table_name(table)?,
-            PyIdentifier::new(name)?.alias(),
-            PyIdentifier::new(new_name)?.alias(),
+            PyIdentifier::new(name)?.name(),
+            PyIdentifier::new(new_name)?.name(),
         )),
     })
 }
@@ -179,7 +179,7 @@ pub(super) fn modify_column(table: &PyTable, column: &PyColumnDef) -> PyResult<P
 pub(super) fn drop_column(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
     Ok(PyDDL {
         inner: Statement::AlterTable(
-            Table::alter(table_name(table)?).drop_column(PyIdentifier::new(name)?.alias()),
+            Table::alter(table_name(table)?).drop_column(PyIdentifier::new(name)?.name()),
         ),
     })
 }

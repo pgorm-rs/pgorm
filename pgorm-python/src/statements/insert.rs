@@ -56,7 +56,7 @@ impl PyInsert {
             ));
         }
         let mut next = self.clone();
-        next.inner.columns(columns.iter().map(PyIdentifier::alias));
+        next.inner.columns(columns.iter().map(PyIdentifier::name));
         next.columns = columns.into_iter().map(|column| column.name).collect();
         Ok(next)
     }

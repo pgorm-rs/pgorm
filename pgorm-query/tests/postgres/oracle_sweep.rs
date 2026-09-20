@@ -34,8 +34,8 @@ fn sweep_select_clause_shapes() {
             .from(Glyph::Table)
             .to_string(),
         Query::select()
-            .expr_as(Expr::col(Glyph::Id), Alias::new("glyph id"))
-            .from((Alias::new("public"), Glyph::Table))
+            .expr_as(Expr::col(Glyph::Id), Name::runtime("glyph id"))
+            .from((Name::runtime("public"), Glyph::Table))
             .to_string(),
         base()
             .and_where(Expr::col(Glyph::Aspect).gt(1))
@@ -58,7 +58,7 @@ fn sweep_select_clause_shapes() {
             .to_string(),
         Query::select()
             .column((Glyph::Table, Glyph::Id))
-            .column((Alias::new("public"), Glyph::Table, Glyph::Aspect))
+            .column((Name::runtime("public"), Glyph::Table, Glyph::Aspect))
             .from(Glyph::Table)
             .to_string(),
     ]);
@@ -86,7 +86,7 @@ fn sweep_expression_shapes() {
         Expr::col(Glyph::Id).eq_any(Vec::<i32>::new()),
         Expr::col(Glyph::Id).ne_all([1, 2]),
         Expr::col(Glyph::Id).ne_all(Vec::<i32>::new()),
-        Expr::col(Glyph::Aspect).cast_as(Alias::new("text")),
+        Expr::col(Glyph::Aspect).cast_as(Name::runtime("text")),
         Expr::raw("now()"),
         Expr::template("$1 + $2", [1, 2]).expect("template arity"),
         Expr::tuple([Expr::val(1).into(), Expr::val(2).into()]).into(),
@@ -112,7 +112,7 @@ fn sweep_expression_shapes() {
             .into(),
         Func::count(Expr::col(Glyph::Id)).into(),
         Func::coalesce([Expr::col(Glyph::Aspect).into(), Expr::val(0).into()]).into(),
-        Expr::val("1").cast_as(Alias::new("int4")),
+        Expr::val("1").cast_as(Name::runtime("int4")),
     ];
 
     sweep(
@@ -163,8 +163,8 @@ fn sweep_join_shapes() {
             .join_as(
                 JoinType::LeftJoin,
                 Font::Table,
-                Alias::new("f"),
-                Expr::col((Char::Table, Char::FontId)).equals((Alias::new("f"), Font::Id)),
+                Name::runtime("f"),
+                Expr::col((Char::Table, Char::FontId)).equals((Name::runtime("f"), Font::Id)),
             )
             .to_string(),
     );
@@ -175,7 +175,7 @@ fn sweep_join_shapes() {
             .join_lateral(
                 JoinType::LeftJoin,
                 base(),
-                Alias::new("sub"),
+                Name::runtime("sub"),
                 Expr::val(1).eq(1),
             )
             .to_string(),
@@ -183,21 +183,21 @@ fn sweep_join_shapes() {
     statements.push(
         Query::select()
             .column(Glyph::Id)
-            .from_subquery(base(), Alias::new("sub"))
+            .from_subquery(base(), Name::runtime("sub"))
             .to_string(),
     );
     statements.push(
         Query::select()
-            .column(Alias::new("column1"))
-            .from_values([(1, "a"), (2, "b")], Alias::new("v"))
+            .column(Name::runtime("column1"))
+            .from_values([(1, "a"), (2, "b")], Name::runtime("v"))
             .to_string(),
     );
     statements.push(
         Query::select()
             .column(Asterisk)
             .from_function(
-                Func::named(Alias::new("generate_series")).arg(1),
-                Alias::new("g"),
+                Func::named(Name::runtime("generate_series")).arg(1),
+                Name::runtime("g"),
             )
             .to_string(),
     );
@@ -253,7 +253,7 @@ fn sweep_union_and_locking_shapes() {
 #[test]
 fn sweep_cte_shapes() {
     let named = |name: &str| {
-        CommonTableExpression::new(Alias::new(name), base())
+        CommonTableExpression::new(Name::runtime(name), base())
             .column(Glyph::Id)
             .to_owned()
     };
@@ -261,7 +261,7 @@ fn sweep_cte_shapes() {
     let outer = || {
         Query::select()
             .column(Glyph::Id)
-            .from(Alias::new("cte"))
+            .from(Name::runtime("cte"))
             .take()
     };
 
@@ -322,8 +322,8 @@ fn sweep_window_function_shapes() {
             .from(Char::Table)
             .expr_window_name_as(
                 Func::count(Expr::col(Char::Id)),
-                Alias::new("w"),
-                Alias::new("n"),
+                Name::runtime("w"),
+                Name::runtime("n"),
             )
             .to_string(),
     ]);
@@ -434,7 +434,7 @@ fn sweep_table_ddl_shapes() {
             )
             .index(
                 Index::create(Glyph::Table, Glyph::Id)
-                    .name("glyph_pk")
+                    .name(Name::runtime("glyph_pk"))
                     .primary()
                     .to_owned(),
             )
@@ -452,7 +452,7 @@ fn sweep_table_ddl_shapes() {
             )
             .to_string(),
         Table::alter(Glyph::Table)
-            .add_column(ColumnDef::new(Alias::new("added")).integer().not_null())
+            .add_column(ColumnDef::new(Name::runtime("added")).integer().not_null())
             .to_string(),
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).big_integer())
@@ -460,14 +460,14 @@ fn sweep_table_ddl_shapes() {
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).null())
             .to_string(),
-        Table::rename_column(Glyph::Table, Glyph::Aspect, Alias::new("ratio")).to_string(),
+        Table::rename_column(Glyph::Table, Glyph::Aspect, Name::runtime("ratio")).to_string(),
         Table::alter(Glyph::Table)
             .drop_column(Glyph::Aspect)
             .to_string(),
         Table::alter(Char::Table)
-            .drop_foreign_key(Alias::new("fk"))
+            .drop_foreign_key(Name::runtime("fk"))
             .to_string(),
-        Table::rename(Glyph::Table, Alias::new("glyph_old")).to_string(),
+        Table::rename(Glyph::Table, Name::runtime("glyph_old")).to_string(),
         Table::truncate(Glyph::Table).to_string(),
         Table::drop(Glyph::Table).if_exists().cascade().to_string(),
         Table::drop(Glyph::Table)
@@ -483,57 +483,60 @@ fn sweep_table_ddl_shapes() {
 fn sweep_schema_object_ddl_shapes() {
     sweep([
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .to_string(),
-        Index::create((Alias::new("public"), Glyph::Table), Glyph::Aspect)
+        Index::create((Name::runtime("public"), Glyph::Table), Glyph::Aspect)
             .if_not_exists()
             .unique()
             .nulls_not_distinct()
-            .name("idx")
+            .name(Name::runtime("idx"))
             .col(Glyph::Image)
             .to_string(),
         Index::create(Glyph::Table, Glyph::Tokens)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .index_type(IndexType::Gin)
             .to_string(),
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .index_type(IndexType::Hash)
             .to_string(),
-        Index::drop("idx").to_string(),
+        Index::drop(Name::runtime("idx")).to_string(),
         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-            .name("fk")
+            .name(Name::runtime("fk"))
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::NoAction)
             .to_string(),
-        ForeignKey::drop(Char::Table, "fk").to_string(),
-        Type::create(Alias::new("tea"))
+        ForeignKey::drop(Char::Table, Name::runtime("fk")).to_string(),
+        Type::create(Name::runtime("tea"))
             .values(["breakfast", "earl grey"])
             .to_string(),
-        Type::alter(Alias::new("tea"))
+        Type::alter(Name::runtime("tea"))
             .add_value("oolong")
             .to_string(),
-        Type::alter(Alias::new("tea"))
+        Type::alter(Name::runtime("tea"))
             .add_value("oolong")
             .after("breakfast")
             .to_string(),
-        Type::alter(Alias::new("tea"))
+        Type::alter(Name::runtime("tea"))
             .rename_value("oolong", "wulong")
             .to_string(),
-        Type::drop(Alias::new("tea"))
+        Type::drop(Name::runtime("tea"))
             .if_exists()
             .cascade()
             .to_string(),
-        Extension::create("ltree").to_string(),
-        Extension::create("ltree")
-            .schema("public")
+        Extension::create(Name::runtime("ltree")).to_string(),
+        Extension::create(Name::runtime("ltree"))
+            .schema(Name::runtime("public"))
             .if_not_exists()
             .cascade()
             .to_string(),
-        Extension::drop("ltree").if_exists().cascade().to_string(),
+        Extension::drop(Name::runtime("ltree"))
+            .if_exists()
+            .cascade()
+            .to_string(),
         Comment::on_table(Glyph::Table, "one row per glyph").to_string(),
         Comment::on_column(
-            (Alias::new("public"), Glyph::Table),
+            (Name::runtime("public"), Glyph::Table),
             Glyph::Aspect,
             "it's fine",
         )
@@ -587,7 +590,7 @@ fn sweep_column_type_vocabulary() {
 
     sweep(types.into_iter().map(|column_type| {
         Table::create(Glyph::Table)
-            .col(ColumnDef::new_with_type(Alias::new("c"), column_type))
+            .col(ColumnDef::new_with_type(Name::runtime("c"), column_type))
             .to_string()
     }));
 }
@@ -685,7 +688,7 @@ fn sweep_placeholder_builds() {
         .and_where(Expr::col(Glyph::Id).eq(2))
         .build();
     let (cast, _) = Query::select()
-        .expr(Expr::val(1).cast_as(Alias::new("text")))
+        .expr(Expr::val(1).cast_as(Name::runtime("text")))
         .build();
 
     sweep([select, insert, update, delete, cast]);

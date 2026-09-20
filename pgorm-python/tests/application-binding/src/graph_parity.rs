@@ -1,5 +1,5 @@
 use crate::{account, graphs, note};
-use pgorm::pgorm_query::{Alias, Expr, Order};
+use pgorm::pgorm_query::{Expr, Name, Order};
 use pgorm::{QueryFilter, QueryOrder, QueryTrait};
 use pgorm_python::expressions::Compiled;
 use pyo3::{prelude::*, types::PyDict};
@@ -27,8 +27,9 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
                     kwargs.set_item("terminal", terminal)?;
                     let native: Compiled =
                         query.call_method("inspect", (), Some(&kwargs))?.extract()?;
-                    let filter = Expr::col((Alias::new("accounts"), account::Column::Id)).gte(2i64);
-                    let ordering = Expr::col((Alias::new(alias), note::Column::Id));
+                    let filter =
+                        Expr::col((Name::runtime("accounts"), account::Column::Id)).gte(2i64);
+                    let ordering = Expr::col((Name::runtime(alias), note::Column::Id));
                     let mut rust = if name == "app.AccountNotes" {
                         graphs::optional(&[alias.to_owned()])
                             .filter(filter)

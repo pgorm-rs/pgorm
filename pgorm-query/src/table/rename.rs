@@ -16,7 +16,7 @@ use crate::{QueryBuilder, types::*};
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
 ///
-/// let table = Table::rename(Font::Table, Alias::new("font_new"));
+/// let table = Table::rename(Font::Table, Name::runtime("font_new"));
 ///
 /// assert_eq!(
 ///     table.to_string(),
@@ -81,8 +81,8 @@ impl std::fmt::Display for TableRenameStatement {
 ///
 /// let table = Table::rename_column(
 ///     Font::Table,
-///     Alias::new("new_col"),
-///     Alias::new("new_column"),
+///     Name::runtime("new_col"),
+///     Name::runtime("new_column"),
 /// );
 ///
 /// assert_eq!(

@@ -152,7 +152,7 @@ impl ColumnType {
     where
         T: Into<String>,
     {
-        ColumnType::Named(TypeName::new(Alias::new(ty)))
+        ColumnType::Named(TypeName::new(Name::runtime(ty)))
     }
 
     pub fn string(length: Option<u32>) -> ColumnType {
@@ -456,22 +456,22 @@ impl ColumnDef {
     /// assert_eq!(
     ///     Table::create(Glyph::Table)
     ///         .col(
-    ///             ColumnDef::new(Alias::new("I1"))
+    ///             ColumnDef::new(Name::runtime("I1"))
     ///                 .interval(IntervalSpec::Any(None))
     ///                 .not_null()
     ///         )
     ///         .col(
-    ///             ColumnDef::new(Alias::new("I2"))
+    ///             ColumnDef::new(Name::runtime("I2"))
     ///                 .interval(IntervalSpec::Fields(PgInterval::YearToMonth))
     ///                 .not_null()
     ///         )
     ///         .col(
-    ///             ColumnDef::new(Alias::new("I3"))
+    ///             ColumnDef::new(Name::runtime("I3"))
     ///                 .interval(IntervalSpec::Any(Some(IntervalPrecision::P4)))
     ///                 .not_null()
     ///         )
     ///         .col(
-    ///             ColumnDef::new(Alias::new("I4"))
+    ///             ColumnDef::new(Name::runtime("I4"))
     ///                 .interval(IntervalSpec::Fields(PgInterval::HourToSecond(Some(
     ///                     IntervalPrecision::P3
     ///                 ))))

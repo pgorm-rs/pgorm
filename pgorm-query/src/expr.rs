@@ -1217,8 +1217,8 @@ impl Expr {
     /// use pgorm_query::{*, tests_cfg::*};
     ///
     /// let query = Query::select()
-    ///     .expr_as(Expr::exists(Query::select().column(Char::Id).from(Char::Table).take()), Alias::new("character_exists"))
-    ///     .expr_as(Expr::exists(Query::select().column(Glyph::Id).from(Glyph::Table).take()), Alias::new("glyph_exists"))
+    ///     .expr_as(Expr::exists(Query::select().column(Char::Id).from(Char::Table).take()), Name::runtime("character_exists"))
+    ///     .expr_as(Expr::exists(Query::select().column(Glyph::Id).from(Glyph::Table).take()), Name::runtime("glyph_exists"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1303,7 +1303,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Expr::col(Char::FontSize).as_enum(Alias::new("text")))
+    ///     .expr(Expr::col(Char::FontSize).as_enum(Name::runtime("text")))
     ///     .from(Char::Table)
     ///     .to_owned();
     ///
@@ -1315,7 +1315,7 @@ impl Expr {
     /// let query = Query::insert()
     ///     .into_table(Char::Table)
     ///     .columns([Char::FontSize])
-    ///     .values_panic([Expr::val("large").as_enum(Alias::new("font_size_enum"))])
+    ///     .values_panic([Expr::val("large").as_enum(Name::runtime("font_size_enum"))])
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1369,7 +1369,7 @@ impl Expr {
     ///                 true
     ///              )
     ///             .finally(false),
-    ///          Alias::new("is_even")
+    ///          Name::runtime("is_even")
     ///     )
     ///     .from(Glyph::Table)
     ///     .to_owned();
@@ -1395,7 +1395,7 @@ impl Expr {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Expr::val("1").cast_as(Alias::new("integer")))
+    ///     .expr(Expr::val("1").cast_as(Name::runtime("integer")))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1908,7 +1908,7 @@ impl SimpleExpr {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Expr::value("1").cast_as(Alias::new("integer")))
+    ///     .expr(Expr::value("1").cast_as(Name::runtime("integer")))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1968,7 +1968,7 @@ impl SimpleExpr {
     /// let query = Query::select()
     ///     .columns([Char::Character, Char::SizeW, Char::SizeH])
     ///     .from(Char::Table)
-    ///     .and_where(Expr::col((Char::Table, Char::FontId)).cast_as(Alias::new("text")).like("a%"))
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).cast_as(Name::runtime("text")).like("a%"))
     ///     .to_owned();
     ///
     /// assert_eq!(

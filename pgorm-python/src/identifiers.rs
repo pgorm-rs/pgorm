@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{Alias, NullOrdering, Order};
+use pgorm::pgorm_query::{Name, NullOrdering, Order};
 use pyo3::prelude::*;
 
 use crate::errors::ConstructionError;
@@ -32,8 +32,8 @@ impl PyIdentifier {
 }
 
 impl PyIdentifier {
-    pub fn alias(&self) -> Alias {
-        Alias::new(&self.name)
+    pub fn name(&self) -> Name {
+        Name::runtime(&self.name)
     }
 }
 

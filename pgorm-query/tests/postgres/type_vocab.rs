@@ -14,9 +14,9 @@ fn into_column_ref_maps_every_form() {
         ColumnRef::TableColumn(Glyph::Table.into_name(), Glyph::Id.into_name())
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table, Glyph::Id).into_column_ref(),
+        (Name::runtime("schema"), Glyph::Table, Glyph::Id).into_column_ref(),
         ColumnRef::SchemaTableColumn(
-            Alias::new("schema").into_name(),
+            Name::runtime("schema"),
             Glyph::Table.into_name(),
             Glyph::Id.into_name()
         )
@@ -42,7 +42,7 @@ fn every_column_ref_form_renders() {
                 Glyph::Id.into_name()
             ))
             .column(ColumnRef::SchemaTableColumn(
-                Alias::new("schema").into_name(),
+                Name::runtime("schema"),
                 Glyph::Table.into_name(),
                 Glyph::Id.into_name()
             ))
@@ -61,8 +61,8 @@ fn into_table_name_maps_the_two_forms() {
         TableName::Table(Glyph::Table.into_name())
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table).into_table_name(),
-        TableName::SchemaTable(Alias::new("schema").into_name(), Glyph::Table.into_name())
+        (Name::runtime("schema"), Glyph::Table).into_table_name(),
+        TableName::SchemaTable(Name::runtime("schema"), Glyph::Table.into_name())
     );
 }
 
@@ -77,9 +77,9 @@ fn into_named_table_maps_the_named_forms() {
         unaliased(TableName::Table(Glyph::Table.into_name()))
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table).into_named_table(),
+        (Name::runtime("schema"), Glyph::Table).into_named_table(),
         unaliased(TableName::SchemaTable(
-            Alias::new("schema").into_name(),
+            Name::runtime("schema"),
             Glyph::Table.into_name()
         ))
     );
@@ -90,9 +90,9 @@ fn into_named_table_maps_the_named_forms() {
     assert_eq!(
         Glyph::Table
             .into_named_table()
-            .alias(Alias::new("g"))
+            .alias(Name::runtime("g"))
             .into_named_table(),
-        Glyph::Table.into_named_table().alias(Alias::new("g"))
+        Glyph::Table.into_named_table().alias(Name::runtime("g"))
     );
     assert_eq!(
         NamedTable::from(Glyph::Table.into_table_name()),
@@ -112,22 +112,19 @@ fn into_from_item_maps_the_named_forms() {
         })
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table).into_from_item(),
+        (Name::runtime("schema"), Glyph::Table).into_from_item(),
         FromItem::Table(NamedTable {
-            name: TableName::SchemaTable(
-                Alias::new("schema").into_name(),
-                Glyph::Table.into_name()
-            ),
+            name: TableName::SchemaTable(Name::runtime("schema"), Glyph::Table.into_name()),
             alias: None,
         })
     );
     assert_eq!(
-        FromItem::from((Alias::new("schema"), Glyph::Table).into_table_name()),
-        (Alias::new("schema"), Glyph::Table).into_from_item()
+        FromItem::from((Name::runtime("schema"), Glyph::Table).into_table_name()),
+        (Name::runtime("schema"), Glyph::Table).into_from_item()
     );
     assert_eq!(
-        FromItem::from(Glyph::Table.into_named_table().alias(Alias::new("g"))),
-        Glyph::Table.into_from_item().alias(Alias::new("g"))
+        FromItem::from(Glyph::Table.into_named_table().alias(Name::runtime("g"))),
+        Glyph::Table.into_from_item().alias(Name::runtime("g"))
     );
 }
 
@@ -138,36 +135,33 @@ fn from_item_alias_adds_or_replaces() {
     let named = |alias: &str| {
         FromItem::Table(NamedTable {
             name: TableName::Table(Glyph::Table.into_name()),
-            alias: Some(Alias::new(alias).into_name()),
+            alias: Some(Name::runtime(alias)),
         })
     };
 
     assert_eq!(
-        Glyph::Table.into_from_item().alias(Alias::new("g")),
+        Glyph::Table.into_from_item().alias(Name::runtime("g")),
         named("g")
     );
     assert_eq!(
         Glyph::Table
             .into_from_item()
-            .alias(Alias::new("g"))
-            .alias(Alias::new("h")),
+            .alias(Name::runtime("g"))
+            .alias(Name::runtime("h")),
         named("h")
     );
     assert_eq!(
-        (Alias::new("schema"), Glyph::Table)
+        (Name::runtime("schema"), Glyph::Table)
             .into_from_item()
-            .alias(Alias::new("g")),
+            .alias(Name::runtime("g")),
         FromItem::Table(NamedTable {
-            name: TableName::SchemaTable(
-                Alias::new("schema").into_name(),
-                Glyph::Table.into_name()
-            ),
-            alias: Some(Alias::new("g").into_name()),
+            name: TableName::SchemaTable(Name::runtime("schema"), Glyph::Table.into_name()),
+            alias: Some(Name::runtime("g")),
         })
     );
     assert_eq!(
-        FromItem::ValuesList(vec![], Alias::new("v").into_name()).alias(Alias::new("w")),
-        FromItem::ValuesList(vec![], Alias::new("w").into_name())
+        FromItem::ValuesList(vec![], Name::runtime("v")).alias(Name::runtime("w")),
+        FromItem::ValuesList(vec![], Name::runtime("w"))
     );
 }
 
@@ -175,22 +169,26 @@ fn from_item_alias_adds_or_replaces() {
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
-    let named = (Alias::new("schema"), Glyph::Table).into_from_item();
+    let named = (Name::runtime("schema"), Glyph::Table).into_from_item();
     assert_eq!(named.qualifier().to_string(), "glyph");
     assert_eq!(
-        named.clone().alias(Alias::new("g")).qualifier().to_string(),
+        named
+            .clone()
+            .alias(Name::runtime("g"))
+            .qualifier()
+            .to_string(),
         "g"
     );
     assert_eq!(
         named.table_name(),
-        Some(&(Alias::new("schema"), Glyph::Table).into_table_name())
+        Some(&(Name::runtime("schema"), Glyph::Table).into_table_name())
     );
 
-    let table = (Alias::new("schema"), Glyph::Table).into_named_table();
+    let table = (Name::runtime("schema"), Glyph::Table).into_named_table();
     assert_eq!(table.qualifier().to_string(), "glyph");
-    assert_eq!(table.alias(Alias::new("g")).qualifier().to_string(), "g");
+    assert_eq!(table.alias(Name::runtime("g")).qualifier().to_string(), "g");
 
-    let values = FromItem::ValuesList(vec![], Alias::new("v").into_name());
+    let values = FromItem::ValuesList(vec![], Name::runtime("v"));
     assert_eq!(values.qualifier().to_string(), "v");
     assert_eq!(values.table_name(), None);
 }
@@ -207,18 +205,18 @@ fn named_from_item_forms_render() {
         r#"SELECT * FROM "glyph""#
     );
     assert_eq!(
-        rendered((Alias::new("schema"), Glyph::Table).into_from_item()),
+        rendered((Name::runtime("schema"), Glyph::Table).into_from_item()),
         r#"SELECT * FROM "schema"."glyph""#
     );
     assert_eq!(
-        rendered(Glyph::Table.into_from_item().alias(Alias::new("g"))),
+        rendered(Glyph::Table.into_from_item().alias(Name::runtime("g"))),
         r#"SELECT * FROM "glyph" AS "g""#
     );
     assert_eq!(
         rendered(
-            (Alias::new("schema"), Glyph::Table)
+            (Name::runtime("schema"), Glyph::Table)
                 .into_from_item()
-                .alias(Alias::new("g"))
+                .alias(Name::runtime("g"))
         ),
         r#"SELECT * FROM "schema"."glyph" AS "g""#
     );
@@ -232,9 +230,9 @@ fn named_from_item_forms_render() {
 #[test]
 fn aliased_dml_targets_render() {
     let target = || {
-        (Alias::new("schema"), Glyph::Table)
+        (Name::runtime("schema"), Glyph::Table)
             .into_named_table()
-            .alias(Alias::new("g"))
+            .alias(Name::runtime("g"))
     };
 
     assert_eq!(
@@ -249,14 +247,14 @@ fn aliased_dml_targets_render() {
         Query::update()
             .table(target())
             .value(Glyph::Aspect, 1.23)
-            .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+            .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).eq(1))
             .to_string(),
         r#"UPDATE "schema"."glyph" AS "g" SET "aspect" = 1.23 WHERE "g"."id" = 1"#
     );
     assert_eq!(
         Query::delete()
             .from_table(target())
-            .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+            .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).eq(1))
             .to_string(),
         r#"DELETE FROM "schema"."glyph" AS "g" WHERE "g"."id" = 1"#
     );
@@ -268,7 +266,7 @@ fn aliased_dml_targets_render() {
 fn value_producing_from_item_forms_render() {
     let sub_query = FromItem::SubQuery(
         Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-        Alias::new("sub").into_name(),
+        Name::runtime("sub"),
     );
     assert_eq!(
         Query::select().column(Asterisk).from(sub_query).to_string(),
@@ -280,7 +278,7 @@ fn value_producing_from_item_forms_render() {
             (1i32, "a").into_value_tuple(),
             (2i32, "b").into_value_tuple(),
         ],
-        Alias::new("v").into_name(),
+        Name::runtime("v"),
     );
     assert_eq!(
         Query::select()
@@ -291,8 +289,8 @@ fn value_producing_from_item_forms_render() {
     );
 
     let function_call = FromItem::FunctionCall(
-        Func::named(Alias::new("generate_series")).arg(1i32),
-        Alias::new("f").into_name(),
+        Func::named(Name::runtime("generate_series")).arg(1i32),
+        Name::runtime("f"),
     );
     assert_eq!(
         Query::select()
@@ -399,7 +397,7 @@ fn string_len_and_the_convenience_constructors() {
     );
     assert_eq!(
         ColumnType::named("citext"),
-        ColumnType::Named(TypeName::new(Alias::new("citext")))
+        ColumnType::Named(TypeName::new(Name::runtime("citext")))
     );
 }
 
@@ -471,24 +469,18 @@ fn column_type_equality_semantics() {
     // `Enum` compares name and variant list, both by rendered text.
     let tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_name(),
-        variants: vec![
-            Alias::new("green").into_name(),
-            Alias::new("black").into_name(),
-        ],
+        name: Name::runtime("tea"),
+        variants: vec![Name::runtime("green"), Name::runtime("black")],
     };
     let same_tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_name(),
-        variants: vec![
-            Alias::new("green").into_name(),
-            Alias::new("black").into_name(),
-        ],
+        name: Name::runtime("tea"),
+        variants: vec![Name::runtime("green"), Name::runtime("black")],
     };
     let other_tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_name(),
-        variants: vec![Alias::new("green").into_name()],
+        name: Name::runtime("tea"),
+        variants: vec![Name::runtime("green")],
     };
     assert_eq!(tea, same_tea);
     assert_ne!(tea, other_tea);

@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{ColumnRef, Condition, Expr, Func, IntoName, Query, SimpleExpr};
+use pgorm::pgorm_query::{ColumnRef, Condition, Expr, Func, Query, SimpleExpr};
 use pyo3::{prelude::*, types::PyTuple};
 
 use super::{PyExpr, compiled::Compiled};
@@ -13,16 +13,14 @@ pub(crate) fn col(
     table: Option<&Bound<'_, PyAny>>,
     schema: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyExpr> {
-    let name = PyIdentifier::new(name)?.alias().into_name();
+    let name = PyIdentifier::new(name)?.name();
     let table = table.map(PyIdentifier::new).transpose()?;
     let schema = schema.map(PyIdentifier::new).transpose()?;
     let column = match (schema, table) {
-        (Some(schema), Some(table)) => ColumnRef::SchemaTableColumn(
-            schema.alias().into_name(),
-            table.alias().into_name(),
-            name,
-        ),
-        (None, Some(table)) => ColumnRef::TableColumn(table.alias().into_name(), name),
+        (Some(schema), Some(table)) => {
+            ColumnRef::SchemaTableColumn(schema.name(), table.name(), name)
+        }
+        (None, Some(table)) => ColumnRef::TableColumn(table.name(), name),
         (None, None) => ColumnRef::Column(name),
         (Some(_), None) => {
             return Err(ConstructionError::new_err(

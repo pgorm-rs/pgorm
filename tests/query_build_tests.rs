@@ -12,8 +12,8 @@
 use pgorm::alias;
 use pgorm::pgorm_query::{
     Asterisk, ConditionType, DeleteStatement, Expr, Func, InsertStatement, IntoCondition, IntoName,
-    LockBehavior, LockType, NullOrdering, OnConflict, QueryBuilder, SelectStatement, SimpleExpr,
-    UpdateStatement, Value, Values,
+    LockBehavior, LockType, Name, NullOrdering, OnConflict, QueryBuilder, SelectStatement,
+    SimpleExpr, UpdateStatement, Value, Values,
 };
 use pgorm::set;
 use pgorm::tests_cfg::{
@@ -425,7 +425,7 @@ fn belongs_to_filters_every_primary_key_column() {
 
     assert_eq!(
         filling::Entity::find()
-            .belongs_to_tbl_alias(&composite, "r0")
+            .belongs_to_tbl_alias(&composite, Name::runtime("r0"))
             .as_query()
             .to_string(),
         [
@@ -445,7 +445,7 @@ fn select_list_modifiers_rewrite_the_list() {
         cake::Entity::find()
             .select_only()
             .columns([cake::Column::Id, cake::Column::Name])
-            .column_as(cake::Column::Id.count(), "count")
+            .column_as(cake::Column::Id.count(), Name::runtime("count"))
             .as_query()
             .to_string(),
         [
@@ -472,9 +472,12 @@ fn select_list_modifiers_rewrite_the_list() {
             .exprs([Expr::col((cake::Entity, cake::Column::Name))])
             .expr_as(
                 Func::upper(Expr::col((cake::Entity, cake::Column::Name))),
-                "name_upper"
+                Name::runtime("name_upper")
             )
-            .tbl_col_as((cake::Entity, cake::Column::Name), "cake_name")
+            .tbl_col_as(
+                (cake::Entity, cake::Column::Name),
+                Name::runtime("cake_name")
+            )
             .as_query()
             .to_string(),
         [
@@ -505,7 +508,7 @@ fn select_clears_and_projects_in_one_call() {
     assert_eq!(
         cake::Entity::find()
             .select(cake::Column::Name)
-            .column_as(cake::Column::Id.count(), "count")
+            .column_as(cake::Column::Id.count(), Name::runtime("count"))
             .as_query()
             .to_string(),
         r#"SELECT "cake"."name", COUNT("cake"."id") AS "count" FROM "cake""#
@@ -633,7 +636,7 @@ fn grouping_distinct_and_locking_clauses() {
     assert_eq!(
         cake::Entity::find()
             .select_only()
-            .column_as(cake::Column::Id.count(), "count")
+            .column_as(cake::Column::Id.count(), Name::runtime("count"))
             .group_by(cake::Column::Name)
             .having(cake::Column::Id.gt(4))
             .having(cake::Column::Id.lt(9))
@@ -1385,7 +1388,10 @@ fn alias_token_declares_and_references_one_name() {
     assert_eq!(
         cake::Entity::find()
             .select_only()
-            .column_as(Expr::col((f, fruit::Column::Name)), "fruit_name")
+            .column_as(
+                Expr::col((f, fruit::Column::Name)),
+                Name::runtime("fruit_name")
+            )
             .join_as(JoinType::LeftJoin, cake::Relation::Fruit.def(), f)
             .as_query()
             .to_string(),

@@ -166,7 +166,7 @@ fn a_table_declared_twice_is_refused() {
 }
 
 fn qualified_item() -> pgorm_query::TableCreateStatement {
-    pgorm_query::Table::create((alias("tenant_a"), alias("item")))
+    pgorm_query::Table::create((runtime_name("tenant_a"), runtime_name("item")))
         .col(serial_pk("id"))
         .to_owned()
 }

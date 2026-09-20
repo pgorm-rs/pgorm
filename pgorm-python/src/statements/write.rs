@@ -37,7 +37,7 @@ impl PyUpdate {
             return Err(ConstructionError::new_err("duplicate update assignment"));
         }
         let mut next = self.clone();
-        next.inner.value(name.alias(), coerce(value)?.inner);
+        next.inner.value(name.name(), coerce(value)?.inner);
         Ok(next)
     }
 

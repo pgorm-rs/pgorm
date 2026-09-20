@@ -159,10 +159,10 @@ impl DerivePartialModel {
             },
             ColumnAs::ColAlias { entity, col, field } => {
                 let col_value = quote!( <#entity as pgorm::EntityTrait>::Column:: #col);
-                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #col_value, #field);)
+                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #col_value, pgorm::pgorm_query::alias(#field));)
             },
             ColumnAs::Expr { expr, field_name } => {
-                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #expr, #field_name);)
+                quote!(let #select_ident =  pgorm::QuerySelect::column_as(#select_ident, #expr, pgorm::pgorm_query::alias(#field_name));)
             },
         });
 

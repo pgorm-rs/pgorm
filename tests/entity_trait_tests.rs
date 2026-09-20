@@ -8,8 +8,7 @@ use pgorm::{
     Schema, Select, Value, entity::prelude::*,
 };
 use pgorm_query::{
-    Alias, Expr, IntoName, IntoValueTuple, QueryBuilder, TableName, TryFromValueTuple,
-    ValueTupleError,
+    Expr, IntoName, IntoValueTuple, QueryBuilder, TableName, TryFromValueTuple, ValueTupleError,
 };
 use pretty_assertions::assert_eq;
 
@@ -828,7 +827,7 @@ fn column_trait_expression_surface() {
     let agg = |e: pgorm_query::SimpleExpr| {
         item::Entity::find()
             .select_only()
-            .column_as(e, "agg")
+            .column_as(e, Name::runtime("agg"))
             .as_query()
             .to_string()
     };

@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
         tx.execute(&table.to_string(), &[]).await?;
 
         let index = Index::create(Cake::Table, Cake::Name)
-            .name("cake_name_index")
+            .name(Name::runtime("cake_name_index"))
             .to_owned();
         tx.execute(&index.to_string(), &[]).await?;
 

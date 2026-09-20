@@ -427,7 +427,7 @@
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
 //! let query = Query::select()
-//!     .expr(Expr::val("hello").cast_as(Alias::new("my_type")))
+//!     .expr(Expr::val("hello").cast_as(Name::runtime("my_type")))
 //!     .to_owned();
 //!
 //! assert_eq!(
@@ -478,7 +478,7 @@
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
 //! let table = Table::alter(Character::Table).add_column(
-//!     ColumnDef::new(Alias::new("new_col"))
+//!     ColumnDef::new(Name::runtime("new_col"))
 //!         .integer()
 //!         .not_null()
 //!         .default(100),
@@ -506,7 +506,7 @@
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let table = Table::rename(Character::Table, Alias::new("character_new"));
+//! let table = Table::rename(Character::Table, Name::runtime("character_new"));
 //!
 //! assert_eq!(
 //!     table.to_string(),

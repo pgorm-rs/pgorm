@@ -27,7 +27,7 @@ fn window_1() {
                     .partition_by(Char::SizeW)
                     .partition_by_columns([Char::SizeH])
                     .take(),
-                Alias::new("C")
+                Name::runtime("C")
             )
             .to_string(),
         [
@@ -53,7 +53,7 @@ fn window_2() {
                     .order_by(Char::Id, Order::Asc)
                     .order_by(Char::SizeW, Order::Desc)
                     .take(),
-                Alias::new("C")
+                Name::runtime("C")
             )
             .to_string(),
         [
@@ -211,9 +211,9 @@ fn window_5() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(counted(), Alias::new("w"))
+            .expr_window_name(counted(), Name::runtime("w"))
             .window(
-                Alias::new("w"),
+                Name::runtime("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .to_string(),
@@ -227,9 +227,9 @@ fn window_5() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name_as(counted(), Alias::new("w"), Alias::new("C"))
+            .expr_window_name_as(counted(), Name::runtime("w"), Name::runtime("C"))
             .window(
-                Alias::new("w"),
+                Name::runtime("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .to_string(),
@@ -248,12 +248,15 @@ fn window_6() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(counted(), Alias::new("w2"))
+            .expr_window_name(counted(), Name::runtime("w2"))
             .window(
-                Alias::new("w1"),
+                Name::runtime("w1"),
                 WindowStatement::partition_by(Char::FontSize)
             )
-            .window(Alias::new("w2"), WindowStatement::partition_by(Char::SizeW))
+            .window(
+                Name::runtime("w2"),
+                WindowStatement::partition_by(Char::SizeW)
+            )
             .to_string(),
         [
             r#"SELECT COUNT("id") OVER "w2" FROM "character""#,
@@ -284,11 +287,11 @@ fn window_clause_precedes_order_limit_lock() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(counted(), Alias::new("w"))
+            .expr_window_name(counted(), Name::runtime("w"))
             .add_group_by([Expr::col(Char::FontSize).into()])
             .and_having(Expr::col(Char::SizeW).gt(1))
             .window(
-                Alias::new("w"),
+                Name::runtime("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .order_by(Char::Id, Order::Asc)
@@ -307,9 +310,9 @@ fn window_clause_precedes_order_limit_lock() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(counted(), Alias::new("w"))
+            .expr_window_name(counted(), Name::runtime("w"))
             .window(
-                Alias::new("w"),
+                Name::runtime("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .lock(LockType::Update)
@@ -329,9 +332,9 @@ fn window_clause_precedes_union() {
     assert_eq!(
         Query::select()
             .from(Char::Table)
-            .expr_window_name(counted(), Alias::new("w"))
+            .expr_window_name(counted(), Name::runtime("w"))
             .window(
-                Alias::new("w"),
+                Name::runtime("w"),
                 WindowStatement::partition_by(Char::FontSize)
             )
             .union(

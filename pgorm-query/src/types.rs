@@ -77,7 +77,7 @@ impl Clone for Name {
 /// The type is asked of the identifier by [`TypeId`](std::any::TypeId), not
 /// read off the trait object's vtable address: Rust guarantees a vtable
 /// neither unique per type nor stable across codegen units, so an address
-/// comparison can answer that two `Alias`es both spelling `"id"` differ.
+/// comparison can answer that two runtime names both spelling `"id"` differ.
 /// `SqlName` is bounded on [`Any`] so the erased value can still be asked, and
 /// asking costs the identifier no width — a `Name` sits in nearly every
 /// node of the AST.
@@ -90,11 +90,30 @@ impl PartialEq for Name {
 }
 
 impl Name {
+    /// Erase a name the program already spells as a type.
     pub fn new<I>(i: I) -> Name
     where
         I: SqlName + 'static,
     {
         Name(Arc::new(i))
+    }
+
+    /// Mint a name from text computed at run time.
+    ///
+    /// The one route from a `String` into identifier position — there is no
+    /// `impl IntoName for &str` — so a grep for `Name::runtime` finds every
+    /// place a value becomes a name, which is the set a reader auditing for
+    /// injection has to look at. A name written in the program says so with
+    /// its type: an [`alias`] token, a derived enum, an entity column.
+    ///
+    /// The text is rendered as a QUOTED identifier like every other name, so
+    /// this is not an escape hatch into SQL — only into naming.
+    // [spec:pgorm:def:sql.types+8]
+    pub fn runtime<T>(text: T) -> Name
+    where
+        T: Into<String>,
+    {
+        Name(Arc::new(RuntimeName(text.into())))
     }
 }
 
@@ -139,7 +158,7 @@ pub trait IntoColumnRef {
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let name = (Alias::new("public"), Glyph::Table).into_table_name();
+/// let name = (Name::runtime("public"), Glyph::Table).into_table_name();
 /// assert_eq!(
 ///     Table::truncate(name.clone()).to_string(),
 ///     r#"TRUNCATE TABLE "public"."glyph""#
@@ -158,7 +177,7 @@ pub trait IntoColumnRef {
 ///
 /// let sub = FromItem::SubQuery(
 ///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-///     Alias::new("q").into_name(),
+///     Name::runtime("q"),
 /// );
 /// Table::truncate(sub);
 /// ```
@@ -169,7 +188,7 @@ pub trait IntoColumnRef {
 /// ```compile_fail,E0277
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// Table::truncate(Glyph::Table.into_named_table().alias(Alias::new("g")));
+/// Table::truncate(Glyph::Table.into_named_table().alias(Name::runtime("g")));
 /// ```
 // [spec:pgorm:def:sql.types.table-ref+2]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
@@ -221,7 +240,7 @@ impl TypeName {
     pub fn raw(type_expr: &'static str) -> Self {
         Self {
             schema: None,
-            name: Alias::new(type_expr).into_name(),
+            name: Name::runtime(type_expr),
             array: false,
             verbatim: true,
         }
@@ -338,11 +357,11 @@ pub trait IntoTableName {
 /// ```
 /// use pgorm_query::{*, tests_cfg::*};
 ///
-/// let target = Glyph::Table.into_named_table().alias(Alias::new("g"));
+/// let target = Glyph::Table.into_named_table().alias(Name::runtime("g"));
 /// assert_eq!(
 ///     Query::delete()
 ///         .from_table(target)
-///         .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+///         .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).eq(1))
 ///         .to_string(),
 ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
 /// );
@@ -356,7 +375,7 @@ pub trait IntoTableName {
 ///
 /// let sub = FromItem::SubQuery(
 ///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-///     Alias::new("q").into_name(),
+///     Name::runtime("q"),
 /// );
 /// Query::insert().into_table(sub);
 /// ```
@@ -368,7 +387,7 @@ pub trait IntoTableName {
 ///
 /// let values = FromItem::ValuesList(
 ///     vec![(1i32,).into_value_tuple()],
-///     Alias::new("v").into_name(),
+///     Name::runtime("v"),
 /// );
 /// Query::update().table(values);
 /// ```
@@ -379,8 +398,8 @@ pub trait IntoTableName {
 /// use pgorm_query::{*, tests_cfg::*};
 ///
 /// let func = FromItem::FunctionCall(
-///     Func::named(Alias::new("generate_series")).arg(1i32),
-///     Alias::new("f").into_name(),
+///     Func::named(Name::runtime("generate_series")).arg(1i32),
+///     Name::runtime("f"),
 /// );
 /// Query::delete().from_table(func);
 /// ```
@@ -557,9 +576,14 @@ pub enum Order {
 mod types_alias;
 pub use types_alias::*;
 
-/// Helper for create name alias
+/// A name computed at run time, reachable only through
+/// [`Name::runtime`].
+///
+/// Private on purpose: `Name::runtime` is the one door a `String` walks
+/// through to reach identifier position, so every entry of
+/// possibly-untrusted text into a name is one grep away.
 #[derive(Debug, Clone)]
-pub struct Alias(String);
+struct RuntimeName(String);
 
 /// Asterisk ("*")
 ///
@@ -645,20 +669,6 @@ where
 impl IntoName for Name {
     fn into_name(self) -> Name {
         self
-    }
-}
-
-// [spec:pgorm:def:sql.types+8]
-impl IntoName for &str {
-    fn into_name(self) -> Name {
-        Name::new(Alias::new(self))
-    }
-}
-
-// [spec:pgorm:def:sql.types+8]
-impl IntoName for String {
-    fn into_name(self) -> Name {
-        Name::new(Alias::new(self))
     }
 }
 
@@ -862,16 +872,8 @@ impl FromItem {
     }
 }
 
-impl Alias {
-    pub fn new<T>(n: T) -> Self
-    where
-        T: Into<String>,
-    {
-        Self(n.into())
-    }
-}
-
-impl SqlName for Alias {
+// [spec:pgorm:def:sql.types+8]
+impl SqlName for RuntimeName {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(s, "{}", self.0).unwrap();
     }
@@ -920,7 +922,7 @@ mod tests {
     #[test]
     fn test_identifier() {
         let query = Query::select()
-            .column(Alias::new("hello-World_"))
+            .column(Name::runtime("hello-World_"))
             .to_owned();
 
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
@@ -929,14 +931,16 @@ mod tests {
     // [spec:pgorm:def:sql.types+8/test]
     #[test]
     fn test_quoted_identifier_1() {
-        let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
+        let query = Query::select().column(Name::runtime("hel\"lo")).to_owned();
 
         assert_eq!(query.to_string(), r#"SELECT "hel""lo""#);
     }
 
     #[test]
     fn test_quoted_identifier_2() {
-        let query = Query::select().column(Alias::new("hel\"\"lo")).to_owned();
+        let query = Query::select()
+            .column(Name::runtime("hel\"\"lo"))
+            .to_owned();
 
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
@@ -963,16 +967,16 @@ mod tests {
             ColumnRef::Column(CharReexport::Id.into_name())
         );
         assert_eq!(
-            ColumnRef::Column(Alias::new("id").into_name()),
-            ColumnRef::Column(Alias::new("id").into_name())
+            ColumnRef::Column(Name::runtime("id")),
+            ColumnRef::Column(Name::runtime("id"))
         );
         assert_ne!(
-            ColumnRef::Column(Alias::new("id").into_name()),
-            ColumnRef::Column(Alias::new("id_").into_name())
+            ColumnRef::Column(Name::runtime("id")),
+            ColumnRef::Column(Name::runtime("id_"))
         );
         assert_ne!(
             ColumnRef::Column(Character::Id.into_name()),
-            ColumnRef::Column(Alias::new("id").into_name())
+            ColumnRef::Column(Name::runtime("id"))
         );
         assert_ne!(
             ColumnRef::Column(Character::Id.into_name()),

@@ -2,8 +2,8 @@ use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
 use pgorm::{ConnectionTrait, DatabasePool, EntityName, Schema, error::*, pgorm_query};
 use pgorm_query::{
-    ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoName, QueryBuilder, StringLen, alias,
-    extension::Type,
+    ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoName, Name, QueryBuilder, StringLen,
+    alias, extension::Type,
 };
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
@@ -156,7 +156,7 @@ where
                 SelfJoin,
                 self_join::Column::Uuid,
             )
-            .name("fk-self_join-uuid_ref")
+            .name(Name::runtime("fk-self_join-uuid_ref"))
             .to_owned(),
         )
         .to_owned();
@@ -236,7 +236,7 @@ where
                 ActiveEnum,
                 active_enum::Column::Id,
             )
-            .name("fk-active_enum_child-active_enum")
+            .name(Name::runtime("fk-active_enum_child-active_enum"))
             .to_owned(),
         )
         .to_owned();

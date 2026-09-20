@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use pgorm::pgorm_query::Alias;
+use pgorm::pgorm_query::Name;
 use pgorm::pipeline::{self as pl, ExprOps};
 
 #[derive(Clone, Copy, Debug)]
@@ -103,10 +103,10 @@ impl Recipe {
             Self::Integer(value) => (*value).into(),
             Self::Float(value) => (*value).into(),
             Self::Text(value) => value.as_str().into(),
-            Self::Column(table, column) => pl::col(Alias::new(table), Alias::new(column)),
-            Self::Alias(name) => Alias::new(name).into(),
-            Self::This(name) => pl::this(Alias::new(name)),
-            Self::That(name) => pl::that(Alias::new(name)),
+            Self::Column(table, column) => pl::col(Name::runtime(table), Name::runtime(column)),
+            Self::Alias(name) => Name::runtime(name).into(),
+            Self::This(name) => pl::this(Name::runtime(name)),
+            Self::That(name) => pl::that(Name::runtime(name)),
             // Only Scope::bind creates these indices; callbacks are validated before lowering.
             Self::Bound(index) => bound[*index].clone(),
             Self::Binary(operation, left, right) => {
@@ -123,7 +123,7 @@ impl Recipe {
                     Unary::IsNotNull => value.is_not_null(),
                 }
             }
-            Self::Named(value, name) => value.lower(bound).as_runtime(Alias::new(name)),
+            Self::Named(value, name) => value.lower(bound).as_runtime(Name::runtime(name)),
             Self::Cast(value, kind) => value.lower(bound).cast(*kind),
             Self::In(value, members) => value
                 .lower(bound)

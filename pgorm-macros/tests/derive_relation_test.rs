@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use pgorm::entity::prelude::*;
-use pgorm::pgorm_query::{Alias, ConditionType, Name};
+use pgorm::pgorm_query::{ConditionType, Name};
 use pgorm::{Key, RelationType, SqlName};
 
 mod cake {
@@ -146,7 +146,7 @@ fn optional_keys_chain_onto_the_relation_builder() {
     // `on_condition` is wrapped in an `IntoCondition` closure taking the two
     // join-side names.
     let on_condition = def.on_condition.expect("on_condition should be set");
-    let condition = on_condition(Name::new(Alias::new("l")), Name::new(Alias::new("r")));
+    let condition = on_condition(Name::runtime("l"), Name::runtime("r"));
     assert_eq!(
         condition,
         pgorm::pgorm_query::IntoCondition::into_condition(pgorm::pgorm_query::Expr::val(1).eq(1))

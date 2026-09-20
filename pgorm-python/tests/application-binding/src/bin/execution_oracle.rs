@@ -1,7 +1,7 @@
 //! Compare installed Python execution with independent Rust operations.
 use _native::{account, graphs, note};
 use futures_util::TryStreamExt;
-use pgorm::pgorm_query::{Alias, ColumnDef, ColumnType, Expr, Order, Query, Table};
+use pgorm::pgorm_query::{ColumnDef, ColumnType, Expr, Name, Order, Query, Table};
 use pgorm::pipeline::{self as pl, ExprOps, IntoSource, JoinSide};
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection,
@@ -22,26 +22,29 @@ async fn execute<C: ConnectionTrait>(db: &C, query: (String, Values)) -> Result<
 }
 
 async fn runtime<C: ConnectionTrait>(db: &C) -> Result<Value> {
-    let table = ("python_entities", "runtime");
-    let ddl = Table::create(table)
-        .col(ColumnDef::new_with_type("id", ColumnType::Integer).primary_key())
-        .col(ColumnDef::new_with_type("name", ColumnType::Text))
+    let table = (Name::runtime("python_entities"), Name::runtime("runtime"));
+    let ddl = Table::create(table.clone())
+        .col(ColumnDef::new_with_type(Name::runtime("id"), ColumnType::Integer).primary_key())
+        .col(ColumnDef::new_with_type(
+            Name::runtime("name"),
+            ColumnType::Text,
+        ))
         .to_string();
     db.execute(&ddl, &[]).await?;
     let inserted = execute(
         db,
         Query::insert()
-            .into_table(table)
-            .columns(["id", "name"])
+            .into_table(table.clone())
+            .columns([Name::runtime("id"), Name::runtime("name")])
             .values([Expr::val(1i64).into(), Expr::val("O'Brien 雪").into()])?
             .build(),
     )
     .await?;
     let (sql, values) = Query::update()
-        .table(table)
-        .value("name", "changed")
-        .and_where(Expr::col("id").eq(1i64))
-        .returning(Query::returning().columns(["id", "name"]))
+        .table(table.clone())
+        .value(Name::runtime("name"), "changed")
+        .and_where(Expr::col(Name::runtime("id")).eq(1i64))
+        .returning(Query::returning().columns([Name::runtime("id"), Name::runtime("name")]))
         .build();
     let values = parameters(values);
     let rows = db
@@ -59,8 +62,8 @@ async fn runtime<C: ConnectionTrait>(db: &C) -> Result<Value> {
     let deleted = execute(
         db,
         Query::delete()
-            .from_table(table)
-            .and_where(Expr::col("id").eq(1i64))
+            .from_table(table.clone())
+            .and_where(Expr::col(Name::runtime("id")).eq(1i64))
             .build(),
     )
     .await?;
@@ -117,7 +120,7 @@ async fn models<C: ConnectionTrait>(db: &C) -> Result<Value> {
         .await?
         .is_none();
     let graph = graphs::optional(&["n".to_owned()])
-        .order_by_asc(Expr::col((Alias::new("accounts"), account::Column::Id)));
+        .order_by_asc(Expr::col((Name::runtime("accounts"), account::Column::Id)));
     let joined: Vec<_> = graph
         .clone()
         .all(db)
@@ -141,7 +144,7 @@ async fn models<C: ConnectionTrait>(db: &C) -> Result<Value> {
         .0
         .id;
     let graph_missing = graph
-        .filter(Expr::col(("accounts", "id")).eq(99i64))
+        .filter(Expr::col((Name::runtime("accounts"), Name::runtime("id"))).eq(99i64))
         .one_opt(db)
         .await?
         .is_none();
@@ -149,10 +152,10 @@ async fn models<C: ConnectionTrait>(db: &C) -> Result<Value> {
         .join(
             JoinSide::Left,
             note::Entity.named("n"),
-            pl::col(Alias::new("accounts"), Alias::new("id"))
-                .eq(pl::col(Alias::new("n"), Alias::new("account_id"))),
+            pl::col(Name::runtime("accounts"), Name::runtime("id"))
+                .eq(pl::col(Name::runtime("n"), Name::runtime("account_id"))),
         )
-        .sort(pl::col(Alias::new("accounts"), Alias::new("id")));
+        .sort(pl::col(Name::runtime("accounts"), Name::runtime("id")));
     let sources: Vec<_> = pipeline
         .clone()
         .select_sources((account::Entity, note::Entity.named("n")))
@@ -175,8 +178,8 @@ async fn models<C: ConnectionTrait>(db: &C) -> Result<Value> {
         .await?
         .is_none();
     let plain: Vec<i32> = pl::Pipeline::from(account::Entity)
-        .select(pl::col(Alias::new("accounts"), Alias::new("id")))
-        .sort(pl::col(Alias::new("accounts"), Alias::new("id")))
+        .select(pl::col(Name::runtime("accounts"), Name::runtime("id")))
+        .sort(pl::col(Name::runtime("accounts"), Name::runtime("id")))
         .into_tuple::<i32>()?
         .all(db)
         .await?;
@@ -237,9 +240,9 @@ async fn compare(db: &mut DatabaseConnection, report: &Value) -> Result {
         == "on";
     read_only.rollback().await?;
     let (sql, values) = Query::select()
-        .column("id")
-        .from(("python_entities", "accounts"))
-        .order_by("id", Order::Asc)
+        .column(Name::runtime("id"))
+        .from((Name::runtime("python_entities"), Name::runtime("accounts")))
+        .order_by(Name::runtime("id"), Order::Asc)
         .build();
     let values = parameters(values);
     let stream = db.query_raw(&sql, values.iter()).await?;

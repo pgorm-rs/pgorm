@@ -147,7 +147,7 @@ impl Func {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
-    ///     .expr(Func::named(Alias::new("MyFunction")).arg("hello"))
+    ///     .expr(Func::named(Name::runtime("MyFunction")).arg("hello"))
     ///     .to_owned();
     ///
     /// assert_eq!(

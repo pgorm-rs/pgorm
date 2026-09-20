@@ -7,19 +7,19 @@ mod common;
 use common::*;
 use pgorm_codegen::Column;
 use pgorm_query::{
-    Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, IntoName, Table,
-    TableCreateStatement, TableName,
+    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Name, Table, TableCreateStatement,
+    TableName,
 };
 
 fn fk(from_table: &str, from_col: &str, to_table: &str, to_col: &str) -> TableCreateStatement {
-    Table::create(Alias::new(from_table))
+    Table::create(Name::runtime(from_table))
         .col(serial_pk("id"))
-        .col(ColumnDef::new(Alias::new(from_col)).integer().to_owned())
+        .col(ColumnDef::new(Name::runtime(from_col)).integer().to_owned())
         .foreign_key(ForeignKey::create(
-            Alias::new(from_table),
-            Alias::new(from_col),
-            Alias::new(to_table),
-            Alias::new(to_col),
+            Name::runtime(from_table),
+            Name::runtime(from_col),
+            Name::runtime(to_table),
+            Name::runtime(to_col),
         ))
         .to_owned()
 }
@@ -56,8 +56,8 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
 // from every `TableName` form, and the qualified form keeps its schema
 #[test]
 fn transform_unpacks_the_table_name_from_every_form() {
-    let cake = || Alias::new("cake").into_name();
-    let schema = || Alias::new("public").into_name();
+    let cake = || Name::runtime("cake");
+    let schema = || Name::runtime("public");
 
     let names = [
         (TableName::Table(cake()), None),
@@ -88,8 +88,8 @@ fn transform_unpacks_the_table_name_from_every_form() {
 // `ColumnType` is a `TransformError` naming the table and the column
 #[test]
 fn transform_rejects_a_column_without_column_type() {
-    let untyped = Table::create(Alias::new("cake"))
-        .col(ColumnDef::new(Alias::new("id")))
+    let untyped = Table::create(Name::runtime("cake"))
+        .col(ColumnDef::new(Name::runtime("id")))
         .to_owned();
 
     assert_transform_error(
@@ -102,14 +102,17 @@ fn transform_rejects_a_column_without_column_type() {
 // a column the table does not have is a `TransformError`
 #[test]
 fn transform_rejects_primary_key_over_unknown_column() {
-    let mismatched = Table::create(Alias::new("cake"))
+    let mismatched = Table::create(Name::runtime("cake"))
         .col(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .integer()
                 .not_null()
                 .to_owned(),
         )
-        .primary_key(Index::create(Alias::new("cake"), Alias::new("missing")))
+        .primary_key(Index::create(
+            Name::runtime("cake"),
+            Name::runtime("missing"),
+        ))
         .to_owned();
 
     assert_transform_error(
@@ -165,13 +168,13 @@ fn transform_rejects_relations_it_cannot_resolve() {
     assert_transform_error(
         vec![
             bare("customers"),
-            Table::create(Alias::new("orders"))
+            Table::create(Name::runtime("orders"))
                 .col(serial_pk("id"))
                 .foreign_key(ForeignKey::create(
-                    Alias::new("orders"),
-                    Alias::new("customer_id"),
-                    Alias::new("customers"),
-                    Alias::new("id"),
+                    Name::runtime("orders"),
+                    Name::runtime("customer_id"),
+                    Name::runtime("customers"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -191,11 +194,11 @@ fn transform_reads_column_specs_off_the_column_definition() {
                 // auto_increment + not_null + primary key
                 serial_pk("id"),
                 // a plain nullable column carries neither
-                ColumnDef::new(Alias::new("baked_at"))
+                ColumnDef::new(Name::runtime("baked_at"))
                     .timestamp()
                     .to_owned(),
                 // not_null without auto_increment
-                ColumnDef::new(Alias::new("name"))
+                ColumnDef::new(Name::runtime("name"))
                     .text()
                     .not_null()
                     .to_owned(),
@@ -216,7 +219,7 @@ fn transform_reads_column_specs_off_the_column_definition() {
     // `unique` likewise comes off `ColumnSpec::UniqueKey` when a `ColumnDef` is
     // converted into a codegen `Column`
     let unique = Column::try_from(
-        &ColumnDef::new(Alias::new("email"))
+        &ColumnDef::new(Name::runtime("email"))
             .string()
             .not_null()
             .unique_key()
@@ -235,22 +238,22 @@ fn transform_reads_column_specs_off_the_column_definition() {
 fn transform_marks_columns_from_single_column_unique_index() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("vendor"))
+            Table::create(Name::runtime("vendor"))
                 .col(serial_pk("id"))
                 .col(
-                    ColumnDef::new(Alias::new("name"))
+                    ColumnDef::new(Name::runtime("name"))
                         .string()
                         .not_null()
                         .to_owned(),
                 )
                 .col(
-                    ColumnDef::new(Alias::new("region"))
+                    ColumnDef::new(Name::runtime("region"))
                         .string()
                         .not_null()
                         .to_owned(),
                 )
                 .col(
-                    ColumnDef::new(Alias::new("tier"))
+                    ColumnDef::new(Name::runtime("tier"))
                         .string()
                         .not_null()
                         .to_owned(),
@@ -258,9 +261,9 @@ fn transform_marks_columns_from_single_column_unique_index() {
                 .index(unique_index("vendor", "name").to_owned())
                 // a multi-column unique index marks nothing
                 .index(
-                    Index::create(Alias::new("vendor"), Alias::new("region"))
-                        .name("idx_vendor_region_tier")
-                        .col(Alias::new("tier"))
+                    Index::create(Name::runtime("vendor"), Name::runtime("region"))
+                        .name(Name::runtime("idx_vendor_region_tier"))
+                        .col(Name::runtime("tier"))
                         .unique()
                         .to_owned(),
                 )
@@ -285,22 +288,22 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
 
     let by_index = generate(
         vec![
-            Table::create(Alias::new("cake_filling"))
+            Table::create(Name::runtime("cake_filling"))
                 .col(
-                    ColumnDef::new(Alias::new("cake_id"))
+                    ColumnDef::new(Name::runtime("cake_id"))
                         .integer()
                         .not_null()
                         .to_owned(),
                 )
                 .col(
-                    ColumnDef::new(Alias::new("filling_id"))
+                    ColumnDef::new(Name::runtime("filling_id"))
                         .integer()
                         .not_null()
                         .to_owned(),
                 )
                 .primary_key(
-                    Index::create(Alias::new("cake_filling"), Alias::new("cake_id"))
-                        .col(Alias::new("filling_id"))
+                    Index::create(Name::runtime("cake_filling"), Name::runtime("cake_id"))
+                        .col(Name::runtime("filling_id"))
                         .to_owned(),
                 )
                 .to_owned(),
@@ -324,11 +327,8 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
 fn transform_registers_enums_once_per_name_across_tables() {
     let tea = || ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_name(),
-        variants: vec![
-            Alias::new("EverydayTea").into_name(),
-            Alias::new("BreakfastTea").into_name(),
-        ],
+        name: Name::runtime("tea"),
+        variants: vec![Name::runtime("EverydayTea"), Name::runtime("BreakfastTea")],
     };
 
     let generated = generate(
@@ -346,7 +346,7 @@ fn transform_registers_enums_once_per_name_across_tables() {
                 "biscuit",
                 vec![
                     serial_pk("id"),
-                    ColumnDef::new(Alias::new("teas"))
+                    ColumnDef::new(Name::runtime("teas"))
                         .array(tea())
                         .not_null()
                         .to_owned(),
@@ -376,30 +376,38 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
             table_with(
                 "cake",
                 vec![
-                    ColumnDef::new(Alias::new("id"))
+                    ColumnDef::new(Name::runtime("id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
-                    ColumnDef::new(Alias::new("kind"))
+                    ColumnDef::new(Name::runtime("kind"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 ],
             ),
-            Table::create(Alias::new("fruit"))
+            Table::create(Name::runtime("fruit"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("cake_kind"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(
                     ForeignKey::create(
-                        Alias::new("fruit"),
-                        Alias::new("cake_id"),
-                        Alias::new("cake"),
-                        Alias::new("id"),
+                        Name::runtime("fruit"),
+                        Name::runtime("cake_id"),
+                        Name::runtime("cake"),
+                        Name::runtime("id"),
                     )
-                    .col(Alias::new("cake_kind"), Alias::new("kind"))
+                    .col(Name::runtime("cake_kind"), Name::runtime("kind"))
                     .on_update(ForeignKeyAction::Cascade)
                     .on_delete(ForeignKeyAction::SetNull)
                     .to_owned(),
@@ -444,28 +452,40 @@ fn transform_numbers_repeated_fks_to_same_table() {
         vec![
             bare("fruit"),
             bare("cake"),
-            Table::create(Alias::new("basket"))
+            Table::create(Name::runtime("basket"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("fruit_id1"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("fruit_id2"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("basket"),
-                    Alias::new("fruit_id1"),
-                    Alias::new("fruit"),
-                    Alias::new("id"),
+                    Name::runtime("basket"),
+                    Name::runtime("fruit_id1"),
+                    Name::runtime("fruit"),
+                    Name::runtime("id"),
                 ))
                 .foreign_key(ForeignKey::create(
-                    Alias::new("basket"),
-                    Alias::new("fruit_id2"),
-                    Alias::new("fruit"),
-                    Alias::new("id"),
+                    Name::runtime("basket"),
+                    Name::runtime("fruit_id2"),
+                    Name::runtime("fruit"),
+                    Name::runtime("id"),
                 ))
                 .foreign_key(ForeignKey::create(
-                    Alias::new("basket"),
-                    Alias::new("cake_id"),
-                    Alias::new("cake"),
-                    Alias::new("id"),
+                    Name::runtime("basket"),
+                    Name::runtime("cake_id"),
+                    Name::runtime("cake"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -535,32 +555,32 @@ fn transform_sorts_relations_and_conjunct_relations() {
 }
 
 fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateStatement {
-    Table::create(Alias::new(name))
+    Table::create(Name::runtime(name))
         .col(
-            ColumnDef::new(Alias::new(left.1))
+            ColumnDef::new(Name::runtime(left.1))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .col(
-            ColumnDef::new(Alias::new(right.1))
+            ColumnDef::new(Name::runtime(right.1))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .foreign_key(ForeignKey::create(
-            Alias::new(name),
-            Alias::new(left.1),
-            Alias::new(left.0),
-            Alias::new("id"),
+            Name::runtime(name),
+            Name::runtime(left.1),
+            Name::runtime(left.0),
+            Name::runtime("id"),
         ))
         .foreign_key(ForeignKey::create(
-            Alias::new(name),
-            Alias::new(right.1),
-            Alias::new(right.0),
-            Alias::new("id"),
+            Name::runtime(name),
+            Name::runtime(right.1),
+            Name::runtime(right.0),
+            Name::runtime("id"),
         ))
         .to_owned()
 }
@@ -586,15 +606,19 @@ fn inverse_has_one_for_unique_foreign_key() {
     let generated = generate(
         vec![
             cake(),
-            Table::create(Alias::new("fruit"))
+            Table::create(Name::runtime("fruit"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
                 .index(unique_index("fruit", "cake_id").to_owned())
                 .foreign_key(ForeignKey::create(
-                    Alias::new("fruit"),
-                    Alias::new("cake_id"),
-                    Alias::new("cake"),
-                    Alias::new("id"),
+                    Name::runtime("fruit"),
+                    Name::runtime("cake_id"),
+                    Name::runtime("cake"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -614,19 +638,19 @@ fn inverse_has_one_for_whole_primary_key_fk() {
     let generated = generate(
         vec![
             bare("users"),
-            Table::create(Alias::new("profile"))
+            Table::create(Name::runtime("profile"))
                 .col(
-                    ColumnDef::new(Alias::new("user_id"))
+                    ColumnDef::new(Name::runtime("user_id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("profile"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
+                    Name::runtime("profile"),
+                    Name::runtime("user_id"),
+                    Name::runtime("users"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -648,12 +672,12 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
         table_with(
             "cake",
             vec![
-                ColumnDef::new(Alias::new("id"))
+                ColumnDef::new(Name::runtime("id"))
                     .integer()
                     .not_null()
                     .primary_key()
                     .to_owned(),
-                ColumnDef::new(Alias::new("kind"))
+                ColumnDef::new(Name::runtime("kind"))
                     .integer()
                     .not_null()
                     .primary_key()
@@ -663,26 +687,34 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
     };
     let cake_key = |table: &'static str| {
         ForeignKey::create(
-            Alias::new(table),
-            Alias::new("cake_id"),
-            Alias::new("cake"),
-            Alias::new("id"),
+            Name::runtime(table),
+            Name::runtime("cake_id"),
+            Name::runtime("cake"),
+            Name::runtime("id"),
         )
-        .col(Alias::new("cake_kind"), Alias::new("kind"))
+        .col(Name::runtime("cake_kind"), Name::runtime("kind"))
         .to_owned()
     };
 
     let generated = generate(
         vec![
             cake(),
-            Table::create(Alias::new("fruit"))
+            Table::create(Name::runtime("fruit"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("cake_kind"))
+                        .integer()
+                        .to_owned(),
+                )
                 .index(
-                    Index::create(Alias::new("fruit"), Alias::new("cake_id"))
-                        .name("idx_fruit_cake")
-                        .col(Alias::new("cake_kind"))
+                    Index::create(Name::runtime("fruit"), Name::runtime("cake_id"))
+                        .name(Name::runtime("idx_fruit_cake"))
+                        .col(Name::runtime("cake_kind"))
                         .unique()
                         .to_owned(),
                 )
@@ -690,16 +722,24 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
                 .to_owned(),
             // the same key under a unique index covering more than the key
             // constrains nothing about the key
-            Table::create(Alias::new("crumb"))
+            Table::create(Name::runtime("crumb"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("batch")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("cake_id"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("cake_kind"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(ColumnDef::new(Name::runtime("batch")).integer().to_owned())
                 .index(
-                    Index::create(Alias::new("crumb"), Alias::new("cake_id"))
-                        .name("idx_crumb_cake_batch")
-                        .col(Alias::new("cake_kind"))
-                        .col(Alias::new("batch"))
+                    Index::create(Name::runtime("crumb"), Name::runtime("cake_id"))
+                        .name(Name::runtime("idx_crumb_cake_batch"))
+                        .col(Name::runtime("cake_kind"))
+                        .col(Name::runtime("batch"))
                         .unique()
                         .to_owned(),
                 )
@@ -731,19 +771,19 @@ fn inverse_has_one_for_inline_unique_key_column() {
     let generated = generate(
         vec![
             cake(),
-            Table::create(Alias::new("fruit"))
+            Table::create(Name::runtime("fruit"))
                 .col(serial_pk("id"))
                 .col(
-                    ColumnDef::new(Alias::new("cake_id"))
+                    ColumnDef::new(Name::runtime("cake_id"))
                         .integer()
                         .unique_key()
                         .to_owned(),
                 )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("fruit"),
-                    Alias::new("cake_id"),
-                    Alias::new("cake"),
-                    Alias::new("id"),
+                    Name::runtime("fruit"),
+                    Name::runtime("cake_id"),
+                    Name::runtime("cake"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -777,21 +817,29 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
     let suffixed = generate(
         vec![
             bare("fruit"),
-            Table::create(Alias::new("basket"))
+            Table::create(Name::runtime("basket"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("fruit_id1"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(
+                    ColumnDef::new(Name::runtime("fruit_id2"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("basket"),
-                    Alias::new("fruit_id1"),
-                    Alias::new("fruit"),
-                    Alias::new("id"),
+                    Name::runtime("basket"),
+                    Name::runtime("fruit_id1"),
+                    Name::runtime("fruit"),
+                    Name::runtime("id"),
                 ))
                 .foreign_key(ForeignKey::create(
-                    Alias::new("basket"),
-                    Alias::new("fruit_id2"),
-                    Alias::new("fruit"),
-                    Alias::new("id"),
+                    Name::runtime("basket"),
+                    Name::runtime("fruit_id2"),
+                    Name::runtime("fruit"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -806,24 +854,32 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
 fn inverse_dropped_when_target_already_relates_back() {
     let generated = generate(
         vec![
-            Table::create(Alias::new("users"))
+            Table::create(Name::runtime("users"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("bill_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("bill_id"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("users"),
-                    Alias::new("bill_id"),
-                    Alias::new("bills"),
-                    Alias::new("id"),
+                    Name::runtime("users"),
+                    Name::runtime("bill_id"),
+                    Name::runtime("bills"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
-            Table::create(Alias::new("bills"))
+            Table::create(Name::runtime("bills"))
                 .col(serial_pk("id"))
-                .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("user_id"))
+                        .integer()
+                        .to_owned(),
+                )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("bills"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
+                    Name::runtime("bills"),
+                    Name::runtime("user_id"),
+                    Name::runtime("users"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -877,34 +933,38 @@ fn fks_outside_the_primary_key_are_not_junctions() {
         vec![
             bare("orgs"),
             bare("users"),
-            Table::create(Alias::new("audit_events"))
+            Table::create(Name::runtime("audit_events"))
                 .col(
-                    ColumnDef::new(Alias::new("id"))
+                    ColumnDef::new(Name::runtime("id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 .col(
-                    ColumnDef::new(Alias::new("version"))
+                    ColumnDef::new(Name::runtime("version"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
-                .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .col(ColumnDef::new(Alias::new("org_id")).integer().to_owned())
+                .col(
+                    ColumnDef::new(Name::runtime("user_id"))
+                        .integer()
+                        .to_owned(),
+                )
+                .col(ColumnDef::new(Name::runtime("org_id")).integer().to_owned())
                 .foreign_key(ForeignKey::create(
-                    Alias::new("audit_events"),
-                    Alias::new("user_id"),
-                    Alias::new("users"),
-                    Alias::new("id"),
+                    Name::runtime("audit_events"),
+                    Name::runtime("user_id"),
+                    Name::runtime("users"),
+                    Name::runtime("id"),
                 ))
                 .foreign_key(ForeignKey::create(
-                    Alias::new("audit_events"),
-                    Alias::new("org_id"),
-                    Alias::new("orgs"),
-                    Alias::new("id"),
+                    Name::runtime("audit_events"),
+                    Name::runtime("org_id"),
+                    Name::runtime("orgs"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
         ],
@@ -935,26 +995,26 @@ fn inbound_relations_are_not_junction_legs() {
     let generated = generate(
         vec![
             bare("tenants"),
-            Table::create(Alias::new("posts"))
+            Table::create(Name::runtime("posts"))
                 .col(
-                    ColumnDef::new(Alias::new("tenant_id"))
+                    ColumnDef::new(Name::runtime("tenant_id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 .col(
-                    ColumnDef::new(Alias::new("id"))
+                    ColumnDef::new(Name::runtime("id"))
                         .integer()
                         .not_null()
                         .primary_key()
                         .to_owned(),
                 )
                 .foreign_key(ForeignKey::create(
-                    Alias::new("posts"),
-                    Alias::new("tenant_id"),
-                    Alias::new("tenants"),
-                    Alias::new("id"),
+                    Name::runtime("posts"),
+                    Name::runtime("tenant_id"),
+                    Name::runtime("tenants"),
+                    Name::runtime("id"),
                 ))
                 .to_owned(),
             fk("comments", "post_id", "posts", "id"),

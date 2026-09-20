@@ -30,7 +30,7 @@ fn the_single_backend_renders_every_statement_kind() {
         .from_table(Glyph::Table)
         .and_where(Expr::col(Glyph::Id).eq(1))
         .to_owned();
-    let cte = || CommonTableExpression::new(Alias::new("cte"), select());
+    let cte = || CommonTableExpression::new(Name::runtime("cte"), select());
     let with = select().with(WithClause::new(cte())).take();
     let with_delete = delete.clone().with(WithClause::new(cte())).to_owned();
 
@@ -110,7 +110,7 @@ fn the_single_backend_renders_every_statement_kind() {
 fn ddl_targets_have_no_unrenderable_shape() {
     for name in [
         Glyph::Table.into_table_name(),
-        (Alias::new("public"), Glyph::Table).into_table_name(),
+        (Name::runtime("public"), Glyph::Table).into_table_name(),
     ] {
         let sql = Table::truncate(name).to_string();
         assert!(sql.starts_with("TRUNCATE TABLE "), "{sql}");
@@ -130,7 +130,7 @@ const HOSTILE_QUOTED: &str = r#""hostile"" name --""#;
 #[test]
 fn a_custom_column_type_name_is_quoted() {
     let create = Table::create(Glyph::Table)
-        .col(ColumnDef::new(Glyph::Aspect).named(Alias::new(HOSTILE)))
+        .col(ColumnDef::new(Glyph::Aspect).named(Name::runtime(HOSTILE)))
         .to_string();
     assert_eq!(
         create,
@@ -161,7 +161,7 @@ fn a_custom_column_type_name_is_quoted() {
     // And a cast to the same custom type, the other position the arm renders in.
     assert_eq!(
         Query::select()
-            .expr(Expr::col(Glyph::Aspect).cast_as(Alias::new(HOSTILE)))
+            .expr(Expr::col(Glyph::Aspect).cast_as(Name::runtime(HOSTILE)))
             .from(Glyph::Table)
             .to_string(),
         format!(r#"SELECT CAST("aspect" AS {HOSTILE_QUOTED}) FROM "glyph""#)
@@ -174,8 +174,8 @@ fn a_custom_column_type_name_is_quoted() {
 fn a_custom_index_access_method_is_quoted() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
-            .index_type(IndexType::Named(Alias::new(HOSTILE).into_name()))
+            .name(Name::runtime("idx"))
+            .index_type(IndexType::Named(Name::runtime(HOSTILE)))
             .to_string(),
         format!(r#"CREATE INDEX "idx" ON "glyph" USING {HOSTILE_QUOTED} ("aspect")"#)
     );
@@ -183,8 +183,8 @@ fn a_custom_index_access_method_is_quoted() {
     // A safe lowercase access method stays bare, as the built-in spellings are.
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
-            .index_type(IndexType::Named(Alias::new("gist").into_name()))
+            .name(Name::runtime("idx"))
+            .index_type(IndexType::Named(Name::runtime("gist")))
             .to_string(),
         r#"CREATE INDEX "idx" ON "glyph" USING gist ("aspect")"#
     );
@@ -195,8 +195,8 @@ fn a_custom_index_access_method_is_quoted() {
 #[test]
 fn an_extension_schema_is_quoted() {
     assert_eq!(
-        Extension::create("ltree")
-            .schema(Alias::new(HOSTILE))
+        Extension::create(Name::runtime("ltree"))
+            .schema(Name::runtime(HOSTILE))
             .to_string(),
         format!(r#"CREATE EXTENSION "ltree" WITH SCHEMA {HOSTILE_QUOTED}"#)
     );
@@ -207,7 +207,7 @@ fn an_extension_schema_is_quoted() {
 // hostile label reaches neither position as SQL
 #[test]
 fn enum_labels_render_as_data_in_both_paths() {
-    let create = Type::create(Alias::new("mood"))
+    let create = Type::create(Name::runtime("mood"))
         .values([HOSTILE])
         .to_owned();
     assert_eq!(
@@ -225,7 +225,7 @@ fn enum_labels_render_as_data_in_both_paths() {
     let (_, values) = sink.into_parts();
     assert_eq!(values.0, vec![Value::from(HOSTILE)]);
 
-    let alter = Type::alter(Alias::new("mood"))
+    let alter = Type::alter(Name::runtime("mood"))
         .add_value(HOSTILE)
         .after(HOSTILE);
     assert_eq!(

@@ -18,7 +18,7 @@
 //! `alias` and its `AliasName` are here for the same reason `Expr` is: a name
 //! the query introduces is written at the point the query is written, and
 //! writing it as a token instead of a string is only cheaper than
-//! `Alias::new` if the token is already in scope.
+//! `Name::runtime` if the token is already in scope.
 
 // [spec:pgorm:def:entity.prelude+3]
 // [spec:pgorm:sem:query.build.alias+1]

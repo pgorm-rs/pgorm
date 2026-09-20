@@ -8,7 +8,7 @@
 
 use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions, Error};
 use pgorm_query::{
-    Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Table, TableCreateStatement,
+    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Name, Table, TableCreateStatement,
 };
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
@@ -150,17 +150,17 @@ pub fn blocks(content: &str) -> Vec<&str> {
         .collect()
 }
 
-pub fn alias(name: &str) -> Alias {
-    Alias::new(name)
+pub fn runtime_name(name: &str) -> Name {
+    Name::runtime(name)
 }
 
 pub fn col(name: &str) -> ColumnDef {
-    ColumnDef::new(Alias::new(name))
+    ColumnDef::new(Name::runtime(name))
 }
 
 /// `id` integer, not null, auto-increment, primary key.
 pub fn serial_pk(name: &str) -> ColumnDef {
-    ColumnDef::new(Alias::new(name))
+    ColumnDef::new(Name::runtime(name))
         .integer()
         .not_null()
         .auto_increment()
@@ -170,29 +170,33 @@ pub fn serial_pk(name: &str) -> ColumnDef {
 
 /// `cake`: serial pk + nullable text name.
 pub fn cake() -> TableCreateStatement {
-    Table::create(Alias::new("cake"))
+    Table::create(Name::runtime("cake"))
         .col(serial_pk("id"))
-        .col(ColumnDef::new(Alias::new("name")).text().to_owned())
+        .col(ColumnDef::new(Name::runtime("name")).text().to_owned())
         .to_owned()
 }
 
 /// `fruit`: serial pk, not-null name, nullable `cake_id` FK to `cake`.
 pub fn fruit() -> TableCreateStatement {
-    Table::create(Alias::new("fruit"))
+    Table::create(Name::runtime("fruit"))
         .col(serial_pk("id"))
         .col(
-            ColumnDef::new(Alias::new("name"))
+            ColumnDef::new(Name::runtime("name"))
                 .string()
                 .not_null()
                 .to_owned(),
         )
-        .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
+        .col(
+            ColumnDef::new(Name::runtime("cake_id"))
+                .integer()
+                .to_owned(),
+        )
         .foreign_key(
             ForeignKey::create(
-                Alias::new("fruit"),
-                Alias::new("cake_id"),
-                Alias::new("cake"),
-                Alias::new("id"),
+                Name::runtime("fruit"),
+                Name::runtime("cake_id"),
+                Name::runtime("cake"),
+                Name::runtime("id"),
             )
             .on_delete(ForeignKeyAction::Cascade)
             .on_update(ForeignKeyAction::Cascade)
@@ -203,10 +207,10 @@ pub fn fruit() -> TableCreateStatement {
 
 /// `filling`: serial pk + not-null name.
 pub fn filling() -> TableCreateStatement {
-    Table::create(Alias::new("filling"))
+    Table::create(Name::runtime("filling"))
         .col(serial_pk("id"))
         .col(
-            ColumnDef::new(Alias::new("name"))
+            ColumnDef::new(Name::runtime("name"))
                 .string()
                 .not_null()
                 .to_owned(),
@@ -217,32 +221,32 @@ pub fn filling() -> TableCreateStatement {
 /// `cake_filling`: the classic junction table — two FK columns that together
 /// form the primary key.
 pub fn cake_filling() -> TableCreateStatement {
-    Table::create(Alias::new("cake_filling"))
+    Table::create(Name::runtime("cake_filling"))
         .col(
-            ColumnDef::new(Alias::new("cake_id"))
+            ColumnDef::new(Name::runtime("cake_id"))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .col(
-            ColumnDef::new(Alias::new("filling_id"))
+            ColumnDef::new(Name::runtime("filling_id"))
                 .integer()
                 .not_null()
                 .primary_key()
                 .to_owned(),
         )
         .foreign_key(ForeignKey::create(
-            Alias::new("cake_filling"),
-            Alias::new("cake_id"),
-            Alias::new("cake"),
-            Alias::new("id"),
+            Name::runtime("cake_filling"),
+            Name::runtime("cake_id"),
+            Name::runtime("cake"),
+            Name::runtime("id"),
         ))
         .foreign_key(ForeignKey::create(
-            Alias::new("cake_filling"),
-            Alias::new("filling_id"),
-            Alias::new("filling"),
-            Alias::new("id"),
+            Name::runtime("cake_filling"),
+            Name::runtime("filling_id"),
+            Name::runtime("filling"),
+            Name::runtime("id"),
         ))
         .to_owned()
 }
@@ -254,7 +258,7 @@ pub fn cake_schema() -> Vec<TableCreateStatement> {
 
 /// A single table built from an explicit column list.
 pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement {
-    let mut stmt = Table::create(Alias::new(table));
+    let mut stmt = Table::create(Name::runtime(table));
     for column in columns {
         stmt.col(column);
     }
@@ -264,28 +268,31 @@ pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement 
 /// A single-column unique index over `column`, which the transformer reads to
 /// mark the column unique.
 pub fn unique_index(table: &str, column: &str) -> pgorm_query::IndexCreateStatement {
-    Index::create(Alias::new(table), Alias::new(column))
-        .name(format!("idx_{table}_{column}"))
+    Index::create(Name::runtime(table), Name::runtime(column))
+        .name(Name::runtime(format!("idx_{table}_{column}")))
         .unique()
         .to_owned()
 }
 
 pub fn enum_col(name: &str, enum_name: &str, variants: &[&str]) -> ColumnDef {
-    ColumnDef::new(Alias::new(name))
+    ColumnDef::new(Name::runtime(name))
         .enumeration(
-            Alias::new(enum_name),
-            variants.iter().map(|v| Alias::new(*v)).collect::<Vec<_>>(),
+            Name::runtime(enum_name),
+            variants
+                .iter()
+                .map(|v| Name::runtime(*v))
+                .collect::<Vec<_>>(),
         )
         .not_null()
         .to_owned()
 }
 
 pub fn typed(name: &str, ty: ColumnType) -> ColumnDef {
-    ColumnDef::new_with_type(Alias::new(name), ty)
+    ColumnDef::new_with_type(Name::runtime(name), ty)
         .not_null()
         .to_owned()
 }
 
 pub fn typed_null(name: &str, ty: ColumnType) -> ColumnDef {
-    ColumnDef::new_with_type(Alias::new(name), ty)
+    ColumnDef::new_with_type(Name::runtime(name), ty)
 }

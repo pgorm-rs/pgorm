@@ -1,10 +1,11 @@
-use pgorm::pgorm_query::Alias;
+use pgorm::pgorm_query::Name;
+
 use pgorm::pipeline::{self as pl, ExprOps, Pipeline};
 
 fn main() {
-    let relation = || Pipeline::from_schema(Alias::new("fixture"), Alias::new("accounts"));
-    let score = || pl::col(Alias::new("accounts"), Alias::new("score"));
-    let identity = pl::col(Alias::new("accounts"), Alias::new("id"));
+    let relation = || Pipeline::from_schema(Name::runtime("fixture"), Name::runtime("accounts"));
+    let score = || pl::col(Name::runtime("accounts"), Name::runtime("score"));
+    let identity = pl::col(Name::runtime("accounts"), Name::runtime("id"));
     let (count, _) = relation()
         .window(pl::count(score()).as_("present"), pl::over())
         .into_sql()

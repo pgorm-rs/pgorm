@@ -25,7 +25,8 @@ trait family keeps its bound.
 
 - [x] L1 rename the Name family + unify `StaticName` + `Identity` → `Key`
       (`Alias` retained; `IntoName for &str/String` retained)
-- [ ] L2 `Alias::new` → `Name::runtime`, delete `IntoName for &str/String`
+- [x] L2 `Alias::new` → `Name::runtime`, delete `IntoName for &str/String`
+      and `IntoKey for &str/String` (replaced by `IntoKey for Name`)
 - [ ] L3 spec pass (bump + repin), node completion, plan residue
 
 The `#[iden = ..]` / `#[pgorm(iden = ..)]` derive attribute is deliberately NOT

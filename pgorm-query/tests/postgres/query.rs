@@ -54,7 +54,7 @@ fn select_4() {
                     .columns([Glyph::Image, Glyph::Aspect])
                     .from(Glyph::Table)
                     .take(),
-                Alias::new("subglyph")
+                Name::runtime("subglyph")
             )
             .to_string(),
         r#"SELECT "aspect" FROM (SELECT "image", "aspect" FROM "glyph") AS "subglyph""#
@@ -455,7 +455,7 @@ fn select_31() {
 fn select_32() {
     assert_eq!(
         Query::select()
-            .expr_as(Expr::col(Char::Character), Alias::new("C"))
+            .expr_as(Expr::col(Char::Character), Name::runtime("C"))
             .from(Char::Table)
             .to_string(),
         r#"SELECT "character" AS "C" FROM "character""#
@@ -1019,11 +1019,11 @@ fn select_58() {
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Glyph::Table)
         .to_owned();
-    let cte = CommonTableExpression::new(Alias::new("cte"), select);
+    let cte = CommonTableExpression::new(Name::runtime("cte"), select);
     let with_clause = WithClause::new(cte);
     let mut select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-        .from(Alias::new("cte"))
+        .from(Name::runtime("cte"))
         .to_owned();
     assert_eq!(
         select.with(with_clause).to_string(),
@@ -1046,7 +1046,7 @@ fn select_59() {
                 .case(Expr::col((Glyph::Table, Glyph::Aspect)).gt(0), "positive")
                 .case(Expr::col((Glyph::Table, Glyph::Aspect)).lt(0), "negative")
                 .finally("zero"),
-            Alias::new("polarity"),
+            Name::runtime("polarity"),
         )
         .from(Glyph::Table)
         .to_owned();
@@ -1104,13 +1104,13 @@ fn select_61() {
 fn select_62() {
     let select = SelectStatement::new()
         .column(Asterisk)
-        .from_values([(1i32, "hello"), (2, "world")], Alias::new("x"))
+        .from_values([(1i32, "hello"), (2, "world")], Name::runtime("x"))
         .to_owned();
-    let cte = CommonTableExpression::new(Alias::new("cte"), select);
+    let cte = CommonTableExpression::new(Name::runtime("cte"), select);
     let with_clause = WithClause::new(cte);
     let mut select = SelectStatement::new()
-        .columns([Alias::new("column1"), Alias::new("column2")])
-        .from(Alias::new("cte"))
+        .columns([Name::runtime("column1"), Name::runtime("column2")])
+        .from(Name::runtime("cte"))
         .to_owned();
     assert_eq!(
         select.with(with_clause).to_string(),
@@ -1223,7 +1223,7 @@ fn insert_6() -> error::Result<()> {
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Glyph::Table)
         .to_owned();
-    let cte = CommonTableExpression::new(Alias::new("cte"), select)
+    let cte = CommonTableExpression::new(Name::runtime("cte"), select)
         .column(Glyph::Id)
         .column(Glyph::Image)
         .column(Glyph::Aspect)
@@ -1231,7 +1231,7 @@ fn insert_6() -> error::Result<()> {
     let with_clause = WithClause::new(cte);
     let select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-        .from(Alias::new("cte"))
+        .from(Name::runtime("cte"))
         .to_owned();
     let mut insert = Query::insert();
     insert
@@ -2323,12 +2323,12 @@ fn test_pgvector_select() {
 fn every_cast_spelling_builds_one_node_shape() {
     let operand = Expr::col(Char::SizeW);
     let casts = [
-        operand.clone().cast_as(Alias::new("citext")),
+        operand.clone().cast_as(Name::runtime("citext")),
         operand.clone().cast_as_raw("numeric(10, 2)"),
-        operand.clone().as_enum(Alias::new("citext")),
+        operand.clone().as_enum(Name::runtime("citext")),
         operand
             .clone()
-            .cast_as_type(TypeName::new(Alias::new("status")).schema(Alias::new("tenant_a"))),
+            .cast_as_type(TypeName::new(Name::runtime("status")).schema(Name::runtime("tenant_a"))),
     ];
 
     let type_names: Vec<TypeName> = casts
@@ -2349,10 +2349,10 @@ fn every_cast_spelling_builds_one_node_shape() {
     assert_eq!(
         type_names,
         [
-            TypeName::new(Alias::new("citext")),
+            TypeName::new(Name::runtime("citext")),
             TypeName::raw("numeric(10, 2)"),
-            TypeName::new(Alias::new("citext")),
-            TypeName::new(Alias::new("status")).schema(Alias::new("tenant_a")),
+            TypeName::new(Name::runtime("citext")),
+            TypeName::new(Name::runtime("status")).schema(Name::runtime("tenant_a")),
         ]
     );
 
@@ -2389,7 +2389,7 @@ fn cast_param_is_pinned_to_the_source_type() {
         Query::select()
             .expr(
                 Expr::val(vec!["a".to_owned()])
-                    .cast_as_type(TypeName::new(Alias::new("tea")).array())
+                    .cast_as_type(TypeName::new(Name::runtime("tea")).array())
             )
             .build(),
         (
@@ -2402,7 +2402,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     // an identifier no bare rendering can carry, so it is quoted.
     assert_eq!(
         Query::select()
-            .expr(Expr::val(vec!["a".to_owned()]).cast_as(Alias::new("tea[]")))
+            .expr(Expr::val(vec!["a".to_owned()]).cast_as(Name::runtime("tea[]")))
             .build()
             .0,
         r#"SELECT CAST($1::text[] AS "tea[]")"#.to_owned(),
@@ -2410,7 +2410,7 @@ fn cast_param_is_pinned_to_the_source_type() {
 
     assert_eq!(
         Query::select()
-            .expr(Expr::val(json!({ "a": 1 })).cast_as(Alias::new("jsonb")))
+            .expr(Expr::val(json!({ "a": 1 })).cast_as(Name::runtime("jsonb")))
             .build(),
         (
             r#"SELECT CAST($1 AS jsonb)"#.to_owned(),
@@ -2431,7 +2431,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
 
     assert_eq!(
         Query::select()
-            .expr(Expr::col(Char::SizeW).cast_as(Alias::new("text")))
+            .expr(Expr::col(Char::SizeW).cast_as(Name::runtime("text")))
             .build()
             .0,
         r#"SELECT CAST("size_w" AS text)"#
@@ -2452,14 +2452,14 @@ fn keywords_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+4/test]    `Alias` wraps an arbitrary string as an identifier,
-// and it is the only identifier helper — there is no empty-name alias
+// [spec:pgorm:def:sql.ast.keywords+4/test]    `Name::runtime` wraps an arbitrary string as an
+// identifier, and it is the only runtime-name helper — there is no empty-name alias
 #[test]
 fn keywords_2() {
     assert_eq!(
         Query::select()
-            .expr_as(Expr::col(Glyph::Id), Alias::new("an alias"))
-            .expr_as(Expr::col(Glyph::Aspect), Alias::new("ratio"))
+            .expr_as(Expr::col(Glyph::Id), Name::runtime("an alias"))
+            .expr_as(Expr::col(Glyph::Aspect), Name::runtime("ratio"))
             .from(Glyph::Table)
             .to_string(),
         r#"SELECT "id" AS "an alias", "aspect" AS "ratio" FROM "glyph""#
@@ -2613,7 +2613,7 @@ fn condition_holder_5() {
 fn with_clause_renders_each_of_its_ctes() {
     let cte = |name: &str| {
         CommonTableExpression::new(
-            Alias::new(name),
+            Name::runtime(name),
             Query::select().column(Glyph::Id).from(Glyph::Table).take(),
         )
     };
@@ -2621,7 +2621,7 @@ fn with_clause_renders_each_of_its_ctes() {
     assert_eq!(
         Query::select()
             .column(Glyph::Id)
-            .from(Alias::new("one"))
+            .from(Name::runtime("one"))
             .take()
             .with(WithClause::new(cte("one")).cte(cte("two")).to_owned())
             .to_string(),
@@ -2649,7 +2649,7 @@ fn from_select_names_the_cte_after_its_table() {
     assert_eq!(
         Query::select()
             .column(Glyph::Id)
-            .from(Alias::new("cte_glyph"))
+            .from(Name::runtime("cte_glyph"))
             .take()
             .with(WithClause::new(cte))
             .to_string(),
@@ -2675,7 +2675,7 @@ fn recursive_with_clause_renders_its_single_cte() {
     assert_eq!(
         Query::select()
             .column(Asterisk)
-            .from(Alias::new("cte"))
+            .from(Name::runtime("cte"))
             .take()
             .with(RecursiveWithClause::new(recursive_cte()))
             .to_string(),
@@ -2697,20 +2697,20 @@ fn recursive_with_clause_renders_search_and_cycle() {
     let with_clause = RecursiveWithClause::new(recursive_cte())
         .search(Search::new(
             SearchOrder::BREADTH,
-            Expr::col(Alias::new("depth")),
-            Alias::new("ordercol"),
+            Expr::col(Name::runtime("depth")),
+            Name::runtime("ordercol"),
         ))
         .cycle(Cycle::new(
             Expr::col(Glyph::Id),
-            Alias::new("looped"),
-            Alias::new("path"),
+            Name::runtime("looped"),
+            Name::runtime("path"),
         ))
         .to_owned();
 
     assert_eq!(
         Query::select()
             .column(Asterisk)
-            .from(Alias::new("cte"))
+            .from(Name::runtime("cte"))
             .take()
             .with(with_clause)
             .to_string(),
@@ -2734,14 +2734,14 @@ fn recursive_with_clause_renders_search_and_cycle() {
 fn carried_with_clause_leaves_the_select_shapeable() {
     let cte = |name: &str| {
         CommonTableExpression::new(
-            Alias::new(name),
+            Name::runtime(name),
             Query::select().column(Glyph::Id).from(Glyph::Table).take(),
         )
     };
 
     let mut select = Query::select()
         .column(Glyph::Id)
-        .from(Alias::new("second"))
+        .from(Name::runtime("second"))
         .take();
 
     select
@@ -2763,7 +2763,7 @@ fn carried_with_clause_leaves_the_select_shapeable() {
     assert_eq!(
         Query::select()
             .column(Asterisk)
-            .from(Alias::new("recursive"))
+            .from(Name::runtime("recursive"))
             .take()
             .with(RecursiveWithClause::new(recursive_cte()))
             .with(WithClause::new(cte("recursive")))
@@ -2785,7 +2785,7 @@ fn carried_with_clause_leaves_the_select_shapeable() {
 fn a_with_clause_has_one_place_to_live() {
     let cte = || {
         CommonTableExpression::new(
-            Alias::new("cte"),
+            Name::runtime("cte"),
             Query::select().column(Glyph::Id).from(Glyph::Table).take(),
         )
     };
@@ -2793,7 +2793,7 @@ fn a_with_clause_has_one_place_to_live() {
         Expr::col(Glyph::Id).in_subquery(
             Query::select()
                 .column(Glyph::Id)
-                .from(Alias::new("cte"))
+                .from(Name::runtime("cte"))
                 .take(),
         )
     };
@@ -2802,7 +2802,7 @@ fn a_with_clause_has_one_place_to_live() {
     let rendered = [
         Query::select()
             .column(Glyph::Id)
-            .from(Alias::new("cte"))
+            .from(Name::runtime("cte"))
             .with(WithClause::new(cte()))
             .to_string(),
         Query::insert()
@@ -2811,7 +2811,7 @@ fn a_with_clause_has_one_place_to_live() {
             .select_from(
                 Query::select()
                     .column(Glyph::Id)
-                    .from(Alias::new("cte"))
+                    .from(Name::runtime("cte"))
                     .take(),
             )
             .expect("a select source is accepted")
@@ -2858,10 +2858,10 @@ fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {
         Query::select()
             .column(Glyph::Id)
-            .from(Alias::new("cte"))
+            .from(Name::runtime("cte"))
             .take()
             .with(WithClause::new(CommonTableExpression::new(
-                Alias::new("cte"),
+                Name::runtime("cte"),
                 Query::select().column(Glyph::Id).from(Glyph::Table).take(),
             )))
             .take()
@@ -2873,7 +2873,7 @@ fn carried_with_clause_renders_at_every_nesting_level() {
     assert_eq!(
         Query::select()
             .column(Asterisk)
-            .from_subquery(inner(), Alias::new("sub"))
+            .from_subquery(inner(), Name::runtime("sub"))
             .to_string(),
         format!(r#"SELECT * FROM ({prefix}) AS "sub""#)
     );
@@ -2890,10 +2890,10 @@ fn carried_with_clause_renders_at_every_nesting_level() {
     assert_eq!(
         Query::select()
             .column(Asterisk)
-            .from(Alias::new("outer"))
+            .from(Name::runtime("outer"))
             .take()
             .with(WithClause::new(CommonTableExpression::new(
-                Alias::new("outer"),
+                Name::runtime("outer"),
                 inner(),
             )))
             .to_string(),
@@ -2907,7 +2907,7 @@ fn carried_with_clause_renders_at_every_nesting_level() {
             .join_lateral(
                 JoinType::InnerJoin,
                 inner(),
-                Alias::new("lat"),
+                Name::runtime("lat"),
                 Expr::raw("TRUE"),
             )
             .to_string(),
@@ -2923,18 +2923,21 @@ fn recursive_cte() -> CommonTableExpression {
         .take();
     let step = Query::select()
         .column(Glyph::Id)
-        .expr(Expr::col(Alias::new("depth")).add(1i32))
+        .expr(Expr::col(Name::runtime("depth")).add(1i32))
         .from(Glyph::Table)
         .inner_join(
-            Alias::new("cte"),
-            Expr::col((Alias::new("cte"), Glyph::Id)).equals((Glyph::Table, Glyph::Id)),
+            Name::runtime("cte"),
+            Expr::col((Name::runtime("cte"), Glyph::Id)).equals((Glyph::Table, Glyph::Id)),
         )
         .take();
 
-    CommonTableExpression::new(Alias::new("cte"), base.union(UnionType::All, step).take())
-        .column(Glyph::Id)
-        .column(Alias::new("depth"))
-        .to_owned()
+    CommonTableExpression::new(
+        Name::runtime("cte"),
+        base.union(UnionType::All, step).take(),
+    )
+    .column(Glyph::Id)
+    .column(Name::runtime("depth"))
+    .to_owned()
 }
 
 // [spec:pgorm:sem:sql.render.empty-in+1/test]    an empty `IN` is rewritten to the always-false

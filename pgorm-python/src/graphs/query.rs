@@ -6,7 +6,7 @@ use crate::{
     errors::ConstructionError,
     expressions::{Compiled, OrderBy, PyCondition, PyExpr},
 };
-use pgorm::pgorm_query::{Alias, Expr, IntoCondition};
+use pgorm::pgorm_query::{Expr, IntoCondition, Name};
 use pyo3::{
     prelude::*,
     types::{PyInt, PyTuple},
@@ -50,7 +50,7 @@ impl PyGraphQuery {
             &self.inner.aliases()[source - 1]
         };
         Ok(PyExpr::from_rust(
-            Expr::col((Alias::new(qualifier), Alias::new(column))).into(),
+            Expr::col((Name::runtime(qualifier), Name::runtime(column))).into(),
         ))
     }
 

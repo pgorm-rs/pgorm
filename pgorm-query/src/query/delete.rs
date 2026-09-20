@@ -106,8 +106,8 @@ impl DeleteStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::delete()
-    ///     .from_table(Glyph::Table.into_named_table().alias(Alias::new("g")))
-    ///     .and_where(Expr::col((Alias::new("g"), Glyph::Id)).eq(1))
+    ///     .from_table(Glyph::Table.into_named_table().alias(Name::runtime("g")))
+    ///     .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).eq(1))
     ///     .to_owned();
     ///
     /// assert_eq!(

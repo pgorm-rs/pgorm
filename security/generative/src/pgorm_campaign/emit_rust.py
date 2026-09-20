@@ -66,12 +66,12 @@ fn params(values: &[pgorm::ValueHolder]) -> Vec<&(dyn pgorm::types::ToSql + Sync
         .map({replay}::wire::Tagged::from_value)
         .collect()
 }}""",
-    "identifier": """fn identifier(value: &{q}::Value) -> Result<{q}::Alias, Error> {{
+    "identifier": """fn identifier(value: &{q}::Value) -> Result<{q}::Name, Error> {{
     match value {{
         {q}::Value::String(Some(name))
             if !name.is_empty() && !name.contains('\\u{{0}}') && name.len() <= 63 =>
         {{
-            Ok({q}::Alias::new(name.as_str()))
+            Ok({q}::Name::runtime(name.as_str()))
         }}
         // The binding builds an Identifier from the Python scalar, which is a
         // string or nothing at all.

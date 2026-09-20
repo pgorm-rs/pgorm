@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use pgorm_query::{Alias, AliasName, SqlName};
+use pgorm_query::{AliasName, IntoName, Name, SqlName};
 
 use crate::ColumnTrait;
 
@@ -45,17 +45,17 @@ pub(super) fn name<'brand>(name: &str) -> Expr<'brand> {
 /// An entity column already knows its table, so `O::Total` is the everyday
 /// spelling and this is the disambiguating one: a table spelled some other
 /// way — an [`alias`](pgorm_query::alias) token, an
-/// [`Alias`](pgorm_query::Alias), a table no entity describes.
+/// [`Name`](pgorm_query::Name), a table no entity describes.
 ///
 /// Qualification is not optional: prqlc has no catalog, so a bare column
 /// name becomes ambiguous the moment a join enters the pipeline. Minting the
 /// reference from a `(table, column)` [`SqlName`] pair makes the qualified form
 /// the only representable one.
 // [spec:pgorm:sem:pipeline.qualify+2]
-pub fn col<'brand>(table: impl SqlName, column: impl SqlName) -> Expr<'brand> {
+pub fn col<'brand>(table: impl IntoName, column: impl IntoName) -> Expr<'brand> {
     branded(adapter::ident_in(
-        vec![SqlName::to_string(&table)],
-        SqlName::to_string(&column),
+        vec![SqlName::to_string(&*table.into_name())],
+        SqlName::to_string(&*column.into_name()),
     ))
 }
 
@@ -69,10 +69,10 @@ pub fn col<'brand>(table: impl SqlName, column: impl SqlName) -> Expr<'brand> {
 /// the join condition; stages after the join refer to the column by its own
 /// name, renamed in the embedded pipeline's projection if it collides.
 // [spec:pgorm:req:pipeline.compose]
-pub fn that<'brand>(column: impl SqlName) -> Expr<'brand> {
+pub fn that<'brand>(column: impl IntoName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec!["that".to_owned()],
-        SqlName::to_string(&column),
+        SqlName::to_string(&*column.into_name()),
     ))
 }
 
@@ -81,10 +81,10 @@ pub fn that<'brand>(column: impl SqlName) -> Expr<'brand> {
 /// an embedded pipeline with no name to qualify by. Scoped to the join
 /// condition, like [`that`].
 // [spec:pgorm:req:pipeline.compose]
-pub fn this<'brand>(column: impl SqlName) -> Expr<'brand> {
+pub fn this<'brand>(column: impl IntoName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec!["this".to_owned()],
-        SqlName::to_string(&column),
+        SqlName::to_string(&*column.into_name()),
     ))
 }
 
@@ -111,9 +111,9 @@ impl<'brand> From<AliasName> for Expr<'brand> {
 
 /// A runtime alias reads an introduced name under the same resolution rules.
 // [spec:pgorm:req:python.pipeline]
-impl<'brand> From<Alias> for Expr<'brand> {
-    fn from(alias: Alias) -> Self {
-        name(&SqlName::to_string(&alias))
+impl<'brand> From<Name> for Expr<'brand> {
+    fn from(alias: Name) -> Self {
+        name(&SqlName::to_string(&*alias))
     }
 }
 
@@ -297,10 +297,10 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     /// Name a projection with an owned identifier computed at runtime.
     /// Reserved-name validation is identical to [`as_`](ExprOps::as_).
     // [spec:pgorm:req:python.pipeline]
-    fn as_runtime(self, name: Alias) -> Expr<'brand> {
+    fn as_runtime(self, name: Name) -> Expr<'brand> {
         branded(adapter::aliased(
             self.into().node,
-            SqlName::to_string(&name),
+            SqlName::to_string(&*name),
         ))
     }
 
@@ -321,7 +321,7 @@ impl<'brand> ExprOps<'brand> for Expr<'brand> {}
 // [spec:pgorm:req:pipeline.surface+3]
 impl<'brand> ExprOps<'brand> for AliasName {}
 
-impl<'brand> ExprOps<'brand> for Alias {}
+impl<'brand> ExprOps<'brand> for Name {}
 
 // [spec:pgorm:req:pipeline.surface+3]
 impl<'brand, C: ColumnTrait> ExprOps<'brand> for C {}
@@ -361,7 +361,7 @@ impl<'brand> ExprList<'brand> for AliasName {
     }
 }
 
-impl<'brand> ExprList<'brand> for Alias {
+impl<'brand> ExprList<'brand> for Name {
     fn into_exprs(self) -> Vec<Expr<'brand>> {
         vec![self.into()]
     }

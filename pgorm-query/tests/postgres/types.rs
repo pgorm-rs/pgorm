@@ -17,7 +17,7 @@ fn create_1() {
 #[test]
 fn create_2() {
     assert_eq!(
-        Type::create((Alias::new("schema"), Font::Table))
+        Type::create((Name::runtime("schema"), Font::Table))
             .values(["name", "variant", "language"])
             .to_string(),
         r#"CREATE TYPE "schema"."font" AS ENUM ('name', 'variant', 'language')"#
@@ -73,7 +73,7 @@ fn drop_3() {
 #[test]
 fn drop_4() {
     assert_eq!(
-        Type::drop((Alias::new("schema"), Font::Table)).to_string(),
+        Type::drop((Name::runtime("schema"), Font::Table)).to_string(),
         r#"DROP TYPE "schema"."font""#
     );
 }
@@ -112,7 +112,7 @@ fn alter_3() {
 fn alter_4() {
     assert_eq!(
         Type::alter(Font::Table)
-            .rename_to(Alias::new("typeface"))
+            .rename_to(Name::runtime("typeface"))
             .to_string(),
         r#"ALTER TYPE "font" RENAME TO "typeface""#
     )
@@ -131,8 +131,8 @@ fn alter_5() {
 #[test]
 fn alter_6() {
     assert_eq!(
-        Type::alter((Alias::new("schema"), Font::Table))
-            .rename_to(Alias::new("typeface"))
+        Type::alter((Name::runtime("schema"), Font::Table))
+            .rename_to(Name::runtime("typeface"))
             .to_string(),
         r#"ALTER TYPE "schema"."font" RENAME TO "typeface""#
     )
@@ -163,24 +163,12 @@ fn identifier_equality_is_type_and_text() {
     // One type rendering one text is one identifier, however the values
     // reached the trait object.
     assert_eq!(Mine.into_name(), Mine.into_name());
-    assert_eq!(
-        Alias::new("same").into_name(),
-        Alias::new("same").into_name()
-    );
-    assert_eq!(
-        Name::new(Alias::new("same")),
-        Alias::new("same").into_name()
-    );
-    assert_eq!(
-        Alias::new("same").into_name(),
-        Alias::new("same").into_name().clone()
-    );
+    assert_eq!(Name::runtime("same"), Name::runtime("same"));
+    assert_eq!(Name::runtime("same"), Name::runtime("same"));
+    assert_eq!(Name::runtime("same"), Name::runtime("same").clone());
 
     // One type rendering two texts is two identifiers.
-    assert_ne!(
-        Alias::new("same").into_name(),
-        Alias::new("other").into_name()
-    );
+    assert_ne!(Name::runtime("same"), Name::runtime("other"));
 }
 
 // [spec:pgorm:req:sql.ddl+6/test]    the two type statements that bind expose `build()`, and its
@@ -209,7 +197,7 @@ fn the_label_binding_type_statements_build() {
     // `RENAME TO` names a type rather than a label, so it stays an identifier
     // in the bound rendering and contributes no value.
     let (sql, values) = Type::alter(Font::Table)
-        .rename_to(Alias::new("typeface"))
+        .rename_to(Name::runtime("typeface"))
         .build();
     assert_eq_unparsed!(sql, r#"ALTER TYPE "font" RENAME TO "typeface""#);
     assert_eq_unparsed!(values, Values(vec![]));

@@ -315,7 +315,7 @@ impl TryFrom<&ColumnDef> for Column {
 #[cfg(test)]
 mod tests {
     use crate::Column;
-    use pgorm_query::{Alias, ColumnDef, ColumnType, StringLen};
+    use pgorm_query::{ColumnDef, ColumnType, Name, StringLen};
     use proc_macro2::TokenStream;
     use quote::quote;
 
@@ -471,11 +471,11 @@ mod tests {
 
     #[test]
     fn test_get_info() {
-        let column = to_column(ColumnDef::new(Alias::new("id")).string().to_owned());
+        let column = to_column(ColumnDef::new(Name::runtime("id")).string().to_owned());
         assert_eq!(column.get_info().as_str(), "Column `id`: Option<String>");
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
                 .to_owned(),
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(column.get_info().as_str(), "Column `id`: String, not_null");
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
                 .unique_key()
@@ -495,7 +495,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
                 .unique_key()
@@ -508,7 +508,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("date_field"))
+            ColumnDef::new(Name::runtime("date_field"))
                 .date()
                 .not_null()
                 .to_owned(),
@@ -519,7 +519,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("time_field"))
+            ColumnDef::new(Name::runtime("time_field"))
                 .time()
                 .not_null()
                 .to_owned(),
@@ -530,7 +530,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("timestamp_field"))
+            ColumnDef::new(Name::runtime("timestamp_field"))
                 .timestamp()
                 .not_null()
                 .to_owned(),
@@ -541,7 +541,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("timestamp_with_timezone_field"))
+            ColumnDef::new(Name::runtime("timestamp_with_timezone_field"))
                 .timestamp_with_time_zone()
                 .not_null()
                 .to_owned(),
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_from_column_def() {
-        let column = to_column(ColumnDef::new(Alias::new("id")).string().to_owned());
+        let column = to_column(ColumnDef::new(Name::runtime("id")).string().to_owned());
         assert_eq!(
             column.get_def().to_string(),
             quote! {
@@ -564,7 +564,7 @@ mod tests {
         );
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
                 .to_owned(),
@@ -572,7 +572,7 @@ mod tests {
         assert!(column.not_null);
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .unique_key()
                 .not_null()
@@ -582,7 +582,7 @@ mod tests {
         assert!(column.not_null);
 
         let column = to_column(
-            ColumnDef::new(Alias::new("id"))
+            ColumnDef::new(Name::runtime("id"))
                 .string()
                 .auto_increment()
                 .unique_key()

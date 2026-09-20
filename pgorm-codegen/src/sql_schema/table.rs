@@ -3,8 +3,8 @@ use crate::{Error, TableIdent};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar};
 use pgorm_query::{
-    Alias, ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, Index,
-    IndexCreateStatement, IntoTableName, Table, TableCreateStatement, TableName,
+    ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, Index,
+    IndexCreateStatement, IntoTableName, Name, Table, TableCreateStatement, TableName,
 };
 use std::collections::BTreeMap;
 
@@ -192,10 +192,10 @@ fn reject_table_features(
 /// rather than quietly reduced to its schema and table.
 // [spec:pgorm:sem:codegen.ddl.tables+2]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
-    let table = Alias::new(relation.relname.as_str());
+    let table = Name::runtime(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
         ("", "") => Ok(table.into_table_name()),
-        ("", schema) => Ok((Alias::new(schema), table).into_table_name()),
+        ("", schema) => Ok((Name::runtime(schema), table).into_table_name()),
         _ => Err(unsupported(
             format!("a cross-database table name on {context}"),
             at,
@@ -258,7 +258,7 @@ fn column(
         return Err(unresolved(format!("{context} has no type"), at));
     };
     let kind = types::column_kind(type_name, enums, &context, at)?;
-    let mut column = ColumnDef::new_with_type(Alias::new(column_name), kind.col_type);
+    let mut column = ColumnDef::new_with_type(Name::runtime(column_name), kind.col_type);
     if kind.auto_increment {
         column.auto_increment();
     }
@@ -281,9 +281,9 @@ fn column(
             // unique index, and that index is where the entity model reads
             // uniqueness from — a `ColumnSpec::UniqueKey` would be discarded.
             ConstrType::ConstrUnique => {
-                let mut index = Index::create(target.clone(), Alias::new(column_name));
+                let mut index = Index::create(target.clone(), Name::runtime(column_name));
                 if !constraint.conname.is_empty() {
-                    index.name(constraint.conname.as_str());
+                    index.name(Name::runtime(constraint.conname.as_str()));
                 }
                 index.unique();
                 if constraint.nulls_not_distinct {
@@ -351,12 +351,12 @@ fn table_constraint(
             let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
             };
-            let mut index = Index::create(target.clone(), Alias::new(first));
+            let mut index = Index::create(target.clone(), Name::runtime(first));
             if !constraint.conname.is_empty() {
-                index.name(constraint.conname.as_str());
+                index.name(Name::runtime(constraint.conname.as_str()));
             }
             for column in columns {
-                index.col(Alias::new(column));
+                index.col(Name::runtime(column));
             }
             if matches!(kind, ConstrType::ConstrPrimary) {
                 index.primary();
@@ -435,12 +435,15 @@ fn references(
     };
     let mut created = ForeignKey::create(
         target.clone(),
-        Alias::new(column.as_str()),
+        Name::runtime(column.as_str()),
         ref_table,
-        Alias::new(ref_column.as_str()),
+        Name::runtime(ref_column.as_str()),
     );
     for (column, ref_column) in pairs {
-        created.col(Alias::new(column.as_str()), Alias::new(ref_column.as_str()));
+        created.col(
+            Name::runtime(column.as_str()),
+            Name::runtime(ref_column.as_str()),
+        );
     }
     named(&mut created, constraint);
     if let Some(action) = action(&constraint.fk_upd_action, "UPDATE", context, at)? {
@@ -476,7 +479,7 @@ fn action(
 
 fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
     if !constraint.conname.is_empty() {
-        created.name(constraint.conname.as_str());
+        created.name(Name::runtime(constraint.conname.as_str()));
     }
 }
 

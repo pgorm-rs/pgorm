@@ -78,10 +78,10 @@ class PipelineEmitter:
         alias = self.source_alias(reference)
         if kind == "table" and alias is None:
             if first is None:
-                return f"{PL}::Pipeline::from({Q}::Alias::new({literal(second)}))"
+                return f"{PL}::Pipeline::from({Q}::Name::runtime({literal(second)}))"
             return (
-                f"{PL}::Pipeline::from_schema({Q}::Alias::new({literal(first)}), "
-                f"{Q}::Alias::new({literal(second)}))"
+                f"{PL}::Pipeline::from_schema({Q}::Name::runtime({literal(first)}), "
+                f"{Q}::Name::runtime({literal(second)}))"
             )
         return f"{PL}::Pipeline::from({self.pipeline_operand(reference)})"
 
@@ -93,19 +93,21 @@ class PipelineEmitter:
             source = f"{PL}::IntoSource::into_source({first})"
         elif first is None:
             source = (
-                f"{PL}::IntoSource::into_source({Q}::Alias::new({literal(second)}))"
+                f"{PL}::IntoSource::into_source({Q}::Name::runtime({literal(second)}))"
             )
         else:
             inner = (
-                f"{PL}::Pipeline::from_schema({Q}::Alias::new({literal(first)}), "
-                f"{Q}::Alias::new({literal(second)}))"
+                f"{PL}::Pipeline::from_schema({Q}::Name::runtime({literal(first)}), "
+                f"{Q}::Name::runtime({literal(second)}))"
             )
-            name = f"{Q}::Alias::new({literal(alias if alias else second)})"
+            name = f"{Q}::Name::runtime({literal(alias if alias else second)})"
             source = (
                 f"{PL}::IntoSource::into_source({PL}::named_runtime({inner}, {name}))"
             )
         if alias is not None:
-            named = f"{PL}::named_runtime({source}, {Q}::Alias::new({literal(alias)}))"
+            named = (
+                f"{PL}::named_runtime({source}, {Q}::Name::runtime({literal(alias)}))"
+            )
             return f"{PL}::IntoSource::into_source({named})"
         return source
 
@@ -148,11 +150,11 @@ class PipelineEmitter:
             case "pipeline.from":
                 return self.pipeline_from(i["source"])
             case "pipeline.column":
-                source = f"{Q}::Alias::new({literal(d['source'])})"
-                column = f"{Q}::Alias::new({literal(d['column'])})"
+                source = f"{Q}::Name::runtime({literal(d['source'])})"
+                column = f"{Q}::Name::runtime({literal(d['column'])})"
                 return f"{PL}::col({source}, {column})"
             case "pipeline.alias":
-                return f"{PL}::Expr::from({Q}::Alias::new({literal(d['name'])}))"
+                return f"{PL}::Expr::from({Q}::Name::runtime({literal(d['name'])}))"
             case "pipeline.value":
                 return self.pipeline_value(node)
             case "pipeline.bind":
@@ -188,7 +190,7 @@ class PipelineEmitter:
                 return f"{PL}::ExprOps::cast({value}, {PL}::CastType::{kind})"
             case "pipeline.named":
                 value = self.use(i["value"])
-                name_source = f"{Q}::Alias::new({literal(d['name'])})"
+                name_source = f"{Q}::Name::runtime({literal(d['name'])})"
                 return f"{PL}::ExprOps::as_runtime({value}, {name_source})"
             case "pipeline.take":
                 query = self.use(i["query"])
@@ -202,7 +204,7 @@ class PipelineEmitter:
                 _, qualifiers, entities = self.source_shape(node["id"])
                 listed = [
                     f"{PL}::named_runtime({self.entity_type(entity)}::default(), "
-                    f"{Q}::Alias::new({literal(qualifier)}))"
+                    f"{Q}::Name::runtime({literal(qualifier)}))"
                     for entity, qualifier in zip(entities, qualifiers, strict=True)
                 ]
                 # One listed source is the source itself, not a one-tuple: that

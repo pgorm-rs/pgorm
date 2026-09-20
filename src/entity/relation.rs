@@ -490,7 +490,7 @@ macro_rules! foreign_key_from_relation {
                 from_cols.join("-")
             )
         };
-        foreign_key.name(name);
+        foreign_key.name(Name::runtime(name));
         foreign_key
     }};
 }

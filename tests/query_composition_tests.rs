@@ -309,8 +309,8 @@ fn top_two_per_bakery() -> SelectStatement {
 
     Bakery::find()
         .select_only()
-        .column_as(bakery::Column::Name, "bakery")
-        .expr_as(Expr::col((top, cake::Column::Name)), "cake")
+        .column_as(bakery::Column::Name, Name::runtime("bakery"))
+        .expr_as(Expr::col((top, cake::Column::Name)), Name::runtime("cake"))
         .join_lateral_on_true(JoinType::InnerJoin, per_bakery, top)
         .order_by_asc(bakery::Column::Id)
         .order_by(

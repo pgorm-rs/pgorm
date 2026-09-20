@@ -4,7 +4,7 @@ use crate::{
 };
 use pgorm_query::{
     ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Index, IndexCreateStatement,
-    SqlName, TableCreateStatement,
+    Name, SqlName, TableCreateStatement,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -231,7 +231,7 @@ where
         }
         let name = format!("idx-{}-{}", entity.to_string(), column.to_string());
         let stmt = Index::create(entity.table_ref(), column)
-            .name(name)
+            .name(Name::runtime(name))
             .to_owned();
         vec.push(stmt)
     }
@@ -282,7 +282,7 @@ where
             }
             stmt.primary_key(
                 idx_pk
-                    .name(format!("pk-{}", entity.to_string()))
+                    .name(Name::runtime(format!("pk-{}", entity.to_string())))
                     .primary()
                     .to_owned(),
             );
@@ -370,7 +370,7 @@ mod tests {
                     CakeFillingPrice.table_ref(),
                     cake_filling_price::Column::CakeId,
                 )
-                .name("pk-cake_filling_price")
+                .name(Name::runtime("pk-cake_filling_price"))
                 .col(cake_filling_price::Column::FillingId)
                 .primary()
                 .to_owned(),
@@ -386,7 +386,7 @@ mod tests {
                     cake_filling_price::Column::FillingId,
                     cake_filling::Column::FillingId,
                 )
-                .name("fk-cake_filling_price-cake_id-filling_id")
+                .name(Name::runtime("fk-cake_filling_price-cake_id-filling_id"))
                 .to_owned(),
             )
             .to_owned()
@@ -406,13 +406,13 @@ mod tests {
 
         let idx: IndexCreateStatement =
             Index::create(indexes::Entity.table_ref(), indexes::Column::Index1Attr)
-                .name("idx-indexes-index1_attr")
+                .name(Name::runtime("idx-indexes-index1_attr"))
                 .to_owned();
         assert_eq!(stmts[0].to_string(), idx.to_string());
 
         let idx: IndexCreateStatement =
             Index::create(indexes::Entity.table_ref(), indexes::Column::Index2Attr)
-                .name("idx-indexes-index2_attr")
+                .name(Name::runtime("idx-indexes-index2_attr"))
                 .to_owned();
         assert_eq!(stmts[1].to_string(), idx.to_string());
     }

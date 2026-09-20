@@ -436,7 +436,7 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
-    ///     .column((Alias::new("schema"), Char::Table, Char::Character))
+    ///     .column((Name::runtime("schema"), Char::Table, Char::Character))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -507,7 +507,7 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
-    ///     .expr_as(Expr::col(Char::Character), Alias::new("C"))
+    ///     .expr_as(Expr::col(Char::Character), Name::runtime("C"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -580,7 +580,7 @@ impl SelectStatement {
     ///     .expr_window_as(
     ///         Func::count(Expr::col(Char::Id)),
     ///         WindowStatement::partition_by(Char::FontSize),
-    ///         Alias::new("C"),
+    ///         Name::runtime("C"),
     ///     )
     ///     .to_owned();
     ///
@@ -616,9 +616,9 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
-    ///     .expr_window_name(Func::count(Expr::col(Char::Id)), Alias::new("w"))
+    ///     .expr_window_name(Func::count(Expr::col(Char::Id)), Name::runtime("w"))
     ///     .window(
-    ///         Alias::new("w"),
+    ///         Name::runtime("w"),
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     )
     ///     .to_owned();
@@ -650,8 +650,8 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
-    ///     .expr_window_name_as(Func::count(Expr::col(Char::Id)), Alias::new("w"), Alias::new("C"))
-    ///     .window(Alias::new("w"), WindowStatement::partition_by(Char::FontSize))
+    ///     .expr_window_name_as(Func::count(Expr::col(Char::Id)), Name::runtime("w"), Name::runtime("C"))
+    ///     .window(Name::runtime("w"), WindowStatement::partition_by(Char::FontSize))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -744,7 +744,7 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .column(Asterisk)
-    ///     .from_values([(1, "hello"), (2, "world")], Alias::new("x"))
+    ///     .from_values([(1, "hello"), (2, "world")], Name::runtime("x"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -774,7 +774,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table_as: Name = Name::new(Alias::new("char"));
+    /// let table_as: Name = Name::runtime("char");
     ///
     /// let query = Query::select()
     ///     .from_as(Char::Table, table_as.clone())
@@ -790,7 +790,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table_as = Alias::new("alias");
+    /// let table_as = Name::runtime("alias");
     ///
     /// let query = Query::select()
     ///     .from_as((Font::Table, Char::Table), table_as.clone())
@@ -824,7 +824,7 @@ impl SelectStatement {
     ///             .columns([Glyph::Image, Glyph::Aspect])
     ///             .from(Glyph::Table)
     ///             .take(),
-    ///         Alias::new("subglyph"),
+    ///         Name::runtime("subglyph"),
     ///     )
     ///     .to_owned();
     ///
@@ -849,7 +849,7 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .column(ColumnRef::Asterisk)
-    ///     .from_function(Func::random(), Alias::new("func"))
+    ///     .from_function(Func::random(), Name::runtime("func"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -1178,7 +1178,7 @@ impl SelectStatement {
     ///     .join_as(
     ///         JoinType::RightJoin,
     ///         Font::Table,
-    ///         Alias::new("f"),
+    ///         Name::runtime("f"),
     ///         Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id))
     ///     )
     ///     .to_owned();
@@ -1197,7 +1197,7 @@ impl SelectStatement {
     ///         .join_as(
     ///             JoinType::RightJoin,
     ///             Font::Table,
-    ///             Alias::new("f"),
+    ///             Name::runtime("f"),
     ///             Condition::all()
     ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
     ///                 .add(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
@@ -1235,7 +1235,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: Name = Name::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: Name = Name::runtime("sub_glyph");
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)
@@ -1298,7 +1298,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: Name = Name::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: Name = Name::runtime("sub_glyph");
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)
@@ -1845,8 +1845,8 @@ impl SelectStatement {
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
-    ///     .expr_window_name_as(Func::count(Expr::col(Char::Id)), Alias::new("w"), Alias::new("C"))
-    ///     .window(Alias::new("w"), WindowStatement::partition_by(Char::FontSize))
+    ///     .expr_window_name_as(Func::count(Expr::col(Char::Id)), Name::runtime("w"), Name::runtime("C"))
+    ///     .window(Name::runtime("w"), WindowStatement::partition_by(Char::FontSize))
     ///     .to_owned();
     ///
     /// assert_eq!(

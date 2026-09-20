@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{ColumnRef, IntoName, NamedTable, TableName};
+use pgorm::pgorm_query::{ColumnRef, NamedTable, TableName};
 use pyo3::prelude::*;
 
 use crate::{expressions::PyExpr, identifiers::PyIdentifier};
@@ -19,28 +19,26 @@ impl PyTable {
         schema: Option<&Bound<'_, PyAny>>,
         alias: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let name = PyIdentifier::new(name)?.alias().into_name();
+        let name = PyIdentifier::new(name)?.name();
         let name = match schema {
-            Some(schema) => {
-                TableName::SchemaTable(PyIdentifier::new(schema)?.alias().into_name(), name)
-            }
+            Some(schema) => TableName::SchemaTable(PyIdentifier::new(schema)?.name(), name),
             None => TableName::Table(name),
         };
         let mut inner = NamedTable::from(name);
         if let Some(alias) = alias {
-            inner = inner.alias(PyIdentifier::new(alias)?.alias());
+            inner = inner.alias(PyIdentifier::new(alias)?.name());
         }
         Ok(Self { inner })
     }
 
     fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().alias(PyIdentifier::new(alias)?.alias()),
+            inner: self.inner.clone().alias(PyIdentifier::new(alias)?.name()),
         })
     }
 
     fn col(&self, name: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
-        let name = PyIdentifier::new(name)?.alias().into_name();
+        let name = PyIdentifier::new(name)?.name();
         let column = match (&self.inner.alias, &self.inner.name) {
             (Some(alias), _) => ColumnRef::TableColumn(alias.clone(), name),
             (None, TableName::Table(table)) => ColumnRef::TableColumn(table.clone(), name),

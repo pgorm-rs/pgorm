@@ -8,7 +8,7 @@ use pgorm::{
     ActiveModelTrait, ColumnTrait, DerivePartialModel, EntityTrait, Error, FromQueryResult,
     ModelTrait, QueryOrder, set,
 };
-use pgorm_query::Expr;
+use pgorm_query::{Expr, Name};
 
 mod entity {
     use pgorm::prelude::*;

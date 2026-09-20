@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::WithSerde;
-use pgorm_query::{Alias, ColumnDef, ColumnType, Table};
+use pgorm_query::{ColumnDef, ColumnType, Name, Table};
 
 // [spec:pgorm:sem:codegen.entity.enums+2/test]    every discovered enum lands in
 // one `pgorm_active_enums.rs`, alphabetically by enum name
@@ -248,10 +248,10 @@ fn keyword_table_names_escaped_in_index_and_prelude() {
 fn non_snake_case_names_preserved_by_column_name() {
     let schema = || {
         vec![
-            Table::create(Alias::new("cake"))
+            Table::create(Name::runtime("cake"))
                 .col(serial_pk("id"))
                 .col(
-                    ColumnDef::new_with_type(Alias::new("bakedAt"), ColumnType::Integer)
+                    ColumnDef::new_with_type(Name::runtime("bakedAt"), ColumnType::Integer)
                         .not_null()
                         .to_owned(),
                 )

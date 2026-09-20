@@ -1,7 +1,7 @@
 //! An intentionally test-only HTTP boundary over pgorm and independent vulnerable controls.
 use axum::{extract::{Path, Query as HttpQuery, State}, http::StatusCode, routing::get, Router};
 use pgorm::{entity::prelude::*, DecodeRaw};
-use pgorm::pgorm_query::{self as q, Alias, Expr, Func, Query, Values};
+use pgorm::pgorm_query::{self as q, Expr, Func, Query, Values};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, io::Write, sync::{Arc, Mutex}};
@@ -51,8 +51,8 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
     use item::{Column as C, Entity as E};
     use pgorm::pipeline::{col, IntoSource, JoinSide, Pipeline};
     let db = app.db.get().await?;
-    let a = || Alias::new("items");
-    let n = || Alias::new("name");
+    let a = || Name::runtime("items");
+    let n = || Name::runtime("name");
     let select = || Query::select().column(n()).from(a()).to_owned();
     let values = match case {
         "select" => names(E::find().filter(C::Name.eq(input)).order_by_asc(C::Id).all(&db).await?),
@@ -85,8 +85,8 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
         "graph-joined" | "graph-alias" => {
             let alias = if case == "graph-alias" { input } else { "peer" };
             let relation = E::belongs_to(E).columns(C::Id,C::Id).into();
-            let graph = E::graph().join_one_as::<E>(relation, Alias::new(alias));
-            let graph = if case == "graph-joined" {graph.filter(Expr::col((Alias::new(alias), n())).eq(input))} else {graph};
+            let graph = E::graph().join_one_as::<E>(relation, Name::runtime(alias));
+            let graph = if case == "graph-joined" {graph.filter(Expr::col((Name::runtime(alias), n())).eq(input))} else {graph};
             graph.all(&db).await?.into_iter().map(|(r, s)| format!("{}:{}",r.name,s.name)).collect()
         },
         "pipeline-literal" | "pipeline-bound" => {
@@ -97,32 +97,32 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
             } else { pipeline.filter(col(a(),n()).eq(input)) };
             strings(&db, pipeline.select(col(a(),n())).into_sql()?).await?
         },
-        "pipeline-projection" => strings(&db, Pipeline::from(E).select(col(a(), Alias::new(input))).into_sql()?).await?,
+        "pipeline-projection" => strings(&db, Pipeline::from(E).select(col(a(), Name::runtime(input))).into_sql()?).await?,
         "pipeline-sources" => {
             use pgorm::pipeline::ExprOps;
-            let peer = Alias::new("peer");
-            Pipeline::from(E).join(JoinSide::Inner, E.named("peer"), col(a(),Alias::new("id")).eq(col(peer.clone(),Alias::new("id"))))
+            let peer = Name::runtime("peer");
+            Pipeline::from(E).join(JoinSide::Inner, E.named("peer"), col(a(),Name::runtime("id")).eq(col(peer.clone(),Name::runtime("id"))))
                 .filter(col(peer.clone(),n()).eq(input)).select_sources((E,E.named("peer")))
                 .all(&db).await?.into_iter().map(|(r,s)|format!("{r:?}:{s:?}")).collect()
         },
-        "schema" => strings(&db, Query::select().column(n()).from((Alias::new(input),a())).build()).await?,
-        "table" => strings(&db, Query::select().column(n()).from(Alias::new(input)).build()).await?,
-        "column" => strings(&db, Query::select().column(Alias::new(input)).from(a()).build()).await?,
+        "schema" => strings(&db, Query::select().column(n()).from((Name::runtime(input),a())).build()).await?,
+        "table" => strings(&db, Query::select().column(n()).from(Name::runtime(input)).build()).await?,
+        "column" => strings(&db, Query::select().column(Name::runtime(input)).from(a()).build()).await?,
         "alias" => {
-            let sql = Query::select().expr_as(Expr::val("alice"),Alias::new(input)).to_string();
+            let sql = Query::select().expr_as(Expr::val("alice"),Name::runtime(input)).to_string();
             let row = db.query_one(&sql, &[]).await?;
             vec![row.columns()[0].name().to_owned(), row.get(0)]
         },
-        "order" => strings(&db,select().order_by(Alias::new(input),q::Order::Asc).build()).await?,
-        "group" => strings(&db,Query::select().column(Alias::new(input)).from(a()).group_by_col(Alias::new(input)).build()).await?,
-        "function" => strings(&db,Query::select().expr(Func::named(Alias::new(input)).arg(Expr::val("Alice"))).build()).await?,
-        "cast" => strings(&db,Query::select().column(n()).from(a()).and_where(Expr::col(n()).eq(Expr::val("alice").cast_as(Alias::new(input)))).build()).await?,
+        "order" => strings(&db,select().order_by(Name::runtime(input),q::Order::Asc).build()).await?,
+        "group" => strings(&db,Query::select().column(Name::runtime(input)).from(a()).group_by_col(Name::runtime(input)).build()).await?,
+        "function" => strings(&db,Query::select().expr(Func::named(Name::runtime(input)).arg(Expr::val("Alice"))).build()).await?,
+        "cast" => strings(&db,Query::select().column(n()).from(a()).and_where(Expr::col(n()).eq(Expr::val("alice").cast_as(Name::runtime(input)))).build()).await?,
         "enum" => {
-            let sql = Query::select().column(n()).from(Alias::new("reviews")).and_where(Expr::col(Alias::new("status")).eq(Expr::val("ready").cast_as_type(q::TypeName::new(Alias::new(input)).schema(Alias::new("fixture"))))).to_string();
+            let sql = Query::select().column(n()).from(Name::runtime("reviews")).and_where(Expr::col(Name::runtime("status")).eq(Expr::val("ready").cast_as_type(q::TypeName::new(Name::runtime(input)).schema(Name::runtime("fixture"))))).to_string();
             strings(&db,(sql,Values(vec![]))).await?
         },
         "enum-ddl" => {
-            let sql = q::Table::create(Alias::new("enum_probe")).col(q::ColumnDef::new(Alias::new("value")).enumeration(Alias::new(input),["ready","waiting"])).to_string();
+            let sql = q::Table::create(Name::runtime("enum_probe")).col(q::ColumnDef::new(Name::runtime("value")).enumeration(Name::runtime(input),[Name::runtime("ready"),Name::runtime("waiting")])).to_string();
             db.batch_execute(&sql).await?;
             db.query_all("SELECT udt_name FROM information_schema.columns WHERE table_schema='fixture' AND table_name='enum_probe' ORDER BY ordinal_position",&[]).await?.into_iter().map(|r|r.get(0)).collect()
         },
@@ -149,7 +149,7 @@ async fn protected(app: &App, case: &str, input: &str) -> Result<Value> {
             db.execute("INSERT INTO stored VALUES ($1)", &[&input]).await?;
             let saved: String = db.query_one("SELECT value FROM stored",&[]).await?.get(0);
             if case == "stored-value" { names(E::find().filter(C::Name.eq(saved)).all(&db).await?) }
-            else { strings(&db,Query::select().column(Alias::new(saved)).from(a()).build()).await? }
+            else { strings(&db,Query::select().column(Name::runtime(saved)).from(a()).build()).await? }
         },
         _ => return Err(format!("unknown case: {case}").into()),
     };

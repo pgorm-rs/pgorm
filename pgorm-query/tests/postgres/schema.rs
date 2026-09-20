@@ -24,7 +24,7 @@ fn every_ddl_entry_point_is_reachable() {
             .starts_with("DROP TABLE")
     );
     assert!(
-        Table::rename(Glyph::Table, Alias::new("g"))
+        Table::rename(Glyph::Table, Name::runtime("g"))
             .to_string()
             .starts_with("ALTER TABLE")
     );
@@ -36,49 +36,53 @@ fn every_ddl_entry_point_is_reachable() {
 
     assert!(
         Index::create(Glyph::Table, Glyph::Id)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .to_string()
             .starts_with("CREATE INDEX")
     );
-    assert!(Index::drop("idx").to_string().starts_with("DROP INDEX"));
+    assert!(
+        Index::drop(Name::runtime("idx"))
+            .to_string()
+            .starts_with("DROP INDEX")
+    );
 
     assert!(
         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-            .name("fk")
+            .name(Name::runtime("fk"))
             .to_string()
             .starts_with("ALTER TABLE")
     );
     assert!(
-        ForeignKey::drop(Char::Table, "fk")
+        ForeignKey::drop(Char::Table, Name::runtime("fk"))
             .to_string()
             .starts_with("ALTER TABLE")
     );
 
     assert!(
-        Type::create(Alias::new("tea"))
+        Type::create(Name::runtime("tea"))
             .values(["green"])
             .to_string()
             .starts_with("CREATE TYPE")
     );
     assert!(
-        Type::alter(Alias::new("tea"))
+        Type::alter(Name::runtime("tea"))
             .add_value("black")
             .to_string()
             .starts_with("ALTER TYPE")
     );
     assert!(
-        Type::drop(Alias::new("tea"))
+        Type::drop(Name::runtime("tea"))
             .to_string()
             .starts_with("DROP TYPE")
     );
 
     assert!(
-        Extension::create("ltree")
+        Extension::create(Name::runtime("ltree"))
             .to_string()
             .starts_with("CREATE EXTENSION")
     );
     assert!(
-        Extension::drop("ltree")
+        Extension::drop(Name::runtime("ltree"))
             .to_string()
             .starts_with("DROP EXTENSION")
     );
@@ -114,21 +118,22 @@ fn ddl_statements_render_through_display() {
     );
     assert_renders(&Table::drop(Glyph::Table), r#"DROP TABLE "glyph""#);
     assert_renders(
-        &Table::rename(Glyph::Table, Alias::new("g")),
+        &Table::rename(Glyph::Table, Name::runtime("g")),
         r#"ALTER TABLE "glyph" RENAME TO "g""#,
     );
     assert_renders(&Table::truncate(Glyph::Table), r#"TRUNCATE TABLE "glyph""#);
     assert_renders(
-        Index::create(Glyph::Table, Glyph::Id).name("idx"),
+        Index::create(Glyph::Table, Glyph::Id).name(Name::runtime("idx")),
         r#"CREATE INDEX "idx" ON "glyph" ("id")"#,
     );
-    assert_renders(&Index::drop("idx"), r#"DROP INDEX "idx""#);
+    assert_renders(&Index::drop(Name::runtime("idx")), r#"DROP INDEX "idx""#);
     assert_renders(
-        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id).name("fk"),
+        ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
+            .name(Name::runtime("fk")),
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
     );
     assert_renders(
-        &ForeignKey::drop(Char::Table, "fk"),
+        &ForeignKey::drop(Char::Table, Name::runtime("fk")),
         r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#,
     );
     assert_renders(
@@ -149,7 +154,7 @@ fn table_statement_wrapper_dispatches() {
         ),
         TableStatement::Alter(Table::alter(Glyph::Table).drop_column(Glyph::Id).to_owned()),
         TableStatement::Drop(Table::drop(Glyph::Table)),
-        TableStatement::Rename(Table::rename(Glyph::Table, Alias::new("g"))),
+        TableStatement::Rename(Table::rename(Glyph::Table, Name::runtime("g"))),
         TableStatement::Truncate(Table::truncate(Glyph::Table)),
     ];
 
@@ -169,10 +174,10 @@ fn table_statement_wrapper_dispatches() {
     // builders; the wrapped statement renders exactly as it does on its own.
     let schema_statements = [
         SchemaStatement::TableStatement(TableStatement::Drop(Table::drop(Glyph::Table))),
-        SchemaStatement::IndexStatement(IndexStatement::Drop(Index::drop("idx"))),
+        SchemaStatement::IndexStatement(IndexStatement::Drop(Index::drop(Name::runtime("idx")))),
         SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Drop(ForeignKey::drop(
             Char::Table,
-            "fk",
+            Name::runtime("fk"),
         ))),
     ];
 
@@ -205,20 +210,20 @@ fn table_statement_wrapper_dispatches() {
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(
-        Table::create(Alias::new(r#"he"llo"#))
-            .col(ColumnDef::new(Alias::new(r#"wor"ld"#)).integer())
+        Table::create(Name::runtime(r#"he"llo"#))
+            .col(ColumnDef::new(Name::runtime(r#"wor"ld"#)).integer())
             .to_string(),
         r#"CREATE TABLE "he""llo" ( "wor""ld" integer )"#
     );
     assert_eq!(
-        Index::create((Alias::new("schema"), Glyph::Table), Glyph::Id)
-            .name("idx")
+        Index::create((Name::runtime("schema"), Glyph::Table), Glyph::Id)
+            .name(Name::runtime("idx"))
             .to_string(),
         r#"CREATE INDEX "idx" ON "schema"."glyph" ("id")"#
     );
     assert_eq!(
         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-            .name("fk")
+            .name(Name::runtime("fk"))
             .to_string(),
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
     );
@@ -233,7 +238,7 @@ fn ddl_index_and_constraint_names_escape_quotes() {
             .col(ColumnDef::new(Glyph::Id).integer())
             .index(
                 Index::create(Glyph::Table, Glyph::Id)
-                    .name(r#"i"dx"#)
+                    .name(Name::runtime(r#"i"dx"#))
                     .unique()
                     .to_owned()
             )
@@ -242,24 +247,27 @@ fn ddl_index_and_constraint_names_escape_quotes() {
     );
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Id)
-            .name(r#"i"dx"#)
+            .name(Name::runtime(r#"i"dx"#))
             .to_string(),
         r#"CREATE INDEX "i""dx" ON "glyph" ("id")"#.to_owned()
     );
-    assert_eq!(Index::drop(r#"i"dx"#).to_string(), r#"DROP INDEX "i""dx""#);
+    assert_eq!(
+        Index::drop(Name::runtime(r#"i"dx"#)).to_string(),
+        r#"DROP INDEX "i""dx""#
+    );
     assert_eq!(
         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-            .name(r#"f"k"#)
+            .name(Name::runtime(r#"f"k"#))
             .to_string(),
         r#"ALTER TABLE "character" ADD CONSTRAINT "f""k" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
     );
     assert_eq!(
-        ForeignKey::drop(Char::Table, r#"f"k"#).to_string(),
+        ForeignKey::drop(Char::Table, Name::runtime(r#"f"k"#)).to_string(),
         r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
     );
     assert_eq!(
         Table::alter(Char::Table)
-            .drop_foreign_key(Alias::new(r#"f"k"#))
+            .drop_foreign_key(Name::runtime(r#"f"k"#))
             .to_string(),
         r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
     );

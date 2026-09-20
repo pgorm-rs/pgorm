@@ -102,7 +102,7 @@ impl WindowStatement {
     ///         WindowStatement::partition_by(Char::FontSize)
     ///             .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
     ///             .take(),
-    ///         Alias::new("C"))
+    ///         Name::runtime("C"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -128,7 +128,7 @@ impl WindowStatement {
     ///         WindowStatement::partition_by(Char::FontSize)
     ///             .frame_between(FrameType::Rows, Frame::UnboundedPreceding, Frame::UnboundedFollowing)
     ///             .take(),
-    ///         Alias::new("C"))
+    ///         Name::runtime("C"))
     ///     .to_owned();
     ///
     /// assert_eq!(

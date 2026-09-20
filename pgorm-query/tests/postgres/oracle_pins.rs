@@ -185,9 +185,10 @@ fn cross_join_renders_without_on_clause() {
 #[test]
 fn column_rename_is_its_own_statement() {
     let added = Table::alter(Font::Table)
-        .add_column(ColumnDef::new(Alias::new("new_col")).integer())
+        .add_column(ColumnDef::new(Name::runtime("new_col")).integer())
         .to_string();
-    let renamed = Table::rename_column(Font::Table, Font::Name, Alias::new("name_new")).to_string();
+    let renamed =
+        Table::rename_column(Font::Table, Font::Name, Name::runtime("name_new")).to_string();
 
     assert_eq!(
         renamed,
@@ -205,8 +206,11 @@ fn column_rename_is_its_own_statement() {
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+3/test]
 #[test]
 fn table_rename_target_is_bare_name() {
-    let sql =
-        Table::rename((Alias::new("schema"), Font::Table), Alias::new("font_new")).to_string();
+    let sql = Table::rename(
+        (Name::runtime("schema"), Font::Table),
+        Name::runtime("font_new"),
+    )
+    .to_string();
 
     assert_eq!(sql, r#"ALTER TABLE "schema"."font" RENAME TO "font_new""#);
     assert_parses(&sql);
@@ -220,7 +224,7 @@ fn table_rename_target_is_bare_name() {
 #[test]
 fn alter_type_rename_emits_identifier() {
     let sql = Type::alter(Font::Table)
-        .rename_to(Alias::new("typeface"))
+        .rename_to(Name::runtime("typeface"))
         .to_string();
 
     assert_eq!(sql, r#"ALTER TYPE "font" RENAME TO "typeface""#);
@@ -259,7 +263,10 @@ fn interval_precision_rides_on_seconds() {
 // [spec:pgorm:req:sql.ddl.extension+4/test]
 #[test]
 fn extension_drop_takes_one_behaviour() {
-    let sql = Extension::drop("ltree").cascade().restrict().to_string();
+    let sql = Extension::drop(Name::runtime("ltree"))
+        .cascade()
+        .restrict()
+        .to_string();
 
     assert_eq!(sql, r#"DROP EXTENSION "ltree" RESTRICT"#);
     assert_parses(&sql);
@@ -276,8 +283,10 @@ fn extension_drop_takes_one_behaviour() {
 // [spec:pgorm:req:sql.ddl.column-def+4/test]
 #[test]
 fn oracle_pins_extra_interpolated_raw() {
-    let version = Extension::create("ltree").version("v0.1.0").to_string();
-    let injected = Extension::create(r#"pg"weird ext"#).to_string();
+    let version = Extension::create(Name::runtime("ltree"))
+        .version("v0.1.0")
+        .to_string();
+    let injected = Extension::create(Name::runtime(r#"pg"weird ext"#)).to_string();
     let extra = Table::create(Glyph::Table)
         .col(
             ColumnDef::new(Glyph::Id)
@@ -303,7 +312,7 @@ fn oracle_pins_extra_interpolated_raw() {
 #[test]
 fn alias_identifiers_are_never_empty() {
     let sql = Query::select()
-        .expr_as(Expr::col(Glyph::Aspect), Alias::new("ratio"))
+        .expr_as(Expr::col(Glyph::Aspect), Name::runtime("ratio"))
         .from(Glyph::Table)
         .to_string();
     let taken = ColumnDef::new(Glyph::Id).integer().take();
@@ -369,7 +378,7 @@ fn empty_ddl_collections_do_not_construct() {
         .drop_column(Font::Name)
         .to_string();
     let indexed = Index::create(Glyph::Table, Glyph::Aspect)
-        .name("idx")
+        .name(Name::runtime("idx"))
         .to_string();
 
     assert_eq!(altered, r#"ALTER TABLE "font" DROP COLUMN "name""#);
@@ -415,13 +424,13 @@ fn ddl_targets_are_taken_by_construction() {
             .to_string(),
         Table::drop(Glyph::Table).to_string(),
         Table::truncate(Glyph::Table).to_string(),
-        Table::rename(Glyph::Table, Alias::new("g")).to_string(),
-        Table::rename_column(Glyph::Table, Glyph::Id, Alias::new("gid")).to_string(),
+        Table::rename(Glyph::Table, Name::runtime("g")).to_string(),
+        Table::rename_column(Glyph::Table, Glyph::Id, Name::runtime("gid")).to_string(),
         Index::create(Glyph::Table, Glyph::Aspect)
-            .name("idx")
+            .name(Name::runtime("idx"))
             .to_string(),
-        Index::drop("idx").to_string(),
-        ForeignKey::drop(Char::Table, "fk").to_string(),
+        Index::drop(Name::runtime("idx")).to_string(),
+        ForeignKey::drop(Char::Table, Name::runtime("fk")).to_string(),
     ];
 
     for sql in &rendered {
@@ -447,7 +456,7 @@ fn ddl_targets_are_taken_by_construction() {
 #[test]
 fn index_name_and_drop_table_stay_optional() {
     let unnamed = Index::create(Glyph::Table, Glyph::Aspect).to_string();
-    let untabled = Index::drop("idx").to_string();
+    let untabled = Index::drop(Name::runtime("idx")).to_string();
 
     assert_eq!(unnamed, r#"CREATE INDEX  ON "glyph" ("aspect")"#);
     assert_eq!(untabled, r#"DROP INDEX "idx""#);
@@ -469,7 +478,7 @@ fn index_name_and_drop_table_stay_optional() {
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {
     let standalone = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-        .name("fk")
+        .name(Name::runtime("fk"))
         .to_string();
     let composite = ForeignKey::create(Char::Table, Char::FontId, Glyph::Table, Glyph::Id)
         .col(Char::Id, Glyph::Aspect)
@@ -527,15 +536,15 @@ fn foreign_keys_name_two_tables_and_a_pair() {
 #[test]
 fn type_and_extension_names_are_taken() {
     let rendered = [
-        Type::create(Alias::new("font_family"))
+        Type::create(Name::runtime("font_family"))
             .values(["serif"])
             .to_string(),
-        Type::drop(Alias::new("font_family")).to_string(),
-        Type::alter(Alias::new("font_family"))
+        Type::drop(Name::runtime("font_family")).to_string(),
+        Type::alter(Name::runtime("font_family"))
             .add_value("sans")
             .to_string(),
-        Extension::create("ltree").to_string(),
-        Extension::drop("ltree").to_string(),
+        Extension::create(Name::runtime("ltree")).to_string(),
+        Extension::drop(Name::runtime("ltree")).to_string(),
     ];
 
     for sql in &rendered {
@@ -558,8 +567,8 @@ fn type_and_extension_names_are_taken() {
 // [spec:pgorm:req:sql.ddl.type-enum+4/test]
 #[test]
 fn empty_enum_and_shell_type_are_valid() {
-    let shell = Type::create(Alias::new("font_family")).to_string();
-    let empty = Type::create(Alias::new("font_family"))
+    let shell = Type::create(Name::runtime("font_family")).to_string();
+    let empty = Type::create(Name::runtime("font_family"))
         .as_enum()
         .to_string();
 

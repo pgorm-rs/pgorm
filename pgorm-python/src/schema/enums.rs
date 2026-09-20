@@ -1,20 +1,18 @@
 use super::statement::{PyDDL, Statement};
 use crate::{errors::ConstructionError, identifiers::PyIdentifier, values::PyTypeName};
-use pgorm::pgorm_query::{
-    Alias, IntoName,
-    extension::{Type, TypeRef},
-};
+use pgorm::pgorm_query::Name;
+use pgorm::pgorm_query::extension::{Type, TypeRef};
 use pyo3::prelude::*;
 
 fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
     if let Ok(name) = name.extract::<PyRef<'_, PyTypeName>>() {
-        let local = Alias::new(&name.name).into_name();
+        let local = Name::runtime(&name.name);
         return Ok(match &name.schema {
-            Some(schema) => TypeRef::SchemaType(Alias::new(schema).into_name(), local),
+            Some(schema) => TypeRef::SchemaType(Name::runtime(schema), local),
             None => TypeRef::Type(local),
         });
     }
-    Ok(TypeRef::Type(PyIdentifier::new(name)?.alias().into_name()))
+    Ok(TypeRef::Type(PyIdentifier::new(name)?.name()))
 }
 
 /// An enum label: data, rendered as a string literal rather than as a name, so
@@ -85,7 +83,7 @@ pub(super) fn rename_enum_value(
 pub(super) fn rename_enum(name: &Bound<'_, PyAny>, new_name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
     Ok(PyDDL {
         inner: Statement::AlterEnum(
-            Type::alter(type_ref(name)?).rename_to(PyIdentifier::new(new_name)?.alias()),
+            Type::alter(type_ref(name)?).rename_to(PyIdentifier::new(new_name)?.name()),
         ),
     })
 }

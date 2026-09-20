@@ -256,7 +256,7 @@ mod test {
     #[test]
     fn creates_a_stmt_for_create_extension() {
         let create_extension_stmt = Extension::create(PgLTree)
-            .schema("public")
+            .schema(Name::runtime("public"))
             .version("v0.1.0")
             .cascade()
             .if_not_exists()

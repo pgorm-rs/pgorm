@@ -23,7 +23,7 @@ pub(super) fn condition(value: &Bound<'_, PyAny>) -> PyResult<Condition> {
 pub(super) fn project(query: &mut SelectStatement, items: &Bound<'_, PyTuple>) -> PyResult<()> {
     for item in items.iter() {
         if let Ok(item) = item.extract::<PyRef<'_, AliasedExpr>>() {
-            query.expr_as(item.expr.inner.clone(), item.alias.alias());
+            query.expr_as(item.expr.inner.clone(), item.alias.name());
         } else {
             query.expr(require_expr(&item)?.inner);
         }
@@ -76,7 +76,7 @@ pub(super) fn returning(items: &Bound<'_, PyTuple>) -> PyResult<ReturningClause>
                     .expr
                     .inner
                     .clone()
-                    .binary(BinOper::As, Expr::col(item.alias.alias())))
+                    .binary(BinOper::As, Expr::col(item.alias.name())))
             } else {
                 Ok(require_expr(&item)?.inner)
             }

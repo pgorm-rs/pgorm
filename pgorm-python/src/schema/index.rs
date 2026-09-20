@@ -6,9 +6,7 @@ use crate::{
     UnsupportedCapabilityError, expressions::Compiled, identifiers::PyIdentifier,
     statements::PyTable,
 };
-use pgorm::pgorm_query::{
-    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoName, Values,
-};
+use pgorm::pgorm_query::{Index, IndexCreateStatement, IndexOrder, IndexType, Name, Values};
 use pyo3::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -27,16 +25,16 @@ impl PyCreateIndex {
         first: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let mut inner = Index::create(table_name(table)?, PyIdentifier::new(first)?.alias());
+        let mut inner = Index::create(table_name(table)?, PyIdentifier::new(first)?.name());
         if let Some(name) = name {
-            inner.name(PyIdentifier::new(name)?.alias());
+            inner.name(PyIdentifier::new(name)?.name());
         }
         Ok(Self { inner })
     }
 
     #[pyo3(signature=(name, *, descending=None))]
     fn column(&self, name: &Bound<'_, PyAny>, descending: Option<bool>) -> PyResult<Self> {
-        let name = PyIdentifier::new(name)?.alias();
+        let name = PyIdentifier::new(name)?.name();
         let mut inner = self.inner.clone();
         match descending {
             None => {
@@ -74,7 +72,7 @@ impl PyCreateIndex {
         let kind = match name {
             "btree" => IndexType::BTree,
             "hash" => IndexType::Hash,
-            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Alias::new(name).into_name()),
+            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Name::runtime(name)),
             _ => {
                 return Err(UnsupportedCapabilityError::new_err(
                     "unsupported index access method",
@@ -101,7 +99,7 @@ pub(super) fn drop_index(
     name: &Bound<'_, PyAny>,
     if_exists: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = Index::drop(PyIdentifier::new(name)?.alias());
+    let mut inner = Index::drop(PyIdentifier::new(name)?.name());
     inner.table(table_name(table)?);
     if if_exists {
         inner.if_exists();
