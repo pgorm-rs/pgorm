@@ -7851,7 +7851,7 @@ children (
                 title "The public surface is curated, not globbed"
                 kind @refactor
                 implements {
-                    rust ([spec:pgorm:req:sql.surface])
+                    main ([spec:pgorm:req:sql.surface])
                 }
                 deps (query-dead-surface-gone)
                 log (
@@ -7867,6 +7867,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T16:56:29.291351Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filing note's hide list was stale in both directions and the compiler settled it. Deleted before this ran: Quote, Cond, IdenList, the debug_query family. Renamed: DynIden/SharedIden to Name, Iden to SqlName, CustomExpr to SqlTemplate. Had to stay public, each because a public signature or accessor names it (rustc's private_interfaces lint, not E0446, is what fires now): SqlWriter and SqlWriterValues (QueryStatementBuilder::build_collect takes a &mut dyn SqlWriter), SubQueryStatement (into_sub_query_statement returns it), ConditionExpression (Condition::add's Into bound), ConflictAction and ConflictAssignments (OnConflict::Targeted's public variant fields), AnyWithClause (mission 95840ed2 made it the with() bound), OrderExpr (OrderedStatement::add_order_by), WindowSelectType (SelectExpr::window), ConflictElement and ConflictAssignment (ConflictTarget::elements and ConflictAssignments::iter), Function and FuncArgMod (FunctionCall::get_func and get_mods), QueryBuilder (sql.render+1 names it as the renderer and its escape_string/unescape_string are the conformance suite's only door). The new finding: QueryStatement, TableStatement, IndexStatement, ForeignKeyStatement, SchemaStatement and the SelectDistinct::All variant have NO reader anywhere in the crate, so narrowing them produces dead_code, which -D warnings refuses; they are doc(hidden) and named individually in lib.rs. Same for Token and Tokenizer, whose is_quoted/is_unquoted/is_space/is_punctuation/unquote accessors only tests/postgres/token.rs calls. That doc(hidden) set is the deletion-candidate list for a later pass: each is either removed outright, with the sql.ddl+7 clause describing the wrappers rewritten, or given a reason to exist. Census: 166 documented items down to 150, and 16 public modules down to 4 (error, extension, value, tests_cfg)."
                     }
                 )
             }
