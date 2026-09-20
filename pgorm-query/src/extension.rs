@@ -1,6 +1,8 @@
 use core::fmt;
 
-use crate::{DynIden, Iden, IntoIden, PgInterval, QueryBuilder, SqlWriter};
+use crate::{
+    DynIden, Iden, IntoIden, PgInterval, QueryBuilder, SqlWriter, SqlWriterValues, value::Values,
+};
 
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -230,7 +232,10 @@ macro_rules! impl_extension_statement_builder {
             }
         }
 
-        // [spec:pgorm:req:sql.ddl+5] (the one rendering an extension statement has)
+        /// Renders the statement with every value inlined as an escaped SQL
+        /// literal. This is its only rendering: it binds nothing, so there is
+        /// no placeholder form to choose between.
+        // [spec:pgorm:req:sql.ddl+6]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -931,7 +936,7 @@ impl TypeAlterOpt {
 }
 
 macro_rules! impl_type_statement_builder {
-    ( $struct_name: ident, $func_name: ident ) => {
+    ( $struct_name: ident, $func_name: ident, $display_doc: literal ) => {
         impl $struct_name {
             /// Build the SQL statement into the given sink, returning the sink's text
             pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String {
@@ -940,7 +945,8 @@ macro_rules! impl_type_statement_builder {
             }
         }
 
-        // [spec:pgorm:req:sql.ddl+5] (the one rendering a type statement has)
+        #[doc = $display_doc]
+        // [spec:pgorm:req:sql.ddl+6]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -951,6 +957,60 @@ macro_rules! impl_type_statement_builder {
     };
 }
 
-impl_type_statement_builder!(TypeCreateStatement, prepare_type_create_statement);
-impl_type_statement_builder!(TypeAlterStatement, prepare_type_alter_statement);
-impl_type_statement_builder!(TypeDropStatement, prepare_type_drop_statement);
+/// Give a label-carrying type statement the placeholder rendering its
+/// `push_param` calls already make reachable, so the capability has a name
+/// rather than only an `into_parts` on a sink the caller had to build.
+macro_rules! impl_type_statement_build {
+    ( $struct_name: ident, $doc: literal ) => {
+        impl $struct_name {
+            #[doc = $doc]
+            ///
+            /// PostgreSQL accepts no bind parameter in DDL, so the pair this
+            /// returns is for inspection — logging the labels apart from the
+            /// SQL, feeding a proxy that expands them — and the statement you
+            /// execute is the inlined `Display` rendering.
+            // [spec:pgorm:req:sql.ddl+6]
+            // [spec:pgorm:req:sql.render.ddl.enum-type+4]
+            pub fn build(&self) -> (String, Values) {
+                let mut sql = SqlWriterValues::new("$", true);
+                self.build_collect(&mut sql);
+                sql.into_parts()
+            }
+        }
+    };
+}
+
+impl_type_statement_builder!(
+    TypeCreateStatement,
+    prepare_type_create_statement,
+    "Renders every enum label inlined as an escaped SQL literal rather than \
+     bound. This is the rendering to execute: PostgreSQL takes no bind \
+     parameter in DDL, so [`build`](Self::build)'s `$N` form is for \
+     inspection."
+);
+impl_type_statement_builder!(
+    TypeAlterStatement,
+    prepare_type_alter_statement,
+    "Renders every enum label inlined as an escaped SQL literal rather than \
+     bound. This is the rendering to execute: PostgreSQL takes no bind \
+     parameter in DDL, so [`build`](Self::build)'s `$N` form is for \
+     inspection."
+);
+impl_type_statement_builder!(
+    TypeDropStatement,
+    prepare_type_drop_statement,
+    "Renders the statement with every value inlined as an escaped SQL \
+     literal. This is its only rendering: it binds nothing, so there is no \
+     placeholder form to choose between."
+);
+
+impl_type_statement_build!(
+    TypeCreateStatement,
+    "Build the statement with its enum labels as numbered placeholders, \
+     returning the SQL and the labels to bind."
+);
+impl_type_statement_build!(
+    TypeAlterStatement,
+    "Build the statement with its enum label operands as numbered \
+     placeholders, returning the SQL and the labels to bind."
+);

@@ -304,17 +304,23 @@
 //!
 //! Statements are divided into 2 categories: Query and Schema.
 //!
-//! A schema statement carries no bind parameters, so it has exactly one rendering — its
-//! [`Display`](std::fmt::Display):
+//! Every statement has the value-inlined rendering — its
+//! [`Display`](std::fmt::Display), reached as `to_string()` — which writes each
+//! value into the SQL as an escaped literal. What differs is whether a statement
+//! *also* has a bound rendering, and that follows from whether it binds anything:
 //!
-//! ```rust
-//! # use pgorm_query::*;
-//! # trait ExampleSchemaBuilder {
-//! fn to_string(&self) -> String;
-//! # }
-//! ```
-//!
-//! A query statement is serialized through [`QueryStatementBuilder`], which offers both:
+//! - **Query statements** — SELECT, INSERT, UPDATE, DELETE and `WithQuery` —
+//!   bind their values. They expose `build() -> (String, Values)`, which emits
+//!   `$N` placeholders and hands back the values, plus `build_collect(sink)` for
+//!   a sink the caller owns. `build` is what you execute: the driver sends the
+//!   values over the binary protocol, so nothing is re-parsed as SQL.
+//! - **`CREATE TYPE ... AS ENUM` and `ALTER TYPE`** bind their enum labels, so
+//!   they expose `build()` and `build_collect(sink)` too — but PostgreSQL takes
+//!   no bind parameter in DDL, so their `$N` rendering is for inspection and the
+//!   inlined one is what you execute.
+//! - **Every other schema statement** — table, index, foreign-key, comment,
+//!   extension, `DROP TYPE` — binds nothing that can reach a placeholder sink.
+//!   The inlined rendering is the only one they have, and it is their `Display`.
 //!
 //! ```rust
 //! # use pgorm_query::*;
@@ -325,11 +331,9 @@
 //! # }
 //! ```
 //!
-//! `build` builds a SQL statement as string and parameters to be passed to the database driver
-//! through the binary protocol. This is the preferred way as it has less overhead and is more secure.
-//!
-//! `to_string` builds a SQL statement as string with parameters injected. This is good for testing
-//! and debugging.
+//! The inlined form escapes what it writes, so it is not an injection hole; it is
+//! the wrong choice because it re-parses on the server and loses the type pinning
+//! a bound value carries. Reach for it in tests, goldens and logs.
 //!
 //! ### Query Select
 //!

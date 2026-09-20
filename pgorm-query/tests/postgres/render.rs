@@ -234,6 +234,32 @@ fn enum_labels_render_as_data_in_both_paths() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl+6/test]    a DDL statement with no placeholder-emitting build inlines
+// the values it carries, which is what its `Display` doc claims
+#[test]
+fn a_display_only_ddl_statement_inlines_its_values() {
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(
+                ColumnDef::new(Glyph::Aspect)
+                    .integer()
+                    .default(3)
+                    .check(Expr::col(Glyph::Aspect).gt(0))
+            )
+            .to_string(),
+        r#"CREATE TABLE "glyph" ( "aspect" integer DEFAULT 3 CHECK ("aspect" > 0) )"#
+    );
+
+    // A hostile string default is escaped rather than spliced, so the one
+    // rendering is not an injection site — it is simply the unbound one.
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Image).text().default("a' -- b"))
+            .to_string(),
+        r#"CREATE TABLE "glyph" ( "image" text DEFAULT E'a\' -- b' )"#
+    );
+}
+
 // [spec:pgorm:def:sql.render.writer+2/test]    `String` is the inline-rendering sink: `push_param`
 // appends the value as a literal, and it takes the default `push_param_source_typed`
 #[test]

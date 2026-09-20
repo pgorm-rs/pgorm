@@ -186,8 +186,17 @@ pub enum ColumnSpec {
     UniqueKey,
     PrimaryKey,
     Check(SimpleExpr),
-    Generated { expr: SimpleExpr },
+    Generated {
+        expr: SimpleExpr,
+    },
     Extra(String),
+    /// Metadata, not a rendered clause: PostgreSQL has no column-comment
+    /// clause of `CREATE TABLE`, so the renderer skips this spec and the text
+    /// is carried for
+    /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments)
+    /// — and for consumers reading it back off `get_column_spec` — to turn
+    /// into the `COMMENT ON COLUMN` statement it really is.
+    // [spec:pgorm:req:sql.ddl.comment+3]
     Comment(String),
 }
 

@@ -38,7 +38,10 @@ impl TableTruncateStatement {
     }
 }
 
-// [spec:pgorm:req:sql.ddl+5] (the one rendering a DDL statement has)
+/// Renders the statement with every value inlined as an escaped SQL literal.
+/// This is its only rendering: it exposes no placeholder-emitting build, so
+/// nothing here is left to bind.
+// [spec:pgorm:req:sql.ddl+6]
 impl std::fmt::Display for TableTruncateStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

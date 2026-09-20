@@ -7707,6 +7707,7 @@ children (
                 id query-bound-quoting-contract
                 title "The bound is the quoting contract at every render site"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:53.187052Z
@@ -7720,6 +7721,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T12:03:02.924238Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -7748,6 +7756,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "lib.rs:296-325 states \"a schema statement carries no bind parameters, so it has exactly one rendering\" — false: CREATE TYPE ... AS ENUM and ALTER TYPE push_param their labels (query_builder.rs:2215, 2242-2263), so their Display inlines values while their build_collect over SqlWriterValues emits $N with the values retrievable only through undocumented into_parts(). The render surface is three-tier: query statements have build() + build_collect + Display (query/traits.rs:50-93), Type statements have build_collect + Display but no build() (extension.rs:215-237), Table/Index/FK/Comment statements have Display only (table/create.rs:256-262). And nothing structural stops executing the inlined string — pgorm's executor accepts any &str via the sealed SqlText (src/database/connection.rs:33-45), so conn.execute(&stmt.to_string(), &[]) compiles and silently loses binding. Fix: every statement that ever calls push_param exposes a real build(); every Display impl carries the inline-literal warning on the impl itself, not only in lib.rs; the \"silent no-op settable field\" class (comment, ColumnSpec::Comment) is ruled out by a fields-read-by-renderer check."
+                    }
+
+                    {
+                        at 2026-09-20T12:03:10.981092Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

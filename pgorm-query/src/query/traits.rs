@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use crate::{SqlWriter, SqlWriterValues, SubQueryStatement, value::Values};
 
-// [spec:pgorm:req:sql.ast.build+2]
+// [spec:pgorm:req:sql.ast.build+3]
 pub trait QueryStatementBuilder: Debug + Display {
     /// Build the SQL statement, collecting query parameters into a vector
     ///

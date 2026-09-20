@@ -765,7 +765,8 @@ assertions (
     {id query-tokenizer-postgres, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:52:15.576491Z}
     {id query-dead-surface-gone, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:13:16.428035Z}
     {id query-single-dialect, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:50:36.846197Z}
-    {id query-bound-quoting-contract, kind @doing, author "brendan@necessary.nu", at 2026-09-20T00:52:41.044835Z}
+    {id query-bound-quoting-contract, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:03:02.924238Z}
+    {id query-render-per-capability, kind @doing, author "brendan@necessary.nu", at 2026-09-20T12:03:10.981092Z}
 )
 
 impl_evidence (

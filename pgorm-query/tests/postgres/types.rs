@@ -1,5 +1,5 @@
 use super::*;
-use crate::oracle::assert_eq;
+use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::extension::Type;
 
 // [spec:pgorm:req:sql.ddl.type-enum+4/test]
@@ -180,5 +180,47 @@ fn identifier_equality_is_type_and_text() {
     assert_ne!(
         Alias::new("same").into_iden(),
         Alias::new("other").into_iden()
+    );
+}
+
+// [spec:pgorm:req:sql.ddl+6/test]    the two type statements that bind expose `build()`, and its
+// pair is the SQL with `$N` placeholders plus the labels in emission order
+#[test]
+fn the_label_binding_type_statements_build() {
+    let (sql, values) = Type::create(Font::Table)
+        .values(["name", "variant"])
+        .build();
+    assert_eq_unparsed!(sql, r#"CREATE TYPE "font" AS ENUM ($1, $2)"#);
+    assert_eq_unparsed!(
+        values,
+        Values(vec![Value::from("name"), Value::from("variant")])
+    );
+
+    let (sql, values) = Type::alter(Font::Table)
+        .add_value("weight")
+        .before("variant")
+        .build();
+    assert_eq_unparsed!(sql, r#"ALTER TYPE "font" ADD VALUE $1 BEFORE $2"#);
+    assert_eq_unparsed!(
+        values,
+        Values(vec![Value::from("weight"), Value::from("variant")])
+    );
+
+    // `RENAME TO` names a type rather than a label, so it stays an identifier
+    // in the bound rendering and contributes no value.
+    let (sql, values) = Type::alter(Font::Table)
+        .rename_to(Alias::new("typeface"))
+        .build();
+    assert_eq_unparsed!(sql, r#"ALTER TYPE "font" RENAME TO "typeface""#);
+    assert_eq_unparsed!(values, Values(vec![]));
+
+    // The inlined rendering is the one PostgreSQL accepts, and the oracle
+    // holds it to the grammar; the `$N` form above is deliberately not run
+    // through it, because no DDL takes a bind parameter.
+    assert_eq!(
+        Type::create(Font::Table)
+            .values(["name", "variant"])
+            .to_string(),
+        r#"CREATE TYPE "font" AS ENUM ('name', 'variant')"#
     );
 }

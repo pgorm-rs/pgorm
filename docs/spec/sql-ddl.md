@@ -10,22 +10,42 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+5]
+> [spec:pgorm:req:sql.ddl+6]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
 > `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`).
 >
-> A DDL statement always renders into a plain `String` sink and so never
-> carries bind parameters: it has exactly one rendering, and that rendering is
-> its `Display`. Table, index, foreign-key, comment, type and extension
-> statements therefore expose `to_string()` and nothing else, delegating to the
-> corresponding `prepare_*` method on the single Postgres `QueryBuilder`. The
-> `SchemaStatementBuilder` trait and its `build`/`build_any`/`to_string`
+> The render surface a statement exposes MUST follow from what it binds, not
+> from which family it belongs to. Every statement has the value-inlined
+> rendering — its `Display`, reached as `to_string()` — and that rendering MUST
+> carry, on the `impl` itself rather than only in module prose, the note that
+> it inlines rather than binds, pointing at `build` where the statement has
+> one.
+>
+> `TypeCreateStatement` and `TypeAlterStatement` push their enum labels through
+> `push_param` (`[spec:pgorm:req:sql.render.ddl.enum-type+4]`), so they have a
+> second rendering and MUST expose it as `build() -> (String, Values)` beside
+> the `build_collect(sink)` they already had — the capability named, rather
+> than reachable only by constructing a `SqlWriterValues` and calling the
+> undocumented `into_parts`. PostgreSQL accepts no bind parameter in DDL, so
+> that pair is for inspection and the inlined rendering is what a caller
+> executes; both the `build` doc and the `Display` doc MUST say so.
+>
+> Every other DDL statement — table, index, foreign-key, comment, extension,
+> `DROP TYPE` — has no placeholder-emitting entry point at all: its renderer is
+> `pub(crate)` and its only public route is `Display` over a `String` sink, so
+> a value it carries (a column `DEFAULT`, a `CHECK` expression) is always
+> inlined as an escaped literal and there is nothing left to bind. These expose
+> `to_string()` and nothing else, delegating to the corresponding `prepare_*`
+> method on the single Postgres `QueryBuilder`. The claim they "carry no bind
+> parameters" is the one to avoid restating: they carry values, and inline
+> them.
+>
+> The `SchemaStatementBuilder` trait and its `build`/`build_any`/`to_string`
 > triplication are gone, as are the `build_ref`/`build_collect_ref` inherent
-> methods on type and extension statements; those two keep a
-> `build_collect(sink)` for callers rendering into a sink they own. No
+> methods on type and extension statements. No
 > rendering method takes a `QueryBuilder` argument — the builder is a stateless
 > unit struct, so passing one carried no information.
 >

@@ -26,7 +26,7 @@ today, including panicking edges and deliberate failsafes.
 > `take()`, which moves the accumulated contents out and leaves the builder in
 > its default (empty) state.
 
-> [spec:pgorm:req:sql.ast.build+2]
+> [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
 > `Display` supertrait carries the value-inlined rendering. There is exactly
 > one method per rendering, and no rendering method takes a builder argument:
@@ -49,6 +49,14 @@ today, including panicking edges and deliberate failsafes.
 > internally generated constants (for example the `ESCAPE` character and the
 > empty-condition `TRUE`/`FALSE`) stay out of the parameter list. Identifiers
 > are double-quoted in the rendered SQL.
+>
+> The two renderings are not interchangeable and the difference MUST be
+> documented where a reader meets it: each query statement's `Display` impl
+> carries the note that it inlines rather than binds, and points at `build`.
+> The inlined form escapes what it writes, so the warning is not about
+> injection; it is that the server re-parses the literal and the type pinning
+> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+2]`) is
+> lost.
 
 ## SELECT statements
 

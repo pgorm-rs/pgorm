@@ -1881,7 +1881,10 @@ impl QueryStatementBuilder for SelectStatement {
     pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-// [spec:pgorm:req:sql.ast.build+2] (the one value-inlined rendering)
+/// Renders every value inlined as an escaped SQL literal rather than bound —
+/// good for logging and goldens. [`build`](Self::build) is the rendering to
+/// execute: it emits `$N` placeholders and returns the values to bind.
+// [spec:pgorm:req:sql.ast.build+3]
 impl std::fmt::Display for SelectStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

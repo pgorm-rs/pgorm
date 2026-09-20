@@ -1057,7 +1057,7 @@ fn select_59() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.build+2/test]
+// [spec:pgorm:req:sql.ast.build+3/test]
 // [spec:pgorm:req:sql.render.placeholders+1/test]
 // [spec:pgorm:req:sql.render.param-vs-inline+1/test]
 // [spec:pgorm:req:sql.render.custom-expr+1/test]
