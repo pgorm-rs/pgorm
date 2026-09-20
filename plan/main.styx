@@ -7866,6 +7866,7 @@ children (
                 title "Verbatim SQL says raw, validated SQL says template, and custom says nothing"
                 kind @refactor
                 deps (query-dead-surface-gone)
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:56.726417Z
@@ -7879,6 +7880,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T13:42:46.717906Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -768,7 +768,7 @@ assertions (
     {id query-bound-quoting-contract, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:03:02.924238Z}
     {id query-render-per-capability, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:13:55.566857Z}
     {id query-verbs-keep-promises, kind @complete, author "brendan@necessary.nu", at 2026-09-20T13:13:26.404952Z}
-    {id query-raw-template-words, kind @doing, author "brendan@necessary.nu", at 2026-09-20T13:15:35.650007Z}
+    {id query-raw-template-words, kind @complete, author "brendan@necessary.nu", at 2026-09-20T13:42:46.717906Z}
 )
 
 impl_evidence (
