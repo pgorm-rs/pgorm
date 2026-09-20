@@ -1153,7 +1153,7 @@ fn try_insert_conversions_and_conflict_clause() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+3/test]    `Update::one` filters on every
+// [spec:pgorm:sem:query.build.update+4/test]    `Update::one` filters on every
 // primary-key column and SETs only `Set`, non-key columns
 #[test]
 fn update_one_sets_changed_non_key_columns() {
@@ -1202,7 +1202,7 @@ fn update_one_sets_changed_non_key_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.update+3/test]    a `NotSet` primary key has no
+// [spec:pgorm:sem:query.build.update+4/test]    a `NotSet` primary key has no
 // filter to contribute, so `Update::one` refuses to build the statement
 #[test]
 fn update_one_errs_on_unset_primary_key() {
@@ -1231,7 +1231,7 @@ fn update_one_errs_on_unset_primary_key() {
     assert_eq!(err, Error::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.update+3/test]    `Update::many` adds no implicit
+// [spec:pgorm:sem:query.build.update+4/test]    `Update::many` adds no implicit
 // filter; `set` writes `Set` columns including primary keys, `col_expr` writes
 // a raw expression, and `QueryFilter` supplies the WHERE clause
 #[test]
@@ -1269,7 +1269,7 @@ fn update_many_has_no_implicit_filter() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete+2/test]    `Delete::one` filters on the
+// [spec:pgorm:sem:query.build.delete+3/test]    `Delete::one` filters on the
 // primary key only — non-key attributes never reach the WHERE clause
 #[test]
 fn delete_one_filters_by_primary_key_only() {
@@ -1311,7 +1311,7 @@ fn delete_one_filters_by_primary_key_only() {
     );
 }
 
-// [spec:pgorm:sem:query.build.delete+2/test]    a `NotSet` primary key has no
+// [spec:pgorm:sem:query.build.delete+3/test]    a `NotSet` primary key has no
 // filter to contribute, so `Delete::one` refuses to build the statement
 #[test]
 fn delete_one_errs_on_unset_primary_key() {
@@ -1339,7 +1339,7 @@ fn delete_one_errs_on_unset_primary_key() {
     assert_eq!(err, Error::PrimaryKeyNotSet);
 }
 
-// [spec:pgorm:sem:query.build.delete+2/test]    `Delete::many` is bare; narrowing
+// [spec:pgorm:sem:query.build.delete+3/test]    `Delete::many` is bare; narrowing
 // it is the caller's job through `QueryFilter`
 #[test]
 fn delete_many_is_unconstrained_until_filtered() {

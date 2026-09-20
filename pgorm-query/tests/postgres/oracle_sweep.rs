@@ -385,7 +385,7 @@ fn sweep_insert_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    UPDATE and DELETE
-// [spec:pgorm:req:sql.render.update-delete+2/test]
+// [spec:pgorm:req:sql.render.update-delete+3/test]
 #[test]
 fn sweep_update_and_delete_shapes() {
     sweep([

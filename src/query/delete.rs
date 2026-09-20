@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
-use pgorm_query::DeleteStatement;
+use pgorm_query::{DeleteStatement, IntoFromItem};
 
 /// Defines the structure for a delete operation
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ where
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:sem:query.build.delete+2]
+// [spec:pgorm:sem:query.build.delete+3]
 impl Delete {
     /// Delete one Model or ActiveModel
     ///
@@ -121,7 +121,7 @@ impl Delete {
     }
 }
 
-// [spec:pgorm:sem:query.build.delete+2]
+// [spec:pgorm:sem:query.build.delete+3]
 impl<A> DeleteOne<A>
 where
     A: ActiveModelTrait,
@@ -197,6 +197,44 @@ where
 
     fn into_query(self) -> DeleteStatement {
         self.query
+    }
+}
+
+// [spec:pgorm:sem:query.build.delete+3]
+impl<E> DeleteMany<E>
+where
+    E: EntityTrait,
+{
+    /// Add a relation to the statement's `USING` clause, so the `QueryFilter`
+    /// predicates can read another table's columns.
+    ///
+    /// `USING` is DELETE's spelling of UPDATE's `FROM`: the join condition
+    /// goes in the filter, and calling it repeatedly accumulates a
+    /// comma-separated relation list.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::{cake, fruit}};
+    ///
+    /// assert_eq!(
+    ///     Delete::many(fruit::Entity)
+    ///         .using(cake::Entity)
+    ///         .filter(fruit::Column::CakeId.eq_col(cake::Column::Id))
+    ///         .filter(cake::Column::Name.eq("Apple Pie"))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"DELETE FROM "fruit" USING "cake""#,
+    ///         r#"WHERE "fruit"."cake_id" = "cake"."id" AND "cake"."name" = 'Apple Pie'"#,
+    ///     ]
+    ///     .join(" "),
+    /// );
+    /// ```
+    pub fn using<R>(mut self, tbl_ref: R) -> Self
+    where
+        R: IntoFromItem,
+    {
+        self.query.using(tbl_ref);
+        self
     }
 }
 

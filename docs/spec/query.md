@@ -449,7 +449,7 @@ what makes it total over partially-set models.
 > `TryInsertResult::Conflicted`; success wraps the result in
 > `TryInsertResult::Inserted`.
 
-> [spec:pgorm:sem:query.build.update+3]
+> [spec:pgorm:sem:query.build.update+4]
 > `Update::one(model)` builds an `UpdateOne<A>` in two passes over the
 > ActiveModel and returns `Result<UpdateOne<A>, Error>`. Filters: every
 > primary-key column contributes a `WHERE pk = value` equality from a `Set`
@@ -465,8 +465,21 @@ what makes it total over partially-set models.
 > filter; `set(model)` applies the same `Set`-only rule but does not exclude
 > primary-key columns, and `col_expr(col, expr)` sets a raw expression. Both
 > forms implement `QueryFilter` for WHERE clauses.
+>
+> `UpdateMany::from(rel)` exposes the statement's FROM relation list
+> (`sql.ast.update`) as a consuming-`self` pass-through taking any
+> `IntoFromItem`, so an update can read another table's columns through
+> `col_expr` and narrow on them through `QueryFilter`. It is a pass-through
+> and nothing more: the ORM adds no relation inference, no `RelationDef`
+> overload and no automatic join predicate, because the entity-relation
+> vocabulary those would need is the graph layer's, not this builder's, and
+> guessing a join condition on a write statement is the kind of help that
+> deletes the wrong rows. The caller names the relation and writes the join
+> predicate as an ordinary filter. `UpdateOne` gets no such method — it
+> exists to write one identified row, and a relation list is meaningless
+> against a full primary-key filter.
 
-> [spec:pgorm:sem:query.build.delete+2]
+> [spec:pgorm:sem:query.build.delete+3]
 > `Delete::one(model)` converts through `IntoActiveModel`, targets the
 > entity's table and returns `Result<DeleteOne<A>, Error>`: every primary-key
 > column contributes a `WHERE pk = value` equality from a `Set` or
@@ -477,6 +490,12 @@ what makes it total over partially-set models.
 > participate in the filter. `EntityTrait::delete` forwards both the success
 > and the error. `Delete::many(entity)` builds a bare `DELETE FROM <table>`;
 > constraining it is the caller's job via `QueryFilter`.
+>
+> `DeleteMany::using(rel)` exposes the statement's USING relation list
+> (`sql.ast.delete`) as a consuming-`self` pass-through taking any
+> `IntoFromItem`, mirroring `UpdateMany::from` clause for clause and carrying
+> the same refusal to infer a join predicate. `DeleteOne` gets no such
+> method, for the reason `UpdateOne` does not.
 
 ## Batched loading
 

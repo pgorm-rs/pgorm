@@ -517,11 +517,27 @@ an ideal Postgres renderer would emit.
 > expressions. There is no pre-source emission point: PostgreSQL spells the
 > returned rows in exactly one position, so the renderer has exactly one.
 
-> [spec:pgorm:req:sql.render.update-delete+2]
+> [spec:pgorm:req:sql.render.update-delete+3]
 > Each half MUST open with the statement's carried WITH clause when it has one
 > (`sql.render.cte`). `UPDATE ` then renders the table, ` SET ` with
-> comma-separated `"col" = expr` assignments, then WHERE and RETURNING.
-> `DELETE ` renders `FROM ` and the table, then WHERE and RETURNING. Neither renders ORDER BY or LIMIT:
+> comma-separated `"col" = expr` assignments, then the FROM clause, then WHERE
+> and RETURNING. `DELETE ` renders `FROM ` and the table, then the USING
+> clause, then WHERE and RETURNING.
+>
+> The two relation clauses render through the same path a SELECT's FROM does:
+> when the list is non-empty, ` FROM ` (UPDATE) or ` USING ` (DELETE) followed
+> by the items comma-separated, each written by `prepare_from_item`, so a
+> subquery, a values list, a function call and a `FromItem::Template` fragment
+> render in a write statement exactly as they do in a SELECT — parameters of a
+> fragment included, which renumber into the enclosing statement's space. An
+> empty list renders nothing at all, not a bare keyword: the clause is absent
+> from the AST's default, so the overwhelmingly common single-table write is
+> byte-identical to what it rendered before the clause existed. Position is
+> fixed by the grammar and not negotiable — PostgreSQL requires FROM after
+> SET and USING after the target table, both before WHERE, since the WHERE is
+> what reads the relations they introduce.
+>
+> Neither renders ORDER BY or LIMIT:
 > PostgreSQL accepts neither on a write statement, and per `sql.ast.update`
 > and `sql.ast.delete` the two statements hold nothing to render them from, so
 > the renderer has no invalid clause to guard against. Row selection that needs

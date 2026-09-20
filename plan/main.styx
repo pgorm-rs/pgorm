@@ -7801,6 +7801,13 @@ children (
                         kind @note
                         text "UpdateStatement has exactly four fields — table, values, where, returning (query/update.rs:76-81) — and DeleteStatement likewise has no USING (query/delete.rs:80-236). UPDATE ... FROM / DELETE ... USING is the join-write idiom every downstream app hits early; today it forces correlated-subquery contortions, which the crate's own doctests demonstrate (update.rs:267-276 routes through in_subquery against a CTE), or raw SQL. Ranked second of the three sufficiency gaps most worth closing in the 2026-09-20 review. The from machinery already exists on SelectStatement; the work is a from slot on the two write statements plus renderer support and multi-relation name resolution in the WHERE."
                     }
+
+                    {
+                        at 2026-09-20T17:58:19.10353Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

@@ -70,13 +70,14 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ast.update+4]
+// [spec:pgorm:req:sql.ast.update+5]
 // [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
     pub(crate) values: Vec<(Name, Box<SimpleExpr>)>,
+    pub(crate) from: Vec<FromItem>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) returning: Option<ReturningClause>,
 }
@@ -109,7 +110,7 @@ impl UpdateStatement {
     /// # Examples
     ///
     /// See [`UpdateStatement::values`]
-    // [spec:pgorm:req:sql.ast.update+4]
+    // [spec:pgorm:req:sql.ast.update+5]
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
@@ -139,7 +140,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.update+4]
+    // [spec:pgorm:req:sql.ast.update+5]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoName,
@@ -177,6 +178,91 @@ impl UpdateStatement {
         T: Into<SimpleExpr>,
     {
         self.values.push((col.into_name(), Box::new(value.into())));
+        self
+    }
+
+    /// Add a relation to the `FROM` clause, so the assignments and the `WHERE`
+    /// can read columns of a table other than the one being updated.
+    ///
+    /// The join condition belongs in `WHERE`: PostgreSQL's `UPDATE .. FROM`
+    /// takes a plain relation list, and a row of the target table is updated
+    /// once for every row the `FROM` relations match it with.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::update()
+    ///     .table(Char::Table)
+    ///     .value(Char::FontSize, Expr::col((Font::Table, Font::Id)))
+    ///     .from(Font::Table)
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"UPDATE "character" SET "font_size" = "font"."id" FROM "font" WHERE "character"."font_id" = "font"."id""#
+    /// );
+    /// ```
+    ///
+    /// Calling it repeatedly accumulates a comma-separated relation list, as
+    /// on a `SELECT`:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::update()
+    ///     .table(Char::Table)
+    ///     .value(Char::FontSize, 12)
+    ///     .from(Font::Table)
+    ///     .from(Glyph::Table)
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///     .and_where(Expr::col((Glyph::Table, Glyph::Id)).eq(1))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"UPDATE "character" SET "font_size" = 12 FROM "font", "glyph""#,
+    ///         r#"WHERE "character"."font_id" = "font"."id" AND "glyph"."id" = 1"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// It takes the same relation currency a `SELECT`'s `from` takes, so a
+    /// subquery, a values list or a validated fragment stands where a table
+    /// stands:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let fragment = SqlTemplate::from_sql(
+    ///     r#"SELECT "id", "name" FROM "font" WHERE "language" = $1"#,
+    ///     ["en".into()],
+    /// )?;
+    ///
+    /// let (sql, values) = Query::update()
+    ///     .table(Char::Table)
+    ///     .value(Char::FontSize, 12)
+    ///     .from(FromItem::Template(fragment, Name::runtime("f")))
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).equals((Name::runtime("f"), Font::Id)))
+    ///     .build();
+    ///
+    /// assert_eq!(
+    ///     sql,
+    ///     "UPDATE \"character\" SET \"font_size\" = $1 FROM \
+    ///      (SELECT \"id\", \"name\" FROM \"font\" WHERE \"language\" = $2\n\
+    ///      ) AS \"f\" WHERE \"character\".\"font_id\" = \"f\".\"id\""
+    /// );
+    /// assert_eq!(values.0, vec![12i32.into(), "en".into()]);
+    /// # Ok::<(), pgorm_query::error::Error>(())
+    /// ```
+    // [spec:pgorm:req:sql.ast.update+5]
+    pub fn from<R>(&mut self, tbl_ref: R) -> &mut Self
+    where
+        R: IntoFromItem,
+    {
+        self.from.push(tbl_ref.into_from_item());
         self
     }
 

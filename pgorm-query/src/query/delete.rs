@@ -66,12 +66,13 @@ use inherent::inherent;
 ///     r#"DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.delete+3]
+// [spec:pgorm:def:sql.ast.delete+4]
 // [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
+    pub(crate) using: Vec<FromItem>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) returning: Option<ReturningClause>,
 }
@@ -115,13 +116,74 @@ impl DeleteStatement {
     ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.delete+3]
+    // [spec:pgorm:def:sql.ast.delete+4]
     #[allow(clippy::wrong_self_convention)]
     pub fn from_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
         T: IntoNamedTable,
     {
         self.table = Some(tbl_ref.into_named_table());
+        self
+    }
+
+    /// Add a relation to the `USING` clause, so the `WHERE` can read columns
+    /// of a table other than the one being deleted from.
+    ///
+    /// `USING` is DELETE's spelling of UPDATE's `FROM`, and takes the same
+    /// relation currency: the join condition belongs in `WHERE`, and a target
+    /// row is deleted when any row of the `USING` relations matches it.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::delete()
+    ///     .from_table(Char::Table)
+    ///     .using(Font::Table)
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).equals((Font::Table, Font::Id)))
+    ///     .and_where(Expr::col((Font::Table, Font::Language)).eq("en"))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"DELETE FROM "character" USING "font""#,
+    ///         r#"WHERE "character"."font_id" = "font"."id" AND "font"."language" = 'en'"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// Calling it repeatedly accumulates a comma-separated relation list, and
+    /// a subquery, a values list or a validated fragment stands where a table
+    /// stands:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::delete()
+    ///     .from_table(Char::Table)
+    ///     .using(FromItem::SubQuery(
+    ///         Query::select().column(Font::Id).from(Font::Table).take(),
+    ///         Name::runtime("f"),
+    ///     ))
+    ///     .and_where(Expr::col((Char::Table, Char::FontId)).equals((Name::runtime("f"), Font::Id)))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"DELETE FROM "character" USING (SELECT "id" FROM "font") AS "f""#,
+    ///         r#"WHERE "character"."font_id" = "f"."id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.delete+4]
+    pub fn using<R>(&mut self, tbl_ref: R) -> &mut Self
+    where
+        R: IntoFromItem,
+    {
+        self.using.push(tbl_ref.into_from_item());
         self
     }
 

@@ -510,7 +510,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## UPDATE and DELETE statements
 
-> [spec:pgorm:req:sql.ast.update+4]
+> [spec:pgorm:req:sql.ast.update+5]
 > `UpdateStatement` MUST accumulate SET assignments in call order as
 > `(column, expression)` pairs: `values(pairs)` pushes many, `value(col, expr)`
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
@@ -518,25 +518,52 @@ today, including panicking edges and deliberate failsafes.
 > not deduplicated — each call appends. The statement also carries the target
 > `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`, so
 > the target is a name with an optional alias and nothing else, rendering
-> `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
-> (per `sql.ast.condition.holder`), an optional `ReturningClause`, and an
-> optional WITH clause attached by `with(..)` (`query.build.with`).
-> `get_values` MUST expose the accumulated assignment pairs for inspection.
+> `UPDATE "t" AS "a" SET ..` when one is bound — a FROM relation list, a WHERE
+> `ConditionHolder` (per `sql.ast.condition.holder`), an optional
+> `ReturningClause`, and an optional WITH clause attached by `with(..)`
+> (`query.build.with`). `get_values` MUST expose the accumulated assignment
+> pairs for inspection.
+>
+> The FROM relation list MUST accumulate through `from(..)`, exactly as
+> `sql.ast.select.from` describes for a SELECT, and MUST take the same
+> currency: any `IntoFromItem`, so a plain table, an aliased table, a
+> subquery, a function call, a values list or a `FromItem::Template` fragment
+> all stand where a relation stands. It is a relation *list*, not a join tree:
+> the statement holds no `JoinExpr`, so a caller writes the join condition as
+> an ordinary WHERE predicate, which is how PostgreSQL's own `UPDATE .. FROM`
+> reads and what its documentation recommends. That boundary is a deliberate
+> first cut rather than an oversight — `JoinExpr`, `JoinKind` and `JoinOn` are
+> `pub(crate)` per `sql.surface`, so joins in the write statements' relation
+> lists would mean publishing the join shape and a whole
+> `inner_join`/`left_join`/`right_join`/`full_outer_join`/`cross_join` family
+> on two more statement types to buy syntax the WHERE already expresses. A
+> caller who needs an outer join's null-extension drives the statement from a
+> subquery FROM item that performs it.
 >
 > The statement MUST NOT carry ORDER BY expressions or a LIMIT: PostgreSQL
 > admits neither on an UPDATE. `UpdateStatement` therefore does not implement
 > `OrderedStatement` and has no `limit` method, so neither clause can be built
 > to be rendered; an update over an ordered, limited set of rows is expressed
 > by the caller as a subquery filter (`WHERE id IN (SELECT .. ORDER BY ..
-> LIMIT ..)`).
+> LIMIT ..)`). A FROM relation does not substitute for that: it widens what
+> the statement can read, not how many rows it touches.
 
-> [spec:pgorm:def:sql.ast.delete+3]
+> [spec:pgorm:def:sql.ast.delete+4]
 > `DeleteStatement` is the DELETE AST node: a target table set by
 > `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
-> bound — a WHERE `ConditionHolder` shared with the condition rules, and an
-> optional `ReturningClause`. Like the other three statements it carries an
-> optional WITH clause, attached by `with(..)` (`query.build.with`).
+> bound — a USING relation list, a WHERE `ConditionHolder` shared with the
+> condition rules, and an optional `ReturningClause`. Like the other three
+> statements it carries an optional WITH clause, attached by `with(..)`
+> (`query.build.with`).
+>
+> USING is DELETE's spelling of UPDATE's FROM and MUST behave identically:
+> `using(..)` accumulates a relation list of any `IntoFromItem`, carries no
+> join tree, and leaves the join condition to WHERE, with the boundary
+> `sql.ast.update` states. The two clauses differ in keyword only because
+> PostgreSQL's grammar does — `FROM` is already spoken for on a DELETE by the
+> target table — so a single `FromItem` list serves both and one rendering
+> rule covers the pair.
 >
 > As with `sql.ast.update`, the statement MUST NOT carry ORDER BY expressions
 > or a LIMIT — PostgreSQL admits neither on a DELETE — so it implements no

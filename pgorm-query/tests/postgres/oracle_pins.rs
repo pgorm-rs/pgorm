@@ -122,9 +122,9 @@ fn on_conflict_renders_only_valid_shapes() {
 // it — leaving the shape the grammar does accept, with the ordering and the
 // limit where they belong: the SELECT that chooses the rows.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.update-delete+2/test]
-// [spec:pgorm:req:sql.ast.update+4/test]
-// [spec:pgorm:def:sql.ast.delete+3/test]
+// [spec:pgorm:req:sql.render.update-delete+3/test]
+// [spec:pgorm:req:sql.ast.update+5/test]
+// [spec:pgorm:def:sql.ast.delete+4/test]
 #[test]
 fn writes_take_order_and_limit_by_subquery() {
     let rows = || {

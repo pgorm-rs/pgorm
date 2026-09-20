@@ -275,7 +275,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UpdateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete+2] (UPDATE half)
+    // [spec:pgorm:req:sql.render.update-delete+3] (UPDATE half)
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_update_statement(
         &self,
@@ -305,13 +305,24 @@ impl QueryBuilder {
             false
         });
 
+        if !update.from.is_empty() {
+            write!(sql, " FROM ").unwrap();
+            update.from.iter().fold(true, |first, from_item| {
+                if !first {
+                    write!(sql, ", ").unwrap()
+                }
+                self.prepare_from_item(from_item, sql);
+                false
+            });
+        }
+
         self.prepare_condition(&update.r#where, "WHERE", sql);
 
         self.prepare_returning(&update.returning, sql);
     }
 
     /// Translate [`DeleteStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete+2] (DELETE half)
+    // [spec:pgorm:req:sql.render.update-delete+3] (DELETE half)
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_delete_statement(
         &self,
@@ -327,6 +338,17 @@ impl QueryBuilder {
         if let Some(table) = &delete.table {
             write!(sql, "FROM ").unwrap();
             self.prepare_named_table(table, sql);
+        }
+
+        if !delete.using.is_empty() {
+            write!(sql, " USING ").unwrap();
+            delete.using.iter().fold(true, |first, from_item| {
+                if !first {
+                    write!(sql, ", ").unwrap()
+                }
+                self.prepare_from_item(from_item, sql);
+                false
+            });
         }
 
         self.prepare_condition(&delete.r#where, "WHERE", sql);

@@ -239,8 +239,8 @@ fn named_from_item_forms_render() {
 // [spec:pgorm:def:sql.types.table-ref+4/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+2/test]
-// [spec:pgorm:req:sql.ast.update+4/test]
-// [spec:pgorm:def:sql.ast.delete+3/test]
+// [spec:pgorm:req:sql.ast.update+5/test]
+// [spec:pgorm:def:sql.ast.delete+4/test]
 #[test]
 fn aliased_dml_targets_render() {
     let target = || {

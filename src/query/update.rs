@@ -3,7 +3,7 @@ use crate::{
     QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
-use pgorm_query::{Expr, IntoName, SimpleExpr, UpdateStatement};
+use pgorm_query::{Expr, IntoFromItem, IntoName, SimpleExpr, UpdateStatement};
 
 /// Defines a structure to perform UPDATE query operations on a ActiveModel
 #[derive(Clone, Debug)]
@@ -102,7 +102,7 @@ impl Update {
     }
 }
 
-// [spec:pgorm:sem:query.build.update+3]
+// [spec:pgorm:sem:query.build.update+4]
 impl<A> UpdateOne<A>
 where
     A: ActiveModelTrait,
@@ -197,7 +197,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.update+3]
+// [spec:pgorm:sem:query.build.update+4]
 impl<E> UpdateMany<E>
 where
     E: EntityTrait,
@@ -225,6 +225,43 @@ where
         T: IntoName,
     {
         self.query.value(col, expr);
+        self
+    }
+
+    /// Add a relation to the statement's `FROM` clause, so `col_expr` and the
+    /// `QueryFilter` predicates can read another table's columns.
+    ///
+    /// The join condition goes in the filter, which is PostgreSQL's own
+    /// spelling of `UPDATE .. FROM`; calling it repeatedly accumulates a
+    /// comma-separated relation list.
+    ///
+    /// ```
+    /// use pgorm::{entity::*, query::*, tests_cfg::{cake, fruit}};
+    /// use pgorm_query::Expr;
+    ///
+    /// assert_eq!(
+    ///     Update::many(fruit::Entity)
+    ///         .col_expr(
+    ///             fruit::Column::Name,
+    ///             Expr::col((cake::Entity, cake::Column::Name)).into(),
+    ///         )
+    ///         .from(cake::Entity)
+    ///         .filter(fruit::Column::CakeId.eq_col(cake::Column::Id))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"UPDATE "fruit" SET "name" = "cake"."name" FROM "cake""#,
+    ///         r#"WHERE "fruit"."cake_id" = "cake"."id""#,
+    ///     ]
+    ///     .join(" "),
+    /// );
+    /// ```
+    // [spec:pgorm:sem:query.build.update+4]
+    pub fn from<R>(mut self, tbl_ref: R) -> Self
+    where
+        R: IntoFromItem,
+    {
+        self.query.from(tbl_ref);
         self
     }
 }
