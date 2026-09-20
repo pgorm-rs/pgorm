@@ -1118,6 +1118,7 @@ pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName 
         FromItem::Table(table) => table.name.clone(),
         FromItem::SubQuery(_, alias)
         | FromItem::ValuesList(_, alias)
-        | FromItem::FunctionCall(_, alias) => pgorm_query::TableName::Table(Name::clone(alias)),
+        | FromItem::FunctionCall(_, alias)
+        | FromItem::Template(_, alias) => pgorm_query::TableName::Table(Name::clone(alias)),
     }
 }

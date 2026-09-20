@@ -367,7 +367,7 @@ impl Expr {
     ///
     /// assert!(Expr::template("6 = $1 * $2", [2]).is_err());
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+2]
+    // [spec:pgorm:req:sql.render.custom-expr+3]
     pub fn template<T, V, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
@@ -420,7 +420,7 @@ impl Expr {
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+2]
+    // [spec:pgorm:req:sql.render.custom-expr+3]
     pub fn template_with_expr<T, E>(s: T, expr: E) -> Result<SimpleExpr>
     where
         T: Into<String>,
@@ -433,7 +433,7 @@ impl Expr {
     /// if your fragment needs other expressions.
     ///
     /// See [`Expr::template`] for how the template's census is checked.
-    // [spec:pgorm:req:sql.render.custom-expr+2]
+    // [spec:pgorm:req:sql.render.custom-expr+3]
     pub fn template_with_exprs<T, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,

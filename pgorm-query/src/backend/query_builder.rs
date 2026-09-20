@@ -335,8 +335,8 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
-    // [spec:pgorm:req:sql.render.subquery+1] (SubQuery/Tuple/Values expression arms)
-    // [spec:pgorm:req:sql.render.custom-expr+2]
+    // [spec:pgorm:req:sql.render.subquery+2] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.custom-expr+3]
     fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::Column(column_ref) => {
@@ -403,7 +403,7 @@ impl QueryBuilder {
             SimpleExpr::Raw(s) => {
                 write!(sql, "{s}").unwrap();
             }
-            // [spec:pgorm:req:sql.render.custom-expr+2]
+            // [spec:pgorm:req:sql.render.custom-expr+3]
             SimpleExpr::Template(template) => {
                 for segment in template.segments() {
                     match segment {
@@ -549,7 +549,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`FromItem`] into SQL statement.
-    // [spec:pgorm:req:sql.render.subquery+1] (value-bearing from items carry mandatory aliases)
+    // [spec:pgorm:req:sql.render.subquery+2] (value-bearing from items carry mandatory aliases)
     fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
         match from_item {
             FromItem::Table(table) => self.prepare_named_table(table, sql),
@@ -571,6 +571,23 @@ impl QueryBuilder {
                 self.prepare_function_name(&func.func, sql);
                 self.prepare_function_arguments(func, sql);
                 write!(sql, " AS ").unwrap();
+                alias.prepare(sql.as_writer());
+            }
+            // A fragment this crate did not build closes on a line of its own:
+            // its last text may end inside a `--` comment, which would
+            // otherwise swallow the closing parenthesis. Each resolved value
+            // re-enters through `prepare_simple_expr`, so the fragment's own
+            // `$N` are renumbered into this statement's parameter space.
+            // [spec:pgorm:req:sql.render.subquery+2]
+            FromItem::Template(template, alias) => {
+                write!(sql, "(").unwrap();
+                for segment in template.segments() {
+                    match segment {
+                        Segment::Text(text) => write!(sql, "{text}").unwrap(),
+                        Segment::Value(expr) => self.prepare_simple_expr(expr, sql),
+                    }
+                }
+                write!(sql, "\n) AS ").unwrap();
                 alias.prepare(sql.as_writer());
             }
         }
@@ -2093,7 +2110,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`NamedTable`] into SQL statement.
-    // [spec:pgorm:def:sql.types.table-ref+3]
+    // [spec:pgorm:def:sql.types.table-ref+4]
     fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {

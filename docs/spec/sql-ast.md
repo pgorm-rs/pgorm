@@ -144,7 +144,7 @@ today, including panicking edges and deliberate failsafes.
 > `cond_having`); both feed the HAVING `ConditionHolder` with the semantics of
 > `sql.ast.condition.holder`.
 
-> [spec:pgorm:req:sql.ast.select.from+1]
+> [spec:pgorm:req:sql.ast.select.from+2]
 > FROM clauses MUST accumulate: calling `from` repeatedly produces multiple
 > comma-separated FROM items (the "old-school join" form), and `from_clear`
 > MUST remove all of them. The FROM item variants are: plain tables (with
@@ -152,6 +152,14 @@ today, including panicking edges and deliberate failsafes.
 > table), `from_subquery` (`FromItem::SubQuery` with mandatory alias),
 > `from_function` (`FromItem::FunctionCall` with alias), and `from_values`
 > (`FromItem::ValuesList` rendering `(VALUES (..), (..)) AS "alias"`).
+>
+> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+4]`) gets no
+> shorthand of its own. Its constructor returns `Result`, and a shorthand
+> would have to either return `Result` — breaking the `&mut Self` chain every
+> other builder method keeps — or swallow the failure; instead it is built
+> first and handed to the generic `from`, which already takes any
+> `IntoFromItem`. A builder method is not owed to every variant; it is owed
+> where it saves the caller a type name and nothing else.
 >
 > `from_values` MUST panic when given an empty tuple list (`assert!` on the
 > collected rows); there is no non-panicking variant.
@@ -425,7 +433,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+2]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -508,7 +516,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
 > (per `sql.ast.condition.holder`), an optional `ReturningClause`, and an
@@ -524,7 +532,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+3]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+3]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a WHERE `ConditionHolder` shared with the condition rules, and an
 > optional `ReturningClause`. Like the other three statements it carries an

@@ -425,19 +425,29 @@ an ideal Postgres renderer would emit.
 > a `$N` parameter in the `build()` path, the literal inline — then a space
 > and the keyword (`$1 PRECEDING`, `2 FOLLOWING`).
 
-> [spec:pgorm:req:sql.render.subquery+1]
+> [spec:pgorm:req:sql.render.subquery+2]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
 > `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
 > A `SimpleExpr::Tuple` renders `(e1, e2, …)`; `SimpleExpr::Values` renders
 > `(v1, v2, …)` with each element parameterized. As a FROM item,
 > `FromItem::SubQuery` renders `(SELECT …) AS "alias"`, `FromItem::ValuesList`
 > renders `(VALUES (…), (…)) AS "alias"`, and `FromItem::FunctionCall` renders
-> `func(args) AS "alias"`; all three forms carry mandatory aliases, and
+> `func(args) AS "alias"`; all such forms carry mandatory aliases, and
 > `FromItem::Table` renders its `TableName` followed by ` AS "alias"` when an
 > alias is bound. Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
 > a value-bearing reference never reaches them
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
+>
+> `FromItem::Template` renders `(<fragment>\n) AS "alias"`. The fragment is
+> the `SqlTemplate`'s resolved segments written in order: each text segment
+> verbatim, each resolved value through the ordinary expression path, so the
+> fragment's `$N` renumber into the enclosing statement's parameter space
+> (`[spec:pgorm:req:sql.render.custom-expr+3]`). The newline before the
+> closing parenthesis is unconditional and load-bearing: the fragment is
+> foreign text that may end inside a `--` comment, which would otherwise
+> swallow the parenthesis. It is written here rather than required of
+> whoever built the fragment, so no caller can forget it.
 
 ## CTEs
 
@@ -520,7 +530,7 @@ an ideal Postgres renderer would emit.
 
 ## Custom expressions
 
-> [spec:pgorm:req:sql.render.custom-expr+2]
+> [spec:pgorm:req:sql.render.custom-expr+3]
 > `SimpleExpr::Raw(s)` MUST be written verbatim, unescaped; its payload is
 > `&'static str`, so only program text can reach it.
 > `SimpleExpr::Template` carries a `SqlTemplate`, whose template and
@@ -542,6 +552,24 @@ an ideal Postgres renderer would emit.
 > tokenized, placeholder-like text inside quoted tokens is neither substituted
 > nor counted.
 >
+> `SqlTemplate::from_sql(sql, values)` is the second constructor, for text
+> that is real SQL rather than a template authored for this machinery — a
+> caller's own statement, which is where relation-position fragments come
+> from (`[spec:pgorm:def:sql.types.table-ref+4]`). It differs in the `$`
+> grammar and in nothing else: only `$N` is a substitution, and every other
+> `$` is reproduced verbatim — `$$` included, because in real SQL `$$` opens
+> a dollar-quoted body rather than standing in for a literal `$`. This is
+> the reading `[spec:pgorm:sem:sql.render.inject+3]` already does, and it is
+> PostgreSQL's own, since the tokenizer reads comments as space and
+> dollar-quoted and `E'…'` bodies as quoted
+> (`[spec:pgorm:sem:sql.token.limits+2]`). `MalformedPlaceholder` is
+> therefore unreachable from this constructor. Its values are `Value`s, not
+> arbitrary expressions: a `$N` in real SQL is a bind marker, and admitting
+> an expression there would turn a parameterised statement into a spliced
+> one. The grammar is a reading and not a property of the value, so what
+> either constructor hands back is the same resolved sequence and no
+> consumer of a `SqlTemplate` can tell them apart.
+>
 > The census MUST come out exact: the set of distinct `N` referenced MUST equal
 > `1..=values.len()`. A reference past the end is
 > `Error::Template { reason: IndexOutOfRange }`; a supplied value the template
@@ -556,6 +584,15 @@ an ideal Postgres renderer would emit.
 > index out of range. This closes the render-time index panic that the previous
 > version of this rule described, per `[dec:pgorm:no-panic]` and
 > `[dec:pgorm:invalid-states-unrepresentable]`.
+>
+> Because each reference was paired with its value rather than with an index,
+> rendering emits ONE parameter per reference, numbered by the enclosing
+> statement's own counter. A template therefore renumbers into whatever
+> statement it lands in — a value read twice becomes two parameters holding
+> it, and values read out of order come out in reference order with the
+> values permuted to match — which is what lets a template compose with a
+> statement that binds values of its own instead of requiring its own
+> numbering to be free.
 >
 > A `SimpleExpr::AsEnum(type, expr)` at the top level is rewritten to a cast and
 > renders as `CAST(expr AS type)`, with the type name written raw (unquoted) as

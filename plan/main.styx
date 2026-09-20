@@ -7950,6 +7950,20 @@ children (
                         kind @note
                         text "FromItem (types.rs:393-402) offers Table/SubQuery/ValuesList/FunctionCall — no raw variant, so a foreign SQL fragment cannot enter a built query as a relation. Expression position has Expr::cust; relation position has nothing. The crate's own executor paid for this twice: wrap_raw_select (src/executor/paginator.rs:395-402) and the count path (:129-133) hand-format \"SELECT * FROM ({select}) AS ...\" around a caller's raw statement, then need a pg_query-based marker census (:411-450) to make the interpolation safe. The fix is a validated raw relation riding the existing template machinery (single-SELECT check, $N renumbering — exactly what the paginator already hand-rolls), after which wrap_raw_select is deleted and the paginator becomes an ordinary builder consumer. Naming follows query-raw-template-words, hence the dep."
                     }
+
+                    {
+                        at 2026-09-20T17:01:55.523093Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T17:49:32.555363Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Landed as a template-class relation, not a raw one, per the 10a04f40 vocabulary: FromItem::Template(SqlTemplate, Name) reached through SqlTemplate::from_sql(sql, values) — a second constructor on the existing type that reads the $ grammar of REAL SQL (Grammar::Sql: only $N is a marker, $$ opens a dollar-quoted body) rather than SqlTemplate::new's authored-template grammar. No new exported item and so no sql.surface change: the grammar is a reading, not a property of the value, and both constructors hand back the same resolved segment sequence, so a second validated-template type would have doubled the surface for no new invariant. No `from_template` builder method either — the Result is SqlTemplate's, one step before the chain, and `.from()` already takes IntoFromItem. No &'static str `from_raw` sibling: relation-position fragments come from callers' runtime statements, which is exactly what the template class exists for. Renumbering is solved IN THE GENERAL CASE and for free: each resolved value re-enters through prepare_simple_expr, so push_param renumbers the fragment's markers into the enclosing statement's space in first-reference order (a value read twice becomes two parameters; markers read out of order come out in order with the values permuted). Tested with a fragment embedded in an outer statement that binds values before and after it. Diagnosis correction for the record: the filing note said the paginator's pg_query marker census was needed because the sql.token tokenizer cannot see comments or dollar quoting, and exec.paginator.raw+3's body said the same, citing sql.token.limits+2 — but that rule now says the OPPOSITE (comments lex as one Space token; dollar-quoted and E'…' bodies as one Quoted token). The tokenizer was upgraded and paginate.md was never revisited, so the rule contradicted its own citation; that stale premise is what made the hand-formatting look unavoidable. The census is now the template machinery's and is strictly stronger than check_markers was — it also refuses a supplied value the statement never reads. What stayed in the ORM is the libpg_query precondition (single row-returning SELECT, taken at the parser's extent), because pg_query is the ORM's dependency and deliberately not the query builder's."
+                    }
                 )
             }
 

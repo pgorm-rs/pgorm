@@ -320,7 +320,7 @@ including panic semantics and quirks inherited from sea-query.
 > 2-tuple to `TableColumn`, a 3-tuple to `SchemaTableColumn`, the `Asterisk`
 > unit type to `Asterisk`, and `(name, Asterisk)` to `TableAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+3]
+> [spec:pgorm:def:sql.types.table-ref+4]
 > Table references are split by position, so that a reference which names no
 > table cannot reach a statement that needs one. There are three positions,
 > and each takes the widest type its position admits: DDL targets a name,
@@ -346,17 +346,32 @@ including panic semantics and quirks inherited from sea-query.
 > qualified by — the bound alias when there is one, otherwise the table name.
 >
 > `FromItem` is the query-position reference: `Table(NamedTable)` — the DML
-> reference reused, so aliasing is expressed in one place — plus the three
+> reference reused, so aliasing is expressed in one place — plus the four
 > value-producing forms `SubQuery(SelectStatement, alias)`,
-> `ValuesList(Vec<ValueTuple>, alias)` and `FunctionCall(FunctionCall,
-> alias)`, each carrying a mandatory alias. `IntoFromItem` accepts a
-> `FromItem` unchanged and widens anything `IntoNamedTable` accepts;
-> `From<NamedTable> for FromItem` and `From<TableName> for FromItem` are the
-> same widening as value conversions. `FromItem::alias(a)` binds or replaces
-> the alias on any form. `FromItem::table_name()` returns the name for the
-> named form and `None` for the value-producing forms;
-> `FromItem::qualifier()` returns the identifier a column of the item is
-> qualified by, delegating to `NamedTable::qualifier()` for the named form.
+> `ValuesList(Vec<ValueTuple>, alias)`, `FunctionCall(FunctionCall, alias)`
+> and `Template(SqlTemplate, alias)`, each carrying a mandatory alias.
+> `IntoFromItem` accepts a `FromItem` unchanged and widens anything
+> `IntoNamedTable` accepts; `From<NamedTable> for FromItem` and
+> `From<TableName> for FromItem` are the same widening as value conversions.
+> `FromItem::alias(a)` binds or replaces the alias on any form.
+> `FromItem::table_name()` returns the name for the named form and `None`
+> for the value-producing forms; `FromItem::qualifier()` returns the
+> identifier a column of the item is qualified by, delegating to
+> `NamedTable::qualifier()` for the named form.
+>
+> `Template` is how SQL this crate did not build stands where a relation
+> stands, and it is template-class rather than raw: its payload is a
+> `SqlTemplate` (`[spec:pgorm:req:sql.render.custom-expr+3]`), so the
+> fragment arrives already paired with the values its `$N` markers number
+> and a fragment whose markers and values disagree is unconstructible. There
+> is no `&'static str` sibling in this position: relation-position fragments
+> come from callers' runtime statements, which is exactly the case the
+> template class exists for, and a verbatim form would have to re-open the
+> render-time census the template class closed. It reaches a query through
+> the ordinary `from`/`join` entry points, which take any `IntoFromItem`, so
+> the crate gains no `Result`-returning builder method for it — the `Result`
+> is `SqlTemplate`'s, one step earlier, where it can be handled without
+> interrupting a builder chain.
 >
 > Because every DDL target takes `TableName`, every DML target takes
 > `NamedTable` and every query position takes `FromItem`, a subquery, values

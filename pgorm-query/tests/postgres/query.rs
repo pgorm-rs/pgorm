@@ -43,7 +43,7 @@ fn select_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+1/test]
+// [spec:pgorm:req:sql.ast.select.from+2/test]
 #[test]
 fn select_4() {
     assert_eq!(
@@ -1060,7 +1060,7 @@ fn select_59() {
 // [spec:pgorm:req:sql.ast.build+3/test]
 // [spec:pgorm:req:sql.render.placeholders+1/test]
 // [spec:pgorm:req:sql.render.param-vs-inline+1/test]
-// [spec:pgorm:req:sql.render.custom-expr+2/test]
+// [spec:pgorm:req:sql.render.custom-expr+3/test]
 #[test]
 fn select_60() {
     let (cust_query, cust_values) = Query::select()
@@ -1098,8 +1098,8 @@ fn select_61() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+1/test]
-// [spec:pgorm:req:sql.render.subquery+1/test]
+// [spec:pgorm:req:sql.ast.select.from+2/test]
+// [spec:pgorm:req:sql.render.subquery+2/test]
 #[test]
 fn select_62() {
     let select = SelectStatement::new()

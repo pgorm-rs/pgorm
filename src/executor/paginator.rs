@@ -4,11 +4,11 @@ use crate::{
 };
 use async_stream::stream;
 use futures::Stream;
-use pg_query::{
-    NodeEnum,
-    protobuf::{RawStmt, Token as ScanToken},
+use pg_query::{NodeEnum, protobuf::RawStmt};
+use pgorm_query::{
+    Asterisk, Expr, FromItem, IntoName, SelectStatement, SqlTemplate, Value, Values, alias,
+    error::{Error as QueryError, TemplateError},
 };
-use pgorm_query::{Expr, SelectStatement, Value, Values, alias};
 use std::{
     fmt::{self, Write as _},
     marker::PhantomData,
@@ -30,7 +30,7 @@ where
     C: ConnectionTrait,
     S: SelectorTrait + 'db,
 {
-    pub(crate) query: Result<PagedQuery, String>,
+    pub(crate) query: Result<SelectStatement, String>,
     pub(crate) page: u64,
     pub(crate) page_size: NonZeroU64,
     pub(crate) db: &'db C,
@@ -46,95 +46,33 @@ pub struct ItemsAndPagesNumber {
     pub number_of_pages: u64,
 }
 
-/// The statement a paginator pages over, in the two forms that differ in who
-/// owns the parameter numbering.
-///
-/// A statement pgorm-query built is numbered by the builder, so `LIMIT` and
-/// `OFFSET` can simply be added to it and the whole thing rebuilt. A caller's
-/// own statement is numbered by the caller: its `$N` markers count the caller's
-/// own values, and rewriting that text to renumber them means re-lexing SQL
-/// pgorm did not write. So a raw statement is held as text and never re-lexed —
-/// pagination appends markers that continue the caller's numbering instead.
-///
-/// The two variants are lopsided by the size of a `SelectStatement`, which a
-/// `Paginator` held inline before there was a second form to hold; boxing would
-/// buy an allocation and a deref on the common path for a value that lives one
-/// to a paginator.
-// [spec:pgorm:sem:exec.paginator.raw+3]
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
-pub(crate) enum PagedQuery {
-    /// A statement pgorm-query built and will build again with the page clauses.
-    Built(SelectStatement),
-    /// A caller's own statement, already wrapped as a pageable subquery.
-    Raw(RawStatement),
-}
-
-/// A caller's statement wrapped as `SELECT * FROM (<statement>) AS
-/// `[`RAW_SUBQUERY_ALIAS`], held as the text that will be sent alongside the
-/// values its own `$N` markers number.
-// [spec:pgorm:sem:exec.paginator.raw+3]
-#[derive(Clone, Debug)]
-pub(crate) struct RawStatement {
-    sql: String,
-    values: Vec<Value>,
-}
-
-/// The projection and alias `num_items` counts through, shared by both forms so
-/// the count query reads the same whichever one it wrapped.
+/// The projection and alias `num_items` counts through.
 const COUNT_PROJECTION: &str = "COUNT(*) AS num_items";
 const COUNT_SUBQUERY_ALIAS: &str = "sub_query";
 
-impl PagedQuery {
-    /// The statement for one page and the values to bind to it.
-    // [spec:pgorm:sem:exec.paginator.raw+3]
-    fn page(&self, limit: u64, offset: u64) -> Result<(String, Values), Error> {
-        match self {
-            Self::Built(query) => {
-                ensure_select_list(query)?;
-                let mut query = query.clone();
-                query.limit(limit).offset(offset);
-                Ok(query.build())
-            }
-            // The caller's markers run `$1..$N`; the page clauses continue from
-            // `$N+1`, which is what makes the caller's text safe to send whole.
-            Self::Raw(raw) => {
-                let bound = raw.values.len();
-                let mut values = raw.values.clone();
-                values.push(limit.into());
-                values.push(offset.into());
-                Ok((
-                    format!("{} LIMIT ${} OFFSET ${}", raw.sql, bound + 1, bound + 2),
-                    Values(values),
-                ))
-            }
-        }
-    }
+/// The statement for one page and the values to bind to it.
+// [spec:pgorm:sem:exec.paginator.fetch+2]
+// [spec:pgorm:sem:exec.paginator.raw+4] (one shape for a built source and a raw one)
+fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, Values), Error> {
+    ensure_select_list(query)?;
+    let mut query = query.clone();
+    query.limit(limit).offset(offset);
+    Ok(query.build())
+}
 
-    /// The statement counting every row the paginator pages over, and the values
-    /// to bind to it.
-    // [spec:pgorm:sem:exec.paginator.raw+3]
-    fn count(&self) -> Result<(String, Values), Error> {
-        match self {
-            Self::Built(query) => {
-                ensure_select_list(query)?;
-                let mut counted = query.clone();
-                counted.reset_limit().reset_offset().clear_order_by();
-                Ok(SelectStatement::new()
-                    .expr(Expr::raw(COUNT_PROJECTION))
-                    .from_subquery(counted, alias(COUNT_SUBQUERY_ALIAS))
-                    .to_owned()
-                    .build())
-            }
-            Self::Raw(raw) => Ok((
-                format!(
-                    r#"SELECT {COUNT_PROJECTION} FROM ({}) AS "{COUNT_SUBQUERY_ALIAS}""#,
-                    raw.sql
-                ),
-                Values(raw.values.clone()),
-            )),
-        }
-    }
+/// The statement counting every row the paginator pages over, and the values to
+/// bind to it.
+// [spec:pgorm:sem:exec.paginator.count]
+// [spec:pgorm:sem:exec.paginator.raw+4] (one shape for a built source and a raw one)
+fn count_of(query: &SelectStatement) -> Result<(String, Values), Error> {
+    ensure_select_list(query)?;
+    let mut counted = query.clone();
+    counted.reset_limit().reset_offset().clear_order_by();
+    Ok(SelectStatement::new()
+        .expr(Expr::raw(COUNT_PROJECTION))
+        .from_subquery(counted, alias(COUNT_SUBQUERY_ALIAS))
+        .to_owned()
+        .build())
 }
 
 // LINT: warn if paginator is used without an order by clause
@@ -145,8 +83,8 @@ where
     S: SelectorTrait + 'db,
 {
     /// The statement to page over, or the reason there is none to page over.
-    // [spec:pgorm:sem:exec.paginator.raw+3]
-    fn query(&self) -> Result<&PagedQuery, Error> {
+    // [spec:pgorm:sem:exec.paginator.raw+4]
+    fn query(&self) -> Result<&SelectStatement, Error> {
         self.query
             .as_ref()
             .map_err(|report| Error::Query(RuntimeError::Internal(report.clone())))
@@ -161,7 +99,7 @@ where
                 self.page_size
             )))
         })?;
-        let (stmt, values) = self.query()?.page(self.page_size.get(), offset)?;
+        let (stmt, values) = page_of(self.query()?, self.page_size.get(), offset)?;
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -185,7 +123,7 @@ where
     /// Get the total number of items
     // [spec:pgorm:sem:exec.paginator.count]
     pub async fn num_items(&self) -> Result<u64, Error> {
-        let (stmt, values) = self.query()?.count()?;
+        let (stmt, values) = count_of(self.query()?)?;
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
         let values = values
             .iter()
@@ -351,7 +289,7 @@ where
     // [spec:pgorm:req:exec.paginator.page-size+2]
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
-            query: Ok(PagedQuery::Built(self.query)),
+            query: Ok(self.query),
             page: 0,
             page_size,
             db,
@@ -367,7 +305,7 @@ where
 {
     type Selector = S;
     // [spec:pgorm:req:exec.paginator.page-size+2]
-    // [spec:pgorm:sem:exec.paginator.raw+3]
+    // [spec:pgorm:sem:exec.paginator.raw+4]
     fn paginate(self, db: &'db C, page_size: NonZeroU64) -> Paginator<'db, C, S> {
         Paginator {
             query: wrap_raw_select(&self.stmt, self.values.0),
@@ -382,72 +320,60 @@ where
 /// The alias the caller's own statement is paged over as.
 const RAW_SUBQUERY_ALIAS: &str = "sub_statement";
 
-/// Everything the wrapper writes after the caller's statement. The newline is
-/// Wrap a caller's raw statement as `SELECT * FROM (<statement>) AS "sub_statement"`,
-/// the shape `LIMIT` and `OFFSET` append to whatever clauses the statement carries
-/// of its own, or report why it cannot be paged over at all.
+/// Build `SELECT * FROM (<statement>) AS "sub_statement"` over a caller's own
+/// statement, or report why it cannot be paged over at all.
 ///
-/// The statement's own text is copied, never rewritten: its `$N` markers already
-/// number `values` and keep those numbers, because nothing is bound ahead of it.
-/// The newline before the closing parenthesis is load-bearing — a statement
-/// ending in a `--` comment would otherwise swallow the parenthesis into it.
-// [spec:pgorm:sem:exec.paginator.raw+3]
-fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<PagedQuery, String> {
+/// Two checks, each where it belongs. That the text is one row-returning
+/// `SELECT` is PostgreSQL's answer and stays here, because libpg_query is a
+/// dependency of the ORM and not of the query builder. That its `$N` markers
+/// and the values behind them agree is the template machinery's answer
+/// (`SqlTemplate::from_sql`), which reads the same `$` grammar PostgreSQL does
+/// — comments and quoted regions opaque, `$$` a dollar-quote opener — and
+/// pairs each marker with its value at construction. The wrapped statement is
+/// then an ordinary `SelectStatement`: the page clauses are added by the
+/// builder, and the fragment's markers renumber into the builder's parameter
+/// space rather than having to be left alone.
+// [spec:pgorm:sem:exec.paginator.raw+4]
+fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, String> {
     let select = single_select(stmt)?;
-    check_markers(select, values.len())?;
-    Ok(PagedQuery::Raw(RawStatement {
-        sql: format!("SELECT * FROM ({select}\n) AS \"{RAW_SUBQUERY_ALIAS}\""),
-        values,
-    }))
+    let fragment = SqlTemplate::from_sql(select, values).map_err(marker_report)?;
+    Ok(SelectStatement::new()
+        .column(Asterisk)
+        .from(FromItem::Template(
+            fragment,
+            alias(RAW_SUBQUERY_ALIAS).into_name(),
+        ))
+        .to_owned())
 }
 
-/// Refuse a statement that reads a value it was never given, before any of it
-/// reaches the server.
-///
-/// Which `$N` are parameter markers is PostgreSQL's own scanner's answer rather
-/// than a guess made from the text, so a `$99` inside a comment, a
-/// dollar-quoted body or a string literal is comment or string text and binds
-/// nothing.
-// [spec:pgorm:sem:exec.paginator.raw+3]
-fn check_markers(select: &str, bound: usize) -> Result<(), String> {
-    let scanned = pg_query::scan(select).map_err(|error| {
-        format!(
-            "cannot paginate a raw statement PostgreSQL cannot scan: {}",
-            parser_message(&error)
-        )
-    })?;
-
-    for token in &scanned.tokens {
-        if token.token != ScanToken::Param as i32 {
-            continue;
+/// A marker census failure, reported in the paginator's voice: the caller asked
+/// to page a statement, so the reason names the statement and its bind values
+/// rather than a template and its substitutions.
+// [spec:pgorm:sem:exec.paginator.raw+4]
+fn marker_report(error: QueryError) -> String {
+    let supplied = |count: usize| {
+        if count == 1 {
+            "value was"
+        } else {
+            "values were"
         }
-
-        let start = usize::try_from(token.start).unwrap_or(0);
-        let end = usize::try_from(token.end).unwrap_or(0);
-        let marker = select.get(start..end).ok_or_else(|| {
-            "cannot paginate a raw statement PostgreSQL located a marker outside".to_owned()
-        })?;
-
-        let number = marker
-            .strip_prefix('$')
-            .and_then(|digits| digits.parse::<usize>().ok())
-            .ok_or_else(|| {
-                format!("cannot paginate a raw statement whose marker {marker} is not numbered")
-            })?;
-
-        if number > bound {
-            return Err(format!(
-                "cannot paginate a raw statement reading {marker} when {bound} bind {} supplied",
-                if bound == 1 {
-                    "value was"
-                } else {
-                    "values were"
-                }
-            ));
-        }
+    };
+    match error {
+        QueryError::Template {
+            reason: TemplateError::IndexOutOfRange { index, supplied: n },
+            ..
+        } => format!(
+            "cannot paginate a raw statement reading ${index} when {n} bind {} supplied",
+            supplied(n)
+        ),
+        QueryError::Template {
+            reason: TemplateError::UnreferencedValue { index, supplied: n },
+            ..
+        } => format!(
+            "cannot paginate a raw statement given {n} bind values when nothing in it reads ${index}"
+        ),
+        other => format!("cannot paginate a raw statement: {other}"),
     }
-
-    Ok(())
 }
 
 /// The one row-returning `SELECT` in `stmt`, at the extent libpg_query reports
@@ -455,7 +381,7 @@ fn check_markers(select: &str, bound: usize) -> Result<(), String> {
 ///
 /// A `WITH ... SELECT` qualifies: PostgreSQL hangs the `WITH` clause off the
 /// `SelectStmt` itself rather than making it a statement of its own.
-// [spec:pgorm:sem:exec.paginator.raw+3]
+// [spec:pgorm:sem:exec.paginator.raw+4]
 fn single_select(stmt: &str) -> Result<&str, String> {
     let parsed = pg_query::parse(stmt).map_err(|error| {
         format!(
@@ -552,19 +478,23 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+3/test]    a caller's statement survives
-// wrapping byte for byte, whatever token forms its text is made of, and a
-// marker with no value behind it is refused rather than indexed
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    a caller's statement reaches
+// the wrapper with its non-marker text untouched, whatever token forms it is
+// made of; its markers renumber into the wrapper's own parameter space with
+// the right values behind them; and a census the supplied values cannot
+// satisfy is refused rather than sent
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    /// Token forms a `$N` walk over the text would corrupt, each with the number
-    /// of values it binds. Every one holds a `$99` that is *not* a marker — it
-    /// is comment or string text — so a walk that substituted it would index
-    /// past the values, and a walk that rewrote the text around it would change
-    /// what the statement says.
+    /// Token forms a `$N` walk over the text would corrupt, each with the
+    /// number of values it binds. Every one holds a `$99` that is *not* a
+    /// marker — it is comment or string text — so a walk that substituted it
+    /// would index past the values, and a walk that rewrote the text around it
+    /// would change what the statement says. Every one also already numbers its
+    /// real markers `$1..$N` in first-reference order, which is the order the
+    /// wrapper renumbers into, so each must come back byte for byte.
     const TOKEN_FORMS: &[(&str, usize)] = &[
         ("SELECT $1::int4 AS n /* $99 is only a comment */", 1),
         // PostgreSQL nests block comments, so the inner close does not end it.
@@ -577,43 +507,73 @@ mod tests {
         ),
         ("SELECT $1::int4 AS n, 'it''s $99' AS msg", 1),
         (r"SELECT $1::int4 AS n, E'a\'b $99' AS msg", 1),
-        // The same value read twice, and two values read out of order.
-        ("SELECT $1::int4 AS a, $1::int4 AS b", 1),
-        ("SELECT $2::int4 AS a, $1::int4 AS b", 2),
         // Subscripts: the brackets are not a quoted region, and the markers
         // inside them are markers.
         ("SELECT (ARRAY[$1::int4, 8])[$2::int4] AS n", 2),
         ("SELECT ($1::int4[])[1] AS n", 1),
     ];
 
-    /// The `RawStatement` a statement carrying `bound` values wraps to.
-    fn wrapped(stmt: &str, bound: usize) -> Result<RawStatement, String> {
-        let values = vec![Value::Int(Some(7)); bound];
-        match wrap_raw_select(stmt, values)? {
-            PagedQuery::Raw(raw) => Ok(raw),
-            PagedQuery::Built(_) => Err("a raw statement wrapped as a built one".to_owned()),
+    /// Statements whose markers are NOT already numbered in first-reference
+    /// order: the values they bind, the text they must renumber to, and the
+    /// values that must then stand behind that text. Renumbering is what lets
+    /// the wrapper compose at all — the fragment no longer has to be the only
+    /// thing in the statement holding parameters.
+    const RENUMBERED: &[(&str, &[i32], &str, &[i32])] = &[
+        // One value read twice becomes two parameters, both holding it.
+        (
+            "SELECT $1::int4 AS a, $1::int4 AS b",
+            &[7],
+            "SELECT $1::int4 AS a, $2::int4 AS b",
+            &[7, 7],
+        ),
+        // Read out of order, the markers come out in order and the values
+        // follow them rather than the other way round.
+        (
+            "SELECT $2::int4 AS a, $1::int4 AS b",
+            &[7, 3],
+            "SELECT $1::int4 AS a, $2::int4 AS b",
+            &[3, 7],
+        ),
+    ];
+
+    fn ints(values: &[i32]) -> Vec<Value> {
+        values
+            .iter()
+            .map(|value| Value::Int(Some(*value)))
+            .collect()
+    }
+
+    /// The page of `query` at an arbitrary limit and offset, or a panic naming
+    /// the statement that has none.
+    fn paged(stmt: &str, query: &SelectStatement) -> (String, Values) {
+        match page_of(query, 10, 20) {
+            Ok(paged) => paged,
+            Err(error) => panic!("{stmt:?} has no page: {error}"),
+        }
+    }
+
+    /// The count over `query`, or a panic naming the statement that has none.
+    fn counted(stmt: &str, query: &SelectStatement) -> (String, Values) {
+        match count_of(query) {
+            Ok(counted) => counted,
+            Err(error) => panic!("{stmt:?} has no count: {error}"),
+        }
+    }
+
+    /// The wrapper around `stmt`, or a panic naming the refusal.
+    fn wrapped(stmt: &str, values: Vec<Value>) -> SelectStatement {
+        match wrap_raw_select(stmt, values) {
+            Ok(query) => query,
+            Err(report) => panic!("{stmt:?} was refused: {report}"),
         }
     }
 
     #[test]
     fn keeps_every_token_form_verbatim() {
         for (stmt, bound) in TOKEN_FORMS {
-            let raw = match wrapped(stmt, *bound) {
-                Ok(raw) => raw,
-                Err(report) => panic!("{stmt:?} was refused: {report}"),
-            };
+            let query = wrapped(stmt, vec![Value::Int(Some(7)); *bound]);
 
-            for sql in [
-                raw.sql.clone(),
-                match PagedQuery::Raw(raw.clone()).page(10, 20) {
-                    Ok((sql, _)) => sql,
-                    Err(error) => panic!("{stmt:?} has no page: {error}"),
-                },
-                match PagedQuery::Raw(raw.clone()).count() {
-                    Ok((sql, _)) => sql,
-                    Err(error) => panic!("{stmt:?} has no count: {error}"),
-                },
-            ] {
+            for (sql, _) in [paged(stmt, &query), counted(stmt, &query)] {
                 assert!(
                     sql.contains(stmt),
                     "{stmt:?} did not survive wrapping into {sql:?}"
@@ -623,20 +583,39 @@ mod tests {
     }
 
     #[test]
+    fn renumbers_markers_into_the_wrappers_own_space() {
+        for (stmt, bound, expected, expected_values) in RENUMBERED {
+            let query = wrapped(stmt, ints(bound));
+            let (sql, values) = paged(stmt, &query);
+
+            assert!(
+                sql.contains(expected),
+                "{stmt:?} renumbered to {sql:?}, not to {expected:?}"
+            );
+            assert_eq!(
+                values.0,
+                [
+                    ints(expected_values),
+                    vec![Value::BigUnsigned(Some(10)), Value::BigUnsigned(Some(20))],
+                ]
+                .concat()
+            );
+        }
+    }
+
+    #[test]
     fn a_trailing_line_comment_still_closes() {
-        let raw = match wrapped("SELECT $1::int4 AS n -- trailing", 1) {
-            Ok(raw) => raw,
-            Err(report) => panic!("refused: {report}"),
-        };
+        let stmt = "SELECT $1::int4 AS n -- trailing";
+        let query = wrapped(stmt, vec![Value::Int(Some(7))]);
+        let (sql, _) = paged(stmt, &query);
         assert!(
-            raw.sql.contains("-- trailing\n)"),
-            "the closing parenthesis is inside the comment: {:?}",
-            raw.sql
+            sql.contains("-- trailing\n)"),
+            "the closing parenthesis is inside the comment: {sql:?}"
         );
     }
 
     #[test]
-    fn pages_after_the_caller_s_own_numbering() {
+    fn pages_after_the_statements_own_markers() {
         let cases = [
             ("SELECT 1 AS n", 0),
             ("SELECT $1::int4 AS n", 1),
@@ -644,14 +623,8 @@ mod tests {
         ];
 
         for (stmt, bound) in cases {
-            let raw = match wrapped(stmt, bound) {
-                Ok(raw) => raw,
-                Err(report) => panic!("{stmt:?} was refused: {report}"),
-            };
-            let (sql, values) = match PagedQuery::Raw(raw.clone()).page(10, 20) {
-                Ok(paged) => paged,
-                Err(error) => panic!("{stmt:?} has no page: {error}"),
-            };
+            let query = wrapped(stmt, vec![Value::Int(Some(7)); bound]);
+            let (sql, values) = paged(stmt, &query);
 
             assert!(
                 sql.ends_with(&format!(" LIMIT ${} OFFSET ${}", bound + 1, bound + 2)),
@@ -666,36 +639,41 @@ mod tests {
                 .concat()
             );
 
-            // Counting binds the caller's values and nothing else.
-            let (sql, values) = match PagedQuery::Raw(raw).count() {
-                Ok(counted) => counted,
-                Err(error) => panic!("{stmt:?} has no count: {error}"),
-            };
+            // Counting binds the statement's values and nothing else.
+            let (sql, values) = counted(stmt, &query);
             assert!(!sql.contains("LIMIT"), "{stmt:?} counted as {sql:?}");
             assert_eq!(values.0, vec![Value::Int(Some(7)); bound]);
         }
     }
 
     #[test]
-    fn refuses_a_marker_with_no_value_behind_it() {
+    fn refuses_a_census_the_values_cannot_satisfy() {
         for (stmt, bound, expected) in [
             (
                 "SELECT $99::int4 AS n",
                 1,
-                "reading $99 when 1 bind value was",
+                "reading $99 when 1 bind value was supplied",
             ),
             (
                 "SELECT $1::int4 AS n",
                 0,
-                "reading $1 when 0 bind values were",
+                "reading $1 when 0 bind values were supplied",
             ),
             (
                 "SELECT $1::int4 + $3::int4 AS n",
                 2,
-                "reading $3 when 2 bind values were",
+                "reading $3 when 2 bind values were supplied",
+            ),
+            // A value the statement never reads is refused here too. The
+            // server would refuse the bind anyway; refusing at `paginate`
+            // reports it once, naming the value, instead of once per page.
+            (
+                "SELECT $1::int4 AS n",
+                2,
+                "given 2 bind values when nothing in it reads $2",
             ),
         ] {
-            let report = match wrapped(stmt, bound) {
+            let report = match wrap_raw_select(stmt, vec![Value::Int(Some(7)); bound]) {
                 Ok(_) => panic!("{stmt:?} was not refused"),
                 Err(report) => report,
             };

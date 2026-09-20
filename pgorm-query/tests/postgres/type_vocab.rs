@@ -1,5 +1,6 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
+use pgorm_query::error::{Error, TemplateError};
 use std::sync::Arc;
 
 // [spec:pgorm:def:sql.types.column-ref/test]    the five forms and what `IntoColumnRef` maps onto them
@@ -53,7 +54,7 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoTableName` maps iden / 2-tuple
+// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
@@ -66,7 +67,7 @@ fn into_table_name_maps_the_two_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoNamedTable` maps the same spellings to an
+// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoNamedTable` maps the same spellings to an
 // unaliased named table, and a `TableName` or `NamedTable` passes through
 #[test]
 fn into_named_table_maps_the_named_forms() {
@@ -100,7 +101,7 @@ fn into_named_table_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    `IntoFromItem` widens every named spelling, and
+// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoFromItem` widens every named spelling, and
 // a `TableName` or `NamedTable` converts infallibly
 #[test]
 fn into_from_item_maps_the_named_forms() {
@@ -128,7 +129,7 @@ fn into_from_item_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    `alias` binds an alias and replaces an existing
+// [spec:pgorm:def:sql.types.table-ref+4/test]    `alias` binds an alias and replaces an existing
 // one, on the named form and on the value-producing forms alike
 #[test]
 fn from_item_alias_adds_or_replaces() {
@@ -163,9 +164,15 @@ fn from_item_alias_adds_or_replaces() {
         FromItem::ValuesList(vec![], Name::runtime("v")).alias(Name::runtime("w")),
         FromItem::ValuesList(vec![], Name::runtime("w"))
     );
+
+    let fragment = || SqlTemplate::from_sql("SELECT 1", []).unwrap();
+    assert_eq!(
+        FromItem::Template(fragment(), Name::runtime("t")).alias(Name::runtime("u")),
+        FromItem::Template(fragment(), Name::runtime("u"))
+    );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    a column of a from item is qualified by its
+// [spec:pgorm:def:sql.types.table-ref+4/test]    a column of a from item is qualified by its
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
@@ -191,9 +198,16 @@ fn from_item_qualifier_prefers_the_alias() {
     let values = FromItem::ValuesList(vec![], Name::runtime("v"));
     assert_eq!(values.qualifier().to_string(), "v");
     assert_eq!(values.table_name(), None);
+
+    let template = FromItem::Template(
+        SqlTemplate::from_sql("SELECT 1", []).unwrap(),
+        Name::runtime("t"),
+    );
+    assert_eq!(template.qualifier().to_string(), "t");
+    assert_eq!(template.table_name(), None);
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    the named form renders as dotted, quoted parts
+// [spec:pgorm:def:sql.types.table-ref+4/test]    the named form renders as dotted, quoted parts
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
@@ -222,7 +236,7 @@ fn named_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    the write statements take the same named table,
+// [spec:pgorm:def:sql.types.table-ref+4/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+2/test]
 // [spec:pgorm:req:sql.ast.update+4/test]
@@ -260,7 +274,7 @@ fn aliased_dml_targets_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+3/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+4/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
 fn value_producing_from_item_forms_render() {
@@ -298,6 +312,112 @@ fn value_producing_from_item_forms_render() {
             .from(function_call)
             .to_string(),
         r#"SELECT * FROM generate_series(1) AS "f""#
+    );
+
+    let template = FromItem::Template(
+        SqlTemplate::from_sql(r#"SELECT "id" FROM "glyph""#, []).unwrap(),
+        Name::runtime("t"),
+    );
+    assert_eq!(
+        Query::select().column(Asterisk).from(template).to_string(),
+        "SELECT * FROM (SELECT \"id\" FROM \"glyph\"\n) AS \"t\""
+    );
+}
+
+// [spec:pgorm:def:sql.types.table-ref+4/test]    a fragment in relation position keeps its
+// non-marker text verbatim and renumbers its markers into the enclosing statement's parameter
+// space, so it composes with a statement that binds values of its own
+// [spec:pgorm:req:sql.render.subquery+2/test]
+#[test]
+fn template_from_item_renumbers_into_the_enclosing_statement() {
+    let fragment = SqlTemplate::from_sql(
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" > $1"#,
+        [2i32.into()],
+    )
+    .unwrap();
+
+    // The fragment's own `$1` lands after the value the enclosing statement
+    // bound before it, and the statement's later value lands after that.
+    let (sql, values) = Query::select()
+        .column(Asterisk)
+        .from_subquery(
+            Query::select().expr(Expr::val(1i32)).take(),
+            Name::runtime("before"),
+        )
+        .from(FromItem::Template(fragment, Name::runtime("g")))
+        .and_where(Expr::col((Name::runtime("g"), Glyph::Id)).lt(9i32))
+        .build();
+
+    assert_eq!(
+        sql,
+        "SELECT * FROM (SELECT $1) AS \"before\", \
+         (SELECT \"id\" FROM \"glyph\" WHERE \"aspect\" > $2\n) AS \"g\" \
+         WHERE \"g\".\"id\" < $3"
+    );
+    assert_eq!(values.0, vec![1i32.into(), 2i32.into(), 9i32.into()]);
+}
+
+// [spec:pgorm:req:sql.render.custom-expr+3/test]    `from_sql` reads the `$` grammar of real SQL
+// — quoted regions and comments opaque, `$$` a dollar-quote opener — and refuses a census the
+// supplied values cannot satisfy
+#[test]
+fn template_from_sql_reads_real_sql() {
+    let opaque = SqlTemplate::from_sql(
+        "SELECT $1::int4 /* $99 */, $$ $99 $$, ' $99 ' -- $99\n",
+        [7i32.into()],
+    )
+    .unwrap();
+
+    let (sql, values) = Query::select()
+        .column(Asterisk)
+        .from(FromItem::Template(opaque, Name::runtime("t")))
+        .build();
+
+    assert_eq!(
+        sql,
+        "SELECT * FROM (SELECT $1::int4 /* $99 */, $$ $99 $$, ' $99 ' -- $99\n\n) AS \"t\""
+    );
+    assert_eq!(values.0, vec![7i32.into()]);
+
+    // A marker with no value behind it, and a value nothing reads.
+    assert_eq!(
+        SqlTemplate::from_sql("SELECT $1, $2", [7i32.into()]),
+        Err(Error::Template {
+            template: "SELECT $1, $2".to_owned(),
+            reason: TemplateError::IndexOutOfRange {
+                index: 2,
+                supplied: 1
+            },
+        })
+    );
+    assert_eq!(
+        SqlTemplate::from_sql("SELECT $1", [7i32.into(), 8i32.into()]),
+        Err(Error::Template {
+            template: "SELECT $1".to_owned(),
+            reason: TemplateError::UnreferencedValue {
+                index: 2,
+                supplied: 2
+            },
+        })
+    );
+
+    // `$$` is a dollar-quote opener here, not the `$` escape an authored
+    // template spells it as, so the two constructors read the same text
+    // differently: `from_sql` keeps the body, `new` collapses each `$$` to one
+    // literal `$`.
+    let rendered = |template| {
+        Query::select()
+            .column(Asterisk)
+            .from(FromItem::Template(template, Name::runtime("t")))
+            .to_string()
+    };
+    assert_eq_unparsed!(
+        rendered(SqlTemplate::from_sql("SELECT $$ a $$", []).unwrap()),
+        "SELECT * FROM (SELECT $$ a $$\n) AS \"t\""
+    );
+    assert_eq_unparsed!(
+        rendered(SqlTemplate::new("SELECT $$ a $$", []).unwrap()),
+        "SELECT * FROM (SELECT $ a $\n) AS \"t\""
     );
 }
 

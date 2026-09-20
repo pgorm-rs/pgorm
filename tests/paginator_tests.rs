@@ -264,7 +264,7 @@ async fn paginator_iterate() -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.crud+1/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
-// [spec:pgorm:sem:exec.paginator.raw+3/test]    a parsed single `SELECT` is
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    a parsed single `SELECT` is
 // wrapped whole as a subquery, so its own clauses survive paging
 #[pgorm_macros::test]
 async fn paginator_raw() -> Result<(), Error> {
@@ -342,7 +342,100 @@ async fn paginator_raw() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+3/test]    anything that is not one
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    markers the caller did not
+// number in first-reference order still read the values the caller meant,
+// because the wrapper renumbers them into its own parameter space instead of
+// requiring the caller's numbering to be usable where the fragment lands
+#[pgorm_macros::test]
+async fn paginator_raw_renumbers_markers() -> Result<(), Error> {
+    let ctx = TestContext::new("paginator_tests_raw_renumbers").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    // Read out of order: `$2` is still the second value supplied, and `$1` the
+    // first, after the wrapper has renumbered both.
+    let swapped = r#"SELECT "id", "name", "profit_margin" FROM "bakery" WHERE "profit_margin" <= $1 AND "profit_margin" >= $2 ORDER BY "id" ASC"#;
+    let bounds = Values(vec![Value::Double(Some(5.0)), Value::Double(Some(3.0))]);
+
+    let paginator = Bakery::find()
+        .from_raw_sql(swapped.to_owned(), bounds.clone())
+        .paginate(&db, page_size(2));
+
+    assert_eq!(paginator.num_items().await?, 3);
+    assert_eq!(paginator.num_pages().await?, 2);
+    assert_eq!(
+        names(&paginator.fetch_page(0).await?),
+        ["Charlie Bakery", "Delta Bakery"]
+    );
+    assert_eq!(names(&paginator.fetch_page(1).await?), ["Echo Bakery"]);
+
+    // The same statement run unpaginated is the oracle: paging changed which
+    // rows came back in no way at all.
+    assert_eq!(
+        names(
+            &Bakery::find()
+                .from_raw_sql(swapped.to_owned(), bounds)
+                .all(&db)
+                .await?
+        ),
+        ["Charlie Bakery", "Delta Bakery", "Echo Bakery"]
+    );
+
+    // One value read twice becomes two parameters, both holding it.
+    let twice = r#"SELECT "id", "name", "profit_margin" FROM "bakery" WHERE "profit_margin" >= $1 AND "profit_margin" < $1::float8 + 3 ORDER BY "id" ASC"#;
+    let floor = Values(vec![Value::Double(Some(2.0))]);
+
+    let repeated = Bakery::find()
+        .from_raw_sql(twice.to_owned(), floor.clone())
+        .paginate(&db, page_size(2));
+
+    assert_eq!(repeated.num_items().await?, 3);
+    assert_eq!(
+        names(&repeated.fetch_page(0).await?),
+        ["Bravo Bakery", "Charlie Bakery"]
+    );
+    assert_eq!(names(&repeated.fetch_page(1).await?), ["Delta Bakery"]);
+    assert_eq!(
+        names(
+            &Bakery::find()
+                .from_raw_sql(twice.to_owned(), floor)
+                .all(&db)
+                .await?
+        ),
+        ["Bravo Bakery", "Charlie Bakery", "Delta Bakery"]
+    );
+
+    // A value the statement never reads is refused at `paginate`, naming it,
+    // rather than discovered by the server once per page.
+    let spare = Bakery::find()
+        .from_raw_sql(RAW_ALL.to_owned(), Values(vec![Value::Double(Some(1.0))]))
+        .paginate(&db, page_size(3));
+
+    for reported in [
+        spare.fetch_page(0).await.err(),
+        spare.num_items().await.err(),
+    ] {
+        let reported = reported.expect("an unread bind value was not refused");
+        assert!(
+            matches!(reported, Error::Query(_)),
+            "unexpected error: {reported:?}"
+        );
+        assert!(
+            reported
+                .to_string()
+                .contains("given 1 bind values when nothing in it reads $1"),
+            "{reported} does not name the unread value"
+        );
+    }
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    anything that is not one
 // row-returning `SELECT` is an `Error::Query` naming what it parsed as
 #[pgorm_macros::test]
 async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
@@ -435,7 +528,7 @@ fn token_forms() -> Vec<(&'static str, Values)> {
     ]
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+3/test]    the caller's statement is sent
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    the caller's statement is sent
 // whole, so comments, dollar quotes, string literals and subscripts read the
 // same paginated as they do direct, and the markers keep their values
 #[pgorm_macros::test]
@@ -501,7 +594,7 @@ async fn paginator_raw_token_forms() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+3/test]    a marker with no value behind
+// [spec:pgorm:sem:exec.paginator.raw+4/test]    a marker with no value behind
 // it is an `Error::Query` naming it, on every reader, rather than an index past
 // the end of the values
 #[pgorm_macros::test]

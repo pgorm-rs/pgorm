@@ -418,7 +418,7 @@ bound parameter is held to.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw+3]
+> [spec:pgorm:sem:exec.paginator.raw+4]
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` 6.2.0 the render oracle and `sql!` use
@@ -430,40 +430,58 @@ bound parameter is held to.
 > clause off the `SelectStmt` itself rather than making it a statement of
 > its own, so a CTE pages like any other `SELECT`. `VALUES (…), (…)` and
 > set operations qualify for the same reason — both parse as a
-> `SelectStmt`.
+> `SelectStmt`. This check stays in the ORM because libpg_query is the
+> ORM's dependency and deliberately not the query builder's.
 >
 > An accepted statement is taken at the extent the parser reports for it,
 > which excludes any terminating `;` that a subquery position would
-> refuse, and is wrapped whole as
-> `SELECT * FROM (<statement>\n) AS "sub_statement"`. Wrapping rather than
-> splicing means `LIMIT` and `OFFSET` land outside the caller's own
-> clauses instead of colliding with them, so a raw statement that already
-> carries `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will
-> not reorder rows a subquery sorted, so the caller's `ORDER BY` still
-> governs page boundaries. The newline before the closing parenthesis is
-> load-bearing: a statement ending in a `--` comment would otherwise
-> swallow it.
+> refuse, and is then paired with its bind values as a `SqlTemplate`
+> (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
+> and placed in relation position as
+> `FromItem::Template(fragment, "sub_statement")`
+> (`[spec:pgorm:def:sql.types.table-ref+4]`). What the paginator holds is
+> then ONE shape — an ordinary `SelectStatement` — for a built source and
+> a raw one alike: the page clauses of `exec.paginator.fetch` and the
+> count wrapper of `exec.paginator.count` are the builder's, and the
+> paginator MUST NOT format SQL text of its own. The rendering, including
+> the newline before the closing parenthesis that keeps a trailing `--`
+> comment from swallowing it, belongs to
+> `[spec:pgorm:req:sql.render.subquery+2]`. Wrapping rather than splicing
+> means `LIMIT` and `OFFSET` land outside the caller's own clauses instead
+> of colliding with them, so a raw statement that already carries
+> `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will not reorder
+> rows a subquery sorted, so the caller's `ORDER BY` still governs page
+> boundaries.
 >
-> The wrapped statement's text MUST be copied verbatim and MUST NOT be
-> re-lexed or rewritten — not by the `sql.token` tokenizer, which knows
-> neither PostgreSQL comments nor dollar quoting
-> (`[spec:pgorm:sem:sql.token.limits+2]`), and not by any other walk over
-> the text. The caller's `$N` markers therefore keep the numbers the
-> caller gave them, which is sound because nothing is bound ahead of
-> them: the page clauses the paginator appends are numbered from `$N+1`
-> where `N` is the count of bind values supplied, and the count query
-> (`[spec:pgorm:sem:exec.paginator.count]`) appends no markers at all.
-> Comment bodies, dollar-quoted strings (tagged and untagged),
+> The statement's non-marker text MUST be reproduced verbatim; its `$N`
+> markers MUST NOT be. Each marker is paired with its value at
+> construction and re-emitted as a parameter of the enclosing statement,
+> so the fragment renumbers into the builder's `$N` space in
+> first-reference order, one parameter per reference: a statement reading
+> `$2` before `$1` comes back reading `$1` before `$2` with the values
+> permuted to match, and one reading `$1` twice comes back reading two
+> parameters that both hold it. Renumbering rather than preserving the
+> caller's numbers is what makes the fragment COMPOSE — it no longer has
+> to be the only thing in the statement that binds anything — and it is
+> what lets the page clauses be appended by the builder rather than
+> counted out by hand.
+>
+> Which `$N` are markers is settled by the `sql.token` tokenizer, which
+> reads `--` and nested `/* */` comments as one `Space` token and
+> dollar-quoted bodies (tagged and untagged) and `E'…'` strings as one
+> `Quoted` token (`[spec:pgorm:sem:sql.token.limits+2]`) — the same
+> opacity PostgreSQL's own scanner has, and the reason a second scan of
+> the text is no longer needed. Comment bodies, dollar-quoted strings,
 > single-quoted and E-string literals, and bracketed subscripts therefore
 > read the same paginated as they do executed directly, and a `$99`
 > written inside any of them stays text.
 >
-> A marker the caller supplied no value for is refused at `paginate`
-> rather than indexed. Which `$N` are markers is again PostgreSQL's own
-> answer rather than a guess from the text — the statement is scanned
-> with libpg_query's scanner — and any marker numbered above the count of
-> bind values is recorded as the reason there is no statement to page
-> over, naming the marker and how many values were supplied.
+> The marker census MUST be exact and MUST be settled at `paginate`
+> rather than by the server. A marker the caller supplied no value for is
+> refused, naming the marker and how many values were supplied; a
+> supplied value nothing in the statement reads is refused too, naming
+> the value — the server would refuse that bind anyway, and refusing here
+> reports it once instead of once per page.
 >
 > Everything else — text the grammar rejects, a `;`-separated script, an
 > `INSERT`/`UPDATE`/`DELETE`/DDL statement, a `SELECT ... INTO` — is

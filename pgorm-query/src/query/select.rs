@@ -728,7 +728,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM "character", "font" WHERE "font"."id" = "character"."font_id""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from+1]
+    // [spec:pgorm:req:sql.ast.select.from+2]
     pub fn from<R>(&mut self, tbl_ref: R) -> &mut Self
     where
         R: IntoFromItem,
@@ -752,7 +752,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from+1]
+    // [spec:pgorm:req:sql.ast.select.from+2]
     pub fn from_values<I, V, A>(&mut self, value_tuples: I, alias: A) -> &mut Self
     where
         I: IntoIterator<Item = V>,

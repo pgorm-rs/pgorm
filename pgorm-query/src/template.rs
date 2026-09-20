@@ -10,6 +10,7 @@
 use crate::error::{Error, Result, TemplateError};
 use crate::expr::SimpleExpr;
 use crate::token::{Token, Tokenizer};
+use crate::value::Value;
 
 /// One piece of a scanned template: literal text, or a reference to the `N`th
 /// substitution as the template wrote it (1-based, unvalidated).
@@ -42,7 +43,7 @@ pub(crate) enum Grammar {
 }
 
 /// Split `input` into literal text and placeholder references.
-// [spec:pgorm:req:sql.render.custom-expr+2] (the `Template` grammar: `$$` escape, `$N` index)
+// [spec:pgorm:req:sql.render.custom-expr+3] (the `Template` grammar: `$$` escape, `$N` index)
 // [spec:pgorm:sem:sql.render.inject+3] (the `Sql` grammar: only `$N`, everything else verbatim)
 pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
     let mark = "$";
@@ -117,7 +118,7 @@ pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
 
 /// Check the census of `chunks` against `supplied`: the distinct placeholder
 /// indices referenced must be exactly `1..=supplied`.
-// [spec:pgorm:req:sql.render.custom-expr+2]
+// [spec:pgorm:req:sql.render.custom-expr+3]
 // [spec:pgorm:sem:sql.render.inject+3]
 fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
     let mut referenced: Vec<usize> = chunks
@@ -153,7 +154,7 @@ fn census(input: &str, chunks: &[Chunk], supplied: usize) -> Result<()> {
 
 /// Scan `input` and pair every placeholder with the value it names, or refuse
 /// the pairing. The result holds values, not indices.
-// [spec:pgorm:req:sql.render.custom-expr+2]
+// [spec:pgorm:req:sql.render.custom-expr+3]
 // [spec:pgorm:sem:sql.render.inject+3]
 pub(crate) fn resolve<T>(input: &str, grammar: Grammar, values: &[T]) -> Result<Vec<Segment<T>>>
 where
@@ -181,7 +182,7 @@ where
         .collect()
 }
 
-// [spec:pgorm:req:sql.render.custom-expr+2/test]
+// [spec:pgorm:req:sql.render.custom-expr+3/test]
 // [spec:pgorm:sem:sql.render.inject+3/test]
 #[cfg(test)]
 mod tests {
@@ -346,9 +347,18 @@ mod tests {
 /// at all, which is why rendering a template cannot reach for a
 /// substitution that was never supplied.
 ///
-/// Reached through [`Expr::template`], [`Expr::template_with_expr`] and
-/// [`Expr::template_with_exprs`].
-// [spec:pgorm:req:sql.render.custom-expr+2]
+/// Two constructors read two different `$` grammars, because there are two
+/// kinds of text a template is made of: [`SqlTemplate::new`] reads a template
+/// authored for this machinery, where `$$` writes a literal `$`, and
+/// [`SqlTemplate::from_sql`] reads real SQL, where `$$` opens a dollar-quoted
+/// body. The grammar is a reading, not a property of the value: what either
+/// constructor hands back is the same resolved sequence.
+///
+/// In expression position a template is reached through [`Expr::template`],
+/// [`Expr::template_with_expr`] and [`Expr::template_with_exprs`]; in relation
+/// position it is the payload of
+/// [`FromItem::Template`](crate::FromItem::Template).
+// [spec:pgorm:req:sql.render.custom-expr+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SqlTemplate {
     segments: Vec<Segment<SimpleExpr>>,
@@ -380,7 +390,7 @@ impl SqlTemplate {
     /// let short = SqlTemplate::new("$1 * $2", [Expr::val(2).into()]);
     /// assert!(short.is_err());
     /// ```
-    // [spec:pgorm:req:sql.render.custom-expr+2]
+    // [spec:pgorm:req:sql.render.custom-expr+3]
     pub fn new<T, I>(template: T, values: I) -> Result<Self>
     where
         T: Into<String>,
@@ -390,6 +400,53 @@ impl SqlTemplate {
         let values: Vec<SimpleExpr> = values.into_iter().collect();
         Ok(Self {
             segments: resolve(&template, Grammar::Template, &values)?,
+        })
+    }
+
+    /// Pair real SQL — text this crate did not author — with the values its
+    /// `$N` markers number, or refuse the pair.
+    ///
+    /// This is [`SqlTemplate::new`]'s sibling for foreign text, and it differs
+    /// in exactly one thing: the `$` grammar. Here only `$N` is a marker and
+    /// every other `$` is reproduced verbatim, `$$` included, because in real
+    /// SQL `$$` opens a dollar-quoted body rather than standing in for a
+    /// literal `$` — the same reading
+    /// [`inject_parameters`](crate::inject_parameters) does. Comments lex as
+    /// space and quoted regions are opaque, so a `$99` written inside a
+    /// comment, a string literal, an `E'…'` string or a dollar-quoted body is
+    /// text and binds nothing.
+    ///
+    /// The census is the same and equally exact: the distinct indices the SQL
+    /// references MUST be `1..=values.len()`, so a marker with no value behind
+    /// it and a value the SQL never reads are both refused here rather than
+    /// discovered by the server.
+    ///
+    /// Each marker is paired with its value up front, so a template placed in
+    /// [relation position](crate::FromItem::Template) renumbers into the
+    /// enclosing statement's parameter space when it renders, rather than
+    /// requiring that the fragment's numbering happen to be free.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// // `$$ … $$` is a dollar-quoted body, and the `$1` inside it is text.
+    /// let quoted = SqlTemplate::from_sql("SELECT $1, $$ $1 $$", [1i32.into()]);
+    /// assert!(quoted.is_ok());
+    ///
+    /// // A marker with no value behind it is refused.
+    /// let unbound = SqlTemplate::from_sql("SELECT $1, $2", [1i32.into()]);
+    /// assert!(unbound.is_err());
+    /// ```
+    // [spec:pgorm:req:sql.render.custom-expr+3]
+    pub fn from_sql<T, I>(sql: T, values: I) -> Result<Self>
+    where
+        T: Into<String>,
+        I: IntoIterator<Item = Value>,
+    {
+        let sql = sql.into();
+        let values: Vec<SimpleExpr> = values.into_iter().map(SimpleExpr::Value).collect();
+        Ok(Self {
+            segments: resolve(&sql, Grammar::Sql, &values)?,
         })
     }
 
