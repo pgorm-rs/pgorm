@@ -7794,6 +7794,7 @@ children (
                 id query-update-from
                 title "UPDATE FROM and DELETE USING are expressible"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:12:32.833419Z
@@ -7807,6 +7808,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T18:32:14.763023Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
