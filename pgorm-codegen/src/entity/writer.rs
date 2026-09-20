@@ -833,7 +833,7 @@ mod tests {
         WithSerde,
         entity::writer::{bonus_attributes, bonus_derive},
     };
-    use pgorm_query::{Alias, ColumnType, ForeignKeyAction, SharedIden, StringLen};
+    use pgorm_query::{Alias, ColumnType, ForeignKeyAction, Name, StringLen};
     use pretty_assertions::assert_eq;
     use proc_macro2::TokenStream;
     use quote::quote;
@@ -2233,10 +2233,10 @@ mod tests {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
                             schema: None,
-                            name: SharedIden::new(Alias::new("tea_enum")),
+                            name: Name::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SharedIden::new(Alias::new("everyday_tea")),
-                                SharedIden::new(Alias::new("breakfast_tea")),
+                                Name::new(Alias::new("everyday_tea")),
+                                Name::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2247,10 +2247,10 @@ mod tests {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
                             schema: None,
-                            name: SharedIden::new(Alias::new("tea_enum")),
+                            name: Name::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SharedIden::new(Alias::new("everyday_tea")),
-                                SharedIden::new(Alias::new("breakfast_tea")),
+                                Name::new(Alias::new("everyday_tea")),
+                                Name::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2279,10 +2279,10 @@ mod tests {
                         name: "first_tea".to_owned(),
                         col_type: ColumnType::Enum {
                             schema: None,
-                            name: SharedIden::new(Alias::new("tea_enum")),
+                            name: Name::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SharedIden::new(Alias::new("everyday_tea")),
-                                SharedIden::new(Alias::new("breakfast_tea")),
+                                Name::new(Alias::new("everyday_tea")),
+                                Name::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2293,10 +2293,10 @@ mod tests {
                         name: "second_tea".to_owned(),
                         col_type: ColumnType::Enum {
                             schema: None,
-                            name: SharedIden::new(Alias::new("tea_enum")),
+                            name: Name::new(Alias::new("tea_enum")),
                             variants: vec![
-                                SharedIden::new(Alias::new("everyday_tea")),
-                                SharedIden::new(Alias::new("breakfast_tea")),
+                                Name::new(Alias::new("everyday_tea")),
+                                Name::new(Alias::new("breakfast_tea")),
                             ],
                         },
                         auto_increment: false,
@@ -2307,11 +2307,11 @@ mod tests {
                         name: "size".to_owned(),
                         col_type: ColumnType::Enum {
                             schema: None,
-                            name: SharedIden::new(Alias::new("tea_size")),
+                            name: Name::new(Alias::new("tea_size")),
                             variants: vec![
-                                SharedIden::new(Alias::new("small")),
-                                SharedIden::new(Alias::new("medium")),
-                                SharedIden::new(Alias::new("huge")),
+                                Name::new(Alias::new("small")),
+                                Name::new(Alias::new("medium")),
+                                Name::new(Alias::new("huge")),
                             ],
                         },
                         auto_increment: false,

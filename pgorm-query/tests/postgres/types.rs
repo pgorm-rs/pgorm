@@ -33,13 +33,13 @@ fn create_3() {
         r#"CREATE TYPE "tea" AS ENUM ('EverydayTea', 'BreakfastTea')"#
     );
 
-    // The type is named by an `Iden`; its labels are data and are written as
+    // The type is named by an `SqlName`; its labels are data and are written as
     // the string literals they render to.
     enum Tea {
         Enum,
     }
 
-    impl pgorm_query::Iden for Tea {
+    impl pgorm_query::SqlName for Tea {
         fn unquoted(&self, s: &mut dyn std::fmt::Write) {
             match self {
                 Self::Enum => write!(s, "tea").unwrap(),
@@ -145,12 +145,12 @@ fn identifier_equality_is_type_and_text() {
     struct Mine;
     struct Yours;
 
-    impl Iden for Mine {
+    impl SqlName for Mine {
         fn unquoted(&self, s: &mut dyn std::fmt::Write) {
             write!(s, "same").unwrap();
         }
     }
-    impl Iden for Yours {
+    impl SqlName for Yours {
         fn unquoted(&self, s: &mut dyn std::fmt::Write) {
             write!(s, "same").unwrap();
         }
@@ -158,28 +158,28 @@ fn identifier_equality_is_type_and_text() {
 
     // Two types rendering one text are two identifiers.
     assert_eq!(Mine.to_string(), Yours.to_string());
-    assert_ne!(Mine.into_iden(), Yours.into_iden());
+    assert_ne!(Mine.into_name(), Yours.into_name());
 
     // One type rendering one text is one identifier, however the values
     // reached the trait object.
-    assert_eq!(Mine.into_iden(), Mine.into_iden());
+    assert_eq!(Mine.into_name(), Mine.into_name());
     assert_eq!(
-        Alias::new("same").into_iden(),
-        Alias::new("same").into_iden()
+        Alias::new("same").into_name(),
+        Alias::new("same").into_name()
     );
     assert_eq!(
-        SharedIden::new(Alias::new("same")),
-        Alias::new("same").into_iden()
+        Name::new(Alias::new("same")),
+        Alias::new("same").into_name()
     );
     assert_eq!(
-        Alias::new("same").into_iden(),
-        Alias::new("same").into_iden().clone()
+        Alias::new("same").into_name(),
+        Alias::new("same").into_name().clone()
     );
 
     // One type rendering two texts is two identifiers.
     assert_ne!(
-        Alias::new("same").into_iden(),
-        Alias::new("other").into_iden()
+        Alias::new("same").into_name(),
+        Alias::new("other").into_name()
     );
 }
 

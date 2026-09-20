@@ -1,4 +1,4 @@
-use crate::{Condition, ConditionHolder, DynIden, IntoCondition, IntoIden, SimpleExpr};
+use crate::{Condition, ConditionHolder, IntoCondition, IntoName, Name, SimpleExpr};
 
 /// A complete `ON CONFLICT` clause.
 ///
@@ -81,7 +81,7 @@ pub enum OnConflict {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictElement {
     /// A column, as in `ON CONFLICT ("id")`.
-    Column(DynIden),
+    Column(Name),
     /// An expression, as in `ON CONFLICT (LOWER("name"))`.
     Expr(SimpleExpr),
 }
@@ -117,9 +117,9 @@ pub struct ConflictTarget {
 pub enum ConflictAssignment {
     /// Take the column's value from the row that failed to insert:
     /// `"col" = "excluded"."col"`.
-    Column(DynIden),
+    Column(Name),
     /// Assign an expression: `"col" = <expr>`.
-    Expr(DynIden, SimpleExpr),
+    Expr(Name, SimpleExpr),
 }
 
 /// The assignments of a `DO UPDATE SET`, non-empty by construction: the
@@ -229,9 +229,9 @@ impl OnConflict {
     /// ```
     pub fn column<C>(column: C) -> ConflictTarget
     where
-        C: IntoIden,
+        C: IntoName,
     {
-        ConflictTarget::new(ConflictElement::Column(column.into_iden()))
+        ConflictTarget::new(ConflictElement::Column(column.into_name()))
     }
 
     /// Begin a conflict target at `expr`, for a conflict arbitrated by an
@@ -282,9 +282,9 @@ impl ConflictTarget {
     #[must_use]
     pub fn and_column<C>(mut self, column: C) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
     {
-        self.rest.push(ConflictElement::Column(column.into_iden()));
+        self.rest.push(ConflictElement::Column(column.into_name()));
         self
     }
 
@@ -293,13 +293,13 @@ impl ConflictTarget {
     #[must_use]
     pub fn and_columns<C, I>(mut self, columns: I) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
         I: IntoIterator<Item = C>,
     {
         self.rest.extend(
             columns
                 .into_iter()
-                .map(|c| ConflictElement::Column(c.into_iden())),
+                .map(|c| ConflictElement::Column(c.into_name())),
         );
         self
     }
@@ -398,20 +398,20 @@ impl ConflictTarget {
     /// from the row that failed to insert.
     pub fn update_column<C>(self, column: C) -> ConflictUpdate
     where
-        C: IntoIden,
+        C: IntoName,
     {
-        ConflictUpdate::new(self, ConflictAssignment::Column(column.into_iden()))
+        ConflictUpdate::new(self, ConflictAssignment::Column(column.into_name()))
     }
 
     /// Begin a `DO UPDATE SET` whose first assignment sets `col` to `value`.
     pub fn value<C, T>(self, col: C, value: T) -> ConflictUpdate
     where
-        C: IntoIden,
+        C: IntoName,
         T: Into<SimpleExpr>,
     {
         ConflictUpdate::new(
             self,
-            ConflictAssignment::Expr(col.into_iden(), value.into()),
+            ConflictAssignment::Expr(col.into_name(), value.into()),
         )
     }
 }
@@ -439,11 +439,11 @@ impl ConflictUpdate {
     #[must_use]
     pub fn update_column<C>(mut self, column: C) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
     {
         self.sets
             .rest
-            .push(ConflictAssignment::Column(column.into_iden()));
+            .push(ConflictAssignment::Column(column.into_name()));
         self
     }
 
@@ -476,13 +476,13 @@ impl ConflictUpdate {
     #[must_use]
     pub fn update_columns<C, I>(mut self, columns: I) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
         I: IntoIterator<Item = C>,
     {
         self.sets.rest.extend(
             columns
                 .into_iter()
-                .map(|c| ConflictAssignment::Column(c.into_iden())),
+                .map(|c| ConflictAssignment::Column(c.into_name())),
         );
         self
     }
@@ -491,7 +491,7 @@ impl ConflictUpdate {
     #[must_use]
     pub fn value<C, T>(self, col: C, value: T) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
         T: Into<SimpleExpr>,
     {
         self.values([(col, value.into())])
@@ -501,13 +501,13 @@ impl ConflictUpdate {
     #[must_use]
     pub fn values<C, I>(mut self, values: I) -> Self
     where
-        C: IntoIden,
+        C: IntoName,
         I: IntoIterator<Item = (C, SimpleExpr)>,
     {
         self.sets.rest.extend(
             values
                 .into_iter()
-                .map(|(c, e)| ConflictAssignment::Expr(c.into_iden(), e)),
+                .map(|(c, e)| ConflictAssignment::Expr(c.into_name(), e)),
         );
         self
     }

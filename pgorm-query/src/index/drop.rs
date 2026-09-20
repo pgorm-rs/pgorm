@@ -31,7 +31,7 @@ use crate::{QueryBuilder, types::*};
 #[derive(Debug, Clone)]
 pub struct IndexDropStatement {
     pub(crate) table: Option<TableName>,
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
     pub(crate) if_exists: bool,
 }
 
@@ -39,11 +39,11 @@ impl IndexDropStatement {
     /// Construct a new [`IndexDropStatement`] over the index it drops
     pub fn new<T>(name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
             table: None,
-            name: name.into_iden(),
+            name: name.into_name(),
             if_exists: false,
         }
     }

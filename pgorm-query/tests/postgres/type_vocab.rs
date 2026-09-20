@@ -7,24 +7,24 @@ use std::sync::Arc;
 fn into_column_ref_maps_every_form() {
     assert_eq!(
         Glyph::Id.into_column_ref(),
-        ColumnRef::Column(Glyph::Id.into_iden())
+        ColumnRef::Column(Glyph::Id.into_name())
     );
     assert_eq!(
         (Glyph::Table, Glyph::Id).into_column_ref(),
-        ColumnRef::TableColumn(Glyph::Table.into_iden(), Glyph::Id.into_iden())
+        ColumnRef::TableColumn(Glyph::Table.into_name(), Glyph::Id.into_name())
     );
     assert_eq!(
         (Alias::new("schema"), Glyph::Table, Glyph::Id).into_column_ref(),
         ColumnRef::SchemaTableColumn(
-            Alias::new("schema").into_iden(),
-            Glyph::Table.into_iden(),
-            Glyph::Id.into_iden()
+            Alias::new("schema").into_name(),
+            Glyph::Table.into_name(),
+            Glyph::Id.into_name()
         )
     );
     assert_eq!(Asterisk.into_column_ref(), ColumnRef::Asterisk);
     assert_eq!(
         (Glyph::Table, Asterisk).into_column_ref(),
-        ColumnRef::TableAsterisk(Glyph::Table.into_iden())
+        ColumnRef::TableAsterisk(Glyph::Table.into_name())
     );
 
     // An existing ColumnRef passes through unchanged.
@@ -36,18 +36,18 @@ fn into_column_ref_maps_every_form() {
 fn every_column_ref_form_renders() {
     assert_eq!(
         Query::select()
-            .column(ColumnRef::Column(Glyph::Id.into_iden()))
+            .column(ColumnRef::Column(Glyph::Id.into_name()))
             .column(ColumnRef::TableColumn(
-                Glyph::Table.into_iden(),
-                Glyph::Id.into_iden()
+                Glyph::Table.into_name(),
+                Glyph::Id.into_name()
             ))
             .column(ColumnRef::SchemaTableColumn(
-                Alias::new("schema").into_iden(),
-                Glyph::Table.into_iden(),
-                Glyph::Id.into_iden()
+                Alias::new("schema").into_name(),
+                Glyph::Table.into_name(),
+                Glyph::Id.into_name()
             ))
             .column(ColumnRef::Asterisk)
-            .column(ColumnRef::TableAsterisk(Glyph::Table.into_iden()))
+            .column(ColumnRef::TableAsterisk(Glyph::Table.into_name()))
             .to_string(),
         r#"SELECT "id", "glyph"."id", "schema"."glyph"."id", *, "glyph".*"#
     );
@@ -58,11 +58,11 @@ fn every_column_ref_form_renders() {
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
         Glyph::Table.into_table_name(),
-        TableName::Table(Glyph::Table.into_iden())
+        TableName::Table(Glyph::Table.into_name())
     );
     assert_eq!(
         (Alias::new("schema"), Glyph::Table).into_table_name(),
-        TableName::SchemaTable(Alias::new("schema").into_iden(), Glyph::Table.into_iden())
+        TableName::SchemaTable(Alias::new("schema").into_name(), Glyph::Table.into_name())
     );
 }
 
@@ -74,13 +74,13 @@ fn into_named_table_maps_the_named_forms() {
 
     assert_eq!(
         Glyph::Table.into_named_table(),
-        unaliased(TableName::Table(Glyph::Table.into_iden()))
+        unaliased(TableName::Table(Glyph::Table.into_name()))
     );
     assert_eq!(
         (Alias::new("schema"), Glyph::Table).into_named_table(),
         unaliased(TableName::SchemaTable(
-            Alias::new("schema").into_iden(),
-            Glyph::Table.into_iden()
+            Alias::new("schema").into_name(),
+            Glyph::Table.into_name()
         ))
     );
     assert_eq!(
@@ -107,7 +107,7 @@ fn into_from_item_maps_the_named_forms() {
     assert_eq!(
         Glyph::Table.into_from_item(),
         FromItem::Table(NamedTable {
-            name: TableName::Table(Glyph::Table.into_iden()),
+            name: TableName::Table(Glyph::Table.into_name()),
             alias: None,
         })
     );
@@ -115,8 +115,8 @@ fn into_from_item_maps_the_named_forms() {
         (Alias::new("schema"), Glyph::Table).into_from_item(),
         FromItem::Table(NamedTable {
             name: TableName::SchemaTable(
-                Alias::new("schema").into_iden(),
-                Glyph::Table.into_iden()
+                Alias::new("schema").into_name(),
+                Glyph::Table.into_name()
             ),
             alias: None,
         })
@@ -137,8 +137,8 @@ fn into_from_item_maps_the_named_forms() {
 fn from_item_alias_adds_or_replaces() {
     let named = |alias: &str| {
         FromItem::Table(NamedTable {
-            name: TableName::Table(Glyph::Table.into_iden()),
-            alias: Some(Alias::new(alias).into_iden()),
+            name: TableName::Table(Glyph::Table.into_name()),
+            alias: Some(Alias::new(alias).into_name()),
         })
     };
 
@@ -159,15 +159,15 @@ fn from_item_alias_adds_or_replaces() {
             .alias(Alias::new("g")),
         FromItem::Table(NamedTable {
             name: TableName::SchemaTable(
-                Alias::new("schema").into_iden(),
-                Glyph::Table.into_iden()
+                Alias::new("schema").into_name(),
+                Glyph::Table.into_name()
             ),
-            alias: Some(Alias::new("g").into_iden()),
+            alias: Some(Alias::new("g").into_name()),
         })
     );
     assert_eq!(
-        FromItem::ValuesList(vec![], Alias::new("v").into_iden()).alias(Alias::new("w")),
-        FromItem::ValuesList(vec![], Alias::new("w").into_iden())
+        FromItem::ValuesList(vec![], Alias::new("v").into_name()).alias(Alias::new("w")),
+        FromItem::ValuesList(vec![], Alias::new("w").into_name())
     );
 }
 
@@ -190,7 +190,7 @@ fn from_item_qualifier_prefers_the_alias() {
     assert_eq!(table.qualifier().to_string(), "glyph");
     assert_eq!(table.alias(Alias::new("g")).qualifier().to_string(), "g");
 
-    let values = FromItem::ValuesList(vec![], Alias::new("v").into_iden());
+    let values = FromItem::ValuesList(vec![], Alias::new("v").into_name());
     assert_eq!(values.qualifier().to_string(), "v");
     assert_eq!(values.table_name(), None);
 }
@@ -268,7 +268,7 @@ fn aliased_dml_targets_render() {
 fn value_producing_from_item_forms_render() {
     let sub_query = FromItem::SubQuery(
         Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-        Alias::new("sub").into_iden(),
+        Alias::new("sub").into_name(),
     );
     assert_eq!(
         Query::select().column(Asterisk).from(sub_query).to_string(),
@@ -280,7 +280,7 @@ fn value_producing_from_item_forms_render() {
             (1i32, "a").into_value_tuple(),
             (2i32, "b").into_value_tuple(),
         ],
-        Alias::new("v").into_iden(),
+        Alias::new("v").into_name(),
     );
     assert_eq!(
         Query::select()
@@ -292,7 +292,7 @@ fn value_producing_from_item_forms_render() {
 
     let function_call = FromItem::FunctionCall(
         Func::named(Alias::new("generate_series")).arg(1i32),
-        Alias::new("f").into_iden(),
+        Alias::new("f").into_name(),
     );
     assert_eq!(
         Query::select()
@@ -471,24 +471,24 @@ fn column_type_equality_semantics() {
     // `Enum` compares name and variant list, both by rendered text.
     let tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_iden(),
+        name: Alias::new("tea").into_name(),
         variants: vec![
-            Alias::new("green").into_iden(),
-            Alias::new("black").into_iden(),
+            Alias::new("green").into_name(),
+            Alias::new("black").into_name(),
         ],
     };
     let same_tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_iden(),
+        name: Alias::new("tea").into_name(),
         variants: vec![
-            Alias::new("green").into_iden(),
-            Alias::new("black").into_iden(),
+            Alias::new("green").into_name(),
+            Alias::new("black").into_name(),
         ],
     };
     let other_tea = ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_iden(),
-        variants: vec![Alias::new("green").into_iden()],
+        name: Alias::new("tea").into_name(),
+        variants: vec![Alias::new("green").into_name()],
     };
     assert_eq!(tea, same_tea);
     assert_ne!(tea, other_tea);

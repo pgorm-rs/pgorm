@@ -120,9 +120,9 @@ impl DeriveEntity {
 
         quote!(
             #[automatically_derived]
-            impl pgorm::Iden for #ident {
+            impl pgorm::SqlName for #ident {
                 fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                    write!(s, "{}", pgorm::IdenStr::as_str(self)).unwrap();
+                    write!(s, "{}", pgorm::StaticName::as_str(self)).unwrap();
                 }
             }
         )
@@ -133,7 +133,7 @@ impl DeriveEntity {
 
         quote!(
             #[automatically_derived]
-            impl pgorm::IdenStr for #ident {
+            impl pgorm::StaticName for #ident {
                 fn as_str(&self) -> &str {
                     <Self as pgorm::EntityName>::table_name(self)
                 }

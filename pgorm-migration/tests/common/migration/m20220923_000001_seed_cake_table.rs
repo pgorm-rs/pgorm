@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum Cake {
     Table,
     Name,

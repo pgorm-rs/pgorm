@@ -1,8 +1,8 @@
 use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_name};
 use core::marker::PhantomData;
 use pgorm_query::{
-    Condition, ConditionType, DynIden, ForeignKeyCreateStatement, FromItem, IntoIden, JoinType,
-    SharedIden, TableForeignKey, alias,
+    Condition, ConditionType, ForeignKeyCreateStatement, FromItem, IntoName, JoinType, Name,
+    TableForeignKey, alias,
 };
 use std::fmt::Debug;
 
@@ -66,7 +66,7 @@ pub struct RelationDef {
     /// `UPDATE` Operation is performed
     pub on_update: Option<ForeignKeyAction>,
     /// Custom join ON condition
-    pub on_condition: Option<Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>>,
+    pub on_condition: Option<Box<dyn Fn(Name, Name) -> Condition + Send + Sync>>,
     /// The name of foreign key constraint
     pub fk_name: Option<String>,
     /// Condition type of join on expression
@@ -90,16 +90,13 @@ impl std::fmt::Debug for RelationDef {
 
 fn debug_on_condition(
     d: &mut core::fmt::DebugStruct<'_, '_>,
-    on_condition: &Option<Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>>,
+    on_condition: &Option<Box<dyn Fn(Name, Name) -> Condition + Send + Sync>>,
 ) {
     match on_condition {
         Some(func) => {
             d.field(
                 "on_condition",
-                &func(
-                    SharedIden::new(alias("left")),
-                    SharedIden::new(alias("right")),
-                ),
+                &func(Name::new(alias("left")), Name::new(alias("right"))),
             );
         }
         None => {
@@ -135,7 +132,7 @@ where
     is_owner: bool,
     on_delete: Option<ForeignKeyAction>,
     on_update: Option<ForeignKeyAction>,
-    on_condition: Option<Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>>,
+    on_condition: Option<Box<dyn Fn(Name, Name) -> Condition + Send + Sync>>,
     fk_name: Option<String>,
     condition_type: ConditionType,
 }
@@ -172,8 +169,8 @@ impl RelationDef {
     // [spec:pgorm:def:entity.relation.def+7]
     pub fn rev(mut self) -> Self {
         let on_condition = self.on_condition.take().map(|f| {
-            Box::new(move |left: DynIden, right: DynIden| f(right, left))
-                as Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>
+            Box::new(move |left: Name, right: Name| f(right, left))
+                as Box<dyn Fn(Name, Name) -> Condition + Send + Sync>
         });
         Self {
             rel_type: self.rel_type,
@@ -232,7 +229,7 @@ impl RelationDef {
     /// ```
     pub fn from_alias<A>(mut self, alias: A) -> Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
         self.from_tbl = self.from_tbl.alias(alias);
         self
@@ -275,7 +272,7 @@ impl RelationDef {
     /// ```
     pub fn on_condition<F>(mut self, f: F) -> Self
     where
-        F: Fn(DynIden, DynIden) -> Condition + 'static + Send + Sync,
+        F: Fn(Name, Name) -> Condition + 'static + Send + Sync,
     {
         self.on_condition = Some(Box::new(f));
         self
@@ -418,7 +415,7 @@ where
     /// denoting the left-hand side and right-hand side table in the join expression.
     pub fn on_condition<F>(mut self, f: F) -> Self
     where
-        F: Fn(DynIden, DynIden) -> Condition + 'static + Send + Sync,
+        F: Fn(Name, Name) -> Condition + 'static + Send + Sync,
     {
         self.on_condition = Some(Box::new(f));
         self
@@ -468,14 +465,10 @@ macro_rules! foreign_key_from_relation {
         let from_tbl = unpack_table_name(&$relation.from_tbl);
         let to_tbl = unpack_table_name(&$relation.to_tbl);
         let (from, to) = $relation.columns.first();
-        let mut foreign_key = <$ty>::new(
-            from_tbl.clone(),
-            SharedIden::clone(from),
-            to_tbl,
-            SharedIden::clone(to),
-        );
+        let mut foreign_key =
+            <$ty>::new(from_tbl.clone(), Name::clone(from), to_tbl, Name::clone(to));
         for (from, to) in $relation.columns.iter().skip(1) {
-            foreign_key.col(SharedIden::clone(from), SharedIden::clone(to));
+            foreign_key.col(Name::clone(from), Name::clone(to));
         }
         if let Some(action) = $relation.on_delete {
             foreign_key.on_delete(action);
@@ -511,13 +504,13 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{ConditionType, FromItem, IntoIden, Table, TableForeignKey, TableName};
-/// use pgorm::{alias, ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
+/// use pgorm_query::{ConditionType, FromItem, IntoName, Table, TableForeignKey, TableName};
+/// use pgorm::{alias, ColumnPairs, EnumIter, SqlName, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
 ///     rel_type: RelationType::HasOne,
-///     from_tbl: FromItem::from(TableName::Table(alias("foo").into_iden())),
-///     to_tbl: FromItem::from(TableName::Table(alias("bar").into_iden())),
+///     from_tbl: FromItem::from(TableName::Table(alias("foo").into_name())),
+///     to_tbl: FromItem::from(TableName::Table(alias("bar").into_name())),
 ///     columns: ColumnPairs::new(alias("bar_id"), alias("bar_id")),
 ///     is_owner: false,
 ///     on_delete: None,
@@ -527,7 +520,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     condition_type: ConditionType::All,
 /// };
 ///
-/// let alter_table = Table::alter(TableName::Table(alias("foo").into_iden()))
+/// let alter_table = Table::alter(TableName::Table(alias("foo").into_name()))
 ///     .add_foreign_key(TableForeignKey::from(relation));
 /// assert_eq!(
 ///     alter_table.to_string(),

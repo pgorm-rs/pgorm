@@ -926,7 +926,7 @@ async fn cursor_over_network_types() -> Result<(), Error> {
         ValueHolder,
         types::{ToSql, Type},
     };
-    use pgorm_query::{ColumnDef, IntoIden, Query, QueryBuilder, Table};
+    use pgorm_query::{ColumnDef, IntoName, Query, QueryBuilder, Table};
 
     // `accepts` is true for every Postgres type: a `Value` carries no target
     // type, so the whole burden sits in `to_sql`.
@@ -988,10 +988,10 @@ async fn cursor_over_network_types() -> Result<(), Error> {
         let (sql, values) = Query::insert()
             .into_table(Entity)
             .columns([
-                Column::Id.into_iden(),
-                Column::Label.into_iden(),
-                ip_col.into_iden(),
-                mac_col.into_iden(),
+                Column::Id.into_name(),
+                Column::Label.into_name(),
+                ip_col.into_name(),
+                mac_col.into_name(),
             ])
             .values_panic([(*id).into(), (*label).into(), ip.into(), mac.into()])
             .to_owned()
@@ -1199,13 +1199,13 @@ async fn cursor_composite_keyset() -> Result<(), Error> {
 }
 
 // [spec:pgorm:sem:exec.cursor.keyset+4/test]    a boundary whose arity does not
-// match a runtime-built `Identity` is an `Error`, not a panic; the typed
+// match a runtime-built `Key` is an `Error`, not a panic; the typed
 // counterpart of the same mismatch does not compile at all, which the
 // `compile_fail` doctests on `Select::cursor_by` prove
 #[pgorm_macros::test]
 async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
-    use pgorm::IntoIdentity;
+    use pgorm::IntoKey;
 
     let ctx = TestContext::new("cursor_tests_arity_mismatch").await;
     let db = ctx.db.get().await?;
@@ -1213,7 +1213,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
 
     // A pair against a unary order column.
     let unary = Entity::find()
-        .cursor_by(Column::A.into_identity())
+        .cursor_by(Column::A.into_key())
         .after((1, 2))
         .first(1)
         .all(&db)
@@ -1223,9 +1223,9 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
         "Query Error: cursor boundary of arity 2 does not match 1 order column(s)"
     );
 
-    // And a five-element tuple against a four-column `Identity`.
+    // And a five-element tuple against a four-column `Key`.
     let many = Entity::find()
-        .cursor_by((Column::A, Column::B, Column::C, Column::D).into_identity())
+        .cursor_by((Column::A, Column::B, Column::C, Column::D).into_key())
         .after((1, 2, 3, 4, 5))
         .first(1)
         .all(&db)
@@ -1238,7 +1238,7 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
     // A matching arity still runs through the same dynamic path.
     assert_eq!(
         ids(&Entity::find()
-            .cursor_by(Column::Id.into_identity())
+            .cursor_by(Column::Id.into_key())
             .after(6)
             .first(2)
             .all(&db)
@@ -1259,8 +1259,8 @@ async fn cursor_dynamic_boundary_arity_error() -> Result<(), Error> {
 async fn cursor_order_composition() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
     use pgorm::alias;
-    use pgorm::{Identity, IntoIdentity};
-    use pgorm_query::IntoIden;
+    use pgorm::{IntoKey, Key};
+    use pgorm_query::IntoName;
 
     let ctx = TestContext::new("cursor_tests_order_composition").await;
     let db = ctx.db.get().await?;
@@ -1285,29 +1285,23 @@ async fn cursor_order_composition() -> Result<(), Error> {
 
     // Order columns are applied in declared order, so `(b, a)` sorts by `b`
     // first — the opposite grouping to `(a, b)`.
-    let table: DynIden = SharedIden::new(Entity);
+    let table: Name = Name::new(Entity);
     let mut by_b_then_a = Entity::find().cursor_by((Column::B, Column::A));
     // A unary secondary entry breaks the remaining tie deterministically.
-    by_b_then_a.set_secondary_order_by(vec![(
-        SharedIden::clone(&table),
-        Column::Id.into_identity(),
-    )]);
+    by_b_then_a.set_secondary_order_by(vec![(Name::clone(&table), Column::Id.into_key())]);
     assert_eq!(ids(&by_b_then_a.first(4).all(&db).await?), [1, 4, 7, 2]);
 
     // The secondary entry follows the cursor's resolved direction too.
     let mut descending = Entity::find().cursor_by((Column::B, Column::A));
-    descending.set_secondary_order_by(vec![(
-        SharedIden::clone(&table),
-        Column::Id.into_identity(),
-    )]);
+    descending.set_secondary_order_by(vec![(Name::clone(&table), Column::Id.into_key())]);
     assert_eq!(ids(&descending.desc().first(3).all(&db).await?), [6, 3, 8]);
 
     // Only unary secondary entries are applied. A unary entry naming a column
     // that does not exist reaches the server and is rejected...
     let mut bad_unary = Entity::find().cursor_by(Column::A);
     bad_unary.set_secondary_order_by(vec![(
-        SharedIden::clone(&table),
-        Identity::from(alias("no_such_column").into_iden()),
+        Name::clone(&table),
+        Key::from(alias("no_such_column").into_name()),
     )]);
     assert!(matches!(
         bad_unary.first(8).all(&db).await,
@@ -1318,10 +1312,10 @@ async fn cursor_order_composition() -> Result<(), Error> {
     // before the SQL is built, so the query succeeds.
     let mut composite_secondary = Entity::find().cursor_by(Column::A);
     composite_secondary.set_secondary_order_by(vec![(
-        SharedIden::clone(&table),
-        Identity::from(vec![
-            alias("no_such_column").into_iden(),
-            alias("nor_this_one").into_iden(),
+        Name::clone(&table),
+        Key::from(vec![
+            alias("no_such_column").into_name(),
+            alias("nor_this_one").into_name(),
         ]),
     )]);
     assert_eq!(composite_secondary.first(8).all(&db).await?.len(), 8);
@@ -1391,7 +1385,7 @@ async fn cursor_reuse_replaces_boundary() -> Result<(), Error> {
 #[pgorm_macros::test]
 async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
     use cursor_composite::{Column, Entity};
-    use pgorm::IntoIdentity;
+    use pgorm::IntoKey;
 
     let ctx = TestContext::new("cursor_tests_secondary_tiebreak").await;
     let db = ctx.db.get().await?;
@@ -1399,13 +1393,10 @@ async fn cursor_secondary_tiebreak_boundary() -> Result<(), Error> {
 
     // Ordered by `b` then `id`, the rows run 1, 4, 7, 2, 5, 8, 3, 6 — three
     // runs of equal `b`.
-    let table: DynIden = SharedIden::new(Entity);
+    let table: Name = Name::new(Entity);
     let by_b = || {
         let mut cursor = Entity::find().cursor_by(Column::B);
-        cursor.set_secondary_order_by(vec![(
-            SharedIden::clone(&table),
-            Column::Id.into_identity(),
-        )]);
+        cursor.set_secondary_order_by(vec![(Name::clone(&table), Column::Id.into_key())]);
         cursor
     };
 

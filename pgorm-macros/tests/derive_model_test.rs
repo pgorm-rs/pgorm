@@ -105,7 +105,7 @@ pub enum PlainColumn {
     LastName,
 }
 
-/// `DeriveCustomColumn` is the same minus the `IdenStr` impl, which the user
+/// `DeriveCustomColumn` is the same minus the `StaticName` impl, which the user
 /// writes — typically delegating to the generated `default_as_str`.
 #[derive(Copy, Clone, Debug, EnumIter, DeriveCustomColumn)]
 pub enum CustomColumn {
@@ -113,7 +113,7 @@ pub enum CustomColumn {
     FirstName,
 }
 
-impl pgorm::IdenStr for CustomColumn {
+impl pgorm::StaticName for CustomColumn {
     fn as_str(&self) -> &str {
         match self {
             Self::FirstName => "SHOUTED",
@@ -367,7 +367,7 @@ fn behavior_and_into_active_model_derives() {
     assert_eq!(active.id, ActiveValue::NotSet);
 }
 
-// [spec:pgorm:sem:macros.derive.column+2/test]    default_as_str / IdenStr / Iden
+// [spec:pgorm:sem:macros.derive.column+2/test]    default_as_str / StaticName / SqlName
 #[test]
 fn derive_column_names() {
     // `default_as_str` is the snake_case of the variant, or the `column_name`
@@ -376,9 +376,9 @@ fn derive_column_names() {
     assert_eq!(PlainColumn::FirstName.default_as_str(), "first_name");
     assert_eq!(PlainColumn::LastName.default_as_str(), "lAsTnAmE");
 
-    // `IdenStr::as_str` is `default_as_str`, and `Iden` writes it.
+    // `StaticName::as_str` is `default_as_str`, and `SqlName` writes it.
     assert_eq!(
-        pgorm::IdenStr::as_str(&PlainColumn::FirstName),
+        pgorm::StaticName::as_str(&PlainColumn::FirstName),
         "first_name"
     );
     assert_eq!(PlainColumn::FirstName.to_string(), "first_name");
@@ -422,8 +422,11 @@ fn derive_custom_column_leaves_as_str_to_user() {
         CustomColumn::from_str("firstName"),
         Ok(CustomColumn::FirstName)
     ));
-    // ...but `IdenStr` is the hand-written one above, and `Iden` renders it.
-    assert_eq!(pgorm::IdenStr::as_str(&CustomColumn::FirstName), "SHOUTED");
+    // ...but `StaticName` is the hand-written one above, and `SqlName` renders it.
+    assert_eq!(
+        pgorm::StaticName::as_str(&CustomColumn::FirstName),
+        "SHOUTED"
+    );
     assert_eq!(CustomColumn::FirstName.to_string(), "SHOUTED");
     // The escape hatch: delegating back to the generated default.
     assert_eq!(CustomColumn::Id.to_string(), "id");

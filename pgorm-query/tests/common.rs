@@ -1,12 +1,12 @@
 pub use std::fmt::Write as FmtWrite;
 
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 
 /// Representation of a database table named `BloB`.
 ///
-/// A `Enum` implemented [`Iden`] used in rustdoc and test to demonstrate the library usage.
+/// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.
 ///
-/// [`Iden`]: crate::types::Iden
+/// [`SqlName`]: crate::types::SqlName
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum BinaryType {
@@ -20,7 +20,7 @@ pub enum BinaryType {
     LongBlob,
 }
 
-impl Iden for BinaryType {
+impl SqlName for BinaryType {
     fn unquoted(&self, s: &mut dyn FmtWrite) {
         write!(
             s,

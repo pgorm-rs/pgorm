@@ -90,7 +90,7 @@ pub enum CustomCol {
     Id,
 }
 
-impl pgorm::IdenStr for CustomCol {
+impl pgorm::StaticName for CustomCol {
     fn as_str(&self) -> &str {
         self.default_as_str()
     }
@@ -136,10 +136,10 @@ pub struct CakeSlice {
 #[derive(Debug, PartialEq, DeriveValueType)]
 pub struct Grams(i32);
 
-/// `DeriveIden`.
-#[derive(DeriveIden)]
+/// `DeriveSqlName`.
+#[derive(DeriveSqlName)]
 #[pgorm(iden = "cake_table")]
-pub struct CakeIden;
+pub struct CakeTable;
 
 /// `EnumIter`, the one derive configured through `#[strum(...)]` rather than
 /// `#[pgorm(...)]`.
@@ -181,7 +181,7 @@ fn the_whole_derive_catalogue_is_exposed() {
     assert_eq!(Tea::Everyday.to_value(), "E");
     assert_eq!(Tea::Everyday.to_string(), "Everyday");
     assert_eq!(pgorm::Value::from(Grams(5)), pgorm::Value::Int(Some(5)));
-    assert_eq!(CakeIden.to_string(), "cake_table");
+    assert_eq!(CakeTable.to_string(), "cake_table");
     assert_eq!(Flavour::iter().collect::<Vec<_>>(), vec![Flavour::Sweet]);
 
     // The projection derives are compile-time contracts; assert the traits.

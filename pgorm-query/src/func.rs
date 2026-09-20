@@ -19,7 +19,7 @@ pub enum Function {
     IfNull,
     CharLength,
     /// A function this enum has no variant for, called by quoted name.
-    Named(DynIden),
+    Named(Name),
     Coalesce,
     Lower,
     Upper,
@@ -125,7 +125,7 @@ impl Func {
     ///
     /// struct MyFunction;
     ///
-    /// impl Iden for MyFunction {
+    /// impl SqlName for MyFunction {
     ///     fn unquoted(&self, s: &mut dyn Write) {
     ///         write!(s, "my_function").unwrap();
     ///     }
@@ -157,9 +157,9 @@ impl Func {
     /// ```
     pub fn named<T>(func: T) -> FunctionCall
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        FunctionCall::new(Function::Named(func.into_iden()))
+        FunctionCall::new(Function::Named(func.into_name()))
     }
 
     /// Call `MAX` function.

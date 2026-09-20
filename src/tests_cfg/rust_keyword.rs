@@ -70,7 +70,7 @@ impl ActiveModelBehavior for ActiveModel {}
 #[cfg(test)]
 mod tests {
     use crate::tests_cfg::rust_keyword::*;
-    use pgorm_query::Iden;
+    use pgorm_query::SqlName;
 
     #[test]
     fn test_columns() {

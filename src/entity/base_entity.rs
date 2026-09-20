@@ -3,42 +3,25 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
     RelationType, Select, SelectGraph,
 };
-use pgorm_query::{Alias, AliasName, Iden, IntoIden, IntoTableName, IntoValueTuple, TableName};
-use std::fmt::Debug;
+use pgorm_query::{Alias, IntoName, IntoTableName, IntoValueTuple, TableName};
 pub use strum::IntoEnumIterator as Iterable;
 
-/// An [`Iden`] that also hands out its name as a `&str`.
+/// The base identifier contract of the entity layer: entities, columns and
+/// primary keys all implement it, and it is what [`IntoKey`](crate::IntoKey)
+/// keys on, so implementing it is what lets a type stand in a column position.
 ///
-/// This is the base identifier contract of the entity layer: entities,
-/// columns and primary keys all implement it, and it is what
-/// [`IntoIdentity`](crate::IntoIdentity) keys on, so implementing it is what
-/// lets a type stand in a column position.
-///
-/// It is deliberately *not* [`pgorm_query::IdenStatic`], whose `as_str`
-/// returns `&'static str`: the name an entity hands out is borrowed from
-/// `self` (`EntityName::table_name`), so the two cannot be one trait. They
-/// once shared the name `IdenStatic`, which put two incompatible traits with
-/// the same name and the same method into scope together.
+/// It is [`pgorm_query::StaticName`] itself — the entity layer used to declare
+/// a second trait of its own with the same method, which meant two traits with
+/// the same shape could be in scope at once and neither call site could say
+/// which it meant.
 // [spec:pgorm:def:entity.traits+1]
-pub trait IdenStr: Iden + Copy + Debug + 'static {
-    /// The identifier as an unquoted string.
-    fn as_str(&self) -> &str;
-}
-
-/// A name the query introduces stands where a column does, so the alias token
-/// carries this contract too and reaches the [`Identity`](crate::Identity)
-/// positions that key on it — `cursor_by`, a secondary ordering — and not
-/// only the plain [`Iden`] ones.
-// [spec:pgorm:sem:query.build.alias+1]
-impl IdenStr for AliasName {
-    fn as_str(&self) -> &str {
-        pgorm_query::IdenStatic::as_str(self)
-    }
-}
+// [spec:pgorm:sem:query.build.alias+1]    AliasName is a StaticName in pgorm-query, so a
+// query-introduced name reaches the key positions that key on it
+pub use pgorm_query::StaticName;
 
 /// A Trait for mapping an Entity to a database table
 // [spec:pgorm:req:entity.traits.entity-name+1]
-pub trait EntityName: IdenStr + Default {
+pub trait EntityName: StaticName + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {
         None
@@ -60,7 +43,7 @@ pub trait EntityName: IdenStr + Default {
     /// Get the [TableName] from invoking the `self.schema_name()`
     fn table_ref(&self) -> TableName {
         match self.schema_name() {
-            Some(schema) => (Alias::new(schema).into_iden(), self.into_iden()).into_table_name(),
+            Some(schema) => (Alias::new(schema).into_name(), self.into_name()).into_table_name(),
             None => self.into_table_name(),
         }
     }

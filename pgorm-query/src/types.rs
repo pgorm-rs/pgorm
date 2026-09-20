@@ -3,9 +3,13 @@
 use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*};
 use std::{any::Any, fmt, ops, sync::Arc};
 
-/// Identifier
+/// A name in SQL: what an identifier position renders.
+///
+/// Spelled as the fork spells its other text contracts — `SqlText` is trusted
+/// SQL, `SqlName` is a name — so the two positions a string can land in are
+/// told apart by the trait it satisfies rather than by convention.
 // [spec:pgorm:def:sql.types+8]
-pub trait Iden: Any + Send + Sync {
+pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
     // [spec:pgorm:req:sql.render.ident-quoting+4]
@@ -29,30 +33,41 @@ pub trait Iden: Any + Send + Sync {
     fn unquoted(&self, s: &mut dyn fmt::Write);
 }
 
-/// Identifier
+/// A name whose text is fixed by the program, and which therefore hands that
+/// text out as a `&str` without rendering it.
+///
+/// This is the base identifier contract of anything that stands where a column
+/// does: entities, columns and primary keys implement it through pgorm's
+/// derives, the [`AliasName`] token implements it, and pgorm's key-column sets
+/// are built from it. `Copy` and `'static` say the name is part of the shape of
+/// the program; `Debug` is what makes a column printable in the generic code
+/// that takes one.
 // [spec:pgorm:def:sql.types+8]
-pub trait IdenStatic: Iden + Copy + 'static {
-    fn as_str(&self) -> &'static str;
+pub trait StaticName: SqlName + Copy + fmt::Debug + 'static {
+    /// The name as an unquoted string.
+    fn as_str(&self) -> &str;
 }
 
-/// A shared, type-erased identifier: an `Arc<dyn Iden>` that can be compared.
+/// A name, type-erased and shared: one `Arc<dyn SqlName>` wide, cheap to
+/// clone, and comparable.
+///
+/// Every identifier position in the AST holds one of these, so the type is
+/// deliberately two words and no more — widening it widens every node.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SharedIden(Arc<dyn Iden>);
+pub struct Name(Arc<dyn SqlName>);
 
-pub type DynIden = SharedIden;
-
-impl ops::Deref for SharedIden {
-    type Target = dyn Iden;
+impl ops::Deref for Name {
+    type Target = dyn SqlName;
 
     fn deref(&self) -> &Self::Target {
         ops::Deref::deref(&self.0)
     }
 }
 
-impl Clone for SharedIden {
-    fn clone(&self) -> SharedIden {
-        SharedIden(Arc::clone(&self.0))
+impl Clone for Name {
+    fn clone(&self) -> Name {
+        Name(Arc::clone(&self.0))
     }
 }
 
@@ -63,31 +78,31 @@ impl Clone for SharedIden {
 /// read off the trait object's vtable address: Rust guarantees a vtable
 /// neither unique per type nor stable across codegen units, so an address
 /// comparison can answer that two `Alias`es both spelling `"id"` differ.
-/// `Iden` is bounded on [`Any`] so the erased value can still be asked, and
-/// asking costs the identifier no width — a `DynIden` sits in nearly every
+/// `SqlName` is bounded on [`Any`] so the erased value can still be asked, and
+/// asking costs the identifier no width — a `Name` sits in nearly every
 /// node of the AST.
 // [spec:pgorm:def:sql.types+8]
-impl PartialEq for SharedIden {
+impl PartialEq for Name {
     fn eq(&self, other: &Self) -> bool {
         let (this, that): (&dyn Any, &dyn Any) = (&*self.0, &*other.0);
         this.type_id() == that.type_id() && self.to_string() == other.to_string()
     }
 }
 
-impl SharedIden {
-    pub fn new<I>(i: I) -> SharedIden
+impl Name {
+    pub fn new<I>(i: I) -> Name
     where
-        I: Iden + 'static,
+        I: SqlName + 'static,
     {
-        SharedIden(Arc::new(i))
+        Name(Arc::new(i))
     }
 }
 
-pub trait IntoIden {
-    fn into_iden(self) -> DynIden;
+pub trait IntoName {
+    fn into_name(self) -> Name;
 }
 
-impl fmt::Debug for dyn Iden {
+impl fmt::Debug for dyn SqlName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.unquoted(formatter);
         Ok(())
@@ -99,11 +114,11 @@ impl fmt::Debug for dyn Iden {
 // [spec:pgorm:def:sql.ast.keywords+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
-    Column(DynIden),
-    TableColumn(DynIden, DynIden),
-    SchemaTableColumn(DynIden, DynIden, DynIden),
+    Column(Name),
+    TableColumn(Name, Name),
+    SchemaTableColumn(Name, Name, Name),
     Asterisk,
-    TableAsterisk(DynIden),
+    TableAsterisk(Name),
 }
 
 // [spec:pgorm:def:sql.types.column-ref]
@@ -143,7 +158,7 @@ pub trait IntoColumnRef {
 ///
 /// let sub = FromItem::SubQuery(
 ///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-///     Alias::new("q").into_iden(),
+///     Alias::new("q").into_name(),
 /// );
 /// Table::truncate(sub);
 /// ```
@@ -170,8 +185,8 @@ pub trait IntoColumnRef {
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
-    pub schema: Option<DynIden>,
-    pub name: DynIden,
+    pub schema: Option<Name>,
+    pub name: Name,
     pub array: bool,
     /// Render `name` as the caller's own SQL rather than as an identifier.
     pub verbatim: bool,
@@ -181,11 +196,11 @@ impl TypeName {
     /// A bare, non-array type name.
     pub fn new<T>(name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
             schema: None,
-            name: name.into_iden(),
+            name: name.into_name(),
             array: false,
             verbatim: false,
         }
@@ -206,7 +221,7 @@ impl TypeName {
     pub fn raw(type_expr: &'static str) -> Self {
         Self {
             schema: None,
-            name: Alias::new(type_expr).into_iden(),
+            name: Alias::new(type_expr).into_name(),
             array: false,
             verbatim: true,
         }
@@ -215,9 +230,9 @@ impl TypeName {
     /// Qualify with a schema.
     pub fn schema<S>(mut self, schema: S) -> Self
     where
-        S: IntoIden,
+        S: IntoName,
     {
-        self.schema = Some(schema.into_iden());
+        self.schema = Some(schema.into_name());
         self
     }
 
@@ -261,7 +276,7 @@ impl TypeName {
     /// [`IndexType::Named`](crate::IndexType::Named) — so one policy covers
     /// every name-shaped position rather than each site inventing its own.
     // [spec:pgorm:req:sql.render.ident-quoting+4]
-    pub(crate) fn prepare_part(part: &DynIden, out: &mut String) {
+    pub(crate) fn prepare_part(part: &Name, out: &mut String) {
         let text = part.to_string();
         let mut chars = text.chars();
         let safe = matches!(chars.next(), Some('a'..='z' | '_'))
@@ -291,7 +306,7 @@ impl TypeName {
 
 impl<T> From<T> for TypeName
 where
-    T: IntoIden,
+    T: IntoName,
 {
     fn from(name: T) -> Self {
         Self::new(name)
@@ -301,9 +316,9 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub enum TableName {
     /// Table identifier without any schema prefix
-    Table(DynIden),
+    Table(Name),
     /// Table identifier with schema prefix
-    SchemaTable(DynIden, DynIden),
+    SchemaTable(Name, Name),
 }
 
 /// Conversion into the [`TableName`] a DDL statement targets.
@@ -341,7 +356,7 @@ pub trait IntoTableName {
 ///
 /// let sub = FromItem::SubQuery(
 ///     Query::select().column(Glyph::Id).from(Glyph::Table).take(),
-///     Alias::new("q").into_iden(),
+///     Alias::new("q").into_name(),
 /// );
 /// Query::insert().into_table(sub);
 /// ```
@@ -353,7 +368,7 @@ pub trait IntoTableName {
 ///
 /// let values = FromItem::ValuesList(
 ///     vec![(1i32,).into_value_tuple()],
-///     Alias::new("v").into_iden(),
+///     Alias::new("v").into_name(),
 /// );
 /// Query::update().table(values);
 /// ```
@@ -365,7 +380,7 @@ pub trait IntoTableName {
 ///
 /// let func = FromItem::FunctionCall(
 ///     Func::named(Alias::new("generate_series")).arg(1i32),
-///     Alias::new("f").into_iden(),
+///     Alias::new("f").into_name(),
 /// );
 /// Query::delete().from_table(func);
 /// ```
@@ -375,7 +390,7 @@ pub struct NamedTable {
     /// The table this reference names
     pub name: TableName,
     /// The alias bound to the name, when one is
-    pub alias: Option<DynIden>,
+    pub alias: Option<Name>,
 }
 
 /// Conversion into the [`NamedTable`] a DML statement targets.
@@ -397,11 +412,11 @@ pub enum FromItem {
     /// A table name with an optional alias
     Table(NamedTable),
     /// Subquery with alias
-    SubQuery(SelectStatement, DynIden),
+    SubQuery(SelectStatement, Name),
     /// Values list with alias
-    ValuesList(Vec<ValueTuple>, DynIden),
+    ValuesList(Vec<ValueTuple>, Name),
     /// Function call with alias
-    FunctionCall(FunctionCall, DynIden),
+    FunctionCall(FunctionCall, Name),
 }
 
 /// Conversion into a [`FromItem`].
@@ -618,32 +633,32 @@ pub enum SubQueryOper {
 
 // Impl begins
 
-impl<T: 'static> IntoIden for T
+impl<T: 'static> IntoName for T
 where
-    T: Iden,
+    T: SqlName,
 {
-    fn into_iden(self) -> DynIden {
-        SharedIden::new(self)
+    fn into_name(self) -> Name {
+        Name::new(self)
     }
 }
 
-impl IntoIden for DynIden {
-    fn into_iden(self) -> DynIden {
+impl IntoName for Name {
+    fn into_name(self) -> Name {
         self
     }
 }
 
 // [spec:pgorm:def:sql.types+8]
-impl IntoIden for &str {
-    fn into_iden(self) -> DynIden {
-        SharedIden::new(Alias::new(self))
+impl IntoName for &str {
+    fn into_name(self) -> Name {
+        Name::new(Alias::new(self))
     }
 }
 
 // [spec:pgorm:def:sql.types+8]
-impl IntoIden for String {
-    fn into_iden(self) -> DynIden {
-        SharedIden::new(Alias::new(self))
+impl IntoName for String {
+    fn into_name(self) -> Name {
+        Name::new(Alias::new(self))
     }
 }
 
@@ -655,10 +670,10 @@ impl IntoColumnRef for ColumnRef {
 
 impl<T: 'static> IntoColumnRef for T
 where
-    T: IntoIden,
+    T: IntoName,
 {
     fn into_column_ref(self) -> ColumnRef {
-        ColumnRef::Column(self.into_iden())
+        ColumnRef::Column(self.into_name())
     }
 }
 
@@ -670,31 +685,31 @@ impl IntoColumnRef for Asterisk {
 
 impl<S: 'static, T: 'static> IntoColumnRef for (S, T)
 where
-    S: IntoIden,
-    T: IntoIden,
+    S: IntoName,
+    T: IntoName,
 {
     fn into_column_ref(self) -> ColumnRef {
-        ColumnRef::TableColumn(self.0.into_iden(), self.1.into_iden())
+        ColumnRef::TableColumn(self.0.into_name(), self.1.into_name())
     }
 }
 
 impl<T: 'static> IntoColumnRef for (T, Asterisk)
 where
-    T: IntoIden,
+    T: IntoName,
 {
     fn into_column_ref(self) -> ColumnRef {
-        ColumnRef::TableAsterisk(self.0.into_iden())
+        ColumnRef::TableAsterisk(self.0.into_name())
     }
 }
 
 impl<S: 'static, T: 'static, U: 'static> IntoColumnRef for (S, T, U)
 where
-    S: IntoIden,
-    T: IntoIden,
-    U: IntoIden,
+    S: IntoName,
+    T: IntoName,
+    U: IntoName,
 {
     fn into_column_ref(self) -> ColumnRef {
-        ColumnRef::SchemaTableColumn(self.0.into_iden(), self.1.into_iden(), self.2.into_iden())
+        ColumnRef::SchemaTableColumn(self.0.into_name(), self.1.into_name(), self.2.into_name())
     }
 }
 
@@ -706,34 +721,34 @@ impl IntoTableName for TableName {
 
 impl<T: 'static> IntoTableName for T
 where
-    T: IntoIden,
+    T: IntoName,
 {
     fn into_table_name(self) -> TableName {
-        TableName::Table(self.into_iden())
+        TableName::Table(self.into_name())
     }
 }
 
 impl<S: 'static, T: 'static> IntoTableName for (S, T)
 where
-    S: IntoIden,
-    T: IntoIden,
+    S: IntoName,
+    T: IntoName,
 {
     fn into_table_name(self) -> TableName {
-        TableName::SchemaTable(self.0.into_iden(), self.1.into_iden())
+        TableName::SchemaTable(self.0.into_name(), self.1.into_name())
     }
 }
 
 // [spec:pgorm:def:sql.types.table-ref+2]
 impl TableName {
     /// The table identifier, without its schema
-    pub fn table(&self) -> &DynIden {
+    pub fn table(&self) -> &Name {
         match self {
             Self::Table(table) | Self::SchemaTable(_, table) => table,
         }
     }
 
     /// The schema identifier, when the name carries one
-    pub fn schema(&self) -> Option<&DynIden> {
+    pub fn schema(&self) -> Option<&Name> {
         match self {
             Self::Table(_) => None,
             Self::SchemaTable(schema, _) => Some(schema),
@@ -764,17 +779,17 @@ impl NamedTable {
     /// Bind an alias to the name, replacing any alias already bound
     pub fn alias<A>(self, alias: A) -> Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
         Self {
             name: self.name,
-            alias: Some(alias.into_iden()),
+            alias: Some(alias.into_name()),
         }
     }
 
     /// The identifier a column of this table is qualified by: the alias when
     /// one is bound, otherwise the table identifier.
-    pub fn qualifier(&self) -> &DynIden {
+    pub fn qualifier(&self) -> &Name {
         self.alias.as_ref().unwrap_or_else(|| self.name.table())
     }
 }
@@ -817,13 +832,13 @@ impl FromItem {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
         match self {
             Self::Table(table) => Self::Table(table.alias(alias)),
-            Self::SubQuery(statement, _) => Self::SubQuery(statement, alias.into_iden()),
-            Self::ValuesList(values, _) => Self::ValuesList(values, alias.into_iden()),
-            Self::FunctionCall(func, _) => Self::FunctionCall(func, alias.into_iden()),
+            Self::SubQuery(statement, _) => Self::SubQuery(statement, alias.into_name()),
+            Self::ValuesList(values, _) => Self::ValuesList(values, alias.into_name()),
+            Self::FunctionCall(func, _) => Self::FunctionCall(func, alias.into_name()),
         }
     }
 
@@ -837,7 +852,7 @@ impl FromItem {
 
     /// The identifier a column of this item is qualified by: the alias when
     /// one is bound, otherwise the table identifier.
-    pub fn qualifier(&self) -> &DynIden {
+    pub fn qualifier(&self) -> &Name {
         match self {
             Self::Table(table) => table.qualifier(),
             Self::SubQuery(_, alias)
@@ -856,7 +871,7 @@ impl Alias {
     }
 }
 
-impl Iden for Alias {
+impl SqlName for Alias {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(s, "{}", self.0).unwrap();
     }
@@ -932,40 +947,40 @@ mod tests {
         type CharLocal = Character;
 
         assert_eq!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(Character::Id.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(Character::Id.into_name())
         );
         assert_eq!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(Char::Id.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(Char::Id.into_name())
         );
         assert_eq!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(CharLocal::Id.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(CharLocal::Id.into_name())
         );
         assert_eq!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(CharReexport::Id.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(CharReexport::Id.into_name())
         );
         assert_eq!(
-            ColumnRef::Column(Alias::new("id").into_iden()),
-            ColumnRef::Column(Alias::new("id").into_iden())
+            ColumnRef::Column(Alias::new("id").into_name()),
+            ColumnRef::Column(Alias::new("id").into_name())
         );
         assert_ne!(
-            ColumnRef::Column(Alias::new("id").into_iden()),
-            ColumnRef::Column(Alias::new("id_").into_iden())
+            ColumnRef::Column(Alias::new("id").into_name()),
+            ColumnRef::Column(Alias::new("id_").into_name())
         );
         assert_ne!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(Alias::new("id").into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(Alias::new("id").into_name())
         );
         assert_ne!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(Character::Table.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(Character::Table.into_name())
         );
         assert_ne!(
-            ColumnRef::Column(Character::Id.into_iden()),
-            ColumnRef::Column(Font::Id.into_iden())
+            ColumnRef::Column(Character::Id.into_name()),
+            ColumnRef::Column(Font::Id.into_name())
         );
     }
 }

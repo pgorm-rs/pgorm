@@ -4,7 +4,7 @@ pub mod common;
 pub use common::{TestContext, features::*, setup::*};
 use pgorm::entity::prelude::*;
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum ClassName {
     Table,
     Id,
@@ -12,7 +12,7 @@ pub enum ClassName {
     Text,
 }
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum Book {
     #[pgorm(iden = "book_table")]
     Table,
@@ -25,16 +25,16 @@ pub enum Book {
     Type,
 }
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 struct GlyphToken;
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 #[pgorm(iden = "weRd")]
 struct Word;
 
 // Every rendered name here is a "valid iden", so the `prepare` override is
 // emitted and quotes the name itself.
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum AllValid {
     Table,
     Id,
@@ -43,7 +43,7 @@ pub enum AllValid {
 // One variant renders a name that is *not* a valid iden, which suppresses the
 // `prepare` override for the whole enum and leaves the trait default (which
 // doubles any embedded double quote) to do the quoting.
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum SomeInvalid {
     Table,
     #[pgorm(iden = "we\"ird")]
@@ -51,11 +51,11 @@ pub enum SomeInvalid {
 }
 
 // An empty enum expands to nothing, which is the only reason this hand-written
-// `Iden` impl compiles rather than colliding with a generated one.
-#[derive(DeriveIden)]
+// `SqlName` impl compiles rather than colliding with a generated one.
+#[derive(DeriveSqlName)]
 pub enum EmptyIden {}
 
-impl Iden for EmptyIden {
+impl SqlName for EmptyIden {
     fn unquoted(&self, _s: &mut dyn std::fmt::Write) {
         match *self {}
     }
@@ -108,6 +108,6 @@ fn prepare_override_is_conditional() {
 // [spec:pgorm:sem:macros.derive.iden+1/test]    an empty enum expands to nothing
 #[test]
 fn empty_enum_expands_to_nothing() {
-    fn assert_iden<T: Iden>() {}
+    fn assert_iden<T: SqlName>() {}
     assert_iden::<EmptyIden>();
 }

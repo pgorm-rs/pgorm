@@ -130,10 +130,10 @@ def type_name(name, schema):
 
 
 def type_ref(name, schema):
-    local = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(name)}))"
+    local = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
     if schema is None:
         return f"{Q}::extension::TypeRef::Type({local})"
-    outer = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(schema)}))"
+    outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
     return f"{Q}::extension::TypeRef::SchemaType({outer}, {local})"
 
 
@@ -256,12 +256,12 @@ class ValueEmitter:
 
     def table_source(self, node):
         name = self.alias_of(node, "name")
-        inner = f"{Q}::IntoIden::into_iden({name})"
+        inner = f"{Q}::IntoName::into_name({name})"
         schema = node["data"].get("schema")
         if schema is None:
             table = f"{Q}::TableName::Table({inner})"
         else:
-            outer = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(schema)}))"
+            outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
             table = f"{Q}::TableName::SchemaTable({outer}, {inner})"
         result = f"{Q}::NamedTable::from({table})"
         alias = node["data"].get("alias")
@@ -288,16 +288,16 @@ class ValueEmitter:
         alias = table["data"].get("alias")
         schema = table["data"].get("schema")
         if alias is not None:
-            qualifier = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(alias)}))"
+            qualifier = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(alias)}))"
             return f"{Q}::ColumnRef::TableColumn({qualifier}, {column})"
-        name = f"{Q}::IntoIden::into_iden({self.alias_of(table, 'name')})"
+        name = f"{Q}::IntoName::into_name({self.alias_of(table, 'name')})"
         if schema is None:
             return f"{Q}::ColumnRef::TableColumn({name}, {column})"
-        outer = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(schema)}))"
+        outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
         return f"{Q}::ColumnRef::SchemaTableColumn({outer}, {name}, {column})"
 
     def column_source(self, node):
-        column = f"{Q}::IntoIden::into_iden({self.alias_of(node, 'name')})"
+        column = f"{Q}::IntoName::into_name({self.alias_of(node, 'name')})"
         if "table" not in node["inputs"]:
             reference = f"{Q}::ColumnRef::Column({column})"
         else:

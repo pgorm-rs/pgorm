@@ -1947,7 +1947,7 @@ fn union_1() {
 // [spec:pgorm:def:sql.ast.func+2/test]
 #[test]
 fn sub_query_with_fn() {
-    #[derive(Iden)]
+    #[derive(SqlName)]
     #[iden = "jsonb_agg"]
     pub struct ArrayFunc;
 

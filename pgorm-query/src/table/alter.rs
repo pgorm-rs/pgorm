@@ -50,9 +50,9 @@ impl PendingTableAlter {
     /// Drop a column from an existing table
     pub fn drop_column<T>(self, col_name: T) -> TableAlterStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.with(TableAlterOption::DropColumn(col_name.into_iden()))
+        self.with(TableAlterOption::DropColumn(col_name.into_name()))
     }
 
     /// Add a foreign key to existing table
@@ -70,9 +70,9 @@ impl PendingTableAlter {
     /// Drop a foreign key from existing table
     pub fn drop_foreign_key<T>(self, name: T) -> TableAlterStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.with(TableAlterOption::DropForeignKey(name.into_iden()))
+        self.with(TableAlterOption::DropForeignKey(name.into_name()))
     }
 }
 
@@ -139,9 +139,9 @@ pub struct AddColumnOption {
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
     ModifyColumn(ColumnDef),
-    DropColumn(DynIden),
+    DropColumn(Name),
     AddForeignKey(TableForeignKey),
-    DropForeignKey(DynIden),
+    DropForeignKey(Name),
 }
 
 impl TableAlterOption {
@@ -250,9 +250,9 @@ impl TableAlterStatement {
     /// ```
     pub fn drop_column<T>(&mut self, col_name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.add_alter_option(TableAlterOption::DropColumn(col_name.into_iden()))
+        self.add_alter_option(TableAlterOption::DropColumn(col_name.into_name()))
     }
 
     /// Add a foreign key to existing table
@@ -330,9 +330,9 @@ impl TableAlterStatement {
     /// ```
     pub fn drop_foreign_key<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.add_alter_option(TableAlterOption::DropForeignKey(name.into_iden()))
+        self.add_alter_option(TableAlterOption::DropForeignKey(name.into_name()))
     }
 
     fn add_alter_option(&mut self, alter_option: TableAlterOption) -> &mut Self {

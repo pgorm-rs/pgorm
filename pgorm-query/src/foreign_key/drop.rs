@@ -27,7 +27,7 @@ use crate::{QueryBuilder, types::*};
 // [spec:pgorm:req:sql.ddl.foreign-key+4]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyDropStatement {
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
     pub(crate) table: TableName,
 }
 
@@ -36,10 +36,10 @@ impl ForeignKeyDropStatement {
     pub fn new<T, N>(table: T, name: N) -> Self
     where
         T: IntoTableName,
-        N: IntoIden,
+        N: IntoName,
     {
         Self {
-            name: name.into_iden(),
+            name: name.into_name(),
             table: table.into_table_name(),
         }
     }

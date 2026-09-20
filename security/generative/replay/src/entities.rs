@@ -6,7 +6,7 @@
 //! reproduced exactly rather than tidied: a replay whose entities are milder
 //! than the binding's is replaying a different program.
 
-use pgorm::{EntityTrait, IdenStr, Iterable};
+use pgorm::{EntityTrait, Iterable, StaticName};
 
 use crate::FormatError;
 
@@ -21,7 +21,7 @@ use crate::FormatError;
 /// Returns [`FormatError`] when the entity declares no column with this name.
 pub fn column<E: EntityTrait>(name: &str) -> Result<E::Column, FormatError> {
     E::Column::iter()
-        .find(|column| IdenStr::as_str(column) == name)
+        .find(|column| StaticName::as_str(column) == name)
         .ok_or_else(|| FormatError::new("unknown compiled entity column"))
 }
 

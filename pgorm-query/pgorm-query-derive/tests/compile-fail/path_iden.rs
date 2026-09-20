@@ -1,6 +1,6 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 
-#[derive(Iden)]
+#[derive(SqlName)]
 enum Asset {
     Table,
     Id,

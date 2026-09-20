@@ -1,6 +1,6 @@
 use crate::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IdenStr,
-    IntoActiveModel, Iterable, QueryTrait, RuntimeError,
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityName, EntityTrait, Error, IntoActiveModel,
+    Iterable, QueryTrait, RuntimeError, StaticName,
 };
 use core::marker::PhantomData;
 use pgorm_query::{Expr, InsertStatement, OnConflict};

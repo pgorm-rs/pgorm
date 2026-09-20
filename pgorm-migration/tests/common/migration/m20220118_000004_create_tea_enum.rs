@@ -15,9 +15,9 @@ impl MigrationTrait for Migration {
     }
 }
 
-// The type is named by an `Iden`; its labels are data and are written as the
+// The type is named by an `SqlName`; its labels are data and are written as the
 // string literals they render to.
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum Tea {
     #[pgorm(iden = "tea")]
     Enum,

@@ -40,7 +40,7 @@ pub(crate) enum InsertValueSource {
 pub struct InsertStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
-    pub(crate) columns: Vec<DynIden>,
+    pub(crate) columns: Vec<Name>,
     pub(crate) source: Option<InsertValueSource>,
     pub(crate) on_conflict: Option<OnConflict>,
     pub(crate) returning: Option<ReturningClause>,
@@ -92,10 +92,10 @@ impl InsertStatement {
     /// See [`InsertStatement::values`]
     pub fn columns<C, I>(&mut self, columns: I) -> &mut Self
     where
-        C: IntoIden,
+        C: IntoName,
         I: IntoIterator<Item = C>,
     {
-        self.columns = columns.into_iter().map(|c| c.into_iden()).collect();
+        self.columns = columns.into_iter().map(|c| c.into_name()).collect();
         self
     }
 

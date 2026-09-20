@@ -175,7 +175,7 @@ fn a_custom_index_access_method_is_quoted() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .index_type(IndexType::Named(Alias::new(HOSTILE).into_iden()))
+            .index_type(IndexType::Named(Alias::new(HOSTILE).into_name()))
             .to_string(),
         format!(r#"CREATE INDEX "idx" ON "glyph" USING {HOSTILE_QUOTED} ("aspect")"#)
     );
@@ -184,7 +184,7 @@ fn a_custom_index_access_method_is_quoted() {
     assert_eq!(
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
-            .index_type(IndexType::Named(Alias::new("gist").into_iden()))
+            .index_type(IndexType::Named(Alias::new("gist").into_name()))
             .to_string(),
         r#"CREATE INDEX "idx" ON "glyph" USING gist ("aspect")"#
     );

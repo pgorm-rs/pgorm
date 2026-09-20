@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 
-use pgorm_query::{Alias, AliasName, Iden};
+use pgorm_query::{Alias, AliasName, SqlName};
 
 use crate::ColumnTrait;
 
@@ -49,13 +49,13 @@ pub(super) fn name<'brand>(name: &str) -> Expr<'brand> {
 ///
 /// Qualification is not optional: prqlc has no catalog, so a bare column
 /// name becomes ambiguous the moment a join enters the pipeline. Minting the
-/// reference from a `(table, column)` [`Iden`] pair makes the qualified form
+/// reference from a `(table, column)` [`SqlName`] pair makes the qualified form
 /// the only representable one.
 // [spec:pgorm:sem:pipeline.qualify+2]
-pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
+pub fn col<'brand>(table: impl SqlName, column: impl SqlName) -> Expr<'brand> {
     branded(adapter::ident_in(
-        vec![Iden::to_string(&table)],
-        Iden::to_string(&column),
+        vec![SqlName::to_string(&table)],
+        SqlName::to_string(&column),
     ))
 }
 
@@ -69,10 +69,10 @@ pub fn col<'brand>(table: impl Iden, column: impl Iden) -> Expr<'brand> {
 /// the join condition; stages after the join refer to the column by its own
 /// name, renamed in the embedded pipeline's projection if it collides.
 // [spec:pgorm:req:pipeline.compose]
-pub fn that<'brand>(column: impl Iden) -> Expr<'brand> {
+pub fn that<'brand>(column: impl SqlName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec!["that".to_owned()],
-        Iden::to_string(&column),
+        SqlName::to_string(&column),
     ))
 }
 
@@ -81,10 +81,10 @@ pub fn that<'brand>(column: impl Iden) -> Expr<'brand> {
 /// an embedded pipeline with no name to qualify by. Scoped to the join
 /// condition, like [`that`].
 // [spec:pgorm:req:pipeline.compose]
-pub fn this<'brand>(column: impl Iden) -> Expr<'brand> {
+pub fn this<'brand>(column: impl SqlName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec!["this".to_owned()],
-        Iden::to_string(&column),
+        SqlName::to_string(&column),
     ))
 }
 
@@ -94,8 +94,8 @@ pub fn this<'brand>(column: impl Iden) -> Expr<'brand> {
 impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
     fn from(column: C) -> Self {
         branded(adapter::ident_in(
-            vec![Iden::to_string(&*column.entity_name())],
-            Iden::to_string(&column),
+            vec![SqlName::to_string(&*column.entity_name())],
+            SqlName::to_string(&column),
         ))
     }
 }
@@ -113,7 +113,7 @@ impl<'brand> From<AliasName> for Expr<'brand> {
 // [spec:pgorm:req:python.pipeline]
 impl<'brand> From<Alias> for Expr<'brand> {
     fn from(alias: Alias) -> Self {
-        name(&Iden::to_string(&alias))
+        name(&SqlName::to_string(&alias))
     }
 }
 
@@ -298,7 +298,10 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     /// Reserved-name validation is identical to [`as_`](ExprOps::as_).
     // [spec:pgorm:req:python.pipeline]
     fn as_runtime(self, name: Alias) -> Expr<'brand> {
-        branded(adapter::aliased(self.into().node, Iden::to_string(&name)))
+        branded(adapter::aliased(
+            self.into().node,
+            SqlName::to_string(&name),
+        ))
     }
 
     /// Mark a sort key descending.

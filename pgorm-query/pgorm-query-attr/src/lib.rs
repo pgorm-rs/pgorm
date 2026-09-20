@@ -23,7 +23,7 @@ struct GenEnumArgs {
 }
 
 const DEFAULT_PREFIX: &str = "";
-const DEFAULT_SUFFIX: &str = "Iden";
+const DEFAULT_SUFFIX: &str = "Name";
 const DEFAULT_CRATE_NAME: &str = "pgorm_query";
 
 impl Default for GenEnumArgs {
@@ -110,7 +110,7 @@ pub fn enum_def(args: TokenStream, input: TokenStream) -> TokenStream {
             #(#pascal_def_names,)*
         }
 
-        impl #import_name::Iden for #enum_name {
+        impl #import_name::SqlName for #enum_name {
             fn unquoted(&self, s: &mut dyn pgorm_query::Write) {
                 write!(s, "{}", match self {
                     #enum_name::Table => stringify!(#table_name),

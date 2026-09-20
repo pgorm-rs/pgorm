@@ -1,6 +1,6 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 
-#[derive(Copy, Clone, Iden)]
+#[derive(Copy, Clone, SqlName)]
 #[iden = "another_name"]
 pub struct CustomName;
 

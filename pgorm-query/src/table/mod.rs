@@ -9,7 +9,7 @@
 //! - Column Rename, see [`ColumnRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
-use crate::types::{IntoIden, IntoTableName};
+use crate::types::{IntoName, IntoTableName};
 
 mod alter;
 mod column;
@@ -76,7 +76,7 @@ impl Table {
     pub fn rename<T, R>(from_name: T, to_name: R) -> TableRenameStatement
     where
         T: IntoTableName,
-        R: IntoIden,
+        R: IntoName,
     {
         TableRenameStatement::new(from_name, to_name)
     }
@@ -85,8 +85,8 @@ impl Table {
     pub fn rename_column<T, F, R>(table: T, from_name: F, to_name: R) -> ColumnRenameStatement
     where
         T: IntoTableName,
-        F: IntoIden,
-        R: IntoIden,
+        F: IntoName,
+        R: IntoName,
     {
         ColumnRenameStatement::new(table, from_name, to_name)
     }

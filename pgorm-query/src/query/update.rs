@@ -76,7 +76,7 @@ use inherent::inherent;
 pub struct UpdateStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
-    pub(crate) values: Vec<(DynIden, Box<SimpleExpr>)>,
+    pub(crate) values: Vec<(Name, Box<SimpleExpr>)>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) returning: Option<ReturningClause>,
 }
@@ -142,11 +142,11 @@ impl UpdateStatement {
     // [spec:pgorm:req:sql.ast.update+4]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
         I: IntoIterator<Item = (T, SimpleExpr)>,
     {
         for (k, v) in values.into_iter() {
-            self.values.push((k.into_iden(), Box::new(v)));
+            self.values.push((k.into_name(), Box::new(v)));
         }
         self
     }
@@ -173,10 +173,10 @@ impl UpdateStatement {
     /// ```
     pub fn value<C, T>(&mut self, col: C, value: T) -> &mut Self
     where
-        C: IntoIden,
+        C: IntoName,
         T: Into<SimpleExpr>,
     {
-        self.values.push((col.into_iden(), Box::new(value.into())));
+        self.values.push((col.into_name(), Box::new(value.into())));
         self
     }
 
@@ -256,7 +256,7 @@ impl UpdateStatement {
     }
 
     /// Get column values
-    pub fn get_values(&self) -> &[(DynIden, Box<SimpleExpr>)] {
+    pub fn get_values(&self) -> &[(Name, Box<SimpleExpr>)] {
         &self.values
     }
 

@@ -1,5 +1,5 @@
 use crate::{EntityTrait, QuerySelect, Related, RelationDef, Select};
-use pgorm_query::{Iden, JoinType};
+use pgorm_query::{JoinType, SqlName};
 use std::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -16,7 +16,7 @@ use std::{
 /// where a chain that gained a hop would silently rebind the string to a
 /// different table.
 ///
-/// It is an ordinary [`Iden`], so it stands in any identifier position:
+/// It is an ordinary [`SqlName`], so it stands in any identifier position:
 ///
 /// ```
 /// use pgorm::{Linked, QueryOrder, QueryTrait, RelatedLink};
@@ -44,7 +44,7 @@ impl LinkedAlias {
 }
 
 // [spec:pgorm:req:entity.relation.linked+4]
-impl Iden for LinkedAlias {
+impl SqlName for LinkedAlias {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         let _ = write!(s, "r{}", self.0);
     }

@@ -1,5 +1,5 @@
-use pgorm::Iden;
 use pgorm::Iterable;
+use pgorm::SqlName;
 use pgorm::prelude::*;
 use pgorm_macros::DeriveEntityModel;
 

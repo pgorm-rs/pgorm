@@ -7,7 +7,7 @@ use crate::{
     statements::PyTable,
 };
 use pgorm::pgorm_query::{
-    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoIden, Values,
+    Alias, Index, IndexCreateStatement, IndexOrder, IndexType, IntoName, Values,
 };
 use pyo3::prelude::*;
 
@@ -74,7 +74,7 @@ impl PyCreateIndex {
         let kind = match name {
             "btree" => IndexType::BTree,
             "hash" => IndexType::Hash,
-            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Alias::new(name).into_iden()),
+            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Alias::new(name).into_name()),
             _ => {
                 return Err(UnsupportedCapabilityError::new_err(
                     "unsupported index access method",

@@ -59,14 +59,14 @@ pub fn expand_derive_primary_key(ident: Ident, data: Data) -> syn::Result<TokenS
 
     Ok(quote!(
         #[automatically_derived]
-        impl pgorm::Iden for #ident {
+        impl pgorm::SqlName for #ident {
             fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                write!(s, "{}", pgorm::IdenStr::as_str(self)).unwrap();
+                write!(s, "{}", pgorm::StaticName::as_str(self)).unwrap();
             }
         }
 
         #[automatically_derived]
-        impl pgorm::IdenStr for #ident {
+        impl pgorm::StaticName for #ident {
             fn as_str(&self) -> &str {
                 match self {
                     #(Self::#variant => #name),*

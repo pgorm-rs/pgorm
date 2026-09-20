@@ -10,7 +10,7 @@
 //! - Table comment, see [`Comment::on_table`]
 //! - Column comment, see [`Comment::on_column`]
 
-use crate::{DynIden, IntoIden, IntoTableName, QueryBuilder, TableName};
+use crate::{IntoName, IntoTableName, Name, QueryBuilder, TableName};
 
 /// Helper for constructing any comment statement
 // [spec:pgorm:req:sql.ddl+6]
@@ -24,7 +24,7 @@ pub enum CommentTarget {
     /// A whole table
     Table(TableName),
     /// A single column of a table
-    Column(TableName, DynIden),
+    Column(TableName, Name),
 }
 
 /// Attach a comment to a table or one of its columns
@@ -81,11 +81,11 @@ impl Comment {
     pub fn on_column<T, N, C>(table: T, column: N, comment: C) -> CommentStatement
     where
         T: IntoTableName,
-        N: IntoIden,
+        N: IntoName,
         C: Into<String>,
     {
         CommentStatement {
-            target: CommentTarget::Column(table.into_table_name(), column.into_iden()),
+            target: CommentTarget::Column(table.into_table_name(), column.into_name()),
             comment: comment.into(),
         }
     }

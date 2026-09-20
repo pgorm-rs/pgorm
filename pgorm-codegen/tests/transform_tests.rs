@@ -7,7 +7,7 @@ mod common;
 use common::*;
 use pgorm_codegen::Column;
 use pgorm_query::{
-    Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, IntoIden, Table,
+    Alias, ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, IntoName, Table,
     TableCreateStatement, TableName,
 };
 
@@ -56,8 +56,8 @@ fn transform_builds_entity_per_statement_ordered_by_name() {
 // from every `TableName` form, and the qualified form keeps its schema
 #[test]
 fn transform_unpacks_the_table_name_from_every_form() {
-    let cake = || Alias::new("cake").into_iden();
-    let schema = || Alias::new("public").into_iden();
+    let cake = || Alias::new("cake").into_name();
+    let schema = || Alias::new("public").into_name();
 
     let names = [
         (TableName::Table(cake()), None),
@@ -324,10 +324,10 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
 fn transform_registers_enums_once_per_name_across_tables() {
     let tea = || ColumnType::Enum {
         schema: None,
-        name: Alias::new("tea").into_iden(),
+        name: Alias::new("tea").into_name(),
         variants: vec![
-            Alias::new("EverydayTea").into_iden(),
-            Alias::new("BreakfastTea").into_iden(),
+            Alias::new("EverydayTea").into_name(),
+            Alias::new("BreakfastTea").into_name(),
         ],
     };
 

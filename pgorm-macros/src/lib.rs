@@ -261,7 +261,7 @@ pub fn derive_primary_key(input: TokenStream) -> TokenStream {
 }
 
 /// The DeriveColumn derive macro will implement `ColumnTrait` for Columns.
-/// It defines the identifier of each column by implementing Iden and IdenStr.
+/// It defines the identifier of each column by implementing SqlName and StaticName.
 /// The EnumIter is also derived, allowing iteration over all enum variants.
 ///
 /// ### Usage
@@ -300,7 +300,7 @@ pub fn derive_column(input: TokenStream) -> TokenStream {
 ///     VendorId,
 /// }
 ///
-/// impl IdenStr for Column {
+/// impl StaticName for Column {
 ///     fn as_str(&self) -> &str {
 ///         match self {
 ///             Self::Id => "id",
@@ -894,14 +894,14 @@ pub fn derive_active_enum_display(input: TokenStream) -> TokenStream {
     }
 }
 
-/// The DeriveIden derive macro will implement `pgorm::pgorm_query::Iden` for simplify Iden implementation.
+/// The DeriveSqlName derive macro will implement `pgorm::pgorm_query::SqlName` for simplify SqlName implementation.
 ///
 /// ## Usage
 ///
 /// ```rust
-/// use pgorm::{DeriveIden, Iden};
+/// use pgorm::{DeriveSqlName, SqlName};
 ///
-/// #[derive(DeriveIden)]
+/// #[derive(DeriveSqlName)]
 /// pub enum MyClass {
 ///     Table, // this is a special case, which maps to the enum's name
 ///     Id,
@@ -910,7 +910,7 @@ pub fn derive_active_enum_display(input: TokenStream) -> TokenStream {
 ///     Text,
 /// }
 ///
-/// #[derive(DeriveIden)]
+/// #[derive(DeriveSqlName)]
 /// struct MyOther;
 ///
 /// assert_eq!(MyClass::Table.to_string(), "my_class");
@@ -920,11 +920,11 @@ pub fn derive_active_enum_display(input: TokenStream) -> TokenStream {
 /// assert_eq!(MyOther.to_string(), "my_other");
 /// ```
 #[cfg(feature = "derive")]
-#[proc_macro_derive(DeriveIden, attributes(pgorm))]
-pub fn derive_iden(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(DeriveSqlName, attributes(pgorm))]
+pub fn derive_sql_name(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
 
-    match derives::expand_derive_iden(derive_input) {
+    match derives::expand_derive_sql_name(derive_input) {
         Ok(token_stream) => token_stream.into(),
         Err(e) => e.to_compile_error().into(),
     }

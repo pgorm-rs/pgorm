@@ -27,7 +27,7 @@ use crate::{QueryBuilder, types::*};
 #[derive(Debug, Clone)]
 pub struct TableRenameStatement {
     pub(crate) from_name: TableName,
-    pub(crate) to_name: DynIden,
+    pub(crate) to_name: Name,
 }
 
 impl TableRenameStatement {
@@ -38,11 +38,11 @@ impl TableRenameStatement {
     pub fn new<T, R>(from_name: T, to_name: R) -> Self
     where
         T: IntoTableName,
-        R: IntoIden,
+        R: IntoName,
     {
         Self {
             from_name: from_name.into_table_name(),
-            to_name: to_name.into_iden(),
+            to_name: to_name.into_name(),
         }
     }
 }
@@ -94,8 +94,8 @@ impl std::fmt::Display for TableRenameStatement {
 #[derive(Debug, Clone)]
 pub struct ColumnRenameStatement {
     pub(crate) table: TableName,
-    pub(crate) from_name: DynIden,
-    pub(crate) to_name: DynIden,
+    pub(crate) from_name: Name,
+    pub(crate) to_name: Name,
 }
 
 impl ColumnRenameStatement {
@@ -103,13 +103,13 @@ impl ColumnRenameStatement {
     pub fn new<T, F, R>(table: T, from_name: F, to_name: R) -> Self
     where
         T: IntoTableName,
-        F: IntoIden,
-        R: IntoIden,
+        F: IntoName,
+        R: IntoName,
     {
         Self {
             table: table.into_table_name(),
-            from_name: from_name.into_iden(),
-            to_name: to_name.into_iden(),
+            from_name: from_name.into_name(),
+            to_name: to_name.into_name(),
         }
     }
 }

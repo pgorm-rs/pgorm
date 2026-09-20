@@ -40,7 +40,7 @@
 //!
 //! 1. Basics
 //!
-//!     1. [Iden](#iden)
+//!     1. [SqlName](#iden)
 //!     1. [Expression](#expression)
 //!     1. [Condition](#condition)
 //!     1. [Statement Builders](#statement-builders)
@@ -120,14 +120,14 @@
 //!     );
 //! ```
 //!
-//! ### Iden
+//! ### SqlName
 //!
-//! `Iden` is a trait for identifiers used in any query statement.
+//! `SqlName` is a trait for identifiers used in any query statement.
 //!
 //! Commonly implemented by Enum where each Enum represents a table found in a database,
 //! and its variants include table name and column name.
 //!
-//! [`Iden::unquoted()`] must be implemented to provide a mapping between Enum variants and its
+//! [`SqlName::unquoted()`] must be implemented to provide a mapping between Enum variants and its
 //! corresponding string value.
 //!
 //! ```rust
@@ -142,7 +142,7 @@
 //! }
 //!
 //! // Mapping between Enum variant and its corresponding string value
-//! impl Iden for Character {
+//! impl SqlName for Character {
 //!     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
 //!         write!(
 //!             s,
@@ -167,17 +167,17 @@
 //!
 //! ```rust
 //! #[cfg(feature = "derive")]
-//! use pgorm_query::Iden;
+//! use pgorm_query::SqlName;
 //!
-//! // This will implement Iden exactly as shown above
-//! #[derive(Iden)]
+//! // This will implement SqlName exactly as shown above
+//! #[derive(SqlName)]
 //! enum Character {
 //!     Table,
 //! }
 //! assert_eq!(Character::Table.to_string(), "character");
 //!
 //! // You can also derive a unit struct
-//! #[derive(Iden)]
+//! #[derive(SqlName)]
 //! struct Glyph;
 //! assert_eq!(Glyph.to_string(), "glyph");
 //! ```
@@ -185,23 +185,23 @@
 //! ```rust
 //! #[cfg(feature = "attr")]
 //! # fn test() {
-//! use pgorm_query::{enum_def, Iden};
+//! use pgorm_query::{enum_def, SqlName};
 //!
 //! #[enum_def]
 //! struct Character {
 //!     pub foo: u64,
 //! }
 //!
-//! // It generates the following along with Iden impl
+//! // It generates the following along with SqlName impl
 //! # let not_real = || {
-//! enum CharacterIden {
+//! enum CharacterName {
 //!     Table,
 //!     Foo,
 //! }
 //! # };
 //!
-//! assert_eq!(CharacterIden::Table.to_string(), "character");
-//! assert_eq!(CharacterIden::Foo.to_string(), "foo");
+//! assert_eq!(CharacterName::Table.to_string(), "character");
+//! assert_eq!(CharacterName::Foo.to_string(), "foo");
 //! # }
 //! # #[cfg(feature = "attr")]
 //! # test();
@@ -442,7 +442,7 @@
 //! # use pgorm_query::{*, tests_cfg::*};
 //! struct MyFunction;
 //!
-//! impl Iden for MyFunction {
+//! impl SqlName for MyFunction {
 //!     fn unquoted(&self, s: &mut dyn Write) {
 //!         write!(s, "my_function").unwrap();
 //!     }
@@ -616,6 +616,7 @@ pub mod extension;
 pub mod foreign_key;
 pub mod func;
 pub mod index;
+mod key;
 pub mod prepare;
 pub mod query;
 pub mod schema;
@@ -637,6 +638,7 @@ pub use expr::*;
 pub use foreign_key::*;
 pub use func::*;
 pub use index::*;
+pub use key::*;
 pub use prepare::*;
 pub use query::*;
 pub use schema::*;
@@ -646,7 +648,7 @@ pub use types::*;
 pub use value::*;
 
 #[cfg(feature = "derive")]
-pub use pgorm_query_derive::{Iden, IdenStatic};
+pub use pgorm_query_derive::{SqlName, StaticName};
 
 #[cfg(feature = "attr")]
 pub use pgorm_query_attr::enum_def;

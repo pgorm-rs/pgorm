@@ -2,7 +2,7 @@ use super::{Enums, unresolved, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
-use pgorm_query::{Alias, ColumnType, IntervalSpec, SharedIden, StringLen};
+use pgorm_query::{Alias, ColumnType, IntervalSpec, Name, StringLen};
 use std::sync::Arc;
 
 /// A column's type together with the auto-increment fact the `serial` family
@@ -97,13 +97,11 @@ fn named_type(
         let identity = (schema.cloned(), name.clone());
         if let Some(variants) = enums.get(&identity) {
             return Ok(plain(ColumnType::Enum {
-                schema: identity
-                    .0
-                    .map(|schema| SharedIden::new(Alias::new(schema)) as _),
-                name: SharedIden::new(Alias::new(name.as_str())),
+                schema: identity.0.map(|schema| Name::new(Alias::new(schema)) as _),
+                name: Name::new(Alias::new(name.as_str())),
                 variants: variants
                     .iter()
-                    .map(|variant| SharedIden::new(Alias::new(variant.as_str())))
+                    .map(|variant| Name::new(Alias::new(variant.as_str())))
                     .collect(),
             }));
         }

@@ -1,9 +1,9 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 
-#[derive(Copy, Clone, Iden)]
+#[derive(Copy, Clone, SqlName)]
 pub struct SomeType;
 
-#[derive(Copy, Clone, Iden)]
+#[derive(Copy, Clone, SqlName)]
 #[iden(rename = "Hel\"lo")]
 pub struct SomeTypeWithRename;
 

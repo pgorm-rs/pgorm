@@ -3,13 +3,13 @@ use crate::types::*;
 /// Specification of a table index
 #[derive(Default, Debug, Clone)]
 pub struct TableIndex {
-    pub(crate) name: Option<DynIden>,
+    pub(crate) name: Option<Name>,
     pub(crate) columns: Vec<IndexColumn>,
 }
 
 #[derive(Debug, Clone)]
 pub struct IndexColumn {
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
     pub(crate) order: Option<IndexOrder>,
 }
 
@@ -31,11 +31,11 @@ impl IntoIndexColumn for IndexColumn {
 
 impl<I> IntoIndexColumn for I
 where
-    I: IntoIden,
+    I: IntoName,
 {
     fn into_index_column(self) -> IndexColumn {
         IndexColumn {
-            name: self.into_iden(),
+            name: self.into_name(),
             order: None,
         }
     }
@@ -43,11 +43,11 @@ where
 
 impl<I> IntoIndexColumn for (I, IndexOrder)
 where
-    I: IntoIden,
+    I: IntoName,
 {
     fn into_index_column(self) -> IndexColumn {
         IndexColumn {
-            name: self.0.into_iden(),
+            name: self.0.into_name(),
             order: Some(self.1),
         }
     }
@@ -62,9 +62,9 @@ impl TableIndex {
     /// Set index name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.name = Some(name.into_iden());
+        self.name = Some(name.into_name());
         self
     }
 

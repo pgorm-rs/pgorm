@@ -15,7 +15,7 @@ impl MigratorTrait for Migrator {
         ]
     }
 
-    fn migration_table_name() -> pgorm::DynIden {
-        Alias::new("override_migration_table_name").into_iden()
+    fn migration_table_name() -> pgorm::Name {
+        Alias::new("override_migration_table_name").into_name()
     }
 }

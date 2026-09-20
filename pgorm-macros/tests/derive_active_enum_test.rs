@@ -185,15 +185,15 @@ fn container_and_variant_string_markers() {
     // Covered exhaustively by `derive_active_enum_value` above; this asserts the
     // container `enum_name` and its default.
     assert_eq!(
-        pgorm::Iden::to_string(&*<TestEnum as ActiveEnum>::name()),
+        pgorm::SqlName::to_string(&*<TestEnum as ActiveEnum>::name()),
         "test_enum"
     );
     assert_eq!(
-        pgorm::Iden::to_string(&*<tea_kind as ActiveEnum>::name()),
+        pgorm::SqlName::to_string(&*<tea_kind as ActiveEnum>::name()),
         "TeaKind"
     );
     assert_eq!(
-        pgorm::Iden::to_string(&*<TestEnum2 as ActiveEnum>::name()),
+        pgorm::SqlName::to_string(&*<TestEnum2 as ActiveEnum>::name()),
         "TestEnum2"
     );
 }
@@ -209,7 +209,7 @@ fn db_type_enum_expands_to_enum_column_type() {
         &ColumnType::Enum {
             schema: None,
             name: <TestEnum as ActiveEnum>::name(),
-            variants: TestEnum::iden_values(),
+            variants: TestEnum::name_values(),
         }
     );
 

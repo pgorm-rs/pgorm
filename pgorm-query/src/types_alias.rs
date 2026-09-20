@@ -7,8 +7,8 @@ use super::*;
 /// `alias("rn")` binds a `Copy` token that is both the declaration site and
 /// every reference site of an introduced name, so the name exists in the
 /// program exactly once and a typo cannot make a reference miss its
-/// declaration. It is an ordinary [`Iden`], so every position that accepts
-/// an identifier — `IntoIden`, `IntoColumnRef`, a projection alias, an
+/// declaration. It is an ordinary [`SqlName`], so every position that accepts
+/// an identifier — `IntoName`, `IntoColumnRef`, a projection alias, an
 /// `ORDER BY` key — accepts the token with no conversion.
 ///
 /// The name is `&'static str` by construction: an introduced name is part of
@@ -16,10 +16,10 @@ use super::*;
 /// computed at runtime.
 ///
 /// ```
-/// use pgorm_query::{Iden, alias};
+/// use pgorm_query::{SqlName, alias};
 ///
 /// let rn = alias("rn");
-/// assert_eq!(Iden::to_string(&rn), "rn");
+/// assert_eq!(SqlName::to_string(&rn), "rn");
 /// ```
 // [spec:pgorm:def:sql.types+8]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -39,14 +39,14 @@ impl AliasName {
 }
 
 // [spec:pgorm:def:sql.types+8]
-impl Iden for AliasName {
+impl SqlName for AliasName {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(s, "{}", self.0).unwrap();
     }
 }
 
 // [spec:pgorm:def:sql.types+8]
-impl IdenStatic for AliasName {
+impl StaticName for AliasName {
     fn as_str(&self) -> &'static str {
         self.0
     }

@@ -14,7 +14,7 @@ use self::{
     error::ErrorMsg,
     iden_attr::IdenAttr,
     iden_path::IdenPath,
-    iden_variant::{DeriveIden, DeriveIdenStatic, IdenVariant},
+    iden_variant::{DeriveSqlName, DeriveStaticName, IdenVariant},
 };
 
 fn find_attr(attrs: &[Attribute]) -> Option<&Attribute> {
@@ -42,7 +42,7 @@ fn must_be_valid_iden(name: &str) -> bool {
         && name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
-fn impl_iden_for_unit_struct(
+fn impl_sql_name_for_unit_struct(
     ident: &proc_macro2::Ident,
     table_name: &str,
 ) -> proc_macro2::TokenStream {
@@ -61,7 +61,7 @@ fn impl_iden_for_unit_struct(
     };
 
     quote! {
-        impl #pgorm_query_path::Iden for #ident {
+        impl #pgorm_query_path::SqlName for #ident {
             #prepare
 
             fn unquoted(&self, s: &mut dyn ::std::fmt::Write) {
@@ -71,7 +71,7 @@ fn impl_iden_for_unit_struct(
     }
 }
 
-fn impl_iden_for_enum<'a, T>(
+fn impl_sql_name_for_enum<'a, T>(
     ident: &proc_macro2::Ident,
     table_name: &str,
     variants: T,
@@ -86,7 +86,7 @@ where
     let match_arms = match variants
         .map(|v| (table_name, v))
         .map(|v| {
-            let v = IdenVariant::<DeriveIden>::try_from(v)?;
+            let v = IdenVariant::<DeriveSqlName>::try_from(v)?;
             is_all_valid &= v.must_be_valid_iden();
             Ok(v)
         })
@@ -109,7 +109,7 @@ where
     };
 
     quote! {
-        impl #pgorm_query_path::Iden for #ident {
+        impl #pgorm_query_path::SqlName for #ident {
             #prepare
 
             fn unquoted(&self, s: &mut dyn ::std::fmt::Write) {
@@ -122,8 +122,8 @@ where
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query]
-#[proc_macro_derive(Iden, attributes(iden, method))]
-pub fn derive_iden(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(SqlName, attributes(iden, method))]
+pub fn derive_sql_name(input: TokenStream) -> TokenStream {
     let DeriveInput {
         ident, data, attrs, ..
     } = parse_macro_input!(input);
@@ -133,31 +133,30 @@ pub fn derive_iden(input: TokenStream) -> TokenStream {
     };
 
     // Currently we only support enums and unit structs
-    let variants =
-        match data {
-            syn::Data::Enum(DataEnum { variants, .. }) => variants,
-            syn::Data::Struct(DataStruct {
-                fields: Fields::Unit,
-                ..
-            }) => return impl_iden_for_unit_struct(&ident, &table_name).into(),
-            _ => return quote_spanned! {
-                ident.span() => compile_error!("you can only derive Iden on enums or unit structs");
-            }
-            .into(),
-        };
+    let variants = match data {
+        syn::Data::Enum(DataEnum { variants, .. }) => variants,
+        syn::Data::Struct(DataStruct {
+            fields: Fields::Unit,
+            ..
+        }) => return impl_sql_name_for_unit_struct(&ident, &table_name).into(),
+        _ => return quote_spanned! {
+            ident.span() => compile_error!("you can only derive SqlName on enums or unit structs");
+        }
+        .into(),
+    };
 
     if variants.is_empty() {
         return TokenStream::new();
     }
 
-    let output = impl_iden_for_enum(&ident, &table_name, variants.iter());
+    let output = impl_sql_name_for_enum(&ident, &table_name, variants.iter());
 
     output.into()
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query]
-#[proc_macro_derive(IdenStatic, attributes(iden, method))]
-pub fn derive_iden_static(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(StaticName, attributes(iden, method))]
+pub fn derive_static_name(input: TokenStream) -> TokenStream {
     let pgorm_query_path = pgorm_query_path();
 
     let DeriveInput {
@@ -170,48 +169,47 @@ pub fn derive_iden_static(input: TokenStream) -> TokenStream {
     };
 
     // Currently we only support enums and unit structs
-    let variants =
-        match data {
-            syn::Data::Enum(DataEnum { variants, .. }) => variants,
-            syn::Data::Struct(DataStruct {
-                fields: Fields::Unit,
-                ..
-            }) => {
-                let impl_iden = impl_iden_for_unit_struct(&ident, &table_name);
+    let variants = match data {
+        syn::Data::Enum(DataEnum { variants, .. }) => variants,
+        syn::Data::Struct(DataStruct {
+            fields: Fields::Unit,
+            ..
+        }) => {
+            let impl_iden = impl_sql_name_for_unit_struct(&ident, &table_name);
 
-                return quote! {
-                    #impl_iden
+            return quote! {
+                #impl_iden
 
-                    impl #pgorm_query_path::IdenStatic for #ident {
-                        fn as_str(&self) -> &'static str {
-                            #table_name
-                        }
-                    }
-
-                    impl std::convert::AsRef<str> for #ident {
-                        fn as_ref(&self) -> &str {
-                            self.as_str()
-                        }
+                impl #pgorm_query_path::StaticName for #ident {
+                    fn as_str(&self) -> &str {
+                        #table_name
                     }
                 }
-                .into();
+
+                impl std::convert::AsRef<str> for #ident {
+                    fn as_ref(&self) -> &str {
+                        self.as_str()
+                    }
+                }
             }
-            _ => return quote_spanned! {
-                ident.span() => compile_error!("you can only derive Iden on enums or unit structs");
-            }
-            .into(),
-        };
+            .into();
+        }
+        _ => return quote_spanned! {
+            ident.span() => compile_error!("you can only derive SqlName on enums or unit structs");
+        }
+        .into(),
+    };
 
     if variants.is_empty() {
         return TokenStream::new();
     }
 
-    let impl_iden = impl_iden_for_enum(&ident, &table_name, variants.iter());
+    let impl_iden = impl_sql_name_for_enum(&ident, &table_name, variants.iter());
 
     let match_arms = match variants
         .iter()
         .map(|v| (table_name.as_str(), v))
-        .map(IdenVariant::<DeriveIdenStatic>::try_from)
+        .map(IdenVariant::<DeriveStaticName>::try_from)
         .collect::<syn::Result<Vec<_>>>()
     {
         Ok(v) => quote! { #(#v),* },
@@ -221,8 +219,8 @@ pub fn derive_iden_static(input: TokenStream) -> TokenStream {
     let output = quote! {
         #impl_iden
 
-        impl #pgorm_query_path::IdenStatic for #ident {
-            fn as_str(&self) -> &'static str {
+        impl #pgorm_query_path::StaticName for #ident {
+            fn as_str(&self) -> &str {
                 match self {
                     #match_arms
                 }
@@ -230,7 +228,7 @@ pub fn derive_iden_static(input: TokenStream) -> TokenStream {
         }
 
         impl std::convert::AsRef<str> for #ident {
-            fn as_ref(&self) -> &'static str {
+            fn as_ref(&self) -> &str {
                 self.as_str()
             }
         }

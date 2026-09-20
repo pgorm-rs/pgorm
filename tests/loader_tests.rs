@@ -443,7 +443,7 @@ mod tagged {
 
 /// The predicate an authored relation adds to its key equality. It qualifies
 /// from the identifier it is handed, so it survives the loader's aliasing.
-fn only_visible(_left: DynIden, right: DynIden) -> Condition {
+fn only_visible(_left: Name, right: Name) -> Condition {
     Expr::col((right, tagged::Column::Visible))
         .eq(true)
         .into_condition()

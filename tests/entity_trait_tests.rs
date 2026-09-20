@@ -8,7 +8,7 @@ use pgorm::{
     Schema, Select, Value, entity::prelude::*,
 };
 use pgorm_query::{
-    Alias, Expr, IntoIden, IntoValueTuple, QueryBuilder, TableName, TryFromValueTuple,
+    Alias, Expr, IntoName, IntoValueTuple, QueryBuilder, TableName, TryFromValueTuple,
     ValueTupleError,
 };
 use pretty_assertions::assert_eq;
@@ -297,7 +297,7 @@ mod mistyped_key {
 /// wired the way the spec says.
 fn assert_entity_family<E>()
 where
-    E: EntityTrait + EntityName + IdenStr + Default,
+    E: EntityTrait + EntityName + StaticName + Default,
     E::Model: ModelTrait<Entity = E> + FromQueryResult,
     E::ActiveModel: ActiveModelBehavior<Entity = E>,
     E::Column: ColumnTrait,
@@ -312,8 +312,8 @@ fn via_default<E: Default>() -> E {
     E::default()
 }
 
-// [spec:pgorm:def:entity.traits+1/test]    `IdenStr` as the base identifier
-// contract (`as_str` alongside `Iden`'s quoting), `EntityName: IdenStr +
+// [spec:pgorm:def:entity.traits+1/test]    `StaticName` as the base identifier
+// contract (`as_str` alongside `SqlName`'s quoting), `EntityName: StaticName +
 // Default`, and `EntityTrait`'s five associated types resolving for both a
 // derive-macro entity and a fully hand-written one
 #[test]
@@ -324,17 +324,17 @@ fn entity_trait_family() {
     assert_entity_family::<pair::Entity>();
     assert_entity_family::<too_many_values::Entity>();
 
-    // `IdenStr::as_str` is the static-string identity, on entities...
+    // `StaticName::as_str` is the static-string identity, on entities...
     assert_eq!(item::Entity.as_str(), "item");
     assert_eq!(too_many_values::Entity.as_str(), "too_many_values");
-    // ...and on columns and primary keys, which are `IdenStr` too.
+    // ...and on columns and primary keys, which are `StaticName` too.
     assert_eq!(item::Column::Id.as_str(), "id");
     assert_eq!(item::Column::Note.as_str(), "note");
     assert_eq!(item::PrimaryKey::Id.as_str(), "id");
 
-    // `IdenStr: Iden`, so the same identifier renders through `to_string`.
-    assert_eq!(pgorm::Iden::to_string(&item::Entity), "item");
-    assert_eq!(pgorm::Iden::to_string(&item::Column::Name), "name");
+    // `StaticName: SqlName`, so the same identifier renders through `to_string`.
+    assert_eq!(pgorm::SqlName::to_string(&item::Entity), "item");
+    assert_eq!(pgorm::SqlName::to_string(&item::Column::Name), "name");
 
     // `EntityName: Default` — the CRUD entry points construct `Self::default()`.
     assert_eq!(via_default::<item::Entity>().table_name(), "item");
@@ -343,7 +343,7 @@ fn entity_trait_family() {
         "too_many_values"
     );
 
-    // `IdenStr: Copy`, so passing an entity by value does not move it away.
+    // `StaticName: Copy`, so passing an entity by value does not move it away.
     let entity = item::Entity;
     let copied = entity;
     assert_eq!(entity.as_str(), copied.as_str());

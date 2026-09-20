@@ -392,9 +392,9 @@ class ExprEmitter:
             outer = (
                 "None"
                 if schema is None
-                else f"Some({Q}::IntoIden::into_iden({Q}::Alias::new({literal(schema)})))"
+                else f"Some({Q}::IntoName::into_name({Q}::Alias::new({literal(schema)})))"
             )
-            local = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(name)}))"
+            local = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
             return f"{Q}::ColumnType::Enum {{ name: {local}, schema: {outer}, {variants} }}"
         array = kind.endswith("[]")
         base = kind[:-2] if array else kind
@@ -476,10 +476,10 @@ class ExprEmitter:
         schema, name, alias = self.table_identity(reference)
         if alias is not None:
             raise UnsupportedInstruction("DDL table targets cannot have an alias")
-        inner = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(name)}))"
+        inner = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(name)}))"
         if schema is None:
             return f"{Q}::TableName::Table({inner})"
-        outer = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(schema)}))"
+        outer = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(schema)}))"
         return f"{Q}::TableName::SchemaTable({outer}, {inner})"
 
     def enum_change(self, data):

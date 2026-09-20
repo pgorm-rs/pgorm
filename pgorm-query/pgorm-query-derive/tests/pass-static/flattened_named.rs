@@ -1,7 +1,7 @@
-use pgorm_query::{Iden, IdenStatic};
+use pgorm_query::{SqlName, StaticName};
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Copy, Clone, IdenStatic, EnumIter)]
+#[derive(Copy, Clone, Debug, StaticName, EnumIter)]
 enum Asset {
     Table,
     Id,
@@ -12,7 +12,7 @@ enum Asset {
     },
 }
 
-#[derive(Copy, Clone, IdenStatic)]
+#[derive(Copy, Clone, Debug, StaticName)]
 enum CreationInfo {
     UserId,
     #[iden = "creation_date"]

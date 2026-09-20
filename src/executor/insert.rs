@@ -3,7 +3,7 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert,
     error::*,
 };
-use pgorm_query::{Iden, InsertStatement, Query};
+use pgorm_query::{InsertStatement, Query, SqlName};
 use tokio_postgres::types::ToSql;
 
 use super::ValueHolder;

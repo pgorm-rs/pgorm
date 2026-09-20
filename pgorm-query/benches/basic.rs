@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use pgorm_query::*;
 
-#[derive(Debug, Iden)]
+#[derive(Debug, SqlName)]
 pub enum Char {
     Table,
     Id,

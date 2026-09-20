@@ -47,7 +47,7 @@ pub struct SelectStatement {
     pub(crate) limit: Option<Value>,
     pub(crate) offset: Option<Value>,
     pub(crate) lock: Option<LockClause>,
-    pub(crate) window: Option<(DynIden, WindowStatement)>,
+    pub(crate) window: Option<(Name, WindowStatement)>,
 }
 
 /// List of distinct keywords that can be used in select statement
@@ -518,7 +518,7 @@ impl SelectStatement {
     pub fn expr_as<T, A>(&mut self, expr: T, alias: A) -> &mut Self
     where
         T: Into<SimpleExpr>,
-        A: IntoIden,
+        A: IntoName,
     {
         self.expr(SelectExpr::new_as(expr, alias));
         self
@@ -597,11 +597,11 @@ impl SelectStatement {
         alias: A,
     ) -> &mut Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
         self.expr(SelectExpr {
             expr: func.into(),
-            alias: Some(alias.into_iden()),
+            alias: Some(alias.into_name()),
             window: Some(WindowSelectType::Query(window)),
         });
         self
@@ -631,12 +631,12 @@ impl SelectStatement {
     // [spec:pgorm:def:sql.ast.window-statement+3]
     pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
     where
-        W: IntoIden,
+        W: IntoName,
     {
         self.expr(SelectExpr {
             expr: func.into(),
             alias: None,
-            window: Some(WindowSelectType::Name(window.into_iden())),
+            window: Some(WindowSelectType::Name(window.into_name())),
         });
         self
     }
@@ -667,13 +667,13 @@ impl SelectStatement {
         alias: A,
     ) -> &mut Self
     where
-        A: IntoIden,
-        W: IntoIden,
+        A: IntoName,
+        W: IntoName,
     {
         self.expr(SelectExpr {
             expr: func.into(),
-            alias: Some(alias.into_iden()),
-            window: Some(WindowSelectType::Name(window.into_iden())),
+            alias: Some(alias.into_name()),
+            window: Some(WindowSelectType::Name(window.into_name())),
         });
         self
     }
@@ -757,14 +757,14 @@ impl SelectStatement {
     where
         I: IntoIterator<Item = V>,
         V: IntoValueTuple,
-        A: IntoIden,
+        A: IntoName,
     {
         let value_tuples: Vec<ValueTuple> = value_tuples
             .into_iter()
             .map(|vt| vt.into_value_tuple())
             .collect();
         assert!(!value_tuples.is_empty());
-        self.from_from(FromItem::ValuesList(value_tuples, alias.into_iden()))
+        self.from_from(FromItem::ValuesList(value_tuples, alias.into_name()))
     }
 
     /// From table with alias.
@@ -774,7 +774,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
-    /// let table_as: DynIden = SharedIden::new(Alias::new("char"));
+    /// let table_as: Name = Name::new(Alias::new("char"));
     ///
     /// let query = Query::select()
     ///     .from_as(Char::Table, table_as.clone())
@@ -805,9 +805,9 @@ impl SelectStatement {
     pub fn from_as<R, A>(&mut self, tbl_ref: R, alias: A) -> &mut Self
     where
         R: IntoFromItem,
-        A: IntoIden,
+        A: IntoName,
     {
-        self.from_from(tbl_ref.into_from_item().alias(alias.into_iden()))
+        self.from_from(tbl_ref.into_from_item().alias(alias.into_name()))
     }
 
     /// From sub-query.
@@ -835,9 +835,9 @@ impl SelectStatement {
     /// ```
     pub fn from_subquery<T>(&mut self, query: SelectStatement, alias: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.from_from(FromItem::SubQuery(query, alias.into_iden()))
+        self.from_from(FromItem::SubQuery(query, alias.into_name()))
     }
 
     /// From function call.
@@ -859,9 +859,9 @@ impl SelectStatement {
     /// ```
     pub fn from_function<T>(&mut self, func: FunctionCall, alias: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.from_from(FromItem::FunctionCall(func, alias.into_iden()))
+        self.from_from(FromItem::FunctionCall(func, alias.into_name()))
     }
 
     /// Clears all current from clauses.
@@ -1215,12 +1215,12 @@ impl SelectStatement {
     ) -> &mut Self
     where
         R: IntoFromItem,
-        A: IntoIden,
+        A: IntoName,
         C: IntoCondition,
     {
         self.join_join(
             join,
-            tbl_ref.into_from_item().alias(alias.into_iden()),
+            tbl_ref.into_from_item().alias(alias.into_name()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1235,7 +1235,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: DynIden = SharedIden::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: Name = Name::new(Alias::new("sub_glyph"));
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)
@@ -1277,12 +1277,12 @@ impl SelectStatement {
         condition: C,
     ) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
         C: IntoCondition,
     {
         self.join_join(
             join,
-            FromItem::SubQuery(query, alias.into_iden()),
+            FromItem::SubQuery(query, alias.into_name()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1298,7 +1298,7 @@ impl SelectStatement {
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
     ///
-    /// let sub_glyph: DynIden = SharedIden::new(Alias::new("sub_glyph"));
+    /// let sub_glyph: Name = Name::new(Alias::new("sub_glyph"));
     /// let query = Query::select()
     ///     .column(Font::Name)
     ///     .from(Font::Table)
@@ -1341,12 +1341,12 @@ impl SelectStatement {
         condition: C,
     ) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
         C: IntoCondition,
     {
         self.join_join(
             join,
-            FromItem::SubQuery(query, alias.into_iden()),
+            FromItem::SubQuery(query, alias.into_name()),
             JoinOn::Condition(Box::new(ConditionHolder::new_with_condition(
                 condition.into_condition(),
             ))),
@@ -1856,9 +1856,9 @@ impl SelectStatement {
     /// ```
     pub fn window<A>(&mut self, name: A, window: WindowStatement) -> &mut Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
-        self.window = Some((name.into_iden(), window));
+        self.window = Some((name.into_name(), window));
         self
     }
 }

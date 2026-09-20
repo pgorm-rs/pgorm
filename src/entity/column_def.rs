@@ -8,7 +8,7 @@ pub trait ColumnTypeTrait {
     fn def(self) -> ColumnDef;
 
     /// Get the name of the enum if this is a enum column
-    fn get_enum_name(&self) -> Option<&DynIden>;
+    fn get_enum_name(&self) -> Option<&Name>;
 }
 
 // [spec:pgorm:req:entity.traits.column-def]
@@ -24,7 +24,7 @@ impl ColumnTypeTrait for ColumnType {
         }
     }
 
-    fn get_enum_name(&self) -> Option<&DynIden> {
+    fn get_enum_name(&self) -> Option<&Name> {
         enum_name(self)
     }
 }
@@ -34,12 +34,12 @@ impl ColumnTypeTrait for ColumnDef {
         self
     }
 
-    fn get_enum_name(&self) -> Option<&DynIden> {
+    fn get_enum_name(&self) -> Option<&Name> {
         enum_name(&self.col_type)
     }
 }
 
-fn enum_name(col_type: &ColumnType) -> Option<&DynIden> {
+fn enum_name(col_type: &ColumnType) -> Option<&Name> {
     match col_type {
         ColumnType::Enum { name, .. } => Some(name),
         ColumnType::Array(col_type) => enum_name(col_type),
@@ -65,7 +65,7 @@ pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeN
     match col_type {
         ColumnType::Enum { name, schema, .. } => Some(pgorm_query::TypeName {
             schema: schema.clone(),
-            name: SharedIden::clone(name),
+            name: Name::clone(name),
             array: false,
             verbatim: false,
         }),
@@ -196,7 +196,7 @@ mod tests {
         mod housed {
             use crate as pgorm;
             use crate::entity::prelude::*;
-            use crate::pgorm_query::{Alias, SharedIden};
+            use crate::pgorm_query::{Alias, Name};
 
             #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
             pub struct Entity;
@@ -242,9 +242,9 @@ mod tests {
                     match self {
                         Self::Id => ColumnType::Integer.def(),
                         Self::Status => ColumnType::Enum {
-                            name: SharedIden::new(Alias::new("status")),
-                            schema: Some(SharedIden::new(Alias::new("custom"))),
-                            variants: vec![SharedIden::new(Alias::new("open"))],
+                            name: Name::new(Alias::new("status")),
+                            schema: Some(Name::new(Alias::new("custom"))),
+                            variants: vec![Name::new(Alias::new("open"))],
                         }
                         .def(),
                     }

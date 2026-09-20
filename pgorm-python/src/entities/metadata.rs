@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::{ColumnType, Value};
-use pgorm::{ColumnTrait, EntityTrait, FromQueryResult, IdenStr, Iterable, PrimaryKeyToColumn};
+use pgorm::{ColumnTrait, EntityTrait, FromQueryResult, Iterable, PrimaryKeyToColumn, StaticName};
 use pyo3::{prelude::*, types::PyString};
 use serde_json::{Value as Json, json};
 

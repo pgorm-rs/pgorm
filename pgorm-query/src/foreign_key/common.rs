@@ -16,11 +16,11 @@ use crate::types::*;
 // [spec:pgorm:req:sql.ddl.foreign-key+4]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
-    pub(crate) name: Option<DynIden>,
+    pub(crate) name: Option<Name>,
     pub(crate) table: TableName,
     pub(crate) ref_table: TableName,
-    pub(crate) first: (DynIden, DynIden),
-    pub(crate) rest: Vec<(DynIden, DynIden)>,
+    pub(crate) first: (Name, Name),
+    pub(crate) rest: Vec<(Name, Name)>,
     pub(crate) on_delete: Option<ForeignKeyAction>,
     pub(crate) on_update: Option<ForeignKeyAction>,
 }
@@ -41,15 +41,15 @@ impl TableForeignKey {
     pub fn new<T, C, R, S>(table: T, column: C, ref_table: R, ref_column: S) -> Self
     where
         T: IntoTableName,
-        C: IntoIden,
+        C: IntoName,
         R: IntoTableName,
-        S: IntoIden,
+        S: IntoName,
     {
         Self {
             name: None,
             table: table.into_table_name(),
             ref_table: ref_table.into_table_name(),
-            first: (column.into_iden(), ref_column.into_iden()),
+            first: (column.into_name(), ref_column.into_name()),
             rest: Vec::new(),
             on_delete: None,
             on_update: None,
@@ -59,9 +59,9 @@ impl TableForeignKey {
     /// Set foreign key name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.name = Some(name.into_iden());
+        self.name = Some(name.into_name());
         self
     }
 
@@ -69,10 +69,10 @@ impl TableForeignKey {
     /// key requires
     pub fn col<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
     where
-        C: IntoIden,
-        S: IntoIden,
+        C: IntoName,
+        S: IntoName,
     {
-        self.rest.push((column.into_iden(), ref_column.into_iden()));
+        self.rest.push((column.into_name(), ref_column.into_name()));
         self
     }
 
@@ -94,7 +94,7 @@ impl TableForeignKey {
     }
 
     /// The mapped pairs in declaration order, of which there is at least one
-    pub fn columns(&self) -> impl Iterator<Item = &(DynIden, DynIden)> {
+    pub fn columns(&self) -> impl Iterator<Item = &(Name, Name)> {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
 

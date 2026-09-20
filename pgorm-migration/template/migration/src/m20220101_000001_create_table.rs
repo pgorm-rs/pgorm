@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 enum Post {
     Table,
     Id,

@@ -10,10 +10,10 @@
 //! module makes every mention of it ambiguous; `order_by_asc` / `order_by_desc`
 //! cover the common case and the enum is one import away.
 //!
-//! `IdenStr` is here. It is not called `IdenStatic` precisely because this
-//! module globs it into every file that uses it: `pgorm_query::IdenStatic` is a
-//! different trait with the same method, and the two names had to differ for
-//! both modules to be glob-imported at once.
+//! `StaticName` is here — pgorm_query's, re-exported. The entity layer used to
+//! declare a second trait of its own with the same method, so this module and
+//! `pgorm_query`'s could not both be glob-imported without ambiguity; there is
+//! now one trait and the question does not arise.
 //!
 //! `alias` and its `AliasName` are here for the same reason `Expr` is: a name
 //! the query introduces is written at the point the query is written, and
@@ -27,13 +27,13 @@ pub use crate::{
     ActiveValue::{NotSet, Set, Unchanged},
     AliasName, ColumnDef, ColumnTrait, ColumnType, ColumnTypeTrait, Condition, ConnectionTrait,
     CursorTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw, DecodeSelect,
-    Delete, EntityName, EntityTrait, EnumIter, FromQueryResult, Iden, IdenStr, Insert,
-    IntoActiveModel, IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait,
-    PaginatorTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder,
-    QueryResult, QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
-    TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
+    Delete, EntityName, EntityTrait, EnumIter, FromQueryResult, Insert, IntoActiveModel,
+    IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait, PaginatorTrait,
+    PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult,
+    QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select, SqlName,
+    StaticName, TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
     error::*,
-    pgorm_query::{DynIden, Expr, ForeignKeyAction, SharedIden, StringLen},
+    pgorm_query::{Expr, ForeignKeyAction, Name, StringLen},
     set,
 };
 pub use std::sync::Arc;
@@ -41,8 +41,8 @@ pub use std::sync::Arc;
 #[cfg(feature = "macros")]
 pub use crate::{
     DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
-    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIden,
-    DeriveIntoActiveModel, DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelation,
+    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIntoActiveModel,
+    DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelation, DeriveSqlName,
     DeriveValueType,
 };
 

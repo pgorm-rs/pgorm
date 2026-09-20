@@ -3,13 +3,12 @@ use super::graph::GraphRow;
 use super::select::ensure_select_list;
 use crate::query::graph::qualified_pk_tiebreaks;
 use crate::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Error, FromQueryResult, Identity, IdentityOf,
-    IntoBoundary, IntoIdentity, PartialModelTrait, QueryOrder, QuerySelect, Select, SelectGraph,
-    SelectModel, SelectProjected, SelectorTrait, Slot, SlotAt, Slots, error::query_err,
+    ColumnTrait, ConnectionTrait, EntityTrait, Error, FromQueryResult, IntoBoundary, IntoKey, Key,
+    KeyOf, PartialModelTrait, QueryOrder, QuerySelect, Select, SelectGraph, SelectModel,
+    SelectProjected, SelectorTrait, Slot, SlotAt, Slots, error::query_err,
 };
 use pgorm_query::{
-    Condition, DynIden, Expr, IntoValueTuple, Order, SelectStatement, SharedIden, SimpleExpr,
-    Value, ValueTuple,
+    Condition, Expr, IntoValueTuple, Name, Order, SelectStatement, SimpleExpr, Value, ValueTuple,
 };
 use tokio_postgres::types::{IsNull, Kind, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -70,7 +69,7 @@ impl BoundaryCast {
     /// The order columns' casts, matched by identifier against the typed
     /// column set they were spelled from. An identifier no column claims — an
     /// alias, a custom expression — keeps the bare binding.
-    fn capture<C: ColumnTrait>(order_columns: &Identity) -> Vec<Self> {
+    fn capture<C: ColumnTrait>(order_columns: &Key) -> Vec<Self> {
         order_columns
             .iter()
             .map(
@@ -88,10 +87,10 @@ impl BoundaryCast {
 #[derive(Debug, Clone)]
 pub struct Cursor<S, K = ValueTuple> {
     query: SelectStatement,
-    table: DynIden,
-    order_columns: Identity,
+    table: Name,
+    order_columns: Key,
     boundary_casts: Vec<BoundaryCast>,
-    secondary_order_by: Vec<(DynIden, Identity)>,
+    secondary_order_by: Vec<(Name, Key)>,
     window: Option<Window>,
     before: Option<ValueTuple>,
     after: Option<ValueTuple>,
@@ -102,14 +101,14 @@ pub struct Cursor<S, K = ValueTuple> {
 
 impl<S, K> Cursor<S, K> {
     /// Create a new cursor
-    pub fn new<C>(query: SelectStatement, table: DynIden, order_columns: C) -> Self
+    pub fn new<C>(query: SelectStatement, table: Name, order_columns: C) -> Self
     where
-        C: IntoIdentity<ValueType = K>,
+        C: IntoKey<ValueType = K>,
     {
         Self {
             query,
             table,
-            order_columns: order_columns.into_identity(),
+            order_columns: order_columns.into_key(),
             boundary_casts: Vec::new(),
             window: None,
             after: None,
@@ -187,13 +186,12 @@ impl<S, K> Cursor<S, K> {
     /// Both `ORDER BY` and the boundary comparison read this, so the row order
     /// and the keyset predicate cannot disagree about what a page boundary is.
     // [spec:pgorm:sem:exec.cursor.keyset+4]
-    fn keyset_columns(&self) -> Vec<(DynIden, DynIden)> {
+    fn keyset_columns(&self) -> Vec<(Name, Name)> {
         self.order_columns
             .iter()
-            .map(|col| (SharedIden::clone(&self.table), SharedIden::clone(col)))
+            .map(|col| (Name::clone(&self.table), Name::clone(col)))
             .chain(self.secondary_order_by.iter().filter_map(|(tbl, col)| {
-                col.single()
-                    .map(|c1| (SharedIden::clone(tbl), SharedIden::clone(c1)))
+                col.single().map(|c1| (Name::clone(tbl), Name::clone(c1)))
             }))
             .collect()
     }
@@ -247,9 +245,7 @@ impl<S, K> Cursor<S, K> {
         //   (c1 = v1 AND ... AND cn ⋈ vn)
         //   OR (c1 = v1 AND ... AND c(n-1) ⋈ v(n-1))
         //   OR ... OR (c1 ⋈ v1)
-        let col = |(tbl, col): &(DynIden, DynIden)| {
-            Expr::col((SharedIden::clone(tbl), SharedIden::clone(col)))
-        };
+        let col = |(tbl, col): &(Name, Name)| Expr::col((Name::clone(tbl), Name::clone(col)));
         // Secondary tiebreaks past the captured casts bind bare, as they
         // always have: they are other tables' primary keys.
         let identity = BoundaryCast::identity();
@@ -374,7 +370,7 @@ impl<S, K> Cursor<S, K> {
 
     /// Set the trailing order entries a joined read tiebreaks on, each
     /// qualified with the table it belongs to.
-    pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(DynIden, Identity)>) -> &mut Self {
+    pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(Name, Key)>) -> &mut Self {
         self.secondary_order_by = tbl_col;
         self
     }
@@ -383,7 +379,7 @@ impl<S, K> Cursor<S, K> {
     /// entry that restates one of the order columns: ordering a source by its
     /// own primary key would otherwise install that key twice.
     // [spec:pgorm:sem:query.graph.cursor+1]
-    fn set_graph_tiebreaks(&mut self, tiebreaks: Vec<(DynIden, Identity)>) -> &mut Self {
+    fn set_graph_tiebreaks(&mut self, tiebreaks: Vec<(Name, Key)>) -> &mut Self {
         let table = self.table.to_string();
         let order: Vec<String> = self.order_columns.iter().map(|c| c.to_string()).collect();
         self.secondary_order_by = tiebreaks
@@ -501,17 +497,17 @@ where
     // [spec:pgorm:sem:exec.cursor.keyset+4/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
-        C: IntoIdentity,
+        C: IntoKey,
     {
-        Cursor::new(self.query, SharedIden::new(E::default()), order_columns)
+        Cursor::new(self.query, Name::new(E::default()), order_columns)
             .with_boundary_casts::<E::Column>()
     }
 }
 
 /// The root entity's primary key as cursor tiebreaks, qualified with its own
 /// table: what a graph ordered on one of its slots falls back to.
-fn pk_tiebreaks<T: EntityTrait>() -> Vec<(DynIden, Identity)> {
-    qualified_pk_tiebreaks::<T>(&SharedIden::new(T::default()))
+fn pk_tiebreaks<T: EntityTrait>() -> Vec<(Name, Key)> {
+    qualified_pk_tiebreaks::<T>(&Name::new(T::default()))
 }
 
 /// A graph's rows are decoded by [`GraphRow`], so that is what its cursor
@@ -574,11 +570,9 @@ where
     // [spec:pgorm:sem:query.graph.cursor+1]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<GraphRow<E, S>, C::ValueType>
     where
-        C: IdentityOf<E>,
+        C: KeyOf<E>,
     {
-        let table = self
-            .qualifier(0)
-            .unwrap_or_else(|| SharedIden::new(E::default()));
+        let table = self.qualifier(0).unwrap_or_else(|| Name::new(E::default()));
         let mut tiebreaks = qualified_pk_tiebreaks::<E>(&table);
         tiebreaks.extend(S::tiebreaks(self.slot_qualifiers(), 0));
 
@@ -634,11 +628,11 @@ where
     ) -> Cursor<GraphRow<E, S>, C::ValueType>
     where
         S: SlotAt<I>,
-        C: IdentityOf<<<S as SlotAt<I>>::Slot as Slot>::Entity>,
+        C: KeyOf<<<S as SlotAt<I>>::Slot as Slot>::Entity>,
     {
-        let table = self.qualifier(I).unwrap_or_else(|| {
-            SharedIden::new(<<S as SlotAt<I>>::Slot as Slot>::Entity::default())
-        });
+        let table = self
+            .qualifier(I)
+            .unwrap_or_else(|| Name::new(<<S as SlotAt<I>>::Slot as Slot>::Entity::default()));
         let mut tiebreaks =
             qualified_pk_tiebreaks::<<<S as SlotAt<I>>::Slot as Slot>::Entity>(&table);
         tiebreaks.extend(pk_tiebreaks::<E>());
@@ -662,9 +656,9 @@ where
     /// one before the cursor can be fetched.
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectUndecoded, C::ValueType>
     where
-        C: IntoIdentity,
+        C: IntoKey,
     {
-        Cursor::new(self.query, SharedIden::new(E::default()), order_columns)
+        Cursor::new(self.query, Name::new(E::default()), order_columns)
             .with_boundary_casts::<E::Column>()
     }
 }

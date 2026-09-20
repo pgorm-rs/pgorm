@@ -1,7 +1,7 @@
 //! Closed runtime type constructors over pgorm_query::ColumnType.
 
 use crate::{UnsupportedCapabilityError, errors::ConstructionError, values::PyTypeName};
-use pgorm::pgorm_query::{Alias, ColumnType, IntervalSpec, IntoIden, StringLen};
+use pgorm::pgorm_query::{Alias, ColumnType, IntervalSpec, IntoName, StringLen};
 use pyo3::{prelude::*, types::PyInt};
 use std::sync::Arc;
 
@@ -60,11 +60,11 @@ impl PyDataType {
             }
             return Ok(Self {
                 inner: ColumnType::Enum {
-                    name: Alias::new(&name.name).into_iden(),
+                    name: Alias::new(&name.name).into_name(),
                     schema: name
                         .schema
                         .as_ref()
-                        .map(|schema| Alias::new(schema).into_iden()),
+                        .map(|schema| Alias::new(schema).into_name()),
                     variants: Vec::new(),
                 },
             });

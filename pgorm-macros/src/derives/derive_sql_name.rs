@@ -13,7 +13,7 @@ fn must_be_valid_iden(name: &str) -> bool {
         && name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
-fn impl_iden_for_unit_struct(
+fn impl_sql_name_for_unit_struct(
     ident: &proc_macro2::Ident,
     new_iden: &str,
 ) -> proc_macro2::TokenStream {
@@ -29,7 +29,7 @@ fn impl_iden_for_unit_struct(
         quote! {}
     };
     quote! {
-        impl pgorm::pgorm_query::Iden for #ident {
+        impl pgorm::pgorm_query::SqlName for #ident {
             #prepare
 
             fn unquoted(&self, s: &mut dyn ::std::fmt::Write) {
@@ -39,7 +39,7 @@ fn impl_iden_for_unit_struct(
     }
 }
 
-fn impl_iden_for_enum(
+fn impl_sql_name_for_enum(
     ident: &proc_macro2::Ident,
     variants: Punctuated<Variant, syn::token::Comma>,
 ) -> syn::Result<proc_macro2::TokenStream> {
@@ -92,7 +92,7 @@ fn impl_iden_for_enum(
     };
 
     Ok(quote! {
-        impl pgorm::pgorm_query::Iden for #ident {
+        impl pgorm::pgorm_query::SqlName for #ident {
             #prepare
 
             fn unquoted(&self, s: &mut dyn ::std::fmt::Write) {
@@ -105,7 +105,7 @@ fn impl_iden_for_enum(
 }
 
 // [spec:pgorm:sem:macros.derive.iden+1]
-pub fn expand_derive_iden(input: DeriveInput) -> syn::Result<TokenStream> {
+pub fn expand_derive_sql_name(input: DeriveInput) -> syn::Result<TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
     let mut new_iden: TokenStream = ident.to_string().to_snake_case().parse().unwrap();
@@ -134,18 +134,18 @@ pub fn expand_derive_iden(input: DeriveInput) -> syn::Result<TokenStream> {
             if variants.is_empty() {
                 Ok(TokenStream::new())
             } else {
-                impl_iden_for_enum(&ident, variants)
+                impl_sql_name_for_enum(&ident, variants)
             }
         }
         syn::Data::Struct(DataStruct {
             fields: Fields::Unit,
             ..
-        }) => Ok(impl_iden_for_unit_struct(
+        }) => Ok(impl_sql_name_for_unit_struct(
             &ident,
             new_iden.to_string().as_str(),
         )),
         _ => Ok(quote_spanned! {
-            ident.span() => compile_error!("you can only derive DeriveIden on unit struct or enum");
+            ident.span() => compile_error!("you can only derive DeriveSqlName on unit struct or enum");
         }),
     }
 }

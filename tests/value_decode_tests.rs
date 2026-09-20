@@ -443,7 +443,7 @@ impl FromQueryResult for WideProbe {
     }
 }
 
-#[derive(EnumIter, DeriveIden)]
+#[derive(EnumIter, DeriveSqlName)]
 enum ResultCol {
     Num,
     Word,

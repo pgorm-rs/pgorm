@@ -1325,7 +1325,7 @@ impl Expr {
     /// ```
     pub fn as_enum<T>(self, type_name: T) -> SimpleExpr
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.cast_as_type(TypeName::new(type_name))
     }
@@ -1405,7 +1405,7 @@ impl Expr {
     /// ```
     pub fn cast_as<T>(self, type_name: T) -> SimpleExpr
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.cast_as_type(TypeName::new(type_name))
     }
@@ -1918,7 +1918,7 @@ impl SimpleExpr {
     /// ```
     pub fn cast_as<T>(self, type_name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self::AsEnum(Box::new(TypeName::new(type_name)), Box::new(self))
     }

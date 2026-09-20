@@ -11,12 +11,12 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{Alias, Iden, Values};
+use pgorm_query::{Alias, SqlName, Values};
 
 use crate::query::graph::{source_column_alias, source_read_cast};
 use crate::{
-    ConnectionTrait, EntityTrait, Error, FromQueryResult, IdenStr, Iterable, QueryResult,
-    SelectorRaw, SelectorTrait,
+    ConnectionTrait, EntityTrait, Error, FromQueryResult, Iterable, QueryResult, SelectorRaw,
+    SelectorTrait, StaticName,
 };
 
 use super::adapter::{self, PlExpr};
@@ -68,7 +68,7 @@ impl<E: EntityTrait> SelectableSource for E {
     type Entity = E;
 
     fn qualifier(&self) -> String {
-        Iden::to_string(&E::default())
+        SqlName::to_string(&E::default())
     }
 }
 
@@ -97,7 +97,7 @@ impl<S: SelectableSource> SelectableSource for Named<S> {
 fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index: usize) {
     for column in <E::Column as Iterable>::iter() {
         let alias = source_column_alias(index, column.as_str());
-        let node = adapter::ident_in(vec![qualifier.to_owned()], Iden::to_string(&column));
+        let node = adapter::ident_in(vec![qualifier.to_owned()], SqlName::to_string(&column));
         let node = match source_read_cast(&column) {
             Some(cast) => adapter::call("as", vec![adapter::ident(&cast), node]),
             None => node,
@@ -433,7 +433,7 @@ pub struct Named<R> {
 pub fn named_runtime<R: IntoSource>(relation: R, name: Alias) -> Named<R> {
     Named {
         relation,
-        name: Iden::to_string(&name),
+        name: SqlName::to_string(&name),
     }
 }
 

@@ -595,16 +595,16 @@ pub trait TryGetableMany: Sized {
     fn try_get_many_by_index(res: &QueryResult) -> Result<Self, TryGetError>;
 
     /// Run a raw statement and decode each row into a tuple, naming the
-    /// columns through an `Iden` enum.
+    /// columns through an `SqlName` enum.
     ///
     /// ```no_run
     /// # #[cfg(feature = "macros")]
     /// # {
-    /// # use pgorm::{error::*, query::*, DatabasePool, DeriveIden, EnumIter, TryGetableMany};
+    /// # use pgorm::{error::*, query::*, DatabasePool, DeriveSqlName, EnumIter, TryGetableMany};
     /// # use pgorm::pgorm_query::Values;
     /// #
     /// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-    /// #[derive(EnumIter, DeriveIden)]
+    /// #[derive(EnumIter, DeriveSqlName)]
     /// enum ResultCol {
     ///     Name,
     ///     NumOfCakes,
@@ -628,7 +628,7 @@ pub trait TryGetableMany: Sized {
         values: Values,
     ) -> SelectorRaw<SelectGetableValue<Self, C>>
     where
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         SelectorRaw::<SelectGetableValue<Self, C>>::with_columns(stmt, values)
     }
@@ -1017,7 +1017,7 @@ mod tests {
 
         let with_clause = RecursiveWithClause::new(common_table_expression)
             .cycle(Cycle::new(
-                SimpleExpr::Column(ColumnRef::Column(id.into_iden())),
+                SimpleExpr::Column(ColumnRef::Column(id.into_name())),
                 alias("looped"),
                 alias("traversal_path"),
             ))

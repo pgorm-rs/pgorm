@@ -4,7 +4,7 @@ use pgorm::{
     ColumnTrait, ColumnType, ConnectionTrait, DatabasePool, EntityTrait, Error, Iterable, Schema,
 };
 use pgorm_query::{
-    QueryBuilder, SharedIden, TableCreateStatement,
+    Name, QueryBuilder, TableCreateStatement,
     extension::{Type, TypeCreateStatement},
 };
 use pretty_assertions::assert_eq;
@@ -170,7 +170,7 @@ where
             ColumnType::Enum { name, .. } => name,
             _ => unreachable!(),
         };
-        let drop_type_stmt = Type::drop(SharedIden::clone(name))
+        let drop_type_stmt = Type::drop(Name::clone(name))
             .if_exists()
             .cascade()
             .to_owned();

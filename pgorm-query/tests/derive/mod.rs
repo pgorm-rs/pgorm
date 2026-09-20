@@ -3,7 +3,7 @@ use pgorm_query::*;
 // [spec:pgorm:sem:macros.derive.iden.query/test]    default snake_case names; `Table` renders the container
 #[test]
 fn derive_1() {
-    #[derive(Debug, Iden)]
+    #[derive(Debug, SqlName)]
     enum User {
         Table,
         Id,
@@ -13,17 +13,17 @@ fn derive_1() {
     }
 
     println!("Default field names");
-    assert_eq!(Iden::to_string(&User::Table), "user");
-    assert_eq!(Iden::to_string(&User::Id), "id");
-    assert_eq!(Iden::to_string(&User::FirstName), "first_name");
-    assert_eq!(Iden::to_string(&User::LastName), "last_name");
-    assert_eq!(Iden::to_string(&User::Email), "email");
+    assert_eq!(SqlName::to_string(&User::Table), "user");
+    assert_eq!(SqlName::to_string(&User::Id), "id");
+    assert_eq!(SqlName::to_string(&User::FirstName), "first_name");
+    assert_eq!(SqlName::to_string(&User::LastName), "last_name");
+    assert_eq!(SqlName::to_string(&User::Email), "email");
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query/test]    container and variant `#[iden = "..."]` renaming
 #[test]
 fn derive_2() {
-    #[derive(Debug, Iden)]
+    #[derive(Debug, SqlName)]
     // Outer iden attributes overrides what's used for "Table"...
     #[iden = "user"]
     enum Custom {
@@ -40,17 +40,17 @@ fn derive_2() {
     }
 
     println!("Custom field names");
-    assert_eq!(Iden::to_string(&Custom::Table), "user");
-    assert_eq!(Iden::to_string(&Custom::Id), "my_id");
-    assert_eq!(Iden::to_string(&Custom::FirstName), "name");
-    assert_eq!(Iden::to_string(&Custom::LastName), "surname");
-    assert_eq!(Iden::to_string(&Custom::Email), "EMail");
+    assert_eq!(SqlName::to_string(&Custom::Table), "user");
+    assert_eq!(SqlName::to_string(&Custom::Id), "my_id");
+    assert_eq!(SqlName::to_string(&Custom::FirstName), "name");
+    assert_eq!(SqlName::to_string(&Custom::LastName), "surname");
+    assert_eq!(SqlName::to_string(&Custom::Email), "EMail");
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query/test]    renaming only the `Table` variant
 #[test]
 fn derive_3() {
-    #[derive(Debug, Iden)]
+    #[derive(Debug, SqlName)]
     enum Something {
         // ...the Table can also be overwritten like this
         #[iden = "something_else"]
@@ -61,31 +61,31 @@ fn derive_3() {
     }
 
     println!("Single custom field name");
-    assert_eq!(Iden::to_string(&Something::Table), "something_else");
-    assert_eq!(Iden::to_string(&Something::Id), "id");
-    assert_eq!(Iden::to_string(&Something::AssetName), "asset_name");
-    assert_eq!(Iden::to_string(&Something::UserId), "user_id");
+    assert_eq!(SqlName::to_string(&Something::Table), "something_else");
+    assert_eq!(SqlName::to_string(&Something::Id), "id");
+    assert_eq!(SqlName::to_string(&Something::AssetName), "asset_name");
+    assert_eq!(SqlName::to_string(&Something::UserId), "user_id");
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query/test]    unit structs, renamed and not
 #[test]
 fn derive_4() {
-    #[derive(Debug, Iden)]
+    #[derive(Debug, SqlName)]
     pub struct SomeType;
 
-    #[derive(Debug, Iden)]
+    #[derive(Debug, SqlName)]
     #[iden = "another_name"]
     pub struct CustomName;
 
     println!("Unit structs");
-    assert_eq!(Iden::to_string(&SomeType), "some_type");
-    assert_eq!(Iden::to_string(&CustomName), "another_name");
+    assert_eq!(SqlName::to_string(&SomeType), "some_type");
+    assert_eq!(SqlName::to_string(&CustomName), "another_name");
 }
 
-// [spec:pgorm:sem:macros.derive.iden.query/test]    IdenStatic adds as_str and AsRef<str>
+// [spec:pgorm:sem:macros.derive.iden.query/test]    StaticName adds as_str and AsRef<str>
 #[test]
 fn derive_5_iden_static() {
-    #[derive(Copy, Clone, Debug, IdenStatic)]
+    #[derive(Copy, Clone, Debug, StaticName)]
     enum User {
         Table,
         Id,
@@ -94,9 +94,9 @@ fn derive_5_iden_static() {
         Email,
     }
 
-    // `IdenStatic` generates the `Iden` impl as well...
-    assert_eq!(Iden::to_string(&User::Table), "user");
-    assert_eq!(Iden::to_string(&User::FirstName), "first_name");
+    // `StaticName` generates the `SqlName` impl as well...
+    assert_eq!(SqlName::to_string(&User::Table), "user");
+    assert_eq!(SqlName::to_string(&User::FirstName), "first_name");
 
     // ...plus `as_str` returning a `&'static str` from the same naming rules...
     assert_eq!(User::Table.as_str(), "user");
@@ -114,17 +114,17 @@ fn derive_5_iden_static() {
 // [spec:pgorm:sem:macros.derive.iden.query/test]    an empty enum expands to nothing
 #[test]
 fn derive_6_empty_enum_expands_to_nothing() {
-    #[derive(Copy, Clone, Debug, Iden)]
+    #[derive(Copy, Clone, Debug, SqlName)]
     enum Empty {}
 
-    // The derive produced no `Iden` impl at all, which is the only reason this
+    // The derive produced no `SqlName` impl at all, which is the only reason this
     // hand-written one compiles instead of colliding with a generated one.
-    impl Iden for Empty {
+    impl SqlName for Empty {
         fn unquoted(&self, _s: &mut dyn std::fmt::Write) {
             match *self {}
         }
     }
 
-    fn assert_iden<T: Iden>() {}
+    fn assert_iden<T: SqlName>() {}
     assert_iden::<Empty>();
 }

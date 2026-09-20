@@ -22,21 +22,19 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{
-    Alias, Condition, DynIden, Expr, IntoIden, JoinType, SelectExpr, SelectStatement, SharedIden,
-};
+use pgorm_query::{Alias, Condition, Expr, IntoName, JoinType, Name, SelectExpr, SelectStatement};
 
 use super::helper::join_condition;
 use crate::executor::result_name::result_column_name;
 use crate::{
-    ColumnTrait, EntityTrait, Error, FromQueryResult, IdenStr, Identity, Iterable,
-    PrimaryKeyToColumn, QueryFilter, QueryOrder, QueryResult, QueryTrait, Related, RelationDef,
+    ColumnTrait, EntityTrait, Error, FromQueryResult, Iterable, Key, PrimaryKeyToColumn,
+    QueryFilter, QueryOrder, QueryResult, QueryTrait, Related, RelationDef, StaticName,
 };
 
 /// The closure shape a call-site `ON` predicate takes: the join's left and
 /// right identifiers in, a [`Condition`] out — the same shape
 /// [`RelationDef::on_condition`] takes.
-type OnCondition = Box<dyn Fn(DynIden, DynIden) -> Condition + Send + Sync>;
+type OnCondition = Box<dyn Fn(Name, Name) -> Condition + Send + Sync>;
 
 mod sealed {
     /// [`Slot`](super::Slot) is sealed: the join type, the decode and the
@@ -121,18 +119,18 @@ impl<F: EntityTrait> Slot for Opt<F> {
 
 /// The secondary order entries one decoded source contributes to a cursor's
 /// sort key: one unary entry per primary-key column.
-pub(crate) type Tiebreaks = Vec<(DynIden, Identity)>;
+pub(crate) type Tiebreaks = Vec<(Name, Key)>;
 
 /// One decoded source's primary key as cursor tiebreaks, qualified with the
 /// source's *effective* identifier — its bound alias when it has one — so a
 /// tiebreak names the same table the projection and the `ON` clause do.
 // [spec:pgorm:sem:query.graph.cursor+1]
-pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &DynIden) -> Tiebreaks {
+pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &Name) -> Tiebreaks {
     <F::PrimaryKey as Iterable>::iter()
         .map(|pk| {
             (
-                SharedIden::clone(qualifier),
-                Identity::from(SharedIden::new(pk.into_column())),
+                Name::clone(qualifier),
+                Key::from(Name::new(pk.into_column())),
             )
         })
         .collect()
@@ -154,7 +152,7 @@ pub trait Slots: sealed::Sealed {
     /// order — the root's is not among them — and slots are numbered from 1
     /// as the projection prefixes are (`s1_` is the first slot), so
     /// `skip == 0` skips nothing.
-    fn tiebreaks(qualifiers: &[DynIden], skip: usize) -> Tiebreaks;
+    fn tiebreaks(qualifiers: &[Name], skip: usize) -> Tiebreaks;
 }
 
 /// The slot declared at position `I`, counted from 1 as the projection
@@ -173,7 +171,7 @@ pub trait SlotAt<const I: usize>: Slots {
 /// A slotless graph declares no tiebreaks; its cursor is a single-table one.
 // [spec:pgorm:sem:query.graph.cursor+1]
 impl Slots for () {
-    fn tiebreaks(_qualifiers: &[DynIden], _skip: usize) -> Tiebreaks {
+    fn tiebreaks(_qualifiers: &[Name], _skip: usize) -> Tiebreaks {
         Tiebreaks::new()
     }
 }
@@ -202,8 +200,8 @@ macro_rules! slots {
 
         // [spec:pgorm:sem:query.graph.cursor+1]
         impl< $( $s: Slot ),+ > Slots for ( $( $s, )+ ) {
-            fn tiebreaks(qualifiers: &[DynIden], skip: usize) -> Tiebreaks {
-                let sources: &[fn(&DynIden) -> Tiebreaks] =
+            fn tiebreaks(qualifiers: &[Name], skip: usize) -> Tiebreaks {
+                let sources: &[fn(&Name) -> Tiebreaks] =
                     &[ $( qualified_pk_tiebreaks::<<$s as Slot>::Entity> ),+ ];
 
                 sources
@@ -261,7 +259,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 // [spec:pgorm:req:sql.ast.cast-shape]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
     use pgorm_query::SimpleExpr;
-    match col.select_as(Expr::col(SharedIden::new(*col))) {
+    match col.select_as(Expr::col(Name::new(*col))) {
         SimpleExpr::AsEnum(type_name, _) => Some(type_name.raw_text()),
         _ => None,
     }
@@ -283,15 +281,15 @@ pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
 // [spec:pgorm:sem:query.graph.writer+4]
 pub(crate) fn project_source<F: EntityTrait>(
     query: &mut SelectStatement,
-    qualifier: DynIden,
+    qualifier: Name,
     index: usize,
 ) {
     for col in <F::Column as Iterable>::iter() {
         let alias = source_column_alias(index, col.as_str());
-        let expr = Expr::col((SharedIden::clone(&qualifier), col.into_iden()));
+        let expr = Expr::col((Name::clone(&qualifier), col.into_name()));
         query.expr(SelectExpr::new_as(
             col.select_as(expr),
-            SharedIden::new(Alias::new(alias)),
+            Name::new(Alias::new(alias)),
         ));
     }
 }
@@ -354,7 +352,7 @@ pub struct SelectGraph<E: EntityTrait, S = ()> {
     /// root at index 0, each slot at its own. It is the writer's prefix index
     /// and the cursor's tiebreak qualifier, held once so the two cannot
     /// disagree about what a source is called.
-    pub(crate) qualifiers: Vec<DynIden>,
+    pub(crate) qualifiers: Vec<Name>,
     pub(crate) marker: PhantomData<(E, S)>,
 }
 
@@ -392,7 +390,7 @@ impl<E: EntityTrait> SelectGraph<E, ()> {
             qualifiers: Vec::new(),
             marker: PhantomData,
         };
-        graph.project::<E>(SharedIden::new(E::default()));
+        graph.project::<E>(Name::new(E::default()));
         graph
     }
 }
@@ -408,10 +406,10 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// Project one decoded source under the next prefix, and record the
     /// identifier that prefix belongs to.
     // [spec:pgorm:sem:query.graph.writer+4]
-    pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: DynIden) {
+    pub(crate) fn project<F: EntityTrait>(&mut self, qualifier: Name) {
         project_source::<F>(
             &mut self.query,
-            SharedIden::clone(&qualifier),
+            Name::clone(&qualifier),
             self.qualifiers.len(),
         );
         self.qualifiers.push(qualifier);
@@ -420,14 +418,14 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// The declared slots' effective identifiers, in declaration order — the
     /// root's excluded, so slot `n` sits at index `n - 1`.
     // [spec:pgorm:sem:query.graph.cursor+1]
-    pub(crate) fn slot_qualifiers(&self) -> &[DynIden] {
+    pub(crate) fn slot_qualifiers(&self) -> &[Name] {
         self.qualifiers.get(1..).unwrap_or_default()
     }
 
     /// The effective identifier of one decoded source: the root at 0, each
     /// slot at its declared position.
     // [spec:pgorm:sem:query.graph.cursor+1]
-    pub(crate) fn qualifier(&self, index: usize) -> Option<DynIden> {
+    pub(crate) fn qualifier(&self, index: usize) -> Option<Name> {
         self.qualifiers.get(index).cloned()
     }
 
@@ -474,20 +472,20 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
         &mut self,
         join: JoinType,
         mut rel: RelationDef,
-        alias: Option<DynIden>,
+        alias: Option<Name>,
         extra: Option<OnCondition>,
     ) {
         if let Some(alias) = alias {
             rel.to_tbl = rel.to_tbl.alias(alias);
         }
-        let left = SharedIden::clone(rel.from_tbl.qualifier());
-        let qualifier = SharedIden::clone(rel.to_tbl.qualifier());
+        let left = Name::clone(rel.from_tbl.qualifier());
+        let qualifier = Name::clone(rel.to_tbl.qualifier());
         let to_tbl = rel.to_tbl.clone();
         let mut condition = join_condition(rel);
         if let Some(extra) = extra {
             condition = Condition::all()
                 .add(condition)
-                .add(extra(left, SharedIden::clone(&qualifier)));
+                .add(extra(left, Name::clone(&qualifier)));
         }
         self.query.join(join, to_tbl, condition);
         self.project::<F>(qualifier);
@@ -540,9 +538,9 @@ macro_rules! grow {
             pub fn join_maybe_as<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
-                alias: impl IntoIden,
+                alias: impl IntoName,
             ) -> SelectGraph<E, ( $( $prev, )* Opt<F>, )> {
-                self.slot_edge::<F>(<Opt<F> as Slot>::JOIN, rel, Some(alias.into_iden()), None);
+                self.slot_edge::<F>(<Opt<F> as Slot>::JOIN, rel, Some(alias.into_name()), None);
                 self.retype()
             }
 
@@ -573,7 +571,7 @@ macro_rules! grow {
             ) -> SelectGraph<E, ( $( $prev, )* Opt<F>, )>
             where
                 F: EntityTrait,
-                C: Fn(DynIden, DynIden) -> Condition + Send + Sync + 'static,
+                C: Fn(Name, Name) -> Condition + Send + Sync + 'static,
             {
                 self.slot_edge::<F>(<Opt<F> as Slot>::JOIN, rel, None, Some(Box::new(f)));
                 self.retype()
@@ -597,9 +595,9 @@ macro_rules! grow {
             pub fn join_one_as<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
-                alias: impl IntoIden,
+                alias: impl IntoName,
             ) -> SelectGraph<E, ( $( $prev, )* Req<F>, )> {
-                self.slot_edge::<F>(<Req<F> as Slot>::JOIN, rel, Some(alias.into_iden()), None);
+                self.slot_edge::<F>(<Req<F> as Slot>::JOIN, rel, Some(alias.into_name()), None);
                 self.retype()
             }
 

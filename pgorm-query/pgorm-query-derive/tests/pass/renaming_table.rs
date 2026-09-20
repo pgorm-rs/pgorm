@@ -1,7 +1,7 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Copy, Clone, Iden, EnumIter)]
+#[derive(Copy, Clone, SqlName, EnumIter)]
 enum Something {
     // ...the Table can also be overwritten like this
     #[iden = "something_else"]

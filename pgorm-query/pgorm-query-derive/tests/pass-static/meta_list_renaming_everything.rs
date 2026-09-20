@@ -1,7 +1,7 @@
-use pgorm_query::{Iden, IdenStatic};
+use pgorm_query::{SqlName, StaticName};
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(IdenStatic, EnumIter, Copy, Clone)]
+#[derive(StaticName, EnumIter, Copy, Clone, Debug)]
 // Outer iden attributes overrides what's used for "Table"...
 #[iden(rename = "user")]
 enum Custom {

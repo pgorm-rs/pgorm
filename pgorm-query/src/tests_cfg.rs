@@ -4,13 +4,13 @@ use std::fmt;
 
 pub use serde_json::json;
 
-use crate::Iden;
+use crate::SqlName;
 
 /// Representation of a database table named `Character`.
 ///
-/// A `Enum` implemented [`Iden`] used in rustdoc and test to demonstrate the library usage.
+/// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.
 ///
-/// [`Iden`]: crate::types::Iden
+/// [`SqlName`]: crate::types::SqlName
 #[derive(Debug)]
 pub enum Character {
     Table,
@@ -28,7 +28,7 @@ pub enum Character {
 /// A shorthand for [`Character`]
 pub type Char = Character;
 
-impl Iden for Character {
+impl SqlName for Character {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(
             s,
@@ -52,9 +52,9 @@ impl Iden for Character {
 
 /// Representation of a database table named `Font`.
 ///
-/// A `Enum` implemented [`Iden`] used in rustdoc and test to demonstrate the library usage.
+/// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.
 ///
-/// [`Iden`]: crate::types::Iden
+/// [`SqlName`]: crate::types::SqlName
 #[derive(Debug)]
 pub enum Font {
     Table,
@@ -64,7 +64,7 @@ pub enum Font {
     Language,
 }
 
-impl Iden for Font {
+impl SqlName for Font {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(
             s,
@@ -83,9 +83,9 @@ impl Iden for Font {
 
 /// Representation of a database table named `Glyph`.
 ///
-/// A `Enum` implemented [`Iden`] used in rustdoc and test to demonstrate the library usage.
+/// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.
 ///
-/// [`Iden`]: crate::types::Iden
+/// [`SqlName`]: crate::types::SqlName
 #[derive(Debug)]
 pub enum Glyph {
     Table,
@@ -95,7 +95,7 @@ pub enum Glyph {
     Tokens,
 }
 
-impl Iden for Glyph {
+impl SqlName for Glyph {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(
             s,
@@ -114,9 +114,9 @@ impl Iden for Glyph {
 
 /// Representation of a database table named `Task`.
 ///
-/// A `Enum` implemented [`Iden`] used in rustdoc and test to demonstrate the library usage.
+/// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.
 ///
-/// [`Iden`]: crate::types::Iden
+/// [`SqlName`]: crate::types::SqlName
 #[derive(Debug)]
 pub enum Task {
     Table,
@@ -124,7 +124,7 @@ pub enum Task {
     IsDone,
 }
 
-impl Iden for Task {
+impl SqlName for Task {
     fn unquoted(&self, s: &mut dyn fmt::Write) {
         write!(
             s,

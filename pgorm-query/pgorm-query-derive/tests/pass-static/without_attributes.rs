@@ -1,7 +1,7 @@
-use pgorm_query::{Iden, IdenStatic};
+use pgorm_query::{SqlName, StaticName};
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Copy, Clone, IdenStatic, EnumIter)]
+#[derive(Copy, Clone, Debug, StaticName, EnumIter)]
 enum User {
     Table,
     Id,
@@ -10,7 +10,7 @@ enum User {
     Email,
 }
 
-#[derive(Copy, Clone, IdenStatic, EnumIter)]
+#[derive(Copy, Clone, Debug, StaticName, EnumIter)]
 enum UserStatic {
     Table,
     Id,

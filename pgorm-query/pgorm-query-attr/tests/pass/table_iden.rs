@@ -1,4 +1,4 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 use pgorm_query_attr::enum_def;
 
 #[enum_def(table_name = "HelloTable")]
@@ -7,5 +7,5 @@ pub struct Hello {
 }
 
 fn main() {
-    assert_eq!("HelloTable".to_string(), HelloIden::Table.to_string());
+    assert_eq!("HelloTable".to_string(), HelloName::Table.to_string());
 }

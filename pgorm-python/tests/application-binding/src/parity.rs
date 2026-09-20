@@ -1,7 +1,7 @@
 use pgorm::pgorm_query::{NullOrdering, Order};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IdenStr,
-    Iterable, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Iterable,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, StaticName,
 };
 use pgorm_python::{entities::ActiveState, expressions::Compiled, values::PyValue};
 use pyo3::{prelude::*, types::PyDict};

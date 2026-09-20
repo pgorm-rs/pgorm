@@ -693,12 +693,7 @@ impl QueryBuilder {
     /// Translate [`Function`] into SQL statement.
     fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
         if let Function::Named(iden) = function {
-            write!(
-                sql,
-                "{}",
-                TypeName::new(SharedIden::clone(iden)).to_sql_string()
-            )
-            .unwrap();
+            write!(sql, "{}", TypeName::new(Name::clone(iden)).to_sql_string()).unwrap();
         } else {
             write!(
                 sql,
@@ -1135,7 +1130,7 @@ impl QueryBuilder {
     }
 
     /// Write ON CONFLICT update action by retrieving value from the excluded table
-    fn prepare_on_conflict_excluded_table(&self, col: &DynIden, sql: &mut dyn SqlWriter) {
+    fn prepare_on_conflict_excluded_table(&self, col: &Name, sql: &mut dyn SqlWriter) {
         write!(sql, "\"excluded\".").unwrap();
         col.prepare(sql.as_writer());
     }
@@ -1469,7 +1464,7 @@ impl QueryBuilder {
                 // [spec:pgorm:req:sql.render.ident-quoting+4]
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. } => {
-                    let mut type_name = TypeName::new(SharedIden::clone(name));
+                    let mut type_name = TypeName::new(Name::clone(name));
                     type_name.schema = schema.clone();
                     type_name.to_sql_string()
                 }

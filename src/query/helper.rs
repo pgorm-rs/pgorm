@@ -1,15 +1,13 @@
 use crate::{
-    ColumnPairs, ColumnTrait, EntityTrait, IntoIdentity, IntoSimpleExpr, Iterable, ModelTrait,
+    ColumnPairs, ColumnTrait, EntityTrait, IntoKey, IntoSimpleExpr, Iterable, ModelTrait,
     PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
 };
 use pgorm_query::{
-    AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoIden,
-    LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SharedIden, SimpleExpr,
-    UnionType, WindowStatement,
+    AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoName,
+    LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SimpleExpr, UnionType,
+    WindowStatement,
 };
-pub use pgorm_query::{
-    Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
-};
+pub use pgorm_query::{Condition, ConditionalStatement, JoinType, Name, Order, OrderedStatement};
 
 use pgorm_query::IntoColumnRef;
 
@@ -93,11 +91,11 @@ pub trait QuerySelect: Sized {
     fn column_as<C, I>(mut self, col: C, alias: I) -> Self::Projected
     where
         C: IntoSimpleExpr,
-        I: IntoIdentity,
+        I: IntoKey,
     {
         self.query().expr(SelectExpr::new_as(
             col.into_simple_expr(),
-            SharedIden::new(alias.into_identity()),
+            Name::new(alias.into_key()),
         ));
         self.into_projected()
     }
@@ -408,10 +406,10 @@ pub trait QuerySelect: Sized {
     /// Join via [`RelationDef`] with table alias.
     fn join_as<I>(mut self, join: JoinType, mut rel: RelationDef, alias: I) -> Self
     where
-        I: IntoIden,
+        I: IntoName,
     {
-        let alias = alias.into_iden();
-        rel.to_tbl = rel.to_tbl.alias(SharedIden::clone(&alias));
+        let alias = alias.into_name();
+        rel.to_tbl = rel.to_tbl.alias(Name::clone(&alias));
         self.query()
             .join(join, rel.to_tbl.clone(), join_condition(rel));
         self
@@ -422,10 +420,10 @@ pub trait QuerySelect: Sized {
     /// You can reverse join B from A.
     fn join_as_rev<I>(mut self, join: JoinType, mut rel: RelationDef, alias: I) -> Self
     where
-        I: IntoIden,
+        I: IntoName,
     {
-        let alias = alias.into_iden();
-        rel.from_tbl = rel.from_tbl.alias(SharedIden::clone(&alias));
+        let alias = alias.into_name();
+        rel.from_tbl = rel.from_tbl.alias(Name::clone(&alias));
         self.query()
             .join(join, rel.from_tbl.clone(), join_condition(rel));
         self
@@ -630,9 +628,9 @@ pub trait QuerySelect: Sized {
     fn expr_as<T, A>(mut self, expr: T, alias: A) -> Self::Projected
     where
         T: Into<SimpleExpr>,
-        A: IntoIdentity,
+        A: IntoKey,
     {
-        self.query().expr_as(expr, alias.into_identity());
+        self.query().expr_as(expr, alias.into_key());
         self.into_projected()
     }
 
@@ -653,12 +651,12 @@ pub trait QuerySelect: Sized {
     /// ```
     fn tbl_col_as<T, C, A>(mut self, (tbl, col): (T, C), alias: A) -> Self::Projected
     where
-        T: IntoIden + 'static,
-        C: IntoIden + 'static,
-        A: IntoIdentity,
+        T: IntoName + 'static,
+        C: IntoName + 'static,
+        A: IntoKey,
     {
         self.query()
-            .expr_as(Expr::col((tbl, col)), alias.into_identity());
+            .expr_as(Expr::col((tbl, col)), alias.into_key());
         self.into_projected()
     }
 
@@ -716,7 +714,7 @@ pub trait QuerySelect: Sized {
     // [spec:pgorm:sem:query.build.lateral]
     fn join_lateral<T, C>(mut self, join: JoinType, sub: SelectStatement, alias: T, on: C) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
         C: IntoCondition,
     {
         QuerySelect::query(&mut self).join_lateral(join, sub, alias, on);
@@ -729,7 +727,7 @@ pub trait QuerySelect: Sized {
     // [spec:pgorm:sem:query.build.lateral]
     fn join_lateral_on_true<T>(self, join: JoinType, sub: SelectStatement, alias: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.join_lateral(join, sub, alias, SimpleExpr::Constant(true.into()))
     }
@@ -738,7 +736,7 @@ pub trait QuerySelect: Sized {
     // [spec:pgorm:sem:query.build.window]
     fn window<A>(mut self, name: A, window: WindowStatement) -> Self
     where
-        A: IntoIden,
+        A: IntoName,
     {
         QuerySelect::query(&mut self).window(name, window);
         self
@@ -753,8 +751,8 @@ pub trait QuerySelect: Sized {
     // [spec:pgorm:sem:query.build.window]
     fn window_expr_as<W, A>(mut self, func: FunctionCall, window: W, alias: A) -> Self::Projected
     where
-        W: IntoIden,
-        A: IntoIden,
+        W: IntoName,
+        A: IntoName,
     {
         QuerySelect::query(&mut self).expr_window_name_as(func, window, alias);
         self.into_projected()
@@ -1063,14 +1061,14 @@ pub trait QueryFilter: Sized {
     }
 
     /// Perform a check to determine table belongs to a Model through it's name alias
-    fn belongs_to_tbl_alias<M>(mut self, model: &M, tbl_alias: impl IntoIden) -> Self
+    fn belongs_to_tbl_alias<M>(mut self, model: &M, tbl_alias: impl IntoName) -> Self
     where
         M: ModelTrait,
     {
-        let tbl_alias = tbl_alias.into_iden();
+        let tbl_alias = tbl_alias.into_name();
         for key in <M::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            let expr = Expr::col((SharedIden::clone(&tbl_alias), col)).eq(model.get(col));
+            let expr = Expr::col((Name::clone(&tbl_alias), col)).eq(model.get(col));
             self = self.filter(expr);
         }
         self
@@ -1080,16 +1078,16 @@ pub trait QueryFilter: Sized {
 // [spec:pgorm:sem:query.build.join+3]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
-    let from_tbl = SharedIden::clone(rel.from_tbl.qualifier());
-    let to_tbl = SharedIden::clone(rel.to_tbl.qualifier());
+    let from_tbl = Name::clone(rel.from_tbl.qualifier());
+    let to_tbl = Name::clone(rel.to_tbl.qualifier());
     let mut condition = match rel.condition_type {
         ConditionType::All => Condition::all(),
         ConditionType::Any => Condition::any(),
     };
 
     condition = condition.add(join_tbl_on_condition(
-        SharedIden::clone(&from_tbl),
-        SharedIden::clone(&to_tbl),
+        Name::clone(&from_tbl),
+        Name::clone(&to_tbl),
         rel.columns,
     ));
     if let Some(f) = rel.on_condition.take() {
@@ -1100,16 +1098,12 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
 }
 
 // [spec:pgorm:sem:query.build.join+3]
-fn join_tbl_on_condition(
-    from_tbl: SharedIden,
-    to_tbl: SharedIden,
-    columns: ColumnPairs,
-) -> Condition {
+fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> Condition {
     let mut cond = Condition::all();
     for (owner_key, foreign_key) in columns {
         cond = cond.add(
-            Expr::col((SharedIden::clone(&from_tbl), owner_key))
-                .equals((SharedIden::clone(&to_tbl), foreign_key)),
+            Expr::col((Name::clone(&from_tbl), owner_key))
+                .equals((Name::clone(&to_tbl), foreign_key)),
         );
     }
     cond
@@ -1124,8 +1118,6 @@ pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName 
         FromItem::Table(table) => table.name.clone(),
         FromItem::SubQuery(_, alias)
         | FromItem::ValuesList(_, alias)
-        | FromItem::FunctionCall(_, alias) => {
-            pgorm_query::TableName::Table(SharedIden::clone(alias))
-        }
+        | FromItem::FunctionCall(_, alias) => pgorm_query::TableName::Table(Name::clone(alias)),
     }
 }

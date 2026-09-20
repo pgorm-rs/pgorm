@@ -2,11 +2,11 @@
 
 #![allow(dead_code)]
 
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 use pgorm_query_attr::enum_def;
 use std::collections::HashSet;
 
-/// Defaults: empty prefix, `Iden` suffix, table name = snake_case struct name.
+/// Defaults: empty prefix, `SqlName` suffix, table name = snake_case struct name.
 #[enum_def]
 pub struct Hello {
     pub name: String,
@@ -30,13 +30,13 @@ pub struct Renamed {
     pub name: String,
 }
 
-/// `crate_name` rewrites the path of the `Iden` trait in the generated impl.
+/// `crate_name` rewrites the path of the `SqlName` trait in the generated impl.
 #[enum_def(crate_name = "pgorm_query")]
 pub struct Crated {
     pub name: String,
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    the input is re-emitted, plus a `{Struct}Iden` enum
+// [spec:pgorm:sem:macros.derive.enum-def/test]    the input is re-emitted, plus a `{Struct}SqlName` enum
 #[test]
 fn the_struct_survives_and_gains_an_iden_enum() {
     // The annotated struct is re-emitted unchanged.
@@ -48,26 +48,26 @@ fn the_struct_survives_and_gains_an_iden_enum() {
     assert_eq!(hello.other_field, 7);
 
     // One `Table` variant plus one PascalCase variant per field.
-    let variants = [HelloIden::Table, HelloIden::Name, HelloIden::OtherField];
+    let variants = [HelloName::Table, HelloName::Name, HelloName::OtherField];
     assert_eq!(variants.len(), 3);
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    what `Iden::unquoted` writes
+// [spec:pgorm:sem:macros.derive.enum-def/test]    what `SqlName::unquoted` writes
 #[test]
 fn iden_renders_table_name_and_field_identifiers() {
     // `Table` defaults to the snake_case of the struct name...
-    assert_eq!(HelloIden::Table.to_string(), "hello");
+    assert_eq!(HelloName::Table.to_string(), "hello");
     // ...and each field variant renders the *original* field identifier, not
     // the PascalCase variant name.
-    assert_eq!(HelloIden::Name.to_string(), "name");
-    assert_eq!(HelloIden::OtherField.to_string(), "other_field");
+    assert_eq!(HelloName::Name.to_string(), "name");
+    assert_eq!(HelloName::OtherField.to_string(), "other_field");
 
     // `table_name` overrides the `Table` rendering only.
-    assert_eq!(RenamedIden::Table.to_string(), "hello_table");
-    assert_eq!(RenamedIden::Name.to_string(), "name");
+    assert_eq!(RenamedName::Table.to_string(), "hello_table");
+    assert_eq!(RenamedName::Name.to_string(), "name");
 
     // `crate_name` only moves the trait path; behaviour is unchanged.
-    assert_eq!(CratedIden::Table.to_string(), "crated");
+    assert_eq!(CratedName::Table.to_string(), "crated");
 }
 
 // [spec:pgorm:sem:macros.derive.enum-def/test]    prefix / suffix control the generated enum's name
@@ -81,18 +81,18 @@ fn prefix_and_suffix_name_the_generated_enum() {
 #[test]
 fn the_generated_enum_derives_the_documented_set() {
     // Debug
-    assert_eq!(format!("{:?}", HelloIden::Name), "Name");
+    assert_eq!(format!("{:?}", HelloName::Name), "Name");
     // Copy + Clone
-    let a = HelloIden::Name;
+    let a = HelloName::Name;
     let b = a;
     #[allow(clippy::clone_on_copy)]
     let c = a.clone();
     // PartialEq + Eq
     assert_eq!(a, b);
     assert_eq!(a, c);
-    assert_ne!(a, HelloIden::Table);
+    assert_ne!(a, HelloName::Table);
     // Hash
-    let set: HashSet<HelloIden> = [HelloIden::Table, HelloIden::Name, HelloIden::Name]
+    let set: HashSet<HelloName> = [HelloName::Table, HelloName::Name, HelloName::Name]
         .into_iter()
         .collect();
     assert_eq!(set.len(), 2);

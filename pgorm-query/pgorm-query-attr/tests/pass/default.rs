@@ -6,5 +6,5 @@ pub struct Hello {
 }
 
 fn main() {
-    println!("{:?}", HelloIden::Name);
+    println!("{:?}", HelloName::Name);
 }

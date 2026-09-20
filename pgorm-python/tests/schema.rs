@@ -1,6 +1,6 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    Alias, ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoIden, StringLen, Table,
+    Alias, ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, StringLen, Table,
     TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
@@ -13,13 +13,13 @@ fn a(name: &str) -> Alias {
 
 fn programs() -> BTreeMap<&'static str, String> {
     let table = TableName::SchemaTable(
-        a("schema \"雪\"").into_iden(),
-        a("items \"雪\"").into_iden(),
+        a("schema \"雪\"").into_name(),
+        a("items \"雪\"").into_name(),
     );
     let kind = (a("schema \"雪\""), a("Mood \"雪\""));
     let column_type = ColumnType::Enum {
-        name: kind.1.clone().into_iden(),
-        schema: Some(kind.0.clone().into_iden()),
+        name: kind.1.clone().into_name(),
+        schema: Some(kind.0.clone().into_name()),
         variants: vec![],
     };
     let mut base = Table::create(table.clone());
@@ -95,7 +95,7 @@ fn programs() -> BTreeMap<&'static str, String> {
         (
             "index_gin",
             Index::create(table.clone(), a("moods"))
-                .index_type(IndexType::Named(a("gin").into_iden()))
+                .index_type(IndexType::Named(a("gin").into_name()))
                 .to_string(),
         ),
         (

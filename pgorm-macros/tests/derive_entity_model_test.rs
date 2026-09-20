@@ -544,12 +544,12 @@ fn primary_key_value_type_and_auto_increment() {
 // [spec:pgorm:sem:macros.derive.entity-model.primary-key+1/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
-    // `IdenStr` maps the variant to its snake_case name, or a `column_name`
-    // override; `Iden` delegates to it.
-    assert_eq!(pgorm::IdenStr::as_str(&single_pk::PrimaryKey::Id), "ID");
+    // `StaticName` maps the variant to its snake_case name, or a `column_name`
+    // override; `SqlName` delegates to it.
+    assert_eq!(pgorm::StaticName::as_str(&single_pk::PrimaryKey::Id), "ID");
     assert_eq!(single_pk::PrimaryKey::Id.to_string(), "ID");
     assert_eq!(
-        pgorm::IdenStr::as_str(&composite_pk::PrimaryKey::CakeId),
+        pgorm::StaticName::as_str(&composite_pk::PrimaryKey::CakeId),
         "cake_id"
     );
 
@@ -568,7 +568,7 @@ fn derive_primary_key_emits_iden_and_mapping() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityTrait associated types and the Iden pair
+// [spec:pgorm:sem:macros.derive.entity+1/test]    EntityTrait associated types and the SqlName pair
 #[test]
 fn derive_entity_wires_up_the_entity_trait() {
     // The five associated types default to the conventional names.
@@ -591,8 +591,8 @@ fn derive_entity_wires_up_the_entity_trait() {
     fn assert_relation<E: EntityTrait<Relation = filling::Relation>>() {}
     assert_relation::<filling::Entity>();
 
-    // `Iden` and `IdenStr` both render `EntityName::table_name`.
-    assert_eq!(pgorm::IdenStr::as_str(&filling::Entity), "filling");
+    // `SqlName` and `StaticName` both render `EntityName::table_name`.
+    assert_eq!(pgorm::StaticName::as_str(&filling::Entity), "filling");
     assert_eq!(filling::Entity.to_string(), "filling");
 }
 

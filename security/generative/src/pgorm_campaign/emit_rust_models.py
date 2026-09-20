@@ -377,7 +377,7 @@ class ModelEmitter:
             if logical not in fields:
                 raise UnsupportedInstruction("unknown runtime model field")
             column = (
-                f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(fields[logical])}))"
+                f"{Q}::IntoName::into_name({Q}::Alias::new({literal(fields[logical])}))"
             )
             items.append(
                 (
@@ -395,7 +395,7 @@ class ModelEmitter:
                 if d["name"] not in fields:
                     raise UnsupportedInstruction("unknown runtime model field")
                 table = self.nodes[i["model"]]["inputs"]["table"]
-                column = f"{Q}::IntoIden::into_iden({Q}::Alias::new({literal(fields[d['name']])}))"
+                column = f"{Q}::IntoName::into_name({Q}::Alias::new({literal(fields[d['name']])}))"
                 reference = self.table_column(table, column)
                 return f"{Q}::SimpleExpr::from({Q}::Expr::col({reference}))"
             case "model.select":

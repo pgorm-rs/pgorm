@@ -106,7 +106,7 @@ pub fn expand_derive_column(ident: &Ident, data: &Data) -> syn::Result<TokenStre
         #impl_iden
 
         #[automatically_derived]
-        impl pgorm::IdenStr for #ident {
+        impl pgorm::StaticName for #ident {
             fn as_str(&self) -> &str {
                 self.default_as_str()
             }
@@ -126,9 +126,9 @@ pub fn expand_derive_custom_column(ident: &Ident, data: &Data) -> syn::Result<To
         #impl_col_from_str
 
         #[automatically_derived]
-        impl pgorm::Iden for #ident {
+        impl pgorm::SqlName for #ident {
             fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-                write!(s, "{}", pgorm::IdenStr::as_str(self)).unwrap();
+                write!(s, "{}", pgorm::StaticName::as_str(self)).unwrap();
             }
         }
     ))

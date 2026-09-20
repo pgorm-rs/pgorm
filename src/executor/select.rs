@@ -72,7 +72,7 @@ pub trait SelectorTrait {
 pub struct SelectGetableValue<T, C>
 where
     T: TryGetableMany,
-    C: strum::IntoEnumIterator + pgorm_query::Iden,
+    C: strum::IntoEnumIterator + pgorm_query::SqlName,
 {
     columns: PhantomData<C>,
     model: PhantomData<T>,
@@ -99,7 +99,7 @@ where
 impl<T, C> SelectorTrait for SelectGetableValue<T, C>
 where
     T: TryGetableMany,
-    C: strum::IntoEnumIterator + pgorm_query::Iden,
+    C: strum::IntoEnumIterator + pgorm_query::SqlName,
 {
     type Item = T;
 
@@ -308,7 +308,7 @@ where
     pub fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         Selector::<SelectGetableValue<T, C>>::with_columns(self.query)
     }
@@ -457,7 +457,7 @@ where
     pub fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         Selector::<SelectGetableValue<T, C>>::with_columns(self.query)
     }
@@ -493,7 +493,7 @@ where
     pub fn with_columns<T, C>(query: SelectStatement) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         Selector {
             query,
@@ -632,7 +632,7 @@ where
     /// Decode a raw statement's rows into a tuple by column index.
     ///
     /// The ordinal counterpart of [`with_columns`](SelectorRaw::with_columns),
-    /// which needs an `Iden` enum to name the columns — an enum a caller who
+    /// which needs an `SqlName` enum to name the columns — an enum a caller who
     /// already holds the SQL text usually does not have.
     ///
     /// ```no_run
@@ -669,7 +669,7 @@ where
     pub fn with_columns<T, C>(stmt: String, values: Values) -> SelectorRaw<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         SelectorRaw {
             stmt,

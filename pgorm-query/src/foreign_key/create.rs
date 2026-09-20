@@ -110,9 +110,9 @@ impl ForeignKeyCreateStatement {
     pub fn new<T, C, R, S>(table: T, column: C, ref_table: R, ref_column: S) -> Self
     where
         T: IntoTableName,
-        C: IntoIden,
+        C: IntoName,
         R: IntoTableName,
-        S: IntoIden,
+        S: IntoName,
     {
         Self {
             foreign_key: TableForeignKey::new(table, column, ref_table, ref_column),
@@ -122,7 +122,7 @@ impl ForeignKeyCreateStatement {
     /// Set foreign key name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.foreign_key.name(name);
         self
@@ -132,8 +132,8 @@ impl ForeignKeyCreateStatement {
     /// key requires
     pub fn col<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
     where
-        C: IntoIden,
-        S: IntoIden,
+        C: IntoName,
+        S: IntoName,
     {
         self.foreign_key.col(column, ref_column);
         self

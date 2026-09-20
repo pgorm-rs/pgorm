@@ -52,11 +52,11 @@ pub trait DecodeSelect {
     where
         T: TryGetableMany;
 
-    /// Decode each row into a tuple, by the column names of an `Iden` enum.
+    /// Decode each row into a tuple, by the column names of an `SqlName` enum.
     fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden;
+        C: strum::IntoEnumIterator + pgorm_query::SqlName;
 }
 
 // [spec:pgorm:sem:exec.crud.selector-entry+1]    statement-first entry
@@ -78,7 +78,7 @@ impl DecodeSelect for SelectStatement {
     fn into_values<T, C>(self) -> Selector<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         Selector::<SelectGetableValue<T, C>>::with_columns::<T, C>(self)
     }
@@ -116,11 +116,11 @@ pub trait DecodeRaw {
     where
         T: TryGetableMany;
 
-    /// Decode each row into a tuple, by the column names of an `Iden` enum.
+    /// Decode each row into a tuple, by the column names of an `SqlName` enum.
     fn into_values<T, C>(self) -> SelectorRaw<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden;
+        C: strum::IntoEnumIterator + pgorm_query::SqlName;
 }
 
 // [spec:pgorm:sem:exec.crud.selector-entry+1]    raw-statement entry, over any spelling of the SQL
@@ -145,7 +145,7 @@ where
     fn into_values<T, C>(self) -> SelectorRaw<SelectGetableValue<T, C>>
     where
         T: TryGetableMany,
-        C: strum::IntoEnumIterator + pgorm_query::Iden,
+        C: strum::IntoEnumIterator + pgorm_query::SqlName,
     {
         SelectorRaw::<SelectGetableValue<T, C>>::with_columns::<T, C>(self.0.into(), self.1)
     }

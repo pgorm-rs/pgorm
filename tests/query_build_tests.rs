@@ -11,7 +11,7 @@
 
 use pgorm::alias;
 use pgorm::pgorm_query::{
-    Asterisk, ConditionType, DeleteStatement, Expr, Func, InsertStatement, IntoCondition, IntoIden,
+    Asterisk, ConditionType, DeleteStatement, Expr, Func, InsertStatement, IntoCondition, IntoName,
     LockBehavior, LockType, NullOrdering, OnConflict, QueryBuilder, SelectStatement, SimpleExpr,
     UpdateStatement, Value, Values,
 };
@@ -21,9 +21,9 @@ use pgorm::tests_cfg::{
     lunch_set, vendor,
 };
 use pgorm::{
-    ActiveValue, ColumnTrait, Condition, Delete, DeleteMany, DeleteOne, EntityTrait, Error,
-    IdenStr, Insert, IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, TryInsert, Update,
+    ActiveValue, ColumnTrait, Condition, Delete, DeleteMany, DeleteOne, EntityTrait, Error, Insert,
+    IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Related, RelationTrait, Select, StaticName, TryInsert, Update,
     UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
@@ -719,7 +719,7 @@ fn join_direction_and_alias_choice() {
         .join(" ")
     );
 
-    // A composite `Identity` becomes one equality per zipped column pair.
+    // A composite `Key` becomes one equality per zipped column pair.
     assert_eq!(
         cake_filling::Entity::find()
             .join(
@@ -1356,13 +1356,13 @@ fn delete_many_is_unconstrained_until_filtered() {
 
 // [spec:pgorm:sem:query.build.alias+1/test]    one token binding serves the
 // aliasing position and every reference to the name it introduced, across the
-// `IntoIdentity`, `IntoIden` and `IntoColumnRef` conversions alike
+// `IntoKey`, `IntoName` and `IntoColumnRef` conversions alike
 #[test]
 fn alias_token_declares_and_references_one_name() {
     let n = alias("n");
 
-    // `column_as` takes the token through `IntoIdentity`, which keys on
-    // `IdenStr`; `having` / `order_by_asc` take it through `IntoColumnRef`.
+    // `column_as` takes the token through `IntoKey`, which keys on
+    // `StaticName`; `having` / `order_by_asc` take it through `IntoColumnRef`.
     assert_eq!(
         cake::Entity::find()
             .select_only()

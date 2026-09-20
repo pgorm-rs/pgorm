@@ -6,7 +6,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableName>,
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
     pub(crate) types: Option<ColumnType>,
     pub(crate) spec: Vec<ColumnSpec>,
 }
@@ -80,9 +80,9 @@ pub enum ColumnType {
     /// hostile catalogue name becomes a name PostgreSQL refuses, never SQL.
     Named(TypeName),
     Enum {
-        name: DynIden,
-        schema: Option<DynIden>,
-        variants: Vec<DynIden>,
+        name: Name,
+        schema: Option<Name>,
+        variants: Vec<Name>,
     },
     Array(Arc<ColumnType>),
     Vector(Option<u32>),
@@ -290,11 +290,11 @@ impl ColumnDef {
     /// Construct a table column
     pub fn new<T>(name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
             table: None,
-            name: name.into_iden(),
+            name: name.into_name(),
             types: None,
             spec: Vec::new(),
         }
@@ -303,11 +303,11 @@ impl ColumnDef {
     /// Construct a table column with column type
     pub fn new_with_type<T>(name: T, types: ColumnType) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
             table: None,
-            name: name.into_iden(),
+            name: name.into_name(),
             types: Some(types),
             spec: Vec::new(),
         }
@@ -590,14 +590,14 @@ impl ColumnDef {
     /// Set column type as enum.
     pub fn enumeration<N, S, V>(&mut self, name: N, variants: V) -> &mut Self
     where
-        N: IntoIden,
-        S: IntoIden,
+        N: IntoName,
+        S: IntoName,
         V: IntoIterator<Item = S>,
     {
         self.types = Some(ColumnType::Enum {
-            name: name.into_iden(),
+            name: name.into_name(),
             schema: None,
-            variants: variants.into_iter().map(IntoIden::into_iden).collect(),
+            variants: variants.into_iter().map(IntoName::into_name).collect(),
         });
         self
     }

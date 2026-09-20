@@ -1,7 +1,7 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Copy, Clone, Iden, EnumIter)]
+#[derive(Copy, Clone, SqlName, EnumIter)]
 enum Asset {
     Table,
     Id,
@@ -12,14 +12,14 @@ enum Asset {
     },
 }
 
-#[derive(Copy, Clone, Iden)]
+#[derive(Copy, Clone, SqlName)]
 enum FirstLevel {
     LevelOne,
     #[iden(flatten)]
     Second(SecondLevel),
 }
 
-#[derive(Copy, Clone, Iden, EnumIter)]
+#[derive(Copy, Clone, SqlName, EnumIter)]
 enum SecondLevel {
     LevelTwo,
     #[iden(flatten)]
@@ -27,7 +27,7 @@ enum SecondLevel {
     UserId,
 }
 
-#[derive(Copy, Clone, Iden, Default)]
+#[derive(Copy, Clone, SqlName, Default)]
 struct LevelThree;
 
 impl Default for FirstLevel {

@@ -60,9 +60,9 @@ pub use schema::*;
 #[cfg(feature = "macros")]
 pub use pgorm_macros::{
     DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
-    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIden,
-    DeriveIntoActiveModel, DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey,
-    DeriveRelation, DeriveValueType, FromJsonQueryResult, FromQueryResult,
+    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIntoActiveModel,
+    DeriveMigrationName, DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelation,
+    DeriveSqlName, DeriveValueType, FromJsonQueryResult, FromQueryResult,
 };
 #[cfg(feature = "macros")]
 pub use tokio_postgres::row::RowIndex;
@@ -124,7 +124,7 @@ pub use pgorm_sql_macro::sql;
 pub use pgorm_sql_macro::prql;
 
 pub use pgorm_query;
-pub use pgorm_query::{AliasName, Iden, Values, alias};
+pub use pgorm_query::{AliasName, SqlName, Values, alias};
 
 pub use pgorm_macros::EnumIter;
 pub use strum;

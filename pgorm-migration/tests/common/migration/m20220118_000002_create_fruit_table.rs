@@ -29,7 +29,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-#[derive(DeriveIden)]
+#[derive(DeriveSqlName)]
 pub enum Fruit {
     Table,
     Id,

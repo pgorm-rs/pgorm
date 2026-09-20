@@ -5,8 +5,8 @@
 #![allow(dead_code)]
 
 use pgorm::entity::prelude::*;
-use pgorm::pgorm_query::{Alias, ConditionType, SharedIden};
-use pgorm::{Iden, Identity, RelationType};
+use pgorm::pgorm_query::{Alias, ConditionType, Name};
+use pgorm::{Key, RelationType, SqlName};
 
 mod cake {
     use pgorm::entity::prelude::*;
@@ -107,8 +107,8 @@ mod entity_override {
     }
 }
 
-fn cols(id: &Identity) -> Vec<String> {
-    id.iter().map(|i| Iden::to_string(&**i)).collect()
+fn cols(id: &Key) -> Vec<String> {
+    id.iter().map(|i| SqlName::to_string(&**i)).collect()
 }
 
 // [spec:pgorm:syn:macros.derive.relation+1/test]    belongs_to + the mandatory from/to
@@ -121,11 +121,8 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     assert!(!def.is_owner);
     assert_eq!(def.from_tbl, fruit::Entity.table_ref().into());
     assert_eq!(def.to_tbl, cake::Entity.table_ref().into());
-    assert_eq!(
-        cols(&def.columns.from_identity()),
-        vec!["cake_id".to_owned()]
-    );
-    assert_eq!(cols(&def.columns.to_identity()), vec!["id".to_owned()]);
+    assert_eq!(cols(&def.columns.from_key()), vec!["cake_id".to_owned()]);
+    assert_eq!(cols(&def.columns.to_key()), vec!["id".to_owned()]);
 
     // Everything optional is left alone.
     assert!(def.on_update.is_none());
@@ -147,12 +144,9 @@ fn optional_keys_chain_onto_the_relation_builder() {
     assert_eq!(def.condition_type, ConditionType::Any);
 
     // `on_condition` is wrapped in an `IntoCondition` closure taking the two
-    // join-side idens.
+    // join-side names.
     let on_condition = def.on_condition.expect("on_condition should be set");
-    let condition = on_condition(
-        SharedIden::new(Alias::new("l")),
-        SharedIden::new(Alias::new("r")),
-    );
+    let condition = on_condition(Name::new(Alias::new("l")), Name::new(Alias::new("r")));
     assert_eq!(
         condition,
         pgorm::pgorm_query::IntoCondition::into_condition(pgorm::pgorm_query::Expr::val(1).eq(1))
@@ -168,18 +162,15 @@ fn has_many_and_has_one_reverse_the_target() {
     // Reversed: the def reads from cake to fruit.
     assert_eq!(many.from_tbl, cake::Entity.table_ref().into());
     assert_eq!(many.to_tbl, fruit::Entity.table_ref().into());
-    assert_eq!(cols(&many.columns.from_identity()), vec!["id".to_owned()]);
-    assert_eq!(
-        cols(&many.columns.to_identity()),
-        vec!["cake_id".to_owned()]
-    );
+    assert_eq!(cols(&many.columns.from_key()), vec!["id".to_owned()]);
+    assert_eq!(cols(&many.columns.to_key()), vec!["cake_id".to_owned()]);
 
     let one = cake::Relation::TopFruit.def();
     assert_eq!(one.rel_type, RelationType::HasOne);
     assert!(one.is_owner);
     // Explicit `from` / `to` are accepted here too and override the reversal.
-    assert_eq!(cols(&one.columns.from_identity()), vec!["id".to_owned()]);
-    assert_eq!(cols(&one.columns.to_identity()), vec!["cake_id".to_owned()]);
+    assert_eq!(cols(&one.columns.from_key()), vec!["id".to_owned()]);
+    assert_eq!(cols(&one.columns.to_key()), vec!["cake_id".to_owned()]);
 }
 
 // [spec:pgorm:syn:macros.derive.relation+1/test]    container-level entity override

@@ -3,7 +3,7 @@
 use super::sources::Named;
 use std::ops::RangeInclusive;
 
-use pgorm_query::{Alias, AliasName, Iden, Value};
+use pgorm_query::{Alias, AliasName, SqlName, Value};
 
 use crate::EntityTrait;
 
@@ -355,7 +355,7 @@ impl IntoSource for AliasName {
 // [spec:pgorm:sem:pipeline.qualify+2]
 impl IntoSource for Alias {
     fn into_source(self) -> Source {
-        table_source(adapter::ident(&Iden::to_string(&self)))
+        table_source(adapter::ident(&SqlName::to_string(&self)))
     }
 }
 
@@ -460,8 +460,11 @@ impl Pipeline {
 
     /// Start a pipeline from a schema-qualified table no entity describes.
     // [spec:pgorm:sem:pipeline.qualify+2]
-    pub fn from_schema(schema: impl Iden, table: impl Iden) -> Self {
-        let source = adapter::ident_in(vec![Iden::to_string(&schema)], Iden::to_string(&table));
+    pub fn from_schema(schema: impl SqlName, table: impl SqlName) -> Self {
+        let source = adapter::ident_in(
+            vec![SqlName::to_string(&schema)],
+            SqlName::to_string(&table),
+        );
         Pipeline {
             bindings: Vec::new(),
             stages: vec![adapter::call("from", vec![source])],

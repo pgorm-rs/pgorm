@@ -6,8 +6,9 @@ use std::{marker::PhantomData, sync::Arc};
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{Expr, SimpleExpr, Value, Values};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error, IdenStr,
+    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error,
     IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    StaticName,
 };
 
 use super::{backend::*, metadata::EntityInfo};

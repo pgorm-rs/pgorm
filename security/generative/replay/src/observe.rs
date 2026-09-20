@@ -8,8 +8,8 @@
 
 use std::collections::HashSet;
 
-use pgorm::pgorm_query::{ArrayType, ColumnType, DynIden, Iden, Value};
-use pgorm::{ColumnTrait, EntityTrait, IdenStr, Iterable, ModelTrait};
+use pgorm::pgorm_query::{ArrayType, ColumnType, Name, SqlName, Value};
+use pgorm::{ColumnTrait, EntityTrait, Iterable, ModelTrait, StaticName};
 use serde_json::{Value as Json, json};
 use tokio_postgres::Row;
 
@@ -118,7 +118,7 @@ where
         let definition = ColumnTrait::def(&column);
         let tagged = declared(definition.get_column_type(), ModelTrait::get(value, column))?;
         fields.push(json!({
-            "name": IdenStr::as_str(&column),
+            "name": StaticName::as_str(&column),
             "value": tagged.encode_checked()?,
         }));
     }
@@ -163,8 +163,8 @@ fn declared(kind: &ColumnType, value: Value) -> Result<Tagged, FormatError> {
 }
 
 fn enumerated(
-    name: &DynIden,
-    schema: Option<&DynIden>,
+    name: &Name,
+    schema: Option<&Name>,
     value: Value,
     array: bool,
 ) -> Result<Tagged, FormatError> {
@@ -178,9 +178,9 @@ fn enumerated(
             "compiled enum column returned an incompatible Rust value",
         ));
     }
-    let identity = TypeName::new(Iden::to_string(&**name));
+    let identity = TypeName::new(SqlName::to_string(&**name));
     let identity = match schema {
-        Some(schema) => identity.in_schema(Iden::to_string(&**schema)),
+        Some(schema) => identity.in_schema(SqlName::to_string(&**schema)),
         None => identity,
     };
     Ok(Tagged::from_enum(value, identity, array))

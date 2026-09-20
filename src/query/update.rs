@@ -3,7 +3,7 @@ use crate::{
     QueryFilter, QueryTrait,
 };
 use core::marker::PhantomData;
-use pgorm_query::{Expr, IntoIden, SimpleExpr, UpdateStatement};
+use pgorm_query::{Expr, IntoName, SimpleExpr, UpdateStatement};
 
 /// Defines a structure to perform UPDATE query operations on a ActiveModel
 #[derive(Clone, Debug)]
@@ -222,7 +222,7 @@ where
     /// Creates a [SimpleExpr] from a column
     pub fn col_expr<T>(mut self, col: T, expr: SimpleExpr) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.query.value(col, expr);
         self

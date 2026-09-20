@@ -7903,6 +7903,13 @@ children (
                         kind @decision
                         text "\"Identity\" is triple-booked: the Iden family names SQL identifiers; pgorm's Identity (src/entity/identity.rs:12) is a key-column set — which also impl Iden by concatenating its members with no separator (:69-75), the multi-part-name bug — and PostgreSQL's own identity columns are the one meaning the codebase can't express. The Iden root is inherited: trait Iden dates to the import commit 5c602d13, and SharedIden is sea-query's SeaRc de-branded (f57ae221) — the fork stripped the vendor name but kept both the implementation-leaking \"Shared\" and the non-word root, then also kept DynIden as a second name for the same type (types.rs:48). Meanwhile every type this fork designed already says Name: TableName/FromItem (99b969d7), NamedTable (f2d2d609), AliasName (97b703da). Decided, ratified 2026-09-20 — finish that migration: SharedIden/DynIden -> Name (one type, Arc inside is private); trait Iden -> SqlName, mirroring pgorm's existing SqlText convention; IntoIden -> IntoName; IdenStatic + pgorm's reinvented IdenStr -> one StaticName; Alias::new(x) -> Name::runtime(x), killing the Alias/alias lookalike and reusing the fork's established \"runtime\" marker (named_runtime, as_runtime) so every untrusted-data entry into identifier position becomes greppable; pgorm's Identity -> Key, freeing the word for query-identity-columns."
                     }
+
+                    {
+                        at 2026-09-20T13:45:39.069215Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

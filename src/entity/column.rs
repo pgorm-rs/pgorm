@@ -1,7 +1,6 @@
-use crate::{EntityName, Iden, IdenStr, IntoSimpleExpr, Iterable};
+use crate::{EntityName, IntoSimpleExpr, Iterable, SqlName, StaticName};
 use pgorm_query::{
-    BinOper, DynIden, Expr, Func, IntoColumnRef, SelectStatement, SharedIden, SimpleExpr, Value,
-    ValueType,
+    BinOper, Expr, Func, IntoColumnRef, Name, SelectStatement, SimpleExpr, Value, ValueType,
 };
 use std::str::FromStr;
 
@@ -95,7 +94,7 @@ use column_def::{enum_type_name, escape_like_text};
 // LINT: when the operand value does not match column type
 /// API for working with a `Column`. Mostly a wrapper of the identically named methods in [`pgorm_query::Expr`]
 // [spec:pgorm:def:entity.traits.column+5]
-pub trait ColumnTrait: IdenStr + Iterable + FromStr {
+pub trait ColumnTrait: StaticName + Iterable + FromStr {
     #[allow(missing_docs)]
     type EntityName: EntityName;
 
@@ -103,13 +102,13 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
     fn def(&self) -> ColumnDef;
 
     /// Get the name of the entity the column belongs to
-    fn entity_name(&self) -> DynIden {
-        SharedIden::new(Self::EntityName::default()) as DynIden
+    fn entity_name(&self) -> Name {
+        Name::new(Self::EntityName::default())
     }
 
     /// get the name of the entity the column belongs to
-    fn as_column_ref(&self) -> (DynIden, DynIden) {
-        (self.entity_name(), SharedIden::new(*self) as DynIden)
+    fn as_column_ref(&self) -> (Name, Name) {
+        (self.entity_name(), Name::new(*self))
     }
 
     /// The key this column occupies in a JSON object, as `serde` names it.
@@ -504,7 +503,7 @@ pub trait ColumnTrait: IdenStr + Iterable + FromStr {
 /// form is the same name under [`pgorm_query::TypeName::array`].
 struct Text;
 
-impl Iden for Text {
+impl SqlName for Text {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "text").expect("write to sql sink");
     }
@@ -678,7 +677,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_1() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod hello {
             use crate as pgorm;
@@ -710,7 +709,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_2() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod hello {
             use crate as pgorm;
@@ -783,7 +782,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn enum_name_1() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod hello {
             use crate as pgorm;
@@ -815,7 +814,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn enum_name_2() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod hello {
             use crate as pgorm;
@@ -888,7 +887,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_1() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         #[allow(clippy::enum_variant_names)]
         mod hello {
@@ -922,7 +921,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_2() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod hello {
             use crate as pgorm;
@@ -1000,7 +999,7 @@ mod tests {
     #[test]
     #[cfg(feature = "macros")]
     fn column_name_enum_name_3() {
-        use pgorm_query::Iden;
+        use pgorm_query::SqlName;
 
         mod my_entity {
             use crate as pgorm;

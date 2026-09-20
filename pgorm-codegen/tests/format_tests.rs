@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use pgorm_codegen::WithSerde;
-use pgorm_query::{Alias, ColumnDef, ColumnType, IntoIden, StringLen, Table};
+use pgorm_query::{Alias, ColumnDef, ColumnType, IntoName, StringLen, Table};
 
 // [spec:pgorm:def:codegen.entity.compact+1/test]    the compact format emits
 // imports, Model, Relation, the Related impls and ActiveModelBehavior, in order
@@ -487,8 +487,8 @@ fn import_block_matches_the_with_serde_variant() {
 fn entity_imports_each_enum_once_in_first_use() {
     let alpha = || ColumnType::Enum {
         schema: None,
-        name: Alias::new("alpha").into_iden(),
-        variants: vec![Alias::new("one").into_iden()],
+        name: Alias::new("alpha").into_name(),
+        variants: vec![Alias::new("one").into_name()],
     };
 
     let generated = generate(

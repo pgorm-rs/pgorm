@@ -1,11 +1,11 @@
 use crate::{
-    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Identity, ModelTrait, QueryFilter,
+    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Key, ModelTrait, QueryFilter,
     QueryTrait, Related, RelationDef, RelationType, Req, Select, SelectGraph, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{
-    AliasName, ColumnRef, DynIden, Expr, FromItem, IntoColumnRef, NamedTable, SharedIden,
-    SimpleExpr, TableName, ValueTuple, alias,
+    AliasName, ColumnRef, Expr, FromItem, IntoColumnRef, Name, NamedTable, SimpleExpr, TableName,
+    ValueTuple, alias,
 };
 use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
@@ -203,7 +203,7 @@ where
 
         // The source side of the via relation: the columns the input models
         // are keyed by, and the columns the junction points back at.
-        let via_from_col = via_rel.columns.from_identity();
+        let via_from_col = via_rel.columns.from_key();
 
         let keys: Vec<ValueTuple> = self
             .iter()
@@ -232,8 +232,8 @@ const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
 
 /// The identifier the input entity's table is bound to inside a loader read.
 // [spec:pgorm:sem:query.loader.batching+6]
-fn source_alias() -> DynIden {
-    SharedIden::new(LOADER_SOURCE_ALIAS)
+fn source_alias() -> Name {
+    Name::new(LOADER_SOURCE_ALIAS)
 }
 
 /// The read every loader operation issues, minus its terminal: the caller's
@@ -265,7 +265,7 @@ where
 async fn collect_buckets<R, F, C>(
     graph: SelectGraph<R, (Req<F>,)>,
     keys: Vec<ValueTuple>,
-    from_col: &Identity,
+    from_col: &Key,
     db: &C,
 ) -> Result<Vec<Vec<R::Model>>, Error>
 where
@@ -315,7 +315,7 @@ where
 {
     check_target_ref(&rel_def)?;
 
-    let from_col = rel_def.columns.from_identity();
+    let from_col = rel_def.columns.from_key();
     let keys: Vec<ValueTuple> = models
         .iter()
         .map(|model: &M| extract_key(&from_col, model))
@@ -345,11 +345,11 @@ fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
         qualifiers: Vec::new(),
         marker: PhantomData,
     };
-    graph.project::<R>(SharedIden::new(R::default()));
+    graph.project::<R>(Name::new(R::default()));
     graph
 }
 
-fn identity_columns(identity: &Identity) -> String {
+fn key_columns(identity: &Key) -> String {
     identity
         .clone()
         .into_iter()
@@ -359,7 +359,7 @@ fn identity_columns(identity: &Identity) -> String {
 }
 
 // [spec:pgorm:sem:query.loader.regroup+4]
-fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Identity) -> Error {
+fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Key) -> Error {
     let sample = match input_keys.first() {
         Some(sample) => format!("{sample:?}"),
         None => "none".to_owned(),
@@ -369,7 +369,7 @@ fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Ide
          none of the keys read from the input models (an input key reads as {sample}). The \
          stored row and the input model match in SQL but not as Rust values; check for a width, \
          padding or collation difference between them.",
-        from = identity_columns(from_col),
+        from = key_columns(from_col),
     ))
 }
 
@@ -383,14 +383,14 @@ fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Ide
 /// on the terms [`table_column`] states rather than rendered.
 // [spec:pgorm:req:query.loader.table-ref-limitation+3]
 fn check_target_ref(rel: &RelationDef) -> Result<(), Error> {
-    for col in rel.columns.to_identity().iter() {
+    for col in rel.columns.to_key().iter() {
         table_column(&rel.to_tbl, col)?;
     }
     Ok(())
 }
 
 // [spec:pgorm:sem:query.loader.batching+6]
-fn resolve_column<Model>(col: &DynIden) -> Result<<Model::Entity as EntityTrait>::Column, Error>
+fn resolve_column<Model>(col: &Name) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
 {
@@ -405,7 +405,7 @@ where
 }
 
 // [spec:pgorm:sem:query.loader.batching+6]
-fn extract_key<Model>(target_col: &Identity, model: &Model) -> Result<ValueTuple, Error>
+fn extract_key<Model>(target_col: &Key, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
 {
@@ -417,11 +417,7 @@ where
 }
 
 // [spec:pgorm:sem:query.loader.batching+6]
-fn prepare_condition(
-    table: &FromItem,
-    col: &Identity,
-    keys: &[ValueTuple],
-) -> Result<Condition, Error> {
+fn prepare_condition(table: &FromItem, col: &Key, keys: &[ValueTuple]) -> Result<Condition, Error> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
     let mut columns = Vec::with_capacity(col.arity());
@@ -438,7 +434,7 @@ fn prepare_condition(
 }
 
 // [spec:pgorm:req:query.loader.table-ref-limitation+3]
-fn table_column(tbl: &FromItem, col: &DynIden) -> Result<ColumnRef, Error> {
+fn table_column(tbl: &FromItem, col: &Name) -> Result<ColumnRef, Error> {
     match tbl.to_owned() {
         FromItem::Table(NamedTable {
             name: TableName::Table(tbl),
@@ -476,7 +472,7 @@ mod tests {
     #[track_caller]
     fn batch_sql<R: EntityTrait, F: EntityTrait>(
         graph: SelectGraph<R, (Req<F>,)>,
-        from_col: &Identity,
+        from_col: &Key,
     ) -> String {
         let src_tbl = FromItem::from(TableName::Table(source_alias()));
         let keys = vec![1i32.into_value_tuple(), 2i32.into_value_tuple()];
@@ -488,7 +484,7 @@ mod tests {
     /// The read a direct load of `cake -> fruit` issues, under the relation
     /// named by `rel`.
     fn direct_sql(rel: RelationDef) -> String {
-        let from_col = rel.columns.from_identity();
+        let from_col = rel.columns.from_key();
         let graph = join_source::<fruit::Entity, cake::Entity>(
             root_graph::<fruit::Entity>(fruit::Entity::find()),
             rel,
@@ -501,7 +497,7 @@ mod tests {
         let via_rel = <cake::Entity as Related<filling::Entity>>::via()
             .expect("cake is related to filling through a junction");
         let rel_def = <cake::Entity as Related<filling::Entity>>::to();
-        let via_from_col = via_rel.columns.from_identity();
+        let via_from_col = via_rel.columns.from_key();
 
         let graph = join_source::<filling::Entity, cake::Entity>(
             root_graph::<filling::Entity>(filling::Entity::find()).via(rel_def.rev()),

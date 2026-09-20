@@ -13,7 +13,7 @@ pub use common::*;
 pub use create::*;
 pub use drop::*;
 
-use crate::types::{IntoIden, IntoTableName};
+use crate::types::{IntoName, IntoTableName};
 
 /// Shorthand for constructing any index statement
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl Index {
     /// Construct index [`IndexDropStatement`] over the index it drops
     pub fn drop<T>(name: T) -> IndexDropStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
         IndexDropStatement::new(name)
     }

@@ -2,8 +2,8 @@ use crate::execution::Database;
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{ValueTuple, Values};
 use pgorm::{
-    EntityTrait, Error, GraphItem, GraphRow, IdenStr, Iterable, QueryFilter, QueryOrder,
-    QueryTrait, SelectGraph, SelectorTrait,
+    EntityTrait, Error, GraphItem, GraphRow, Iterable, QueryFilter, QueryOrder, QueryTrait,
+    SelectGraph, SelectorTrait, StaticName,
 };
 use std::{marker::PhantomData, sync::Arc};
 

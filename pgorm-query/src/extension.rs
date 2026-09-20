@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::{
-    DynIden, Iden, IntoIden, PgInterval, QueryBuilder, SqlWriter, SqlWriterValues, value::Values,
+    IntoName, Name, PgInterval, QueryBuilder, SqlName, SqlWriter, SqlWriterValues, value::Values,
 };
 
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
@@ -12,7 +12,7 @@ impl Extension {
     /// Creates a new [`ExtensionCreateStatement`] over the extension it creates
     pub fn create<T>(name: T) -> ExtensionCreateStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
         ExtensionCreateStatement::new(name)
     }
@@ -20,7 +20,7 @@ impl Extension {
     /// Creates a new [`ExtensionDropStatement`] over the extension it drops
     pub fn drop<T>(name: T) -> ExtensionDropStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
         ExtensionDropStatement::new(name)
     }
@@ -73,11 +73,11 @@ impl Extension {
 // [spec:pgorm:req:sql.ddl.extension+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionCreateStatement {
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
     /// The schema the extension's objects are created in — an identifier, the
     /// same type every other schema qualifier in the crate is, because that is
     /// what it renders as.
-    pub(crate) schema: Option<DynIden>,
+    pub(crate) schema: Option<Name>,
     /// The version, a string literal in the grammar and so genuinely text.
     pub(crate) version: Option<String>,
 
@@ -92,10 +92,10 @@ impl ExtensionCreateStatement {
     /// Construct a new statement over the extension it creates
     pub fn new<T>(name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
-            name: name.into_iden(),
+            name: name.into_name(),
             schema: None,
             version: None,
             if_not_exists: false,
@@ -108,8 +108,8 @@ impl ExtensionCreateStatement {
     /// The schema is a name and renders as a quoted identifier, so the bound
     /// is the identifier bound every other schema position takes.
     // [spec:pgorm:req:sql.render.ident-quoting+4]
-    pub fn schema<T: IntoIden>(&mut self, schema: T) -> &mut Self {
-        self.schema = Some(schema.into_iden());
+    pub fn schema<T: IntoName>(&mut self, schema: T) -> &mut Self {
+        self.schema = Some(schema.into_name());
         self
     }
 
@@ -170,7 +170,7 @@ impl ExtensionCreateStatement {
 // [spec:pgorm:req:sql.ddl.extension+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionDropStatement {
-    pub(crate) name: DynIden,
+    pub(crate) name: Name,
 
     /// Conditional to execute query based on existance of the extension.
     pub(crate) if_exists: bool,
@@ -194,10 +194,10 @@ impl ExtensionDropStatement {
     /// Construct a new statement over the extension it drops
     pub fn new<T>(name: T) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         Self {
-            name: name.into_iden(),
+            name: name.into_name(),
             if_exists: false,
             option: None,
         }
@@ -403,7 +403,7 @@ impl TryFrom<&str> for PgInterval {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PgLTree;
 
-impl Iden for PgLTree {
+impl SqlName for PgLTree {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
         write!(s, "ltree").unwrap();
     }
@@ -421,9 +421,9 @@ pub struct Type;
 
 #[derive(Clone, Debug)]
 pub enum TypeRef {
-    Type(DynIden),
-    SchemaType(DynIden, DynIden),
-    DatabaseSchemaType(DynIden, DynIden, DynIden),
+    Type(Name),
+    SchemaType(Name, Name),
+    DatabaseSchemaType(Name, Name, Name),
 }
 
 pub trait IntoTypeRef {
@@ -438,31 +438,31 @@ impl IntoTypeRef for TypeRef {
 
 impl<I> IntoTypeRef for I
 where
-    I: IntoIden,
+    I: IntoName,
 {
     fn into_type_ref(self) -> TypeRef {
-        TypeRef::Type(self.into_iden())
+        TypeRef::Type(self.into_name())
     }
 }
 
 impl<A, B> IntoTypeRef for (A, B)
 where
-    A: IntoIden,
-    B: IntoIden,
+    A: IntoName,
+    B: IntoName,
 {
     fn into_type_ref(self) -> TypeRef {
-        TypeRef::SchemaType(self.0.into_iden(), self.1.into_iden())
+        TypeRef::SchemaType(self.0.into_name(), self.1.into_name())
     }
 }
 
 impl<A, B, C> IntoTypeRef for (A, B, C)
 where
-    A: IntoIden,
-    B: IntoIden,
-    C: IntoIden,
+    A: IntoName,
+    B: IntoName,
+    C: IntoName,
 {
     fn into_type_ref(self) -> TypeRef {
-        TypeRef::DatabaseSchemaType(self.0.into_iden(), self.1.into_iden(), self.2.into_iden())
+        TypeRef::DatabaseSchemaType(self.0.into_name(), self.1.into_name(), self.2.into_name())
     }
 }
 
@@ -571,7 +571,7 @@ pub enum TypeDropOpt {
 #[derive(Debug, Clone)]
 pub enum TypeAlterOpt {
     Add(String, Option<TypeAlterAddOpt>),
-    Rename(DynIden),
+    Rename(Name),
     RenameValue(String, String),
 }
 
@@ -654,7 +654,7 @@ impl TypeCreateStatement {
     ///     Type,
     /// }
     ///
-    /// impl Iden for FontFamily {
+    /// impl SqlName for FontFamily {
     ///     fn unquoted(&self, s: &mut dyn Write) {
     ///         write!(s, "font_family").unwrap();
     ///     }
@@ -702,7 +702,7 @@ impl TypeDropStatement {
     ///
     /// struct FontFamily;
     ///
-    /// impl Iden for FontFamily {
+    /// impl SqlName for FontFamily {
     ///     fn unquoted(&self, s: &mut dyn Write) {
     ///         write!(s, "{}", "font_family").unwrap();
     ///     }
@@ -726,7 +726,7 @@ impl TypeDropStatement {
     /// ```
     /// use pgorm_query::{*, extension::Type};
     ///
-    /// #[derive(Iden)]
+    /// #[derive(SqlName)]
     /// enum KycStatus {
     ///     #[iden = "kyc_status"]
     ///     Type,
@@ -734,7 +734,7 @@ impl TypeDropStatement {
     ///     Approved,
     /// }
     ///
-    /// #[derive(Iden)]
+    /// #[derive(SqlName)]
     /// enum FontFamily {
     ///     #[iden = "font_family"]
     ///     Type,
@@ -743,9 +743,9 @@ impl TypeDropStatement {
     /// }
     ///
     /// assert_eq!(
-    ///     Type::drop(SharedIden::new(KycStatus::Type) as DynIden)
+    ///     Type::drop(Name::new(KycStatus::Type))
     ///         .if_exists()
-    ///         .names([SharedIden::new(FontFamily::Type) as DynIden])
+    ///         .names([Name::new(FontFamily::Type)])
     ///         .cascade()
     ///         .to_string(),
     ///     r#"DROP TYPE IF EXISTS "kyc_status", "font_family" CASCADE"#
@@ -815,7 +815,7 @@ impl PendingTypeAlter {
     ///     Type,
     /// }
     ///
-    /// impl Iden for FontFamily {
+    /// impl SqlName for FontFamily {
     ///     fn unquoted(&self, s: &mut dyn Write) {
     ///         write!(s, "font_family").unwrap();
     ///     }
@@ -842,9 +842,9 @@ impl PendingTypeAlter {
     /// identifier, so this keeps the identifier bound the label methods drop.
     pub fn rename_to<T>(self, name: T) -> TypeAlterStatement
     where
-        T: IntoIden,
+        T: IntoName,
     {
-        self.with(TypeAlterOpt::Rename(name.into_iden()))
+        self.with(TypeAlterOpt::Rename(name.into_name()))
     }
 
     /// Rename an enum value

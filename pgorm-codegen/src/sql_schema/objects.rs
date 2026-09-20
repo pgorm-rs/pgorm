@@ -146,9 +146,7 @@ fn index_type(access_method: &str) -> Option<IndexType> {
         "" | "btree" => None,
         "hash" => Some(IndexType::Hash),
         "gin" => Some(IndexType::Gin),
-        other => Some(IndexType::Named(pgorm_query::SharedIden::new(Alias::new(
-            other,
-        )))),
+        other => Some(IndexType::Named(pgorm_query::Name::new(Alias::new(other)))),
     }
 }
 

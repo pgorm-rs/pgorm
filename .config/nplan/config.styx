@@ -197,6 +197,15 @@ quality {
     // scaffold templates are starting shapes for downstream
     // crates, not code any structural gate can judge
     exempt-paths (pgorm-migration/template/**)
+    duplication {
+        // the entity derives are exercised by declaring a whole
+        // throwaway entity per case — model struct, empty Relation,
+        // ActiveModelBehavior — so sibling cases in one test module are
+        // near-identical by construction. Collapsing them into one
+        // parameterised fixture would hide the single attribute each
+        // case exists to vary
+        exempt-test-scope true
+    }
     test-footprint {
         // roll the test:prod ratio up per crate so tests/
         // counts toward src/ — the directory scope penalized

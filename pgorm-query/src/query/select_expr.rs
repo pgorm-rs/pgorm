@@ -5,7 +5,7 @@ use crate::{WindowStatement, expr::SimpleExpr, types::*};
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindowSelectType {
     /// Name in [`SelectStatement`][crate::SelectStatement]
-    Name(DynIden),
+    Name(Name),
     /// Inline query in [`SelectExpr`]
     Query(WindowStatement),
 }
@@ -22,7 +22,7 @@ pub enum WindowSelectType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectExpr {
     pub(crate) expr: SimpleExpr,
-    pub alias: Option<DynIden>,
+    pub alias: Option<Name>,
     pub(crate) window: Option<WindowSelectType>,
 }
 
@@ -45,11 +45,11 @@ impl SelectExpr {
     pub fn new_as<T, A>(expr: T, alias: A) -> Self
     where
         T: Into<SimpleExpr>,
-        A: IntoIden,
+        A: IntoName,
     {
         Self {
             expr: expr.into(),
-            alias: Some(alias.into_iden()),
+            alias: Some(alias.into_name()),
             window: None,
         }
     }

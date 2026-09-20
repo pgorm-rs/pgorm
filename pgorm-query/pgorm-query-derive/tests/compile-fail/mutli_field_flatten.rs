@@ -1,6 +1,6 @@
-use pgorm_query::Iden;
+use pgorm_query::SqlName;
 
-#[derive(Iden)]
+#[derive(SqlName)]
 enum Asset {
     Table,
     Id,
@@ -9,7 +9,7 @@ enum Asset {
     Creation(CreationInfo, CreationInfo),
 }
 
-#[derive(Iden)]
+#[derive(SqlName)]
 enum CreationInfo {
     UserId,
     #[iden = "creation_date"]

@@ -166,7 +166,7 @@ pub enum IndexType {
     Hash,
     /// An access method this enum has no variant for, named rather than
     /// spelled: the name renders quoted-or-safe-bare, never as SQL.
-    Named(DynIden),
+    Named(Name),
 }
 
 impl IndexCreateStatement {
@@ -197,7 +197,7 @@ impl IndexCreateStatement {
     /// Set index name
     pub fn name<T>(&mut self, name: T) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
     {
         self.index.name(name);
         self

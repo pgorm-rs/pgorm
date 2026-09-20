@@ -3,8 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Iden, Index,
-    IndexCreateStatement, TableCreateStatement,
+    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Index, IndexCreateStatement,
+    SqlName, TableCreateStatement,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -54,7 +54,7 @@ impl Schema {
     /// See [CommentStatement] for more details.
     ///
     /// ```
-    /// use crate::pgorm::IdenStr;
+    /// use crate::pgorm::StaticName;
     /// use pgorm::{
     ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, EntityName, EntityTrait,
     ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,
@@ -105,7 +105,7 @@ impl Schema {
     /// Creates a column definition for example to update a table.
     ///
     /// ```
-    /// use crate::pgorm::IdenStr;
+    /// use crate::pgorm::StaticName;
     /// use pgorm::{
     ///     ActiveModelBehavior, ColumnDef, ColumnTrait, ColumnType, EntityName, EntityTrait,
     ///     EnumIter, PrimaryKeyTrait, RelationDef, RelationTrait, Schema,

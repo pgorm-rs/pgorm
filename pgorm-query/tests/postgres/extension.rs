@@ -25,11 +25,11 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.extension+4/test]    `PgLTree` is a ready-made `Iden` rendering `ltree`,
+// [spec:pgorm:req:sql.ddl.extension+4/test]    `PgLTree` is a ready-made `SqlName` rendering `ltree`,
 // usable as an extension name through `From<PgLTree> for String`
 #[test]
 fn create_3() {
-    assert_eq!(Iden::to_string(&PgLTree), "ltree");
+    assert_eq!(SqlName::to_string(&PgLTree), "ltree");
     assert_eq!(
         Extension::create(PgLTree).to_string(),
         r#"CREATE EXTENSION "ltree""#

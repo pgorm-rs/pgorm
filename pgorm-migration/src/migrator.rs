@@ -6,10 +6,10 @@ use std::time::SystemTime;
 use tracing::info;
 
 use super::{MigrationTrait, ledger};
-use pgorm::pgorm_query::{ColumnDef, Iden, IntoIden, Order, Query, SelectStatement, Table};
+use pgorm::pgorm_query::{ColumnDef, IntoName, Order, Query, SelectStatement, SqlName, Table};
 use pgorm::{
-    ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, DynIden, Error,
-    FromQueryResult, Insert, Iterable, TransactionTrait, set,
+    ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, Error, FromQueryResult,
+    Insert, Iterable, Name, TransactionTrait, set,
 };
 
 /// The name of the ledger's nullable digest column, as PostgreSQL stores it.
@@ -76,8 +76,8 @@ pub trait MigratorTrait: Send {
     /// adoption applies to the default name alone, so a custom-named ledger is
     /// never renamed and never adopted from.
     // [spec:pgorm:req:migration.ledger-upgrade]    an override opts out of adoption
-    fn migration_table_name() -> DynIden {
-        ledger::Entity.into_iden()
+    fn migration_table_name() -> Name {
+        ledger::Entity.into_name()
     }
 
     /// Get list of migrations wrapped in `Migration` struct, failing if two of
@@ -130,7 +130,7 @@ pub trait MigratorTrait: Send {
         const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
         const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
-        let name = Iden::to_string(&*Self::migration_table_name());
+        let name = SqlName::to_string(&*Self::migration_table_name());
         let mut hash = FNV_OFFSET;
         for byte in name.as_bytes() {
             hash ^= u64::from(*byte);
@@ -162,7 +162,7 @@ pub trait MigratorTrait: Send {
         Self::install(db).await?;
         let stmt = Query::select()
             .table_name(Self::migration_table_name())
-            .columns(ledger::Column::iter().map(IntoIden::into_iden))
+            .columns(ledger::Column::iter().map(IntoName::into_name))
             .order_by(ledger::Column::Version, Order::Asc)
             .to_owned();
         let (stmt, values) = stmt.build();
@@ -256,7 +256,7 @@ pub trait MigratorTrait: Send {
     /// the legacy table is not touched.
     // [spec:pgorm:req:migration.ledger-upgrade]    detect, then rename in place
     async fn adopt_legacy_ledger(db: &(impl ConnectionTrait)) -> Result<(), Error> {
-        if Iden::to_string(&*Self::migration_table_name()) != DEFAULT_LEDGER_TABLE {
+        if SqlName::to_string(&*Self::migration_table_name()) != DEFAULT_LEDGER_TABLE {
             return Ok(());
         }
 
@@ -344,7 +344,7 @@ pub trait MigratorTrait: Send {
         // its own. The catalog is consulted first because `ADD COLUMN IF NOT
         // EXISTS` takes an ACCESS EXCLUSIVE lock even when it goes on to do
         // nothing, and `install` runs on every read.
-        let table_name = Iden::to_string(&*Self::migration_table_name());
+        let table_name = SqlName::to_string(&*Self::migration_table_name());
         let has_checksum: bool = db
             .query_one(
                 "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
@@ -464,13 +464,13 @@ where
 trait QueryTable {
     type Statement;
 
-    fn table_name(self, table_name: DynIden) -> Self::Statement;
+    fn table_name(self, table_name: Name) -> Self::Statement;
 }
 
 impl QueryTable for SelectStatement {
     type Statement = SelectStatement;
 
-    fn table_name(mut self, table_name: DynIden) -> SelectStatement {
+    fn table_name(mut self, table_name: Name) -> SelectStatement {
         self.from(table_name);
         self
     }
@@ -482,7 +482,7 @@ where
 {
     type Statement = pgorm::Insert<A>;
 
-    fn table_name(mut self, table_name: DynIden) -> pgorm::Insert<A> {
+    fn table_name(mut self, table_name: Name) -> pgorm::Insert<A> {
         pgorm::QueryTrait::query(&mut self).into_table(table_name);
         self
     }

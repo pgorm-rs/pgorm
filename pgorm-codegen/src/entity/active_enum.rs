@@ -1,5 +1,5 @@
 use heck::ToUpperCamelCase;
-use pgorm_query::DynIden;
+use pgorm_query::Name;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::fmt::Write;
@@ -8,9 +8,9 @@ use crate::{Error, WithSerde, util::safe_ident};
 
 #[derive(Clone, Debug)]
 pub struct ActiveEnum {
-    pub(crate) enum_name: DynIden,
-    pub(crate) schema: Option<DynIden>,
-    pub(crate) values: Vec<DynIden>,
+    pub(crate) enum_name: Name,
+    pub(crate) schema: Option<Name>,
+    pub(crate) values: Vec<Name>,
 }
 
 /// The Rust variant name a DB enum value maps to, and whether deriving it
@@ -128,7 +128,7 @@ impl ActiveEnum {
 mod tests {
     use super::*;
     use crate::entity::writer::{bonus_attributes, bonus_derive};
-    use pgorm_query::{Alias, IntoIden};
+    use pgorm_query::{Alias, IntoName};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("media_type").into_iden(),
+                enum_name: Alias::new("media_type").into_name(),
                 values: vec![
                     "UNKNOWN",
                     "BITMAP",
@@ -151,7 +151,7 @@ mod tests {
                     "3D",
                 ]
                 .into_iter()
-                .map(|variant| Alias::new(variant).into_iden())
+                .map(|variant| Alias::new(variant).into_name())
                 .collect(),
             }
             .impl_active_enum(
@@ -198,10 +198,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("media_type").into_iden(),
+                enum_name: Alias::new("media_type").into_name(),
                 values: vec!["UNKNOWN", "BITMAP",]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_iden())
+                    .map(|variant| Alias::new(variant).into_name())
                     .collect(),
             }
             .impl_active_enum(
@@ -236,10 +236,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("coinflip_result_type").into_iden(),
+                enum_name: Alias::new("coinflip_result_type").into_name(),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_iden())
+                    .map(|variant| Alias::new(variant).into_name())
                     .collect(),
             }
             .impl_active_enum(
@@ -273,10 +273,10 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("coinflip_result_type").into_iden(),
+                enum_name: Alias::new("coinflip_result_type").into_name(),
                 values: vec!["HEADS", "TAILS"]
                     .into_iter()
-                    .map(|variant| Alias::new(variant).into_iden())
+                    .map(|variant| Alias::new(variant).into_name())
                     .collect(),
             }
             .impl_active_enum(
@@ -315,7 +315,7 @@ mod tests {
         assert_eq!(
             ActiveEnum {
                 schema: None,
-                enum_name: Alias::new("ty").into_iden(),
+                enum_name: Alias::new("ty").into_name(),
                 values: vec![
                     "Question",
                     "QuestionsAdditional",
@@ -327,7 +327,7 @@ mod tests {
                     "你好",
                 ]
                 .into_iter()
-                .map(|variant| Alias::new(variant).into_iden())
+                .map(|variant| Alias::new(variant).into_name())
                 .collect(),
             }
             .impl_active_enum(

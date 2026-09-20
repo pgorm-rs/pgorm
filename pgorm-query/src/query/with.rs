@@ -1,5 +1,5 @@
 use crate::{
-    Alias, ColumnRef, DeleteStatement, DynIden, FromItem, InsertStatement, IntoIden,
+    Alias, ColumnRef, DeleteStatement, FromItem, InsertStatement, IntoName, Name,
     QueryStatementBuilder, SelectExpr, SelectStatement, SimpleExpr, SubQueryStatement,
     UpdateStatement,
 };
@@ -23,8 +23,8 @@ use crate::{
 // [spec:pgorm:def:sql.ast.with+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
-    pub(crate) table_name: DynIden,
-    pub(crate) cols: Vec<DynIden>,
+    pub(crate) table_name: Name,
+    pub(crate) cols: Vec<Name>,
     pub(crate) query: Box<SubQueryStatement>,
     pub(crate) materialized: Option<bool>,
 }
@@ -34,11 +34,11 @@ impl CommonTableExpression {
     /// and the query producing its rows.
     pub fn new<T, Q>(table_name: T, query: Q) -> Self
     where
-        T: IntoIden,
+        T: IntoName,
         Q: QueryStatementBuilder,
     {
         Self {
-            table_name: table_name.into_iden(),
+            table_name: table_name.into_name(),
             cols: Vec::new(),
             query: Box::new(query.into_sub_query_statement()),
             materialized: None,
@@ -48,20 +48,20 @@ impl CommonTableExpression {
     /// Adds a named column to the CTE table definition.
     pub fn column<C>(&mut self, col: C) -> &mut Self
     where
-        C: IntoIden,
+        C: IntoName,
     {
-        self.cols.push(col.into_iden());
+        self.cols.push(col.into_name());
         self
     }
 
     /// Adds a named columns to the CTE table definition.
     pub fn columns<T, I>(&mut self, cols: I) -> &mut Self
     where
-        T: IntoIden,
+        T: IntoName,
         I: IntoIterator<Item = T>,
     {
         self.cols
-            .extend(cols.into_iter().map(|col| col.into_iden()));
+            .extend(cols.into_iter().map(|col| col.into_name()));
         self
     }
 
@@ -92,12 +92,12 @@ impl CommonTableExpression {
         })
     }
 
-    fn derived_table_name(from: &FromItem) -> Option<DynIden> {
+    fn derived_table_name(from: &FromItem) -> Option<Name> {
         let FromItem::Table(table) = from else {
             return None;
         };
 
-        Some(Alias::new(format!("cte_{}", table.qualifier().to_string())).into_iden())
+        Some(Alias::new(format!("cte_{}", table.qualifier().to_string())).into_name())
     }
 
     /// Set up the columns of the CTE to match the given [SelectStatement] selected columns.
@@ -115,7 +115,7 @@ impl CommonTableExpression {
         }
     }
 
-    fn cols_from_selects(selects: &[SelectExpr]) -> Option<Vec<DynIden>> {
+    fn cols_from_selects(selects: &[SelectExpr]) -> Option<Vec<Name>> {
         selects
             .iter()
             .map(|select| {
@@ -127,7 +127,7 @@ impl CommonTableExpression {
                             ColumnRef::Column(iden) => Some(iden.clone()),
                             ColumnRef::TableColumn(table, column) => Some(
                                 Alias::new(format!("{}_{}", table.to_string(), column.to_string()))
-                                    .into_iden(),
+                                    .into_name(),
                             ),
                             ColumnRef::SchemaTableColumn(schema, table, column) => Some(
                                 Alias::new(format!(
@@ -136,7 +136,7 @@ impl CommonTableExpression {
                                     table.to_string(),
                                     column.to_string()
                                 ))
-                                .into_iden(),
+                                .into_name(),
                             ),
                             _ => None,
                         },
@@ -171,7 +171,7 @@ pub enum SearchOrder {
 pub struct Search {
     pub(crate) order: SearchOrder,
     pub(crate) expr: SimpleExpr,
-    pub(crate) alias: DynIden,
+    pub(crate) alias: Name,
 }
 
 impl Search {
@@ -181,12 +181,12 @@ impl Search {
     pub fn new<E, A>(order: SearchOrder, expr: E, alias: A) -> Self
     where
         E: Into<SimpleExpr>,
-        A: IntoIden,
+        A: IntoName,
     {
         Self {
             order,
             expr: expr.into(),
-            alias: alias.into_iden(),
+            alias: alias.into_name(),
         }
     }
 }
@@ -205,8 +205,8 @@ impl Search {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cycle {
     pub(crate) expr: SimpleExpr,
-    pub(crate) set_as: DynIden,
-    pub(crate) using: DynIden,
+    pub(crate) set_as: Name,
+    pub(crate) using: Name,
 }
 
 impl Cycle {
@@ -217,13 +217,13 @@ impl Cycle {
     pub fn new<E, S, U>(expr: E, set: S, using: U) -> Self
     where
         E: Into<SimpleExpr>,
-        S: IntoIden,
-        U: IntoIden,
+        S: IntoName,
+        U: IntoName,
     {
         Self {
             expr: expr.into(),
-            set_as: set.into_iden(),
-            using: using.into_iden(),
+            set_as: set.into_name(),
+            using: using.into_name(),
         }
     }
 }
@@ -322,7 +322,7 @@ impl WithClause {
 /// # Examples
 ///
 /// ```
-/// use pgorm_query::{*, IntoIden, tests_cfg::*};
+/// use pgorm_query::{*, IntoName, tests_cfg::*};
 ///
 /// let base_query = SelectStatement::new()
 ///                     .column(Alias::new("id"))
@@ -356,7 +356,7 @@ impl WithClause {
 ///     .to_owned();
 ///
 /// let with_clause = RecursiveWithClause::new(common_table_expression)
-///         .cycle(Cycle::new(SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_iden())), Alias::new("looped"), Alias::new("traversal_path")))
+///         .cycle(Cycle::new(SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_name())), Alias::new("looped"), Alias::new("traversal_path")))
 ///         .to_owned();
 ///
 /// let query = SelectStatement::new()
@@ -448,7 +448,7 @@ impl SelectStatement {
     /// # Examples
     ///
     /// ```
-    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
+    /// use pgorm_query::{*, IntoCondition, IntoName, tests_cfg::*};
     ///
     /// let base_query = SelectStatement::new()
     ///                     .column(Alias::new("id"))

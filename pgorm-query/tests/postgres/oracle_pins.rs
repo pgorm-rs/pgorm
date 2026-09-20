@@ -198,7 +198,7 @@ fn column_rename_is_its_own_statement() {
 }
 
 // Fixed by plan node `bug.oracle-findings`, at the type level per
-// [dec:pgorm:invalid-states-unrepresentable]: the target is a `DynIden` rather
+// [dec:pgorm:invalid-states-unrepresentable]: the target is a `Name` rather
 // than a `TableName`, so the qualified form a rename cannot honour — the table
 // stays in the schema it is already in — no longer typechecks.
 // [spec:pgorm:req:sql.render.oracle/test]

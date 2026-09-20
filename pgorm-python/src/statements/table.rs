@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{ColumnRef, IntoIden, NamedTable, TableName};
+use pgorm::pgorm_query::{ColumnRef, IntoName, NamedTable, TableName};
 use pyo3::prelude::*;
 
 use crate::{expressions::PyExpr, identifiers::PyIdentifier};
@@ -19,10 +19,10 @@ impl PyTable {
         schema: Option<&Bound<'_, PyAny>>,
         alias: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let name = PyIdentifier::new(name)?.alias().into_iden();
+        let name = PyIdentifier::new(name)?.alias().into_name();
         let name = match schema {
             Some(schema) => {
-                TableName::SchemaTable(PyIdentifier::new(schema)?.alias().into_iden(), name)
+                TableName::SchemaTable(PyIdentifier::new(schema)?.alias().into_name(), name)
             }
             None => TableName::Table(name),
         };
@@ -40,7 +40,7 @@ impl PyTable {
     }
 
     fn col(&self, name: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
-        let name = PyIdentifier::new(name)?.alias().into_iden();
+        let name = PyIdentifier::new(name)?.alias().into_name();
         let column = match (&self.inner.alias, &self.inner.name) {
             (Some(alias), _) => ColumnRef::TableColumn(alias.clone(), name),
             (None, TableName::Table(table)) => ColumnRef::TableColumn(table.clone(), name),

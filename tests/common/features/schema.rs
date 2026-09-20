@@ -2,7 +2,7 @@ use super::*;
 use crate::common::setup::{create_enum, create_table, create_table_without_asserts};
 use pgorm::{ConnectionTrait, DatabasePool, EntityName, Schema, error::*, pgorm_query};
 use pgorm_query::{
-    ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoIden, QueryBuilder, StringLen, alias,
+    ColumnDef, ColumnType, ForeignKeyCreateStatement, IntoName, QueryBuilder, StringLen, alias,
     extension::Type,
 };
 
@@ -412,10 +412,10 @@ where
             ColumnDef::new(collection::Column::Teas)
                 .array(pgorm_query::ColumnType::Enum {
                     schema: None,
-                    name: TeaEnum.into_iden(),
+                    name: TeaEnum.into_name(),
                     variants: vec![
-                        TeaVariant::EverydayTea.into_iden(),
-                        TeaVariant::BreakfastTea.into_iden(),
+                        TeaVariant::EverydayTea.into_name(),
+                        TeaVariant::BreakfastTea.into_name(),
                     ],
                 })
                 .not_null(),
@@ -423,10 +423,10 @@ where
         .col(
             ColumnDef::new(collection::Column::TeasOpt).array(pgorm_query::ColumnType::Enum {
                 schema: None,
-                name: TeaEnum.into_iden(),
+                name: TeaEnum.into_name(),
                 variants: vec![
-                    TeaVariant::EverydayTea.into_iden(),
-                    TeaVariant::BreakfastTea.into_iden(),
+                    TeaVariant::EverydayTea.into_name(),
+                    TeaVariant::BreakfastTea.into_name(),
                 ],
             }),
         )
