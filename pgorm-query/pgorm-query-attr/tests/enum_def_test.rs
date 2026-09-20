@@ -36,7 +36,7 @@ pub struct Crated {
     pub name: String,
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    the input is re-emitted, plus a `{Struct}SqlName` enum
+// [spec:pgorm:sem:macros.derive.enum-def+1/test]    the input is re-emitted, plus a `{Struct}SqlName` enum
 #[test]
 fn the_struct_survives_and_gains_an_iden_enum() {
     // The annotated struct is re-emitted unchanged.
@@ -52,7 +52,7 @@ fn the_struct_survives_and_gains_an_iden_enum() {
     assert_eq!(variants.len(), 3);
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    what `SqlName::unquoted` writes
+// [spec:pgorm:sem:macros.derive.enum-def+1/test]    what `SqlName::unquoted` writes
 #[test]
 fn iden_renders_table_name_and_field_identifiers() {
     // `Table` defaults to the snake_case of the struct name...
@@ -70,14 +70,14 @@ fn iden_renders_table_name_and_field_identifiers() {
     assert_eq!(CratedName::Table.to_string(), "crated");
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    prefix / suffix control the generated enum's name
+// [spec:pgorm:sem:macros.derive.enum-def+1/test]    prefix / suffix control the generated enum's name
 #[test]
 fn prefix_and_suffix_name_the_generated_enum() {
     assert_eq!(EnumPrefixed::Table.to_string(), "prefixed");
     assert_eq!(SuffixedDef::Table.to_string(), "suffixed");
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def/test]    the generated enum's derives
+// [spec:pgorm:sem:macros.derive.enum-def+1/test]    the generated enum's derives
 #[test]
 fn the_generated_enum_derives_the_documented_set() {
     // Debug

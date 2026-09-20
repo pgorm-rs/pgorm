@@ -36,6 +36,36 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
+> [spec:pgorm:req:sql.surface]
+> The crate's exports are an explicit list, not a set of module globs.
+> `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
+> grouped by what the items are for — names, expressions, values, query
+> statements, schema statements, rendering — and the modules those items are
+> defined in MUST be private, so `use pgorm_query::*` and that list are the same
+> set and nothing becomes API by being declared `pub` inside a module a caller
+> can reach. Exactly three modules stay public, each because a path through it
+> is the spelling callers write: `error` (`Error`, `Result`, `TemplateError`),
+> `extension` (the `CREATE EXTENSION` / `CREATE TYPE` surface, deliberately not
+> flattened into the root) and `value` (whose `value::with_array::NotU8` pgorm's
+> derives name in generated code). `tests_cfg` is `#[doc(hidden)]` behind its
+> own feature and is not surface.
+>
+> What the crate reads but a caller cannot use is `pub(crate)`: the renderer's
+> `Mode` and `Oper` helpers, the clause shapes a statement holds internally
+> (`JoinExpr`, `JoinKind`, `JoinOn`, `LockClause`, `ConditionHolder`), and
+> `prepare`'s re-export of `std::fmt::Write`, which put a `std` trait in
+> pgorm-query's namespace and was the only path by which `pgorm_query::Write`
+> could be written. An item that narrowing would merely turn into dead code is
+> instead exported `#[doc(hidden)]`, so the rendered documentation is the
+> curated list while the item stays reachable: the statement-dispatch wrappers
+> `QueryStatement`, `TableStatement`, `IndexStatement`, `ForeignKeyStatement`
+> and `SchemaStatement`, which no builder produces and no renderer takes; the
+> `SelectDistinct` flag, whose `All` variant no builder sets; and the
+> `Token`/`Tokenizer` lexer behind `inject_parameters`, whose classification
+> accessors only the conformance suite calls. Each of those MUST be named
+> individually in `lib.rs` rather than left to a glob, so the residue is a list
+> a later pass can work through rather than a category.
+
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
 > `Display` supertrait carries the value-inlined rendering. There is exactly

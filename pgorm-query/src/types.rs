@@ -536,7 +536,7 @@ pub enum JoinType {
 /// cross join and an unconstrained inner join both fail to construct.
 // [spec:pgorm:req:sql.ast.select.join+1]
 #[derive(Debug, Clone, PartialEq)]
-pub enum JoinKind {
+pub(crate) enum JoinKind {
     Cross,
     Qualified(JoinType, JoinOn),
 }
@@ -559,7 +559,7 @@ pub struct OrderExpr {
 /// Join on types
 // [spec:pgorm:req:sql.render.joins+2]
 #[derive(Debug, Clone, PartialEq)]
-pub enum JoinOn {
+pub(crate) enum JoinOn {
     Condition(Box<ConditionHolder>),
 }
 

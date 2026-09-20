@@ -443,7 +443,7 @@
 //! struct MyFunction;
 //!
 //! impl SqlName for MyFunction {
-//!     fn unquoted(&self, s: &mut dyn Write) {
+//!     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
 //!         write!(s, "my_function").unwrap();
 //!     }
 //! }
@@ -585,6 +585,29 @@
 //! );
 //! ```
 //!
+//! ## The public surface
+//!
+//! Everything the crate exports is listed by name at the crate root, in one
+//! block grouped by what the items are for: names, expressions, values, query
+//! statements, schema statements, rendering. The modules behind that list are
+//! private, so an internal type cannot become API by being declared `pub` in a
+//! module someone can reach — `use pgorm_query::*` and the list are the same
+//! set. Three modules stay public because a path through them is the spelling:
+//! [`error`] (the crate's `Error` and `Result`), [`extension`] (PostgreSQL's
+//! `CREATE EXTENSION` and `CREATE TYPE` surface, deliberately not flattened
+//! into the root) and [`value`] (whose `value::with_array::NotU8` pgorm's
+//! derives name in generated code).
+//!
+//! So a module path into the crate does not compile:
+//!
+//! ```compile_fail,E0603
+//! let _: pgorm_query::types::Name;
+//! ```
+//!
+//! ```compile_fail,E0603
+//! let _ = pgorm_query::backend::QueryBuilder;
+//! ```
+//!
 //! ## License
 //!
 //! Licensed under either of
@@ -608,23 +631,33 @@
 //! and its contributors; the fork keeps their license and gratefully builds on
 //! their work.
 
-pub mod backend;
-pub mod comment;
+// The crate's own modules are private: the `pub use` block below is the whole
+// public surface, item by item, so nothing reaches the API by sitting in a
+// module that happens to be reachable. Three modules stay public because a
+// path through them is the documented spelling: `error` (the crate's
+// `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
+// TYPE` surface, deliberately not flattened into the root), and `value`
+// (`value::with_array::NotU8`, which pgorm's derives name in generated code).
+// [spec:pgorm:req:sql.surface]
+// [spec:pgorm:req:sql.surface/test]    the two `compile_fail,E0603` examples in
+// the crate docs above, under "The public surface": a module path into the
+// crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
+mod backend;
+mod comment;
 pub mod error;
-pub mod expr;
+mod expr;
 pub mod extension;
-pub mod foreign_key;
-pub mod func;
-pub mod index;
+mod foreign_key;
+mod func;
+mod index;
 mod key;
-pub mod prepare;
-pub mod query;
-pub mod schema;
-pub mod table;
+mod prepare;
+mod query;
+mod schema;
+mod table;
 mod template;
-pub use template::SqlTemplate;
-pub mod token;
-pub mod types;
+mod token;
+mod types;
 pub mod value;
 mod value_identity;
 
@@ -632,20 +665,101 @@ mod value_identity;
 #[cfg(feature = "tests-cfg")]
 pub mod tests_cfg;
 
-pub use backend::*;
-pub use comment::*;
-pub use expr::*;
-pub use foreign_key::*;
-pub use func::*;
-pub use index::*;
-pub use key::*;
-pub use prepare::*;
-pub use query::*;
-pub use schema::*;
-pub use table::*;
-pub use token::*;
-pub use types::*;
-pub use value::*;
+// The internal shapes the rest of the crate reaches for as `crate::Thing`,
+// and which stop at the crate boundary. Everything else a module names that
+// way arrives through the public re-exports below.
+pub(crate) use backend::Oper;
+pub(crate) use prepare::Write;
+pub(crate) use query::{ConditionHolder, InsertValueSource, JoinExpr, LockClause};
+pub(crate) use types::{JoinKind, JoinOn};
+
+// Names: what an identifier position holds, and the conversions into it —
+// names themselves, then the table references and the join shape that reads
+// them, then column references.
+pub use types::{AliasName, IntoName, Name, SqlName, StaticName, TableName, TypeName, alias};
+pub use types::{Asterisk, ColumnRef, IntoColumnRef};
+pub use types::{FromItem, IntoFromItem, IntoNamedTable, IntoTableName, JoinType, NamedTable};
+
+// Expressions: the operator vocabulary an expression tree is built from, and
+// the two trees themselves.
+pub use expr::{Expr, SimpleExpr};
+pub use func::{Func, FuncArgMod, Function, FunctionCall};
+pub use types::{BinOper, IntoLikeExpr, Keyword, LikeExpr, SubQueryOper, UnOper};
+
+// Values: what a bound parameter carries, and the conversions in and out.
+pub use key::{IntoBoundary, IntoKey, Key};
+pub use value::{
+    ArrayType, IntoValueTuple, IpNetwork, MacAddress, Nullable, TryFromValueTuple, Value,
+    ValueTuple, ValueTupleError, ValueType, ValueTypeError, Values, Vector,
+};
+
+// Query statements: the four DML builders, the clauses they take, and the
+// traits that let a caller write against any of them.
+pub use query::{
+    AnyWithClause, CaseStatement, CommonTableExpression, Condition, ConditionExpression,
+    ConditionType, ConditionalStatement, Cycle, DeleteStatement, Frame, FrameClause, FrameType,
+    InsertStatement, IntoCondition, LockBehavior, LockType, OrderedStatement, OverStatement, Query,
+    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, Search, SearchOrder,
+    SelectExpr, SelectStatement, SubQueryStatement, UnionType, UpdateStatement, WindowSelectType,
+    WindowStatement, WithClause,
+};
+pub use query::{
+    ConflictAction, ConflictAssignment, ConflictAssignments, ConflictElement, ConflictTarget,
+    ConflictUpdate, OnConflict,
+};
+pub use types::{NullOrdering, Order, OrderExpr};
+
+// Schema statements: the DDL builders and the column vocabulary they share.
+pub use comment::{Comment, CommentStatement, CommentTarget};
+pub use foreign_key::{
+    ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, ForeignKeyDropStatement,
+    TableForeignKey,
+};
+pub use index::{
+    Index, IndexColumn, IndexCreateStatement, IndexDropStatement, IndexKind, IndexOrder, IndexType,
+    IntoIndexColumn, StandaloneIndexKind, TableIndex,
+};
+pub use table::{
+    AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IntervalPrecision,
+    IntervalSpec, IntoColumnDef, PendingTableAlter, PgInterval, StringLen, Table, TableAlterOption,
+    TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement,
+    TableRenameStatement, TableTruncateStatement,
+};
+
+// Rendering: the sink a statement is written into, and the two entry points
+// that are not a statement's own `build`.
+pub use backend::QueryBuilder;
+pub use prepare::{SqlWriter, SqlWriterValues, inject_parameters};
+pub use template::SqlTemplate;
+
+// Reachable but not API. Each of these is an internal shape that cannot be
+// narrowed to `pub(crate)` today because nothing inside the crate reads it —
+// hiding it would make it dead code, and removing dead surface is the deletion
+// pass's job, not curation's. They are hidden from the documentation so the
+// rendered API is the list above, and they are named here rather than left to
+// a module glob so the debt is a list someone can work through.
+//
+// The statement-dispatch wrappers: no builder produces one and no renderer
+// takes one, so they exist only to be matched on by a caller that already has
+// the inner statement.
+#[doc(hidden)]
+pub use foreign_key::ForeignKeyStatement;
+#[doc(hidden)]
+pub use index::IndexStatement;
+#[doc(hidden)]
+pub use query::QueryStatement;
+#[doc(hidden)]
+pub use schema::SchemaStatement;
+#[doc(hidden)]
+pub use table::TableStatement;
+// The SELECT distinct flag: `distinct`/`distinct_on` are how a caller sets it,
+// and `SelectDistinct::All` has no builder at all.
+#[doc(hidden)]
+pub use query::SelectDistinct;
+// The lexer `inject_parameters` and `SqlTemplate` read SQL text with. Its
+// classification accessors are exercised only by the conformance suite.
+#[doc(hidden)]
+pub use token::{Token, Tokenizer};
 
 #[cfg(feature = "derive")]
 pub use pgorm_query_derive::{SqlName, StaticName};

@@ -37,7 +37,7 @@ impl Default for GenEnumArgs {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.enum-def]
+// [spec:pgorm:sem:macros.derive.enum-def+1]
 #[proc_macro_attribute]
 pub fn enum_def(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
@@ -111,7 +111,7 @@ pub fn enum_def(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #import_name::SqlName for #enum_name {
-            fn unquoted(&self, s: &mut dyn pgorm_query::Write) {
+            fn unquoted(&self, s: &mut dyn ::std::fmt::Write) {
                 write!(s, "{}", match self {
                     #enum_name::Table => stringify!(#table_name),
                     #(#enum_name::#pascal_def_names2 => stringify!(#default_names)),*

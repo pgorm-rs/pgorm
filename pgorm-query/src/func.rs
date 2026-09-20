@@ -126,7 +126,7 @@ impl Func {
     /// struct MyFunction;
     ///
     /// impl SqlName for MyFunction {
-    ///     fn unquoted(&self, s: &mut dyn Write) {
+    ///     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
     ///         write!(s, "my_function").unwrap();
     ///     }
     /// }

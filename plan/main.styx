@@ -7850,6 +7850,9 @@ children (
                 id query-reexports-curated
                 title "The public surface is curated, not globbed"
                 kind @refactor
+                implements {
+                    rust ([spec:pgorm:req:sql.surface])
+                }
                 deps (query-dead-surface-gone)
                 log (
                     {
@@ -7857,6 +7860,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "lib.rs:623-635 glob re-exports every module, leaking the render engine as public API: QueryBuilder, Mode, Oper, SqlWriter, SqlWriterValues, Quote, Tokenizer, Token, OrderExpr, JoinOn, JoinExpr, SelectDistinct, LockClause, WindowSelectType, ConditionExpression, ConditionHolder, AnyWithClause, the on-conflict typestate internals, and the six *Statement dispatch enums (QueryStatement, SubQueryStatement, TableStatement, IndexStatement, ForeignKeyStatement, SchemaStatement). Verified against every consumer's use pgorm_query:: imports: not one of these is imported anywhere, so curation breaks nothing. Two low-level items are genuinely imported and stay public: inject_parameters (pgorm-python statements/raw.rs, sqlmap adapter main.rs:131) and QueryStatementBuilder (one site). The cautionary detail: CustomExpr is the single hand-curated re-export in the file (lib.rs:613) and has zero consumers — curation without a consumer check is how that happens. Depends on the trim so the surviving surface is what gets curated."
+                    }
+
+                    {
+                        at 2026-09-20T15:59:59.393369Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

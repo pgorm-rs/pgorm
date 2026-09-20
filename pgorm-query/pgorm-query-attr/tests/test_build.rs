@@ -1,6 +1,6 @@
 // The `pass` fixtures are compiled and run, covering the default / prefixed /
 // suffixed generated enum names and the `table_name` override.
-// [spec:pgorm:sem:macros.derive.enum-def/test]
+// [spec:pgorm:sem:macros.derive.enum-def+1/test]
 #[test]
 fn build_tests() {
     let t = trybuild::TestCases::new();

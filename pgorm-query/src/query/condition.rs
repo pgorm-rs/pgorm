@@ -31,7 +31,7 @@ pub enum ConditionExpression {
 
 // [spec:pgorm:req:sql.ast.condition.holder+2]
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct ConditionHolder {
+pub(crate) struct ConditionHolder {
     pub contents: Option<Condition>,
 }
 
@@ -524,20 +524,6 @@ impl ConditionHolder {
     pub fn new_with_condition(condition: Condition) -> Self {
         Self {
             contents: Some(condition),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        match &self.contents {
-            None => true,
-            Some(c) => c.conditions.is_empty(),
-        }
-    }
-
-    pub fn is_one(&self) -> bool {
-        match &self.contents {
-            None => true,
-            Some(c) => c.conditions.len() == 1,
         }
     }
 

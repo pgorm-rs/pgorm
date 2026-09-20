@@ -466,7 +466,7 @@ known limitations.
 > today only because `find_attr` pre-filters to those two paths, and any new call path
 > would panic rather than error.
 
-> [spec:pgorm:sem:macros.derive.enum-def]
+> [spec:pgorm:sem:macros.derive.enum-def+1]
 > `#[enum_def]` (in `pgorm-query-attr`) applies to named-field structs — anything else
 > panics with "#[enum_def] can only be used on structs" — and re-emits the input
 > unchanged followed by a generated
@@ -477,8 +477,12 @@ known limitations.
 > struct name, overridable with `table_name = "..."` (which must itself be a valid
 > identifier, since it is re-parsed as one) — and `stringify!` of the original field
 > identifier for each field variant. The `crate_name = "..."` argument (default
-> `pgorm_query`) rewrites the `SqlName` trait path but not the hard-coded
-> `pgorm_query::Write` argument type in the generated method.
+> `pgorm_query`) rewrites the `SqlName` trait path, and there is nothing else in
+> the expansion for it to rewrite: the sink argument is spelled
+> `&mut dyn ::std::fmt::Write` at its own crate's path, as the two `SqlName`
+> derives already spelled it, so the generated method names pgorm-query exactly
+> once and a re-export of `std::fmt::Write` is not part of pgorm-query's
+> surface.
 
 ## Iteration and test harness
 

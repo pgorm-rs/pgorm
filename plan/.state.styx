@@ -1716,6 +1716,7 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule generative.acceptance}
     )}
+    {id query-reexports-curated}
 )
 
 onboarding {kind @adopt, phase 11}

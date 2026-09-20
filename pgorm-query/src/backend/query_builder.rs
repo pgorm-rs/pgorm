@@ -2395,7 +2395,7 @@ impl SubQueryStatement {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Mode {
+pub(crate) enum Mode {
     Creation,
     Alter,
     TableAlter,

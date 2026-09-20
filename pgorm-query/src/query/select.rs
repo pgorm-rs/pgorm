@@ -61,7 +61,7 @@ pub enum SelectDistinct {
 /// Join expression used in select statement
 // [spec:pgorm:req:sql.ast.select.join+1]
 #[derive(Debug, Clone, PartialEq)]
-pub struct JoinExpr {
+pub(crate) struct JoinExpr {
     pub join: JoinKind,
     pub table: Box<FromItem>,
     pub lateral: bool,
@@ -87,7 +87,7 @@ pub enum LockBehavior {
 
 // [spec:pgorm:def:sql.ast.select+2]
 #[derive(Debug, Clone, PartialEq)]
-pub struct LockClause {
+pub(crate) struct LockClause {
     pub(crate) r#type: LockType,
     pub(crate) tables: Vec<FromItem>,
     pub(crate) behavior: Option<LockBehavior>,

@@ -3,7 +3,7 @@
 use crate::error::Result;
 use crate::template::{self, Grammar, Segment};
 use crate::*;
-pub use std::fmt::Write;
+pub(crate) use std::fmt::Write;
 
 // [spec:pgorm:def:sql.render.writer+2]
 pub trait SqlWriter: Write + ToString {

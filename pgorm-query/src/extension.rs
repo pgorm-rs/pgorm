@@ -655,7 +655,7 @@ impl TypeCreateStatement {
     /// }
     ///
     /// impl SqlName for FontFamily {
-    ///     fn unquoted(&self, s: &mut dyn Write) {
+    ///     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
     ///         write!(s, "font_family").unwrap();
     ///     }
     /// }
@@ -703,7 +703,7 @@ impl TypeDropStatement {
     /// struct FontFamily;
     ///
     /// impl SqlName for FontFamily {
-    ///     fn unquoted(&self, s: &mut dyn Write) {
+    ///     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
     ///         write!(s, "{}", "font_family").unwrap();
     ///     }
     /// }
@@ -816,7 +816,7 @@ impl PendingTypeAlter {
     /// }
     ///
     /// impl SqlName for FontFamily {
-    ///     fn unquoted(&self, s: &mut dyn Write) {
+    ///     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
     ///         write!(s, "font_family").unwrap();
     ///     }
     /// }

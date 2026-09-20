@@ -7,7 +7,7 @@ mod query_builder;
 pub use self::query_builder::*;
 
 #[derive(Debug, PartialEq)]
-pub enum Oper {
+pub(crate) enum Oper {
     UnOper(UnOper),
     BinOper(BinOper),
 }
