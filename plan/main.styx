@@ -7750,6 +7750,7 @@ children (
                 id query-render-per-capability
                 title "Every parameter-carrying statement builds, every Display admits it inlines"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:55.609114Z
@@ -7763,6 +7764,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T12:13:55.566857Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
