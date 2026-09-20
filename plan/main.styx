@@ -7736,6 +7736,7 @@ children (
                 id query-verbs-keep-promises
                 title "take drains, embedders consume by value, with composes identically everywhere"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:54.437664Z
@@ -7749,6 +7750,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T13:13:26.404952Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
