@@ -7678,6 +7678,7 @@ children (
                 id query-single-dialect
                 title "The backend admits it has exactly one dialect"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:51.915325Z
@@ -7691,6 +7692,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T00:50:36.846197Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

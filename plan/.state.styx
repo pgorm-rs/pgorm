@@ -764,7 +764,7 @@ assertions (
     {id query-generated-virtual-guarded, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:41:47.316724Z}
     {id query-tokenizer-postgres, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:52:15.576491Z}
     {id query-dead-surface-gone, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:13:16.428035Z}
-    {id query-single-dialect, kind @doing, author "brendan@necessary.nu", at 2026-09-20T00:14:57.088834Z}
+    {id query-single-dialect, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:50:36.846197Z}
 )
 
 impl_evidence (
