@@ -42,11 +42,11 @@ pub enum AllValid {
 
 // One variant renders a name that is *not* a valid iden, which suppresses the
 // `prepare` override for the whole enum and leaves the trait default (which
-// doubles any embedded right-quote) to do the quoting.
+// doubles any embedded double quote) to do the quoting.
 #[derive(DeriveIden)]
 pub enum SomeInvalid {
     Table,
-    #[pgorm(iden = "we`ird")]
+    #[pgorm(iden = "we\"ird")]
     Weird,
 }
 
@@ -84,25 +84,25 @@ fn main() -> Result<(), Error> {
 // [spec:pgorm:sem:macros.derive.iden+1/test]    `prepare` is emitted only for statically-valid idens
 #[test]
 fn prepare_override_is_conditional() {
-    // Emitted: the name is written between the quote pair verbatim.
+    // Emitted: the name is written between the quotes verbatim.
     let mut s = String::new();
-    AllValid::Table.prepare(&mut s, '"'.into());
+    AllValid::Table.prepare(&mut s);
     assert_eq!(s, "\"all_valid\"");
 
     // Not emitted: the trait default is used, which doubles an embedded
-    // right-quote. `AllValid` never shows that behaviour, `SomeInvalid` does.
+    // double quote. `AllValid` never shows that behaviour, `SomeInvalid` does.
     let mut s = String::new();
-    SomeInvalid::Weird.prepare(&mut s, b'`'.into());
-    assert_eq!(s, "`we``ird`");
+    SomeInvalid::Weird.prepare(&mut s);
+    assert_eq!(s, "\"we\"\"ird\"");
 
     // The suppression is per-enum, not per-variant.
     let mut s = String::new();
-    SomeInvalid::Table.prepare(&mut s, b'`'.into());
-    assert_eq!(s, "`some_invalid`");
+    SomeInvalid::Table.prepare(&mut s);
+    assert_eq!(s, "\"some_invalid\"");
 
     let mut s = String::new();
-    AllValid::Id.prepare(&mut s, b'`'.into());
-    assert_eq!(s, "`id`");
+    AllValid::Id.prepare(&mut s);
+    assert_eq!(s, "\"id\"");
 }
 
 // [spec:pgorm:sem:macros.derive.iden+1/test]    an empty enum expands to nothing

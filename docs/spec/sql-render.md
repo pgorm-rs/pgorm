@@ -81,9 +81,10 @@ an ideal Postgres renderer would emit.
 
 ## Placeholders and parameters
 
-> [spec:pgorm:req:sql.render.placeholders]
-> `QueryBuilder::placeholder()` MUST return `("$", true)`: parameters are
-> rendered as numbered placeholders `$1`, `$2`, … When rendering into a
+> [spec:pgorm:req:sql.render.placeholders+1]
+> Parameters MUST be rendered as numbered placeholders `$1`, `$2`, … — the
+> only spelling PostgreSQL has, so the mark and the numbering are constants of
+> the renderer rather than a setting anything can read or choose. When rendering into a
 > `SqlWriterValues`, each `push_param` call MUST increment a counter that starts
 > at 0 and write `${counter}` after incrementing, so the first parameter emitted
 > is `$1`. Placeholder numbers therefore follow textual emission order exactly,
@@ -169,11 +170,13 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+1]
-> The quote pair is `Quote(b'"', b'"')`. Every identifier rendered through
-> `Iden::prepare` MUST be wrapped in double quotes with any embedded `"`
-> doubled (`Iden::quoted` replaces the right-quote character with itself
-> repeated twice: `he"llo` → `"he""llo"`). Quoting is unconditional — there is
+> [spec:pgorm:req:sql.render.ident-quoting+2]
+> The quote is the double quote, and it is the only one: PostgreSQL has a
+> single identifier quote, so it is written at the render sites rather than
+> carried in a parameter that could hold another character. Every identifier
+> rendered through `Iden::prepare` MUST be wrapped in double quotes with any
+> embedded `"` doubled (`Iden::quoted` replaces `"` with `""`: `he"llo` →
+> `"he""llo"`). Quoting is unconditional — there is
 > no reserved-word or safe-character check. This applies to column names, table
 > names, schema/database qualifiers, aliases, CTE names, window names, and
 > index/constraint/foreign-key names. Multi-part references join the quoted
@@ -476,12 +479,12 @@ an ideal Postgres renderer would emit.
 > inference specification — is unrepresentable per `sql.ast.on-conflict`, which
 > is the only guard available since `sql.render.oracle` cannot see it.
 
-> [spec:pgorm:req:sql.render.returning]
+> [spec:pgorm:req:sql.render.returning+1]
 > A returning clause on INSERT, UPDATE, or DELETE MUST render as the final
 > clause ` RETURNING ` followed by `*` (`ReturningClause::All`), a
 > comma-separated list of column refs, or a comma-separated list of
-> expressions. The pre-source `prepare_output` hook (SQL Server `OUTPUT`
-> heritage) is a no-op in this backend.
+> expressions. There is no pre-source emission point: PostgreSQL spells the
+> returned rows in exactly one position, so the renderer has exactly one.
 
 > [spec:pgorm:req:sql.render.update-delete+1]
 > `UPDATE ` renders the table, ` SET ` with comma-separated `"col" = expr`

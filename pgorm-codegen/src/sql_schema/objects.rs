@@ -11,7 +11,7 @@ use pgorm_query::{
 
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+2]
+// [spec:pgorm:sem:codegen.ddl.objects+3]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -42,7 +42,7 @@ pub(super) struct ParsedIndex {
     pub(super) index: Option<IndexCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+2]
+// [spec:pgorm:sem:codegen.ddl.objects+3]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -132,7 +132,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
 }
 
 /// A parsed identity back as the name a statement targets.
-// [spec:pgorm:sem:codegen.ddl.objects+2]
+// [spec:pgorm:sem:codegen.ddl.objects+3]
 fn target(ident: &TableIdent) -> TableName {
     let table = Alias::new(ident.table.as_str());
     match ident.schema.as_deref() {
@@ -145,7 +145,7 @@ fn index_type(access_method: &str) -> Option<IndexType> {
     match access_method {
         "" | "btree" => None,
         "hash" => Some(IndexType::Hash),
-        "gin" => Some(IndexType::FullText),
+        "gin" => Some(IndexType::Gin),
         other => Some(IndexType::Custom(pgorm_query::SharedIden::new(Alias::new(
             other,
         )))),
@@ -173,7 +173,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+2]
+// [spec:pgorm:sem:codegen.ddl.objects+3]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

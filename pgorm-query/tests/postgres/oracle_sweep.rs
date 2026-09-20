@@ -332,7 +332,7 @@ fn sweep_window_function_shapes() {
 // [spec:pgorm:req:sql.render.oracle/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert/test]
 // [spec:pgorm:req:sql.render.on-conflict+1/test]
-// [spec:pgorm:req:sql.render.returning/test]
+// [spec:pgorm:req:sql.render.returning+1/test]
 #[test]
 fn sweep_insert_shapes() {
     let insert = || {
@@ -478,7 +478,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+5/test]
+// [spec:pgorm:req:sql.ddl.index-create+6/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([
@@ -494,7 +494,7 @@ fn sweep_schema_object_ddl_shapes() {
             .to_string(),
         Index::create(Glyph::Table, Glyph::Tokens)
             .name("idx")
-            .index_type(IndexType::FullText)
+            .index_type(IndexType::Gin)
             .to_string(),
         Index::create(Glyph::Table, Glyph::Aspect)
             .name("idx")
@@ -659,7 +659,7 @@ fn sweep_binary_operator_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    the `build()` path: `$N` placeholders parse as
 // PostgreSQL parameter references
-// [spec:pgorm:req:sql.render.placeholders/test]
+// [spec:pgorm:req:sql.render.placeholders+1/test]
 #[test]
 fn sweep_placeholder_builds() {
     let (select, _) = base()

@@ -490,7 +490,7 @@ impl QueryStatementBuilder for InsertStatement {
     pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+// [spec:pgorm:req:sql.ast.build+2] (the one value-inlined rendering)
 impl std::fmt::Display for InsertStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

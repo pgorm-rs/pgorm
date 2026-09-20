@@ -13,7 +13,7 @@ enum Custom {
     #[iden(rename = "surname")]
     LastName,
     // Custom casing if needed
-    #[iden(rename = "EM`ail")]
+    #[iden(rename = "EM\"ail")]
     // the tuple value will be ignored
     Email(i32),
     // Custom method
@@ -32,17 +32,15 @@ impl Custom {
 
 fn main() {
     // custom ends up being default string which is an empty string
-    let expected = ["user", "my_id", "name", "surname", "EM`ail", "custom"];
+    let expected = ["user", "my_id", "name", "surname", "EM\"ail", "custom"];
     Custom::iter()
         .map(|var| var.to_string())
         .zip(expected)
         .for_each(|(iden, exp)| assert_eq!(iden, exp));
     
+    // The name is not a valid iden, so the trait default quotes it — doubling
+    // the embedded quote.
     let mut string = String::new();
-    Custom::Email(0).prepare(&mut string, '"'.into());
-    assert_eq!(string, "\"EM`ail\"");
-
-    let mut string = String::new();
-    Custom::Email(0).prepare(&mut string, b'`'.into());
-    assert_eq!(string, "`EM``ail`");
+    Custom::Email(0).prepare(&mut string);
+    assert_eq!(string, "\"EM\"\"ail\"");
 }

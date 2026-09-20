@@ -34,20 +34,13 @@ impl WithBody for DeleteStatement {}
 /// The name and the query are given to [CommonTableExpression::new]; the column list and the
 /// materialization hint are optional and are added afterwards.
 ///
-/// Some databases (like sqlite) restrict the acceptable kinds of queries inside of the WITH clause
-/// common table expressions. These databases only allow [SelectStatement]s to form a common table
-/// expression.
+/// PostgreSQL admits a data-modifying statement — INSERT, UPDATE, DELETE — as a
+/// common table expression, provided it carries a RETURNING clause so it yields
+/// the rows the enclosing query reads.
 ///
-/// Other databases like postgres allow modification queries (UPDATE, DELETE) inside of the WITH
-/// clause but they have to return a table. (They must have a RETURNING clause).
-///
-/// pgorm-query doesn't check this or restrict the kind of [CommonTableExpression] that you can create
-/// in rust. This means that you can put an UPDATE or DELETE queries into WITH clause and pgorm-query
-/// will succeed in generating that kind of sql query but the execution inside the database will
-/// fail because they are invalid.
-///
-/// It is your responsibility to ensure that the kind of WITH clause that you put together makes
-/// sense and valid for that database that you are using.
+/// pgorm-query does not enforce that: a write CTE with no RETURNING renders
+/// happily and is refused by the server. Supplying the RETURNING clause is the
+/// caller's part.
 // [spec:pgorm:def:sql.ast.with+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
@@ -267,20 +260,13 @@ impl Cycle {
 /// These named queries can act as a "query local table" that are materialized during execution and
 /// then can be used by the query prefixed with the WITH clause.
 ///
-/// Some databases (like sqlite) restrict the acceptable kinds of queries inside of the WITH clause
-/// common table expressions. These databases only allow [SelectStatement]s to form a common table
-/// expression.
+/// PostgreSQL admits a data-modifying statement — INSERT, UPDATE, DELETE — as a
+/// common table expression, provided it carries a RETURNING clause so it yields
+/// the rows the enclosing query reads.
 ///
-/// Other databases like postgres allow modification queries (UPDATE, DELETE) inside of the WITH
-/// clause but they have to return a table. (They must have a RETURNING clause).
-///
-/// pgorm-query doesn't check this or restrict the kind of [CommonTableExpression] that you can create
-/// in rust. This means that you can put an UPDATE or DELETE queries into WITH clause and pgorm-query
-/// will succeed in generating that kind of sql query but the execution inside the database will
-/// fail because they are invalid.
-///
-/// It is your responsibility to ensure that the kind of WITH clause that you put together makes
-/// sense and valid for that database that you are using.
+/// pgorm-query does not enforce that: a write CTE with no RETURNING renders
+/// happily and is refused by the server. Supplying the RETURNING clause is the
+/// caller's part.
 ///
 /// # Examples
 ///
@@ -547,7 +533,7 @@ impl QueryStatementBuilder for WithQuery {
     pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-// [spec:pgorm:req:sql.ast.build+1] (the one value-inlined rendering)
+// [spec:pgorm:req:sql.ast.build+2] (the one value-inlined rendering)
 impl std::fmt::Display for WithQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

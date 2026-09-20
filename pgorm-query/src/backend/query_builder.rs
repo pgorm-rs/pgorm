@@ -9,9 +9,6 @@ use crate::{
 };
 use std::ops::Deref;
 
-// [spec:pgorm:req:sql.render.ident-quoting+1] (the double-quote pair; doubling in Iden::quoted)
-const QUOTE: Quote = Quote(b'"', b'"');
-
 /// Discard sub-microsecond digits before a temporal value is rendered as a
 /// literal. PostgreSQL stores microseconds and would round a ninth digit,
 /// while the parameter path discards it — so without this the same value means
@@ -31,19 +28,6 @@ macro_rules! truncate_to_microsecond {
 pub struct QueryBuilder;
 
 impl QueryBuilder {
-    const fn quote(&self) -> Quote {
-        QUOTE
-    }
-
-    // [spec:pgorm:req:sql.render.placeholders]
-    pub const fn placeholder(&self) -> (&str, bool) {
-        ("$", true)
-    }
-
-    pub(crate) fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
-        QueryBuilder::prepare_simple_expr_common(self, simple_expr, sql)
-    }
-
     fn prepare_select_distinct(&self, select_distinct: &SelectDistinct, sql: &mut dyn SqlWriter) {
         match select_distinct {
             SelectDistinct::All => write!(sql, "ALL").unwrap(),
@@ -94,15 +78,6 @@ impl QueryBuilder {
         write!(buffer, "'").unwrap();
     }
 
-    fn if_null_function(&self) -> &str {
-        "COALESCE"
-    }
-
-    /// Prefix for tuples in VALUES list (e.g. ROW for Mysql)
-    fn values_list_tuple_prefix(&self) -> &str {
-        ""
-    }
-
     /// Translate [`InsertStatement`] into SQL statement.
     // [spec:pgorm:req:sql.render.insert]
     pub(crate) fn prepare_insert_statement(
@@ -110,7 +85,7 @@ impl QueryBuilder {
         insert: &InsertStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        self.prepare_insert(sql);
+        write!(sql, "INSERT").unwrap();
 
         if let Some(table) = &insert.table {
             write!(sql, " INTO ").unwrap();
@@ -122,7 +97,6 @@ impl QueryBuilder {
             insert.columns.is_empty(),
             insert.source.is_none(),
         ) {
-            self.prepare_output(&insert.returning, sql);
             write!(sql, " ").unwrap();
             self.insert_default_values(num_rows, sql);
         } else {
@@ -132,12 +106,10 @@ impl QueryBuilder {
                 if !first {
                     write!(sql, ", ").unwrap()
                 }
-                col.prepare(sql.as_writer(), self.quote());
+                col.prepare(sql.as_writer());
                 false
             });
             write!(sql, ")").unwrap();
-
-            self.prepare_output(&insert.returning, sql);
 
             if let Some(source) = &insert.source {
                 write!(sql, " ").unwrap();
@@ -224,7 +196,6 @@ impl QueryBuilder {
                 self.prepare_from_item(from_item, sql);
                 false
             });
-            self.prepare_index_hints(select, sql);
         }
 
         if !select.join.is_empty() {
@@ -251,7 +222,7 @@ impl QueryBuilder {
 
         if let Some((name, query)) = &select.window {
             write!(sql, " WINDOW ").unwrap();
-            name.prepare(sql.as_writer(), self.quote());
+            name.prepare(sql.as_writer());
             write!(sql, " AS ").unwrap();
             self.prepare_window_spec(query, sql);
         }
@@ -318,13 +289,11 @@ impl QueryBuilder {
                 write!(sql, ", ").unwrap()
             }
             let (col, v) = row;
-            col.prepare(sql.as_writer(), self.quote());
+            col.prepare(sql.as_writer());
             write!(sql, " = ").unwrap();
             self.prepare_simple_expr(v, sql);
             false
         });
-
-        self.prepare_output(&update.returning, sql);
 
         self.prepare_condition(&update.r#where, "WHERE", sql);
 
@@ -345,8 +314,6 @@ impl QueryBuilder {
             self.prepare_named_table(table, sql);
         }
 
-        self.prepare_output(&delete.returning, sql);
-
         self.prepare_condition(&delete.r#where, "WHERE", sql);
 
         self.prepare_returning(&delete.returning, sql);
@@ -355,7 +322,7 @@ impl QueryBuilder {
     // [spec:pgorm:sem:sql.render.empty-in+1]
     // [spec:pgorm:req:sql.render.subquery+1] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr+1]
-    fn prepare_simple_expr_common(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
+    fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
             SimpleExpr::Column(column_ref) => {
                 self.prepare_column_ref(column_ref, sql);
@@ -445,7 +412,7 @@ impl QueryBuilder {
                     SimpleExpr::Value(value) => sql.push_param_source_typed(value.clone()),
                     other => self.prepare_simple_expr(other, sql),
                 }
-                write!(sql, " AS {})", type_name.to_sql_string(self.quote())).unwrap();
+                write!(sql, " AS {})", type_name.to_sql_string()).unwrap();
             }
             SimpleExpr::Case(case_stmt) => {
                 self.prepare_case_statement(case_stmt, sql);
@@ -491,9 +458,6 @@ impl QueryBuilder {
         write!(sql, " END)").unwrap();
     }
 
-    /// Translate [`IndexHint`] into SQL statement.
-    fn prepare_index_hints(&self, _select: &SelectStatement, _sql: &mut dyn SqlWriter) {}
-
     /// Translate [`LockType`] into SQL statement.
     // [spec:pgorm:sem:sql.render.locking]
     fn prepare_select_lock(&self, lock: &LockClause, sql: &mut dyn SqlWriter) {
@@ -533,7 +497,7 @@ impl QueryBuilder {
         match &select_expr.window {
             Some(WindowSelectType::Name(name)) => {
                 write!(sql, " OVER ").unwrap();
-                name.prepare(sql.as_writer(), self.quote())
+                name.prepare(sql.as_writer())
             }
             Some(WindowSelectType::Query(window)) => {
                 write!(sql, " OVER ").unwrap();
@@ -544,7 +508,7 @@ impl QueryBuilder {
 
         if let Some(alias) = &select_expr.alias {
             write!(sql, " AS ").unwrap();
-            alias.prepare(sql.as_writer(), self.quote());
+            alias.prepare(sql.as_writer());
         }
     }
 
@@ -579,44 +543,44 @@ impl QueryBuilder {
                 self.prepare_select_statement(query, sql);
                 write!(sql, ")").unwrap();
                 write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
+                alias.prepare(sql.as_writer());
             }
             FromItem::ValuesList(values, alias) => {
                 write!(sql, "(").unwrap();
                 self.prepare_values_list(values, sql);
                 write!(sql, ")").unwrap();
                 write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
+                alias.prepare(sql.as_writer());
             }
             FromItem::FunctionCall(func, alias) => {
                 self.prepare_function_name(&func.func, sql);
                 self.prepare_function_arguments(func, sql);
                 write!(sql, " AS ").unwrap();
-                alias.prepare(sql.as_writer(), self.quote());
+                alias.prepare(sql.as_writer());
             }
         }
     }
 
     fn prepare_column_ref(&self, column_ref: &ColumnRef, sql: &mut dyn SqlWriter) {
         match column_ref {
-            ColumnRef::Column(column) => column.prepare(sql.as_writer(), self.quote()),
+            ColumnRef::Column(column) => column.prepare(sql.as_writer()),
             ColumnRef::TableColumn(table, column) => {
-                table.prepare(sql.as_writer(), self.quote());
+                table.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                column.prepare(sql.as_writer(), self.quote());
+                column.prepare(sql.as_writer());
             }
             ColumnRef::SchemaTableColumn(schema, table, column) => {
-                schema.prepare(sql.as_writer(), self.quote());
+                schema.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
+                table.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                column.prepare(sql.as_writer(), self.quote());
+                column.prepare(sql.as_writer());
             }
             ColumnRef::Asterisk => {
                 write!(sql, "*").unwrap();
             }
             ColumnRef::TableAsterisk(table) => {
-                table.prepare(sql.as_writer(), self.quote());
+                table.prepare(sql.as_writer());
                 write!(sql, ".*").unwrap();
             }
         };
@@ -717,7 +681,7 @@ impl QueryBuilder {
             write!(
                 sql,
                 "{}",
-                TypeName::new(SharedIden::clone(iden)).to_sql_string(self.quote())
+                TypeName::new(SharedIden::clone(iden)).to_sql_string()
             )
             .unwrap();
         } else {
@@ -732,14 +696,14 @@ impl QueryBuilder {
                     Function::Abs => "ABS",
                     Function::Coalesce => "COALESCE",
                     Function::Count => "COUNT",
-                    Function::IfNull => self.if_null_function(),
-                    Function::CharLength => self.char_length_function(),
+                    Function::IfNull => "COALESCE",
+                    Function::CharLength => "CHAR_LENGTH",
                     Function::Lower => "LOWER",
                     Function::Upper => "UPPER",
                     Function::BitAnd => "BIT_AND",
                     Function::BitOr => "BIT_OR",
                     Function::Custom(_) => "",
-                    Function::Random => self.random_function(),
+                    Function::Random => "RANDOM",
                     Function::Round => "ROUND",
                     Function::ToTsquery => "TO_TSQUERY",
                     Function::ToTsvector => "TO_TSVECTOR",
@@ -818,7 +782,7 @@ impl QueryBuilder {
 
             write!(sql, " SET ").unwrap();
 
-            search.alias.prepare(sql.as_writer(), self.quote());
+            search.alias.prepare(sql.as_writer());
             write!(sql, " ").unwrap();
         }
         if let Some(cycle) = &with_clause.cycle {
@@ -828,9 +792,9 @@ impl QueryBuilder {
 
             write!(sql, " SET ").unwrap();
 
-            cycle.set_as.prepare(sql.as_writer(), self.quote());
+            cycle.set_as.prepare(sql.as_writer());
             write!(sql, " USING ").unwrap();
-            cycle.using.prepare(sql.as_writer(), self.quote());
+            cycle.using.prepare(sql.as_writer());
             write!(sql, " ").unwrap();
         }
     }
@@ -840,7 +804,7 @@ impl QueryBuilder {
         cte: &CommonTableExpression,
         sql: &mut dyn SqlWriter,
     ) {
-        cte.table_name.prepare(sql.as_writer(), self.quote());
+        cte.table_name.prepare(sql.as_writer());
 
         if cte.cols.is_empty() {
             write!(sql, " ").unwrap();
@@ -853,7 +817,7 @@ impl QueryBuilder {
                     write!(sql, ", ").unwrap();
                 }
                 col_first = false;
-                col.prepare(sql.as_writer(), self.quote());
+                col.prepare(sql.as_writer());
             }
 
             write!(sql, ") ").unwrap();
@@ -883,10 +847,6 @@ impl QueryBuilder {
             )
             .unwrap()
         }
-    }
-
-    fn prepare_insert(&self, sql: &mut dyn SqlWriter) {
-        write!(sql, "INSERT").unwrap();
     }
 
     /// Translate [`JoinType`] into SQL statement.
@@ -957,7 +917,6 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            write!(sql, "{}", self.values_list_tuple_prefix()).unwrap();
             write!(sql, "(").unwrap();
             value_tuple.clone().into_iter().fold(true, |first, value| {
                 if !first {
@@ -1099,14 +1058,13 @@ impl QueryBuilder {
         s
     }
 
-    #[doc(hidden)]
     /// Write ON CONFLICT expression
     // [spec:pgorm:req:sql.render.on-conflict+1]
     fn prepare_on_conflict(&self, on_conflict: &Option<OnConflict>, sql: &mut dyn SqlWriter) {
         let Some(on_conflict) = on_conflict else {
             return;
         };
-        self.prepare_on_conflict_keywords(sql);
+        write!(sql, " ON CONFLICT").unwrap();
         match on_conflict {
             OnConflict::AnyDoNothing => write!(sql, " DO NOTHING").unwrap(),
             OnConflict::Targeted { target, action } => {
@@ -1116,7 +1074,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Write ON CONFLICT target
     fn prepare_on_conflict_target(&self, target: &ConflictTarget, sql: &mut dyn SqlWriter) {
         write!(sql, " (").unwrap();
@@ -1126,7 +1083,7 @@ impl QueryBuilder {
             }
             match element {
                 ConflictElement::Column(col) => {
-                    col.prepare(sql.as_writer(), self.quote());
+                    col.prepare(sql.as_writer());
                 }
                 ConflictElement::Expr(expr) => {
                     self.prepare_simple_expr(expr, sql);
@@ -1138,25 +1095,24 @@ impl QueryBuilder {
         self.prepare_on_conflict_condition(&target.filter, sql);
     }
 
-    #[doc(hidden)]
     /// Write ON CONFLICT action
     fn prepare_on_conflict_action(&self, action: &ConflictAction, sql: &mut dyn SqlWriter) {
         match action {
             ConflictAction::DoNothing => write!(sql, " DO NOTHING").unwrap(),
             ConflictAction::Update { sets, filter } => {
-                self.prepare_on_conflict_do_update_keywords(sql);
+                write!(sql, " DO UPDATE SET ").unwrap();
                 sets.iter().fold(true, |first, assignment| {
                     if !first {
                         write!(sql, ", ").unwrap()
                     }
                     match assignment {
                         ConflictAssignment::Column(col) => {
-                            col.prepare(sql.as_writer(), self.quote());
+                            col.prepare(sql.as_writer());
                             write!(sql, " = ").unwrap();
                             self.prepare_on_conflict_excluded_table(col, sql);
                         }
                         ConflictAssignment::Expr(col, expr) => {
-                            col.prepare(sql.as_writer(), self.quote());
+                            col.prepare(sql.as_writer());
                             write!(sql, " = ").unwrap();
                             self.prepare_simple_expr(expr, sql);
                         }
@@ -1168,33 +1124,12 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
-    /// Write ON CONFLICT keywords
-    fn prepare_on_conflict_keywords(&self, sql: &mut dyn SqlWriter) {
-        write!(sql, " ON CONFLICT").unwrap();
-    }
-
-    #[doc(hidden)]
-    /// Write ON CONFLICT keywords
-    fn prepare_on_conflict_do_update_keywords(&self, sql: &mut dyn SqlWriter) {
-        write!(sql, " DO UPDATE SET ").unwrap();
-    }
-
-    #[doc(hidden)]
     /// Write ON CONFLICT update action by retrieving value from the excluded table
     fn prepare_on_conflict_excluded_table(&self, col: &DynIden, sql: &mut dyn SqlWriter) {
-        write!(
-            sql,
-            "{}excluded{}",
-            self.quote().left(),
-            self.quote().right()
-        )
-        .unwrap();
-        write!(sql, ".").unwrap();
-        col.prepare(sql.as_writer(), self.quote());
+        write!(sql, "\"excluded\".").unwrap();
+        col.prepare(sql.as_writer());
     }
 
-    #[doc(hidden)]
     /// Write ON CONFLICT conditions
     fn prepare_on_conflict_condition(&self, filter: &Option<Condition>, sql: &mut dyn SqlWriter) {
         if let Some(condition) = filter {
@@ -1203,14 +1138,8 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
-    /// Hook to insert "OUTPUT" expressions.
-    // [spec:pgorm:req:sql.render.returning] (pre-source OUTPUT hook is a no-op)
-    fn prepare_output(&self, _returning: &Option<ReturningClause>, _sql: &mut dyn SqlWriter) {}
-
-    #[doc(hidden)]
     /// Hook to insert "RETURNING" statements.
-    // [spec:pgorm:req:sql.render.returning]
+    // [spec:pgorm:req:sql.render.returning+1]
     fn prepare_returning(&self, returning: &Option<ReturningClause>, sql: &mut dyn SqlWriter) {
         if let Some(returning) = returning {
             write!(sql, " RETURNING ").unwrap();
@@ -1238,7 +1167,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Translate a condition to a "WHERE" clause.
     // [spec:pgorm:req:sql.render.condition-chain+1]
     fn prepare_condition(
@@ -1253,14 +1181,12 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Translate part of a condition to part of a "WHERE" clause.
     fn prepare_condition_where(&self, condition: &Condition, sql: &mut dyn SqlWriter) {
         let simple_expr = condition.to_simple_expr();
         self.prepare_simple_expr(&simple_expr, sql);
     }
 
-    #[doc(hidden)]
     /// Translate [`Frame`] into SQL statement.
     // [spec:pgorm:req:sql.render.window+3] (frame bounds)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
@@ -1279,7 +1205,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Translate a [`WindowStatement`] into the parenthesized window
     /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
     // [spec:pgorm:req:sql.render.window+3]
@@ -1289,7 +1214,6 @@ impl QueryBuilder {
         write!(sql, " )").unwrap();
     }
 
-    #[doc(hidden)]
     /// Translate [`WindowStatement`] into SQL statement.
     // [spec:pgorm:req:sql.render.window+3]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
@@ -1331,7 +1255,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Translate a binary expr to SQL.
     // [spec:pgorm:req:sql.render.parens+1]
     fn binary_expr(
@@ -1383,24 +1306,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
-    /// The name of the function that returns the char length.
-    fn char_length_function(&self) -> &str {
-        "CHAR_LENGTH"
-    }
-
-    #[doc(hidden)]
-    /// The name of the function that returns a random number
-    fn random_function(&self) -> &str {
-        // Returning it with parens as part of the name because the tuple preparer can't deal with empty lists
-        "RANDOM"
-    }
-
-    /// The keywords for insert default row.
-    fn insert_default_keyword(&self) -> &str {
-        "(DEFAULT)"
-    }
-
     /// Write insert default rows expression.
     fn insert_default_values(&self, num_rows: u32, sql: &mut dyn SqlWriter) {
         write!(sql, "VALUES ").unwrap();
@@ -1408,7 +1313,7 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap()
             }
-            write!(sql, "{}", self.insert_default_keyword()).unwrap();
+            write!(sql, "(DEFAULT)").unwrap();
             false
         });
     }
@@ -1423,8 +1328,6 @@ impl QueryBuilder {
         self.prepare_constant(&false.into(), sql);
     }
 
-    // COMMON
-    // START: impl that ought not be here
     // [spec:pgorm:sem:sql.ddl.panics+4]
     // [spec:pgorm:def:sql.render.ddl.types+3] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
@@ -1454,14 +1357,22 @@ impl QueryBuilder {
         }
     }
 
+    /// Write a column definition: its name, then its type as `write_type`
+    /// spells it, then every spec that has a spelling of its own. The type is
+    /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
+    /// differently; everything around it is the same in both.
     // [spec:pgorm:req:sql.ddl.column-def+4]
-    fn prepare_column_def_common<F>(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter, f: F)
-    where
+    fn prepare_column_def_parts<F>(
+        &self,
+        column_def: &ColumnDef,
+        sql: &mut dyn SqlWriter,
+        write_type: F,
+    ) where
         F: Fn(&ColumnDef, &mut dyn SqlWriter),
     {
-        column_def.name.prepare(sql.as_writer(), self.quote());
+        column_def.name.prepare(sql.as_writer());
 
-        f(column_def, sql);
+        write_type(column_def, sql);
 
         for column_spec in column_def.spec.iter() {
             if let ColumnSpec::AutoIncrement = column_spec {
@@ -1474,13 +1385,11 @@ impl QueryBuilder {
             self.prepare_column_spec(column_spec, sql);
         }
     }
-    // END: lol
 
     fn prepare_column_def(&self, column_def: &ColumnDef, sql: &mut dyn SqlWriter) {
-        let f = |column_def: &ColumnDef, sql: &mut dyn SqlWriter| {
+        self.prepare_column_def_parts(column_def, sql, |column_def, sql| {
             self.prepare_column_type_check_auto_increment(column_def, sql);
-        };
-        self.prepare_column_def_common(column_def, sql, f);
+        });
     }
 
     // [spec:pgorm:req:sql.ddl.column-types+3]
@@ -1551,7 +1460,7 @@ impl QueryBuilder {
                 ColumnType::Enum { name, schema, .. } => {
                     let mut type_name = TypeName::new(SharedIden::clone(name));
                     type_name.schema = schema.clone();
-                    type_name.to_sql_string(self.quote())
+                    type_name.to_sql_string()
                 }
                 ColumnType::Cidr => "cidr".into(),
                 ColumnType::Inet => "inet".into(),
@@ -1560,10 +1469,6 @@ impl QueryBuilder {
             }
         )
         .unwrap()
-    }
-
-    fn column_spec_auto_increment_keyword(&self) -> &str {
-        ""
     }
 
     // [spec:pgorm:req:sql.ddl.alter-table+3]
@@ -1589,7 +1494,7 @@ impl QueryBuilder {
                     if *if_not_exists {
                         write!(sql, "IF NOT EXISTS ").unwrap();
                     }
-                    let f = |column_def: &ColumnDef, sql: &mut dyn SqlWriter| {
+                    self.prepare_column_def_parts(column, sql, |column_def, sql| {
                         if let Some(column_type) = &column_def.types {
                             write!(sql, " ").unwrap();
                             if column_def
@@ -1602,13 +1507,12 @@ impl QueryBuilder {
                                 self.prepare_column_type(column_type, sql);
                             }
                         }
-                    };
-                    self.prepare_column_def_common(column, sql, f);
+                    });
                 }
                 TableAlterOption::ModifyColumn(column_def) => {
                     if let Some(column_type) = &column_def.types {
                         write!(sql, "ALTER COLUMN ").unwrap();
-                        column_def.name.prepare(sql.as_writer(), self.quote());
+                        column_def.name.prepare(sql.as_writer());
                         write!(sql, " TYPE ").unwrap();
                         self.prepare_column_type(column_type, sql);
                     }
@@ -1627,28 +1531,28 @@ impl QueryBuilder {
                             ColumnSpec::AutoIncrement => {}
                             ColumnSpec::Null => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
-                                column_def.name.prepare(sql.as_writer(), self.quote());
+                                column_def.name.prepare(sql.as_writer());
                                 write!(sql, " DROP NOT NULL").unwrap();
                             }
                             ColumnSpec::NotNull => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
-                                column_def.name.prepare(sql.as_writer(), self.quote());
+                                column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
                             }
                             ColumnSpec::Default(v) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
-                                column_def.name.prepare(sql.as_writer(), self.quote());
+                                column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET DEFAULT ").unwrap();
-                                QueryBuilder::prepare_simple_expr(self, v, sql);
+                                self.prepare_simple_expr(v, sql);
                             }
                             ColumnSpec::UniqueKey => {
                                 write!(sql, "ADD UNIQUE (").unwrap();
-                                column_def.name.prepare(sql.as_writer(), self.quote());
+                                column_def.name.prepare(sql.as_writer());
                                 write!(sql, ")").unwrap();
                             }
                             ColumnSpec::PrimaryKey => {
                                 write!(sql, "ADD PRIMARY KEY (").unwrap();
-                                column_def.name.prepare(sql.as_writer(), self.quote());
+                                column_def.name.prepare(sql.as_writer());
                                 write!(sql, ")").unwrap();
                             }
                             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
@@ -1661,11 +1565,11 @@ impl QueryBuilder {
                 }
                 TableAlterOption::DropColumn(column_name) => {
                     write!(sql, "DROP COLUMN ").unwrap();
-                    column_name.prepare(sql.as_writer(), self.quote());
+                    column_name.prepare(sql.as_writer());
                 }
                 TableAlterOption::DropForeignKey(name) => {
                     write!(sql, "DROP CONSTRAINT ").unwrap();
-                    name.prepare(sql.as_writer(), self.quote());
+                    name.prepare(sql.as_writer());
                 }
                 TableAlterOption::AddForeignKey(foreign_key) => {
                     let create = ForeignKeyCreateStatement {
@@ -1691,7 +1595,7 @@ impl QueryBuilder {
         write!(sql, "ALTER TABLE ").unwrap();
         self.prepare_table_name(&rename.from_name, sql);
         write!(sql, " RENAME TO ").unwrap();
-        rename.to_name.prepare(sql.as_writer(), self.quote());
+        rename.to_name.prepare(sql.as_writer());
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
@@ -1704,9 +1608,9 @@ impl QueryBuilder {
         write!(sql, "ALTER TABLE ").unwrap();
         self.prepare_table_name(&rename.table, sql);
         write!(sql, " RENAME COLUMN ").unwrap();
-        rename.from_name.prepare(sql.as_writer(), self.quote());
+        rename.from_name.prepare(sql.as_writer());
         write!(sql, " TO ").unwrap();
-        rename.to_name.prepare(sql.as_writer(), self.quote());
+        rename.to_name.prepare(sql.as_writer());
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
@@ -1771,11 +1675,12 @@ impl QueryBuilder {
             ColumnSpec::NotNull => write!(sql, "NOT NULL").unwrap(),
             ColumnSpec::Default(value) => {
                 write!(sql, "DEFAULT ").unwrap();
-                QueryBuilder::prepare_simple_expr(self, value, sql);
+                self.prepare_simple_expr(value, sql);
             }
-            ColumnSpec::AutoIncrement => {
-                write!(sql, "{}", self.column_spec_auto_increment_keyword()).unwrap()
-            }
+            // The serial family carries auto-increment in the column's type,
+            // rendered by `prepare_column_auto_increment`; there is no
+            // trailing keyword to spell here.
+            ColumnSpec::AutoIncrement => {}
             ColumnSpec::UniqueKey => write!(sql, "UNIQUE").unwrap(),
             ColumnSpec::PrimaryKey => write!(sql, "PRIMARY KEY").unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
@@ -1802,7 +1707,7 @@ impl QueryBuilder {
                 write!(sql, "COLUMN ").unwrap();
                 self.prepare_table_name(table, sql);
                 write!(sql, ".").unwrap();
-                column.prepare(sql.as_writer(), self.quote());
+                column.prepare(sql.as_writer());
             }
         }
         write!(sql, " IS ").unwrap();
@@ -1867,7 +1772,7 @@ impl QueryBuilder {
     /// Translate the check constraint into SQL statement
     pub(crate) fn prepare_check_constraint(&self, check: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "CHECK (").unwrap();
-        QueryBuilder::prepare_simple_expr(self, check, sql);
+        self.prepare_simple_expr(check, sql);
         write!(sql, ")").unwrap();
     }
 
@@ -1879,7 +1784,7 @@ impl QueryBuilder {
     // [spec:pgorm:req:sql.ddl.column-def+4]
     pub(crate) fn prepare_generated_column(&self, gen_: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
-        QueryBuilder::prepare_simple_expr(self, gen_, sql);
+        self.prepare_simple_expr(gen_, sql);
         write!(sql, ") STORED").unwrap();
     }
 
@@ -1895,8 +1800,10 @@ impl QueryBuilder {
     }
 
     // INDEX
-    // Overriden due to different "NULLS NOT UNIQUE" position in table index expression
-    // (as opposed to the regular index expression)
+
+    /// Write an index as a `CREATE TABLE` constraint. The embedded form puts
+    /// `NULLS NOT DISTINCT` before the column list; the standalone
+    /// `CREATE INDEX` of `prepare_index_create_statement` puts it after.
     fn prepare_table_index_expression(
         &self,
         create: &IndexCreateStatement,
@@ -1904,7 +1811,7 @@ impl QueryBuilder {
     ) {
         if let Some(name) = &create.index.name {
             write!(sql, "CONSTRAINT ").unwrap();
-            name.prepare(sql.as_writer(), self.quote());
+            name.prepare(sql.as_writer());
             write!(sql, " ").unwrap();
         }
 
@@ -1921,7 +1828,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+5]
+    // [spec:pgorm:req:sql.ddl.index-create+6]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -1941,7 +1848,7 @@ impl QueryBuilder {
         }
 
         if let Some(name) = &create.index.name {
-            name.prepare(sql.as_writer(), self.quote());
+            name.prepare(sql.as_writer());
         }
 
         write!(sql, " ON ").unwrap();
@@ -1969,10 +1876,10 @@ impl QueryBuilder {
         }
 
         if let Some(schema) = drop.table.as_ref().and_then(TableName::schema) {
-            schema.prepare(sql.as_writer(), self.quote());
+            schema.prepare(sql.as_writer());
             write!(sql, ".").unwrap();
         }
-        drop.name.prepare(sql.as_writer(), self.quote());
+        drop.name.prepare(sql.as_writer());
     }
 
     fn prepare_index_type(&self, col_index_type: &Option<IndexType>, sql: &mut dyn SqlWriter) {
@@ -1982,7 +1889,7 @@ impl QueryBuilder {
                 " USING {}",
                 match index_type {
                     IndexType::BTree => "BTREE".to_owned(),
-                    IndexType::FullText => "GIN".to_owned(),
+                    IndexType::Gin => "GIN".to_owned(),
                     IndexType::Hash => "HASH".to_owned(),
                     IndexType::Custom(custom) => custom.to_string(),
                 }
@@ -1991,7 +1898,6 @@ impl QueryBuilder {
         }
     }
 
-    #[doc(hidden)]
     /// Write an index's column list.
     fn prepare_index_columns(&self, columns: &[IndexColumn], sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
@@ -1999,7 +1905,7 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            col.name.prepare(sql.as_writer(), self.quote());
+            col.name.prepare(sql.as_writer());
             if let Some(order) = &col.order {
                 match order {
                     IndexOrder::Asc => write!(sql, " ASC").unwrap(),
@@ -2023,7 +1929,7 @@ impl QueryBuilder {
         write!(sql, "ALTER TABLE ").unwrap();
         self.prepare_table_name(&drop.table, sql);
         write!(sql, " DROP CONSTRAINT ").unwrap();
-        drop.name.prepare(sql.as_writer(), self.quote());
+        drop.name.prepare(sql.as_writer());
     }
 
     // [spec:pgorm:req:sql.ddl.foreign-key+3]
@@ -2045,7 +1951,7 @@ impl QueryBuilder {
 
         if let Some(name) = &create.foreign_key.name {
             write!(sql, "CONSTRAINT ").unwrap();
-            name.prepare(sql.as_writer(), self.quote());
+            name.prepare(sql.as_writer());
             write!(sql, " ").unwrap();
         }
 
@@ -2054,7 +1960,7 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            col.prepare(sql.as_writer(), self.quote());
+            col.prepare(sql.as_writer());
             false
         });
         write!(sql, ")").unwrap();
@@ -2068,7 +1974,7 @@ impl QueryBuilder {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            col.prepare(sql.as_writer(), self.quote());
+            col.prepare(sql.as_writer());
             false
         });
         write!(sql, ")").unwrap();
@@ -2166,11 +2072,11 @@ impl QueryBuilder {
     /// Translate [`TableName`] into SQL statement.
     fn prepare_table_name(&self, name: &TableName, sql: &mut dyn SqlWriter) {
         match name {
-            TableName::Table(table) => table.prepare(sql.as_writer(), self.quote()),
+            TableName::Table(table) => table.prepare(sql.as_writer()),
             TableName::SchemaTable(schema, table) => {
-                schema.prepare(sql.as_writer(), self.quote());
+                schema.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                table.prepare(sql.as_writer(), self.quote());
+                table.prepare(sql.as_writer());
             }
         }
     }
@@ -2181,7 +2087,7 @@ impl QueryBuilder {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {
             write!(sql, " AS ").unwrap();
-            alias.prepare(sql.as_writer(), self.quote());
+            alias.prepare(sql.as_writer());
         }
     }
 
@@ -2237,7 +2143,7 @@ impl QueryBuilder {
             }
             TypeAlterOpt::Rename(new_name) => {
                 write!(sql, " RENAME TO ").unwrap();
-                new_name.prepare(sql.as_writer(), self.quote());
+                new_name.prepare(sql.as_writer());
             }
             TypeAlterOpt::RenameValue(existing, new_name) => {
                 write!(sql, " RENAME VALUE ").unwrap();
@@ -2306,19 +2212,19 @@ impl QueryBuilder {
     fn prepare_type_ref(&self, type_ref: &TypeRef, sql: &mut dyn SqlWriter) {
         match type_ref {
             TypeRef::Type(name) => {
-                name.prepare(sql.as_writer(), self.quote());
+                name.prepare(sql.as_writer());
             }
             TypeRef::SchemaType(schema, name) => {
-                schema.prepare(sql.as_writer(), self.quote());
+                schema.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                name.prepare(sql.as_writer(), self.quote());
+                name.prepare(sql.as_writer());
             }
             TypeRef::DatabaseSchemaType(database, schema, name) => {
-                database.prepare(sql.as_writer(), self.quote());
+                database.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                schema.prepare(sql.as_writer(), self.quote());
+                schema.prepare(sql.as_writer());
                 write!(sql, ".").unwrap();
-                name.prepare(sql.as_writer(), self.quote());
+                name.prepare(sql.as_writer());
             }
         }
     }
@@ -2337,11 +2243,11 @@ impl QueryBuilder {
             write!(sql, "IF NOT EXISTS ").unwrap()
         }
 
-        create.name.prepare(sql.as_writer(), self.quote());
+        create.name.prepare(sql.as_writer());
 
         if let Some(schema) = create.schema.as_ref() {
             write!(sql, " WITH SCHEMA ").unwrap();
-            self.prepare_extension_ident(schema, sql);
+            Alias::new(schema).prepare(sql.as_writer());
         }
 
         if let Some(version) = create.version.as_ref() {
@@ -2369,7 +2275,7 @@ impl QueryBuilder {
             write!(sql, "IF EXISTS ").unwrap();
         }
 
-        drop.name.prepare(sql.as_writer(), self.quote());
+        drop.name.prepare(sql.as_writer());
 
         match drop.option {
             Some(ExtensionDropOpt::Cascade) => write!(sql, " CASCADE").unwrap(),
@@ -2378,44 +2284,79 @@ impl QueryBuilder {
         }
     }
 
-    /// Write an extension name or schema as a quoted identifier.
-    // [spec:pgorm:sem:sql.render.ddl.extension+1]
-    fn prepare_extension_ident(&self, ident: &str, sql: &mut dyn SqlWriter) {
-        Alias::new(ident).prepare(sql.as_writer(), self.quote());
-    }
-
+    /// Whether parentheses around `inner` can be dropped inside `outer_oper`.
+    ///
+    /// One table, because there is one dialect. Atoms never need them —
+    /// all but a column and a tuple already wrap themselves. A binary inner
+    /// expression keeps them unless it binds tighter than the operator it
+    /// sits under: arithmetic and shifts bind tighter than comparison,
+    /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
+    /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
+    /// unknown and keeps its parentheses.
     // [spec:pgorm:def:sql.render.precedence+2]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
         outer_oper: &Oper,
     ) -> bool {
-        let common_answer = common_inner_expr_well_known_greater_precedence(inner, outer_oper);
-        let pg_specific_answer = match inner {
+        match inner {
+            SimpleExpr::Column(_)
+            | SimpleExpr::Tuple(_)
+            | SimpleExpr::Constant(_)
+            | SimpleExpr::FunctionCall(_)
+            | SimpleExpr::Value(_)
+            | SimpleExpr::Keyword(_)
+            | SimpleExpr::Case(_)
+            | SimpleExpr::LikePattern(_)
+            | SimpleExpr::AsEnum(_, _)
+            | SimpleExpr::SubQuery(_, _) => true,
             SimpleExpr::Binary(_, inner_bin_oper, _) => {
                 let inner_oper: Oper = (*inner_bin_oper).into();
                 if inner_oper.is_arithmetic() || inner_oper.is_shift() {
-                    is_ilike(inner_bin_oper)
-                } else if is_pg_comparison(inner_bin_oper) {
+                    outer_oper.is_comparison()
+                        || outer_oper.is_between()
+                        || outer_oper.is_in()
+                        || outer_oper.is_like()
+                        || outer_oper.is_logical()
+                } else if inner_oper.is_comparison()
+                    || inner_oper.is_in()
+                    || inner_oper.is_like()
+                    || inner_oper.is_is()
+                    || returns_boolean(inner_bin_oper)
+                {
                     outer_oper.is_logical()
                 } else {
                     false
                 }
             }
             _ => false,
-        };
-        common_answer || pg_specific_answer
+        }
     }
 
-    // [spec:pgorm:req:sql.render.parens+1] (left-associative flattening incl. || for Postgres)
+    /// The operators whose repetition renders flat: `a AND b AND c`,
+    /// `a || b || c`.
+    // [spec:pgorm:req:sql.render.parens+1]
     fn well_known_left_associative(&self, op: &BinOper) -> bool {
-        let common_answer = common_well_known_left_associative(op);
-        let pg_specific_answer = matches!(op, BinOper::Concatenate);
-        common_answer || pg_specific_answer
+        matches!(
+            op,
+            BinOper::And
+                | BinOper::Or
+                | BinOper::Add
+                | BinOper::Sub
+                | BinOper::Mul
+                | BinOper::Mod
+                | BinOper::Concatenate
+        )
     }
 }
 
-fn is_pg_comparison(b: &BinOper) -> bool {
+/// The operators outside the comparison/IN/LIKE/IS families that still yield a
+/// boolean, and so bind tighter than a logical operator. Membership is exactly
+/// "returns boolean", which is why the JSON *existence* tests are here and the
+/// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
+/// not.
+// [spec:pgorm:def:sql.render.precedence+2]
+fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,
         BinOper::Contained
@@ -2430,10 +2371,6 @@ fn is_pg_comparison(b: &BinOper) -> bool {
     )
 }
 
-fn is_ilike(b: &BinOper) -> bool {
-    matches!(b, BinOper::ILike | BinOper::NotILike)
-}
-
 impl SubQueryStatement {
     pub(crate) fn prepare_statement(&self, sql: &mut dyn SqlWriter) {
         use SubQueryStatement::*;
@@ -2445,57 +2382,6 @@ impl SubQueryStatement {
             WithStatement(stmt) => QueryBuilder.prepare_with_query(stmt, sql),
         }
     }
-}
-
-// [spec:pgorm:def:sql.render.precedence+2] (backend-independent portion of the elision table)
-pub(crate) fn common_inner_expr_well_known_greater_precedence(
-    inner: &SimpleExpr,
-    outer_oper: &Oper,
-) -> bool {
-    match inner {
-        // We only consider the case where an inner expression is contained in either a
-        // unary or binary expression (with an outer_oper).
-        // We do not need to wrap with parentheses:
-        // Columns, tuples (already wrapped), constants, function calls, values,
-        // keywords, subqueries (already wrapped), case (already wrapped),
-        // casts (`CAST(_ AS _)` wraps itself)
-        SimpleExpr::Column(_)
-        | SimpleExpr::Tuple(_)
-        | SimpleExpr::Constant(_)
-        | SimpleExpr::FunctionCall(_)
-        | SimpleExpr::Value(_)
-        | SimpleExpr::Keyword(_)
-        | SimpleExpr::Case(_)
-        | SimpleExpr::LikePattern(_)
-        | SimpleExpr::AsEnum(_, _)
-        | SimpleExpr::SubQuery(_, _) => true,
-        SimpleExpr::Binary(_, inner_oper, _) => {
-            let inner_oper: Oper = (*inner_oper).into();
-            if inner_oper.is_arithmetic() || inner_oper.is_shift() {
-                outer_oper.is_comparison()
-                    || outer_oper.is_between()
-                    || outer_oper.is_in()
-                    || outer_oper.is_like()
-                    || outer_oper.is_logical()
-            } else if inner_oper.is_comparison()
-                || inner_oper.is_in()
-                || inner_oper.is_like()
-                || inner_oper.is_is()
-            {
-                outer_oper.is_logical()
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-pub(crate) fn common_well_known_left_associative(op: &BinOper) -> bool {
-    matches!(
-        op,
-        BinOper::And | BinOper::Or | BinOper::Add | BinOper::Sub | BinOper::Mul | BinOper::Mod
-    )
 }
 
 #[derive(Debug, PartialEq, Eq)]

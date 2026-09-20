@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display};
 
-use crate::{SqlWriter, SqlWriterValues, SubQueryStatement, backend::QueryBuilder, value::Values};
+use crate::{SqlWriter, SqlWriterValues, SubQueryStatement, value::Values};
 
-// [spec:pgorm:req:sql.ast.build+1]
+// [spec:pgorm:req:sql.ast.build+2]
 pub trait QueryStatementBuilder: Debug + Display {
     /// Build the SQL statement, collecting query parameters into a vector
     ///
@@ -48,8 +48,7 @@ pub trait QueryStatementBuilder: Debug + Display {
     /// );
     /// ```
     fn build(&self) -> (String, Values) {
-        let (placeholder, numbered) = QueryBuilder.placeholder();
-        let mut sql = SqlWriterValues::new(placeholder, numbered);
+        let mut sql = SqlWriterValues::new("$", true);
         self.build_collect_into(&mut sql);
         sql.into_parts()
     }
@@ -69,8 +68,7 @@ pub trait QueryStatementBuilder: Debug + Display {
     ///     .order_by((Glyph::Table, Glyph::Aspect), Order::Asc)
     ///     .to_owned();
     ///
-    /// let (placeholder, numbered) = QueryBuilder.placeholder();
-    /// let mut sql = SqlWriterValues::new(placeholder, numbered);
+    /// let mut sql = SqlWriterValues::new("$", true);
     ///
     /// assert_eq!(
     ///     query.build_collect(&mut sql),

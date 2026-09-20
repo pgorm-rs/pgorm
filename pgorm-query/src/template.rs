@@ -7,7 +7,6 @@
 //! text and values; there is nothing left to look up, and so nothing left to
 //! be out of range.
 
-use crate::backend::QueryBuilder;
 use crate::error::{Error, Result, TemplateError};
 use crate::expr::SimpleExpr;
 use crate::token::{Token, Tokenizer};
@@ -46,7 +45,7 @@ pub(crate) enum Grammar {
 // [spec:pgorm:req:sql.render.custom-expr+1] (the `Template` grammar: `$$` escape, `$N` index)
 // [spec:pgorm:sem:sql.render.inject+3] (the `Sql` grammar: only `$N`, everything else verbatim)
 pub(crate) fn scan(input: &str, grammar: Grammar) -> Result<Vec<Chunk>> {
-    let mark = QueryBuilder.placeholder().0;
+    let mark = "$";
     let tokens: Vec<Token> = match grammar {
         Grammar::Sql => Tokenizer::new(input).iter().collect(),
         Grammar::Template => Tokenizer::new_without_dollar_quoting(input)

@@ -241,13 +241,15 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Identifier machinery
 
-> [spec:pgorm:def:sql.types+7]
+> [spec:pgorm:def:sql.types+8]
 > `Iden` is the identifier trait (bounded `Any + Send + Sync`): implementors provide
-> `unquoted`, and the trait derives `to_string` (unquoted), `quoted(q)` —
-> which doubles any embedded quote character — and `prepare`, which writes the
-> identifier wrapped in the `Quote` pair. The Postgres `QueryBuilder` uses
-> `Quote(b'"', b'"')`, so identifiers render double-quoted with embedded `"`
-> doubled. `IdenStatic` adds `as_str() -> &'static str` for `Copy + 'static`
+> `unquoted`, and the trait derives `to_string` (unquoted), `quoted()` —
+> which doubles any embedded double quote — and `prepare`, which writes the
+> identifier wrapped in double quotes. Neither takes a quote character:
+> PostgreSQL has one identifier quote, so there is no `Quote` type and no
+> parameter that could carry a different one (which is also how the panic on a
+> non-ASCII quote byte stopped existing).
+> `IdenStatic` adds `as_str() -> &'static str` for `Copy + 'static`
 > identifiers.
 >
 > `DynIden` is `SharedIden`, a non-generic wrapper over

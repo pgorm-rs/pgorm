@@ -7685,6 +7685,13 @@ children (
                         kind @note
                         text "The multi-backend trait is gone but its skeleton still governs backend/query_builder.rs: dialect knobs returning constants (placeholder() -> (\"$\", true) at :38; values_list_tuple_prefix \"\" :102-104; insert_default_keyword :1400-1403; column_spec_auto_increment_keyword \"\" :1566-1568; if_null/char_length/random_function :97-99, 1389-1398), no-op hooks prepare_output (:1210) and prepare_index_hints (:495), a precedence table split into common_* free functions merged with a pg_specific_answer (:2404-2516) for exactly one dialect, UFCS pseudo-dispatch spelled QueryBuilder::prepare_simple_expr(self, ..) (:1643, 1775, 1873, 1885), and #[doc(hidden)] on private methods — vestigial from when they were trait items. Quote is generalized over arbitrary (u8,u8) with five From impls (types.rs:618-654) though the crate has one quote (:13), and Quote::new(0xFF) panics in Iden::quoted (types.rs:21). The renderer's own comment marks the seam: \"START: impl that ought not be here … END: lol\" (:1428, 1478). Also here: the 12 MySQL/SQLite doc mentions, and IndexType::FullText -> Gin (index/create.rs:159, render :1993; codegen round-trips \"gin\" => FullText at pgorm-codegen/src/sql_schema/objects.rs:148). Inline the constants, delete the hooks, fold common_* in, name the index method for what it renders."
                     }
+
+                    {
+                        at 2026-09-20T00:14:57.088834Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

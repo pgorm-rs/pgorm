@@ -132,7 +132,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Resolve the collected statements against each other: enum types into the
 /// columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+2]
+// [spec:pgorm:sem:codegen.ddl.objects+3]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         enums,

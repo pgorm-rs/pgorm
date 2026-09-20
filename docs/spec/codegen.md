@@ -792,7 +792,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+2]
+> [spec:pgorm:sem:codegen.ddl.objects+3]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -804,7 +804,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > A unique `CREATE INDEX` is folded into its table's indexes, keeping its name,
 > columns, `ASC`/`DESC` ordering, `NULLS NOT DISTINCT`, `IF NOT EXISTS` and
 > access method (`btree` is the default, `hash` → `IndexType::Hash`,
-> `gin` → `IndexType::FullText`, anything else `IndexType::Custom`);
+> `gin` → `IndexType::Gin`, anything else `IndexType::Custom`);
 > `codegen.entity.transform` then reads a single-column unique index as that
 > column's `unique` flag. `COMMENT ON TABLE` becomes the statement's comment and
 > `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column. Neither

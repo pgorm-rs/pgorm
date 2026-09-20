@@ -58,7 +58,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
 > ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+5]`) and `NULLS NOT
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+6]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis only
@@ -203,7 +203,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > All three take their targets in the constructor, because PostgreSQL rejects
 > every one of these statements with the name left out: `Table::drop(table)`
 > seeds the list and `table()` appends the rest, in the pattern
-> `[spec:pgorm:req:sql.ddl.index-create+5]` uses for index columns, so the
+> `[spec:pgorm:req:sql.ddl.index-create+6]` uses for index columns, so the
 > empty `DROP TABLE ` cannot be built; `Table::rename(from, to)` and
 > `Table::truncate(table)` take theirs whole and expose no setter. `take()` on
 > a drop copies the target list rather than moving it, so no target-less husk
@@ -249,7 +249,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+5]
+> [spec:pgorm:req:sql.ddl.index-create+6]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
 > `index_type` and `if_not_exists` flags. Its target table and its column list
@@ -293,8 +293,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
-> `<type>` is `BTREE`, `GIN` (the `FullText` mapping, also set by
-> `full_text()`), `HASH`, or a custom identifier, and each column renders as
+> `<type>` is `BTREE`, `GIN` (the `IndexType::Gin` variant, also set by the
+> `gin()` shorthand — the access method is named for what PostgreSQL calls it,
+> not for the full-text use it serves), `HASH`, or a custom identifier, and
+> each column renders as
 > `"name"[ ASC|DESC]`. There is no prefix length: `"name" (128)` is MySQL's
 > syntax for indexing a leading substring, PostgreSQL rejects it outright, and
 > an index the server cannot accept MUST NOT be constructible — the expression

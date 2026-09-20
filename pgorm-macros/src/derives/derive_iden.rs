@@ -19,10 +19,10 @@ fn impl_iden_for_unit_struct(
 ) -> proc_macro2::TokenStream {
     let prepare = if must_be_valid_iden(new_iden) {
         quote! {
-            fn prepare(&self, s: &mut dyn ::std::fmt::Write, q: pgorm::pgorm_query::Quote) {
-                write!(s, "{}", q.left()).unwrap();
+            fn prepare(&self, s: &mut dyn ::std::fmt::Write) {
+                write!(s, "\"").unwrap();
                 self.unquoted(s);
-                write!(s, "{}", q.right()).unwrap();
+                write!(s, "\"").unwrap();
             }
         }
     } else {
@@ -81,10 +81,10 @@ fn impl_iden_for_enum(
 
     let prepare = if all_valid {
         quote! {
-            fn prepare(&self, s: &mut dyn ::std::fmt::Write, q: pgorm::pgorm_query::Quote) {
-                write!(s, "{}", q.left()).unwrap();
+            fn prepare(&self, s: &mut dyn ::std::fmt::Write) {
+                write!(s, "\"").unwrap();
                 self.unquoted(s);
-                write!(s, "{}", q.right()).unwrap();
+                write!(s, "\"").unwrap();
             }
         }
     } else {

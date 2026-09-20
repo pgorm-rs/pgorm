@@ -3,7 +3,7 @@
 // A SQL builder renders text; nothing it does needs the unsafe half of the
 // language. The one block that existed compared trait-object vtable addresses
 // for identifier equality, which `TypeId` answers with a guarantee behind it
-// (`[spec:pgorm:def:sql.types+7]`).
+// (`[spec:pgorm:def:sql.types+8]`).
 #![forbid(unsafe_code)]
 
 //! # pgorm-query

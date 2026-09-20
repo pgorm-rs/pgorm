@@ -50,10 +50,10 @@ fn impl_iden_for_unit_struct(
 
     let prepare = if must_be_valid_iden(table_name) {
         quote! {
-            fn prepare(&self, s: &mut dyn ::std::fmt::Write, q: #pgorm_query_path::Quote) {
-                write!(s, "{}", q.left()).unwrap();
+            fn prepare(&self, s: &mut dyn ::std::fmt::Write) {
+                write!(s, "\"").unwrap();
                 self.unquoted(s);
-                write!(s, "{}", q.right()).unwrap();
+                write!(s, "\"").unwrap();
             }
         }
     } else {
@@ -98,10 +98,10 @@ where
 
     let prepare = if is_all_valid {
         quote! {
-            fn prepare(&self, s: &mut dyn ::std::fmt::Write, q: #pgorm_query_path::Quote) {
-                write!(s, "{}", q.left()).unwrap();
+            fn prepare(&self, s: &mut dyn ::std::fmt::Write) {
+                write!(s, "\"").unwrap();
                 self.unquoted(s);
-                write!(s, "{}", q.right()).unwrap();
+                write!(s, "\"").unwrap();
             }
         }
     } else {

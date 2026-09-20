@@ -72,7 +72,7 @@ impl std::fmt::Display for SqlWriterValues {
     }
 }
 
-// [spec:pgorm:req:sql.render.placeholders] (counter increments then emits $N; value collected)
+// [spec:pgorm:req:sql.render.placeholders+1] (counter increments then emits $N; value collected)
 // [spec:pgorm:def:sql.render.writer+2]
 impl SqlWriter for SqlWriterValues {
     fn push_param(&mut self, value: Value) {

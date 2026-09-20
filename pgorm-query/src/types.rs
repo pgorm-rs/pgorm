@@ -3,42 +3,37 @@
 use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*};
 use std::{any::Any, fmt, ops, sync::Arc};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Quote(pub(crate) u8, pub(crate) u8);
+/// Identifier
+// [spec:pgorm:def:sql.types+8]
+pub trait Iden: Any + Send + Sync {
+    /// Write the identifier as PostgreSQL spells one: wrapped in double
+    /// quotes, with any embedded double quote doubled.
+    // [spec:pgorm:req:sql.render.ident-quoting+2]
+    fn prepare(&self, s: &mut dyn fmt::Write) {
+        write!(s, "\"{}\"", self.quoted()).unwrap();
+    }
 
-// [spec:pgorm:def:sql.types+7]
-macro_rules! iden_trait {
-    ($($bounds:ident),*) => {
-        /// Identifier
-        pub trait Iden where $(Self: $bounds),* {
-            // [spec:pgorm:req:sql.render.ident-quoting+1] (wrap in quote pair; embedded right-quote doubled)
-            fn prepare(&self, s: &mut dyn fmt::Write, q: Quote) {
-                write!(s, "{}{}{}", q.left(), self.quoted(q), q.right()).unwrap();
-            }
+    /// The identifier's text with embedded double quotes doubled, ready to sit
+    /// between the quotes [`prepare`](Self::prepare) writes.
+    // [spec:pgorm:req:sql.render.ident-quoting+2]
+    fn quoted(&self) -> String {
+        self.to_string().replace('"', "\"\"")
+    }
 
-            fn quoted(&self, q: Quote) -> String {
-                let byte = [q.1];
-                let qq: &str = std::str::from_utf8(&byte).unwrap();
-                self.to_string().replace(qq, qq.repeat(2).as_str())
-            }
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        self.unquoted(&mut s);
+        s
+    }
 
-            fn to_string(&self) -> String {
-                let mut s = String::new();
-                self.unquoted(&mut s);
-                s
-            }
-
-            fn unquoted(&self, s: &mut dyn fmt::Write);
-        }
-
-        /// Identifier
-        pub trait IdenStatic: Iden + Copy + 'static {
-            fn as_str(&self) -> &'static str;
-        }
-    };
+    fn unquoted(&self, s: &mut dyn fmt::Write);
 }
 
-iden_trait!(Any, Send, Sync);
+/// Identifier
+// [spec:pgorm:def:sql.types+8]
+pub trait IdenStatic: Iden + Copy + 'static {
+    fn as_str(&self) -> &'static str;
+}
 
 /// A shared, type-erased identifier: an `Arc<dyn Iden>` that can be compared.
 #[derive(Debug)]
@@ -71,7 +66,7 @@ impl Clone for SharedIden {
 /// `Iden` is bounded on [`Any`] so the erased value can still be asked, and
 /// asking costs the identifier no width — a `DynIden` sits in nearly every
 /// node of the AST.
-// [spec:pgorm:def:sql.types+7]
+// [spec:pgorm:def:sql.types+8]
 impl PartialEq for SharedIden {
     fn eq(&self, other: &Self) -> bool {
         let (this, that): (&dyn Any, &dyn Any) = (&*self.0, &*other.0);
@@ -242,23 +237,23 @@ impl TypeName {
     /// an identifier PostgreSQL refuses rather than SQL it executes. A
     /// [`custom`](Self::custom) type expression is the one exception and
     /// renders as written.
-    pub fn to_sql_string(&self, quote: Quote) -> String {
+    pub fn to_sql_string(&self) -> String {
         if self.verbatim {
             return self.raw_text();
         }
         let mut out = String::new();
         if let Some(schema) = &self.schema {
-            Self::prepare_part(schema, &mut out, quote);
+            Self::prepare_part(schema, &mut out);
             out.push('.');
         }
-        Self::prepare_part(&self.name, &mut out, quote);
+        Self::prepare_part(&self.name, &mut out);
         if self.array {
             out.push_str("[]");
         }
         out
     }
 
-    fn prepare_part(part: &DynIden, out: &mut String, quote: Quote) {
+    fn prepare_part(part: &DynIden, out: &mut String) {
         let text = part.to_string();
         let mut chars = text.chars();
         let safe = matches!(chars.next(), Some('a'..='z' | '_'))
@@ -266,7 +261,7 @@ impl TypeName {
         if safe {
             out.push_str(&text);
         } else {
-            part.prepare(out, quote);
+            part.prepare(out);
         }
     }
 
@@ -614,44 +609,6 @@ pub enum SubQueryOper {
 
 // Impl begins
 
-impl Quote {
-    pub fn new(c: u8) -> Self {
-        Self(c, c)
-    }
-
-    pub fn left(&self) -> char {
-        char::from(self.0)
-    }
-
-    pub fn right(&self) -> char {
-        char::from(self.1)
-    }
-}
-
-impl From<char> for Quote {
-    fn from(c: char) -> Self {
-        (c as u8).into()
-    }
-}
-
-impl From<(char, char)> for Quote {
-    fn from((l, r): (char, char)) -> Self {
-        (l as u8, r as u8).into()
-    }
-}
-
-impl From<u8> for Quote {
-    fn from(u8: u8) -> Self {
-        Quote::new(u8)
-    }
-}
-
-impl From<(u8, u8)> for Quote {
-    fn from((l, r): (u8, u8)) -> Self {
-        Quote(l, r)
-    }
-}
-
 impl<T: 'static> IntoIden for T
 where
     T: Iden,
@@ -667,14 +624,14 @@ impl IntoIden for DynIden {
     }
 }
 
-// [spec:pgorm:def:sql.types+7]
+// [spec:pgorm:def:sql.types+8]
 impl IntoIden for &str {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
     }
 }
 
-// [spec:pgorm:def:sql.types+7]
+// [spec:pgorm:def:sql.types+8]
 impl IntoIden for String {
     fn into_iden(self) -> DynIden {
         SharedIden::new(Alias::new(self))
@@ -945,7 +902,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hello-World_""#);
     }
 
-    // [spec:pgorm:def:sql.types+7/test]
+    // [spec:pgorm:def:sql.types+8/test]
     #[test]
     fn test_quoted_identifier_1() {
         let query = Query::select().column(Alias::new("hel\"lo")).to_owned();
@@ -960,7 +917,7 @@ mod tests {
         assert_eq!(query.to_string(), r#"SELECT "hel""""lo""#);
     }
 
-    // [spec:pgorm:def:sql.types+7/test]
+    // [spec:pgorm:def:sql.types+8/test]
     #[test]
     fn test_cmp_identifier() {
         type CharLocal = Character;

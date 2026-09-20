@@ -1,12 +1,6 @@
 use crate::{ColumnRef, IntoColumnRef, SimpleExpr};
 
-/// RETURNING clause.
-/// ## Note:
-/// Works on
-/// * PostgreSQL
-/// * SQLite
-///     - SQLite version >= 3.35.0
-///     - **Note that pgorm-query won't try to enforce either of these constraints**
+/// RETURNING clause: the rows an INSERT, UPDATE or DELETE yields back.
 // [spec:pgorm:def:sql.ast.returning]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReturningClause {

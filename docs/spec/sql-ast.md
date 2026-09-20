@@ -26,7 +26,7 @@ today, including panicking edges and deliberate failsafes.
 > `take()`, which moves the accumulated contents out and leaves the builder in
 > its default (empty) state.
 
-> [spec:pgorm:req:sql.ast.build+1]
+> [spec:pgorm:req:sql.ast.build+2]
 > Every statement type implements the single `QueryStatementBuilder`, whose
 > `Display` supertrait carries the value-inlined rendering. There is exactly
 > one method per rendering, and no rendering method takes a builder argument:
@@ -37,8 +37,8 @@ today, including panicking edges and deliberate failsafes.
 >
 > `build()` MUST return the pair `(String, Values)` where
 > ordinary `SimpleExpr::Value` operands are replaced by numbered PostgreSQL
-> placeholders (`$1`, `$2`, ...) — `QueryBuilder::placeholder()` returns
-> `("$", true)` — and the corresponding values are collected in order into
+> placeholders (`$1`, `$2`, ...) per `[spec:pgorm:req:sql.render.placeholders+1]`
+> — and the corresponding values are collected in order into
 > `Values`. `to_string()`, reached through `Display`, MUST render the same
 > statement with all values inlined as SQL literals instead of placeholders.
 > `build_collect_into(sink)` is the single required method both are written in

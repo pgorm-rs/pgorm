@@ -149,7 +149,7 @@ fn alter_6() {
     )
 }
 
-// [spec:pgorm:def:sql.types+7/test]    equality is the concrete type and the rendered text,
+// [spec:pgorm:def:sql.types+8/test]    equality is the concrete type and the rendered text,
 // both asked of values Rust never promised to place at one vtable address
 #[test]
 fn identifier_equality_is_type_and_text() {

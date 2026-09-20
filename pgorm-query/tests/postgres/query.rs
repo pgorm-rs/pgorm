@@ -3,7 +3,7 @@ use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast/test]
 // [spec:pgorm:def:sql.ast.select+2/test]
-// [spec:pgorm:req:sql.render.ident-quoting+1/test]
+// [spec:pgorm:req:sql.render.ident-quoting+2/test]
 #[test]
 fn select_1() {
     assert_eq!(
@@ -1057,8 +1057,8 @@ fn select_59() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.build+1/test]
-// [spec:pgorm:req:sql.render.placeholders/test]
+// [spec:pgorm:req:sql.ast.build+2/test]
+// [spec:pgorm:req:sql.render.placeholders+1/test]
 // [spec:pgorm:req:sql.render.param-vs-inline+1/test]
 // [spec:pgorm:req:sql.render.custom-expr+1/test]
 #[test]
@@ -1604,7 +1604,7 @@ fn insert_on_conflict_both_filters() {
 // [spec:pgorm:def:sql.ast.returning/test]
 #[test]
 #[allow(clippy::approx_constant)]
-// [spec:pgorm:req:sql.render.returning/test]
+// [spec:pgorm:req:sql.render.returning+1/test]
 fn insert_returning_all_columns() {
     assert_eq!(
         Query::insert()

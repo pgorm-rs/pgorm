@@ -435,7 +435,8 @@ impl Func {
         FunctionCall::new(Function::Upper).arg(expr)
     }
 
-    /// Call `BIT_AND` function, this is not supported on SQLite.
+    /// Call the `BIT_AND` aggregate: the bitwise AND of the argument across
+    /// the rows of the group.
     ///
     /// # Examples
     ///
@@ -457,7 +458,8 @@ impl Func {
         FunctionCall::new(Function::BitAnd).arg(expr)
     }
 
-    /// Call `BIT_OR` function, this is not supported on SQLite.
+    /// Call the `BIT_OR` aggregate: the bitwise OR of the argument across
+    /// the rows of the group.
     ///
     /// # Examples
     ///

@@ -83,7 +83,7 @@ use super::common::*;
 ///     r#"CREATE UNIQUE INDEX "idx-glyph-aspect" ON "glyph" ("image" ASC, "aspect" DESC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+5]
+// [spec:pgorm:req:sql.ddl.index-create+6]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -104,7 +104,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+5]
+// [spec:pgorm:req:sql.ddl.index-create+6]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -117,7 +117,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+5]
+// [spec:pgorm:req:sql.ddl.index-create+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -136,11 +136,11 @@ impl IndexKind {
     }
 }
 
-/// Specification of a table index
+/// The access method an index is built with — PostgreSQL's `USING <method>`.
 #[derive(Debug, Clone)]
 pub enum IndexType {
     BTree,
-    FullText,
+    Gin,
     Hash,
     Custom(DynIden),
 }
@@ -213,14 +213,15 @@ impl IndexCreateStatement {
         self
     }
 
-    /// Set index as full text.
-    /// On MySQL, this is `FULLTEXT`.
-    /// On PgSQL, this is `GIN`.
-    pub fn full_text(&mut self) -> &mut Self {
-        self.index_type(IndexType::FullText)
+    /// Build the index with the GIN access method — `USING GIN` — the one
+    /// full-text search and the container operators (`@>`, `?`, `&&`) index
+    /// under.
+    pub fn gin(&mut self) -> &mut Self {
+        self.index_type(IndexType::Gin)
     }
 
-    /// Set index type. Not available on Sqlite.
+    /// Set the access method the index is built with. Omitted, PostgreSQL
+    /// uses its default, `btree`, and the statement spells no `USING` clause.
     pub fn index_type(&mut self, index_type: IndexType) -> &mut Self {
         self.index_type = Some(index_type);
         self
