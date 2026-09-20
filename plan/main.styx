@@ -7896,6 +7896,7 @@ children (
                 title "An SQL name is a Name, known statically or minted at runtime"
                 kind @refactor
                 deps (query-dead-surface-gone)
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:57.861408Z
@@ -7909,6 +7910,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T15:57:48.442505Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
