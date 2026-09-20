@@ -516,7 +516,6 @@ children (
                         [spec:pgorm:sem:query.build.insert.empty-failsafe]
                         [spec:pgorm:sem:query.build.update]
                         [spec:pgorm:sem:query.build.delete]
-                        [spec:pgorm:def:query.build.debug-query]
                         [spec:pgorm:sem:query.loader.batching]
                         [spec:pgorm:sem:query.loader.regroup]
                         [spec:pgorm:sem:query.loader.many-to-many]
@@ -7650,6 +7649,7 @@ children (
                 id query-dead-surface-gone
                 title "The zero-consumer residue is deleted, not deprecated"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:11:10.235617Z
@@ -7663,6 +7663,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T00:13:16.428035Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
