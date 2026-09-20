@@ -7823,6 +7823,7 @@ children (
                 id query-aggregate-modifiers
                 title "FILTER and WITHIN GROUP reach aggregate calls"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:12:33.920008Z
@@ -7836,6 +7837,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-20T19:04:53.640837Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

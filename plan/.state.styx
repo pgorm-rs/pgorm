@@ -836,7 +836,7 @@ assertions (
     {id query-name-vocabulary, kind @complete, author "brendan@necessary.nu", at 2026-09-20T15:57:48.442505Z}
     {id query-raw-relation, kind @complete, author "brendan@necessary.nu", at 2026-09-20T17:54:31.968723Z}
     {id query-update-from, kind @complete, author "brendan@necessary.nu", at 2026-09-20T18:32:14.763023Z}
-    {id query-aggregate-modifiers, kind @doing, author "brendan@necessary.nu", at 2026-09-20T18:33:20.101021Z}
+    {id query-aggregate-modifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-20T19:04:53.640837Z}
 )
 
 impl_evidence (
