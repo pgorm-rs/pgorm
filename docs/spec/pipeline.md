@@ -240,7 +240,7 @@ of the crate, compiled in every build. Rules are grouped under
 > refuses at `into_sql`, naming the candidates. In the join condition —
 > where neither an embedded relation nor a mid-pipeline consumer has a name
 > to qualify by — `this(column)` and `that(column)` qualify by role, PRQL's
-> own `this` / `that`, and are scoped to that condition. Alias tokens
+> own `this` / `that`, and are scoped to that condition. `AliasName` tokens
 > declared in two composed pipelines never collide: each lives in its own
 > binding's scope, and the same name may be introduced in both.
 >
