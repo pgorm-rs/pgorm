@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ast/test]
+// [spec:pgorm:req:sql.ast+1/test]
 // [spec:pgorm:def:sql.ast.select+2/test]
 // [spec:pgorm:req:sql.render.ident-quoting+3/test]
 #[test]
@@ -942,7 +942,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+2/test]
+// [spec:pgorm:req:sql.render.select-order+3/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -1011,8 +1011,8 @@ fn select_57() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+2/test]
-// [spec:pgorm:req:sql.render.cte+2/test]
+// [spec:pgorm:def:sql.ast.with+3/test]
+// [spec:pgorm:req:sql.render.cte+3/test]
 #[test]
 fn select_58() {
     let select = SelectStatement::new()
@@ -1021,7 +1021,7 @@ fn select_58() {
         .to_owned();
     let cte = CommonTableExpression::new(Alias::new("cte"), select);
     let with_clause = WithClause::new(cte);
-    let select = SelectStatement::new()
+    let mut select = SelectStatement::new()
         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
         .from(Alias::new("cte"))
         .to_owned();
@@ -1108,7 +1108,7 @@ fn select_62() {
         .to_owned();
     let cte = CommonTableExpression::new(Alias::new("cte"), select);
     let with_clause = WithClause::new(cte);
-    let select = SelectStatement::new()
+    let mut select = SelectStatement::new()
         .columns([Alias::new("column1"), Alias::new("column2")])
         .from(Alias::new("cte"))
         .to_owned();
@@ -1124,8 +1124,8 @@ fn select_62() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.insert+1/test]
-// [spec:pgorm:req:sql.render.insert/test]
+// [spec:pgorm:def:sql.ast.insert+2/test]
+// [spec:pgorm:req:sql.render.insert+1/test]
 // [spec:pgorm:def:sql.render.value-literals+4/test]
 #[test]
 #[allow(clippy::approx_constant)]
@@ -1216,7 +1216,7 @@ fn insert_from_select() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+2/test]
+// [spec:pgorm:def:sql.ast.with+3/test]
 #[test]
 fn insert_6() -> error::Result<()> {
     let select = SelectStatement::new()
@@ -1637,9 +1637,9 @@ fn insert_returning_specific_columns() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.update+2/test]
+// [spec:pgorm:req:sql.ast.update+3/test]
 #[test]
-// [spec:pgorm:req:sql.render.update-delete+1/test]
+// [spec:pgorm:req:sql.render.update-delete+2/test]
 fn update_1() {
     assert_eq!(
         Query::update()
@@ -1723,9 +1723,9 @@ fn update_returning_specified_columns() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.delete+2/test]
+// [spec:pgorm:def:sql.ast.delete+3/test]
 #[test]
-// [spec:pgorm:req:sql.render.update-delete+1/test]
+// [spec:pgorm:req:sql.render.update-delete+2/test]
 fn delete_1() {
     assert_eq!(
         Query::delete()
@@ -2606,9 +2606,9 @@ fn condition_holder_5() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+2/test]    a non-recursive clause takes its first CTE at
+// [spec:pgorm:def:sql.ast.with+3/test]    a non-recursive clause takes its first CTE at
 // construction and renders every one it was given
-// [spec:pgorm:req:sql.render.cte+2/test]
+// [spec:pgorm:req:sql.render.cte+3/test]
 #[test]
 fn with_clause_renders_each_of_its_ctes() {
     let cte = |name: &str| {
@@ -2634,7 +2634,7 @@ fn with_clause_renders_each_of_its_ctes() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+2/test]    `from_select` names the CTE after the select's first
+// [spec:pgorm:def:sql.ast.with+3/test]    `from_select` names the CTE after the select's first
 // FROM table and takes its columns from the projection
 #[test]
 fn from_select_names_the_cte_after_its_table() {
@@ -2661,7 +2661,7 @@ fn from_select_names_the_cte_after_its_table() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+2/test]    a select with no FROM table has no name to derive, so
+// [spec:pgorm:def:sql.ast.with+3/test]    a select with no FROM table has no name to derive, so
 // `from_select` declines rather than yielding a nameless CTE
 #[test]
 fn from_select_declines_a_select_without_a_table() {
@@ -2727,9 +2727,9 @@ fn recursive_with_clause_renders_search_and_cycle() {
     );
 }
 
-// [spec:pgorm:def:query.build.with/test]    the clause is carried on the select, so the value is
+// [spec:pgorm:def:query.build.with+1/test]    the clause is carried on the select, so the value is
 // still a `SelectStatement` and every builder method still applies afterwards
-// [spec:pgorm:sem:query.build.with.attach/test]    and the last clause set is the one that renders
+// [spec:pgorm:sem:query.build.with.attach+1/test]    and the last clause set is the one that renders
 #[test]
 fn carried_with_clause_leaves_the_select_shapeable() {
     let cte = |name: &str| {
@@ -2745,8 +2745,8 @@ fn carried_with_clause_leaves_the_select_shapeable() {
         .take();
 
     select
-        .with_cte(WithClause::new(cte("first")))
-        .with_cte(WithClause::new(cte("second")))
+        .with(WithClause::new(cte("first")))
+        .with(WithClause::new(cte("second")))
         .and_where(Expr::col(Glyph::Id).gt(1))
         .order_by(Glyph::Id, Order::Asc)
         .limit(2);
@@ -2765,8 +2765,8 @@ fn carried_with_clause_leaves_the_select_shapeable() {
             .column(Asterisk)
             .from(Alias::new("recursive"))
             .take()
-            .with_recursive_cte(RecursiveWithClause::new(recursive_cte()))
-            .with_cte(WithClause::new(cte("recursive")))
+            .with(RecursiveWithClause::new(recursive_cte()))
+            .with(WithClause::new(cte("recursive")))
             .to_string(),
         [
             r#"WITH "recursive" AS (SELECT "id" FROM "glyph")"#,
@@ -2776,11 +2776,11 @@ fn carried_with_clause_leaves_the_select_shapeable() {
     );
 }
 
-// [spec:pgorm:req:query.build.with.single/test]    one clause, one place: a select carries its own
-// and renders exactly one WITH, while the wrapping form takes data-modifying statements only. The
-// double prefix that a select wearing both would render is a compile error, which the
-// `compile_fail` doctest on `WithQuery` proves
-// [spec:pgorm:req:sql.render.cte+2/test]
+// [spec:pgorm:req:query.build.with.single+1/test]    one clause, one place: every statement carries
+// its own and renders exactly one WITH, with no wrapper type to give a second one a home
+// [spec:pgorm:def:query.build.with+1/test]    and `with` is the same verb on all four statements —
+// same receiver, same return, same last-call-wins slot
+// [spec:pgorm:req:sql.render.cte+3/test]
 #[test]
 fn a_with_clause_has_one_place_to_live() {
     let cte = || {
@@ -2789,43 +2789,70 @@ fn a_with_clause_has_one_place_to_live() {
             Query::select().column(Glyph::Id).from(Glyph::Table).take(),
         )
     };
-
-    let carried = Query::select()
-        .column(Glyph::Id)
-        .from(Alias::new("cte"))
-        .take()
-        .with(WithClause::new(cte()))
-        .to_string();
-    assert_eq!(carried.matches("WITH").count(), 1);
-    assert_eq!(
-        carried,
-        r#"WITH "cte" AS (SELECT "id" FROM "glyph") SELECT "id" FROM "cte""#
-    );
-
-    let wrapped = WithClause::new(cte())
-        .query(
-            Query::delete()
-                .from_table(Glyph::Table)
-                .and_where(Expr::col(Glyph::Id).eq(1))
-                .to_owned(),
+    let picked = || {
+        Expr::col(Glyph::Id).in_subquery(
+            Query::select()
+                .column(Glyph::Id)
+                .from(Alias::new("cte"))
+                .take(),
         )
-        .to_string();
-    assert_eq!(wrapped.matches("WITH").count(), 1);
+    };
+    let prefix = r#"WITH "cte" AS (SELECT "id" FROM "glyph")"#;
+
+    let rendered = [
+        Query::select()
+            .column(Glyph::Id)
+            .from(Alias::new("cte"))
+            .with(WithClause::new(cte()))
+            .to_string(),
+        Query::insert()
+            .into_table(Glyph::Table)
+            .columns([Glyph::Id])
+            .select_from(
+                Query::select()
+                    .column(Glyph::Id)
+                    .from(Alias::new("cte"))
+                    .take(),
+            )
+            .expect("a select source is accepted")
+            .with(WithClause::new(cte()))
+            .to_string(),
+        Query::update()
+            .table(Glyph::Table)
+            .value(Glyph::Aspect, 1)
+            .and_where(picked())
+            .with(WithClause::new(cte()))
+            .to_string(),
+        Query::delete()
+            .from_table(Glyph::Table)
+            .and_where(picked())
+            .with(WithClause::new(cte()))
+            .to_string(),
+    ];
+
+    for sql in &rendered {
+        assert_eq!(sql.matches("WITH").count(), 1);
+        assert!(sql.starts_with(prefix), "{sql}");
+    }
+
     assert_eq!(
-        wrapped,
+        rendered,
         [
-            r#"WITH "cte" AS (SELECT "id" FROM "glyph")"#,
-            r#"DELETE FROM "glyph" WHERE "id" = 1"#,
+            format!(r#"{prefix} SELECT "id" FROM "cte""#),
+            format!(r#"{prefix} INSERT INTO "glyph" ("id") SELECT "id" FROM "cte""#),
+            format!(
+                r#"{prefix} UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "cte")"#
+            ),
+            format!(r#"{prefix} DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "cte")"#),
         ]
-        .join(" ")
     );
 }
 
-// [spec:pgorm:sem:query.build.with.attach/test]    the prefix is legal PostgreSQL at every level a
+// [spec:pgorm:sem:query.build.with.attach+1/test]    the prefix is legal PostgreSQL at every level a
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.select-order+2/test]
+// [spec:pgorm:req:sql.render.select-order+3/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {
@@ -2837,6 +2864,7 @@ fn carried_with_clause_renders_at_every_nesting_level() {
                 Alias::new("cte"),
                 Query::select().column(Glyph::Id).from(Glyph::Table).take(),
             )))
+            .take()
     };
     let prefix = r#"WITH "cte" AS (SELECT "id" FROM "glyph") SELECT "id" FROM "cte""#;
 

@@ -62,7 +62,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+6]
+> [spec:pgorm:req:sql.ddl.create-table+7]
 > `TableCreateStatement` composes a table name, ordered `ColumnDef`s (`col()`,
 > which stamps the table ref onto each column), table-level indexes (`index()`
 > and `primary_key()` — the latter takes an `IndexCreateStatement` and forces
@@ -72,13 +72,22 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > foreign keys (`foreign_key()`), check expressions (`check()`), an
 > `if_not_exists` flag, a `comment` and a trailing `extra` string.
 >
+> Every embedder MUST take what it embeds by value. `index()`, `primary_key()`
+> and `foreign_key()` are bounded `Into<IndexCreateStatement>` /
+> `Into<ForeignKeyCreateStatement>` and consume the argument, as `col()`'s
+> `IntoColumnDef` consumes a column: a caller reusing the value writes
+> `.to_owned()` and sees the copy in the source, rather than the embedder
+> cloning or draining a `&mut` behind their back. Reuse after the call
+> therefore has one outcome across all four, not three
+> (`[spec:pgorm:req:sql.ast+1]`).
+>
 > Rendering MUST emit `CREATE TABLE [IF NOT EXISTS ]<table> ( ... )` with the
 > body in this fixed order: column definitions, then embedded index
 > expressions, then foreign-key clauses (in `Mode::Creation`, i.e. without
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
 > ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+6]`) and `NULLS NOT
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+7]`) and `NULLS NOT
 > DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis only
@@ -97,8 +106,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `TableCreateStatement::new(table)` take any `IntoTableName` and there is no
 > `table()` setter, so the `CREATE TABLE  ( ... )` PostgreSQL rejects at the
 > parenthesis has no constructor
-> (`[dec:pgorm:invalid-states-unrepresentable]`). `take()` copies the table
-> rather than moving it, for the same reason.
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `take()` moves every
+> accumulated part out and copies only that name, for the same reason
+> (`[spec:pgorm:req:sql.ast+1]`).
 >
 > A statement with no columns renders `CREATE TABLE <table> (  )`, and that is
 > deliberately left buildable: PostgreSQL accepts a table with no columns, so
@@ -169,7 +179,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > enum type name; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
-> [spec:pgorm:req:sql.ddl.alter-table+3]
+> [spec:pgorm:req:sql.ddl.alter-table+4]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey` and `DropForeignKey`. Both the table and a first option are
@@ -180,9 +190,16 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > neither `ALTER TABLE "font"` nor `ALTER TABLE ADD COLUMN ...`, and neither MUST
 > be constructible (`[dec:pgorm:invalid-states-unrepresentable]`); the
 > `No alter option found` panic that stood in for the first of those is gone, and
-> MUST NOT return. `take()` copies rather than moves for the same reason: moving
-> the options out would leave the action-less statement this type exists to rule
-> out.
+> MUST NOT return. The statement has no `take()` for the same reason: moving the
+> options out would leave the action-less statement this type exists to rule
+> out, and a `take()` that copied instead would be a promise the name does not
+> keep (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`.
+>
+> `add_foreign_key` — on both `PendingTableAlter` and `TableAlterStatement` —
+> takes `Into<TableForeignKey>` by value, as `add_column` takes
+> `IntoColumnDef`: an embedder consumes what it embeds, and a borrow that
+> silently cloned would be the third reuse-outcome
+> `[spec:pgorm:req:sql.ddl.create-table+7]` rules out.
 >
 > Rendering MUST emit a single `ALTER TABLE <table> ` prefix
 > with the options comma-separated: `ADD COLUMN [IF NOT EXISTS ]<column-def>`
@@ -223,7 +240,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > All three take their targets in the constructor, because PostgreSQL rejects
 > every one of these statements with the name left out: `Table::drop(table)`
 > seeds the list and `table()` appends the rest, in the pattern
-> `[spec:pgorm:req:sql.ddl.index-create+6]` uses for index columns, so the
+> `[spec:pgorm:req:sql.ddl.index-create+7]` uses for index columns, so the
 > empty `DROP TABLE ` cannot be built; `Table::rename(from, to)` and
 > `Table::truncate(table)` take theirs whole and expose no setter. `take()` on
 > a drop copies the target list rather than moving it, so no target-less husk
@@ -255,7 +272,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > quoting is the whole injection boundary for comment text.
 >
 > The comment text a `TableCreateStatement` carries — its own
-> (`[spec:pgorm:req:sql.ddl.create-table+6]`) and each `ColumnSpec::Comment`
+> (`[spec:pgorm:req:sql.ddl.create-table+7]`) and each `ColumnSpec::Comment`
 > (`[spec:pgorm:req:sql.ddl.column-def+4]`) — MUST be reachable as those
 > statements: `TableCreateStatement::comments()` returns one
 > `CommentStatement` per carried comment, the table's first and then one per
@@ -269,25 +286,27 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+6]
+> [spec:pgorm:req:sql.ddl.index-create+7]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
 > `index_type` and `if_not_exists` flags. Its target table and its column list
 > MUST both be non-empty by construction: `Index::create(table, col)` and
 > `IndexCreateStatement::new(table, col)` take the table and the first column
 > and `col()` appends the rest, in the pattern
-> `[spec:pgorm:def:sql.ast.with+1]` uses for CTEs, there is no `table()`
-> setter, and `take()` copies rather than moves so no target-less or
-> column-less husk is left behind. PostgreSQL rejects an empty
+> `[spec:pgorm:def:sql.ast.with+3]` uses for CTEs, and there is no `table()`
+> setter. It has no `take()` at all: moving the table or the columns out would
+> leave exactly the target-less, column-less husk the constructor rules out, and
+> a `take()` that copied instead would be a promise the name does not keep
+> (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
 > column list in every position this statement reaches — standalone
 > `CREATE INDEX ... ()` and the embedded `PRIMARY KEY ()` and `UNIQUE ()` of
-> `[spec:pgorm:req:sql.ddl.create-table+6]` alike — and rejects
+> `[spec:pgorm:req:sql.ddl.create-table+7]` alike — and rejects
 > `CREATE INDEX "n" ON  (...)` at the parenthesis, so both states are
 > unreachable rather than checked
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The index *name* is the one
 > part that stays optional: PostgreSQL derives a name when `CREATE INDEX`
 > omits it, so `CREATE INDEX  ON "t" ("c")` parses and is left buildable. In
-> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+6]` the table
+> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+7]` the table
 > is not rendered at all and the owning statement restamps it, so the
 > constructor argument there names the table the index already belongs to
 > rather than a second one. `IndexKind`
@@ -309,7 +328,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+6]`.
+> `[spec:pgorm:req:sql.ddl.create-table+7]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
@@ -341,7 +360,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+3]
+> [spec:pgorm:req:sql.ddl.foreign-key+4]
 > `TableForeignKey` holds the owning and referenced table names, a non-empty
 > list of `(column, referenced column)` pairs, an optional constraint name, and
 > optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
@@ -355,8 +374,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`[dec:pgorm:invalid-states-unrepresentable]`). Holding the two sides as one
 > list of pairs also makes the arity mismatch unrepresentable — a render the
 > grammar accepts and only parse analysis rejects, so no oracle could have
-> caught it. `take()` copies the tables and the first pair rather than moving
-> them, as `ColumnDef::take` copies the column name.
+> caught it. Neither `TableForeignKey` nor the `ForeignKeyCreateStatement`
+> wrapping it has a `take()`: moving the tables and the first pair out would
+> leave exactly the husk the constructor rules out, and a `take()` that copied
+> them would be a promise the name does not keep
+> (`[spec:pgorm:req:sql.ast+1]`). A second copy is `.to_owned()`.
 >
 > The standalone statement MUST render `ALTER TABLE <from> ADD [CONSTRAINT
 > "name" ]FOREIGN KEY (cols) REFERENCES <to> (ref-cols)[ ON DELETE <action>]
@@ -365,7 +387,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > only the `ALTER TABLE` prefix is dropped. On the `CREATE TABLE` path the key
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`, as
 > an embedded index is by `index()`: an embedded key constrains the table it
-> sits inside and MUST NOT name another. `ForeignKeyDropStatement` MUST
+> sits inside and MUST NOT name another. That embedder, and the
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+4]`, take the key by
+> value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
+> respectively) rather than by reference: an embedder consumes what it embeds,
+> so a caller who reuses the key writes the copy
+> (`[spec:pgorm:req:sql.ddl.create-table+7]`). `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`; both halves are taken by
 > `ForeignKey::drop(table, name)` and neither has a setter, for the same reason.
 > It holds the constraint name
@@ -468,7 +495,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > The last edge was the empty `TableAlterStatement`, which panicked with
 > `No alter option found`; it is closed by construction rather than converted to
 > an error, because a statement with no action is not a statement
-> (`[spec:pgorm:req:sql.ddl.alter-table+3]`). It MUST NOT come back, in that
+> (`[spec:pgorm:req:sql.ddl.alter-table+4]`). It MUST NOT come back, in that
 > form or as a `Result`.
 >
 > Column type and auto-increment shape were panics of their own, and MUST NOT

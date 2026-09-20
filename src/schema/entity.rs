@@ -3,7 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, Iden, Index, IndexCreateStatement, TableCreateStatement,
+    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Iden, Index,
+    IndexCreateStatement, TableCreateStatement,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -279,7 +280,12 @@ where
             for primary_key in primary_keys {
                 idx_pk.col(primary_key);
             }
-            stmt.primary_key(idx_pk.name(format!("pk-{}", entity.to_string())).primary());
+            stmt.primary_key(
+                idx_pk
+                    .name(format!("pk-{}", entity.to_string()))
+                    .primary()
+                    .to_owned(),
+            );
         }
     }
 
@@ -288,7 +294,7 @@ where
         if relation.is_owner {
             continue;
         }
-        stmt.foreign_key(&mut relation.into());
+        stmt.foreign_key(ForeignKeyCreateStatement::from(relation));
     }
 
     stmt.take()
@@ -366,7 +372,8 @@ mod tests {
                 )
                 .name("pk-cake_filling_price")
                 .col(cake_filling_price::Column::FillingId)
-                .primary(),
+                .primary()
+                .to_owned(),
             )
             .foreign_key(
                 ForeignKeyCreateStatement::new(
@@ -379,7 +386,8 @@ mod tests {
                     cake_filling_price::Column::FillingId,
                     cake_filling::Column::FillingId,
                 )
-                .name("fk-cake_filling_price-cake_id-filling_id"),
+                .name("fk-cake_filling_price-cake_id-filling_id")
+                .to_owned(),
             )
             .to_owned()
     }

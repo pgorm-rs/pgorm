@@ -494,7 +494,7 @@ fn enum_and_unique_index_round_trip() {
                 col("code").string().not_null().to_owned(),
             ],
         );
-        task.index(&mut unique_index("task", "code"));
+        task.index(unique_index("task", "code").to_owned());
         vec![task.take()]
     };
     let enum_type = Type::create(alias("task_state"))

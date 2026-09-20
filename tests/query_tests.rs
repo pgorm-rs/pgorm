@@ -433,7 +433,7 @@ pub async fn raw_selector_one_semantics() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:sql.render.select-order+2/test]    a named window combined with ORDER BY and
+// [spec:pgorm:req:sql.render.select-order+3/test]    a named window combined with ORDER BY and
 // LIMIT, run against a live server
 // [spec:pgorm:req:sql.render.window+3/test]
 #[pgorm_macros::test]

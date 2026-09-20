@@ -511,7 +511,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 
 /// Creates a column definition for example to update a table.
 /// ```
-/// use pgorm_query::{ConditionType, FromItem, IntoIden, Table, TableName};
+/// use pgorm_query::{ConditionType, FromItem, IntoIden, Table, TableForeignKey, TableName};
 /// use pgorm::{alias, ColumnPairs, EnumIter, Iden, PrimaryKeyTrait, RelationDef, RelationTrait, RelationType};
 ///
 /// let relation = RelationDef {
@@ -528,7 +528,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 /// };
 ///
 /// let alter_table = Table::alter(TableName::Table(alias("foo").into_iden()))
-///     .add_foreign_key(&relation.into());
+///     .add_foreign_key(TableForeignKey::from(relation));
 /// assert_eq!(
 ///     alter_table.to_string(),
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#

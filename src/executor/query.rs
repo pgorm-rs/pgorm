@@ -1010,7 +1010,7 @@ mod tests {
         .columns([id, depth, next, value])
         .to_owned();
 
-        let select = SelectStatement::new()
+        let mut select = SelectStatement::new()
             .column(ColumnRef::Asterisk)
             .from(traversal)
             .to_owned();

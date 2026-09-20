@@ -70,7 +70,7 @@ is what `EntityTrait::find()` produces.
 > identifier again. A string literal still passes, through
 > `IntoIden for &str`.
 
-> [spec:pgorm:sem:query.build.modifiers+7]
+> [spec:pgorm:sem:query.build.modifiers+8]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` /
@@ -81,9 +81,8 @@ is what `EntityTrait::find()` produces.
 > AND-ed HAVING conditions, `distinct` / `distinct_on` add DISTINCT /
 > DISTINCT ON, and `lock`, `lock_shared`, `lock_exclusive` and
 > `lock_with_behavior` add row-locking clauses. The composition clauses join
-> them on the same terms — `with_cte` / `with_recursive_cte`
-> (`query.build.with`), `join_lateral` / `join_lateral_on_true`
-> (`query.build.lateral`), `window` and `window_expr_as`
+> them on the same terms — `with` (`query.build.with`), `join_lateral` /
+> `join_lateral_on_true` (`query.build.lateral`), `window` and `window_expr_as`
 > (`query.build.window`), and `union` (`query.build.union`) — each a default
 > method mutating the statement and returning `Self`, except the projecting
 > `window_expr_as`, which returns `Projected`.
@@ -258,38 +257,42 @@ The composition clauses — WITH, LATERAL, WINDOW and the set operators — are 
 in-place mutations of the same `SelectStatement`, so none of them changes what a
 builder is or what its rows decode into.
 
-> [spec:pgorm:def:query.build.with]
-> A WITH clause attaches to a SELECT by being *carried on it*:
-> `SelectStatement` holds `with: Option<Box<AnyWithClause>>` and the statement
-> renders its own prefix (`sql.render.select-order`). It MUST NOT be modelled as
-> a wrapper around the select, because a wrapper erases the statement — the
-> ORM's whole spine is a `SelectStatement`, and a value that has stopped being
-> one can no longer take a filter, an ordering, a `LIMIT`, a projection or any
-> typed terminal.
+> [spec:pgorm:def:query.build.with+1]
+> A WITH clause attaches to a statement by being *carried on it*: each of
+> `SelectStatement`, `InsertStatement`, `UpdateStatement` and `DeleteStatement`
+> holds `with: Option<Box<AnyWithClause>>` and renders its own prefix
+> (`sql.render.select-order`, `sql.render.insert`, `sql.render.update-delete`).
+> It MUST NOT be modelled as a wrapper around the statement, because a wrapper
+> erases it — the ORM's whole spine is a `SelectStatement`, and a value that has
+> stopped being one can no longer take a filter, an ordering, a `LIMIT`, a
+> projection or any typed terminal; a wrapped INSERT likewise loses `returning`
+> and every other builder method.
 >
-> Three setters write that one slot. `SelectStatement::with(clause)` takes
-> `self` and returns `Self`, accepting either clause form through
-> `Into<AnyWithClause>`; `with_cte(WithClause)` and
-> `with_recursive_cte(RecursiveWithClause)` are the `&mut self` builder-style
-> pair, named apart so the call site says which form it is building. All three
-> overwrite: the last call wins and a select carries at most one clause
-> (`query.build.with.single`).
+> There MUST be exactly one setter, spelled and shaped identically on all four:
+> `with<C: Into<AnyWithClause>>(&mut self, clause: C) -> &mut Self`, the same
+> receiver and return every other builder verb on those statements uses. One
+> generic method covers both clause forms, so the type-split pair `with_cte` /
+> `with_recursive_cte` is deleted rather than kept as a second vocabulary for
+> the same slot. `with` overwrites: the last call wins and a statement carries
+> at most one clause (`query.build.with.single`).
 >
-> `QuerySelect` re-exposes the pair as owned-`self` default methods
-> `with_cte` / `with_recursive_cte` returning `Self`, so every ORM builder over a
-> `SelectStatement` — `Select<E>`, the projected and two-model states, `Cursor` —
-> gains CTE support without a new type and without a new decode path. `Selector`,
-> `SelectorRaw`, `Paginator` and `Cursor` inherit it unchanged, because the
-> clause is already inside the statement they were always given.
+> `QuerySelect` re-exposes it as the owned-`self` default method `with`
+> returning `Self` — the same verb at the ORM's own receiver convention — so
+> every ORM builder over a `SelectStatement` — `Select<E>`, the projected and
+> two-model states, `Cursor` — gains CTE support without a new type and without
+> a new decode path. `Selector`, `SelectorRaw`, `Paginator` and `Cursor` inherit
+> it unchanged, because the clause is already inside the statement they were
+> always given.
 
-> [spec:pgorm:sem:query.build.with.attach]
+> [spec:pgorm:sem:query.build.with.attach+1]
 > The carried clause renders as a prefix of the statement at whatever level the
-> statement occupies, so a select carrying one nests exactly like any other: as a
-> FROM subquery, a union arm, a CTE body and a LATERAL body, all of which
+> statement occupies, so a statement carrying one nests exactly like any other:
+> as a FROM subquery, a union arm, a CTE body and a LATERAL body, all of which
 > PostgreSQL parses. Nothing else about the statement changes — the builder keeps
 > its type, the projection keeps its shape, and `filter`, `order_by`, `limit`,
 > `join`, `join_lateral` and the projection combinators all still apply after the
-> clause is attached.
+> clause is attached; on a write statement `values`, `returning` and the
+> conditions do the same.
 >
 > Because the clause rides *inside* the statement rather than around it, the
 > execution terminals keep their semantics: `Selector::one` sets `LIMIT 1` on the
@@ -302,22 +305,20 @@ builder is or what its rows decode into.
 > unannotated placeholder resolves to `text`; annotating it is the caller's
 > obligation under `sql.render.placeholder-typing`.
 
-> [spec:pgorm:req:query.build.with.single]
-> A WITH clause MUST have exactly one place to live on a SELECT. A carried clause
-> and a clause wrapped around the same select would both render, producing
-> `WITH … WITH … SELECT …`, which PostgreSQL does not parse — so the wrapping
-> form is removed from the type system rather than guarded at runtime
+> [spec:pgorm:req:query.build.with.single+1]
+> A WITH clause MUST have exactly one place to live on a statement. A carried
+> clause and a clause wrapped around the same statement would both render,
+> producing `WITH … WITH … SELECT …`, which PostgreSQL does not parse — so the
+> wrapping form is removed from the type system rather than guarded at runtime
 > (`[dec:pgorm:invalid-states-unrepresentable]`).
 >
-> `WithQuery` therefore prefixes data-modifying statements only: its bound is the
-> `WithBody` trait, implemented for `InsertStatement`, `UpdateStatement` and
-> `DeleteStatement` and NOT for `SelectStatement` (nor for `WithQuery` itself,
-> which would stack two prefixes on one statement). `WithQuery::new`,
-> `WithClause::query` and `RecursiveWithClause::query` all take `T: WithBody`, so
-> handing any of them a select is a compile error and the double-WITH render is
-> unconstructible. `SelectStatement::with` accordingly returns `Self` rather than
-> a `WithQuery`; the DML statements' `with` methods still return one, since they
-> carry no clause of their own.
+> The removal is total: there is no wrapper type at all. `WithQuery`, the
+> `WithBody` bound that kept a select out of it, `WithClause::query`,
+> `RecursiveWithClause::query` and the `SubQueryStatement::WithStatement` variant
+> are deleted, and MUST NOT come back — a second home for the clause is what
+> made the bound necessary in the first place. Each statement's `with` writes
+> the statement's own single slot and returns `&mut Self`, so the double-WITH
+> render has no constructor and the four statements compose identically.
 
 > [spec:pgorm:sem:query.build.lateral]
 > `QuerySelect::join_lateral(join_type, sub, alias, on)` is the ORM name for

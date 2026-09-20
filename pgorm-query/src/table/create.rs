@@ -33,6 +33,7 @@ use crate::{
 ///             .name("FK_2e303c3a712662f1fc2a4d0aad6")
 ///             .on_delete(ForeignKeyAction::Cascade)
 ///             .on_update(ForeignKeyAction::Cascade)
+///             .to_owned()
 ///     )
 ///     .to_owned();
 ///
@@ -73,7 +74,7 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+6]
+// [spec:pgorm:req:sql.ddl.create-table+7]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
@@ -140,11 +141,15 @@ impl TableCreateStatement {
 
     /// Add a table-level index expression to the create statement
     ///
-    /// The index is restamped onto this statement's table, as `col()` restamps
-    /// each column: an embedded index constrains the table it sits inside and
-    /// cannot name another.
-    pub fn index(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
-        let mut index = index.take();
+    /// The index is consumed, as `col()` consumes its column, and is restamped
+    /// onto this statement's table: an embedded index constrains the table it
+    /// sits inside and cannot name another. Pass an owned value — `.to_owned()`
+    /// a builder chain you mean to reuse.
+    pub fn index<I>(&mut self, index: I) -> &mut Self
+    where
+        I: Into<IndexCreateStatement>,
+    {
+        let mut index = index.into();
         index.table = self.table.clone();
         self.indexes.push(index);
         self
@@ -161,7 +166,7 @@ impl TableCreateStatement {
     /// statement
     ///     .col(ColumnDef::new(Glyph::Id).integer().not_null())
     ///     .col(ColumnDef::new(Glyph::Image).string().not_null())
-    ///     .primary_key(Index::create(Glyph::Table, Glyph::Id).col(Glyph::Image));
+    ///     .primary_key(Index::create(Glyph::Table, Glyph::Id).col(Glyph::Image).to_owned());
     ///
     /// assert_eq!(
     ///     statement.to_string(),
@@ -175,8 +180,11 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn primary_key(&mut self, index: &mut IndexCreateStatement) -> &mut Self {
-        let mut index = index.take();
+    pub fn primary_key<I>(&mut self, index: I) -> &mut Self
+    where
+        I: Into<IndexCreateStatement>,
+    {
+        let mut index = index.into();
         index.kind = IndexKind::PrimaryKey;
         index.table = self.table.clone();
         self.indexes.push(index);
@@ -185,11 +193,15 @@ impl TableCreateStatement {
 
     /// Add a foreign key
     ///
-    /// The key is restamped onto this statement's table, as `col()` and
-    /// `index()` restamp each column and index: an embedded key constrains the
-    /// table it sits inside and cannot name another.
-    pub fn foreign_key(&mut self, foreign_key: &mut ForeignKeyCreateStatement) -> &mut Self {
-        let mut foreign_key = foreign_key.take();
+    /// The key is consumed, as `col()` and `index()` consume their column and
+    /// index, and is restamped onto this statement's table: an embedded key
+    /// constrains the table it sits inside and cannot name another. Pass an
+    /// owned value — `.to_owned()` a builder chain you mean to reuse.
+    pub fn foreign_key<F>(&mut self, foreign_key: F) -> &mut Self
+    where
+        F: Into<ForeignKeyCreateStatement>,
+    {
+        let mut foreign_key = foreign_key.into();
         foreign_key.foreign_key.retarget(self.table.clone());
         self.foreign_keys.push(foreign_key);
         self

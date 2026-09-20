@@ -98,7 +98,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+3]
+// [spec:pgorm:req:sql.ddl.foreign-key+4]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
@@ -153,12 +153,6 @@ impl ForeignKeyCreateStatement {
 
     pub fn get_foreign_key(&self) -> &TableForeignKey {
         &self.foreign_key
-    }
-
-    pub fn take(&mut self) -> Self {
-        Self {
-            foreign_key: self.foreign_key.take(),
-        }
     }
 }
 

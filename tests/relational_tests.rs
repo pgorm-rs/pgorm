@@ -1728,8 +1728,7 @@ fn relation_def_converts_to_foreign_key_forms() {
         TableForeignKey, TableName,
     };
 
-    let alter =
-        |fk: &mut TableForeignKey| Table::alter(baker::Entity).add_foreign_key(fk).to_string();
+    let alter = |fk: TableForeignKey| Table::alter(baker::Entity).add_foreign_key(fk).to_string();
 
     // With an explicit `fk_name`, that name is used verbatim.
     let named: RelationDef = RelationDef::from(
@@ -1784,14 +1783,14 @@ fn relation_def_converts_to_foreign_key_forms() {
     );
 
     // The `TableForeignKey` conversion carries the same mapping.
-    let mut fk: TableForeignKey = RelationDef::from(
+    let fk: TableForeignKey = RelationDef::from(
         baker::Entity::belongs_to(bakery::Entity)
             .columns(baker::Column::BakeryId, bakery::Column::Id)
             .on_delete(pgorm_query::ForeignKeyAction::Cascade),
     )
     .into();
     assert_eq!(
-        alter(&mut fk),
+        alter(fk),
         [
             r#"ALTER TABLE "baker" ADD CONSTRAINT "fk-baker-bakery_id""#,
             r#"FOREIGN KEY ("bakery_id") REFERENCES "bakery" ("id") ON DELETE CASCADE"#,

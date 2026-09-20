@@ -24,7 +24,7 @@ use crate::{QueryBuilder, types::*};
 ///     r#"ALTER TABLE "character" DROP CONSTRAINT "FK_character_id""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+3]
+// [spec:pgorm:req:sql.ddl.foreign-key+4]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyDropStatement {
     pub(crate) name: DynIden,

@@ -15,7 +15,7 @@ fn fk(from_table: &str, from_col: &str, to_table: &str, to_col: &str) -> TableCr
     Table::create(Alias::new(from_table))
         .col(serial_pk("id"))
         .col(ColumnDef::new(Alias::new(from_col)).integer().to_owned())
-        .foreign_key(&mut ForeignKey::create(
+        .foreign_key(ForeignKey::create(
             Alias::new(from_table),
             Alias::new(from_col),
             Alias::new(to_table),
@@ -109,10 +109,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
                 .not_null()
                 .to_owned(),
         )
-        .primary_key(&mut Index::create(
-            Alias::new("cake"),
-            Alias::new("missing"),
-        ))
+        .primary_key(Index::create(Alias::new("cake"), Alias::new("missing")))
         .to_owned();
 
     assert_transform_error(
@@ -170,7 +167,7 @@ fn transform_rejects_relations_it_cannot_resolve() {
             bare("customers"),
             Table::create(Alias::new("orders"))
                 .col(serial_pk("id"))
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("orders"),
                     Alias::new("customer_id"),
                     Alias::new("customers"),
@@ -258,10 +255,10 @@ fn transform_marks_columns_from_single_column_unique_index() {
                         .not_null()
                         .to_owned(),
                 )
-                .index(&mut unique_index("vendor", "name"))
+                .index(unique_index("vendor", "name").to_owned())
                 // a multi-column unique index marks nothing
                 .index(
-                    &mut Index::create(Alias::new("vendor"), Alias::new("region"))
+                    Index::create(Alias::new("vendor"), Alias::new("region"))
                         .name("idx_vendor_region_tier")
                         .col(Alias::new("tier"))
                         .unique()
@@ -303,7 +300,8 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
                 )
                 .primary_key(
                     Index::create(Alias::new("cake_filling"), Alias::new("cake_id"))
-                        .col(Alias::new("filling_id")),
+                        .col(Alias::new("filling_id"))
+                        .to_owned(),
                 )
                 .to_owned(),
         ],
@@ -403,7 +401,8 @@ fn transform_turns_foreign_keys_into_belongs_to_relations() {
                     )
                     .col(Alias::new("cake_kind"), Alias::new("kind"))
                     .on_update(ForeignKeyAction::Cascade)
-                    .on_delete(ForeignKeyAction::SetNull),
+                    .on_delete(ForeignKeyAction::SetNull)
+                    .to_owned(),
                 )
                 .to_owned(),
         ],
@@ -450,19 +449,19 @@ fn transform_numbers_repeated_fks_to_same_table() {
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("basket"),
                     Alias::new("fruit_id1"),
                     Alias::new("fruit"),
                     Alias::new("id"),
                 ))
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("basket"),
                     Alias::new("fruit_id2"),
                     Alias::new("fruit"),
                     Alias::new("id"),
                 ))
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("basket"),
                     Alias::new("cake_id"),
                     Alias::new("cake"),
@@ -551,13 +550,13 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
                 .primary_key()
                 .to_owned(),
         )
-        .foreign_key(&mut ForeignKey::create(
+        .foreign_key(ForeignKey::create(
             Alias::new(name),
             Alias::new(left.1),
             Alias::new(left.0),
             Alias::new("id"),
         ))
-        .foreign_key(&mut ForeignKey::create(
+        .foreign_key(ForeignKey::create(
             Alias::new(name),
             Alias::new(right.1),
             Alias::new(right.0),
@@ -590,8 +589,8 @@ fn inverse_has_one_for_unique_foreign_key() {
             Table::create(Alias::new("fruit"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
-                .index(&mut unique_index("fruit", "cake_id"))
-                .foreign_key(&mut ForeignKey::create(
+                .index(unique_index("fruit", "cake_id").to_owned())
+                .foreign_key(ForeignKey::create(
                     Alias::new("fruit"),
                     Alias::new("cake_id"),
                     Alias::new("cake"),
@@ -623,7 +622,7 @@ fn inverse_has_one_for_whole_primary_key_fk() {
                         .primary_key()
                         .to_owned(),
                 )
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("profile"),
                     Alias::new("user_id"),
                     Alias::new("users"),
@@ -681,13 +680,13 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
                 .col(ColumnDef::new(Alias::new("cake_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
                 .index(
-                    &mut Index::create(Alias::new("fruit"), Alias::new("cake_id"))
+                    Index::create(Alias::new("fruit"), Alias::new("cake_id"))
                         .name("idx_fruit_cake")
                         .col(Alias::new("cake_kind"))
                         .unique()
                         .to_owned(),
                 )
-                .foreign_key(&mut cake_key("fruit"))
+                .foreign_key(cake_key("fruit").to_owned())
                 .to_owned(),
             // the same key under a unique index covering more than the key
             // constrains nothing about the key
@@ -697,14 +696,14 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
                 .col(ColumnDef::new(Alias::new("cake_kind")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("batch")).integer().to_owned())
                 .index(
-                    &mut Index::create(Alias::new("crumb"), Alias::new("cake_id"))
+                    Index::create(Alias::new("crumb"), Alias::new("cake_id"))
                         .name("idx_crumb_cake_batch")
                         .col(Alias::new("cake_kind"))
                         .col(Alias::new("batch"))
                         .unique()
                         .to_owned(),
                 )
-                .foreign_key(&mut cake_key("crumb"))
+                .foreign_key(cake_key("crumb").to_owned())
                 .to_owned(),
         ],
         Opts::default(),
@@ -740,7 +739,7 @@ fn inverse_has_one_for_inline_unique_key_column() {
                         .unique_key()
                         .to_owned(),
                 )
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("fruit"),
                     Alias::new("cake_id"),
                     Alias::new("cake"),
@@ -782,13 +781,13 @@ fn no_inverse_for_self_referencing_or_suffixed_relations() {
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("fruit_id1")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("fruit_id2")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("basket"),
                     Alias::new("fruit_id1"),
                     Alias::new("fruit"),
                     Alias::new("id"),
                 ))
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("basket"),
                     Alias::new("fruit_id2"),
                     Alias::new("fruit"),
@@ -810,7 +809,7 @@ fn inverse_dropped_when_target_already_relates_back() {
             Table::create(Alias::new("users"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("bill_id")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("users"),
                     Alias::new("bill_id"),
                     Alias::new("bills"),
@@ -820,7 +819,7 @@ fn inverse_dropped_when_target_already_relates_back() {
             Table::create(Alias::new("bills"))
                 .col(serial_pk("id"))
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("bills"),
                     Alias::new("user_id"),
                     Alias::new("users"),
@@ -895,13 +894,13 @@ fn fks_outside_the_primary_key_are_not_junctions() {
                 )
                 .col(ColumnDef::new(Alias::new("user_id")).integer().to_owned())
                 .col(ColumnDef::new(Alias::new("org_id")).integer().to_owned())
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("audit_events"),
                     Alias::new("user_id"),
                     Alias::new("users"),
                     Alias::new("id"),
                 ))
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("audit_events"),
                     Alias::new("org_id"),
                     Alias::new("orgs"),
@@ -951,7 +950,7 @@ fn inbound_relations_are_not_junction_legs() {
                         .primary_key()
                         .to_owned(),
                 )
-                .foreign_key(&mut ForeignKey::create(
+                .foreign_key(ForeignKey::create(
                     Alias::new("posts"),
                     Alias::new("tenant_id"),
                     Alias::new("tenants"),

@@ -83,7 +83,29 @@ use super::common::*;
 ///     r#"CREATE UNIQUE INDEX "idx-glyph-aspect" ON "glyph" ("image" ASC, "aspect" DESC)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+6]
+///
+/// There is no `take()`: draining the table or the columns would leave exactly
+/// the husk the constructor rules out, so the method a reader would expect to
+/// move is absent rather than quietly copying. A second copy is `.to_owned()`.
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// let mut index = Index::create(Glyph::Table, Glyph::Aspect).to_owned();
+/// let moved: IndexCreateStatement = index.take();
+/// ```
+///
+/// Embedding one consumes it, so a `&mut` builder chain does not typecheck —
+/// write the `.to_owned()` and see the copy:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// Table::create(Glyph::Table).index(Index::create(Glyph::Table, Glyph::Aspect).unique());
+/// ```
+// [spec:pgorm:req:sql.ddl.index-create+7]
+// [spec:pgorm:req:sql.ast+1]
+// [spec:pgorm:req:sql.ddl.create-table+7]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -104,7 +126,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+6]
+// [spec:pgorm:req:sql.ddl.index-create+7]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -117,7 +139,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+6]
+// [spec:pgorm:req:sql.ddl.index-create+7]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -249,14 +271,6 @@ impl IndexCreateStatement {
 
     pub fn get_table_name(&self) -> &TableName {
         &self.table
-    }
-
-    /// Clone this statement out of a builder chain.
-    ///
-    /// This copies rather than moves: moving the table or the columns out would
-    /// leave the targetless, column-less index this type exists to rule out.
-    pub fn take(&mut self) -> Self {
-        self.clone()
     }
 }
 

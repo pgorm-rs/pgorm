@@ -1,6 +1,6 @@
 use crate::{
     AnyWithClause, QueryStatementBuilder, ReturningClause, SimpleExpr, SubQueryStatement,
-    WithQuery, backend::QueryBuilder, prepare::*, query::condition::*, types::*, value::*,
+    backend::QueryBuilder, prepare::*, query::condition::*, types::*, value::*,
 };
 use inherent::inherent;
 
@@ -66,9 +66,11 @@ use inherent::inherent;
 ///     r#"DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.delete+2]
+// [spec:pgorm:def:sql.ast.delete+3]
+// [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
+    pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) returning: Option<ReturningClause>,
@@ -113,7 +115,7 @@ impl DeleteStatement {
     ///     r#"DELETE FROM "glyph" AS "g" WHERE "g"."id" = 1"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.delete+2]
+    // [spec:pgorm:def:sql.ast.delete+3]
     #[allow(clippy::wrong_self_convention)]
     pub fn from_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
@@ -191,42 +193,6 @@ impl DeleteStatement {
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
         self.returning(ReturningClause::All)
-    }
-
-    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
-    /// either a [`WithClause`](crate::WithClause) or a
-    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
-    ///
-    /// let select = SelectStatement::new()
-    ///         .columns([Glyph::Id])
-    ///         .from(Glyph::Table)
-    ///         .and_where(Expr::col(Glyph::Image).like("0%"))
-    ///         .to_owned();
-    ///     let cte = CommonTableExpression::new(Alias::new("cte"), select)
-    ///         .column(Glyph::Id)
-    ///         .to_owned();
-    ///     let with_clause = WithClause::new(cte);
-    ///     let update = DeleteStatement::new()
-    ///         .from_table(Glyph::Table)
-    ///         .and_where(Expr::col(Glyph::Id).in_subquery(SelectStatement::new().column(Glyph::Id).from(Alias::new("cte")).to_owned()))
-    ///         .to_owned();
-    ///     let query = update.with(with_clause);
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph" WHERE "image" LIKE '0%') DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "cte")"#
-    /// );
-    /// ```
-    pub fn with<C>(self, clause: C) -> WithQuery
-    where
-        C: Into<AnyWithClause>,
-    {
-        WithQuery::new(clause, self)
     }
 }
 

@@ -1,29 +1,8 @@
 use crate::{
-    ColumnRef, DeleteStatement, DynIden, FromItem, InsertStatement, IntoIden,
-    QueryStatementBuilder, SelectExpr, SelectStatement, SimpleExpr, SqlWriter, SubQueryStatement,
-    UpdateStatement, Values, {Alias, QueryBuilder},
+    Alias, ColumnRef, DeleteStatement, DynIden, FromItem, InsertStatement, IntoIden,
+    QueryStatementBuilder, SelectExpr, SelectStatement, SimpleExpr, SubQueryStatement,
+    UpdateStatement,
 };
-use inherent::inherent;
-
-/// The statements a [`WithQuery`] may prefix.
-///
-/// [`SelectStatement`] is deliberately absent. A select carries its own WITH
-/// clause ([`SelectStatement::with`]), so wrapping one would give the same
-/// clause two places to live and let two of them render at once —
-/// `WITH a AS (…) WITH b AS (…) SELECT …`, which PostgreSQL does not parse.
-/// Excluding the select from this bound is what makes that state
-/// unconstructible rather than merely discouraged.
-// [spec:pgorm:req:query.build.with.single]
-pub trait WithBody: QueryStatementBuilder {}
-
-// [spec:pgorm:req:query.build.with.single]
-impl WithBody for InsertStatement {}
-
-// [spec:pgorm:req:query.build.with.single]
-impl WithBody for UpdateStatement {}
-
-// [spec:pgorm:req:query.build.with.single]
-impl WithBody for DeleteStatement {}
 
 /// A table definition inside a WITH clause ([WithClause] or [RecursiveWithClause]).
 ///
@@ -41,7 +20,7 @@ impl WithBody for DeleteStatement {}
 /// pgorm-query does not enforce that: a write CTE with no RETURNING renders
 /// happily and is refused by the server. Supplying the RETURNING clause is the
 /// caller's part.
-// [spec:pgorm:def:sql.ast.with+2]
+// [spec:pgorm:def:sql.ast.with+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
     pub(crate) table_name: DynIden,
@@ -87,9 +66,9 @@ impl CommonTableExpression {
     }
 
     /// Some databases allow you to put "MATERIALIZED" or "NOT MATERIALIZED" in the CTE definition.
-    /// This will affect how during the execution of [WithQuery] the CTE in the with clause will be
-    /// executed. If the database doesn't support this syntax this option specified here will be
-    /// ignored and not appear in the generated sql.
+    /// This affects how the CTE is executed when the statement carrying the clause runs. If the
+    /// database doesn't support this syntax this option specified here will be ignored and not
+    /// appear in the generated sql.
     pub fn materialized(&mut self, materialized: bool) -> &mut Self {
         self.materialized = Some(materialized);
         self
@@ -255,7 +234,8 @@ impl Cycle {
 /// [WithClause::cte], so the clause is never empty. The recursive form is the separate
 /// [RecursiveWithClause].
 ///
-/// You can use this to generate [WithQuery] by calling [WithClause::query].
+/// Attach it to a statement with that statement's `with` method — see
+/// [`SelectStatement::with`].
 ///
 /// These named queries can act as a "query local table" that are materialized during execution and
 /// then can be used by the query prefixed with the WITH clause.
@@ -283,19 +263,18 @@ impl Cycle {
 ///     .column(Alias::new("id"))
 ///     .to_owned();
 ///
-/// let select = SelectStatement::new()
+/// let query = SelectStatement::new()
 ///         .column(ColumnRef::Asterisk)
 ///         .from(Alias::new("cte"))
+///         .with(WithClause::new(common_table_expression))
 ///         .to_owned();
-///
-/// let query = select.with(WithClause::new(common_table_expression));
 ///
 /// assert_eq!(
 ///     query.to_string(),
 ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "table") SELECT * FROM "cte""#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.with+2]
+// [spec:pgorm:def:sql.ast.with+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithClause {
     pub(crate) first: CommonTableExpression,
@@ -320,16 +299,6 @@ impl WithClause {
     /// The common table expressions of this clause, in the order they were added.
     pub fn ctes(&self) -> impl Iterator<Item = &CommonTableExpression> {
         std::iter::once(&self.first).chain(self.rest.iter())
-    }
-
-    /// Prefix a data-modifying statement with this clause, yielding a
-    /// [WithQuery]. A SELECT instead carries the clause on itself — see
-    /// [`SelectStatement::with`] and [`WithBody`].
-    pub fn query<T>(self, query: T) -> WithQuery
-    where
-        T: WithBody,
-    {
-        WithQuery::new(self, query)
     }
 }
 
@@ -386,16 +355,15 @@ impl WithClause {
 ///     .column(Alias::new("value"))
 ///     .to_owned();
 ///
-/// let select = SelectStatement::new()
-///         .column(ColumnRef::Asterisk)
-///         .from(Alias::new("cte_traversal"))
-///         .to_owned();
-///
 /// let with_clause = RecursiveWithClause::new(common_table_expression)
 ///         .cycle(Cycle::new(SimpleExpr::Column(ColumnRef::Column(Alias::new("id").into_iden())), Alias::new("looped"), Alias::new("traversal_path")))
 ///         .to_owned();
 ///
-/// let query = select.with(with_clause);
+/// let query = SelectStatement::new()
+///         .column(ColumnRef::Asterisk)
+///         .from(Alias::new("cte_traversal"))
+///         .with(with_clause)
+///         .to_owned();
 ///
 /// assert_eq!(
 ///     query.to_string(),
@@ -436,21 +404,11 @@ impl RecursiveWithClause {
         self.cycle = Some(cycle);
         self
     }
-
-    /// Prefix a data-modifying statement with this clause, yielding a
-    /// [WithQuery]. A SELECT instead carries the clause on itself — see
-    /// [`SelectStatement::with`] and [`WithBody`].
-    pub fn query<T>(self, query: T) -> WithQuery
-    where
-        T: WithBody,
-    {
-        WithQuery::new(self, query)
-    }
 }
 
-/// Either form of WITH clause. This is what the statement builders' `with` methods accept and what
-/// a [WithQuery] carries.
-// [spec:pgorm:def:sql.ast.with+2]
+/// Either form of WITH clause. This is what every statement builder's `with`
+/// method accepts, and what the statement then carries.
+// [spec:pgorm:def:sql.ast.with+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyWithClause {
     /// A non-recursive clause of one or more common table expressions.
@@ -471,76 +429,209 @@ impl From<RecursiveWithClause> for AnyWithClause {
     }
 }
 
-/// A data-modifying statement prefixed by a WITH clause ([WithClause] or
-/// [RecursiveWithClause]).
-///
-/// These named queries can act as a "query local table" that are materialized during execution and
-/// then can be used by the query prefixed with the WITH clause.
-///
-/// Both the clause and the query it prefixes are given to [WithQuery::new], so a [WithQuery] is
-/// always complete. It is usually built through [WithClause::query],
-/// [RecursiveWithClause::query], or the `with` method on an insert/update/delete statement.
-///
-/// A SELECT never becomes a [WithQuery]: it carries its clause itself, which is
-/// what keeps it a live [SelectStatement] afterwards. Handing one to this
-/// constructor does not compile ([`WithBody`]):
-///
-/// ```compile_fail
-/// use pgorm_query::{tests_cfg::*, *};
-///
-/// let cte = CommonTableExpression::new(
-///     Alias::new("cte"),
-///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
-/// );
-/// let select = Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned();
-///
-/// WithQuery::new(WithClause::new(cte), select);
-/// ```
-// [spec:pgorm:def:sql.ast.with+2]
-// [spec:pgorm:req:query.build.with.single]
-#[derive(Debug, Clone, PartialEq)]
-pub struct WithQuery {
-    pub(crate) with_clause: AnyWithClause,
-    pub(crate) query: Box<SubQueryStatement>,
-}
-
-impl WithQuery {
-    /// Constructs a [WithQuery] from a with clause of either form and the
-    /// data-modifying statement it prefixes.
-    pub fn new<C, T>(with_clause: C, query: T) -> Self
+impl SelectStatement {
+    /// Attach a WITH clause — either a [`WithClause`] or a
+    /// [`RecursiveWithClause`] — to this statement.
+    ///
+    /// The clause is carried *on* the statement rather than wrapping it, so the
+    /// value stays a [`SelectStatement`]: `and_where`, `order_by`, `limit` and
+    /// every other builder method still apply afterwards, and the statement
+    /// still nests as a subquery, a union arm, a CTE body or a LATERAL body.
+    /// The clause renders as a prefix at whatever level the statement occupies.
+    ///
+    /// [`InsertStatement`], [`UpdateStatement`] and [`DeleteStatement`] carry a
+    /// clause the same way, through a method of the same name, receiver and
+    /// return: `with` means one thing across all four.
+    ///
+    /// The last call wins; a statement carries at most one clause.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
+    ///
+    /// let base_query = SelectStatement::new()
+    ///                     .column(Alias::new("id"))
+    ///                     .expr(1i32)
+    ///                     .column(Alias::new("next"))
+    ///                     .column(Alias::new("value"))
+    ///                     .from(Alias::new("table"))
+    ///                     .to_owned();
+    ///
+    /// let cte_referencing = SelectStatement::new()
+    ///                             .column(Alias::new("id"))
+    ///                             .expr(Expr::col(Alias::new("depth")).add(1i32))
+    ///                             .column(Alias::new("next"))
+    ///                             .column(Alias::new("value"))
+    ///                             .from(Alias::new("table"))
+    ///                             .join(
+    ///                                 JoinType::InnerJoin,
+    ///                                 Alias::new("cte_traversal"),
+    ///                                 Expr::col((Alias::new("cte_traversal"), Alias::new("next"))).equals((Alias::new("table"), Alias::new("id")))
+    ///                             )
+    ///                             .to_owned();
+    ///
+    /// let common_table_expression = CommonTableExpression::new(
+    ///             Alias::new("cte_traversal"),
+    ///             base_query.clone().union(UnionType::All, cte_referencing).to_owned(),
+    ///         )
+    ///         .columns([Alias::new("id"), Alias::new("depth"), Alias::new("next"), Alias::new("value")])
+    ///         .to_owned();
+    ///
+    /// let query = SelectStatement::new()
+    ///         .column(ColumnRef::Asterisk)
+    ///         .from(Alias::new("cte_traversal"))
+    ///         .with(RecursiveWithClause::new(common_table_expression))
+    ///         .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) SELECT * FROM "cte_traversal""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
+    // [spec:pgorm:req:query.build.with.single+1]
+    pub fn with<C>(&mut self, clause: C) -> &mut Self
     where
         C: Into<AnyWithClause>,
-        T: WithBody,
     {
-        Self {
-            with_clause: with_clause.into(),
-            query: Box::new(query.into_sub_query_statement()),
-        }
+        self.with = Some(Box::new(clause.into()));
+        self
     }
 }
 
-#[inherent]
-impl QueryStatementBuilder for WithQuery {
-    pub fn build_collect_into(&self, sql: &mut dyn SqlWriter) {
-        QueryBuilder.prepare_with_query(self, sql);
+impl InsertStatement {
+    /// Attach a WITH clause to this statement. See
+    /// [`SelectStatement::with`] — the method is the same one, on every
+    /// statement that has it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let cte = CommonTableExpression::new(
+    ///     Alias::new("cte"),
+    ///     Query::select()
+    ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
+    ///         .from(Glyph::Table)
+    ///         .to_owned(),
+    /// )
+    /// .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
+    /// .to_owned();
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table)
+    ///     .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
+    ///     .select_from(
+    ///         Query::select()
+    ///             .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
+    ///             .from(Alias::new("cte"))
+    ///             .to_owned(),
+    ///     )
+    ///     .unwrap()
+    ///     .with(WithClause::new(cte))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"WITH "cte" ("id", "image", "aspect") AS (SELECT "id", "image", "aspect" FROM "glyph") INSERT INTO "glyph" ("id", "image", "aspect") SELECT "id", "image", "aspect" FROM "cte""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
+    // [spec:pgorm:req:query.build.with.single+1]
+    pub fn with<C>(&mut self, clause: C) -> &mut Self
+    where
+        C: Into<AnyWithClause>,
+    {
+        self.with = Some(Box::new(clause.into()));
+        self
     }
-
-    pub fn into_sub_query_statement(self) -> SubQueryStatement {
-        SubQueryStatement::WithStatement(self)
-    }
-
-    pub fn build(&self) -> (String, Values);
-    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
-/// Renders every value inlined as an escaped SQL literal rather than bound —
-/// good for logging and goldens. [`build`](Self::build) is the rendering to
-/// execute: it emits `$N` placeholders and returns the values to bind.
-// [spec:pgorm:req:sql.ast.build+3]
-impl std::fmt::Display for WithQuery {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut sql = String::with_capacity(256);
-        QueryBuilder.prepare_with_query(self, &mut sql);
-        f.write_str(&sql)
+impl UpdateStatement {
+    /// Attach a WITH clause to this statement. See
+    /// [`SelectStatement::with`] — the method is the same one, on every
+    /// statement that has it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let cte = CommonTableExpression::new(
+    ///     Alias::new("cte"),
+    ///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
+    /// )
+    /// .column(Glyph::Id)
+    /// .to_owned();
+    ///
+    /// let query = Query::update()
+    ///     .table(Glyph::Table)
+    ///     .value(Glyph::Aspect, 2.1345)
+    ///     .and_where(Expr::col(Glyph::Id).in_subquery(
+    ///         Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned(),
+    ///     ))
+    ///     .with(WithClause::new(cte))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph") UPDATE "glyph" SET "aspect" = 2.1345 WHERE "id" IN (SELECT "id" FROM "cte")"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
+    // [spec:pgorm:req:query.build.with.single+1]
+    pub fn with<C>(&mut self, clause: C) -> &mut Self
+    where
+        C: Into<AnyWithClause>,
+    {
+        self.with = Some(Box::new(clause.into()));
+        self
+    }
+}
+
+impl DeleteStatement {
+    /// Attach a WITH clause to this statement. See
+    /// [`SelectStatement::with`] — the method is the same one, on every
+    /// statement that has it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let cte = CommonTableExpression::new(
+    ///     Alias::new("cte"),
+    ///     Query::select().column(Glyph::Id).from(Glyph::Table).to_owned(),
+    /// )
+    /// .column(Glyph::Id)
+    /// .to_owned();
+    ///
+    /// let query = Query::delete()
+    ///     .from_table(Glyph::Table)
+    ///     .and_where(Expr::col(Glyph::Id).in_subquery(
+    ///         Query::select().column(Glyph::Id).from(Alias::new("cte")).to_owned(),
+    ///     ))
+    ///     .with(WithClause::new(cte))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph") DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "cte")"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
+    // [spec:pgorm:req:query.build.with.single+1]
+    pub fn with<C>(&mut self, clause: C) -> &mut Self
+    where
+        C: Into<AnyWithClause>,
+    {
+        self.with = Some(Box::new(clause.into()));
+        self
     }
 }

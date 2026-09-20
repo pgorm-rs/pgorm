@@ -36,7 +36,7 @@ pub use window::*;
 pub use with::*;
 
 /// Shorthand for constructing any table query
-// [spec:pgorm:req:sql.ast]
+// [spec:pgorm:req:sql.ast+1]
 #[derive(Debug, Clone)]
 pub struct Query;
 
@@ -49,14 +49,13 @@ pub enum QueryStatement {
     Delete(DeleteStatement),
 }
 
-// [spec:pgorm:req:sql.ast]
+// [spec:pgorm:req:sql.ast+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubQueryStatement {
     SelectStatement(SelectStatement),
     InsertStatement(InsertStatement),
     UpdateStatement(UpdateStatement),
     DeleteStatement(DeleteStatement),
-    WithStatement(WithQuery),
 }
 
 impl Query {

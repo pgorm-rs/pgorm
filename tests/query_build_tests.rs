@@ -436,7 +436,7 @@ fn belongs_to_filters_every_primary_key_column() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    `select_only` clears the list;
+// [spec:pgorm:sem:query.build.modifiers+8/test]    `select_only` clears the list;
 // `column`/`columns` re-add through `select_as`; `column_as`, `expr_as`,
 // `tbl_col_as`, `expr` and `exprs` append explicit expressions
 #[test]
@@ -485,7 +485,7 @@ fn select_list_modifiers_rewrite_the_list() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    `select` clears the list and
+// [spec:pgorm:sem:query.build.modifiers+8/test]    `select` clears the list and
 // projects in one call, rendering exactly what `select_only` plus `columns`
 // does, and casting an enum column the same way
 #[test]
@@ -530,7 +530,7 @@ fn select_clears_and_projects_in_one_call() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    a tuple is the mixed list: two
+// [spec:pgorm:sem:query.build.modifiers+8/test]    a tuple is the mixed list: two
 // entities' columns, a raw expression and an alias token have no common array
 // element type
 #[test]
@@ -577,7 +577,7 @@ fn select_tuple_mixes_columns_and_expressions() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    rendering a cleared select
+// [spec:pgorm:sem:query.build.modifiers+8/test]    rendering a cleared select
 // list still emits the text as written — `to_string` and `build` have no
 // `Result` channel, so the empty projection is refused at execution instead
 // (see `empty_select_tests.rs`)
@@ -589,7 +589,7 @@ fn cleared_select_list_renders_verbatim() {
     assert_eq!(query.build().0, r#"SELECT  FROM "cake""#);
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    `limit`/`offset` take
+// [spec:pgorm:sem:query.build.modifiers+8/test]    `limit`/`offset` take
 // `Into<Option<u64>>`: the last `Some` wins and `None` removes the clause
 #[test]
 fn limit_and_offset_last_call_wins() {
@@ -625,7 +625,7 @@ fn limit_and_offset_last_call_wins() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    `group_by` adds GROUP BY,
+// [spec:pgorm:sem:query.build.modifiers+8/test]    `group_by` adds GROUP BY,
 // `having` accumulates AND-ed conditions, `distinct` / `distinct_on` and the
 // four locking helpers each add their clause
 #[test]
@@ -670,7 +670,7 @@ fn grouping_distinct_and_locking_clauses() {
     );
 }
 
-// [spec:pgorm:sem:query.build.modifiers+7/test]    ORDER BY expressions append in
+// [spec:pgorm:sem:query.build.modifiers+8/test]    ORDER BY expressions append in
 // call order and are never deduplicated
 #[test]
 fn order_by_appends_and_never_dedups() {

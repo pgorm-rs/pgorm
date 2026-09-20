@@ -127,7 +127,7 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     }
     Ok(ParsedIndex {
         table,
-        index: stmt.unique.then(|| index.take()),
+        index: stmt.unique.then_some(index),
     })
 }
 

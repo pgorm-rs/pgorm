@@ -1,6 +1,6 @@
 use crate::{
     AnyWithClause, OnConflict, QueryStatementBuilder, ReturningClause, SelectStatement, SimpleExpr,
-    SubQueryStatement, Values, WithQuery, backend::QueryBuilder, error::*, prepare::*, types::*,
+    SubQueryStatement, Values, backend::QueryBuilder, error::*, prepare::*, types::*,
 };
 use inherent::inherent;
 
@@ -8,7 +8,7 @@ use inherent::inherent;
 ///
 /// [`InsertValueSource`] is a node in the expression tree and can represent a raw value set
 /// ('VALUES') or a select query.
-// [spec:pgorm:def:sql.ast.insert+1]
+// [spec:pgorm:def:sql.ast.insert+2]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum InsertValueSource {
     Values(Vec<Vec<SimpleExpr>>),
@@ -34,9 +34,11 @@ pub(crate) enum InsertValueSource {
 ///     r#"INSERT INTO "glyph" ("aspect", "image") VALUES (5.15, '12A'), (4.21, '123')"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.insert+1]
+// [spec:pgorm:def:sql.ast.insert+2]
+// [spec:pgorm:def:query.build.with+1]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
+    pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
     pub(crate) columns: Vec<DynIden>,
     pub(crate) source: Option<InsertValueSource>,
@@ -74,7 +76,7 @@ impl InsertStatement {
     /// # Examples
     ///
     /// See [`InsertStatement::values`]
-    // [spec:pgorm:def:sql.ast.insert+1]
+    // [spec:pgorm:def:sql.ast.insert+2]
     pub fn into_table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
         T: IntoNamedTable,
@@ -358,49 +360,6 @@ impl InsertStatement {
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
         self.returning(ReturningClause::All)
-    }
-
-    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
-    /// either a [`WithClause`](crate::WithClause) or a
-    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
-    ///
-    /// let select = SelectStatement::new()
-    ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-    ///         .from(Glyph::Table)
-    ///         .to_owned();
-    ///     let cte = CommonTableExpression::new(Alias::new("cte"), select)
-    ///         .column(Glyph::Id)
-    ///         .column(Glyph::Image)
-    ///         .column(Glyph::Aspect)
-    ///         .to_owned();
-    ///     let with_clause = WithClause::new(cte);
-    ///     let select = SelectStatement::new()
-    ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-    ///         .from(Alias::new("cte"))
-    ///         .to_owned();
-    ///     let mut insert = Query::insert();
-    ///     insert
-    ///         .into_table(Glyph::Table)
-    ///         .columns([Glyph::Id, Glyph::Image, Glyph::Aspect])
-    ///         .select_from(select)
-    ///         .unwrap();
-    ///     let query = insert.with(with_clause);
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"WITH "cte" ("id", "image", "aspect") AS (SELECT "id", "image", "aspect" FROM "glyph") INSERT INTO "glyph" ("id", "image", "aspect") SELECT "id", "image", "aspect" FROM "cte""#
-    /// );
-    /// ```
-    pub fn with<C>(self, clause: C) -> WithQuery
-    where
-        C: Into<AnyWithClause>,
-    {
-        WithQuery::new(clause, self)
     }
 
     /// Insert with default values if columns and values are not supplied.

@@ -156,7 +156,8 @@ where
                 SelfJoin,
                 self_join::Column::Uuid,
             )
-            .name("fk-self_join-uuid_ref"),
+            .name("fk-self_join-uuid_ref")
+            .to_owned(),
         )
         .to_owned();
 
@@ -235,7 +236,8 @@ where
                 ActiveEnum,
                 active_enum::Column::Id,
             )
-            .name("fk-active_enum_child-active_enum"),
+            .name("fk-active_enum_child-active_enum")
+            .to_owned(),
         )
         .to_owned();
 

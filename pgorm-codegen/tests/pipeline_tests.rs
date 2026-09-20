@@ -24,7 +24,7 @@ fn vendor_schema() -> Vec<pgorm_query::TableCreateStatement> {
                     .not_null()
                     .to_owned(),
             )
-            .index(&mut unique_index("vendor", "name"))
+            .index(unique_index("vendor", "name").to_owned())
             .to_owned(),
     ]
 }

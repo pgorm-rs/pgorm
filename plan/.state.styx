@@ -767,6 +767,7 @@ assertions (
     {id query-single-dialect, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:50:36.846197Z}
     {id query-bound-quoting-contract, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:03:02.924238Z}
     {id query-render-per-capability, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:13:55.566857Z}
+    {id query-verbs-keep-promises, kind @doing, author "brendan@necessary.nu", at 2026-09-20T12:16:18.005329Z}
 )
 
 impl_evidence (

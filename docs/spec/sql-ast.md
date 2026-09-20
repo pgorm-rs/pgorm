@@ -10,21 +10,31 @@ today, including panicking edges and deliberate failsafes.
 
 ## Overview
 
-> [spec:pgorm:req:sql.ast]
+> [spec:pgorm:req:sql.ast+1]
 > pgorm-query MUST provide a programmatic AST for building SQL statements,
-> comprising `SelectStatement`, `InsertStatement`, `UpdateStatement`,
-> `DeleteStatement`, and `WithQuery`, plus the `Query` shorthand whose
+> comprising `SelectStatement`, `InsertStatement`, `UpdateStatement` and
+> `DeleteStatement`, plus the `Query` shorthand whose
 > associated functions (`Query::select()`, `Query::insert()`, `Query::update()`,
 > `Query::delete()`, `Query::with()`, `Query::returning()`) construct fresh
 > builders. Builder methods MUST mutate in place and return `&mut Self` so calls
 > chain; constructing or mutating a statement MUST NOT touch a database.
 >
-> Any of the five statement kinds MUST be embeddable as a subquery via
+> Any of the four statement kinds MUST be embeddable as a subquery via
 > `into_sub_query_statement`, which wraps it in the `SubQueryStatement` enum
-> (`SelectStatement`, `InsertStatement`, `UpdateStatement`, `DeleteStatement`,
-> `WithStatement`). `SelectStatement` and `WindowStatement` additionally provide
-> `take()`, which moves the accumulated contents out and leaves the builder in
-> its default (empty) state.
+> (`SelectStatement`, `InsertStatement`, `UpdateStatement`, `DeleteStatement`).
+> There is no fifth variant for a WITH-prefixed statement: a clause is carried
+> by the statement it prefixes (`query.build.with`), so the prefix nests
+> wherever the statement does.
+>
+> Where a builder offers `take()`, the method MUST move the accumulated contents
+> out and leave the source in its default (empty) state — it may copy only the
+> identity field a constructor demanded, never content a caller added. A type
+> whose contents cannot be moved out without leaving an invalid value therefore
+> has no `take()` at all rather than a `take()` that copies: `SelectStatement`,
+> `WindowStatement`, `TableIndex`, `ColumnDef`, `TableCreateStatement` and
+> `TableDropStatement` have one; `IndexCreateStatement`,
+> `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
+> not, and a caller who wants a second copy of one writes `.to_owned()`.
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -381,14 +391,15 @@ today, including panicking edges and deliberate failsafes.
 
 ## INSERT statements
 
-> [spec:pgorm:def:sql.ast.insert+1]
+> [spec:pgorm:def:sql.ast.insert+2]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
 > taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
 > column list (`columns`, which replaces any previous list), a value source, an
-> optional `OnConflict`, an optional `ReturningClause`, and an optional
+> optional `OnConflict`, an optional `ReturningClause`, an optional WITH clause
+> attached by `with(..)` (`query.build.with`), and an optional
 > default-values row count. The value source (`InsertValueSource`) is either
 > `Values(Vec<Vec<SimpleExpr>>)` — multi-row VALUES accumulated one row per
 > `values`/`values_panic` call — or `Select(..)` set by `select_from`, which
@@ -459,7 +470,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## UPDATE and DELETE statements
 
-> [spec:pgorm:req:sql.ast.update+2]
+> [spec:pgorm:req:sql.ast.update+3]
 > `UpdateStatement` MUST accumulate SET assignments in call order as
 > `(column, expression)` pairs: `values(pairs)` pushes many, `value(col, expr)`
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
@@ -468,7 +479,8 @@ today, including panicking edges and deliberate failsafes.
 > `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a WHERE `ConditionHolder`
-> (per `sql.ast.condition.holder`), and an optional `ReturningClause`.
+> (per `sql.ast.condition.holder`), an optional `ReturningClause`, and an
+> optional WITH clause attached by `with(..)` (`query.build.with`).
 > `get_values` MUST expose the accumulated assignment pairs for inspection.
 >
 > The statement MUST NOT carry ORDER BY expressions or a LIMIT: PostgreSQL
@@ -478,13 +490,13 @@ today, including panicking edges and deliberate failsafes.
 > by the caller as a subquery filter (`WHERE id IN (SELECT .. ORDER BY ..
 > LIMIT ..)`).
 
-> [spec:pgorm:def:sql.ast.delete+2]
+> [spec:pgorm:def:sql.ast.delete+3]
 > `DeleteStatement` is the DELETE AST node: a target table set by
 > `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+2]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a WHERE `ConditionHolder` shared with the condition rules, and an
-> optional `ReturningClause`. Like the other write statements it can be
-> prefixed with a WITH clause via `with(..)`, producing a `WithQuery`.
+> optional `ReturningClause`. Like the other three statements it carries an
+> optional WITH clause, attached by `with(..)` (`query.build.with`).
 >
 > As with `sql.ast.update`, the statement MUST NOT carry ORDER BY expressions
 > or a LIMIT — PostgreSQL admits neither on a DELETE — so it implements no
@@ -493,7 +505,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## WITH clauses and CTEs
 
-> [spec:pgorm:def:sql.ast.with+2]
+> [spec:pgorm:def:sql.ast.with+3]
 > `CommonTableExpression` defines one named query in a WITH clause and MUST be
 > complete the moment it exists: `CommonTableExpression::new(table_name, query)`
 > takes both mandatory parts, the query being any `QueryStatementBuilder` stored
@@ -514,17 +526,15 @@ today, including panicking edges and deliberate failsafes.
 > CTE collection: `WithClause::new(cte)` takes the first, `cte` appends further
 > ones, and `ctes` iterates them in order. `RecursiveWithClause` is the
 > recursive form, described by `sql.ast.with.recursive`. `AnyWithClause` is the
-> closed sum of the two, and `Into<AnyWithClause>` is what `WithQuery::new`,
-> `WithClause::query(stmt)`, `RecursiveWithClause::query(stmt)`, and
-> `stmt.with(clause)` on select/insert/update/delete accept. `WithQuery::new`
-> takes the clause and the statement it prefixes together, so a `WithQuery` is
-> likewise never half-built.
+> closed sum of the two, and `Into<AnyWithClause>` is what `stmt.with(clause)`
+> accepts on each of select, insert, update and delete — the only way a clause
+> reaches a statement.
 >
-> A `WithQuery` prefixes a *data-modifying* statement only: the statement bound
-> is the `WithBody` trait, which `SelectStatement` deliberately does not
-> implement because a select carries its clause itself. That split, and the
-> invalid state it makes unconstructible, are specified by
-> `query.build.with.single`.
+> A clause has exactly one home, the statement that carries it. There is no
+> wrapper type holding a clause plus the statement it prefixes, and therefore no
+> `WithBody` bound to keep a select out of one: the invalid state that bound
+> guarded is unconstructible because the second home no longer exists
+> (`query.build.with.single`).
 
 > [spec:pgorm:req:sql.ast.with.recursive+1]
 > The recursive WITH form MUST be a distinct type, `RecursiveWithClause`, whose

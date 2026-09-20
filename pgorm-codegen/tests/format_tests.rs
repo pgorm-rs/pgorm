@@ -70,7 +70,7 @@ fn compact_field_attribute_parts_assembled_in_fixed_order() {
                     .primary_key()
                     .to_owned(),
                 )
-                .index(&mut unique_index("ledger", "camelCase"))
+                .index(unique_index("ledger", "camelCase").to_owned())
                 .to_owned(),
         ],
         Opts::default(),
@@ -324,7 +324,7 @@ fn expanded_column_def_chains_null_unique_enum_type() {
                 .col(typed_null("note", ColumnType::Text))
                 .col(typed("email", ColumnType::String(StringLen::None)))
                 .col(enum_col("state", "task_state", &["open", "done"]))
-                .index(&mut unique_index("task", "email"))
+                .index(unique_index("task", "email").to_owned())
                 .to_owned(),
         ],
         expanded(),

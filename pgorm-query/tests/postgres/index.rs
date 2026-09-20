@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -59,7 +59,7 @@ fn create_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn create_6() {
     assert_eq!(
@@ -73,7 +73,7 @@ fn create_6() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn standalone_index_spells_plain_or_unique_only() {
     let index = || {
@@ -91,10 +91,10 @@ fn standalone_index_spells_plain_or_unique_only() {
     assert_eq!(index().unique().primary().to_string(), plain);
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn index_kind_accessors_are_mutually_exclusive() {
-    let index = Index::create(Glyph::Table, Glyph::Aspect).to_owned();
+    let index = Index::create(Glyph::Table, Glyph::Aspect);
 
     assert_eq!(index.kind(), IndexKind::Plain);
     assert!(!index.is_primary_key());
@@ -109,7 +109,7 @@ fn index_kind_accessors_are_mutually_exclusive() {
     assert!(!primary.is_unique_key());
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn nulls_not_distinct_needs_the_unique_kind() {
     let index = || {
@@ -158,20 +158,30 @@ fn drop_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+6/test]    take copies, so the source keeps its columns
+// [spec:pgorm:req:sql.ddl.index-create+7/test]    an index embeds by value: the source survives
+// only because the call site cloned it, and a chained builder has to say `.to_owned()`
 #[test]
-fn index_take_leaves_the_source_whole() {
-    let mut index = Index::create(Glyph::Table, Glyph::Aspect)
+fn index_embeds_by_value() {
+    let index = Index::create(Glyph::Table, Glyph::Aspect)
         .name("idx")
+        .unique()
         .to_owned();
-    let taken = index.take();
 
     assert_eq!(
-        taken.to_string(),
-        r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Aspect).integer())
+            .index(index.clone())
+            .to_string(),
+        [
+            r#"CREATE TABLE "glyph" ("#,
+            r#""aspect" integer,"#,
+            r#"CONSTRAINT "idx" UNIQUE ("aspect")"#,
+            r#")"#,
+        ]
+        .join(" ")
     );
     assert_eq!(
         index.to_string(),
-        r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#
+        r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#
     );
 }

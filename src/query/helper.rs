@@ -2,13 +2,13 @@ use crate::{
     ColumnPairs, ColumnTrait, EntityTrait, IntoIdentity, IntoSimpleExpr, Iterable, ModelTrait,
     PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
 };
+use pgorm_query::{
+    AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoIden,
+    LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SharedIden, SimpleExpr,
+    UnionType, WindowStatement,
+};
 pub use pgorm_query::{
     Condition, ConditionalStatement, DynIden, JoinType, Order, OrderedStatement,
-};
-use pgorm_query::{
-    ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoIden, LockBehavior, LockType,
-    NullOrdering, RecursiveWithClause, SelectExpr, SelectStatement, SharedIden, SimpleExpr,
-    UnionType, WindowStatement, WithClause,
 };
 
 use pgorm_query::IntoColumnRef;
@@ -17,7 +17,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+7]
+// [spec:pgorm:sem:query.build.modifiers+8]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -662,12 +662,20 @@ pub trait QuerySelect: Sized {
         self.into_projected()
     }
 
-    /// Prefix the query with a non-recursive `WITH` clause.
+    /// Prefix the query with a `WITH` clause — a
+    /// [`WithClause`](pgorm_query::WithClause) or a
+    /// [`RecursiveWithClause`](pgorm_query::RecursiveWithClause).
     ///
-    /// The clause is carried on the statement, not wrapped around it, so this
-    /// returns `Self`: filters, ordering, joins, the typed terminals, the
-    /// paginator and the cursor all keep working afterwards. The last call
-    /// wins.
+    /// This is [`SelectStatement::with`](pgorm_query::SelectStatement::with) at
+    /// the ORM's own receiver: the clause is carried on the statement, not
+    /// wrapped around it, so this returns `Self` and filters, ordering, joins,
+    /// the typed terminals, the paginator and the cursor all keep working
+    /// afterwards. The last call wins.
+    ///
+    /// A recursive CTE takes its column types from the anchor arm, where an
+    /// unannotated `$n` placeholder resolves to `text`. Annotate any literal in
+    /// that arm with [`cast_as`](pgorm_query::Expr::cast_as) — see
+    /// `[spec:pgorm:sem:sql.render.placeholder-typing]`.
     ///
     /// ```
     /// use pgorm::pgorm_query::{CommonTableExpression, Query, WithClause};
@@ -680,7 +688,7 @@ pub trait QuerySelect: Sized {
     ///
     /// assert_eq!(
     ///     cake::Entity::find()
-    ///         .with_cte(WithClause::new(cheap))
+    ///         .with(WithClause::new(cheap))
     ///         .filter(cake::Column::Id.gt(1))
     ///         .as_query()
     ///         .to_string(),
@@ -690,27 +698,14 @@ pub trait QuerySelect: Sized {
     ///     )
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with]
-    // [spec:pgorm:sem:query.build.with.attach]
-    fn with_cte(mut self, clause: WithClause) -> Self {
-        QuerySelect::query(&mut self).with_cte(clause);
-        self
-    }
-
-    /// Prefix the query with a `WITH RECURSIVE` clause.
-    ///
-    /// See [`with_cte`](QuerySelect::with_cte); the two share one slot, so the
-    /// last of either call wins.
-    ///
-    /// A recursive CTE takes its column types from the anchor arm, where an
-    /// unannotated `$n` placeholder resolves to `text`. Annotate any literal in
-    /// that arm with [`cast_as`](pgorm_query::Expr::cast_as) — see
-    /// `[spec:pgorm:sem:sql.render.placeholder-typing]`.
-    // [spec:pgorm:def:query.build.with]
-    // [spec:pgorm:sem:query.build.with.attach]
+    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:sem:sql.render.placeholder-typing]
-    fn with_recursive_cte(mut self, clause: RecursiveWithClause) -> Self {
-        QuerySelect::query(&mut self).with_recursive_cte(clause);
+    fn with<C>(mut self, clause: C) -> Self
+    where
+        C: Into<AnyWithClause>,
+    {
+        QuerySelect::query(&mut self).with(clause);
         self
     }
 
@@ -800,7 +795,7 @@ pub trait QuerySelect: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+7]
+// [spec:pgorm:sem:query.build.modifiers+8]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;

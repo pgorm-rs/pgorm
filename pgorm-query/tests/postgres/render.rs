@@ -13,7 +13,7 @@ fn select() -> SelectStatement {
         .take()
 }
 
-// [spec:pgorm:def:sql.render/test]    `QueryBuilder` is the one backend, and it walks every
+// [spec:pgorm:def:sql.render+1/test]    `QueryBuilder` is the one backend, and it walks every
 // statement kind of the AST into a `SqlWriter` sink
 #[test]
 fn the_single_backend_renders_every_statement_kind() {
@@ -31,8 +31,8 @@ fn the_single_backend_renders_every_statement_kind() {
         .and_where(Expr::col(Glyph::Id).eq(1))
         .to_owned();
     let cte = || CommonTableExpression::new(Alias::new("cte"), select());
-    let with = select().with(WithClause::new(cte()));
-    let with_query = WithClause::new(cte()).query(delete.clone());
+    let with = select().with(WithClause::new(cte())).take();
+    let with_delete = delete.clone().with(WithClause::new(cte())).to_owned();
 
     assert_eq!(
         select().to_string(),
@@ -53,7 +53,7 @@ fn the_single_backend_renders_every_statement_kind() {
         .join(" ")
     );
     assert_eq!(
-        with_query.to_string(),
+        with_delete.to_string(),
         [
             r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = 1)"#,
             r#"DELETE FROM "glyph" WHERE "id" = 1"#,
@@ -95,7 +95,7 @@ fn the_single_backend_renders_every_statement_kind() {
         .join(" ")
     );
     assert_eq!(
-        collect(&with_query),
+        collect(&with_delete),
         [
             r#"WITH "cte" AS (SELECT "id" FROM "glyph" WHERE "aspect" = $1)"#,
             r#"DELETE FROM "glyph" WHERE "id" = $2"#,
@@ -104,7 +104,7 @@ fn the_single_backend_renders_every_statement_kind() {
     );
 }
 
-// [spec:pgorm:def:sql.render/test]    rendering is infallible by construction: a DDL target is a
+// [spec:pgorm:def:sql.render+1/test]    rendering is infallible by construction: a DDL target is a
 // `TableName`, which has no shape the renderer would have to refuse
 #[test]
 fn ddl_targets_have_no_unrenderable_shape() {

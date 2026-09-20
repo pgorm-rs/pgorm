@@ -235,6 +235,7 @@ fn ddl_index_and_constraint_names_escape_quotes() {
                 Index::create(Glyph::Table, Glyph::Id)
                     .name(r#"i"dx"#)
                     .unique()
+                    .to_owned()
             )
             .to_string(),
         r#"CREATE TABLE "glyph" ( "id" integer, CONSTRAINT "i""dx" UNIQUE ("id") )"#
@@ -243,7 +244,7 @@ fn ddl_index_and_constraint_names_escape_quotes() {
         Index::create(Glyph::Table, Glyph::Id)
             .name(r#"i"dx"#)
             .to_string(),
-        r#"CREATE INDEX "i""dx" ON "glyph" ("id")"#
+        r#"CREATE INDEX "i""dx" ON "glyph" ("id")"#.to_owned()
     );
     assert_eq!(Index::drop(r#"i"dx"#).to_string(), r#"DROP INDEX "i""dx""#);
     assert_eq!(

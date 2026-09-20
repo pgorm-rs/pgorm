@@ -129,15 +129,15 @@ pub(super) fn build(
         create.col(column.def);
     }
 
-    for mut index in table_indexes.into_iter().chain(indexes) {
+    for index in table_indexes.into_iter().chain(indexes) {
         if index.is_primary_key() {
-            create.primary_key(&mut index);
+            create.primary_key(index);
         } else {
-            create.index(&mut index);
+            create.index(index);
         }
     }
-    for mut foreign_key in foreign_keys {
-        create.foreign_key(&mut foreign_key);
+    for foreign_key in foreign_keys {
+        create.foreign_key(foreign_key);
     }
     Ok(create.take())
 }
@@ -289,7 +289,7 @@ fn column(
                 if constraint.nulls_not_distinct {
                     index.nulls_not_distinct();
                 }
-                unique_index = Some(index.take());
+                unique_index = Some(index);
             }
             ConstrType::ConstrForeign => {
                 if foreign_key.is_some() {
@@ -366,7 +366,7 @@ fn table_constraint(
             if constraint.nulls_not_distinct {
                 index.nulls_not_distinct();
             }
-            Ok(TableConstraint::Index(Box::new(index.take())))
+            Ok(TableConstraint::Index(Box::new(index)))
         }
         ConstrType::ConstrForeign => {
             let columns = types::idents(&constraint.fk_attrs)
@@ -449,7 +449,7 @@ fn references(
     if let Some(action) = action(&constraint.fk_del_action, "DELETE", context, at)? {
         created.on_delete(action);
     }
-    Ok(created.take())
+    Ok(created)
 }
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no

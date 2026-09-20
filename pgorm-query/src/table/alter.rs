@@ -14,7 +14,7 @@ use crate::{ColumnDef, IntoColumnDef, TableForeignKey, backend::QueryBuilder, ty
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+3]
+// [spec:pgorm:req:sql.ddl.alter-table+4]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -56,8 +56,15 @@ impl PendingTableAlter {
     }
 
     /// Add a foreign key to existing table
-    pub fn add_foreign_key(self, foreign_key: &TableForeignKey) -> TableAlterStatement {
-        self.with(TableAlterOption::AddForeignKey(foreign_key.to_owned()))
+    ///
+    /// The key is consumed, as [`add_column`](Self::add_column) consumes its
+    /// column: pass an owned value, and `.to_owned()` a binding you mean to
+    /// reuse.
+    pub fn add_foreign_key<F>(self, foreign_key: F) -> TableAlterStatement
+    where
+        F: Into<TableForeignKey>,
+    {
+        self.with(TableAlterOption::AddForeignKey(foreign_key.into()))
     }
 
     /// Drop a foreign key from existing table
@@ -93,7 +100,20 @@ impl PendingTableAlter {
 ///     r#"ALTER TABLE "font" ADD COLUMN "new_col" integer NOT NULL DEFAULT 100"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+3]
+///
+/// There is no `take()`: draining the options would leave the action-less
+/// statement this type exists to rule out, so the method a reader would expect
+/// to move is absent rather than quietly copying. A second copy is
+/// `.to_owned()`.
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let mut alter = Table::alter(Font::Table).drop_column(Font::Name).to_owned();
+/// let moved: TableAlterStatement = alter.take();
+/// ```
+// [spec:pgorm:req:sql.ddl.alter-table+4]
+// [spec:pgorm:req:sql.ast+1]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: TableName,
@@ -114,7 +134,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+3]
+// [spec:pgorm:req:sql.ddl.alter-table+4]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
@@ -237,6 +257,10 @@ impl TableAlterStatement {
 
     /// Add a foreign key to existing table
     ///
+    /// The key is consumed, as [`add_column`](Self::add_column) consumes its
+    /// column: pass an owned value, and `.to_owned()` a binding you mean to
+    /// reuse.
+    ///
     /// # Examples
     ///
     /// ```
@@ -257,8 +281,8 @@ impl TableAlterStatement {
     ///     .to_owned();
     ///
     /// let table = Table::alter(Character::Table)
-    ///     .add_foreign_key(&foreign_key_char)
-    ///     .add_foreign_key(&foreign_key_font)
+    ///     .add_foreign_key(foreign_key_char)
+    ///     .add_foreign_key(foreign_key_font)
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -275,8 +299,11 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn add_foreign_key(&mut self, foreign_key: &TableForeignKey) -> &mut Self {
-        self.add_alter_option(TableAlterOption::AddForeignKey(foreign_key.to_owned()))
+    pub fn add_foreign_key<F>(&mut self, foreign_key: F) -> &mut Self
+    where
+        F: Into<TableForeignKey>,
+    {
+        self.add_alter_option(TableAlterOption::AddForeignKey(foreign_key.into()))
     }
 
     /// Drop a foreign key from existing table
@@ -311,15 +338,6 @@ impl TableAlterStatement {
     fn add_alter_option(&mut self, alter_option: TableAlterOption) -> &mut Self {
         self.options.push(alter_option);
         self
-    }
-
-    /// Clone this statement out of a builder chain.
-    ///
-    /// Unlike the other DDL builders this copies rather than moves: moving the
-    /// options out would leave an action-less `ALTER TABLE` behind, which is the
-    /// very state this type exists to rule out.
-    pub fn take(&mut self) -> Self {
-        self.clone()
     }
 }
 

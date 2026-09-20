@@ -1,6 +1,5 @@
 use crate::{
-    AnyWithClause, FunctionCall, QueryStatementBuilder, RecursiveWithClause, SubQueryStatement,
-    WindowStatement, WithClause,
+    AnyWithClause, FunctionCall, QueryStatementBuilder, SubQueryStatement, WindowStatement,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -9,9 +8,6 @@ use crate::{
     value::*,
 };
 use inherent::inherent;
-
-#[path = "select_with.rs"]
-mod select_with;
 
 /// Select rows from an existing table
 ///
@@ -35,7 +31,7 @@ mod select_with;
 /// );
 /// ```
 // [spec:pgorm:def:sql.ast.select+2]
-// [spec:pgorm:def:query.build.with]
+// [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,

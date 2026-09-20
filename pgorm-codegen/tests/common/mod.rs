@@ -195,7 +195,8 @@ pub fn fruit() -> TableCreateStatement {
                 Alias::new("id"),
             )
             .on_delete(ForeignKeyAction::Cascade)
-            .on_update(ForeignKeyAction::Cascade),
+            .on_update(ForeignKeyAction::Cascade)
+            .to_owned(),
         )
         .to_owned()
 }
@@ -231,13 +232,13 @@ pub fn cake_filling() -> TableCreateStatement {
                 .primary_key()
                 .to_owned(),
         )
-        .foreign_key(&mut ForeignKey::create(
+        .foreign_key(ForeignKey::create(
             Alias::new("cake_filling"),
             Alias::new("cake_id"),
             Alias::new("cake"),
             Alias::new("id"),
         ))
-        .foreign_key(&mut ForeignKey::create(
+        .foreign_key(ForeignKey::create(
             Alias::new("cake_filling"),
             Alias::new("filling_id"),
             Alias::new("filling"),

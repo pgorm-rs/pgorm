@@ -309,7 +309,7 @@
 //! value into the SQL as an escaped literal. What differs is whether a statement
 //! *also* has a bound rendering, and that follows from whether it binds anything:
 //!
-//! - **Query statements** — SELECT, INSERT, UPDATE, DELETE and `WithQuery` —
+//! - **Query statements** — SELECT, INSERT, UPDATE and DELETE —
 //!   bind their values. They expose `build() -> (String, Values)`, which emits
 //!   `$N` placeholders and hands back the values, plus `build_collect(sink)` for
 //!   a sink the caller owns. `build` is what you execute: the driver sends the

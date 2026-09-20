@@ -8,13 +8,13 @@ an ideal Postgres renderer would emit.
 
 ## The renderer
 
-> [spec:pgorm:def:sql.render]
+> [spec:pgorm:def:sql.render+1]
 > The SQL renderer is the unit struct `QueryBuilder` in
 > `pgorm-query/src/backend/query_builder.rs`. It is the only backend: pgorm-query
 > renders exclusively PostgreSQL-dialect SQL. `QueryBuilder` walks the statement
-> AST (`SelectStatement`, `InsertStatement`, `UpdateStatement`, `DeleteStatement`,
-> `WithQuery`, and DDL statement types) and emits SQL text into a `SqlWriter`
-> sink through `prepare_*` methods. Rendering is infallible by construction: all
+> AST (`SelectStatement`, `InsertStatement`, `UpdateStatement`, `DeleteStatement`
+> and the DDL statement types) and emits SQL text into a `SqlWriter` sink through
+> `prepare_*` methods. Rendering is infallible by construction: all
 > writes `unwrap()`, and unsupported AST shapes abort via `panic!` /
 > `unimplemented!` rather than returning errors.
 
@@ -356,11 +356,11 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+2]
+> [spec:pgorm:req:sql.render.select-order+3]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
-> through the same `prepare_with_clause` a `WithQuery` uses and therefore already
-> ending in a separating space;
+> through the same `prepare_with_clause` the three write statements use and
+> therefore already ending in a separating space;
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
@@ -440,7 +440,7 @@ an ideal Postgres renderer would emit.
 
 ## CTEs
 
-> [spec:pgorm:req:sql.render.cte+2]
+> [spec:pgorm:req:sql.render.cte+3]
 > A `WithClause` renders `WITH ` followed by its comma-separated common table
 > expressions; a `RecursiveWithClause` renders `WITH RECURSIVE ` followed by the
 > single one it holds. Each CTE renders as: quoted table name; optional
@@ -454,17 +454,20 @@ an ideal Postgres renderer would emit.
 > unrepresentable per `sql.ast.with` and `sql.ast.with.recursive` — so it
 > carries no assertion and MUST NOT panic on a caller-built clause.
 >
-> The same `prepare_with_clause` serves both ways a clause reaches the sink: as
-> the prefix a `SelectStatement` renders for its own carried clause
-> (`sql.render.select-order`), and as the prefix of a `WithQuery`, whose attached
-> statement is an INSERT, UPDATE or DELETE (`query.build.with.single`) reached
-> through `SubQueryStatement`. The two are the same bytes, so a CTE query reads
-> identically whichever route built it.
+> One `prepare_with_clause` serves every statement that can carry a clause: it
+> is called from `prepare_select_statement` (`sql.render.select-order`),
+> `prepare_insert_statement` (`sql.render.insert`) and the UPDATE and DELETE
+> halves of `sql.render.update-delete`, each for that statement's own carried
+> clause and always as the first thing written. There is no second rendering
+> path — no wrapper statement to prefix (`query.build.with.single`) — so a CTE
+> query reads identically whichever statement it prefixes and at whatever
+> nesting level `SubQueryStatement` places it.
 
 ## INSERT / UPDATE / DELETE
 
-> [spec:pgorm:req:sql.render.insert]
-> `prepare_insert_statement` MUST render: `INSERT` (or `REPLACE` when the
+> [spec:pgorm:req:sql.render.insert+1]
+> `prepare_insert_statement` MUST render: the statement's carried WITH clause
+> when it has one (`sql.render.cte`), then `INSERT` (or `REPLACE` when the
 > statement's replace flag is set — kept from the MySQL-era API even though
 > PostgreSQL has no such statement), ` INTO ` and the table; then either the
 > default-values form or the explicit form. The default-values form (used when
@@ -503,10 +506,11 @@ an ideal Postgres renderer would emit.
 > expressions. There is no pre-source emission point: PostgreSQL spells the
 > returned rows in exactly one position, so the renderer has exactly one.
 
-> [spec:pgorm:req:sql.render.update-delete+1]
-> `UPDATE ` renders the table, ` SET ` with comma-separated `"col" = expr`
-> assignments, then WHERE and RETURNING. `DELETE ` renders `FROM ` and the
-> table, then WHERE and RETURNING. Neither renders ORDER BY or LIMIT:
+> [spec:pgorm:req:sql.render.update-delete+2]
+> Each half MUST open with the statement's carried WITH clause when it has one
+> (`sql.render.cte`). `UPDATE ` then renders the table, ` SET ` with
+> comma-separated `"col" = expr` assignments, then WHERE and RETURNING.
+> `DELETE ` renders `FROM ` and the table, then WHERE and RETURNING. Neither renders ORDER BY or LIMIT:
 > PostgreSQL accepts neither on a write statement, and per `sql.ast.update`
 > and `sql.ast.delete` the two statements hold nothing to render them from, so
 > the renderer has no invalid clause to guard against. Row selection that needs

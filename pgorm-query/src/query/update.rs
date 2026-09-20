@@ -1,5 +1,5 @@
 use crate::{
-    AnyWithClause, QueryStatementBuilder, ReturningClause, SubQueryStatement, WithQuery,
+    AnyWithClause, QueryStatementBuilder, ReturningClause, SubQueryStatement,
     backend::QueryBuilder, expr::*, prepare::*, query::condition::*, types::*, value::*,
 };
 use inherent::inherent;
@@ -70,9 +70,11 @@ use inherent::inherent;
 ///     r#"UPDATE "glyph" SET "aspect" = 1 WHERE "id" IN (SELECT "id" FROM "glyph" ORDER BY "id" ASC LIMIT 1)"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ast.update+2]
+// [spec:pgorm:req:sql.ast.update+3]
+// [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
+    pub(crate) with: Option<Box<AnyWithClause>>,
     pub(crate) table: Option<NamedTable>,
     pub(crate) values: Vec<(DynIden, Box<SimpleExpr>)>,
     pub(crate) r#where: ConditionHolder,
@@ -107,7 +109,7 @@ impl UpdateStatement {
     /// # Examples
     ///
     /// See [`UpdateStatement::values`]
-    // [spec:pgorm:req:sql.ast.update+2]
+    // [spec:pgorm:req:sql.ast.update+3]
     #[allow(clippy::wrong_self_convention)]
     pub fn table<T>(&mut self, tbl_ref: T) -> &mut Self
     where
@@ -137,7 +139,7 @@ impl UpdateStatement {
     ///     r#"UPDATE "glyph" SET "aspect" = 2.1345, "image" = '235m'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.update+2]
+    // [spec:pgorm:req:sql.ast.update+3]
     pub fn values<T, I>(&mut self, values: I) -> &mut Self
     where
         T: IntoIden,
@@ -251,43 +253,6 @@ impl UpdateStatement {
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
         self.returning(ReturningClause::All)
-    }
-
-    /// Create a [WithQuery] by specifying a with clause to execute this query with. The clause is
-    /// either a [`WithClause`](crate::WithClause) or a
-    /// [`RecursiveWithClause`](crate::RecursiveWithClause).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, IntoCondition, IntoIden, tests_cfg::*};
-    ///
-    /// let select = SelectStatement::new()
-    ///         .columns([Glyph::Id])
-    ///         .from(Glyph::Table)
-    ///         .and_where(Expr::col(Glyph::Image).like("0%"))
-    ///         .to_owned();
-    ///     let cte = CommonTableExpression::new(Alias::new("cte"), select)
-    ///         .column(Glyph::Id)
-    ///         .to_owned();
-    ///     let with_clause = WithClause::new(cte);
-    ///     let update = UpdateStatement::new()
-    ///         .table(Glyph::Table)
-    ///         .and_where(Expr::col(Glyph::Id).in_subquery(SelectStatement::new().column(Glyph::Id).from(Alias::new("cte")).to_owned()))
-    ///         .value(Glyph::Aspect, Expr::cust("60 * 24 * 24"))
-    ///         .to_owned();
-    ///     let query = update.with(with_clause);
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph" WHERE "image" LIKE '0%') UPDATE "glyph" SET "aspect" = 60 * 24 * 24 WHERE "id" IN (SELECT "id" FROM "cte")"#
-    /// );
-    /// ```
-    pub fn with<C>(self, clause: C) -> WithQuery
-    where
-        C: Into<AnyWithClause>,
-    {
-        WithQuery::new(clause, self)
     }
 
     /// Get column values

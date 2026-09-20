@@ -44,12 +44,13 @@ fn programs() -> BTreeMap<&'static str, String> {
             a("amount"),
             ColumnType::Decimal(Some((12, 3))),
         ))
-        .primary_key(&mut Index::create(table.clone(), a("id \"x\"")))
+        .primary_key(Index::create(table.clone(), a("id \"x\"")))
         .index(
             Index::create(table.clone(), a("name"))
                 .name(a("unique \"x\""))
                 .unique()
-                .nulls_not_distinct(),
+                .nulls_not_distinct()
+                .to_owned(),
         )
         .check(Expr::col(a("id \"x\"")).gt(0i64))
         .if_not_exists()

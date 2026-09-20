@@ -124,9 +124,9 @@ struct PriceBracket {
     cakes: i64,
 }
 
-// [spec:pgorm:def:query.build.with/test]    a recursive CTE drives the query and the rows land in a
+// [spec:pgorm:def:query.build.with+1/test]    a recursive CTE drives the query and the rows land in a
 // `FromQueryResult` struct through every terminal the ORM owns
-// [spec:pgorm:sem:query.build.with.attach/test]
+// [spec:pgorm:sem:query.build.with.attach+1/test]
 // [spec:pgorm:sem:exec.crud.selector-entry+1/test]
 // [spec:pgorm:sem:sql.render.placeholder-typing/test]    the anchor's cast is what makes the
 // recursion typecheck at all
@@ -144,6 +144,7 @@ pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
             .order_by((bracket, lo), Order::Asc)
             .to_owned()
             .with(price_brackets())
+            .to_owned()
     };
 
     let all = Selector::<SelectModel<PriceBracket>>::from_select::<PriceBracket>(ascending())
@@ -170,7 +171,8 @@ pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
             )
             .order_by((bracket, lo), Order::Asc)
             .to_owned()
-            .with(price_brackets()),
+            .with(price_brackets())
+            .to_owned(),
     )
     .one(&db)
     .await?;
@@ -219,7 +221,8 @@ pub async fn recursive_cte_anchor_needs_a_cast() -> Result<(), Error> {
             CommonTableExpression::new(bracket, anchor.union(UnionType::All, step).to_owned())
                 .columns([lo_col])
                 .to_owned(),
-        ));
+        ))
+        .to_owned();
 
     let refused = Selector::<SelectGetableTuple<(i32,)>>::into_tuple::<(i32,)>(uncast)
         .all(&db)
@@ -236,7 +239,7 @@ pub async fn recursive_cte_anchor_needs_a_cast() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.with.attach/test]    a CTE joined into an entity's own query leaves
+// [spec:pgorm:sem:query.build.with.attach+1/test]    a CTE joined into an entity's own query leaves
 // the builder a `Select<E>`, so filters, ordering and the `E::Model` terminals all still apply
 // [spec:pgorm:sem:query.build.lateral/test]
 #[pgorm_macros::test]
@@ -271,7 +274,7 @@ pub async fn cte_joins_into_entity_find() -> Result<(), Error> {
         .to_owned();
 
     let bakeries = Bakery::find()
-        .with_cte(WithClause::new(cte))
+        .with(WithClause::new(cte))
         .join_lateral_on_true(JoinType::InnerJoin, dearest, alias("m"))
         .filter(bakery::Column::Name.like("B%"))
         .order_by_asc(bakery::Column::Id)
@@ -488,7 +491,7 @@ fn sorted_names(cakes: &[cake::Model]) -> Vec<String> {
 
 // [spec:pgorm:sem:exec.crud.selector-entry+1/test]    the new constructor is a `Selector`, so it
 // inherits the empty-projection guard rather than sending `SELECT  FROM …`
-// [spec:pgorm:sem:query.build.modifiers+7/test]
+// [spec:pgorm:sem:query.build.modifiers+8/test]
 #[pgorm_macros::test]
 pub async fn from_select_guards_an_empty_projection() -> Result<(), Error> {
     let ctx = TestContext::new("from_select_guards_an_empty_projection").await;

@@ -19,7 +19,8 @@ impl MigrationTrait for Migration {
             .col(ColumnDef::new(Fruit::CakeId).integer().not_null())
             .foreign_key(
                 ForeignKey::create(Fruit::Table, Fruit::CakeId, Cake::Table, Cake::Id)
-                    .name("fk-fruit-cake_id"),
+                    .name("fk-fruit-cake_id")
+                    .to_owned(),
             )
             .to_owned();
         tx.execute(&table.to_string(), &[]).await?;

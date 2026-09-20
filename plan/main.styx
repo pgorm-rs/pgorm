@@ -7743,6 +7743,13 @@ children (
                         kind @note
                         text "take() drains via mem::take on SelectStatement (query/select.rs:116-133), WindowStatement, TableIndex, TableCreateStatement — but IndexCreateStatement::take is self.clone() (index/create.rs:273-275, name promises a move), ForeignKeyCreateStatement::take half-drains (foreign_key/common.rs:130-140), and Insert/Update/Delete have no take() so every doc example clones with .to_owned(). Embedding into TableCreateStatement happens four different ways: .col() consumes by value (create.rs:102), .index(&mut) silently clones (:119-124, because that take is a clone), .foreign_key(&mut) silently drains the argument (:164-169), PendingTableAlter::add_foreign_key(&) borrows-and-clones (table/alter.rs:59-61) — reuse the argument after the call and you get three different outcomes. .with() diverges too: Select carries the clause and stays buildable (select_with.rs:65-71) while Insert/Update/Delete return WithQuery and end the builder (insert.rs:399-404, update.rs:286-289, delete.rs:226-229), with with_cte(&mut) as a third receiver convention. Standard to enforce: embedders take impl IntoX by value (the IntoColumnDef pattern, table/column.rs:742-752); take() drains or doesn't exist; with composes the way Select's does."
                     }
+
+                    {
+                        at 2026-09-20T12:16:18.005329Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

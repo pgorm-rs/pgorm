@@ -21,7 +21,7 @@ macro_rules! truncate_to_microsecond {
     };
 }
 
-// [spec:pgorm:def:sql.render]
+// [spec:pgorm:def:sql.render+1]
 // [spec:pgorm:req:sql.render.oracle] (the renderer whose every output the oracle in
 // pgorm-query/tests/postgres/oracle.rs holds to the libpg_query grammar)
 #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+2] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+3] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -79,12 +79,17 @@ impl QueryBuilder {
     }
 
     /// Translate [`InsertStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.insert]
+    // [spec:pgorm:req:sql.render.insert+1]
+    // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_insert_statement(
         &self,
         insert: &InsertStatement,
         sql: &mut dyn SqlWriter,
     ) {
+        if let Some(with_clause) = &insert.with {
+            self.prepare_with_clause(with_clause, sql);
+        }
+
         write!(sql, "INSERT").unwrap();
 
         if let Some(table) = &insert.table {
@@ -161,8 +166,8 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+2]
-    // [spec:pgorm:sem:query.build.with.attach]
+    // [spec:pgorm:req:sql.render.select-order+3]
+    // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_select_statement(
         &self,
         select: &SelectStatement,
@@ -270,12 +275,17 @@ impl QueryBuilder {
     }
 
     /// Translate [`UpdateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete+1] (UPDATE half)
+    // [spec:pgorm:req:sql.render.update-delete+2] (UPDATE half)
+    // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_update_statement(
         &self,
         update: &UpdateStatement,
         sql: &mut dyn SqlWriter,
     ) {
+        if let Some(with_clause) = &update.with {
+            self.prepare_with_clause(with_clause, sql);
+        }
+
         write!(sql, "UPDATE ").unwrap();
 
         if let Some(table) = &update.table {
@@ -301,12 +311,17 @@ impl QueryBuilder {
     }
 
     /// Translate [`DeleteStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.update-delete+1] (DELETE half)
+    // [spec:pgorm:req:sql.render.update-delete+2] (DELETE half)
+    // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_delete_statement(
         &self,
         delete: &DeleteStatement,
         sql: &mut dyn SqlWriter,
     ) {
+        if let Some(with_clause) = &delete.with {
+            self.prepare_with_clause(with_clause, sql);
+        }
+
         write!(sql, "DELETE ").unwrap();
 
         if let Some(table) = &delete.table {
@@ -737,12 +752,7 @@ impl QueryBuilder {
         write!(sql, ")").unwrap();
     }
 
-    pub(crate) fn prepare_with_query(&self, query: &WithQuery, sql: &mut dyn SqlWriter) {
-        self.prepare_with_clause(&query.with_clause, sql);
-        query.query.prepare_statement(sql);
-    }
-
-    // [spec:pgorm:req:sql.render.cte+2]
+    // [spec:pgorm:req:sql.render.cte+3]
     pub(crate) fn prepare_with_clause(&self, with_clause: &AnyWithClause, sql: &mut dyn SqlWriter) {
         match with_clause {
             AnyWithClause::Plain(plain) => {
@@ -1472,7 +1482,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+3]
+    // [spec:pgorm:req:sql.ddl.alter-table+4]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1600,7 +1610,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+3]
+    // [spec:pgorm:req:sql.ddl.alter-table+4]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1615,7 +1625,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+6]
+    // [spec:pgorm:req:sql.ddl.create-table+7]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1829,7 +1839,7 @@ impl QueryBuilder {
         self.prepare_index_columns(&create.index.columns, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+6]
+    // [spec:pgorm:req:sql.ddl.index-create+7]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -1926,7 +1936,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+3]
+    // [spec:pgorm:req:sql.ddl.foreign-key+4]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -1938,7 +1948,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+3]
+    // [spec:pgorm:req:sql.ddl.foreign-key+4]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2385,7 +2395,6 @@ impl SubQueryStatement {
             InsertStatement(stmt) => QueryBuilder.prepare_insert_statement(stmt, sql),
             UpdateStatement(stmt) => QueryBuilder.prepare_update_statement(stmt, sql),
             DeleteStatement(stmt) => QueryBuilder.prepare_delete_statement(stmt, sql),
-            WithStatement(stmt) => QueryBuilder.prepare_with_query(stmt, sql),
         }
     }
 }

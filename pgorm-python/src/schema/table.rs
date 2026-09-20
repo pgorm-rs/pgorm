@@ -56,7 +56,7 @@ impl PyCreateTable {
             key.col(PyIdentifier::new(&column)?.alias());
         }
         let mut inner = self.inner.clone();
-        inner.primary_key(&mut key);
+        inner.primary_key(key);
         Ok(Self { inner })
     }
 
@@ -83,7 +83,7 @@ impl PyCreateTable {
             key.nulls_not_distinct();
         }
         let mut inner = self.inner.clone();
-        inner.index(&mut key);
+        inner.index(key);
         Ok(Self { inner })
     }
 

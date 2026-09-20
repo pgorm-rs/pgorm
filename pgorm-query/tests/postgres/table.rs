@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+6/test]
+// [spec:pgorm:req:sql.ddl.create-table+7/test]
 // [spec:pgorm:req:sql.ddl.column-def+4/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+4/test]
@@ -82,6 +82,7 @@ fn create_3() {
                     .name("FK_2e303c3a712662f1fc2a4d0aad6")
                     .on_delete(ForeignKeyAction::Cascade)
                     .on_update(ForeignKeyAction::Cascade)
+                    .to_owned()
             )
             .to_string(),
         [
@@ -293,6 +294,7 @@ fn create_15() {
                     .nulls_not_distinct()
                     .name("idx-glyph-aspect-image")
                     .col(Glyph::Image)
+                    .to_owned()
             )
             .to_string(),
         [
@@ -345,7 +347,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+3/test]
+// [spec:pgorm:req:sql.ddl.alter-table+4/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -361,7 +363,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+3/test]
+// [spec:pgorm:req:sql.ddl.alter-table+4/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -413,7 +415,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+3/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+4/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -560,10 +562,10 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+6/test]
+// [spec:pgorm:req:sql.ddl.create-table+7/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
-    let table = |index: &mut IndexCreateStatement| {
+    let table = |index: IndexCreateStatement| {
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer().not_null())
             .col(ColumnDef::new(Glyph::Image).string().not_null())
@@ -585,24 +587,36 @@ fn embedded_index_is_the_only_primary_key_spelling() {
             .to_owned()
     };
 
-    assert_eq!(table(&mut index()), expected);
-    assert_eq!(table(index().primary()), expected);
-    assert_eq!(table(index().unique()), expected);
+    assert_eq!(table(index()), expected);
+    assert_eq!(table(index().primary().to_owned()), expected);
+    assert_eq!(table(index().unique().to_owned()), expected);
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+3/test]    take copies, so the source keeps its actions
+// [spec:pgorm:req:sql.ddl.alter-table+4/test]    a foreign key embeds by value, so the source
+// survives only where the call site cloned it
 #[test]
-fn alter_take_leaves_the_source_whole() {
-    let mut alter = Table::alter(Font::Table).drop_column(Font::Name);
-    let taken = alter.take();
+fn alter_embeds_its_foreign_key_by_value() {
+    let key = TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id)
+        .name("fk-character-font_id")
+        .to_owned();
 
     assert_eq!(
-        taken.to_string(),
-        r#"ALTER TABLE "font" DROP COLUMN "name""#
+        Table::alter(Char::Table)
+            .add_foreign_key(key.clone())
+            .to_string(),
+        [
+            r#"ALTER TABLE "character" ADD CONSTRAINT "fk-character-font_id""#,
+            r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
+        ]
+        .join(" ")
     );
     assert_eq!(
-        alter.to_string(),
-        r#"ALTER TABLE "font" DROP COLUMN "name""#
+        Table::alter(Char::Table).add_foreign_key(key).to_string(),
+        [
+            r#"ALTER TABLE "character" ADD CONSTRAINT "fk-character-font_id""#,
+            r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
+        ]
+        .join(" ")
     );
 }
 

@@ -13,7 +13,7 @@ use crate::types::*;
 /// referencing and referenced sides cannot disagree in length — a mismatch the
 /// grammar accepts and parse analysis rejects, and so one no parser oracle can
 /// catch. Further pairs are appended with [`TableForeignKey::col`].
-// [spec:pgorm:req:sql.ddl.foreign-key+3]
+// [spec:pgorm:req:sql.ddl.foreign-key+4]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<DynIden>,
@@ -120,22 +120,5 @@ impl TableForeignKey {
 
     pub fn get_on_update(&self) -> Option<ForeignKeyAction> {
         self.on_update
-    }
-
-    /// Clone this key out of a builder chain.
-    ///
-    /// The tables and the first pair are copied rather than moved: moving them
-    /// out would leave the targetless, column-less key this type exists to rule
-    /// out.
-    pub fn take(&mut self) -> Self {
-        Self {
-            name: self.name.take(),
-            table: self.table.clone(),
-            ref_table: self.ref_table.clone(),
-            first: self.first.clone(),
-            rest: std::mem::take(&mut self.rest),
-            on_delete: self.on_delete.take(),
-            on_update: self.on_update.take(),
-        }
     }
 }

@@ -14,7 +14,7 @@ fn base() -> SelectStatement {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the select clause vocabulary
-// [spec:pgorm:req:sql.render.select-order+2/test]
+// [spec:pgorm:req:sql.render.select-order+3/test]
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([
@@ -249,7 +249,7 @@ fn sweep_union_and_locking_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    common table expressions
-// [spec:pgorm:req:sql.render.cte+2/test]
+// [spec:pgorm:req:sql.render.cte+3/test]
 #[test]
 fn sweep_cte_shapes() {
     let named = |name: &str| {
@@ -330,7 +330,7 @@ fn sweep_window_function_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    INSERT, including ON CONFLICT and RETURNING
-// [spec:pgorm:req:sql.render.insert/test]
+// [spec:pgorm:req:sql.render.insert+1/test]
 // [spec:pgorm:req:sql.render.on-conflict+1/test]
 // [spec:pgorm:req:sql.render.returning+1/test]
 #[test]
@@ -385,7 +385,7 @@ fn sweep_insert_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    UPDATE and DELETE
-// [spec:pgorm:req:sql.render.update-delete+1/test]
+// [spec:pgorm:req:sql.render.update-delete+2/test]
 #[test]
 fn sweep_update_and_delete_shapes() {
     sweep([
@@ -412,7 +412,7 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+6/test]
+// [spec:pgorm:req:sql.ddl.create-table+7/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -433,15 +433,15 @@ fn sweep_table_ddl_shapes() {
                     .check(Expr::col(Glyph::Aspect).gt(0)),
             )
             .index(
-                &mut Index::create(Glyph::Table, Glyph::Id)
+                Index::create(Glyph::Table, Glyph::Id)
                     .name("glyph_pk")
                     .primary()
-                    .take(),
+                    .to_owned(),
             )
             .foreign_key(
-                &mut ForeignKey::create(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
+                ForeignKey::create(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
                     .on_delete(ForeignKeyAction::Cascade)
-                    .take(),
+                    .to_owned(),
             )
             .to_string(),
         Table::create(Glyph::Table)
@@ -478,7 +478,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+6/test]
+// [spec:pgorm:req:sql.ddl.index-create+7/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([
