@@ -834,7 +834,7 @@ assertions (
     {id query-verbs-keep-promises, kind @complete, author "brendan@necessary.nu", at 2026-09-20T13:13:26.404952Z}
     {id query-raw-template-words, kind @complete, author "brendan@necessary.nu", at 2026-09-20T13:42:46.717906Z}
     {id query-name-vocabulary, kind @complete, author "brendan@necessary.nu", at 2026-09-20T15:57:48.442505Z}
-    {id query-raw-relation, kind @doing, author "brendan@necessary.nu", at 2026-09-20T17:01:55.523093Z}
+    {id query-raw-relation, kind @complete, author "brendan@necessary.nu", at 2026-09-20T17:54:31.968723Z}
 )
 
 impl_evidence (
